@@ -49,20 +49,161 @@ describe("consumer census (#2303)", () => {
 
   const FACTORIES = [...new Set(Object.values(FACTORY_BY_TYPE))];
 
-  /**
-   * Members that hand back an object, so the census can walk one level down.
-   * ⚑ This is where the #2255 and #1932 doors actually live: `printedQueryNames`
-   * is a member of `port()`, not of any named surface.
-   */
-  const RETURNS_OBJECT = new Set([
-    "port",
-    "routeGetStore",
-    "dependenciesGetStore",
-    "getTree",
-    "getOptions",
-    "getCloneState",
-    "getAdoptedOrigins",
+  /** Where each surface's interface is declared, for the derivation below. */
+  const SURFACE_DECL: readonly [file: string, iface: string][] = [
+    ["src/internals.ts", "RouterInternals"],
+    ["src/types/api.ts", "PluginApi"],
+    ["src/types/api.ts", "RoutesApi"],
+    ["src/types/api.ts", "DependenciesApi"],
+    ["src/types/api.ts", "LifecycleApi"],
+    ["src/types/router.ts", "Navigator"],
+  ];
+
+  /** A type that cannot carry members, so nothing is one level down from it. */
+  const FLAT = new Set([
+    ts.SyntaxKind.StringKeyword,
+    ts.SyntaxKind.NumberKeyword,
+    ts.SyntaxKind.BooleanKeyword,
+    ts.SyntaxKind.VoidKeyword,
+    ts.SyntaxKind.UndefinedKeyword,
+    ts.SyntaxKind.NeverKeyword,
+    ts.SyntaxKind.SymbolKeyword,
+    ts.SyntaxKind.AnyKeyword,
+    ts.SyntaxKind.UnknownKeyword,
   ]);
+
+  /**
+   * Members whose value can carry members of its own — the set the census walks
+   * one level down.
+   *
+   * ⚑ **Derived from the DECLARATIONS, and it has to be.** The live-value form
+   * is unsafe here: `RouterInternals.start` is a zero-argument member, so a
+   * derivation that called each member to see what comes back would start the
+   * router. Reading the types answers the same question without running
+   * anything.
+   *
+   * ⚠ **`null` on a bare router is not "flat".** `validator` and
+   * `hydrationState` are empty until a plugin fills them, and the shipped reach
+   * this census exists to find — `ctx.validator.options.validateOptions(…)` —
+   * happens on exactly those. The declaration is what decides; the value on an
+   * unconfigured router is not evidence.
+   */
+  /**
+   * Type aliases whose right-hand side is a FUNCTION — derived, because a member
+   * handing one back has nothing one level down. `addEventListener` returns
+   * `Unsubscribe`, and without this the walk counts
+   * `ctx.addEventListener.bind(ctx)` as a reach into a door.
+   */
+  const functionAliases = (): Set<string> => {
+    const out = new Set<string>();
+
+    for (const file of globSync("src/types/*.ts", {
+      cwd: path.join(ROOT, "packages/core"),
+    })) {
+      const source = ts.createSourceFile(
+        file,
+        readFileSync(path.join(ROOT, "packages/core", file), "utf8"),
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS,
+      );
+
+      const visit = (node: ts.Node): void => {
+        if (
+          ts.isTypeAliasDeclaration(node) &&
+          ts.isFunctionTypeNode(node.type)
+        ) {
+          out.add(node.name.text);
+        }
+
+        ts.forEachChild(node, visit);
+      };
+
+      visit(source);
+    }
+
+    return out;
+  };
+
+  /**
+   * Can a value of this type carry members of its own?
+   *
+   * ⚠ **An ARRAY answers no, and that is a classification rather than a live
+   * filter.** It removes exactly one member — `RouterInternals.routerExtensions`
+   * (`{ keys: string[] }[]`) — which #2343 item 4 names among the six the old
+   * hand list hid. Measured: deleting this arm leaves every cell GREEN, because
+   * nothing outside core reaches into that array today. It is kept for the shape
+   * the function arm below was added for: the next access off an array is
+   * `length` or `map`, which is `Array.prototype`, not a door.
+   */
+  const carries = (
+    type: ts.TypeNode | undefined,
+    flatAliases: ReadonlySet<string>,
+  ): boolean => {
+    if (!type) {
+      return false;
+    }
+
+    if (ts.isFunctionTypeNode(type)) {
+      return carries(type.type, flatAliases);
+    }
+
+    if (ts.isUnionTypeNode(type)) {
+      return type.types.some((one) => carries(one, flatAliases));
+    }
+
+    if (ts.isArrayTypeNode(type) || ts.isLiteralTypeNode(type)) {
+      return false;
+    }
+
+    if (
+      ts.isTypeReferenceNode(type) &&
+      ts.isIdentifier(type.typeName) &&
+      flatAliases.has(type.typeName.text)
+    ) {
+      return false;
+    }
+
+    return !FLAT.has(type.kind);
+  };
+
+  const objectValuedMembers = (): Set<string> => {
+    const out = new Set<string>();
+    const flatAliases = functionAliases();
+
+    for (const [file, iface] of SURFACE_DECL) {
+      const source = ts.createSourceFile(
+        file,
+        readFileSync(path.join(ROOT, "packages/core", file), "utf8"),
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS,
+      );
+
+      const visit = (node: ts.Node): void => {
+        if (ts.isInterfaceDeclaration(node) && node.name.text === iface) {
+          for (const member of node.members) {
+            const declared =
+              ts.isPropertySignature(member) || ts.isMethodSignature(member)
+                ? member.type
+                : undefined;
+
+            if (member.name && carries(declared, flatAliases)) {
+              out.add(member.name.getText());
+            }
+          }
+        }
+
+        ts.forEachChild(node, visit);
+      };
+
+      visit(source);
+    }
+
+    return out;
+  };
+
+  const RETURNS_OBJECT = objectValuedMembers();
 
   interface Reached {
     src: Set<string>;
@@ -273,6 +414,20 @@ describe("consumer census (#2303)", () => {
         if (ts.isIdentifier(target) && aliasDown.has(target.text)) {
           secondBucket(aliasDown.get(target.text)!)[bucket].add(node.name.text);
         }
+
+        // chained through a PROPERTY: `ctx.validator.options`. The key keeps the
+        // shape — `<factory>.<member>` without parentheses — because a property
+        // and a call are different doors even when they hand back the same kind
+        // of object.
+        if (ts.isPropertyAccessExpression(target)) {
+          const owner = ownerOf(target);
+
+          if (owner) {
+            secondBucket(`${owner}.${target.name.text}`)[bucket].add(
+              node.name.text,
+            );
+          }
+        }
       };
 
       const walk = (node: ts.Node): void => {
@@ -413,17 +568,50 @@ describe("consumer census (#2303)", () => {
     // ⚠ The control for this cell is the presence of `getOptions()`, not the
     // absence of `port()`: a derivation that never walked down would report both
     // as empty and read as "nothing reaches the second level".
+    //
+    // ⚠ **What this walk still cannot see, recorded rather than left to read as
+    // absence (#2343).** It is syntactic: it follows a value while the value
+    // stays in the expression. A value that LEAVES — passed whole into a
+    // function — is invisible on the far side, and two shipped channels do
+    // exactly that with the route store. `validationPlugin` hands
+    // `ctx.routeGetStore()` to `validators/retrospective.ts`, whose functions
+    // take `store: unknown` and read `definitions` / `config` / `tree` there;
+    // and core itself passes the live store to validator methods as an
+    // ARGUMENT, so those reads never pass through `routeGetStore()` in the
+    // plugin at all. `routeGetStore`'s empty `src` therefore means "no reach
+    // this instrument can see", not "no reach" — #2339 §4 question 4 owns that
+    // channel and prices closing it.
     expect(rows).toStrictEqual({
+      "getInternals.getCloneState()": { src: [], tests: ["limits"] },
       "getInternals.getOptions()": {
         src: ["defaultRoute", "limits"],
         tests: ["queryParams"],
       },
-      "getPluginApi.getOptions()": { src: ["allowNotFound"], tests: [] },
       "getInternals.routeGetStore()": {
         src: [],
         tests: ["config", "matcher", "matcherOptions", "tree"],
       },
-      "getInternals.getCloneState()": { src: [], tests: ["limits"] },
+      "getInternals.validator": { src: ["options"], tests: ["dependencies"] },
+      "getNavigator.getState()": { src: [], tests: ["name"] },
+      "getPluginApi.buildNavigationState()": {
+        src: ["name", "params", "path", "search"],
+        tests: ["name"],
+      },
+      "getPluginApi.claimContextNamespace()": {
+        src: ["release", "write"],
+        tests: ["release", "write"],
+      },
+      "getPluginApi.forwardState()": {
+        src: ["name", "params", "search"],
+        tests: ["name"],
+      },
+      "getPluginApi.getOptions()": { src: ["allowNotFound"], tests: [] },
+      "getPluginApi.makeState()": {
+        src: [],
+        tests: ["name", "params", "path"],
+      },
+      "getPluginApi.matchPath()": { src: [], tests: ["params", "search"] },
+      "getRoutesApi.get()": { src: [], tests: ["forwardTo"] },
     });
   });
 
