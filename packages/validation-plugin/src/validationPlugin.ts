@@ -414,6 +414,24 @@ export function validationPlugin<
       );
     }
 
+    // ⚑ One router, one validator (#2349). `RouterInternals.validator` is a
+    // single slot and `teardown` clears it, so with two installs either
+    // teardown leaves a registered plugin whose validator no longer answers.
+    // The refusal keeps that state unrepresentable; a tally of installs only
+    // models an ownership the slot does not grant.
+    //
+    // ⚠ A CLONE needs no install of its own: `cloneRouter` re-runs plugin
+    // factories by contract, which is what the message points at.
+    if (ctx.validator !== null) {
+      throw freezeThrownError(
+        new RouterError("VALIDATION_PLUGIN_ALREADY_INSTALLED", {
+          message:
+            "validation-plugin is already installed on this router — " +
+            "a clone re-runs plugin factories, so it needs no usePlugin of its own",
+        }),
+      );
+    }
+
     // RouterInternals.validator is now mutable — direct assignment works
     const defaultsWatch = new DefaultsMutationWatch();
 

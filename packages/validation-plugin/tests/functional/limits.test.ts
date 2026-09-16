@@ -283,15 +283,17 @@ describe("core/limits — with validationPlugin", () => {
       }).not.toThrow();
     });
 
-    it("should preserve limits in cloned router (with separate plugin registration)", () => {
+    it("should preserve limits in cloned router (the replayed plugin counts)", () => {
       router = createRouter([], { limits: { maxPlugins: 4 } });
       router.usePlugin(validationPlugin());
 
       const cloned = cloneRouter(router);
 
-      cloned.usePlugin(validationPlugin());
-
+      // ⚑ The clone starts at ONE plugin, not zero: `cloneRouter` re-runs the
+      // base's factories, and since #2349 installing the validation plugin
+      // again is refused rather than counted twice.
       expect(() => {
+        cloned.usePlugin(() => ({}));
         cloned.usePlugin(() => ({}));
         cloned.usePlugin(() => ({}));
       }).not.toThrow();

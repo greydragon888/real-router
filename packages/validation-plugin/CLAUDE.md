@@ -50,6 +50,26 @@ parameter from the start.
 
 `validationPlugin()` must be registered before `router.start()`. Registering after start throws `RouterError("VALIDATION_PLUGIN_AFTER_START")`. That error is **frozen** (#1964), like every `RouterError` core throws — annotate a copy, not the instance you caught. This is enforced because the retrospective pass needs to run before the router begins navigating.
 
+### One router, one validator (#2349)
+
+A registration that finds `ctx.validator` already occupied throws
+`RouterError("VALIDATION_PLUGIN_ALREADY_INSTALLED")`. The slot holds one
+validator and `teardown` clears it, so two installations give the router a
+teardown that switches validation off while a plugin is still registered —
+whichever of the two runs first, and regardless of which installation it
+belongs to.
+
+⚠ **A clone needs no installation of its own.** `cloneRouter` re-runs the base's
+plugin factories, so a clone arrives validated; calling `usePlugin` on it is the
+shape this refuses, and the message says so. The SSR per-request clone is the
+common case.
+
+⚠ **The refusal reads the SLOT, not a tally of installations.** A counter would
+model an ownership the slot does not grant — `validator` is one of two writable
+members on an otherwise `readonly` `RouterInternals`, open to anything importing
+`@real-router/core/validation`. Reading the slot also keeps re-registration after
+`teardown()` working, which the two diagnostic de-dup tests depend on.
+
 ### `undefined` path is allowed in `validateStartArgs`
 
 `validateStartArgs(undefined)` does not throw. This is intentional: the facade calls `validateStartArgs(startPath)` **before** the interceptor pipeline runs. `browser-plugin` injects `window.location` via `addInterceptor("start", ...)`, which wraps the internal `start()` call — **after** facade validation. If `undefined` were rejected, `router.start()` without an argument would fail when `browser-plugin` is installed.

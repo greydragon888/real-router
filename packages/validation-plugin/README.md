@@ -89,6 +89,32 @@ await router.start();
 router.usePlugin(validationPlugin()); // too late
 ```
 
+Throws `RouterError("VALIDATION_PLUGIN_ALREADY_INSTALLED")` if the router
+already carries a validator. One router holds one — with two installations, the
+first `teardown` to run switches validation off while a plugin is still
+registered.
+
+```typescript
+const remove = router.usePlugin(validationPlugin());
+
+// Throws VALIDATION_PLUGIN_ALREADY_INSTALLED
+router.usePlugin(validationPlugin());
+
+// Fine — the slot is empty again after teardown
+remove();
+router.usePlugin(validationPlugin());
+```
+
+A clone needs no registration of its own: `cloneRouter` re-runs the base's
+plugin factories, so the per-request clone an SSR scope creates arrives
+validated, and a `usePlugin` on it is refused for the same reason.
+
+```typescript
+router.usePlugin(validationPlugin());
+
+const perRequest = cloneRouter(router); // already validated
+```
+
 ### `RouterValidator` type
 
 ```typescript
