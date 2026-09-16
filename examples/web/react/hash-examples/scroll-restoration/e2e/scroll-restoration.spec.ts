@@ -164,8 +164,8 @@ test.describe("Scenario 4: replace is no-op for scroll", () => {
     const store: Record<string, number> = await page.evaluate(() =>
       JSON.parse(sessionStorage.getItem("real-router:scroll") ?? "{}"),
     );
-    expect(store['articles.article:{"id":"1"}']).toBeGreaterThan(1480);
-    expect(store['articles.article:{"id":"2"}']).toBeUndefined();
+    expect(store["/articles/1"]).toBeGreaterThan(1480);
+    expect(store["/articles/2"]).toBeUndefined();
   });
 });
 
@@ -594,13 +594,13 @@ test.describe("Scenario 6: custom scrollContainer", () => {
     // getter returns null and `readPos`/`writePos` lazy-fall back to
     // window. This test exercises BOTH paths in one flow:
     //
-    //   /articles  →  window scroll captured under "articles:{}"
+    //   /articles  →  window scroll captured under "/articles"
     //       ↓
-    //   /gallery   →  container scrollTop captured under "gallery:{}"
+    //   /gallery   →  container scrollTop captured under "/gallery"
     //       ↓ Back
-    //   /articles  →  window scroll restored from "articles:{}"
+    //   /articles  →  window scroll restored from "/articles"
     //       ↓ Forward
-    //   /gallery   →  container scrollTop restored from "gallery:{}"
+    //   /gallery   →  container scrollTop restored from "/gallery"
     //
     // Demonstrates that fallback is not just a graceful degradation but a
     // correct two-target solution working transparently across routes.
@@ -633,8 +633,8 @@ test.describe("Scenario 6: custom scrollContainer", () => {
     const store: Record<string, number> = await page.evaluate(() =>
       JSON.parse(sessionStorage.getItem("real-router:scroll") ?? "{}"),
     );
-    expect(store["articles:{}"]).toBeGreaterThan(1180);
-    expect(store["gallery:{}"]).toBeGreaterThan(780);
+    expect(store["/articles"]).toBeGreaterThan(1180);
+    expect(store["/gallery"]).toBeGreaterThan(780);
   });
 });
 
@@ -655,7 +655,7 @@ test.describe("Scenario 7: F5 persistence", () => {
       const raw = sessionStorage.getItem("real-router:scroll") ?? "{}";
       const store = JSON.parse(raw) as Record<string, number>;
 
-      return store["articles:{}"] ?? 0;
+      return store["/articles"] ?? 0;
     });
     expect(stored).toBeGreaterThan(2480);
   });

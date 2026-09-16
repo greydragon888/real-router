@@ -106,7 +106,11 @@ function applyInitialF5Restore(router: RouterLike, mode: Mode): void {
     return;
   }
 
-  const key = `${route.name}:${JSON.stringify(route.params)}`;
+  // The key is the LOCATION, in the form core prints it (#2227) — the same
+  // expression the utility's `keyOf` reads. A second spelling here misses
+  // every saved position silently: `store[key]` cannot tell "nothing saved"
+  // from "saved under the other spelling".
+  const key = route.path;
   let store: Record<string, number | undefined>;
 
   try {

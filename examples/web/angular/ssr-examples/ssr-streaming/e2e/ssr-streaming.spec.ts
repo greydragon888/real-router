@@ -274,7 +274,13 @@ test.describe("Streaming SSR Example (Angular)", () => {
     // ("reviews-section") and abort only that one. The bootstrap chunk and
     // RelatedItems chunk pass through, so the page hydrates normally and
     // only the Reviews defer block observes a load failure.
-    await page.route(/\/chunk-[A-Za-z0-9]+\.js$/, async (route) => {
+    //
+    // ⚠ The name pattern admits `-` and `_`, not just alphanumerics: the hash
+    // is URL-safe base64, and a pattern that omits either routes NOTHING on a
+    // build whose hash carries one — the abort never runs, the server-rendered
+    // section stays untouched, and the test reads that as "no @error template".
+    // Measured on #2364: `chunk-Bdyi-TJ4.js` slipped past `[A-Za-z0-9]+`.
+    await page.route(/\/chunk-[\w-]+\.js$/, async (route) => {
       const response = await route.fetch();
       const body = await response.text();
 
@@ -307,7 +313,7 @@ test.describe("Streaming SSR Example (Angular)", () => {
     // be skipped entirely, so we slow only the Reviews chunk by ~600ms to
     // make the transient state observable. Bootstrap and RelatedItems
     // chunks pass through unmodified so the rest of the page is unaffected.
-    await page.route(/\/chunk-[A-Za-z0-9]+\.js$/, async (route) => {
+    await page.route(/\/chunk-[\w-]+\.js$/, async (route) => {
       const response = await route.fetch();
       const body = await response.text();
 
@@ -393,7 +399,7 @@ test.describe("Streaming SSR Example (Angular)", () => {
     // Angular captures the click globally and replays it once the button's
     // event handler is actually wired up. Without event replay, the click
     // would be lost and data-marked would stay "false".
-    await page.route(/\/chunk-[A-Za-z0-9]+\.js$/, async (route) => {
+    await page.route(/\/chunk-[\w-]+\.js$/, async (route) => {
       const response = await route.fetch();
       const body = await response.text();
 
