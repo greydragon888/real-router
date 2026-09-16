@@ -377,6 +377,32 @@ negative example is indistinguishable from a description of the current set, so
 the first member that satisfies both clauses and is still refused is the one that
 makes this a rule — write that refusal down when it happens.
 
+### Before adding an aggregating entity, ask what could REFUSE a member
+
+> **An interface, bag, store or vocabulary that cannot refuse a proposed member
+> will accrete. Name what refuses, or the entity grows by default rather than by
+> decision.**
+
+Derived from a census, not asserted: measured 2026-09-16, every aggregating type
+in shipped source carrying eight members or more was checked for members the
+declaring package never uses — the mechanical form of "it landed because someone
+else needed it". The majority came back clean, and the clean ones all have a
+construction that can say no: a dependency bag admits nothing without a call site
+that reads it, a store admits only state its namespace owns, a validator method
+needs a door to guard.
+
+⚠ **Size is not the signal, and neither is a member with one reader.** Both were
+tried and both failed: `NavigationDependencies` carries 26 members with half of
+them read exactly once, which is the CORRECT shape for an injected dependency,
+and `RoutesStore` has no unread member at all. What separates an accreting entity
+from a large one is the absence of a refusal.
+
+⚠ **The two that accreted are the two that had no rule.** `RouterInternals`,
+whose members landed by default rather than by decision (#2339), and `PluginApi`,
+which gets its first criterion in the section above. A declared VOCABULARY is the
+same shape and fails the same way — #2362 and #2363 are values a public type
+promises and nothing produces.
+
 ## Gotchas
 
 ### Guards Cannot Redirect

@@ -10285,3 +10285,87 @@ a formality and is now the real gate.
 required checks must report: `Require Changeset`, `Validate Changesets`, `CI Result`,
 `Dependency Review` (still skipped-as-passed) and `SonarCloud`, which now runs for real on the
 release tree.
+
+## Two example suites asserted on a contract that had moved (2026-09-16)
+
+### Problem
+
+The nightly `examples.yml` run of 16 September failed six tests across two unrelated apps (#2364).
+The four React ones failed again on their retry — `retries: 1`, and every one of them left a
+`-retry1` artifact — which is the signature of a defect rather than a flake. (The Angular config
+sets no `retries`, so those two ran once and nothing about a repeat is known.)
+
+Those four live in `examples/web/react/hash-examples/scroll-restoration`. #2227 re-keyed scroll
+storage from `${state.name}:${canonicalJson({ ...params, ...search })}` to `state.path`, and its
+changeset says so in a ⚠. Two readers of the old spelling stayed behind. One is the e2e spec, which
+asserts on literal keys (`articles:{}`, `articles.article:{"id":"1"}`). The other is not a test:
+`applyInitialF5Restore` in `src/main.tsx` — the userland bridge that restores scroll on a cold F5 —
+rebuilt the key by hand. Measured against a fresh build, the store is keyed `/articles`,
+`/articles/1`, `/gallery`, so every lookup under the old spelling answered `undefined`: three tests
+read an absent key, and 7b lost F5 restore entirely, because the app's own reader was the one that
+missed. The utility stayed self-consistent throughout — it writes and reads one spelling — which is
+why every in-memory assertion still passed and only the ones crossing `sessionStorage` failed.
+
+The other two live in `examples/web/angular/ssr-examples/ssr-streaming`. Both identify the Reviews
+`@defer` chunk by routing `/\/chunk-[A-Za-z0-9]+\.js$/` and matching the chunk body. The hash in
+those names is URL-safe base64, so `-` and `_` are in its alphabet, and the build under test emitted
+`chunk-Bdyi-TJ4.js`. The pattern matched no chunk at all: nothing was aborted, nothing was delayed,
+the server-rendered section stayed on the page, and the assertions read that as "the `@error`
+template never appeared". Which build first drew a hyphen is not established — the 8 September
+nightly also failed, and its log no longer names the tests it failed on.
+
+### Solution
+
+The spec's key literals become paths, `applyInitialF5Restore` reads `route.path` — the expression
+the utility's `keyOf` returns — and the three chunk routes admit `[\w-]+`. Verified locally from a
+clean build: scroll-restoration 24/24, ssr-streaming 23/23.
+
+### Why
+
+`keyOf`'s docblock already says a replica drifts silently the moment the key changes, and the
+adapter tests obey it by importing the function. The example cannot — `keyOf` sits outside the
+package barrel by design — so it carried a hand-built copy that a contract change had no way to
+reach. The Angular pattern is the same shape one level down: a pattern that names a value's alphabet
+incompletely keeps passing until the generator emits the character it left out.
+
+Neither had a gate in front of it. None of the 148 example manifests declares a `lint` script, so
+`turbo run lint` never reads them, and their e2e suites run only in the nightly workflow — where a
+failure has so far been closed as flake once the next run came back green.
+
+## size-limit 14 measures with rolldown, and the limits were recalibrated to it (2026-09-16)
+
+### Problem
+
+`size-limit` 13 → 14 swaps the bundler inside `@size-limit/preset-small-lib`: esbuild out, **rolldown** in. The root manifest declared the preset *and* `@size-limit/esbuild`, which was harmless in 13 (the preset shipped the same plugin) and is not in 14. Both plugins register the same steps — `step20`, `step40`, `step61` — `loadPlugins` imports every `@size-limit/*` it finds, and `calc` walks them in manifest key order, so **which bundler measures the repo was decided by the order of two lines in `package.json`**.
+
+Measured on three representatives, all four states disagree:
+
+| | core | solid | route-utils |
+| --- | --- | --- | --- |
+| 13.0.3 (esbuild) | 26324 | 8847 | 738 |
+| 14, esbuild only | 26340 | 8863 | 754 |
+| 14, rolldown only | 26001 | 8140 | 796 |
+| 14, both declared | 25985 | 8124 | 780 |
+
+Two consequences the release notes do not mention:
+
+- `@size-limit/rolldown@14` needs `rolldown ^1.2.8`. The tree already had 1.2.7 under **tsdown** and **`rolldown-plugin-dts`** — the tools that build the published `dist` and `.d.ts` — so `lint:dedupe` went red and `pnpm dedupe` wanted to move them. A measurement tool was reaching into the publishing toolchain.
+- On a config error size-limit prints `{"error": …}` to the **same stdout** as the report. `ci.yml` guarded it with `${output:-[]}`, which substitutes on emptiness, not on the wrong type, so the object passed through and the comparator would throw on `.filter`. `post-merge.yml` already had the right shape; the PR side did not.
+
+### Solution
+
+One bundler. `size-limit` + `@size-limit/preset-small-lib`, with the explicit `@size-limit/esbuild` dropped — the ambiguity leaves with it, and rolldown is what upstream ships.
+
+The rolldown move was **validated, not assumed**: `core`, `react` and `route-utils` rebuilt under 1.2.7 and under 1.2.8 give **135 of 135 artifact files byte-identical**. The comparison was first shown to discriminate — an added export moved 3 of 3 `route-utils` hashes, and reverting restored them — so "identical" means identical and not "I compared a cache".
+
+All 25 limits were recalibrated against rolldown: **14 tightened, 6 raised, 5 unchanged**, at roughly 6 % headroom with a +120 B floor so a 500 B bundle does not fail on a 25 B addition. Before recalibration the only entry over its limit was `rsc-server-plugin`, which had been over on 13 too.
+
+`ci.yml`'s PR measurement now mirrors `post-merge.yml`: stderr stays in the log, the report is checked with `Array.isArray(...)` and a non-zero length before use, and the comparator coerces both inputs through one helper.
+
+### Why
+
+A size limit only means something against a fixed instrument. Swapping the bundler moves every number at once — up to ~700 B here — and the old limits would have kept passing while measuring something else, with the PR comment showing 25 phantom improvements on the first run against a base artifact recorded by the previous instrument. Recalibrating in the same commit as the swap is what keeps the series readable: one discontinuity, named, instead of a slow drift nobody can date.
+
+The dedupe check earns its place here. A dev-only measurement tool is exactly the kind of bump nobody validates against the published artifacts, and the only reason this one did not ship unexamined is that `lint:dedupe` turned red and named tsdown.
+
+⚠ One claim in `.size-limit.js` inverted with the bundler and was removed rather than re-worded: under esbuild, marking core external made `logger-plugin` *bigger* (1.66 kB without `ignoreCore`, 1.74 kB with). Under rolldown the same pair measures 2168 B without and 1666 B with. The configuration was correct for reasons that never depended on that number, and the surprise it documented no longer exists.
