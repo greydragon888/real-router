@@ -1088,12 +1088,22 @@ jobs:
       - name: Bundle remaining packages (cache-hit for non-affected)
         run: pnpm turbo run bundle --filter='./packages/*'
 
+      # size-limit exits non-zero when a limit is exceeded but still prints the
+      # JSON report, so the exit code is not the signal here — the report is. On a
+      # CONFIG error it prints `{"error": …}` to that same stdout: valid JSON, but
+      # an object, so a `${output:-[]}` guard passes it straight through and the
+      # comparator below throws on `.filter`. Same shape as post-merge.yml's base
+      # measurement: keep stderr in the log, and announce an unusable report.
       - name: Get PR sizes
         id: pr_sizes
         run: |
+          npx size-limit --json > pr-bundle-sizes.json || true
+          if ! node -e 'const r = JSON.parse(require("fs").readFileSync("pr-bundle-sizes.json", "utf8")); if (!Array.isArray(r) || r.length === 0) process.exit(1)' 2>/dev/null; then
+            echo "::warning title=PR bundle sizes unavailable::size-limit produced no usable report (see this step's log) — the size table will show every package as removed"
+            echo '[]' > pr-bundle-sizes.json
+          fi
           echo "sizes<<EOF" >> $GITHUB_OUTPUT
-          output=$(npx size-limit --json 2>/dev/null) || true
-          echo "${output:-[]}" >> $GITHUB_OUTPUT
+          cat pr-bundle-sizes.json >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       # ── Base sizes: download master's sizes published by post-merge.yml (#734)
@@ -1153,8 +1163,19 @@ jobs:
           BASE_SIZES: ${{ steps.base_sizes.outputs.sizes }}
         with:
           script: |
-            const prSizes = JSON.parse(process.env.PR_SIZES || '[]');
-            const baseSizes = JSON.parse(process.env.BASE_SIZES || '[]');
+            // Both inputs are guarded at their source, but parse defensively here
+            // too: size-limit's error payload is an OBJECT, and every use below
+            // assumes an array.
+            const asRows = (raw) => {
+              try {
+                const parsed = JSON.parse(raw || '[]');
+                return Array.isArray(parsed) ? parsed : [];
+              } catch {
+                return [];
+              }
+            };
+            const prSizes = asRows(process.env.PR_SIZES);
+            const baseSizes = asRows(process.env.BASE_SIZES);
 
             const formatBytes = (bytes) => {
               if (bytes == null || isNaN(bytes)) return '—';
