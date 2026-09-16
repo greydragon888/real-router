@@ -296,6 +296,7 @@ export function buildPlan(
   affected,
   dirOf,
   membership = affected,
+  changedFiles = [],
   readers = defaultReaders,
 ) {
   // Routing signals are read from `affected` (the target set), NOT `membership`:
@@ -318,12 +319,23 @@ export function buildPlan(
   // The declared-dep query set reports NONE of those consumers (the dep is a
   // symlink, not a package.json edge), only the `shared` workspace — which
   // `deriveAffected` drops from `affected` (path `shared/`, not `packages/*`). So
-  // `shared-sources` survives only in `dirOf`; detect it there and force sharded,
-  // same as touchesCore / touchesAdapterShared. The consumers themselves come from
-  // `membership` (input-aware), not from here. Keys on the shared WORKSPACE, so a
-  // direct multi-package edit that does NOT touch a shared source stays on the
-  // count path (the K-boundary leaf set with two url-plugins is unaffected).
-  const touchesSharedSources = dirOf.has("@real-router/shared-sources");
+  // such a PR must be forced onto the sharded path; its consumers then come from
+  // `membership` (input-aware), not from here.
+  //
+  // ⚠ **Keyed on the DIFF, not on `dirOf` (#2378).** `dirOf` comes from
+  // `turbo query affected`, which answers "is `shared` DOWNSTREAM of what
+  // changed" — and `shared` is downstream of core, so every core-fanout PR set
+  // this flag. Forced onto the sharded path, such a PR then produced no shards,
+  // because the shard set is input-aware and the changed file was in no task's
+  // inputs; the #1067 guard below correctly refused the empty plan and the PR
+  // was blocked. Reproduced with ONE file: a line appended to
+  // `packages/core/tests/functional/claim-census-ledger.json` gives 169 affected
+  // workspaces, `shared-sources` among them, and no shardable member.
+  //
+  // The changed paths answer the question the dep graph cannot: authorship.
+  const touchesSharedSources = changedFiles.some((f) =>
+    f.startsWith("shared/"),
+  );
   // Composition trigger (K re-measure, 2026-07-19): adapters are the ONLY
   // per-package shards — every other group is batched into a single shard, so
   // for same-group sets the sharded path equals the leaf path at ANY count
@@ -503,6 +515,9 @@ export function runMembershipQuery() {
 /** Entry point: query (routing) + dry-run (membership) → plan → GITHUB_OUTPUT. */
 export function main() {
   const { affected, examples, dirOf } = deriveAffected(runAffectedQuery());
+  // Read once — `buildPlan` needs it for the shared-source flag (#2378) and
+  // `filterTouchedExamples` for the example filter.
+  const changedFiles = runChangedFilesQuery();
   const { members, dirOf: memberDirOf } =
     deriveMembership(runMembershipQuery());
   // Merge dirs so classify() can resolve every membership package; query's dirOf
@@ -513,6 +528,7 @@ export function main() {
     affected,
     mergedDirOf,
     members,
+    changedFiles.split("\n").filter(Boolean),
   );
   process.stdout.write(`mode=${mode}\n`);
   process.stdout.write(`matrix=${JSON.stringify(matrix)}\n`);
@@ -525,7 +541,7 @@ export function main() {
   const touchedExamples = filterTouchedExamples(
     examples,
     mergedDirOf,
-    runChangedFilesQuery(),
+    changedFiles,
   );
   process.stdout.write(
     `examples_filter=${touchedExamples.map((p) => `--filter=${p}`).join(" ")}\n`,
