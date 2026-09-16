@@ -44,20 +44,13 @@ jobs:
 
       - name: Check for code changes
         id: changes
-        env:
-          # Pass the (potentially untrusted) head ref through the environment
-          # instead of interpolating ${{ }} directly into the script — avoids
-          # the script-injection class actionlint flags, and stops shellcheck's
-          # SC2193 false positive from the substituted literal vs. glob compare.
-          HEAD_REF: ${{ github.head_ref }}
         run: |
-          # Skip for release PRs (code already validated by source PR)
-          if [[ "$HEAD_REF" == changeset-release/* ]]; then
-            echo "should_run=false" >> $GITHUB_OUTPUT
-            echo "🚀 Release PR detected, skipping CI"
-            exit 0
-          fi
-
+          # A `changeset-release/*` PR is NOT skipped here, deliberately: its tree
+          # — bumped versions, rewritten CHANGELOGs, consumed changesets — is the
+          # one that lands on master, and until it does nothing else checks it
+          # (see IMPLEMENTATION_NOTES "Release PRs run the pipeline"). CodeQL,
+          # CodSpeed and danger keep their own head-ref skips.
+          #
           # pull_request-only workflow — base/head come straight from the PR event.
           BASE="${{ github.event.pull_request.base.sha }}"
           HEAD="${{ github.event.pull_request.head.sha }}"
