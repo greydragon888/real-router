@@ -62,7 +62,7 @@ export interface RouterInternals<
    * prints from (#1556), minus path slots. Feeds the always-on channel guard
    * (#1572); read here rather than re-derived, so classification cannot drift.
    */
-  readonly getQueryParams: (name: string) => readonly string[];
+  readonly getDeclaredQueryNames: (name: string) => readonly string[];
 
   readonly forwardState: <
     P extends Params = Params,
@@ -407,7 +407,7 @@ export function throwOnMisChanneledKey<D extends DefaultDependencies>(
     method,
     routeName,
     params,
-    ctx.getQueryParams(routeName),
+    ctx.getDeclaredQueryNames(routeName),
   );
 }
 

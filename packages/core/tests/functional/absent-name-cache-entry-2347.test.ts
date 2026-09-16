@@ -84,9 +84,9 @@ const DOORS: readonly Door[] = [
     },
   },
   {
-    label: "getInternals().getQueryParams",
+    label: "getInternals().getDeclaredQueryNames",
     ask: (router, name) => {
-      getInternals(router).getQueryParams(name);
+      getInternals(router).getDeclaredQueryNames(name);
 
       return Promise.resolve();
     },
@@ -193,8 +193,8 @@ describe("a name no route carries leaves no cache entry (#2347)", () => {
     const router = await fresh();
     const internals = getInternals(router);
 
-    const first = internals.getQueryParams("absent-a");
-    const second = internals.getQueryParams("absent-b");
+    const first = internals.getDeclaredQueryNames("absent-a");
+    const second = internals.getDeclaredQueryNames("absent-b");
 
     // Identity, not equality: this is what ties the subtracted registry to its
     // twin `getPrintedQueryParams`, which has always shared one frozen empty.

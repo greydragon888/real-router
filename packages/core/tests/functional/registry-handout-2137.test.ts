@@ -30,7 +30,7 @@ describe("the name registries are core's own, and handed out sealed (#2137)", ()
   const ROUTES = [{ name: "q", path: "/q/:id?tab" }];
 
   function queryReg(r: Router): readonly string[] {
-    return getInternals(r).getQueryParams("q");
+    return getInternals(r).getDeclaredQueryNames("q");
   }
 
   function portOf(r: Router) {

@@ -61,16 +61,39 @@ function aliasesInternalsMember(node: ts.Node, name: string): boolean {
   return found;
 }
 
-/** A real `ctx.<name>(…)` call inside this property — AST, never text. */
+/**
+ * A real call that reaches `ctx.<name>` inside this property — AST, never text.
+ *
+ * ⚑ The call may go THROUGH the member: `ctx.logger.warn(…)` reaches the same
+ * bag member per call, which is what the class measures, and a frozen view whose
+ * methods do that is intercepted by a spy exactly like `ctx.<name>(…)` is. What
+ * stays load-bearing is that the first property after `ctx` is this member's own
+ * name — the hazard measured below, a member rewired to call a DIFFERENT
+ * internals method, still fails here.
+ */
 function callsInternalsMember(node: ts.Node, name: string): boolean {
   let found = false;
+
+  /** The first property after `ctx` in a `ctx.a.b.c` chain, if it roots there. */
+  const firstAfterCtx = (expression: ts.Node): string | undefined => {
+    let cursor = expression;
+    let last: ts.PropertyAccessExpression | undefined;
+
+    while (ts.isPropertyAccessExpression(cursor)) {
+      last = cursor;
+      cursor = cursor.expression;
+    }
+
+    return ts.isIdentifier(cursor) && cursor.text === "ctx"
+      ? last?.name.text
+      : undefined;
+  };
 
   const walk = (current: ts.Node): void => {
     if (
       ts.isCallExpression(current) &&
       ts.isPropertyAccessExpression(current.expression) &&
-      current.expression.expression.getText() === "ctx" &&
-      current.expression.name.text === name
+      firstAfterCtx(current.expression) === name
     ) {
       found = true;
     }
@@ -199,6 +222,8 @@ describe("the stub seam below getPluginApi (#1805)", () => {
       "buildPathResolved",
       "emitTransitionError",
       "forwardState",
+      "getDeclaredQueryNames",
+      "logger",
       "makeState",
       "matchPath",
       "navigateToState",

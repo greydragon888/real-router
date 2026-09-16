@@ -21,6 +21,7 @@ import type {
   Plugin,
   Route,
   RouteConfigUpdate,
+  RouterLogger,
   AnyOptions,
 } from "./router";
 import type { TreeChangedEvent } from "./tree-changed";
@@ -183,6 +184,33 @@ export interface PluginApi {
    */
   setRootPath: (rootPath: string) => boolean;
   getRootPath: () => string;
+
+  /**
+   * A three-method VIEW of the router's logger, frozen and built once.
+   *
+   * ⚠ Not the logger instance. The class behind this interface also carries
+   * `configure`, which would let any holder re-aim or silence this router's
+   * logging for every consumer at once — and the instance is not frozen, so a
+   * write to `warn` would land for all of them (#1805).
+   */
+  logger: RouterLogger;
+
+  /**
+   * The route's DECLARED query names minus its path slots — the registry that
+   * decides which CHANNEL owns a key (#1556), with the `/items/:id?id` carve-out
+   * falling out of the subtraction. Answers `[]` for a route the tree does not
+   * hold; a name is not a claim that the route exists.
+   *
+   * ⚠ **The array is handed out BY REFERENCE and does not track the tree
+   * (#2255).** Cache the handle and a later `replace()` leaves you holding a
+   * frozen array that describes the old declaration — it does not throw, empty
+   * or warn. Call the door again after a tree change, or do not hold it.
+   *
+   * ⚑ An unknown name costs nothing to ask: since #2347 that arm answers the
+   * shared frozen empty WITHOUT a cache write, so a caller-controlled name
+   * cannot grow the registry.
+   */
+  getDeclaredQueryNames: (name: string) => readonly string[];
 
   addEventListener: <E extends EventName>(
     eventName: E,

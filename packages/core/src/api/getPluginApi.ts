@@ -19,6 +19,7 @@ import type {
   DefaultDependencies,
   Params,
   Router,
+  RouterLogger,
   SearchParams,
   State,
 } from "../types";
@@ -257,6 +258,28 @@ export function getPluginApi<
     buildPathResolved: (name, params, search) =>
       ctx.buildPathResolved(name, params, search),
     getAdoptedOrigins: ctx.getAdoptedOrigins,
+    // ⚠ A frozen three-method VIEW, never the instance. `RouterLogger` the
+    // INTERFACE declares three methods; `RouterLogger` the CLASS carries five,
+    // and `configure` reconfigures this router's logging for every consumer at
+    // once. Handing the instance out also hands out the #1805 hazard the frozen
+    // surface exists to close — measured, `api.logger.warn = …` on the instance
+    // lands and every consumer sees it.
+    //
+    // ⚑ It DELEGATES rather than copies, so a spy installed on the internals
+    // logger afterwards is still seen. `validator-boundary-authority-2322`'s two
+    // `spyOn(…, "warn")` cells are the check.
+    logger: freeze<RouterLogger>({
+      log: (context, message, ...args) => {
+        ctx.logger.log(context, message, ...args);
+      },
+      warn: (context, message, ...args) => {
+        ctx.logger.warn(context, message, ...args);
+      },
+      error: (context, message, ...args) => {
+        ctx.logger.error(context, message, ...args);
+      },
+    }),
+    getDeclaredQueryNames: (name) => ctx.getDeclaredQueryNames(name),
     getOptions: ctx.getOptions,
     getTree: ctx.getTree,
     addInterceptor: (method, fn) => {
