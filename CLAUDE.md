@@ -57,6 +57,7 @@ shared/
 - After completing a task, run: `pnpm build` (turbo runs the full graph: type-check → test → build, with lint in PARALLEL — it is a `build` dependency, no longer a `test` one)
 - Prefer editing existing files over creating new ones
 - Keep changes minimal and focused
+- **The main checkout stays on `master`; a branch belongs in its own worktree.** Sessions share this directory, so a `git checkout` here moves the tree under someone else's build, test or push — measured on 2026-09-15, a pre-push failed on a branch the push did not carry. Work on a branch from `git worktree add --detach <dir outside the repo> <branch>`, and `git worktree remove` it when done. ⚠ Run `pnpm install --frozen-lockfile` in that worktree before pushing from it: without it there is no `.husky/_`, and the push runs **no** pre-push hook at all, silently
 - **Update `IMPLEMENTATION_NOTES.md` after any infrastructure change** — new scripts/hooks (`.husky/*`, `scripts/*.sh`), CI workflow edits (`.github/workflows/*.yml`), build pipeline changes (turbo.json, tsdown configs, custom export conditions), dependency-audit tooling, or anything that changes "how the repo builds/ships/audits itself." Use the Problem → Solution → Why format established there. This is what makes the file useful as the "why is it this way?" reference
 
 ## Docblocks and Code Comments
