@@ -1378,11 +1378,14 @@ export default tsEslint.config(
   // ============================================
   // 16. TURBO CONFIGURATION (must be last)
   // ============================================
-  // eslint-config-turbo v2.10.5 (co-versioned with the turbo CLI)
+  // eslint-config-turbo — co-versioned with the turbo CLI, so it moves with it
   ...turboConfig,
   {
-    // eslint-config-turbo does not read global.env from turbo.json
-    // when futureFlags.globalConfiguration is enabled — allowList global env vars
+    // eslint-config-turbo does not read global.env from turbo.json when
+    // futureFlags.globalConfiguration is enabled, so the rule reports vars that
+    // ARE declared — allowList them here. Still true on 2.10.13: a probe reading
+    // `process.env.BENCH_ROUTER` is reported even though turbo.json declares it,
+    // while an undeclared name is reported too (the rule itself works).
     rules: {
       "turbo/no-undeclared-env-vars": [
         "error",
