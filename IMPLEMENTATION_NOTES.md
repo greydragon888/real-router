@@ -1174,7 +1174,7 @@ pnpm turbo run bundle --filter='./packages/*'
 
 **Why not `--affected`:** Turbo does not allow `--affected` with `--filter`. The `--filter='!./examples/**'` exclusion is required — without it, ~90 example apps run their lint/test/build, adding ~20 minutes to CI. The `...[ref]` syntax provides equivalent git-diff filtering while allowing combination with exclusion filters.
 
-**Check job:** Pre-filters by changed files (skips CI for docs-only changes, skips for `changeset-release/*` PRs). Computes `turbo_base` as a job output consumed by all downstream jobs.
+**Check job:** Pre-filters by changed files (skips CI for docs-only changes; a `changeset-release/*` PR is **not** skipped — see "Release PRs run the pipeline"). Computes `turbo_base` as a job output consumed by all downstream jobs.
 
 ### Concurrency
 
@@ -10215,3 +10215,73 @@ file; a branch that is not `HEAD`; `HEAD~1:refs/heads/older`; an annotated tag; 
 a tree that changes mid-hook; a detached `HEAD:master` — plus `HEAD` moving mid-hook, and it
 requires the start block ahead of the first step and nothing between the end block and "✅". Its
 git runs with none of the caller's `GIT_*` variables and no global or system config.
+
+## Three places where a failure read as an answer (2026-09-15)
+
+**Problem.** The reconcile saga above was one instance of a shape the repo had in three more
+places: a command's failure silently became a datum. `changesets.yml`'s tag backfill asked
+`pnpm view "$tag" version >/dev/null 2>&1 || continue`, so a 5xx, a timeout or an auth failure read
+as "npm does not have this version" and the missing tag was not backfilled — the one case where a
+tag is genuinely lost. `post-merge.yml` measured the base bundle sizes with
+`npx size-limit --json > … 2>/dev/null || true` followed by `[ -s … ] || echo '[]'`, so a broken
+measurement became an empty base — and an empty base makes every package in every PR's size diff
+read as "new". `ci.yml`'s bundle-size job fetched that base with `gh run list … 2>/dev/null || true`,
+where an API failure and "no post-merge run yet" ended in the same `[]` and the same `ℹ️` line.
+
+**Solution.** Each site separates "the answer is no" from "there was no answer".
+
+1. The backfill calls `.changeset/unpublished-packages.mjs --published-version <name@version>` —
+   the classifier the publish preflight already uses. A missing package or a missing version prints
+   nothing and exits 0 (skip the tag); anything else retries once and then exits 1 with an
+   `::error::` carrying the registry's words. Measured with pnpm 12.4.1: an absent package answers
+   `ERR_PNPM_FETCH_404`, an absent version `ERR_PNPM_PACKAGE_NOT_FOUND` + "No matching version
+   found" — two answers, and the classifier's pattern names both.
+2. post-merge keeps size-limit's stderr in the log and warns when the report is missing or is not a
+   non-empty array, before falling back to `[]`.
+3. The PR job tells the two cases apart: no successful post-merge run yet stays an `ℹ️`, while a
+   failing `gh run list` — or a run whose artifact will not download — is a `::warning::` with gh's
+   stderr in the log.
+
+**Why warnings, not failures.** Both bundle-size sites are measurements, and neither job is a gate;
+turning them red would stop PRs on a registry hiccup. A warning shows in the run's annotation
+summary, which `[]` and a green log did not.
+
+**Guard.** `scripts/release-workflow.test.mjs` pins the classifier's spec half with `pnpm` stubbed
+on PATH: a version prints, a missing package and a missing version print nothing and exit 0 without
+a retry, and a 5xx retries once and exits non-zero with the annotation.
+
+## Release PRs run the pipeline (2026-09-16)
+
+**Problem.** `ci.yml`'s "Check for code changes" step opened with a skip: a `changeset-release/*`
+head ref set `should_run=false`, reasoning that the code was already validated by the source PR. The
+code was; the release commit's TREE was not. A release rewrites `version` in every bumped
+`package.json`, which moves those packages' turbo hashes, so the first run of those tasks happened
+in Post-Merge Build on master — the run the release chain hangs on, since `changesets.yml` triggers
+on `workflow_run` with `conclusion == 'success'`: a red post-merge means no release run at all, and
+the bumped versions sit unpublished until someone pushes again or dispatches the workflow by hand.
+
+Nine Post-Merge Build failures between 24 August and 15 September (#1903, #1912, #1954, #2106,
+#2218, #2262, #2329, #2335, #2357), six of them on release commits — and none of the causes that
+were established was a fault of the release: a vitest runner crash on a getter-only
+`Object.prototype.id`, two repository-wide scans over `testTimeout` under coverage, a fast-check
+counterexample. (#2106's log had aged out; its cause is unknown.) Six of the last seven release
+commits spent 9-16 minutes in post-merge, against 0-1 minute for an ordinary PR merge whose tree the
+remote cache already holds.
+
+**Solution.** The skip is gone, and with it the `HEAD_REF` env it was the only reader of. A release
+PR takes the same pipeline as any other PR: its tree is checked where a flake costs a re-run rather
+than the release chain, and that run fills the remote cache the release commit's post-merge then
+reads instead of rebuilding.
+
+**Why the other head-ref skips stay.** CodeQL and `Dependency Review` (`codeql.yml`), CodSpeed and
+danger keep theirs. Two of those are required checks, and a job skipped by `if:` reports a "skipped"
+conclusion, which branch protection counts as a pass — the pattern the "`Dependency Review` is a
+required check" record above rests on. Only `CI Result` changes meaning here: on a release PR it was
+a formality and is now the real gate.
+
+**Cost.** CI minutes on every release PR, and the wait for them before merging it.
+
+**Eyeball on the first release PR after this lands** — the same caution that record took. All five
+required checks must report: `Require Changeset`, `Validate Changesets`, `CI Result`,
+`Dependency Review` (still skipped-as-passed) and `SonarCloud`, which now runs for real on the
+release tree.

@@ -27,20 +27,24 @@
 // silently pass.
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { classify } from "../.changeset/unpublished-packages.mjs";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-const CHANGESETS_YML = join(
-  repoRoot,
-  ".github",
-  "workflows",
-  "changesets.yml",
-);
+const CHANGESETS_YML = join(repoRoot, ".github", "workflows", "changesets.yml");
 
 /** The job that runs `changeset publish`. */
 export const RELEASE_JOB = "release";
@@ -114,12 +118,18 @@ test("fixture: healthy workflow passes both invariants", () => {
 });
 
 test("fixture: release job moved to a self-hosted runner is caught", () => {
-  const mutated = FIXTURE.replace("runs-on: ubuntu-latest", "runs-on: self-hosted");
+  const mutated = FIXTURE.replace(
+    "runs-on: ubuntu-latest",
+    "runs-on: self-hosted",
+  );
   assert.doesNotMatch(parseRunsOn(mutated, RELEASE_JOB), HOSTED);
 });
 
 test("fixture: a custom runner label is caught too (not just the literal 'self-hosted')", () => {
-  const mutated = FIXTURE.replace("runs-on: ubuntu-latest", "runs-on: bench-vps");
+  const mutated = FIXTURE.replace(
+    "runs-on: ubuntu-latest",
+    "runs-on: bench-vps",
+  );
   assert.doesNotMatch(parseRunsOn(mutated, RELEASE_JOB), HOSTED);
 });
 
@@ -188,4 +198,117 @@ test("classify: absent from the registry is 'never-published', not 'behind'", ()
   // which compared unequal and looked exactly like 'behind'.
   assert.equal(classify("0.0.1", null), "never-published");
   assert.notEqual(classify("0.0.1", null), classify("0.0.1", "0.0.0"));
+});
+
+// --------------------------------------------------------------------------
+// The spec half: `--published-version <name@version>` is what the tag backfill
+// in changesets.yml asks. "The registry does not have it" (skip the tag) and
+// "the registry did not answer" (fail the run) must not look alike — the line
+// it replaced, `pnpm view … >/dev/null 2>&1 || continue`, made them identical.
+// `pnpm` is stubbed on PATH: no network, and the error TEXTS are the contract.
+// --------------------------------------------------------------------------
+
+const CLI = join(repoRoot, ".changeset", "unpublished-packages.mjs");
+const stubDirs = [];
+
+after(() => {
+  for (const dir of stubDirs) rmSync(dir, { recursive: true, force: true });
+});
+
+/** A `pnpm` first on PATH that records its argv, then answers as told. */
+function stubPnpm({ stdout = "", stderr = "", code = 0 }) {
+  const dir = mkdtempSync(join(tmpdir(), "pnpm-stub-"));
+
+  stubDirs.push(dir);
+  const bin = join(dir, "pnpm");
+
+  writeFileSync(
+    bin,
+    [
+      "#!/bin/sh",
+      `echo "$@" >> "${join(dir, "calls.txt")}"`,
+      stdout ? `echo '${stdout}'` : ":",
+      stderr ? `echo '${stderr}' >&2` : ":",
+      `exit ${code}`,
+      "",
+    ].join("\n"),
+  );
+  chmodSync(bin, 0o755);
+
+  return dir;
+}
+
+function publishedVersion(dir, spec) {
+  const result = spawnSync(
+    process.execPath,
+    [CLI, "--published-version", spec],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${dir}:${process.env.PATH}` },
+    },
+  );
+  const log = join(dir, "calls.txt");
+
+  return {
+    ...result,
+    calls: existsSync(log)
+      ? readFileSync(log, "utf8").trim().split("\n").length
+      : 0,
+  };
+}
+
+test("--published-version: a version the registry has is printed", () => {
+  const run = publishedVersion(
+    stubPnpm({ stdout: "1.2.3" }),
+    "@real-router/core@1.2.3",
+  );
+
+  assert.equal(run.status, 0, run.stderr);
+  assert.equal(run.stdout.trim(), "1.2.3");
+});
+
+test("--published-version: a missing package is an answer, not a failure", () => {
+  const dir = stubPnpm({
+    stderr: "ERR_PNPM_FETCH_404 Not Found - 404",
+    code: 1,
+  });
+  const run = publishedVersion(dir, "@real-router/nope@1.0.0");
+
+  assert.equal(run.status, 0, run.stderr);
+  assert.equal(
+    run.stdout.trim(),
+    "",
+    "empty stdout is how the caller reads 'no'",
+  );
+  assert.equal(run.calls, 1, "an answer is not retried");
+});
+
+test("--published-version: a missing VERSION is an answer too — the backfill's normal case", () => {
+  const dir = stubPnpm({
+    stderr:
+      "ERR_PNPM_PACKAGE_NOT_FOUND No matching version found for @real-router/core@99.0.0",
+    code: 1,
+  });
+  const run = publishedVersion(dir, "@real-router/core@99.0.0");
+
+  assert.equal(run.status, 0, run.stderr);
+  assert.equal(run.stdout.trim(), "");
+});
+
+test("--published-version: a registry failure retries once, then fails loudly", () => {
+  const dir = stubPnpm({
+    stderr: "ERR_PNPM_FETCH_503 Service Unavailable",
+    code: 1,
+  });
+  const run = publishedVersion(dir, "@real-router/core@1.2.3");
+
+  assert.notEqual(run.status, 0);
+  assert.equal(
+    run.stdout.trim(),
+    "",
+    "nothing on stdout: the caller reads it as a version",
+  );
+  assert.match(run.stderr, /::error/);
+  assert.equal(run.calls, 2, "one retry, then the failure stands");
 });

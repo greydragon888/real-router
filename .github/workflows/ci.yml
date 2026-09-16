@@ -44,20 +44,13 @@ jobs:
 
       - name: Check for code changes
         id: changes
-        env:
-          # Pass the (potentially untrusted) head ref through the environment
-          # instead of interpolating ${{ }} directly into the script — avoids
-          # the script-injection class actionlint flags, and stops shellcheck's
-          # SC2193 false positive from the substituted literal vs. glob compare.
-          HEAD_REF: ${{ github.head_ref }}
         run: |
-          # Skip for release PRs (code already validated by source PR)
-          if [[ "$HEAD_REF" == changeset-release/* ]]; then
-            echo "should_run=false" >> $GITHUB_OUTPUT
-            echo "🚀 Release PR detected, skipping CI"
-            exit 0
-          fi
-
+          # A `changeset-release/*` PR is NOT skipped here, deliberately: its tree
+          # — bumped versions, rewritten CHANGELOGs, consumed changesets — is the
+          # one that lands on master, and until it does nothing else checks it
+          # (see IMPLEMENTATION_NOTES "Release PRs run the pipeline"). CodeQL,
+          # CodSpeed and danger keep their own head-ref skips.
+          #
           # pull_request-only workflow — base/head come straight from the PR event.
           BASE="${{ github.event.pull_request.base.sha }}"
           HEAD="${{ github.event.pull_request.head.sha }}"
@@ -1116,18 +1109,27 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # "gh could not answer" is not "there is no base yet". Both used to end
+          # in the same `[]`, and an empty base shows every package as new in the
+          # diff below — so keep them apart: the missing base is a note, a failed
+          # query a warning, and gh's own stderr stays in the log. Neither stops
+          # the job; it is a measurement, not a gate.
           sizes='[]'
-          run_id="$(gh run list -R "$GITHUB_REPOSITORY" --workflow=post-merge.yml \
+          if run_id="$(gh run list -R "$GITHUB_REPOSITORY" --workflow=post-merge.yml \
             --branch=master --status=success --limit=1 \
-            --json databaseId --jq '.[0].databaseId' 2>/dev/null || true)"
-          if [ -n "$run_id" ] \
-            && gh run download "$run_id" -R "$GITHUB_REPOSITORY" \
-                 --name master-bundle-sizes --dir /tmp/base-sizes 2>/dev/null \
-            && [ -s /tmp/base-sizes/master-bundle-sizes.json ]; then
-            sizes="$(cat /tmp/base-sizes/master-bundle-sizes.json)"
-            echo "✓ Base sizes from post-merge run $run_id"
+            --json databaseId --jq '.[0].databaseId')"; then
+            if [ -z "$run_id" ]; then
+              echo "ℹ️ No successful post-merge run yet — base defaults to [] (sizes shown as new)"
+            elif gh run download "$run_id" -R "$GITHUB_REPOSITORY" \
+                   --name master-bundle-sizes --dir /tmp/base-sizes \
+              && [ -s /tmp/base-sizes/master-bundle-sizes.json ]; then
+              sizes="$(cat /tmp/base-sizes/master-bundle-sizes.json)"
+              echo "✓ Base sizes from post-merge run $run_id"
+            else
+              echo "::warning title=Base bundle sizes unavailable::post-merge run $run_id has no readable master-bundle-sizes artifact — every package will show as new"
+            fi
           else
-            echo "ℹ️ No master bundle-size artifact — base defaults to [] (sizes shown as new)"
+            echo "::warning title=Base bundle sizes unavailable::gh run list failed (see the log) — every package will show as new"
           fi
           {
             echo "sizes<<EOF"

@@ -59,10 +59,16 @@ const execFileAsync = promisify(execFile);
 const CONCURRENCY = 16;
 
 /**
- * A missing package is reported differently by pnpm and npm; match either so the
- * classification does not silently depend on which client runs.
+ * The registry ANSWERING "I do not have that", as opposed to failing to answer.
+ * A missing package is reported differently by pnpm and npm, and a
+ * `name@version` spec whose package exists but whose version does not gets its
+ * own code, so match all of them: the classification must not depend on which
+ * client runs, nor on which half of a spec is missing. Measured with pnpm
+ * 12.4.1 — a missing package answers `ERR_PNPM_FETCH_404`, a missing version
+ * `ERR_PNPM_PACKAGE_NOT_FOUND` + "No matching version found".
  */
-const NOT_FOUND = /ERR_PNPM_FETCH_404|E404|Not Found - 404/;
+const NOT_FOUND =
+  /ERR_PNPM_FETCH_404|E404|Not Found - 404|ERR_PNPM_PACKAGE_NOT_FOUND|No matching version found/;
 
 /**
  * Read the public packages at HEAD.
@@ -169,7 +175,29 @@ export async function classifyAll(root = process.cwd()) {
   }));
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+const CLI = process.argv[1] === fileURLToPath(import.meta.url);
+const SPEC =
+  process.argv[2] === "--published-version" ? (process.argv[3] ?? "") : null;
+
+// `--published-version <name@version>` — the one-spec question the tag backfill
+// in changesets.yml asks. stdout carries the answer and nothing else (the
+// version, or empty when the registry says no), so the caller can read it with
+// `$(…)`; a registry that did NOT answer exits non-zero with an ::error:: on
+// stderr instead of passing for a silent "no".
+if (CLI && SPEC !== null) {
+  if (SPEC === "") {
+    console.error("::error::--published-version needs a <name@version>");
+    process.exitCode = 2;
+  } else {
+    try {
+      const version = await fetchNpmVersion(SPEC);
+      if (version !== null) console.log(version);
+    } catch (error) {
+      console.error(`::error title=Registry query failed::${error.message}`);
+      process.exitCode = 1;
+    }
+  }
+} else if (CLI) {
   const rows = await classifyAll();
 
   for (const row of rows) {
