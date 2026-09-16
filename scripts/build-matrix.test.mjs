@@ -387,21 +387,36 @@ test("routing: shared-source fanout — routing shards via touchesSharedSources,
   const routing = []; // packages/* from query-affected on a pure shared edit
 
   // shared/dom-utils → input-aware membership = the 6 adapters.
-  const domUtils = buildPlan(routing, dirOf, [...ADAPTERS]);
+  const domUtils = buildPlan(
+    routing,
+    dirOf,
+    [...ADAPTERS],
+    ["shared/dom-utils/direction-tracker.ts"],
+  );
   assert.equal(domUtils.mode, "sharded");
   const domUtilsNames = domUtils.matrix.include.map((i) => i.name);
   for (const a of ["react", "preact", "solid", "svelte", "vue", "angular"])
     assert.ok(domUtilsNames.includes(a), a);
 
   // shared/browser-env → the 3 url-plugins.
-  const browserEnv = buildPlan(routing, dirOf, [...URL_PLUGINS]);
+  const browserEnv = buildPlan(
+    routing,
+    dirOf,
+    [...URL_PLUGINS],
+    ["shared/browser-env/types.ts"],
+  );
   assert.equal(browserEnv.mode, "sharded");
   assert.ok(
     browserEnv.matrix.include.map((i) => i.name).includes("url-plugin"),
   );
 
   // shared/ssr → the 2 ssr-plugins.
-  const ssr = buildPlan(routing, dirOf, [...SSR_PLUGINS]);
+  const ssr = buildPlan(
+    routing,
+    dirOf,
+    [...SSR_PLUGINS],
+    ["shared/ssr/createSsrLoaderPlugin.ts"],
+  );
   assert.equal(ssr.mode, "sharded");
   assert.ok(ssr.matrix.include.map((i) => i.name).includes("ssr-plugin"));
 });
@@ -415,9 +430,55 @@ test("routing: sharded with an empty membership set throws — empty matrix is a
   // code emitted mode=sharded + {"include":[]} and passed CI green with ZERO
   // shards (base-* jobs only, consumers unvalidated). The guard must fail loudly.
   assert.throws(
-    () => buildPlan([], dirOf, []),
+    () => buildPlan([], dirOf, [], ["shared/dom-utils/x.ts"]),
     /empty|no.*shard|misdetection/i,
   );
+});
+
+test("routing: shared-source is keyed on the DIFF, not on the dep fanout (#2378)", () => {
+  // `shared` is downstream of core, so `turbo query affected` lists it on ANY
+  // core-fanout PR. Keying the flag on that made a diff which touches no shared
+  // source force the sharded path; the shard set is input-aware, so a file
+  // outside every task input produced none, and the #1067 guard blocked the PR.
+  // Reproduced live on #2377 with one file — a line appended to
+  // `packages/core/tests/functional/claim-census-ledger.json`.
+  const dirOf = new Map([
+    ...realDirOf,
+    ["@real-router/shared-sources", "shared"],
+  ]);
+
+  // The shape that blocked: shared present in dirOf, membership empty, and the
+  // diff naming no shared source. It must NOT throw and must NOT be sharded.
+  const plan = buildPlan(
+    [],
+    dirOf,
+    [],
+    ["packages/core/tests/functional/claim-census-ledger.json", "CLAUDE.md"],
+  );
+  assert.notEqual(plan.mode, "sharded");
+
+  // CONTROL — the same dirOf and the same empty membership, but the diff DOES
+  // name a shared source: the flag must still fire, and the #1067 guard with it.
+  assert.throws(
+    () => buildPlan([], dirOf, [], ["shared/dom-utils/x.ts"]),
+    /empty|no.*shard|misdetection/i,
+  );
+});
+
+test("routing: a shared source anywhere in the diff still forces sharded (#2378 control)", () => {
+  const dirOf = new Map([
+    ...realDirOf,
+    ["@real-router/shared-sources", "shared"],
+  ]);
+  // Mixed diff: the shared file is not first and not alone. Keying on the diff
+  // must not become "the diff is only shared files".
+  const plan = buildPlan(
+    [],
+    dirOf,
+    [...ADAPTERS],
+    ["README.md", "shared/dom-utils/link-utils.ts", "packages/core/CLAUDE.md"],
+  );
+  assert.equal(plan.mode, "sharded");
 });
 
 test("routing: ≥2 affected adapters force sharded even at N ≤ K (composition trigger)", () => {
