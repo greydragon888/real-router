@@ -56,6 +56,6 @@
     "@real-router/search-schema-plugin": "workspace:^"
   },
   "peerDependencies": {
-    "@real-router/core": "workspace:>=0.138.0"
+    "@real-router/core": "workspace:>=0.139.0"
   }
 }

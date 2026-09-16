@@ -7,6 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-16]
 
+### @real-router/core@0.139.0
+
+### Minor Changes
+
+- [#2371](https://github.com/greydragon888/real-router/pull/2371) [`dacb834`](https://github.com/greydragon888/real-router/commit/dacb834ba80b32a89e2b989746df502c3746ddbb) Thanks [@greydragon888](https://github.com/greydragon888)! - `PluginApi.logger` and `PluginApi.getDeclaredQueryNames` — two more members reach plugins without the internals door ([#2339](https://github.com/greydragon888/real-router/issues/2339))
+
+  Second slice of retiring the published `getInternals`, and the last one that needs
+  no design decision: both members satisfy the membership rule recorded in
+  `packages/core/CLAUDE.md` — shipped code outside core reaches them, and each has a
+  signature the published types can already express (`RouterLogger` is exported from
+  `@real-router/core/types`; the other takes and returns primitives).
+
+  `logger` is published as a **frozen three-method view**, never the instance. The
+  class behind the interface also carries `configure`, and the instance is not
+  frozen — measured, a holder could re-aim this router's logging for every consumer
+  at once and replace `warn` for all of them, which is the [#1805](https://github.com/greydragon888/real-router/issues/1805) hazard the frozen
+  surface exists to close. The view DELEGATES rather than copies, so a spy installed
+  on the logger afterwards is still seen; that is what the new cells assert.
+
+  `getDeclaredQueryNames` is the renamed member the migration plan asks for, and the
+  INTERNALS member is renamed with it. A differently-named pair is a drift surface by
+  construction, and the stub-seam authority's same-name rule exists to refuse exactly
+  the shape a one-sided rename would create. It ships with three hostile-input
+  vectors — a boxed name, a name the tree does not hold, and a prototype key.
+
+  Measured: shipped code outside core now reaches **four** internals members, down
+  from seven. What is left is exactly what cannot move without a decision — the two
+  stores, whose type no subpath publishes; the validator's write channel; and the
+  hydration scratchpad ([#2361](https://github.com/greydragon888/real-router/issues/2361)).
+
+  Two authorities gained a class, both derived and both narrower than the shape they
+  admit. The stub seam now accepts a call that reaches `ctx.<member>` THROUGH the
+  member (`ctx.logger.warn(…)`) — the same-name rule is untouched, so a member
+  rewired to a different internals method still fails it. The parity ledger gained a
+  VIEW class: a pair that is not identity-equal and takes no input, where what can
+  diverge is forwarding rather than an answer, and the cell asserts that instead.
+
+  ⚠ The internals members stay for now. They cannot leave while `getPluginApi` reads
+  through the same bag, and the door itself is what a later slice removes.
+
+### @real-router/validation-plugin@0.22.0
+
+### Minor Changes
+
+- [#2371](https://github.com/greydragon888/real-router/pull/2371) [`dacb834`](https://github.com/greydragon888/real-router/commit/dacb834ba80b32a89e2b989746df502c3746ddbb) Thanks [@greydragon888](https://github.com/greydragon888)! - Read `logger`, `getOptions` and the declared query names from `PluginApi` instead of the internals door ([#2339](https://github.com/greydragon888/real-router/issues/2339))
+
+  Twenty reads move: eighteen inside `buildValidatorObject`, two in the factory body.
+  Same values — `PluginApi.getOptions` was measured identical to its internals twin
+  (the same frozen object, stable across calls, nested `limits` included), and the
+  other two are the frozen logger view and the renamed call the core changeset describes.
+
+  `buildValidatorObject` now takes the plugin API beside the internals bag, and the
+  bag it still needs shrinks from four members to one: `dependenciesGetStore`, whose
+  type no subpath publishes and which a later slice dissolves into narrower members.
+  Across the whole plugin the internals reach drops from six members to three.
+
+  ⚠ Two test spies still reach `getInternals(router).logger` directly
+  (`validator-boundary-authority-2322`). That is deliberate scope: the shipped
+  consumer moved, the test seam did not, and the door census counts tests as
+  consumers on purpose.
+
+### Patch Changes
+
+- Updated dependencies [[`dacb834`](https://github.com/greydragon888/real-router/commit/dacb834ba80b32a89e2b989746df502c3746ddbb)]:
+  - @real-router/core@0.139.0
+
+
 ### @real-router/validation-plugin@0.21.0
 
 ### Minor Changes
