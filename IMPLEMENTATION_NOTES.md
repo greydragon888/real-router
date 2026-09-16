@@ -10369,3 +10369,25 @@ A size limit only means something against a fixed instrument. Swapping the bundl
 The dedupe check earns its place here. A dev-only measurement tool is exactly the kind of bump nobody validates against the published artifacts, and the only reason this one did not ship unexamined is that `lint:dedupe` turned red and named tsdown.
 
 ⚠ One claim in `.size-limit.js` inverted with the bundler and was removed rather than re-worded: under esbuild, marking core external made `logger-plugin` *bigger* (1.66 kB without `ignoreCore`, 1.74 kB with). Under rolldown the same pair measures 2168 B without and 1666 B with. The configuration was correct for reasons that never depended on that number, and the surprise it documented no longer exists.
+
+## A duplication scan that analyses nothing now fails instead of reporting clean (2026-09-16)
+
+### Problem
+
+Both duplication channels — `pnpm lint:duplicates` in pre-push and the `duplication` job's SARIF upload — treat "found no clones" and "analysed no files" as the same green. A glob that stops matching, an `ignore` entry that widens too far, a scan root that moves: each produces an empty report, exit 0, and a channel that looks healthy.
+
+This is the class the repository has already paid for once. Section "Code Duplication (SARIF)" above records eighteen analyses that uploaded results and produced ZERO alerts (#2154), and the guard written afterwards — `scripts/check-sarif-paths.mjs` — closes the half that was actually diagnosed. It does not close this half: given a report whose `results` array is empty it prints "no results to resolve" and exits 0. Measured on a crafted empty SARIF, and jscpd itself exits 0 on a scan where every file is ignored.
+
+### Solution
+
+`jscpd` 5.2.1 adds `failOnEmpty` (CLI `--fail-on-empty`), and `.jscpd.json` now carries `"failOnEmpty": true`. Both channels read that file — the npm scripts directly, and the CI job through `pnpm dlx` from the repository root — so one key covers both.
+
+Proven read rather than merely accepted, which for this tool is a real distinction: a scan with everything ignored exits **1** under 5.2.1 with the key in config, and the same scan on 5.2.0, which has no such option, exits **0**. The live channels are unaffected: 368 files, 11 clones, 0.80 % against the 2 % threshold, and the SARIF guard passes on all 22 locations.
+
+For the SARIF job a failure here is the trade its own header already declares — the step sits outside the `ci` gate's `needs`, so a red step is loud and blocks nothing, and the upload keeps `if: always()` so a broken scan still hands over whatever it produced.
+
+### Why
+
+A gate that cannot tell silence from success is not a gate, and duplication is the one metric in this repository where that has already happened for a year without anyone noticing. The 5.2.1 bump that carried this option was otherwise a measured no-op — identical clone set character for character on both channels — so the option is the whole reason the version moved.
+
+⚠ `failOnEmpty` guards the scan, not the scope. A scan that still analyses files while silently missing a directory stays green, which is what the `shared/` drift in the SARIF job's header describes; keeping the two invocations in sync remains a manual obligation.
