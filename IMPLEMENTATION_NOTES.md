@@ -2,6 +2,24 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## The bench runner reclaims under its cgroup ceiling, and nothing read the counter (2026-09-16)
+
+**Problem.** The runner unit carries `MemoryMax=5G`, added by #1746 so that a runaway becomes a local cgroup event instead of a global OOM that picks a victim on the co-tenant production workload. Reaching that ceiling makes the kernel force-**reclaim**, not kill. So `oom_kill` stays 0, the journal records nothing, and the unit's `OOMScoreAdjust=-800` / `OOMPolicy=continue` never fire — they guard the kill path, and there is no kill. Direct reclaim stalls the measured process mid-collection and re-faults its file pages, which moves exactly the components a CodSpeed `simulation` run reports. A run corrupted that way is indistinguishable from a clean one, and a CodSpeed run is not discarded whole: it seeds the baseline every later PR is compared against (#2375).
+
+**Solution.** `scripts/cgroup-sample.sh`, called around the measured step of all three benchmark jobs — `core` and `adapters` in `codspeed.yml`, and the matrix step of `cross-router-bench.yml`, which shares the host, the unit and therefore the cgroup. `capture` writes a snapshot of `memory.events` + `memory.pressure`; `report` prints the delta into the job summary and raises a `::warning` when the job reclaimed. The after-sample runs under `if: always()`, because a reclaim may be *why* the step above failed.
+
+**Measured on the host, 2026-09-16, read-only.** Cgroup started 2026-09-11 06:21 MSK, so the counters cover 5.5 days: `memory.events max` **2208** with `oom` and `oom_kill` both **0**; `MemoryPeak` 5 368 713 216 against `MemoryMax` 5 368 709 120, exactly one page over; `pgscan_direct` / `pgsteal_direct` 691 749 / 687 162; `workingset_refault_file` 87 160; `memory.pressure full` 4.62 s cumulative.
+
+⚠ **cgroup v2 counts page cache against the limit, and that is what reaches the ceiling.** #1746 sized the 5 GiB against the workload's own memory — "a healthy bench is ~1 GB per worker and CodSpeed under valgrind peaks near 1.8 GiB" — which is sound for anonymous memory and does not account for the cache these suites pull in. `workingset_refault_file` is the evidence that the evicted pages are file pages.
+
+**Why the path is derived, not hardcoded.** `resolve_cgroup` reads `/proc/self/cgroup` and takes the unified (`0::`) entry. The unit name embeds this host's IP-derived hostname; a hardcoded absolute path would survive a rename by reading a file that does not exist and reporting zeros — the failure direction that looks like good news.
+
+**Why it fails the step.** A sampler that prints zeros when it cannot read is worse than no sampler. Every unreadable path, missing field and non-numeric value exits 1 with `::error`. This is the "an error must not read as an absence" rule that `a8f0b43fb` applied to three release-path steps.
+
+**Validated by execution on the runner itself**, as `gh-runner` and as root: `capture` resolves the cgroup and writes a snapshot; a fabricated non-zero delta produces the table, the verdict block and the `::warning`; malformed input and a missing snapshot each exit 1 with `::error`. ⚑ The malformed-input control earned its keep — the first draft called `die` from inside `$( )`, where its `exit 1` leaves only the subshell, so the script continued with an empty value and failed later on an unrelated `unbound variable`. `compute` is now called plainly, and its docblock says why.
+
+⚠ **This does not reduce the reclaim and does not make a measurement correct.** A run that reclaimed still has to be thrown away; the gain is knowing which one. Whether the ceiling itself should move is a separate decision (#2376), which this instrument informs rather than pre-empts.
+
 ## pnpm 12.4 with `pmOnFail: ignore`, and a pre-commit guard for the switch it turns off (2026-09-15)
 
 **Problem.** The pnpm 12 major was held by the readers of its two-document lockfile. osv-scanner stopped being one with 2.6.0 (the entry below). GitHub's dependency graph still reads only the first document (dependabot-core #15904, and the 2026-09-15 update to the entry "pnpm 11.26 and the action pin that has to move first"): on a two-document lockfile, Dependency Review, a required check, and Dependabot alerts see pnpm's own binaries and none of the tree.

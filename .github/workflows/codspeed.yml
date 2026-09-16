@@ -353,6 +353,28 @@ jobs:
       - name: Put cargo bin dir on PATH (for cargo-installed codspeed-runner)
         run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
+      # ⚑ SAMPLE THE CGROUP AROUND THE MEASUREMENT (#2376).
+      #
+      # The runner unit carries `MemoryMax=5G` (#1746). Reaching it makes the
+      # kernel force-RECLAIM rather than kill, so `oom_kill` stays 0, the journal
+      # records nothing, and the unit's OOMScoreAdjust / OOMPolicy guards never
+      # fire — they guard the kill path, and there is no kill. Measured on the
+      # host 2026-09-16: `memory.events max` 2208 over 5.5 days, `oom_kill` 0,
+      # `MemoryPeak` exactly `MemoryMax` + one page, 692k pages of DIRECT reclaim
+      # and 87k file refaults. cgroup v2 counts page cache against the limit and
+      # these suites read heavily, so the ceiling is reached by cache.
+      #
+      # Direct reclaim stalls the measured process mid-collection and re-faults
+      # its file pages, which moves exactly the components simulation reports.
+      # #2375 is the run where that is the leading explanation: the same commit
+      # measured 27-39 % apart across two runs, with a degenerate call graph on
+      # one side, while every CodSpeed health field read clean.
+      #
+      # ⚠ This does NOT reduce the reclaim and does not make a measurement
+      # correct. It says which run to throw away.
+      - name: Sample cgroup — before
+        run: bash "$GITHUB_WORKSPACE/scripts/cgroup-sample.sh" capture "$RUNNER_TEMP/cgroup-before.txt"
+
       # CodSpeed injects its required V8 flags (--allow-natives-syntax, --no-opt,
       # …) ONLY into the process it wraps directly, and those flags can't ride
       # ⚠ #1728 briefly "corrected" this line to say `--no-opt` is not applied in
@@ -406,6 +428,15 @@ jobs:
           runner-version: rev:v4.18.4
           working-directory: packages/core
           run: node --conditions=@real-router/internal-source --import tsx tests/benchmarks/codspeed.ts
+
+      # always(): a reclaim may be WHY the step above failed, so the sample is
+      # worth more on the failing path than on the green one.
+      - name: Sample cgroup — after
+        if: always()
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/cgroup-sample.sh" capture "$RUNNER_TEMP/cgroup-after.txt"
+          bash "$GITHUB_WORKSPACE/scripts/cgroup-sample.sh" report \
+            "$RUNNER_TEMP/cgroup-before.txt" "$RUNNER_TEMP/cgroup-after.txt" "core hot-path benchmarks"
 
   adapters:
     name: Adapter hot-path benchmarks (6 frameworks)
@@ -473,6 +504,11 @@ jobs:
         # suite resolves @real-router/* to built dist — see vite/base.mts.
         run: pnpm run prebuild:adapter
 
+      # Same cgroup sampler as `core` (#2376) — same unit, same ceiling, same
+      # exposure. Its rationale is stated once, on the core job's copy.
+      - name: Sample cgroup — before
+        run: bash "$GITHUB_WORKSPACE/scripts/cgroup-sample.sh" capture "$RUNNER_TEMP/cgroup-before.txt"
+
       # runner-version: rev:… = cargo-install path (github.com + crates.io
       # only; codspeed.io is unreachable from this VPS ~50% of the time).
       # cargo self-caches the rev, so this is zero-network after the first
@@ -486,3 +522,12 @@ jobs:
           runner-version: rev:v4.18.4
           working-directory: benchmarks
           run: node --import tsx adapter-bench/codspeed.mts
+
+      # always(): a reclaim may be WHY the step above failed, so the sample is
+      # worth more on the failing path than on the green one.
+      - name: Sample cgroup — after
+        if: always()
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/cgroup-sample.sh" capture "$RUNNER_TEMP/cgroup-after.txt"
+          bash "$GITHUB_WORKSPACE/scripts/cgroup-sample.sh" report \
+            "$RUNNER_TEMP/cgroup-before.txt" "$RUNNER_TEMP/cgroup-after.txt" "adapter benchmarks"
