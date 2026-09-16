@@ -114,6 +114,15 @@ const VECTORS: Readonly<Record<string, readonly Vector[]>> = {
     // vector pins that the two agree on PRINTING it, not on refusing it.
     { input: "mis-channelled key", pub: () => ["u", { id: "7", q: "x" }] },
   ],
+  getDeclaredQueryNames: [
+    // Published by #2339's slice 2 as a CALL, so the pair is DISTINCT and owes
+    // this vector. The member reads a route's declared query names and answers
+    // for a name the tree does not hold, so the inputs worth separating are the
+    // ones that are not a plain name at all.
+    { input: "boxed route name", pub: () => [boxed("u")] },
+    { input: "unknown route name", pub: () => ["nope"] },
+    { input: "prototype key as a route name", pub: () => ["__proto__"] },
+  ],
   forwardState: [
     { input: "junk search channel", pub: () => ["u", { id: "7" }, 42] },
     { input: "boxed route name", pub: () => [boxed("u"), { id: "7" }] },
@@ -296,6 +305,20 @@ const plainAliases = (router: Router): string[] => {
   return sharedPairs(router).filter((k) => pub[k] === int[k]);
 };
 
+/**
+ * A pair where the public side is a capability-limited VIEW of the internal
+ * value — not identity-equal, so not an alias, and not a function, so a
+ * hostile-input vector could only be vacuous. What can diverge is whether the
+ * view still FORWARDS, which the cell below asserts instead.
+ */
+const viewPairs = (router: Router): string[] => {
+  const { pub, int } = surfaces(router);
+
+  return sharedPairs(router).filter(
+    (k) => pub[k] !== int[k] && typeof pub[k] === "object",
+  );
+};
+
 describe("an internal door answers what its guarded sibling answers (#2258 / #2259)", () => {
   it("derives the pair set from the live surfaces, and it is not empty", async () => {
     // POSITIVE control for every cell below: an empty derivation is also what a
@@ -322,13 +345,44 @@ describe("an internal door answers what its guarded sibling answers (#2258 / #22
     router.stop();
   });
 
+  it("classifies the VIEW pairs, and each one still forwards", async () => {
+    const router = await build(false);
+
+    expect(viewPairs(router)).toStrictEqual(["logger"]);
+
+    // `logger` is published as a frozen three-method view (#2339 slice 3): the
+    // instance carries `configure`, which would let a holder re-aim this
+    // router's logging for everyone. The view is what closes that, so the pair
+    // is distinct BY DESIGN — and the only way it can go wrong is by ceasing to
+    // forward, which a copied method would do silently.
+    const { pub, int } = surfaces(router);
+    const view = pub.logger as Record<string, (...a: unknown[]) => void>;
+    const instance = int.logger as Record<string, unknown>;
+    const seen: string[] = [];
+
+    for (const method of ["log", "warn", "error"]) {
+      instance[method] = (_context: string, message: string): void => {
+        seen.push(`${method}:${message}`);
+      };
+
+      view[method]("ctx", method);
+    }
+
+    expect(seen).toStrictEqual(["log:log", "warn:warn", "error:error"]);
+    expect(Object.isFrozen(view)).toBe(true);
+
+    router.stop();
+  });
+
   it("has a probe vector for every DISTINCT pair — the ratchet", async () => {
     // A door added to `RouterInternals` beside a guarded sibling is unprobed
     // until it appears here. Inheriting the weaker side silently is how the
     // #2243–#2256 wave was generated.
     const router = await build(false);
-    const aliases = new Set(plainAliases(router));
-    const distinct = sharedPairs(router).filter((k) => !aliases.has(k));
+    // Views are excluded for the reason the cell above gives: they are distinct
+    // by design and take no input, so a vector on them could only be vacuous.
+    const exempt = new Set([...plainAliases(router), ...viewPairs(router)]);
+    const distinct = sharedPairs(router).filter((k) => !exempt.has(k));
 
     expect(distinct.filter((k) => !(k in VECTORS))).toStrictEqual([]);
     expect(
@@ -405,6 +459,9 @@ const BASELINE_BARE: readonly string[] = [
   "buildPathResolved · junk search channel → same",
   "buildPathResolved · drifting bag → same",
   "buildPathResolved · mis-channelled key → same",
+  "getDeclaredQueryNames · boxed route name → same",
+  "getDeclaredQueryNames · unknown route name → same",
+  "getDeclaredQueryNames · prototype key as a route name → same",
   "forwardState · junk search channel → same",
   "forwardState · boxed route name → same",
   "makeState · mis-channelled key → same",
@@ -437,6 +494,9 @@ const BASELINE_WITH_PLUGIN: readonly string[] = [
   "buildPathResolved · junk search channel → same",
   "buildPathResolved · drifting bag → same",
   "buildPathResolved · mis-channelled key → same",
+  "getDeclaredQueryNames · boxed route name → same",
+  "getDeclaredQueryNames · unknown route name → same",
+  "getDeclaredQueryNames · prototype key as a route name → same",
   "forwardState · junk search channel → BYPASS",
   "forwardState · boxed route name → BYPASS",
   "makeState · mis-channelled key → same",

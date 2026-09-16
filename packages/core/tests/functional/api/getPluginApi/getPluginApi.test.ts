@@ -11,6 +11,7 @@ import {
   getPluginApi,
   getRoutesApi,
 } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -454,5 +455,60 @@ describe("setRootPath refuses while a navigation is in flight (#1755)", () => {
     expect(code).toBe(errorCodes.REENTRANT_TREE_MUTATION);
 
     r.dispose();
+  });
+
+  describe("the two members published by #2339 slice 2", () => {
+    it("getDeclaredQueryNames answers a route's DECLARED query names, path slots excluded", () => {
+      expect(api.getDeclaredQueryNames("section.query")).toStrictEqual([
+        "param1",
+        "param2",
+        "param3",
+      ]);
+      // `section` is a PATH slot on the parent, so it is not a query name
+      expect(api.getDeclaredQueryNames("section.view")).toStrictEqual([]);
+    });
+
+    it("getDeclaredQueryNames answers for a route the tree does not hold", () => {
+      // The door is total, like its internals twin — a name is not a claim that
+      // the route exists, and `internals-parity-authority-2258` pins the pair.
+      expect(api.getDeclaredQueryNames("nope")).toStrictEqual([]);
+    });
+
+    it("logger is a frozen three-method view, not the instance", () => {
+      expect(api.logger).toBe(getPluginApi(router).logger);
+      expect(Object.isFrozen(api.logger)).toBe(true);
+      expect(
+        Object.keys(api.logger).toSorted((a, b) => a.localeCompare(b)),
+      ).toStrictEqual(["error", "log", "warn"]);
+
+      // The instance behind it carries `configure`, which would let any holder
+      // re-aim this router's logging for every consumer at once. The view is
+      // what closes that, so the absence is the assertion.
+      expect(
+        (api.logger as unknown as { configure?: unknown }).configure,
+      ).toBeUndefined();
+    });
+
+    it("the view DELEGATES, so a spy installed after the surface is built lands", () => {
+      // Built before the spy: if the view had copied the methods, the spy would
+      // be missed — which is the difference between this class and an alias.
+      const seen: string[][] = [];
+
+      for (const method of ["log", "warn", "error"] as const) {
+        vi.spyOn(getInternals(router).logger, method).mockImplementation(
+          (context, message) => {
+            seen.push([method, context, message]);
+          },
+        );
+
+        api.logger[method]("ctx", `${method}-message`);
+      }
+
+      expect(seen).toStrictEqual([
+        ["log", "ctx", "log-message"],
+        ["warn", "ctx", "warn-message"],
+        ["error", "ctx", "error-message"],
+      ]);
+    });
   });
 });

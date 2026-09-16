@@ -95,6 +95,7 @@ import {
 import type { EventName, EventMethodMap } from "./validators/eventBus";
 import type {
   DefaultDependencies,
+  PluginApi,
   PluginFactory,
   RouterValidator,
   Route,
@@ -107,6 +108,7 @@ function buildValidatorObject<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
   ctx: RouterInternals<Dependencies>,
+  api: PluginApi,
   defaultsWatch: DefaultsMutationWatch,
 ): RouterValidator {
   // One de-dup cache per validator object, i.e. per registration, i.e. per router
@@ -114,7 +116,7 @@ function buildValidatorObject<
   // reason: a module-level Set would let the first router in a process silence
   // every one after it.
   const reportMisChanneledKey = createMisChanneledKeyReporter((routeName) =>
-    ctx.getQueryParams(routeName),
+    api.getDeclaredQueryNames(routeName),
   );
 
   return {
@@ -248,17 +250,17 @@ function buildValidatorObject<
         validateDependencyExistsRaw(value, name);
       },
       validateDependencyCount(store, methodName) {
-        validateDependencyCount(store, methodName, ctx.logger);
+        validateDependencyCount(store, methodName, api.logger);
       },
       validateCloneArgs,
       warnOverwrite(name, methodName) {
-        warnDepsOverwrite(name, methodName, ctx.logger);
+        warnDepsOverwrite(name, methodName, api.logger);
       },
       warnBatchOverwrite(keys, methodName) {
-        warnBatchOverwrite(keys, methodName, ctx.logger);
+        warnBatchOverwrite(keys, methodName, api.logger);
       },
       warnRemoveNonExistent(name) {
-        warnRemoveNonExistent(name, ctx.logger);
+        warnRemoveNonExistent(name, api.logger);
       },
     },
     plugins: {
@@ -273,46 +275,46 @@ function buildValidatorObject<
       validatePluginKeys,
       validateCountThresholds(count) {
         const maxPlugins =
-          ctx.getOptions().limits?.maxPlugins ?? CORE_LIMIT_DEFAULTS.maxPlugins;
+          api.getOptions().limits?.maxPlugins ?? CORE_LIMIT_DEFAULTS.maxPlugins;
 
-        validatePluginCountThresholds(count, maxPlugins, ctx.logger);
+        validatePluginCountThresholds(count, maxPlugins, api.logger);
       },
       warnBatchDuplicates() {
-        warnBatchDuplicates(ctx.logger);
+        warnBatchDuplicates(api.logger);
       },
       warnPluginMethodType(methodName) {
-        warnPluginMethodType(methodName, ctx.logger);
+        warnPluginMethodType(methodName, api.logger);
       },
       warnPluginAfterStart(methodName) {
-        warnPluginAfterStart(methodName, ctx.logger);
+        warnPluginAfterStart(methodName, api.logger);
       },
     },
     lifecycle: {
       validateHandler,
       validateHandlerLimit(count, methodName) {
         const maxHandlers =
-          ctx.getOptions().limits?.maxLifecycleHandlers ??
+          api.getOptions().limits?.maxLifecycleHandlers ??
           CORE_LIMIT_DEFAULTS.maxLifecycleHandlers;
 
         validateHandlerLimit(count, methodName, maxHandlers);
       },
       validateCountThresholds(count, methodName) {
         const maxHandlers =
-          ctx.getOptions().limits?.maxLifecycleHandlers ??
+          api.getOptions().limits?.maxLifecycleHandlers ??
           CORE_LIMIT_DEFAULTS.maxLifecycleHandlers;
 
         validateLifecycleCountThresholds(
           count,
           methodName,
           maxHandlers,
-          ctx.logger,
+          api.logger,
         );
       },
       warnOverwrite(name, type, methodName) {
-        warnLifecycleOverwrite(name, type, methodName, ctx.logger);
+        warnLifecycleOverwrite(name, type, methodName, api.logger);
       },
       warnAsyncGuardSync(name, methodName) {
-        warnAsyncGuardSync(name, methodName, ctx.logger);
+        warnAsyncGuardSync(name, methodName, api.logger);
       },
     },
     navigation: {
@@ -327,7 +329,7 @@ function buildValidatorObject<
         // zero reads, and `buildPath` refuses a missing param rather than filling
         // it from the option. An application that never calls this is never
         // charged for the check.
-        defaultsWatch.check(ctx.logger);
+        defaultsWatch.check(api.logger);
       },
       validateNavigateToStateArgs,
       validateNavigationOptions,
@@ -371,14 +373,14 @@ function buildValidatorObject<
       },
       validateCountThresholds(count, eventName, methodName) {
         const maxListeners =
-          ctx.getOptions().limits?.maxListeners ??
+          api.getOptions().limits?.maxListeners ??
           CORE_LIMIT_DEFAULTS.maxListeners;
 
         validateListenerCountThresholds(
           count,
           eventName,
           methodName,
-          ctx.logger,
+          api.logger,
           maxListeners,
         );
       },
@@ -405,6 +407,7 @@ export function validationPlugin<
   // eslint-disable-next-line unicorn/consistent-function-scoping
   return (router) => {
     const ctx = getInternals(router);
+    const api = getPluginApi(router);
 
     if (router.isActive()) {
       throw freezeThrownError(
@@ -437,14 +440,14 @@ export function validationPlugin<
 
     // ⚠ BEFORE the validator goes live, so the first `navigateToDefault` after
     // this line already has a baseline to compare against.
-    defaultsWatch.watch(getPluginApi(router).getAdoptedOrigins());
+    defaultsWatch.watch(api.getAdoptedOrigins());
 
-    ctx.validator = buildValidatorObject(ctx, defaultsWatch);
+    ctx.validator = buildValidatorObject(ctx, api, defaultsWatch);
 
     try {
       const store = ctx.routeGetStore();
       const deps = ctx.dependenciesGetStore();
-      const options = ctx.getOptions();
+      const options = api.getOptions();
 
       validateExistingRoutes(store);
       validateForwardToConsistency(store);
@@ -478,29 +481,26 @@ export function validationPlugin<
     // the next to throw — an `onStart` here turns the advertised number into
     // 9999 for every application that installs this plugin. Interceptors are
     // counted against nothing.
-    const removeInterceptor = getPluginApi(router).addInterceptor(
-      "start",
-      (next, path) => {
-        // ⚠ The diagnostic must NEVER be worse than its own absence. A start
-        // interceptor WRAPS the call, so an unguarded throw here rejects
-        // `start()` and leaves the router inactive — measured, core turns it
-        // into "a `start` interceptor returned without calling next()". A
-        // `$start` listener would have swallowed it instead, so this catch is
-        // what buys the same safety explicitly rather than by accident.
-        /* v8 ignore start -- @preserve: the catch exists so a bug in the
+    const removeInterceptor = api.addInterceptor("start", (next, path) => {
+      // ⚠ The diagnostic must NEVER be worse than its own absence. A start
+      // interceptor WRAPS the call, so an unguarded throw here rejects
+      // `start()` and leaves the router inactive — measured, core turns it
+      // into "a `start` interceptor returned without calling next()". A
+      // `$start` listener would have swallowed it instead, so this catch is
+      // what buys the same safety explicitly rather than by accident.
+      /* v8 ignore start -- @preserve: the catch exists so a bug in the
            diagnostic cannot reject `start()`; by construction nothing above it
            throws, so the arm has no reachable input. Removing it is the change
            this comment exists to argue against. */
-        try {
-          warnOrphanedGuards(ctx.routeGetStore(), ctx.logger);
-        } catch {
-          // A broken diagnostic is not the application's problem.
-        }
-        /* v8 ignore stop */
+      try {
+        warnOrphanedGuards(ctx.routeGetStore(), api.logger);
+      } catch {
+        // A broken diagnostic is not the application's problem.
+      }
+      /* v8 ignore stop */
 
-        return next(path);
-      },
-    );
+      return next(path);
+    });
 
     return {
       teardown() {

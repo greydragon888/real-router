@@ -487,14 +487,12 @@ describe("consumer census (#2303)", () => {
       getDependenciesApi: sorted(hits.getDependenciesApi.src),
       getLifecycleApi: sorted(hits.getLifecycleApi.src),
     }).toStrictEqual({
-      // ⚠ `getQueryParams` is here only because the parameter idiom is counted;
-      // it is `validation-plugin`'s, through a lazy callback that re-reads.
+      // ⚠ What is LEFT here is what #2339 cannot move without a decision: two
+      // stores whose type no subpath publishes, the validator's write channel
+      // (§4 1a) and the hydration scratchpad (#2361).
       getInternals: [
         "dependenciesGetStore",
-        "getOptions",
-        "getQueryParams",
         "hydrationState",
-        "logger",
         "routeGetStore",
         "validator",
       ],
@@ -507,10 +505,12 @@ describe("consumer census (#2303)", () => {
         "extendRouter",
         "forwardState",
         "getAdoptedOrigins",
+        "getDeclaredQueryNames",
         "getOptions",
         "getRootPath",
         "getRouteConfig",
         "getTree",
+        "logger",
         "makeState",
         "matchPath",
         "setRootPath",
@@ -583,10 +583,7 @@ describe("consumer census (#2303)", () => {
     // channel and prices closing it.
     expect(rows).toStrictEqual({
       "getInternals.getCloneState()": { src: [], tests: ["limits"] },
-      "getInternals.getOptions()": {
-        src: ["defaultRoute", "limits"],
-        tests: ["queryParams"],
-      },
+      "getInternals.getOptions()": { src: [], tests: ["queryParams"] },
       "getInternals.routeGetStore()": {
         src: [],
         tests: ["config", "matcher", "matcherOptions", "tree"],
@@ -605,7 +602,10 @@ describe("consumer census (#2303)", () => {
         src: ["name", "params", "search"],
         tests: ["name"],
       },
-      "getPluginApi.getOptions()": { src: ["allowNotFound"], tests: [] },
+      "getPluginApi.getOptions()": {
+        src: ["allowNotFound", "defaultRoute", "limits"],
+        tests: [],
+      },
       "getPluginApi.makeState()": {
         src: [],
         tests: ["name", "params", "path"],
@@ -674,10 +674,12 @@ describe("consumer census (#2303)", () => {
         "contextClaimRecords",
         "emitTransitionError",
         "forwardState",
-        // ⚑ Untouched from 09-15: its only consumer outside core moved to the
-        // `PluginApi` twin (#2339 slice 1). The internals member is now dead
-        // weight, which is the state slice 7 removes.
+        // ⚑ Untouched: their only consumer outside core moved to the `PluginApi`
+        // twin — `getAdoptedOrigins` in #2339 slice 1, `getDeclaredQueryNames` and
+        // `logger` in slice 2. The internals members are now dead weight, which
+        // is the state the door's removal clears.
         "getAdoptedOrigins",
+        "getDeclaredQueryNames",
         "getMetaForState",
         "getRootPath",
         "getStateName",

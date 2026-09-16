@@ -568,7 +568,7 @@ export class Router<
         return this.#state.makeState(name, ownParams, search, path);
       },
       getMetaForState: (name) => this.#routes.getMetaForState(name),
-      getQueryParams: (name) => this.#routes.getQueryParams(name),
+      getDeclaredQueryNames: (name) => this.#routes.getQueryParams(name),
       forwardState,
       buildStateResolved: (name, params) =>
         this.#routes.buildStateResolved(name, params),
