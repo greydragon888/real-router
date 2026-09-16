@@ -75,12 +75,19 @@ jobs:
       # against them via artifact download — instead of re-checking-out,
       # re-installing, and re-bundling the base branch on every PR (#734).
       # size-limit exits non-zero when a limit is exceeded but still prints the
-      # JSON report; capture it and keep the step green (this is a measurement,
-      # not a gate). The guard guarantees valid JSON even if nothing was emitted.
+      # JSON report, so the exit code is not the signal here — the report is.
+      # The step stays green either way (this is a measurement, not a gate), but
+      # it no longer stays SILENT: size-limit's stderr reaches the log, and a
+      # report that is missing or is not a non-empty array is announced before
+      # the fallback. An empty base is not free — it makes every package in
+      # every PR's size diff read as "new".
       - name: Measure bundle sizes (base for PR diffs)
         run: |
-          npx size-limit --json > master-bundle-sizes.json 2>/dev/null || true
-          [ -s master-bundle-sizes.json ] || echo '[]' > master-bundle-sizes.json
+          npx size-limit --json > master-bundle-sizes.json || true
+          if ! node -e 'const r = JSON.parse(require("fs").readFileSync("master-bundle-sizes.json", "utf8")); if (!Array.isArray(r) || r.length === 0) process.exit(1)' 2>/dev/null; then
+            echo "::warning title=Base bundle sizes unavailable::size-limit produced no usable report (see this step's log) — PR size diffs will show every package as new"
+            echo '[]' > master-bundle-sizes.json
+          fi
 
       - name: Upload base bundle sizes
         uses: actions/upload-artifact@v7

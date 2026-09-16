@@ -397,8 +397,16 @@ jobs:
             tag="${pname}@${version}"
             git rev-parse -q --verify "refs/tags/${tag}" >/dev/null && continue
             # Tag missing — backfill only if npm really has this exact version
-            # (a never-published new package legitimately has no tag).
-            pnpm view "${tag}" version >/dev/null 2>&1 || continue
+            # (a never-published new package legitimately has no tag). The
+            # preflight's classifier answers that, and keeps "the registry says
+            # no" apart from "the registry did not answer": the bare
+            # `pnpm view … >/dev/null 2>&1 || continue` read a 5xx, a timeout or
+            # an auth failure as "not published" and skipped the backfill in
+            # silence — the one case where the tag is genuinely lost.
+            if ! npm_version=$(node .changeset/unpublished-packages.mjs --published-version "${tag}"); then
+              exit 1 # the script printed ::error:: with the registry's answer
+            fi
+            [ -n "$npm_version" ] || continue
             echo "🏷️  Backfilling missing tag ${tag} at ${HEAD_SHA}"
             gh api "repos/${GITHUB_REPOSITORY}/git/refs" -f ref="refs/tags/${tag}" -f sha="${HEAD_SHA}" --silent
             git tag "${tag}" "${HEAD_SHA}"

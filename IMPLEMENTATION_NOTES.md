@@ -10215,3 +10215,37 @@ file; a branch that is not `HEAD`; `HEAD~1:refs/heads/older`; an annotated tag; 
 a tree that changes mid-hook; a detached `HEAD:master` — plus `HEAD` moving mid-hook, and it
 requires the start block ahead of the first step and nothing between the end block and "✅". Its
 git runs with none of the caller's `GIT_*` variables and no global or system config.
+
+## Three places where a failure read as an answer (2026-09-15)
+
+**Problem.** The reconcile saga above was one instance of a shape the repo had in three more
+places: a command's failure silently became a datum. `changesets.yml`'s tag backfill asked
+`pnpm view "$tag" version >/dev/null 2>&1 || continue`, so a 5xx, a timeout or an auth failure read
+as "npm does not have this version" and the missing tag was not backfilled — the one case where a
+tag is genuinely lost. `post-merge.yml` measured the base bundle sizes with
+`npx size-limit --json > … 2>/dev/null || true` followed by `[ -s … ] || echo '[]'`, so a broken
+measurement became an empty base — and an empty base makes every package in every PR's size diff
+read as "new". `ci.yml`'s bundle-size job fetched that base with `gh run list … 2>/dev/null || true`,
+where an API failure and "no post-merge run yet" ended in the same `[]` and the same `ℹ️` line.
+
+**Solution.** Each site separates "the answer is no" from "there was no answer".
+
+1. The backfill calls `.changeset/unpublished-packages.mjs --published-version <name@version>` —
+   the classifier the publish preflight already uses. A missing package or a missing version prints
+   nothing and exits 0 (skip the tag); anything else retries once and then exits 1 with an
+   `::error::` carrying the registry's words. Measured with pnpm 12.4.1: an absent package answers
+   `ERR_PNPM_FETCH_404`, an absent version `ERR_PNPM_PACKAGE_NOT_FOUND` + "No matching version
+   found" — two answers, and the classifier's pattern names both.
+2. post-merge keeps size-limit's stderr in the log and warns when the report is missing or is not a
+   non-empty array, before falling back to `[]`.
+3. The PR job tells the two cases apart: no successful post-merge run yet stays an `ℹ️`, while a
+   failing `gh run list` — or a run whose artifact will not download — is a `::warning::` with gh's
+   stderr in the log.
+
+**Why warnings, not failures.** Both bundle-size sites are measurements, and neither job is a gate;
+turning them red would stop PRs on a registry hiccup. A warning shows in the run's annotation
+summary, which `[]` and a green log did not.
+
+**Guard.** `scripts/release-workflow.test.mjs` pins the classifier's spec half with `pnpm` stubbed
+on PATH: a version prints, a missing package and a missing version print nothing and exit 0 without
+a retry, and a 5xx retries once and exits non-zero with the annotation.
