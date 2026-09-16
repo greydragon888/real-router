@@ -442,7 +442,27 @@ export function validationPlugin<
     // this line already has a baseline to compare against.
     defaultsWatch.watch(api.getAdoptedOrigins());
 
-    ctx.validator = buildValidatorObject(ctx, api, defaultsWatch);
+    // ⚑ The object is held so teardown can prove it is still the holder.
+    // The slot has no owner — `RouterInternals.validator` is plain data on a
+    // surface pinned `accessorNames === []`, so a second writer cannot be
+    // REFUSED here. What it can be is not silently destroyed: an
+    // unconditional `= null` on teardown nulls whoever holds the slot now.
+    // Measured: with a second writer in place, teardown destroyed the
+    // foreign validator; the control (no second writer) nulled its own.
+    // Same shape as `claimContextNamespace`, which checks the holder on
+    // write and on release (#2059 / #1929) — here only the release half is
+    // reachable, and the write half waits for the slot to go away.
+    const ownValidator = buildValidatorObject(ctx, api, defaultsWatch);
+    // One branch, shared by the error path below and by `teardown`: both ask
+    // the same question, so they share the site rather than each growing an
+    // arm the other's test has to reach.
+    const releaseIfStillOurs = () => {
+      if (ctx.validator === ownValidator) {
+        ctx.validator = null;
+      }
+    };
+
+    ctx.validator = ownValidator;
 
     try {
       const store = ctx.routeGetStore();
@@ -464,7 +484,7 @@ export function validationPlugin<
         validateResolvedDefaultRoute(options.defaultRoute, store);
       }
     } catch (error) {
-      ctx.validator = null;
+      releaseIfStillOurs();
 
       throw error;
     }
@@ -505,7 +525,8 @@ export function validationPlugin<
     return {
       teardown() {
         removeInterceptor();
-        ctx.validator = null;
+
+        releaseIfStillOurs();
       },
     };
   };

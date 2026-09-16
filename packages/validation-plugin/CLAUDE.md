@@ -166,9 +166,13 @@ regression — the shape recurred once already (#1579 copied #1575's module-leve
 call sites. It flags only ACCUMULATING state: a frozen lookup table is fine, and
 so is a `WeakMap` keyed by an object, which evicts with its key.
 
-### Teardown disables validation
+### Teardown disables validation — but only the validator it still holds
 
-Calling the unsubscribe function returned by `router.usePlugin(validationPlugin())` sets `ctx.validator = null`. All subsequent router calls skip validation silently. This is by design — plugins are removable.
+Calling the unsubscribe function returned by `router.usePlugin(validationPlugin())` clears `ctx.validator`. All subsequent router calls skip validation silently. This is by design — plugins are removable.
+
+⚠ **The release is owner-checked (#2339 §4 1b).** The plugin holds the object it wrote and nulls the slot only while that object is still there. `RouterInternals.validator` has no owner — it is plain data on a surface pinned `accessorNames === []`, so a second writer cannot be REFUSED at the slot — and an unconditional `= null` therefore destroyed whoever held the slot at teardown time. Measured with a control: with a second writer in place the foreign validator was nulled; with none, the plugin correctly nulled its own. Same shape as `claimContextNamespace`, which checks the holder on write and on release (#2059 / #1929); here only the release half is reachable.
+
+⚠ **The WRITE half stays open, deliberately.** Refusing a second write needs an accessor on `RouterInternals`, and `accessorNames === []` is pinned on all six handed-out surfaces (`door-census/surface.test.ts`). It is answered where the slot goes away, not here — #2373.
 
 ### Cross-field `Options` validation
 
