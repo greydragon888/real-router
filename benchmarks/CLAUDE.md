@@ -94,11 +94,21 @@ Weekly `schedule` + `workflow_dispatch(runs=100)` runs the full 5-cohort matrix 
 pnpm cpu                # Check CPU load before benchmarking (run from benchmarks/)
 ```
 
-⚠ There is no `bench:type-check` / `bench:lint` script — neither at the root nor
-here. `benchmarks` is a private workspace package with no `lint` or `type-check`
-task, so turbo skips it and the root gates never reach this tree. Checking a
-change by hand takes **six** configs, and `benchmarks/tsconfig.json` is not one
-of them — it holds no file of its own:
+`lint:bench` is ESLint over this whole tree, and pre-push runs it after its
+build. Run it through turbo — `pnpm turbo run lint:bench --filter=router-benchmarks`
+— because the Angular apps resolve `@real-router/*` through `dist/`, which
+`^bundle` builds first.
+
+⚠ **A lint fix in `cross-router/apps` or `adapter-bench/apps` must leave the
+built bundle byte-identical.** The results were measured on those bytes. The
+rules whose fixes change the program are off for those paths in this
+directory's `eslint.config.mjs`, each with the measurement behind it; before
+trusting a new fix there, build the touched apps before and after it and compare
+the outputs.
+
+⚠ There is no `bench:type-check` script — neither at the root nor here, so no
+gate type-checks this tree. Checking a change by hand takes **six** configs, and
+`benchmarks/tsconfig.json` is not one of them — it holds no file of its own:
 
 ```bash
 tsc --noEmit -p benchmarks/adapter-bench/tsconfig.json            # adapter-bench + plugin-seam (all but the two below)

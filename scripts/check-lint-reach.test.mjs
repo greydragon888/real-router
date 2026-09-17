@@ -167,18 +167,20 @@ test("an exemption excuses exactly its package, and goes stale once that package
   assert.deepEqual(excused.staleExemptions, []);
 
   assert.deepEqual(
-    reach({ exempt: new Map([["react-basic-example", "#0"]]) })
-      .staleExemptions,
+    reach({ exempt: new Map([["react-basic-example", "#0"]]) }).staleExemptions,
     ["react-basic-example"],
   );
   assert.deepEqual(
-    reach({ exempt: new Map([["no-such-package", "#0"]])}).staleExemptions,
+    reach({ exempt: new Map([["no-such-package", "#0"]]) }).staleExemptions,
     ["no-such-package"],
   );
 });
 
 test("a verdict over nothing is refused, not passed", () => {
-  assert.match(reach({ hookText: "#!/bin/sh\necho hi" }).vacuous, /no `pnpm turbo run`/);
+  assert.match(
+    reach({ hookText: "#!/bin/sh\necho hi" }).vacuous,
+    /no `pnpm turbo run`/,
+  );
   assert.match(
     reach({ hookText: "pnpm turbo run build", scripts: {} }).vacuous,
     /lints any package/,
@@ -195,14 +197,20 @@ test("a hook task turbo.json does not define fails loudly", () => {
 // ─── the pieces ──────────────────────────────────────────────────────────────
 
 test("the real pre-push hook is readable by the parser", () => {
-  const runs = turboRuns(readFileSync(path.join(ROOT, ".husky/pre-push"), "utf8"));
+  const runs = turboRuns(
+    readFileSync(path.join(ROOT, ".husky/pre-push"), "utf8"),
+  );
 
   assert.ok(runs.length > 0, "pre-push has no `pnpm turbo run` line");
 });
 
 test("quotes are removed from flag values, and comment lines are not invocations", () => {
   assert.deepEqual(turboRuns(HEALTHY_HOOK), [
-    { line: 3, tasks: ["build", "lint:package"], flags: ["--filter=!./examples/**"] },
+    {
+      line: 3,
+      tasks: ["build", "lint:package"],
+      flags: ["--filter=!./examples/**"],
+    },
     { line: 4, tasks: ["lint:example"], flags: ["--filter=./examples/**"] },
   ]);
 });
@@ -230,10 +238,13 @@ test("only a lint task with a real command counts as linted", () => {
     ],
   });
 
-  assert.deepEqual([...linted], [
-    ["c", ["eslint ."]],
-    ["d", ["eslint src/", "eslint ."]],
-  ]);
+  assert.deepEqual(
+    [...linted],
+    [
+      ["c", ["eslint ."]],
+      ["d", ["eslint src/", "eslint ."]],
+    ],
+  );
 });
 
 test("a shared dir is read only when a command names its alias as a whole path", () => {

@@ -4,7 +4,7 @@
 // output and the tracked tree; `check-lint-reach.test.mjs` feeds them fixtures.
 
 /** Tasks that run ESLint over a package. */
-export const LINT_TASKS = new Set(["lint", "lint:example"]);
+export const LINT_TASKS = new Set(["lint", "lint:example", "lint:bench"]);
 
 /** What ESLint reads here: `eslint.config.mjs` ignores `*.mjs` and `*.d.ts` globally. */
 const LINTABLE = /(?<!\.d)\.(?:[cm]?ts|tsx|c?js|jsx)$/;
@@ -43,7 +43,8 @@ export function turboRuns(hookText) {
     }
 
     const words =
-      text.slice(TURBO_RUN.length).match(/(?:[^\s'"]+|'[^']*'|"[^"]*")+/g) ?? [];
+      text.slice(TURBO_RUN.length).match(/(?:[^\s'"]+|'[^']*'|"[^"]*")+/g) ??
+      [];
     const args = words.map((word) => word.replaceAll(/['"]/g, ""));
 
     runs.push({
