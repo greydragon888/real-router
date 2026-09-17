@@ -10491,3 +10491,33 @@ For the SARIF job a failure here is the trade its own header already declares �
 A gate that cannot tell silence from success is not a gate, and duplication is the one metric in this repository where that has already happened for a year without anyone noticing. The 5.2.1 bump that carried this option was otherwise a measured no-op — identical clone set character for character on both channels — so the option is the whole reason the version moved.
 
 ⚠ `failOnEmpty` guards the scan, not the scope. A scan that still analyses files while silently missing a directory stays green, which is what the `shared/` drift in the SARIF job's header describes; keeping the two invocations in sync remains a manual obligation.
+
+## typescript-eslint 8.70: a stale pin removed, and two rules scoped around deliberate idioms (2026-09-17)
+
+### Problem
+
+One bump surfaced three separate things.
+
+**The pin had outlived its cause.** When typescript-eslint unpublished 8.63.0 (2026-07-11), `pnpm-workspace.yaml` pinned seven `@typescript-eslint/*` packages to 8.62.0, under a comment that said to remove the block on the next typescript-eslint bump. The 8.62.0 → 8.65.0 bump did not. From then on the root `typescript-eslint@8.65.0` — which declares its siblings at an exact 8.65.0 — ran its rules on `utils`, `typescript-estree`, `scope-manager` and `types` from 8.62.0. The override won without a sound: install passed and lint passed. Nothing recorded the pin outside that comment.
+
+**New detection reached the gate.** 8.69.0 extends `no-meaningless-void-operator` to non-call expressions, and 8.70.0 adds `no-generated-empty-object-type` to `strictTypeChecked`, which the root config spreads. Every `packages/*` workspace linted as its own `lint` script does, read-only, gave 1846 files and 0 messages before the bump and 13 messages after, over the same file set.
+
+**All thirteen are deliberate idioms.** Eight are `void bag.prop` in core tests: a read through a counting getter, and `hostile-bags-battery` asserts the count straight after the read, so the rule's autofix — deleting the read — fails that test. The other five resolve to `{}` on purpose: `Record<never, never>` as the FSM's "no payload map" default, and `asserts value is NonNullable<unknown>` in validation-plugin, where `{}` is precisely "any non-nullish value". TypeScript has no other spelling for either. Three of the thirteen sit in `packages/*/src`, where any edit needs a changeset.
+
+### Solution
+
+The pin is removed, after checking both of its premises: 8.63.0 is back on the registry, and all ten `@typescript-eslint/*` packages exist at 8.70.0.
+
+Removing the pin and running `pnpm dedupe` was not enough. The lockfile then carried three parallel copies of the family — 8.62.0, 8.65.0 and 8.70.0 — because two optional peers keep their old resolution: `@vitest/eslint-plugin` held `@typescript-eslint/eslint-plugin@8.65.0` with its exact 8.65.0 siblings, and `eslint-plugin-import-x` held `utils@8.62.0`. pnpm does not re-resolve a range that is already satisfied, and `lint:dedupe` stays green on peer variants. `pnpm update -r '@typescript-eslint/*'` re-resolves them: every package of the family now resolves to the single version 8.70.0, both plugins load 8.70.0 at runtime, no manifest gains a direct dependency, and nothing outside the family changes version. The `pnpm dedupe` that follows only rewrites peer suffixes. The one peer suffix on a publishing builder's path — `svelte@5.57.0` and `@sveltejs/vite-plugin-svelte@7.3.0`, whose optional `@typescript-eslint/types` peer moves — changes no code: no JavaScript file in `svelte` imports `@typescript-eslint`.
+
+Before that step, a census with the family forced to 8.70.0 through a temporary override gave the identical 13 findings, per rule and per package, as the three-copy state did. So the copies never changed what lint reports; unifying them removes a toolchain that lints with code the manifest does not name.
+
+The two rules are scoped in the package configs, leaving `src` untouched: `no-meaningless-void-operator` is off for core's tests, and `no-generated-empty-object-type` is off for core's `src/utils/fsm/**` plus its fsm tests and for validation-plugin's `src/validators/dependencies.ts`. A probe placed the same three constructs inside and outside each exemption: each rule stays silent only inside its own scope and still reports everywhere else. The final census gives 1846 files and 0 messages.
+
+### Why
+
+A pin that encodes a registry incident is a promise to remove it, and this one had already broken that promise once while every gate stayed green. Removing it is what makes the version in `package.json` the version that lints.
+
+The findings were suppressed rather than fixed because they are not defects: the rules cannot see a getter's side effect or an intentional `{}`. Scoping by file keeps both rules on for the code they were added to protect, and keeps an infrastructure bump out of published source.
+
+⚠ `pnpm dedupe` does not collapse a family split across peer variants, and a green `lint:dedupe` does not show the split. Read the resolved versions of the family itself — `pnpm update -r '<scope>/*'` is the step that re-resolves them, and it needs no pin.

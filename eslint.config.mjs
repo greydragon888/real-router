@@ -207,7 +207,6 @@ export default tsEslint.config(
   // ============================================
   // 5. TYPESCRIPT CONFIGURATION
   // ============================================
-  // Updated for typescript-eslint v8.58.0
   // Changelog: https://github.com/typescript-eslint/typescript-eslint/releases
   tsEslint.configs.strictTypeChecked,
   tsEslint.configs.stylisticTypeChecked,

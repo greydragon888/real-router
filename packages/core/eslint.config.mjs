@@ -9,10 +9,24 @@ export default [
     rules: {
       // Conflicts with @typescript-eslint/no-floating-promises which requires `void` prefix
       "sonarjs/void-use": "off",
+      // `void bag.prop` reads a getter for its side effect — the read counters and
+      // hostile bags count exactly these reads. The rule's autofix deletes the read,
+      // and `hostile-bags-battery` then fails its own assertion.
+      "@typescript-eslint/no-meaningless-void-operator": "off",
       // Tests use defensive optional chaining even when types guarantee non-null
       "@typescript-eslint/no-unnecessary-condition": "off",
       // Tests extensively use expect() inside try/catch blocks (468 occurrences)
       "vitest/no-conditional-expect": "off",
+    },
+  },
+
+  // `Record<never, never>` is the FSM's "no payload map" default. TypeScript has no
+  // spelling for an object type with no keys that does not resolve to `{}`, so the
+  // rule would report every alternative too.
+  {
+    files: ["src/utils/fsm/**/*.ts", "tests/**/fsm/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-generated-empty-object-type": "off",
     },
   },
 
