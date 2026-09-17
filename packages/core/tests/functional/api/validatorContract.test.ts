@@ -66,9 +66,12 @@ describe("core/validator call-site contract", () => {
     it("set: new key checks count ('setDependency'), does NOT warn overwrite", () => {
       deps.set("fresh", 1);
 
+      // ⚑ The two NUMBERS core reads, not the store (#2382) — and the count is
+      // the PRE-write one, which is what makes the limit refuse the write that
+      // would exceed it rather than the one after.
       expect(
         validator.dependencies.validateDependencyCount,
-      ).toHaveBeenCalledWith(expect.anything(), "setDependency");
+      ).toHaveBeenCalledWith(0, 100, "setDependency");
       expect(validator.dependencies.warnOverwrite).not.toHaveBeenCalled();
     });
 
@@ -128,9 +131,14 @@ describe("core/validator call-site contract", () => {
       expect(
         validator.dependencies.validateDependenciesObject,
       ).toHaveBeenCalledWith({ a: 1, b: 2 }, "setDependencies");
+      // Once per new key, and the count GROWS between them: the walk writes
+      // each key before the next is judged.
       expect(
         validator.dependencies.validateDependencyCount,
-      ).toHaveBeenCalledWith(expect.anything(), "setDependencies");
+      ).toHaveBeenNthCalledWith(1, 0, 100, "setDependencies");
+      expect(
+        validator.dependencies.validateDependencyCount,
+      ).toHaveBeenNthCalledWith(2, 1, 100, "setDependencies");
       expect(validator.dependencies.warnBatchOverwrite).not.toHaveBeenCalled();
     });
 
@@ -164,7 +172,8 @@ describe("core/validator call-site contract", () => {
         1,
       );
       expect(fresh.dependencies.validateDependencyCount).toHaveBeenCalledWith(
-        expect.anything(),
+        1,
+        100,
         "setDependencies",
       );
       // 'keep' kept its old value, 'brandNew' written
@@ -179,9 +188,10 @@ describe("core/validator call-site contract", () => {
       expect(
         validator.dependencies.validateDependencyName,
       ).toHaveBeenCalledWith("g", "getDependency");
+      // ⚑ The VALUE core read, not the store (#2382): the same one `get` returns.
       expect(
         validator.dependencies.validateDependencyExists,
-      ).toHaveBeenCalledWith("g", expect.anything());
+      ).toHaveBeenCalledWith("g", 1);
     });
 
     it("remove: validates name ('removeDependency')", () => {

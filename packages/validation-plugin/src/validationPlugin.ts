@@ -243,14 +243,16 @@ function buildValidatorObject<
           methodName,
         );
       },
-      validateDependencyExists(name, store) {
-        const typedStore = store as { dependencies?: Record<string, unknown> };
-        const value = typedStore.dependencies?.[name];
-
+      validateDependencyExists(name, value) {
         validateDependencyExistsRaw(value, name);
       },
-      validateDependencyCount(store, methodName) {
-        validateDependencyCount(store, methodName, api.logger);
+      validateDependencyCount(currentCount, maxDependencies, methodName) {
+        validateDependencyCount(
+          currentCount,
+          maxDependencies,
+          methodName,
+          api.logger,
+        );
       },
       validateCloneArgs,
       warnOverwrite(name, methodName) {

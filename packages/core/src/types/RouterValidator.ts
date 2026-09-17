@@ -5,7 +5,10 @@
  * When ctx.validator is null (default), validation is skipped.
  * When ctx.validator is set (by validation plugin), all methods are called.
  *
- * All parameters use `unknown` type to avoid coupling to internal type names.
+ * Parameters that carry a caller-supplied value use `unknown`, to avoid coupling
+ * to internal type names. ⚠ That is not a blanket rule: where core already holds
+ * the fact the analyser judges, the fact travels — a number, a name, a value —
+ * rather than the container it was read from (#2382).
  */
 
 export interface RouterValidator {
@@ -69,8 +72,26 @@ export interface RouterValidator {
       caller: string,
     ) => void;
     validateDependenciesObject: (deps: unknown, caller: string) => void;
-    validateDependencyExists: (name: string, store: unknown) => void;
-    validateDependencyCount: (store: unknown, methodName: string) => void;
+    /**
+     * ⚑ Takes the VALUE core read, not the store that holds it (#2382). The
+     * question is whether the name resolved to anything, and core has the answer
+     * one line earlier: `readDependency` performs exactly that lookup.
+     */
+    validateDependencyExists: (name: string, value: unknown) => void;
+    /**
+     * ⚑ Takes the two NUMBERS it judges, not the store that holds them (#2382).
+     * `maxDependencies` arrives already resolved by `createLimits`, which takes
+     * this path out of the default-drift #1879 names.
+     *
+     * ⚠ Both arguments sit inside the optional chain on purpose: with no
+     * validator installed the `?.` short-circuits the whole chain, arguments
+     * included, so the key count is never walked.
+     */
+    validateDependencyCount: (
+      currentCount: number,
+      maxDependencies: number,
+      methodName: string,
+    ) => void;
     validateCloneArgs: (dependencies: unknown) => void;
     warnOverwrite: (name: string, methodName: string) => void;
     warnBatchOverwrite: (keys: string[], methodName: string) => void;

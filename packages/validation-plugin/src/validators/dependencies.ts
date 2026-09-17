@@ -165,22 +165,15 @@ export function validateDependencyExists(
 }
 
 export function validateDependencyCount(
-  store: unknown,
+  currentCount: number,
+  maxDependencies: number,
   methodName: string,
   logger: RouterLogger,
 ): void {
-  const typedStore = store as {
-    dependencies: Record<string, unknown>;
-    limits?: { maxDependencies?: number };
-  };
-  const maxDependencies =
-    typedStore.limits?.maxDependencies ?? CORE_LIMIT_DEFAULTS.maxDependencies;
-
   if (maxDependencies === 0) {
     return;
   }
 
-  const currentCount = objectKeys(typedStore.dependencies).length;
   const { warn, error } = computeThresholds(maxDependencies);
 
   if (currentCount >= maxDependencies) {

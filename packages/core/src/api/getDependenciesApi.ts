@@ -26,6 +26,7 @@ import type { RouterValidator } from "../types/RouterValidator";
  * (#1798), which is the doctrine's own caveat and travels with it.
  */
 const hasOwn = Object.hasOwn;
+const objectKeys = Object.keys;
 
 /**
  * One `ToPropertyKey`, at the door (#1843).
@@ -108,7 +109,11 @@ function setDependency(
 
   if (isNewKey) {
     // Only check limit when adding new keys (overwrites don't increase count)
-    validator?.dependencies.validateDependencyCount(store, "setDependency");
+    validator?.dependencies.validateDependencyCount(
+      objectKeys(target).length,
+      store.limits.maxDependencies,
+      "setDependency",
+    );
   } else {
     const oldValue = target[key];
     const isChanging = oldValue !== dependencyValue;
@@ -152,7 +157,11 @@ function setMultipleDependencies(
     if (hasOwn(target, key)) {
       overwrittenKeys.push(key);
     } else {
-      validator?.dependencies.validateDependencyCount(store, "setDependencies");
+      validator?.dependencies.validateDependencyCount(
+        objectKeys(target).length,
+        store.limits.maxDependencies,
+        "setDependencies",
+      );
     }
 
     storeDependency(target, key, value);
@@ -184,7 +193,7 @@ export function getDependenciesApi<
 
       ctx.validator?.dependencies.validateDependencyExists(
         name as string,
-        store,
+        value,
       );
 
       return value;

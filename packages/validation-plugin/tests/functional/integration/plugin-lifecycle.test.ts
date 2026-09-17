@@ -143,10 +143,23 @@ describe("validationPlugin — lifecycle integration", () => {
         throw new Error("validator not set");
       }
 
-      ctx.validator.dependencies.validateDependencyExists("missing-dep", {
-        dependencies: {},
-      });
+      // ⚑ The VALUE core read, not the store (#2382): `undefined` is what
+      // `readDependency` hands back for a name nothing resolved.
+      ctx.validator.dependencies.validateDependencyExists(
+        "missing-dep",
+        undefined,
+      );
     }).toThrow(ReferenceError);
+
+    // Control: a name that DID resolve must pass, so the arm above is not
+    // green for want of a value it could never receive.
+    expect(() => {
+      if (!ctx.validator) {
+        throw new Error("validator not set");
+      }
+
+      ctx.validator.dependencies.validateDependencyExists("present-dep", 0);
+    }).not.toThrow();
   });
 
   it("areStatesEqual with valid boolean ignoreQP — covers FALSE branch of !isBoolean check", async () => {

@@ -461,7 +461,7 @@ describe("Phase 2 dependency validators", () => {
   describe("validateDependencyCount", () => {
     it("returns early when maxDependencies is 0 (unlimited)", () => {
       expect(() => {
-        validateDependencyCount(makeStore(999, 0), "test", testLogger);
+        validateDependencyCount(999, 0, "test", testLogger);
       }).not.toThrow();
       expect(warnSpy).not.toHaveBeenCalled();
       expect(errorSpy).not.toHaveBeenCalled();
@@ -469,25 +469,15 @@ describe("Phase 2 dependency validators", () => {
 
     it("throws when currentCount >= maxDependencies", () => {
       expect(() => {
-        validateDependencyCount(
-          makeStore(100, 100),
-          "setDependency",
-          testLogger,
-        );
+        validateDependencyCount(100, 100, "setDependency", testLogger);
       }).toThrow("Dependency limit exceeded");
       expect(() => {
-        validateDependencyCount(
-          makeStore(105, 100),
-          "setDependency",
-          testLogger,
-        );
+        validateDependencyCount(105, 100, "setDependency", testLogger);
       }).toThrow("Dependency limit exceeded");
     });
 
     it("calls logger.error when currentCount === error threshold", () => {
-      const store = makeStore(50, 100);
-
-      validateDependencyCount(store, "setDependency", testLogger);
+      validateDependencyCount(50, 100, "setDependency", testLogger);
 
       expect(errorSpy).toHaveBeenCalledWith(
         "router.setDependency",
@@ -496,9 +486,7 @@ describe("Phase 2 dependency validators", () => {
     });
 
     it("calls logger.warn when currentCount === warn threshold", () => {
-      const store = makeStore(20, 100);
-
-      validateDependencyCount(store, "setDependency", testLogger);
+      validateDependencyCount(20, 100, "setDependency", testLogger);
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.setDependency",
@@ -507,27 +495,17 @@ describe("Phase 2 dependency validators", () => {
     });
 
     it("does nothing below thresholds", () => {
-      validateDependencyCount(makeStore(5, 100), "setDependency", testLogger);
+      validateDependencyCount(5, 100, "setDependency", testLogger);
 
       expect(warnSpy).not.toHaveBeenCalled();
       expect(errorSpy).not.toHaveBeenCalled();
     });
 
-    it("uses default maxDependencies of 100 when limits absent", () => {
-      expect(() => {
-        const deps: Record<string, unknown> = {};
-
-        for (let i = 0; i < 100; i++) {
-          deps[`dep${i}`] = i;
-        }
-
-        validateDependencyCount(
-          { dependencies: deps },
-          "setDependency",
-          testLogger,
-        );
-      }).toThrow("Dependency limit exceeded");
-    });
+    // ⚑ The "limits absent" arm is GONE with the store parameter (#2382). The
+    // limit arrives resolved by core's `createLimits`, so the plugin carries no
+    // default of its own to fall back to — and the default itself is pinned
+    // end-to-end by `limits.test.ts` › "should enforce default maxDependencies
+    // limit (100)", which asks the public door rather than this function.
   });
 
   describe("validateDependencyBatchLimit", () => {

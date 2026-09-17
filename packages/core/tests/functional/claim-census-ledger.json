@@ -929,6 +929,10 @@
       "8e43d6c8a68a"
     ],
     "packages/core/src/types/RouterValidator.ts": [
+      "a3344185c6b9",
+      "8dad0e0a2337",
+      "7dca144bec49",
+      "7f5276061d37",
       "6e7cc71923f5"
     ],
     "packages/core/src/types/tree-changed.ts": [
