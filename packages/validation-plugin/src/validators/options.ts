@@ -45,7 +45,7 @@ const VALID_OPTION_VALUES = {
 //
 // ⚠ A `Record`, not an array of `keyof QueryParamsOptions`. An annotated array
 // binds each ELEMENT to the union and says nothing about the SET, so a missing
-// key compiles — the two-level mirror #2091 found in `expectedLimitKeys`. The
+// key compiles — the two-level mirror shape #2091 names. The
 // `Record` is what makes a missing key TS2741 and an extra key TS2353.
 //
 // ⚑ The VALUES are absent on purpose, and this is the whole of #2307. Core

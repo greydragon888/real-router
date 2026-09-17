@@ -1,6 +1,6 @@
 // packages/validation-plugin/src/validators/dependencies.ts
 
-import { computeThresholds, CORE_LIMIT_DEFAULTS } from "../helpers";
+import { computeThresholds } from "../helpers";
 import { getTypeDescription } from "../type-guards";
 
 import type { RouterLogger } from "@real-router/core";
@@ -113,27 +113,17 @@ export function validateDependenciesObject(
  */
 export function validateDependencyBatchLimit(
   deps: Record<string, unknown>,
-  store: unknown,
+  heldKeys: readonly string[],
+  maxDependencies: number,
   methodName: string,
 ): void {
-  const typedStore = store as {
-    dependencies: Record<string, unknown>;
-    limits?: { maxDependencies?: number };
-  };
-  const maxDependencies =
-    typedStore.limits?.maxDependencies ?? CORE_LIMIT_DEFAULTS.maxDependencies;
-
   if (maxDependencies === 0) {
     return;
   }
 
-  // ⚑ ONE question about the store's own keys, asked once (#1815 / #2064). The
-  // size and the membership test come from the SAME list: `Object.keys` is own
-  // AND enumerable while `hasOwn` is own only, so two calls would disagree on
-  // exactly the keys the count refuses to see. `store.dependencies` is a handout
-  // a plugin can replace (core INVARIANTS 13b), so the receiver is not
-  // guaranteed to answer `ownKeys` and `getOwnPropertyDescriptor` alike.
-  const heldKeys = objectKeys(typedStore.dependencies);
+  // ⚑ The size and the membership test come from the SAME list (#1815 /
+  // #2064) — `PluginApi.getDependencyKeys()`, one `Object.keys` of core's
+  // record — so they cannot disagree on a key the count refuses to see.
   const held = new Set(heldKeys);
   let added = 0;
 
@@ -165,22 +155,15 @@ export function validateDependencyExists(
 }
 
 export function validateDependencyCount(
-  store: unknown,
+  currentCount: number,
+  maxDependencies: number,
   methodName: string,
   logger: RouterLogger,
 ): void {
-  const typedStore = store as {
-    dependencies: Record<string, unknown>;
-    limits?: { maxDependencies?: number };
-  };
-  const maxDependencies =
-    typedStore.limits?.maxDependencies ?? CORE_LIMIT_DEFAULTS.maxDependencies;
-
   if (maxDependencies === 0) {
     return;
   }
 
-  const currentCount = objectKeys(typedStore.dependencies).length;
   const { warn, error } = computeThresholds(maxDependencies);
 
   if (currentCount >= maxDependencies) {

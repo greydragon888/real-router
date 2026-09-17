@@ -9,466 +9,288 @@ import {
   validateLimitsConsistency,
   validateResolvedDefaultRoute,
 } from "../../../src/validators/retrospective";
+import { lookupOf } from "../../helpers";
 
-function makeTree(routes: { name: string; children?: typeof routes }[] = []) {
-  function buildChildren(items: typeof routes): Map<string, unknown> {
-    const map = new Map<string, unknown>();
+import type { LimitsConfig } from "@real-router/core";
 
-    for (const item of items) {
-      map.set(item.name, {
-        children: buildChildren(item.children ?? []),
-        paramMeta: { urlParams: [] },
-      });
-    }
+// The retrospective validators take FACTS rather than core's stores (#2382):
+// routes as `RoutesApi.get` reports them, the one-hop forward map, a
+// `RouteLookup`, the resolved limits. Each fixture below is one of those facts.
 
-    return map;
-  }
+type RouteFixture = Parameters<typeof validateExistingRoutes>[0][number];
 
-  return {
-    children: buildChildren(routes),
-    paramMeta: { urlParams: [] },
-  };
-}
+const LIMITS: Readonly<LimitsConfig> = {
+  maxDependencies: 100,
+  maxPlugins: 50,
+  maxListeners: 10_000,
+  warnListeners: 1000,
+  maxLifecycleHandlers: 200,
+};
 
-function makeStore(
-  opts: {
-    definitions?: unknown[];
-    forwardMap?: Record<string, string>;
-    forwardFnMap?: Record<string, unknown>;
-    decoders?: Record<string, unknown>;
-    encoders?: Record<string, unknown>;
-    defaultParams?: Record<string, unknown>;
-    defaultSearch?: Record<string, unknown>;
-    treeRoutes?: { name: string }[];
-  } = {},
-) {
-  const treeRoutes = opts.treeRoutes ?? [];
-
-  return {
-    definitions:
-      opts.definitions ??
-      treeRoutes.map((r) => ({ name: r.name, path: `/${r.name}` })),
-    config: {
-      forwardMap: opts.forwardMap ?? {},
-      forwardFnMap: opts.forwardFnMap ?? {},
-      decoders: opts.decoders ?? {},
-      encoders: opts.encoders ?? {},
-      defaultParams: opts.defaultParams ?? {},
-      // The real store always carries this slot (#1787); a literal that omits
-      // it describes a shape core does not produce.
-      defaultSearch: opts.defaultSearch ?? {},
-    },
-    tree: makeTree(treeRoutes),
-    matcher: {
-      getSegmentsByName: (name: string) => {
-        const found = treeRoutes.some((r) => r.name === name);
-
-        return found ? [{ paramMeta: { urlParams: [] } }] : null;
-      },
-    },
-  };
-}
-
-function makeDeps(
-  opts: {
-    dependencies?: Record<string, unknown>;
-    limits?: Record<string, unknown>;
-  } = {},
-) {
-  return {
-    dependencies: opts.dependencies ?? {},
-    limits: opts.limits ?? {
-      maxDependencies: 100,
-      maxPlugins: 50,
-      maxListeners: 10_000,
-      warnListeners: 1000,
-      maxLifecycleHandlers: 200,
-    },
-  };
+/** A route with one slot set to a value its declared type may rule out. */
+function routeWith(slot: string, value: unknown, name = "home"): RouteFixture {
+  return { name, path: `/${name}`, [slot]: value };
 }
 
 describe("validateExistingRoutes", () => {
-  it("throws TypeError when store is not an object", () => {
+  it("passes with no routes", () => {
     expect(() => {
-      validateExistingRoutes(null);
-    }).toThrow(TypeError);
-    expect(() => {
-      validateExistingRoutes("string");
-    }).toThrow(TypeError);
-    expect(() => {
-      validateExistingRoutes(42);
-    }).toThrow(TypeError);
-  });
-
-  it("throws TypeError when store.definitions is not an array", () => {
-    expect(() => {
-      validateExistingRoutes({
-        definitions: "not-array",
-        config: {},
-        tree: {},
-      });
-    }).toThrow(TypeError);
-  });
-
-  it("throws TypeError when store.config is not an object", () => {
-    expect(() => {
-      validateExistingRoutes({ definitions: [], config: null, tree: {} });
-    }).toThrow(TypeError);
-  });
-
-  it("throws TypeError when store.tree is not an object", () => {
-    expect(() => {
-      validateExistingRoutes({ definitions: [], config: {}, tree: null });
-    }).toThrow(TypeError);
-  });
-
-  it("passes with empty definitions", () => {
-    expect(() => {
-      validateExistingRoutes(makeStore());
+      validateExistingRoutes([]);
     }).not.toThrow();
   });
 
-  it("passes with valid definitions", () => {
+  it("passes with valid routes", () => {
     expect(() => {
-      validateExistingRoutes(
-        makeStore({
-          definitions: [
-            { name: "home", path: "/home" },
-            { name: "about", path: "/about" },
-          ],
-        }),
-      );
+      validateExistingRoutes([
+        { name: "home", path: "/home" },
+        { name: "about", path: "/about" },
+      ]);
     }).not.toThrow();
   });
 
   it("throws when route has invalid name (empty)", () => {
     expect(() => {
-      validateExistingRoutes(
-        makeStore({
-          definitions: [{ name: "", path: "/bad" }],
-        }),
-      );
+      validateExistingRoutes([{ name: "", path: "/bad" }]);
     }).toThrow(TypeError);
   });
 
   it("throws when route path is not a string", () => {
     expect(() => {
-      validateExistingRoutes(
-        makeStore({
-          definitions: [{ name: "bad", path: 123 }],
-        }),
-      );
+      validateExistingRoutes([routeWith("path", 123, "bad")]);
     }).toThrow(TypeError);
   });
 
-  it("validates nested definitions recursively", () => {
+  it("validates nested routes recursively, naming them by full name", () => {
     expect(() => {
-      validateExistingRoutes(
-        makeStore({
-          definitions: [
-            {
-              name: "parent",
-              path: "/parent",
-              children: [{ name: "child", path: "/child" }],
-            },
-          ],
-        }),
-      );
+      validateExistingRoutes([
+        {
+          name: "parent",
+          path: "/parent",
+          children: [{ name: "child", path: "/child" }],
+        },
+      ]);
     }).not.toThrow();
+
+    expect(() => {
+      validateExistingRoutes([
+        {
+          name: "parent",
+          path: "/parent",
+          children: [routeWith("path", 7, "child")],
+        },
+      ]);
+    }).toThrow(/route "parent\.child" has non-string path/);
   });
 });
 
 describe("validateForwardToConsistency — chain depth limit", () => {
   it("throws when forwardTo chain exceeds max depth (101 entries)", () => {
     const routeCount = 102;
-    const treeRoutes = Array.from({ length: routeCount }, (_, i) => ({
-      name: `r${i}`,
-    }));
+    const table: Record<string, string[]> = {};
     const forwardMap: Record<string, string> = {};
+
+    for (let i = 0; i < routeCount; i++) {
+      table[`r${i}`] = [];
+    }
 
     for (let i = 0; i < routeCount - 1; i++) {
       forwardMap[`r${i}`] = `r${i + 1}`;
     }
 
-    const store = makeStore({ treeRoutes, forwardMap });
-
     expect(() => {
-      validateForwardToConsistency(store);
+      validateForwardToConsistency(forwardMap, lookupOf(table));
     }).toThrow(/exceeds maximum depth/);
   });
 });
 
 describe("validateForwardToConsistency", () => {
   it("passes with empty forwardMap", () => {
-    const store = makeStore({ treeRoutes: [{ name: "home" }] });
-
     expect(() => {
-      validateForwardToConsistency(store);
+      validateForwardToConsistency({}, lookupOf({ home: [] }));
     }).not.toThrow();
   });
 
   it("throws when forwardTo target does not exist in tree", () => {
-    const store = makeStore({
-      treeRoutes: [{ name: "home" }],
-      forwardMap: { home: "nonexistent" },
-    });
-
     expect(() => {
-      validateForwardToConsistency(store);
+      validateForwardToConsistency(
+        { home: "nonexistent" },
+        lookupOf({ home: [] }),
+      );
     }).toThrow(/does not exist in tree/);
   });
 
   it("passes when forwardTo target exists in tree", () => {
-    const store = makeStore({
-      treeRoutes: [{ name: "home" }, { name: "about" }],
-      forwardMap: { home: "about" },
-    });
-
     expect(() => {
-      validateForwardToConsistency(store);
+      validateForwardToConsistency(
+        { home: "about" },
+        lookupOf({ home: [], about: [] }),
+      );
     }).not.toThrow();
   });
 
   it("throws on circular forwardTo chain", () => {
-    const store = makeStore({
-      treeRoutes: [{ name: "a" }, { name: "b" }],
-      forwardMap: { a: "b", b: "a" },
-    });
-
     expect(() => {
-      validateForwardToConsistency(store);
+      validateForwardToConsistency(
+        { a: "b", b: "a" },
+        lookupOf({ a: [], b: [] }),
+      );
     }).toThrow(/circular/i);
   });
 
   it("detects param incompatibility when target requires params absent in source", () => {
-    const treeRoutes = [{ name: "home" }, { name: "product" }];
-    const storeWithParams = {
-      definitions: [
-        { name: "home", path: "/home" },
-        { name: "product", path: "/product/:id" },
-      ],
-      config: {
-        forwardMap: { home: "product" },
-        forwardFnMap: {},
-        decoders: {},
-        encoders: {},
-        defaultParams: {},
-      },
-      tree: makeTree(treeRoutes),
-      matcher: {
-        getSegmentsByName: (name: string) => {
-          if (name === "product") {
-            return [{ paramMeta: { urlParams: ["id"] } }];
-          }
-          if (name === "home") {
-            return [{ paramMeta: { urlParams: [] } }];
-          }
-
-          return null;
-        },
-      },
-    };
-
     expect(() => {
-      validateForwardToConsistency(storeWithParams);
+      validateForwardToConsistency(
+        { home: "product" },
+        lookupOf({ home: [], product: ["id"] }),
+      );
     }).toThrow(/requires params/i);
   });
 
-  it("passes when matcher returns null for both segments — covers FALSE branch of sourceSegments check", () => {
-    const store = {
-      definitions: [
-        { name: "a", path: "/a" },
-        { name: "b", path: "/b" },
-      ],
-      config: {
-        forwardMap: { a: "b" },
-        forwardFnMap: {},
-        decoders: {},
-        encoders: {},
-        defaultParams: {},
-      },
-      tree: makeTree([{ name: "a" }, { name: "b" }]),
-      matcher: {
-        getSegmentsByName: () => null,
-      },
-    };
-
-    expect(() => {
-      validateForwardToConsistency(store);
-    }).not.toThrow();
-  });
-
-  // #1997: the fixture used to supply `{ urlParams: [] }`
-  // — a shape `buildParamMeta` never produces, since a splat's name is a url
-  // param like any other. Production shape now, same intent.
   it("a forwardTo target requiring a splat param the source lacks throws", () => {
-    const treeRoutes = [{ name: "home" }, { name: "files" }];
-    const storeWithSplat = {
-      definitions: [
-        { name: "home", path: "/home" },
-        { name: "files", path: "/files/*path" },
-      ],
-      config: {
-        forwardMap: { home: "files" },
-        forwardFnMap: {},
-        decoders: {},
-        encoders: {},
-        defaultParams: {},
-      },
-      tree: makeTree(treeRoutes),
-      matcher: {
-        getSegmentsByName: (name: string) => {
-          if (name === "files") {
-            return [{ paramMeta: { urlParams: ["path"] } }];
-          }
-          if (name === "home") {
-            return [{ paramMeta: { urlParams: [] } }];
-          }
-
-          return null;
-        },
-      },
-    };
-
+    // A splat's name is a url param like any other, so `/files/*path` owns the
+    // slot `path`.
     expect(() => {
-      validateForwardToConsistency(storeWithSplat);
+      validateForwardToConsistency(
+        { home: "files" },
+        lookupOf({ home: [], files: ["path"] }),
+      );
     }).toThrow(/requires params/i);
+  });
+
+  it("names each missing slot once, however many times the target lists it", () => {
+    expect(() => {
+      validateForwardToConsistency(
+        { a: "b" },
+        lookupOf({ a: [], b: ["x", "x"] }),
+      );
+    }).toThrow(/requires params \[x\] not available/);
   });
 });
 
 describe("validateRoutePropertiesStore", () => {
-  it("passes with empty config", () => {
+  it("passes with no routes", () => {
     expect(() => {
-      validateRoutePropertiesStore(makeStore());
+      validateRoutePropertiesStore([]);
     }).not.toThrow();
   });
 
   it("throws when decoder is not a function", () => {
-    const store = makeStore({ decoders: { home: "not-a-function" } });
+    const routes = [routeWith("decodeParams", "not-a-function")];
 
     expect(() => {
-      validateRoutePropertiesStore(store);
+      validateRoutePropertiesStore(routes);
     }).toThrow(TypeError);
     expect(() => {
-      validateRoutePropertiesStore(store);
+      validateRoutePropertiesStore(routes);
     }).toThrow(/decoder must be a function/);
   });
 
   it("throws when async decoder is detected", () => {
-    const store = makeStore({
-      decoders: { home: async () => ({}) },
-    });
+    const routes = [routeWith("decodeParams", async () => ({}))];
 
     expect(() => {
-      validateRoutePropertiesStore(store);
+      validateRoutePropertiesStore(routes);
     }).toThrow(TypeError);
     expect(() => {
-      validateRoutePropertiesStore(store);
+      validateRoutePropertiesStore(routes);
     }).toThrow(/cannot be async/);
   });
 
   it("passes with valid sync decoder", () => {
-    const store = makeStore({
-      decoders: { product: ({ id }: { id: string }) => ({ id: Number(id) }) },
-    });
-
     expect(() => {
-      validateRoutePropertiesStore(store);
+      validateRoutePropertiesStore([
+        routeWith("decodeParams", ({ id }: { id: string }) => ({
+          id: Number(id),
+        })),
+      ]);
     }).not.toThrow();
   });
 
   it("throws when encoder is not a function", () => {
-    const store = makeStore({ encoders: { home: 42 } });
+    const routes = [routeWith("encodeParams", 42)];
 
     expect(() => {
-      validateRoutePropertiesStore(store);
+      validateRoutePropertiesStore(routes);
     }).toThrow(TypeError);
     expect(() => {
-      validateRoutePropertiesStore(store);
+      validateRoutePropertiesStore(routes);
     }).toThrow(/encoder must be a function/);
   });
 
   it("throws when async encoder is detected", () => {
-    const store = makeStore({
-      encoders: { home: async () => ({}) },
-    });
+    const routes = [routeWith("encodeParams", async () => ({}))];
 
     expect(() => {
-      validateRoutePropertiesStore(store);
+      validateRoutePropertiesStore(routes);
     }).toThrow(TypeError);
     expect(() => {
-      validateRoutePropertiesStore(store);
+      validateRoutePropertiesStore(routes);
     }).toThrow(/cannot be async/);
   });
 
   it("passes with valid sync encoder", () => {
-    const store = makeStore({
-      encoders: { product: ({ id }: { id: number }) => ({ id: String(id) }) },
-    });
-
     expect(() => {
-      validateRoutePropertiesStore(store);
+      validateRoutePropertiesStore([
+        routeWith("encodeParams", ({ id }: { id: number }) => ({
+          id: String(id),
+        })),
+      ]);
     }).not.toThrow();
   });
 
   it("throws when defaultParams is null", () => {
-    const store = makeStore({ defaultParams: { home: null } });
+    const routes = [routeWith("defaultParams", null)];
 
     expect(() => {
-      validateRoutePropertiesStore(store);
+      validateRoutePropertiesStore(routes);
     }).toThrow(TypeError);
     expect(() => {
-      validateRoutePropertiesStore(store);
+      validateRoutePropertiesStore(routes);
     }).toThrow(/defaultParams must be a plain object/);
   });
 
   it("throws when defaultParams is an array", () => {
-    const store = makeStore({ defaultParams: { home: [] } });
-
     expect(() => {
-      validateRoutePropertiesStore(store);
+      validateRoutePropertiesStore([routeWith("defaultParams", [])]);
     }).toThrow(TypeError);
   });
 
   it("passes with valid defaultParams object", () => {
-    const store = makeStore({ defaultParams: { home: { tab: "overview" } } });
-
     expect(() => {
-      validateRoutePropertiesStore(store);
+      validateRoutePropertiesStore([
+        routeWith("defaultParams", { tab: "overview" }),
+      ]);
     }).not.toThrow();
   });
 
-  it("throws when forwardFnMap callback is not a function", () => {
-    const store = makeStore({ forwardFnMap: { home: "not-a-function" } });
+  it("throws when a non-string forwardTo is not a function", () => {
+    const routes = [routeWith("forwardTo", 42)];
 
     expect(() => {
-      validateRoutePropertiesStore(store);
+      validateRoutePropertiesStore(routes);
     }).toThrow(TypeError);
     expect(() => {
-      validateRoutePropertiesStore(store);
+      validateRoutePropertiesStore(routes);
     }).toThrow(/forwardTo callback must be a function/);
   });
 
-  it("throws when async forwardFn is detected", () => {
-    const store = makeStore({
-      forwardFnMap: { home: async () => "target" },
-    });
+  it("throws when async forwardTo callback is detected", () => {
+    const routes = [routeWith("forwardTo", async () => "target")];
 
     expect(() => {
-      validateRoutePropertiesStore(store);
+      validateRoutePropertiesStore(routes);
     }).toThrow(TypeError);
     expect(() => {
-      validateRoutePropertiesStore(store);
+      validateRoutePropertiesStore(routes);
     }).toThrow(/cannot be async/);
   });
 
-  it("passes with valid sync forwardFn", () => {
-    const store = makeStore({
-      forwardFnMap: { home: () => "target" },
-    });
-
+  it("passes with a valid sync forwardTo callback and with a string forwardTo", () => {
     expect(() => {
-      validateRoutePropertiesStore(store);
+      validateRoutePropertiesStore([
+        routeWith("forwardTo", () => "target"),
+        routeWith("forwardTo", "target", "other"),
+      ]);
     }).not.toThrow();
   });
 
@@ -477,92 +299,67 @@ describe("validateRoutePropertiesStore", () => {
       return "__awaiter";
     }
 
-    const store = makeStore({ decoders: { home: transpiledDecoder } });
+    const routes = [routeWith("decodeParams", transpiledDecoder)];
 
     expect(() => {
-      validateRoutePropertiesStore(store);
+      validateRoutePropertiesStore(routes);
     }).toThrow(TypeError);
 
     expect(() => {
-      validateRoutePropertiesStore(store);
+      validateRoutePropertiesStore(routes);
     }).toThrow(/cannot be async/);
+  });
+
+  it("names a nested route by its full name", () => {
+    expect(() => {
+      validateRoutePropertiesStore([
+        {
+          name: "parent",
+          path: "/parent",
+          children: [routeWith("defaultSearch", 5, "child")],
+        },
+      ]);
+    }).toThrow(/route "parent\.child" defaultSearch must be a plain object/);
   });
 });
 
 describe("validateForwardToTargetsStore", () => {
   it("passes with empty forwardMap", () => {
-    const store = makeStore({ treeRoutes: [{ name: "home" }] });
-
     expect(() => {
-      validateForwardToTargetsStore(store);
+      validateForwardToTargetsStore({}, lookupOf({ home: [] }));
     }).not.toThrow();
   });
 
   it("throws when forwardTo target does not exist in tree", () => {
-    const store = makeStore({
-      treeRoutes: [{ name: "home" }],
-      forwardMap: { home: "nonexistent" },
-    });
-
     expect(() => {
-      validateForwardToTargetsStore(store);
+      validateForwardToTargetsStore(
+        { home: "nonexistent" },
+        lookupOf({ home: [] }),
+      );
     }).toThrow(/does not exist/);
   });
 
   it("passes when forwardTo target exists in tree", () => {
-    const store = makeStore({
-      treeRoutes: [{ name: "home" }, { name: "about" }],
-      forwardMap: { home: "about" },
-    });
-
     expect(() => {
-      validateForwardToTargetsStore(store);
+      validateForwardToTargetsStore(
+        { home: "about" },
+        lookupOf({ home: [], about: [] }),
+      );
     }).not.toThrow();
-  });
-
-  it("throws TypeError when store is not an object", () => {
-    expect(() => {
-      validateForwardToTargetsStore(null);
-    }).toThrow(TypeError);
   });
 });
 
 describe("validateDependenciesStructure", () => {
-  it("throws TypeError when deps is not an object", () => {
-    expect(() => {
-      validateDependenciesStructure(null);
-    }).toThrow(TypeError);
-    expect(() => {
-      validateDependenciesStructure("string");
-    }).toThrow(TypeError);
-    expect(() => {
-      validateDependenciesStructure(42);
-    }).toThrow(TypeError);
-  });
-
-  it("throws TypeError when deps.dependencies is not an object", () => {
-    expect(() => {
-      validateDependenciesStructure({ dependencies: null, limits: {} });
-    }).toThrow(TypeError);
-    expect(() => {
-      validateDependenciesStructure({ dependencies: "string", limits: {} });
-    }).toThrow(TypeError);
-  });
-
   it("passes with empty dependencies", () => {
     expect(() => {
-      validateDependenciesStructure(makeDeps());
+      validateDependenciesStructure({}, LIMITS);
     }).not.toThrow();
   });
 
   it("throws when dependency has a getter", () => {
-    const deps = makeDeps();
-    const depsWithGetter = {
-      dependencies: {} as Record<string, unknown>,
-      limits: deps.limits,
-    };
+    const dependencies: Record<string, unknown> = {};
 
-    Object.defineProperty(depsWithGetter.dependencies, "secret", {
+    Object.defineProperty(dependencies, "secret", {
       get() {
         return "value";
       },
@@ -571,164 +368,90 @@ describe("validateDependenciesStructure", () => {
     });
 
     expect(() => {
-      validateDependenciesStructure(depsWithGetter);
+      validateDependenciesStructure(dependencies, LIMITS);
     }).toThrow(TypeError);
     expect(() => {
-      validateDependenciesStructure(depsWithGetter);
+      validateDependenciesStructure(dependencies, LIMITS);
     }).toThrow(/must not use a getter/);
   });
 
-  it("throws TypeError when deps.limits is not an object", () => {
+  it("throws TypeError when a limit value is not an integer", () => {
     expect(() => {
-      validateDependenciesStructure({ dependencies: {}, limits: null });
-    }).toThrow(TypeError);
-    expect(() => {
-      validateDependenciesStructure({ dependencies: {}, limits: "invalid" });
-    }).toThrow(TypeError);
-  });
+      validateDependenciesStructure(
+        {},
+        { ...LIMITS, maxDependencies: "100" as unknown as number },
+      );
+    }).toThrow(/maxDependencies must be an integer/);
 
-  it("throws TypeError when a limit value is not a number", () => {
-    expect(() => {
-      validateDependenciesStructure({
-        dependencies: {},
-        limits: {
-          maxDependencies: "100",
-          maxPlugins: 50,
-          maxListeners: 10_000,
-          warnListeners: 1000,
-          maxLifecycleHandlers: 200,
-        },
-      });
-    }).toThrow(TypeError);
-    expect(() => {
-      validateDependenciesStructure({
-        dependencies: {},
-        limits: {
-          maxDependencies: "100",
-          maxPlugins: 50,
-          maxListeners: 10_000,
-          warnListeners: 1000,
-          maxLifecycleHandlers: 200,
-        },
-      });
-    }).toThrow(/must be an integer/);
-
-    // ⚑ NaN is the shape that matters now. Core coerces limits once at
+    // ⚑ NaN is the shape that matters. Core coerces limits once at
     // construction (#1875), so a bag spelling a limit as `undefined`, `"abc"`
     // or `{}` arrives here as `Number(x)` — that is `NaN`, and `NaN` is
-    // `typeof "number"`. The predicate that used to catch those inputs stopped
-    // catching them the moment the coercion moved upstream; this cell is the
-    // one that reds if it is ever weakened back to a `typeof` test.
+    // `typeof "number"`. This cell reds if the predicate is weakened to a
+    // `typeof` test.
     expect(() => {
-      validateDependenciesStructure({
-        dependencies: {},
-        limits: {
-          maxDependencies: Number.NaN,
-          maxPlugins: 50,
-          maxListeners: 10_000,
-          warnListeners: 1000,
-          maxLifecycleHandlers: 200,
-        },
-      });
+      validateDependenciesStructure(
+        {},
+        { ...LIMITS, maxDependencies: Number.NaN },
+      );
     }).toThrow(/maxDependencies must be an integer, got NaN/);
 
     // ⚑ The other half of that type, and it is what separates `isInteger` from
     // `isFinite`: a limit spelled `1.5` or `Infinity` coerces CLEANLY, so it
-    // reaches this store as an ordinary `number` that no NaN cell can see.
+    // reaches this pass as an ordinary `number` that no NaN cell can see.
     // `isFinite` in place of `isInteger` passes the whole suite without these
     // two.
     expect(() => {
-      validateDependenciesStructure({
-        dependencies: {},
-        limits: {
-          maxDependencies: 1.5,
-          maxPlugins: 50,
-          maxListeners: 10_000,
-          warnListeners: 1000,
-          maxLifecycleHandlers: 200,
-        },
-      });
+      validateDependenciesStructure({}, { ...LIMITS, maxDependencies: 1.5 });
     }).toThrow(/maxDependencies must be an integer, got 1.5/);
     expect(() => {
-      validateDependenciesStructure({
-        dependencies: {},
-        limits: {
-          maxDependencies: 100,
-          maxPlugins: Number.POSITIVE_INFINITY,
-          maxListeners: 10_000,
-          warnListeners: 1000,
-          maxLifecycleHandlers: 200,
-        },
-      });
+      validateDependenciesStructure(
+        {},
+        { ...LIMITS, maxPlugins: Number.POSITIVE_INFINITY },
+      );
     }).toThrow(/maxPlugins must be an integer, got Infinity/);
   });
 
   it("passes with valid dependencies and limits", () => {
     expect(() => {
-      validateDependenciesStructure(
-        makeDeps({ dependencies: { api: "https://example.com" } }),
-      );
+      validateDependenciesStructure({ api: "https://example.com" }, LIMITS);
     }).not.toThrow();
   });
 });
 
 describe("validateLimitsConsistency", () => {
-  it("passes with no options or deps", () => {
+  it("passes with no configured limits and no dependencies", () => {
     expect(() => {
-      validateLimitsConsistency({}, {});
+      validateLimitsConsistency({}, 0, 100);
     }).not.toThrow();
   });
 
   it("passes with undefined options", () => {
     expect(() => {
-      validateLimitsConsistency(undefined, makeDeps());
+      validateLimitsConsistency(undefined, 0, 100);
     }).not.toThrow();
   });
 
-  it("throws RangeError when dep count exceeds maxDependencies from deps store", () => {
-    const deps = makeDeps({
-      // 4 deps > maxDependencies 3 — strictly over (#1225: at-limit is legal, so
-      // the throw case is now over-limit, not at-limit).
-      dependencies: { dep1: 1, dep2: 2, dep3: 3, dep4: 4 },
-      limits: {
-        maxDependencies: 3,
-        maxPlugins: 50,
-        maxListeners: 10_000,
-        warnListeners: 1000,
-        maxLifecycleHandlers: 200,
-      },
-    });
-
+  it("throws RangeError when dep count exceeds the resolved maxDependencies", () => {
+    // 4 deps > maxDependencies 3 — strictly over (#1225: at-limit is legal).
     expect(() => {
-      validateLimitsConsistency({}, deps);
+      validateLimitsConsistency({}, 4, 3);
     }).toThrow(RangeError);
     expect(() => {
-      validateLimitsConsistency({}, deps);
+      validateLimitsConsistency({}, 4, 3);
     }).toThrow(/dependency count/i);
   });
 
-  it("prefers maxDependencies from options over deps store limit", () => {
-    const deps = makeDeps({
-      // 3 deps: strictly over the OPTIONS limit (2) but well under the STORE
-      // limit (100). The throw proves the options limit is the one applied.
-      dependencies: { dep1: 1, dep2: 2, dep3: 3 },
-      limits: {
-        maxDependencies: 100,
-        maxPlugins: 50,
-        maxListeners: 10_000,
-        warnListeners: 1000,
-        maxLifecycleHandlers: 200,
-      },
-    });
-
+  it("prefers maxDependencies from options over the resolved limit", () => {
+    // 3 deps: strictly over the OPTIONS limit (2) but well under the RESOLVED
+    // limit (100). The throw proves the options limit is the one applied.
     expect(() => {
-      validateLimitsConsistency({ limits: { maxDependencies: 2 } }, deps);
+      validateLimitsConsistency({ limits: { maxDependencies: 2 } }, 3, 100);
     }).toThrow(RangeError);
   });
 
-  it("passes when deps is null — covers FALSE branch of deps check", () => {
+  it("a limit of 0 means no cap", () => {
     expect(() => {
-      validateLimitsConsistency({}, null);
+      validateLimitsConsistency({}, 5, 0);
     }).not.toThrow();
   });
 
@@ -737,116 +460,51 @@ describe("validateLimitsConsistency", () => {
   // checks state, not room-for-next-insert, so it must accept an at-limit store
   // (else every cloneRouter on an at-limit base throws — breaking SSR).
   it("passes when dep count equals maxDependencies (#1225)", () => {
-    const deps = makeDeps({
-      dependencies: { dep1: 1, dep2: 2, dep3: 3 },
-      limits: {
-        maxDependencies: 3,
-        maxPlugins: 50,
-        maxListeners: 10_000,
-        warnListeners: 1000,
-        maxLifecycleHandlers: 200,
-      },
-    });
-
     expect(() => {
-      validateLimitsConsistency({}, deps);
+      validateLimitsConsistency({}, 3, 3);
     }).not.toThrow();
   });
 });
 
 describe("validateResolvedDefaultRoute", () => {
-  it("is a no-op when routeName is not a string", () => {
-    const store = makeStore({ treeRoutes: [{ name: "home" }] });
+  const lookup = lookupOf({ home: [], about: [], "admin.dashboard": [] });
 
+  it("is a no-op when routeName is not a string", () => {
     expect(() => {
-      validateResolvedDefaultRoute(undefined, store);
+      validateResolvedDefaultRoute(undefined, lookup);
     }).not.toThrow();
     expect(() => {
-      validateResolvedDefaultRoute(null, store);
+      validateResolvedDefaultRoute(null, lookup);
     }).not.toThrow();
     expect(() => {
-      validateResolvedDefaultRoute(42, store);
+      validateResolvedDefaultRoute(42, lookup);
     }).not.toThrow();
     expect(() => {
-      validateResolvedDefaultRoute({}, store);
+      validateResolvedDefaultRoute({}, lookup);
     }).not.toThrow();
   });
 
   it("is a no-op when routeName is empty string", () => {
-    const store = makeStore({ treeRoutes: [{ name: "home" }] });
-
     expect(() => {
-      validateResolvedDefaultRoute("", store);
+      validateResolvedDefaultRoute("", lookup);
     }).not.toThrow();
   });
 
-  it("passes when route exists in tree", () => {
-    const store = makeStore({
-      treeRoutes: [{ name: "home" }, { name: "about" }],
-    });
-
+  it("passes when route exists", () => {
     expect(() => {
-      validateResolvedDefaultRoute("home", store);
+      validateResolvedDefaultRoute("home", lookup);
+    }).not.toThrow();
+    expect(() => {
+      validateResolvedDefaultRoute("admin.dashboard", lookup);
     }).not.toThrow();
   });
 
-  it("passes for nested route that exists in tree", () => {
-    const store = {
-      definitions: [],
-      config: {
-        forwardMap: {},
-        forwardFnMap: {},
-        decoders: {},
-        encoders: {},
-        defaultParams: {},
-      },
-      tree: {
-        children: new Map([
-          [
-            "admin",
-            {
-              children: new Map([
-                [
-                  "dashboard",
-                  {
-                    children: new Map(),
-                    paramMeta: { urlParams: [] },
-                  },
-                ],
-              ]),
-              paramMeta: { urlParams: [] },
-            },
-          ],
-        ]),
-        paramMeta: { urlParams: [] },
-      },
-      matcher: { getSegmentsByName: () => null },
-    };
-
+  it("throws when route does not exist", () => {
     expect(() => {
-      validateResolvedDefaultRoute("admin.dashboard", store);
-    }).not.toThrow();
-  });
-
-  it("throws when route does not exist in tree", () => {
-    const store = makeStore({ treeRoutes: [{ name: "home" }] });
-
-    expect(() => {
-      validateResolvedDefaultRoute("missing", store);
+      validateResolvedDefaultRoute("missing", lookup);
     }).toThrow(/defaultRoute resolved to non-existent route: "missing"/);
-  });
-
-  it("throws when nested route's parent is missing", () => {
-    const store = makeStore({ treeRoutes: [{ name: "home" }] });
-
     expect(() => {
-      validateResolvedDefaultRoute("admin.dashboard", store);
-    }).toThrow(/non-existent route: "admin.dashboard"/);
-  });
-
-  it("throws TypeError when store is invalid", () => {
-    expect(() => {
-      validateResolvedDefaultRoute("home", null);
-    }).toThrow(TypeError);
+      validateResolvedDefaultRoute("admin.settings", lookup);
+    }).toThrow(/non-existent route: "admin.settings"/);
   });
 });

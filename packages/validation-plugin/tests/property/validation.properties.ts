@@ -705,23 +705,14 @@ describe("validateLimitValue — property-based", () => {
 // legally REACH exactly maxDependencies — the retrospective pass must accept
 // that boundary and reject only a store that STRICTLY exceeds it.
 describe("validateLimitsConsistency — dependency-count boundary (#1225)", () => {
-  const depStore = (count: number, max: number) => {
-    const dependencies: Record<string, number> = {};
-
-    for (let i = 0; i < count; i++) {
-      dependencies[`d${i}`] = i;
-    }
-
-    return { dependencies, limits: { maxDependencies: max } };
-  };
-
   test.prop([fc.integer({ min: 1, max: 100 })], { numRuns: NUM_RUNS.standard })(
     "a store at exactly maxDependencies never throws (plugin ⊇ core)",
     (max) => {
       expect(() => {
         validateLimitsConsistency(
           { limits: { maxDependencies: max } },
-          depStore(max, max),
+          max,
+          max,
         );
       }).not.toThrow();
     },
@@ -733,7 +724,8 @@ describe("validateLimitsConsistency — dependency-count boundary (#1225)", () =
       expect(() => {
         validateLimitsConsistency(
           { limits: { maxDependencies: max } },
-          depStore(max + 1, max),
+          max + 1,
+          max,
         );
       }).toThrow(RangeError);
     },

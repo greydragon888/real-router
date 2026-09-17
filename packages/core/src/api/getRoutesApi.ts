@@ -924,12 +924,12 @@ export function getRoutesApi<
       guardRouteCallbacks(batch, ctx.validator);
 
       if (parentName !== undefined) {
-        ctx.validator?.routes.validateParentOption(parentName, store.tree);
+        ctx.validator?.routes.validateParentOption(parentName);
       }
 
       ctx.validator?.routes.throwIfInternalRouteInArray(batch, "addRoute");
       ctx.validator?.routes.validateAddRouteArgs(batch);
-      ctx.validator?.routes.validateRoutes(batch, store, parentName);
+      ctx.validator?.routes.validateRoutes(batch, parentName);
 
       addRoutes(store, batch, parentName, ctx.logger);
 
@@ -1015,7 +1015,7 @@ export function getRoutesApi<
 
       ctx.validator?.routes.validateUpdateRoutePropertyTypes(name, updates);
 
-      ctx.validator?.routes.validateUpdateRoute(name, updates, store);
+      ctx.validator?.routes.validateUpdateRoute(name, updates);
 
       // #1205: bare-core existence backstop as a TRUE no-op — NOT a throw
       // (validation is opt-in). Without it, update() of a route that does not
@@ -1158,7 +1158,7 @@ export function getRoutesApi<
 
       ctx.validator?.routes.throwIfInternalRouteInArray(batch, "replaceRoutes");
       ctx.validator?.routes.validateAddRouteArgs(batch);
-      ctx.validator?.routes.validateRoutes(batch, store);
+      ctx.validator?.routes.validateRoutes(batch);
 
       const currentState = router.getState();
 

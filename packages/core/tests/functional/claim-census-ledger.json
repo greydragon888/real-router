@@ -65,8 +65,10 @@
       "abbe073482a7",
       "0894a4e24d52",
       "49938a779a17",
+      "0c097ebaeaa4",
       "abff99dd2474",
       "404320bc32d0",
+      "20f58e2efeb0",
       "33269ff7e380",
       "8cec97b84cc3",
       "73c7f9b06fe0",
@@ -90,6 +92,7 @@
       "3bc098c58e47",
       "3fcd4d036820",
       "1b0b3a35d94f",
+      "b931252eed92",
       "8931f6585c8f",
       "8e4c90ef67fb",
       "9bd586a1ebb3",
@@ -158,7 +161,7 @@
       "64547fa1dec5"
     ],
     "packages/core/src/dependenciesStore.ts": [
-      "39738c161a94",
+      "5950ce1d5302",
       "d5b5e80fbe8a",
       "9c02305b8687",
       "3134ec6834ac",
@@ -903,6 +906,11 @@
       "97fd4214f924",
       "1e875de4519f",
       "bf8954b9cf46",
+      "a8e38a061e72",
+      "5e6ea52a5e7e",
+      "6e1086fc75ab",
+      "ff1016afd7e2",
+      "f2d50012530d",
       "665682d5adb4",
       "82b51dfed35c",
       "ae74ecdfb885",
@@ -929,6 +937,12 @@
       "8e43d6c8a68a"
     ],
     "packages/core/src/types/RouterValidator.ts": [
+      "a3344185c6b9",
+      "1ac644d1e3c1",
+      "c6efb2c9e1be",
+      "8dad0e0a2337",
+      "7dca144bec49",
+      "7f5276061d37",
       "6e7cc71923f5"
     ],
     "packages/core/src/types/tree-changed.ts": [
@@ -1159,6 +1173,8 @@
       "53ad4226340d"
     ],
     "packages/validation-plugin/src/validationPlugin.ts": [
+      "a7d9d2e5665c",
+      "4e9bb19d9393",
       "48a89b2d4227",
       "704d1c57a59f",
       "434726b26e3a",
@@ -1188,9 +1204,10 @@
       "1375827e9c5c",
       "5a38c110a7be",
       "6bd571d74d8a",
-      "458a2f768e0a"
+      "8ef321a92a01"
     ],
     "packages/validation-plugin/src/validators/forwardTo.ts": [
+      "235292f28a1d",
       "1a9864dfed80",
       "d7294177f708",
       "e979213fd943",
@@ -1212,7 +1229,7 @@
       "1a9864dfed80",
       "d7294177f708",
       "1445410b4e2b",
-      "ca23f48b1a91",
+      "b29fd4b33c0b",
       "cfd981f6ec0e",
       "33fddb44dd09",
       "50d6c27cf998",
@@ -1229,15 +1246,13 @@
     "packages/validation-plugin/src/validators/retrospective.ts": [
       "1a9864dfed80",
       "d7294177f708",
-      "c2ade9ca7bd5",
-      "1270d9bae8b6",
-      "8eff56d4bc30",
+      "5cb0784c6ec3",
       "6141e683da17",
-      "0f4642ebf40d",
+      "d78282cbd09e",
+      "289ccd6a2171",
       "61af2e0ed3e3",
       "6b41e44865cd",
-      "ae85efe21874",
-      "83b8685831b4"
+      "041d12da3c39"
     ],
     "packages/validation-plugin/src/validators/routes.ts": [
       "60deacb9290d",
@@ -1736,7 +1751,7 @@
       "c8537dc41f1f",
       "23b367096d4f",
       "f3043589c680",
-      "b00205a19ad1",
+      "e72c5a66f211",
       "401bebc3e86e",
       "8da0051899ff",
       "842014339d2e",
@@ -1914,7 +1929,7 @@
       "592e1eb0b1ae",
       "13113acd12d4",
       "9bc488169d45",
-      "423442d02536",
+      "7bcec890f556",
       "6c43793526e7"
     ],
     "packages/vue/CLAUDE.md": [

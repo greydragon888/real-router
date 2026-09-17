@@ -2,6 +2,8 @@
 
 import { resolveForwardChain as coreResolveForwardChain } from "@real-router/core";
 
+import type { RouteLookup } from "./forwardTo";
+import type { LimitsConfig } from "@real-router/core";
 import type { RouterLogger } from "@real-router/core/types";
 
 /**
@@ -22,146 +24,66 @@ const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const objectKeys = Object.keys;
 
 /**
- * Retrospective validators — run AFTER the route tree is already built.
- * Called by the validation plugin at usePlugin() time, in a try/catch with rollback.
+ * Retrospective validators — run once, at `usePlugin()` time, over what the
+ * router already holds. Called by the validation plugin in a try/catch with
+ * rollback.
  *
- * The plugin is registered AFTER the constructor, so all routes are already in the store.
- * These functions receive store objects as parameters and cast internally using
- * local structural interfaces to avoid tight coupling to core internal types.
- *
- * All parameters are typed as `unknown` — cast internally as needed.
+ * Every function takes FACTS read from the published surface (#2382): the
+ * routes as `RoutesApi.get` reports them, the one-hop forward map, the resolved
+ * limits, the dependency names. None of them receives a core store.
  */
-
-// =============================================================================
-// Local structural interfaces (cast-only, not imported from core internals)
-// =============================================================================
-
-interface LocalSegmentParamMeta {
-  urlParams: readonly string[];
-}
-
-interface LocalRouteSegment {
-  paramMeta: LocalSegmentParamMeta;
-}
-
-interface LocalRouteTree {
-  children: Map<string, LocalRouteTree>;
-  paramMeta: LocalSegmentParamMeta;
-}
-
-interface LocalRouteMatcher {
-  getSegmentsByName: (
-    name: string,
-  ) => readonly LocalRouteSegment[] | null | undefined;
-}
 
 /**
- * The slots this pass reads off the store's `RouteConfig`.
- *
- * ⚠ A hand-written mirror of core's `RouteConfig`
- * (`namespaces/RoutesNamespace/types.ts`), and the TYPE system keeps nothing in
- * step: adding a slot in core compiles here unchanged, so a field can be
- * invisible in this pass while the store carries it (#1787 — `defaultSearch`
- * was). `core-union-mirror-authority-2091` binds the two key sets and reds on
- * either side moving — measured by mutation in both directions.
- *
- * ⚑ `structural-field-coverage-authority-1787` does NOT bind this, though the
- * two read as neighbours: that table classifies RUNTIME behaviour per field and
- * door, and dropping a slot from this interface leaves it green — measured.
+ * A route as `RoutesApi.get` reports it, with the fields this pass judges typed
+ * `unknown` — the pass exists to catch values the declared type rules out.
  */
-interface LocalRouteConfig {
-  forwardMap: Record<string, string>;
-  forwardFnMap: Record<string, unknown>;
-  defaultParams: Record<string, unknown>;
-  defaultSearch: Record<string, unknown>;
-  decoders: Record<string, unknown>;
-  encoders: Record<string, unknown>;
-}
-
-interface LocalRouteDefinition {
+interface RouteFacts {
   name: string;
   path: string;
-  children?: LocalRouteDefinition[];
-}
-
-interface LocalRoutesStore {
-  definitions: LocalRouteDefinition[];
-  config: LocalRouteConfig;
-  tree: LocalRouteTree;
-  matcher: LocalRouteMatcher;
-}
-
-interface LocalDependencyLimits {
-  maxDependencies: number;
-  maxPlugins: number;
-  maxListeners: number;
-  warnListeners: number;
-  maxLifecycleHandlers: number;
+  forwardTo?: unknown;
+  defaultParams?: unknown;
+  defaultSearch?: unknown;
+  decodeParams?: unknown;
+  encodeParams?: unknown;
+  children?: readonly RouteFacts[];
 }
 
 // =============================================================================
 // Private helpers
 // =============================================================================
 
-function assertRoutesStore(store: unknown, fnName: string): LocalRoutesStore {
-  if (!store || typeof store !== "object") {
-    throw new TypeError(
-      `[validation-plugin] ${fnName}: store must be an object`,
-    );
-  }
-
-  const storeRecord = store as Record<string, unknown>;
-
-  if (!Array.isArray(storeRecord.definitions)) {
-    throw new TypeError(
-      `[validation-plugin] ${fnName}: store.definitions must be an array`,
-    );
-  }
-
-  if (!storeRecord.config || typeof storeRecord.config !== "object") {
-    throw new TypeError(
-      `[validation-plugin] ${fnName}: store.config must be an object`,
-    );
-  }
-
-  if (!storeRecord.tree || typeof storeRecord.tree !== "object") {
-    throw new TypeError(
-      `[validation-plugin] ${fnName}: store.tree must be an object`,
-    );
-  }
-
-  return storeRecord as unknown as LocalRoutesStore;
-}
-
-function walkDefinitions(
-  definitions: LocalRouteDefinition[],
-  callback: (def: LocalRouteDefinition, fullName: string) => void,
+function walkRoutes(
+  routes: readonly RouteFacts[],
+  callback: (route: RouteFacts, fullName: string) => void,
   parentName = "",
 ): void {
-  for (const def of definitions) {
-    const fullName = parentName ? `${parentName}.${def.name}` : def.name;
+  for (const route of routes) {
+    const fullName = parentName ? `${parentName}.${route.name}` : route.name;
 
-    callback(def, fullName);
+    callback(route, fullName);
 
-    if (def.children) {
-      walkDefinitions(def.children, callback, fullName);
+    if (route.children) {
+      walkRoutes(route.children, callback, fullName);
     }
   }
 }
 
-function routeExistsInTree(tree: LocalRouteTree, routeName: string): boolean {
-  const segments = routeName.split(".");
-  let current: LocalRouteTree | undefined = tree;
+/** One slot of every route, in walk order, skipping routes that leave it unset. */
+function collectSlot(
+  routes: readonly RouteFacts[],
+  pick: (route: RouteFacts) => unknown,
+): [string, unknown][] {
+  const entries: [string, unknown][] = [];
 
-  for (const segment of segments) {
-    current = current.children.get(segment);
+  walkRoutes(routes, (route, fullName) => {
+    const value = pick(route);
 
-    if (!current) {
-      return false;
+    if (value !== undefined) {
+      entries.push([fullName, value]);
     }
-  }
+  });
 
-  return true;
+  return entries;
 }
 
 /**
@@ -171,7 +93,7 @@ function routeExistsInTree(tree: LocalRouteTree, routeName: string): boolean {
  */
 function resolveForwardChainWithPrefix(
   startRoute: string,
-  forwardMap: Record<string, string>,
+  forwardMap: Readonly<Record<string, string>>,
 ): string {
   try {
     return coreResolveForwardChain(startRoute, forwardMap);
@@ -180,18 +102,6 @@ function resolveForwardChainWithPrefix(
       cause: error,
     });
   }
-}
-
-function collectUrlParams(segments: readonly LocalRouteSegment[]): Set<string> {
-  const params = new Set<string>();
-
-  for (const segment of segments) {
-    for (const param of segment.paramMeta.urlParams) {
-      params.add(param);
-    }
-  }
-
-  return params;
 }
 
 /**
@@ -220,8 +130,8 @@ function assertNotAsync(fn: Function, label: string, routeName: string): void {
 // =============================================================================
 
 /**
- * Validates the existing route tree/definitions for structural integrity.
- * Walks all route definitions, checking each name and path shape.
+ * Validates the existing routes for structural integrity.
+ * Walks every route, checking each name and path shape.
  * Adapted from: validateRoutes() in RoutesNamespace/validators.ts
  *
  * Duplicate route names are intentionally NOT checked here. Bare core rejects a
@@ -232,33 +142,27 @@ function assertNotAsync(fn: Function, label: string, routeName: string): void {
  * sole authority for the name-uniqueness invariant; a mirror here would be
  * reachable only from a white-box unit test (#1226).
  *
- * @param store - RoutesStore instance (typed as unknown to avoid core coupling)
- * @throws {TypeError} If store shape is invalid or definitions have structural issues
+ * @param routes - Every top-level route, nested, as `RoutesApi.get` reports it
+ * @throws {TypeError} If a route has structural issues
  */
-export function validateExistingRoutes(store: unknown): void {
-  const routesStore = assertRoutesStore(store, "validateExistingRoutes");
-
-  walkDefinitions(routesStore.definitions, (def, fullName) => {
-    if (typeof def.name !== "string" || !def.name) {
+export function validateExistingRoutes(routes: readonly RouteFacts[]): void {
+  walkRoutes(routes, (route, fullName) => {
+    if (typeof route.name !== "string" || !route.name) {
       throw new TypeError(
-        `[validation-plugin] validateExistingRoutes: route has invalid name: ${def.name}`,
+        `[validation-plugin] validateExistingRoutes: route has invalid name: ${route.name}`,
       );
     }
 
-    // ⚑ The dotted-name check that #1194 added here is GONE, and its absence is
-    // load-bearing rather than a cleanup. It closed a real hole: `add()` and
-    // `replace()` rejected a dotted route name while the constructor did not, so
-    // `createRouter([{ name: "a.c" }])` + this plugin slipped one past validation
-    // into a name-vs-URL split-brain. #1763 moved the rule to where it belongs —
-    // bare core now refuses the spelling at registration, with this exact
-    // message — so `createRouter` throws before a plugin exists and nothing
-    // dotted can reach this pass. It was unreachable code, not defence in depth:
-    // `store.definitions` is derived from the TREE, whose nested children carry
-    // bare names by construction.
+    // ⚑ No dotted-name check here, and its absence is load-bearing rather
+    // than a cleanup. Bare core refuses a dotted route name at registration,
+    // with this package's message (#1763), so `createRouter` throws before a
+    // plugin exists and nothing dotted can reach this pass. The names walked
+    // here come off the TREE, whose nested children carry bare names by
+    // construction.
 
-    if (typeof def.path !== "string") {
+    if (typeof route.path !== "string") {
       throw new TypeError(
-        `[validation-plugin] validateExistingRoutes: route "${fullName}" has non-string path (${typeof def.path})`,
+        `[validation-plugin] validateExistingRoutes: route "${fullName}" has non-string path (${typeof route.path})`,
       );
     }
   });
@@ -269,22 +173,23 @@ export function validateExistingRoutes(store: unknown): void {
 // =============================================================================
 
 /**
- * Validates forwardTo consistency across all chains in the store.
+ * Validates forwardTo consistency across all chains.
  * Checks target existence, param compatibility, and circular chain detection.
  * Adapted from: validateForwardToTargets() in forwardToValidation.ts
  *
- * @param store - RoutesStore instance (typed as unknown to avoid core coupling)
+ * @param forwardMap - The ONE-HOP forward map, from `PluginApi.getForwardMap()`
+ * @param lookup - Existence and path slots of routes that already exist
  * @throws {Error} If any forwardTo target does not exist in the tree
  * @throws {Error} If param incompatibility is detected across a forwardTo pair
  * @throws {Error} If a circular forwardTo chain is detected
  */
-export function validateForwardToConsistency(store: unknown): void {
-  const routesStore = assertRoutesStore(store, "validateForwardToConsistency");
-  const { config, tree, matcher } = routesStore;
-
+export function validateForwardToConsistency(
+  forwardMap: Readonly<Record<string, string>>,
+  lookup: RouteLookup,
+): void {
   // Check target existence and param compatibility for each static mapping
-  for (const [fromRoute, targetRoute] of objectEntries(config.forwardMap)) {
-    if (!routeExistsInTree(tree, targetRoute)) {
+  for (const [fromRoute, targetRoute] of objectEntries(forwardMap)) {
+    if (!lookup.hasRoute(targetRoute)) {
       throw new Error(
         `[validation-plugin] validateForwardToConsistency: forwardTo target "${targetRoute}" ` +
           `does not exist in tree (source route: "${fromRoute}")`,
@@ -292,28 +197,22 @@ export function validateForwardToConsistency(store: unknown): void {
     }
 
     // Validate param compatibility: target must not require params absent in source
-    const sourceSegments = matcher.getSegmentsByName(fromRoute);
-    const targetSegments = matcher.getSegmentsByName(targetRoute);
+    const sourceParams = new Set(lookup.getUrlParams(fromRoute));
+    const missingParams = [...new Set(lookup.getUrlParams(targetRoute))].filter(
+      (param) => !sourceParams.has(param),
+    );
 
-    if (sourceSegments && targetSegments) {
-      const sourceParams = collectUrlParams(sourceSegments);
-      const targetParams = collectUrlParams(targetSegments);
-      const missingParams = [...targetParams].filter(
-        (param) => !sourceParams.has(param),
+    if (missingParams.length > 0) {
+      throw new Error(
+        `[validation-plugin] validateForwardToConsistency: forwardTo target "${targetRoute}" ` +
+          `requires params [${missingParams.join(", ")}] not available in source route "${fromRoute}"`,
       );
-
-      if (missingParams.length > 0) {
-        throw new Error(
-          `[validation-plugin] validateForwardToConsistency: forwardTo target "${targetRoute}" ` +
-            `requires params [${missingParams.join(", ")}] not available in source route "${fromRoute}"`,
-        );
-      }
     }
   }
 
   // Detect cycles in the full forwardMap (catches multi-hop cycles)
-  for (const fromRoute of objectKeys(config.forwardMap)) {
-    resolveForwardChainWithPrefix(fromRoute, config.forwardMap);
+  for (const fromRoute of objectKeys(forwardMap)) {
+    resolveForwardChainWithPrefix(fromRoute, forwardMap);
   }
 }
 
@@ -321,22 +220,12 @@ export function validateForwardToConsistency(store: unknown): void {
 // 3. validateRouteProperties
 // =============================================================================
 
-/**
- * Validates route properties for all registered routes in the store.
- * Checks decoder/encoder types, defaultParams structure, and async forwardTo callbacks.
- * Adapted from: validateRouteProperties() in forwardToValidation.ts
- *
- * @param store - RoutesStore instance (typed as unknown to avoid core coupling)
- * @throws {TypeError} If any registered decoder/encoder is not a valid sync function
- * @throws {TypeError} If any defaultParams is not a plain object
- * @throws {TypeError} If any forwardTo callback is async
- */
-/** Every entry of a default-bag slot is a plain object, or the store is bad. */
+/** Every entry of a default-bag slot is a plain object, or the route is bad. */
 function assertPlainBagSlot(
-  slot: Record<string, unknown>,
+  slot: [string, unknown][],
   slotName: "defaultParams" | "defaultSearch",
 ): void {
-  for (const [routeName, bag] of objectEntries(slot)) {
+  for (const [routeName, bag] of slot) {
     if (bag === null || typeof bag !== "object" || Array.isArray(bag)) {
       throw new TypeError(
         `[validation-plugin] validateRoutePropertiesStore: route "${routeName}" ${slotName} must be a plain object, got ${Array.isArray(bag) ? "array" : typeof bag}`,
@@ -345,12 +234,28 @@ function assertPlainBagSlot(
   }
 }
 
-export function validateRoutePropertiesStore(store: unknown): void {
-  const routesStore = assertRoutesStore(store, "validateRoutePropertiesStore");
-  const { config } = routesStore;
+/**
+ * Validates route properties for every registered route.
+ * Checks decoder/encoder types, defaultParams structure, and async forwardTo callbacks.
+ * Adapted from: validateRouteProperties() in forwardToValidation.ts
+ *
+ * @param routes - Every top-level route, nested, as `RoutesApi.get` reports it
+ * @throws {TypeError} If any registered decoder/encoder is not a valid sync function
+ * @throws {TypeError} If any defaultParams is not a plain object
+ * @throws {TypeError} If any forwardTo callback is async
+ */
+export function validateRoutePropertiesStore(
+  routes: readonly RouteFacts[],
+): void {
+  const decoders = collectSlot(routes, (route) => route.decodeParams);
+  const encoders = collectSlot(routes, (route) => route.encodeParams);
+  // A string `forwardTo` is a target name, judged by the forward-map checks.
+  const forwardCallbacks = collectSlot(routes, (route) =>
+    typeof route.forwardTo === "string" ? undefined : route.forwardTo,
+  );
 
   // Validate decoders — must be non-async functions (sync required for matchPath/buildPath)
-  for (const [routeName, decoder] of objectEntries(config.decoders)) {
+  for (const [routeName, decoder] of decoders) {
     if (typeof decoder !== "function") {
       throw new TypeError(
         `[validation-plugin] validateRoutePropertiesStore: route "${routeName}" decoder must be a function, got ${typeof decoder}`,
@@ -361,7 +266,7 @@ export function validateRoutePropertiesStore(store: unknown): void {
   }
 
   // Validate encoders — must be non-async functions (sync required for matchPath/buildPath)
-  for (const [routeName, encoder] of objectEntries(config.encoders)) {
+  for (const [routeName, encoder] of encoders) {
     if (typeof encoder !== "function") {
       throw new TypeError(
         `[validation-plugin] validateRoutePropertiesStore: route "${routeName}" encoder must be a function, got ${typeof encoder}`,
@@ -375,11 +280,17 @@ export function validateRoutePropertiesStore(store: unknown): void {
   // ⚠ Reachable only for a TRUTHY value: core drops a falsy structural field
   // before anything is stored, so this pass has nothing left to read for one.
   // `structural-field-coverage-authority-1787` derives that boundary.
-  assertPlainBagSlot(config.defaultParams, "defaultParams");
-  assertPlainBagSlot(config.defaultSearch, "defaultSearch");
+  assertPlainBagSlot(
+    collectSlot(routes, (route) => route.defaultParams),
+    "defaultParams",
+  );
+  assertPlainBagSlot(
+    collectSlot(routes, (route) => route.defaultSearch),
+    "defaultSearch",
+  );
 
   // Validate forwardTo function callbacks — must be non-async functions
-  for (const [routeName, callback] of objectEntries(config.forwardFnMap)) {
+  for (const [routeName, callback] of forwardCallbacks) {
     if (typeof callback !== "function") {
       throw new TypeError(
         `[validation-plugin] validateRoutePropertiesStore: route "${routeName}" forwardTo callback must be a function, got ${typeof callback}`,
@@ -399,15 +310,16 @@ export function validateRoutePropertiesStore(store: unknown): void {
  * This is a focused existence-only check (param compat is in validateForwardToConsistency).
  * Adapted from: validateForwardToTargets() in forwardToValidation.ts
  *
- * @param store - RoutesStore instance (typed as unknown to avoid core coupling)
+ * @param forwardMap - The ONE-HOP forward map, from `PluginApi.getForwardMap()`
+ * @param lookup - Existence of routes that already exist
  * @throws {Error} If any forwardTo target route does not exist in the tree
  */
-export function validateForwardToTargetsStore(store: unknown): void {
-  const routesStore = assertRoutesStore(store, "validateForwardToTargetsStore");
-  const { config, tree } = routesStore;
-
-  for (const [fromRoute, targetRoute] of objectEntries(config.forwardMap)) {
-    if (!routeExistsInTree(tree, targetRoute)) {
+export function validateForwardToTargetsStore(
+  forwardMap: Readonly<Record<string, string>>,
+  lookup: RouteLookup,
+): void {
+  for (const [fromRoute, targetRoute] of objectEntries(forwardMap)) {
+    if (!lookup.hasRoute(targetRoute)) {
       throw new Error(
         `[validation-plugin] validateForwardToTargetsStore: forwardTo target "${targetRoute}" ` +
           `does not exist for route "${fromRoute}"`,
@@ -421,32 +333,23 @@ export function validateForwardToTargetsStore(store: unknown): void {
 // =============================================================================
 
 /**
- * Validates the full structure of the dependencies store.
- * Checks that the dependencies object is valid, has no getters, and limits are well-formed.
+ * Validates the dependency record and the resolved limits.
  *
- * @param deps - DependenciesStore instance (typed as unknown to avoid core coupling)
- * @throws {TypeError} If deps is not an object
- * @throws {TypeError} If deps.dependencies is not a valid plain object (or has getters)
- * @throws {TypeError} If deps.limits is missing or has non-numeric limit values
+ * ⚠ The getter walk reads core's LIVE dependency record, the one read of a
+ * core store this pass makes. Core refuses a getter at every dependency
+ * door, so the only way one lands there is `Object.defineProperty` through the
+ * record `getInternals(router).dependenciesGetStore()` hands out, and the walk
+ * exists for as long as that door does (#2386).
+ *
+ * @param dependencies - Core's dependency record
+ * @param limits - The resolved limits, from `PluginApi.getResolvedLimits()`
+ * @throws {TypeError} If a dependency is a getter
+ * @throws {TypeError} If a limit is not an integer
  */
-export function validateDependenciesStructure(deps: unknown): void {
-  if (!deps || typeof deps !== "object") {
-    throw new TypeError(
-      "[validation-plugin] validateDependenciesStructure: deps must be an object",
-    );
-  }
-
-  const depsRecord = deps as Record<string, unknown>;
-
-  // Validate dependencies field exists and is an object
-  if (!depsRecord.dependencies || typeof depsRecord.dependencies !== "object") {
-    throw new TypeError(
-      "[validation-plugin] validateDependenciesStructure: deps.dependencies must be an object",
-    );
-  }
-
-  const dependencies = depsRecord.dependencies as Record<string, unknown>;
-
+export function validateDependenciesStructure(
+  dependencies: object,
+  limits: Readonly<LimitsConfig>,
+): void {
   // Getters can throw, return different values, or have side effects — reject them
   for (const key of objectKeys(dependencies)) {
     if (getOwnPropertyDescriptor(dependencies, key)?.get) {
@@ -456,35 +359,18 @@ export function validateDependenciesStructure(deps: unknown): void {
     }
   }
 
-  // Validate limits field exists and is an object
-  if (!depsRecord.limits || typeof depsRecord.limits !== "object") {
-    throw new TypeError(
-      "[validation-plugin] validateDependenciesStructure: deps.limits must be an object",
-    );
-  }
-
-  const limits = depsRecord.limits as Record<string, unknown>;
-  const expectedLimitKeys: (keyof LocalDependencyLimits)[] = [
-    "maxDependencies",
-    "maxPlugins",
-    "maxListeners",
-    "warnListeners",
-    "maxLifecycleHandlers",
-  ];
-
-  for (const key of expectedLimitKeys) {
+  for (const [key, value] of objectEntries(limits)) {
     // ⚑ `Number.isInteger`, not `typeof === "number"`. Core coerces the caller's
-    // limits ONCE at construction (#1875), so by the time they reach this store
-    // they are always `typeof "number"` — and `Number(undefined)`,
-    // `Number("abc")` and `Number({})` are all `NaN`, which passes a `typeof`
-    // test. A `typeof` check therefore diagnoses nothing here: whatever reaches
-    // this store is already `typeof "number"`, and the values worth rejecting
-    // are spread across that type — `retrospective.test.ts` owns which ones and
-    // reds on both `typeof` and `isFinite`. This also lands the check on the same
-    // predicate `validateLimitValue` already uses, so the two mirrors agree.
-    if (!Number.isInteger(limits[key])) {
+    // limits ONCE at construction (#1875), so every resolved limit is already
+    // `typeof "number"` — and `Number(undefined)`, `Number("abc")` and
+    // `Number({})` are all `NaN`, which passes a `typeof` test. The values
+    // worth rejecting are spread across that type; `retrospective.test.ts`
+    // owns which ones and reds on both `typeof` and `isFinite`. This also lands
+    // the check on the same predicate `validateLimitValue` already uses, so the
+    // two mirrors agree.
+    if (!Number.isInteger(value)) {
       throw new TypeError(
-        `[validation-plugin] validateDependenciesStructure: deps.limits.${key} must be an integer, got ${String(limits[key])}`,
+        `[validation-plugin] validateDependenciesStructure: deps.limits.${key} must be an integer, got ${String(value)}`,
       );
     }
   }
@@ -495,54 +381,33 @@ export function validateDependenciesStructure(deps: unknown): void {
 // =============================================================================
 
 /**
- * Validates that actual resource counts don't exceed configured limits.
- * Compares dependency count vs maxDependencies limit from the deps store.
+ * Validates that the dependency count does not exceed the configured limit.
  * Adapted from: validateLimits() in OptionsNamespace/validators.ts
  *
  * @param options - Router options (typed as unknown to avoid core coupling)
+ * @param dependencyCount - How many dependencies the router holds
+ * @param resolvedMaxDependencies - `maxDependencies` from the resolved limits
  * @throws {RangeError} If dependency count exceeds maxDependencies limit (#1225:
  *   `>` not `>=` — an at-limit store is legal, mirroring the live limiter)
  */
-function extractConfiguredLimits(options: unknown): Record<string, unknown> {
+export function validateLimitsConsistency(
+  options: unknown,
+  dependencyCount: number,
+  resolvedMaxDependencies: number,
+): void {
   const opts =
     options && typeof options === "object"
       ? (options as Record<string, unknown>)
       : {};
-
-  return opts.limits && typeof opts.limits === "object"
-    ? (opts.limits as Record<string, unknown>)
-    : {};
-}
-
-function checkDepCountLimit(
-  deps: unknown,
-  configuredLimits: Record<string, unknown>,
-): void {
-  if (!deps || typeof deps !== "object") {
-    return;
-  }
-
-  const depsRecord = deps as Record<string, unknown>;
-  const dependencies = depsRecord.dependencies;
-  const depsLimits = depsRecord.limits;
-
-  if (
-    !dependencies ||
-    typeof dependencies !== "object" ||
-    !depsLimits ||
-    typeof depsLimits !== "object"
-  ) {
-    return;
-  }
-
-  const depCount = objectKeys(dependencies).length;
-  const limitsRecord = depsLimits as Record<string, unknown>;
+  const configuredLimits =
+    opts.limits && typeof opts.limits === "object"
+      ? (opts.limits as Record<string, unknown>)
+      : {};
   const maxDepsFromOptions = configuredLimits.maxDependencies;
-  const maxDepsFromStore = limitsRecord.maxDependencies;
   const maxDeps =
     typeof maxDepsFromOptions === "number"
       ? maxDepsFromOptions
-      : maxDepsFromStore;
+      : resolvedMaxDependencies;
 
   // `>`, not `>=` (#1225): the live limiter (`validateDependencyCount`) counts
   // BEFORE the insert, so a store may legally REACH exactly maxDependencies. This
@@ -550,20 +415,11 @@ function checkDepCountLimit(
   // cloneRouter), so it must accept an at-limit store and reject only one that
   // STRICTLY exceeds the limit — else every SSR per-request clone of an at-limit
   // base throws.
-  if (typeof maxDeps === "number" && maxDeps > 0 && depCount > maxDeps) {
+  if (maxDeps > 0 && dependencyCount > maxDeps) {
     throw new RangeError(
-      `[validation-plugin] validateLimitsConsistency: dependency count (${depCount}) exceeds maxDependencies limit (${maxDeps})`,
+      `[validation-plugin] validateLimitsConsistency: dependency count (${dependencyCount}) exceeds maxDependencies limit (${maxDeps})`,
     );
   }
-}
-
-export function validateLimitsConsistency(
-  options: unknown,
-  deps: unknown,
-): void {
-  const configuredLimits = extractConfiguredLimits(options);
-
-  checkDepCountLimit(deps, configuredLimits);
 }
 
 // =============================================================================
@@ -585,15 +441,13 @@ export function validateLimitsConsistency(
  */
 export function validateResolvedDefaultRoute(
   routeName: unknown,
-  store: unknown,
+  lookup: RouteLookup,
 ): void {
   if (typeof routeName !== "string" || !routeName) {
     return;
   }
 
-  const routesStore = assertRoutesStore(store, "validateResolvedDefaultRoute");
-
-  if (!routeExistsInTree(routesStore.tree, routeName)) {
+  if (!lookup.hasRoute(routeName)) {
     throw new Error(
       `[validation-plugin] defaultRoute resolved to non-existent route: "${routeName}"`,
     );
@@ -620,51 +474,21 @@ export function validateResolvedDefaultRoute(
  *
  * ⚠ **EXTERNAL origins only.** A definition guard arrives attached to a route in
  * the config, so its name cannot be a typo by construction; reporting it would
- * be noise no caller could act on.
+ * be noise no caller could act on. `PluginApi.getExternalGuardNames()` hands
+ * out exactly that origin, each name once.
  */
-export function warnOrphanedGuards(store: unknown, logger: RouterLogger): void {
-  const routesStore = assertRoutesStore(store, "warnOrphanedGuards");
-  const lifecycle = (
-    routesStore as { lifecycleNamespace?: { getFactoriesByOrigin?: unknown } }
-  ).lifecycleNamespace;
-
-  /* v8 ignore start -- @preserve: `lifecycleNamespace` is declared optional on
-     the store, so TypeScript requires the arm, but `routeGetStore()` at
-     `start()` always carries a wired namespace. Unreachable through the plugin's
-     only caller; kept because the type admits it. */
-  if (typeof lifecycle?.getFactoriesByOrigin !== "function") {
-    return;
-  }
-  /* v8 ignore stop */
-
-  const byOrigin = (
-    lifecycle as {
-      getFactoriesByOrigin: () => {
-        external: [Record<string, unknown>, Record<string, unknown>];
-      };
+export function warnOrphanedGuards(
+  guardNames: readonly string[],
+  lookup: RouteLookup,
+  logger: RouterLogger,
+): void {
+  for (const name of guardNames) {
+    if (!lookup.hasRoute(name)) {
+      logger.warn(
+        "router.start",
+        `Guard registered for route "${name}", which the route tree does not contain. ` +
+          `It will never run unless that route is added. Check the name for a typo.`,
+      );
     }
-  ).getFactoriesByOrigin();
-
-  // `[deactivate, activate]` — the namespace's own ordering convention, stated
-  // on the class. Both halves take the same door and the same typo.
-  //
-  // ⚠ These are RECORDS, not Maps, and they are `Object.create(null)`-backed
-  // (#1801) — the namespace builds them that way precisely because `cloneRouter`
-  // enumerates them. `Object.keys` is the read that matches.
-  const [deactivate, activate] = byOrigin.external;
-  const orphaned = new Set<string>();
-
-  for (const name of [...objectKeys(deactivate), ...objectKeys(activate)]) {
-    if (!routeExistsInTree(routesStore.tree, name)) {
-      orphaned.add(name);
-    }
-  }
-
-  for (const name of orphaned) {
-    logger.warn(
-      "router.start",
-      `Guard registered for route "${name}", which the route tree does not contain. ` +
-        `It will never run unless that route is added. Check the name for a typo.`,
-    );
   }
 }

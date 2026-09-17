@@ -5,7 +5,10 @@
  * When ctx.validator is null (default), validation is skipped.
  * When ctx.validator is set (by validation plugin), all methods are called.
  *
- * All parameters use `unknown` type to avoid coupling to internal type names.
+ * Parameters that carry a caller-supplied value use `unknown`, to avoid coupling
+ * to internal type names. ⚠ That is not a blanket rule: where core already holds
+ * the fact the analyser judges, the fact travels — a number, a name, a value —
+ * rather than the container it was read from (#2382).
  */
 
 export interface RouterValidator {
@@ -28,20 +31,24 @@ export interface RouterValidator {
       caller: string,
     ) => void;
     validateAddRouteArgs: (routes: unknown) => void;
-    validateRoutes: (
-      routes: unknown[],
-      tree: unknown,
-      parentName?: string,
-    ) => void;
+    /**
+     * ⚑ Takes no store (#2382). The analyser reads the three facts it judges
+     * from `PluginApi`: the path slots and the ONE-HOP forward map come back as
+     * frozen values, and the tree is the published one `getTree()` already hands
+     * out — no container travels that the curated surface does not.
+     */
+    validateRoutes: (routes: unknown[], parentName?: string) => void;
     validateRemoveRouteArgs: (name: unknown) => void;
     validateUpdateRouteBasicArgs: (name: unknown, updates: unknown) => void;
     validateUpdateRoutePropertyTypes: (name: string, updates: unknown) => void;
-    validateUpdateRoute: (
-      name: string,
-      updates: unknown,
-      tree: unknown,
-    ) => void;
-    validateParentOption: (parent: unknown, tree: unknown) => void;
+    /** Reads the same three facts from `PluginApi` as `validateRoutes` (#2382). */
+    validateUpdateRoute: (name: string, updates: unknown) => void;
+    /**
+     * ⚑ Takes no tree (#2382): the analyser reads it from `PluginApi.getTree()`,
+     * which hands out the same object — the tree is published already, so
+     * passing it as an argument added a second address and nothing else.
+     */
+    validateParentOption: (parent: unknown) => void;
     validateRouteName: (name: unknown, caller: string) => void;
     throwIfInternalRoute: (name: unknown, caller: string) => void;
     throwIfInternalRouteInArray: (routes: unknown[], caller: string) => void;
@@ -55,7 +62,8 @@ export interface RouterValidator {
    */
   options: {
     validateOptions: (options: unknown, methodName: string) => void;
-    validateResolvedDefaultRoute: (routeName: unknown, store: unknown) => void;
+    /** Reads the tree from `PluginApi.getTree()`, like `validateParentOption` (#2382). */
+    validateResolvedDefaultRoute: (routeName: unknown) => void;
   };
 
   /**
@@ -69,8 +77,26 @@ export interface RouterValidator {
       caller: string,
     ) => void;
     validateDependenciesObject: (deps: unknown, caller: string) => void;
-    validateDependencyExists: (name: string, store: unknown) => void;
-    validateDependencyCount: (store: unknown, methodName: string) => void;
+    /**
+     * ⚑ Takes the VALUE core read, not the store that holds it (#2382). The
+     * question is whether the name resolved to anything, and core has the answer
+     * one line earlier: `readDependency` performs exactly that lookup.
+     */
+    validateDependencyExists: (name: string, value: unknown) => void;
+    /**
+     * ⚑ Takes the two NUMBERS it judges, not the store that holds them (#2382).
+     * `maxDependencies` arrives already resolved by `createLimits`, which takes
+     * this path out of the default-drift #1879 names.
+     *
+     * ⚠ Both arguments sit inside the optional chain on purpose: with no
+     * validator installed the `?.` short-circuits the whole chain, arguments
+     * included, so the key count is never walked.
+     */
+    validateDependencyCount: (
+      currentCount: number,
+      maxDependencies: number,
+      methodName: string,
+    ) => void;
     validateCloneArgs: (dependencies: unknown) => void;
     warnOverwrite: (name: string, methodName: string) => void;
     warnBatchOverwrite: (keys: string[], methodName: string) => void;

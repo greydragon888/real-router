@@ -9,9 +9,10 @@ import {
   throwIfDisposed,
   throwOnMisChanneledKey,
 } from "../internals";
+import { urlParamsOf } from "../namespaces/RoutesNamespace/helpers";
 import { validateSetRootPath } from "../namespaces/RoutesNamespace/routeGuards";
 import { RouterError, freezeThrownError } from "../RouterError";
-import { putField } from "../utils/ingest";
+import { copyFields, emptyRecord, putField } from "../utils/ingest";
 
 import type { PluginApi } from "./types";
 import type {
@@ -280,6 +281,31 @@ export function getPluginApi<
       },
     }),
     getDeclaredQueryNames: (name) => ctx.getDeclaredQueryNames(name),
+    // ⚑ Read through the store rather than a new `RouterInternals` member
+    // (#2382): the internals bag is what #2387 dissolves, and a member that
+    // lives on both surfaces becomes a parity pair the ledger has to vector.
+    getUrlParams: (name) => urlParamsOf(ctx.routeGetStore(), name),
+    getForwardMap: () => {
+      // The route names are keys core did not choose here, so the copy goes
+      // through `copyFields` into a null-prototype record rather than a spread.
+      const copy = emptyRecord<string>();
+
+      copyFields(copy, ctx.routeGetStore().config.forwardMap);
+
+      return freeze(copy);
+    },
+    getResolvedLimits: () => ctx.dependenciesGetStore().limits,
+    getDependencyKeys: () =>
+      freeze(objectKeys(ctx.dependenciesGetStore().dependencies)),
+    getExternalGuardNames: () => {
+      const [deactivate, activate] =
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- wired at construction
+        ctx.routeGetStore().lifecycleNamespace!.getFactoriesByOrigin().external;
+
+      return freeze([
+        ...new Set([...objectKeys(deactivate), ...objectKeys(activate)]),
+      ]);
+    },
     getOptions: ctx.getOptions,
     getTree: ctx.getTree,
     addInterceptor: (method, fn) => {

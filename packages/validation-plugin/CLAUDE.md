@@ -38,9 +38,9 @@ dependencies as `Record<string, T>`; a map with concrete keys was always fine.
 
 `PluginFactory<never>` is NOT the shorthand here, even though core uses exactly
 that for `AnyOptions = Options<never>`: measured, it fails on BOTH compilers,
-because this plugin actually reads dependencies. `buildValidatorObject` is
-generic for the same reason — otherwise `RouterInternals<D>` does not fit its
-`RouterInternals<object>` parameter.
+because this plugin actually reads dependencies. `readRoutes` is generic for
+the same reason — otherwise `RoutesApi<D>` does not fit its `RoutesApi<object>`
+parameter.
 
 ⚠ The same `(): PluginFactory` default is still on the other nine plugin
 factories — see #1621 for the list. Anything added here should take the type
@@ -194,11 +194,11 @@ Callbacks are intentionally **not** probed at registration time — their return
 
 ### Reaches the engine only through `@real-router/core` (#1301)
 
-The plugin does **not** import the foundation `route-tree` package. `validateRoute` (the batch route/path validator — no matcher equivalent) comes from the `@real-router/core/validation` subpath; forwardTo segment lookup + target existence use the matcher's own `getSegmentsByName` / `hasRoute` (via `store.matcher`, threaded into `validateRoutes` → `validateForwardToTargets`); the `RouteTree` / `Matcher` types come from core. This keeps core the sole consumer of the routing engine. `tests/functional/no-route-tree.test.ts` scans `src/` for any `route-tree` import and fails on a regression — keep it green (and `route-tree` out of `devDependencies`).
+The plugin does **not** import the foundation `route-tree` package. `validateRoute` (the batch route/path validator — no matcher equivalent) comes from the `@real-router/core/validation` subpath; the route validators ask existence by walking `PluginApi.getTree()` and read path slots from `PluginApi.getUrlParams` (a `RouteLookup`, threaded into `validateRoutes` → `validateForwardToTargets`), and the retrospective pass reads the same two answers from that lookup; the `RouteTree` type comes from core. This keeps core the sole consumer of the routing engine. `tests/functional/no-route-tree.test.ts` scans `src/` for any `route-tree` import and fails on a regression — keep it green (and `route-tree` out of `devDependencies`).
 
 ### Core's limit defaults live in ONE place here (#1879)
 
-`helpers.ts` exports `CORE_LIMIT_DEFAULTS`, and every reader takes its fallback from it, in one of two shapes: a `?? …` (four in `validationPlugin.ts`, one in `dependencies.ts`) or a defaulted parameter (`eventBus.ts`, `lifecycle.ts`, `plugins.ts`). Core keeps `DEFAULT_LIMITS` internal, so this is a copy by decision, not by accident.
+`helpers.ts` exports `CORE_LIMIT_DEFAULTS`, and every reader takes its fallback from it, in one of two shapes: a `?? …` (four in `validationPlugin.ts`) or a defaulted parameter (`eventBus.ts`, `lifecycle.ts`, `plugins.ts`). Core keeps `DEFAULT_LIMITS` internal, so this is a copy by decision, not by accident.
 
 Two things keep it honest, and they answer different questions. `Readonly<LimitsConfig>` — core's own interface — is what a **key** added in core hits, as a TS2741 here and in `LIMIT_BOUNDS`. `tests/functional/limit-defaults-authority-1879.test.ts` is what a **value** hits: it reads the resolved bag off a router built with no `limits`, so it compares against what core enforces rather than what any file says. The same file scans `src/` for a re-inlined literal, which is what stops the eight-copies shape coming back.
 
@@ -227,9 +227,9 @@ product, not a bug fix.
 ⚑ **`setDependencies` is the worked example (#2253).** Its limit is asked by
 `validateDependencyBatchLimit`, from inside this plugin's `validateDependenciesObject`
 wrapper — core's only pre-flight call on the whole bag, and therefore the one position from
-which a refusal can precede every write. Core needed no change at all: the position already
-existed, and `ctx.dependenciesGetStore()` gives the wrapper what it needs to project. The
-per-key `validateDependencyCount` stays where it is, because the advisory `warn` / `error`
+which a refusal can precede every write. The position already existed in core, and
+`PluginApi.getDependencyKeys()` plus `getResolvedLimits()` give the wrapper what it needs to
+project (#2382). The per-key `validateDependencyCount` stays where it is, because the advisory `warn` / `error`
 thresholds fire as the store grows and a projection cannot say which of them a batch would
 cross without replaying it.
 

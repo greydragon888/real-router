@@ -21,6 +21,7 @@ import {
 import { validateForwardToTargets, validateRouteProperties } from "./forwardTo";
 import { validateNavigateParamsShape } from "./navigation";
 
+import type { RouteLookup } from "./forwardTo";
 import type {
   ForwardToCallback,
   Params,
@@ -28,16 +29,10 @@ import type {
   RouteConfigUpdate,
   DefaultDependencies,
 } from "@real-router/core";
-import type { Matcher, RouteTree } from "@real-router/core/validation";
+import type { RouteTree } from "@real-router/core/validation";
 
 // Internal constant (matches core's INTERNAL_ROUTE_PREFIX)
 const INTERNAL_ROUTE_PREFIX = "@@";
-
-// Minimal local type — only the forwardMap field used by this file
-// (RouteConfig from core is not exported from @real-router/core public API)
-interface RouteConfigLike {
-  forwardMap: Record<string, string>;
-}
 
 export function throwIfInternalRoute(name: string, methodName: string): void {
   if (name.startsWith(INTERNAL_ROUTE_PREFIX)) {
@@ -502,20 +497,20 @@ export function validateShouldUpdateNodeArgs(
  * Checks parent existence, duplicates, and forwardTo targets/cycles.
  *
  * @param routes - Routes to validate
- * @param tree - Current route tree (optional for initial validation)
- * @param matcher - Current route matcher (segment lookup + existence for forwardTo)
- * @param forwardMap - Current forward map for cycle detection
+ * @param tree - The route tree, from `PluginApi.getTree()`
+ * @param lookup - Existence and path slots of routes that already exist
+ * @param forwardMap - The ONE-HOP forward map, from `PluginApi.getForwardMap()`
  * @param parentName - Optional parent route fullName for nesting via addRoute({ parent })
  */
 export function validateRoutes<Dependencies extends DefaultDependencies>(
   routes: Route<Dependencies>[],
-  tree?: RouteTree,
-  matcher?: Matcher,
-  forwardMap?: Record<string, string>,
+  tree: RouteTree,
+  lookup: RouteLookup,
+  forwardMap: Readonly<Record<string, string>>,
   parentName?: string,
 ): void {
   // Validate parent route exists in tree
-  if (parentName && tree) {
+  if (parentName) {
     let node: RouteTree | undefined = tree;
 
     for (const segment of parentName.split(".")) {
@@ -544,9 +539,7 @@ export function validateRoutes<Dependencies extends DefaultDependencies>(
     );
   }
 
-  if (matcher && forwardMap) {
-    validateForwardToTargets(routes, forwardMap, matcher, parentName);
-  }
+  validateForwardToTargets(routes, forwardMap, lookup, parentName);
 }
 
 // ============================================================================
@@ -554,57 +547,23 @@ export function validateRoutes<Dependencies extends DefaultDependencies>(
 // ============================================================================
 
 /**
- * Collects URL params from segments into a Set.
- */
-function collectUrlParams(segments: readonly RouteTree[]): Set<string> {
-  const params = new Set<string>();
-
-  for (const segment of segments) {
-    for (const param of segment.paramMeta.urlParams) {
-      params.add(param);
-    }
-  }
-
-  return params;
-}
-
-/**
  * Validates that forwardTo target doesn't require params that source doesn't have.
  *
  * @param sourceName - Source route name
  * @param targetName - Target route name
- * @param matcher - Current route matcher
+ * @param lookup - Path slots of routes that already exist
  */
 export function validateForwardToParamCompatibility(
   sourceName: string,
   targetName: string,
-  matcher: Matcher,
+  lookup: RouteLookup,
 ): void {
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  const sourceSegments = matcher.getSegmentsByName(
-    sourceName,
-  )! as readonly RouteTree[];
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  const targetSegments = matcher.getSegmentsByName(
-    targetName,
-  )! as readonly RouteTree[];
-
-  // Get source URL params as a Set for O(1) lookup
-  const sourceParams = collectUrlParams(sourceSegments);
-
-  // Build target URL params array (inline — no separate helper needed)
-  const targetParams: string[] = [];
-
-  for (const segment of targetSegments) {
-    for (const param of segment.paramMeta.urlParams) {
-      targetParams.push(param);
-    }
-  }
+  const sourceParams = new Set(lookup.getUrlParams(sourceName));
 
   // Check if target requires params that source doesn't have
-  const missingParams = targetParams.filter(
-    (param) => !sourceParams.has(param),
-  );
+  const missingParams = lookup
+    .getUrlParams(targetName)
+    .filter((param) => !sourceParams.has(param));
 
   if (missingParams.length > 0) {
     throw new Error(
@@ -621,16 +580,16 @@ export function validateForwardToParamCompatibility(
  *
  * @param sourceName - Source route name
  * @param targetName - Target route name
- * @param config - Current route config (forwardMap read-only in this call)
+ * @param forwardMap - The ONE-HOP forward map (never the resolved one)
  */
 export function validateForwardToCycle(
   sourceName: string,
   targetName: string,
-  config: RouteConfigLike,
+  forwardMap: Readonly<Record<string, string>>,
 ): void {
   // Create a test map with the new entry to validate BEFORE mutation
   const testMap = {
-    ...config.forwardMap,
+    ...forwardMap,
     [sourceName]: targetName,
   };
 
@@ -643,21 +602,19 @@ export function validateForwardToCycle(
  *
  * @param name - Route name (already validated by static method)
  * @param forwardTo - Cached forwardTo value
- * @param hasRoute - Function to check route existence
- * @param matcher - Current route matcher
- * @param config - Current route config
+ * @param lookup - Existence and path slots of routes that already exist
+ * @param forwardMap - The ONE-HOP forward map
  */
 export function validateUpdateRoute<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
   name: string,
   forwardTo: string | ForwardToCallback<Dependencies> | null | undefined,
-  hasRoute: (n: string) => boolean,
-  matcher: Matcher,
-  config: RouteConfigLike,
+  lookup: RouteLookup,
+  forwardMap: Readonly<Record<string, string>>,
 ): void {
   // Validate route exists
-  if (!hasRoute(name)) {
+  if (!lookup.hasRoute(name)) {
     throw new ReferenceError(
       `[router.updateRoute] route "${name}" does not exist`,
     );
@@ -669,16 +626,16 @@ export function validateUpdateRoute<
     forwardTo !== null &&
     typeof forwardTo === "string"
   ) {
-    if (!hasRoute(forwardTo)) {
+    if (!lookup.hasRoute(forwardTo)) {
       throw new Error(
         `[router.updateRoute] forwardTo target "${forwardTo}" does not exist`,
       );
     }
 
     // Check forwardTo param compatibility
-    validateForwardToParamCompatibility(name, forwardTo, matcher);
+    validateForwardToParamCompatibility(name, forwardTo, lookup);
 
     // Check for cycle detection
-    validateForwardToCycle(name, forwardTo, config);
+    validateForwardToCycle(name, forwardTo, forwardMap);
   }
 }

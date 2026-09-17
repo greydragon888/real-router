@@ -487,15 +487,10 @@ describe("consumer census (#2303)", () => {
       getDependenciesApi: sorted(hits.getDependenciesApi.src),
       getLifecycleApi: sorted(hits.getLifecycleApi.src),
     }).toStrictEqual({
-      // ⚠ What is LEFT here is what #2339 cannot move without a decision: two
-      // stores whose type no subpath publishes, the validator's write channel
-      // (§4 1a) and the hydration scratchpad (#2361).
-      getInternals: [
-        "dependenciesGetStore",
-        "hydrationState",
-        "routeGetStore",
-        "validator",
-      ],
+      // ⚠ What is LEFT here: the dependency record the getter walk reads until
+      // its door goes (#2386), the validator slot (#2388) and the hydration
+      // scratchpad (#2361).
+      getInternals: ["dependenciesGetStore", "hydrationState", "validator"],
       getPluginApi: [
         "addEventListener",
         "addInterceptor",
@@ -506,16 +501,21 @@ describe("consumer census (#2303)", () => {
         "forwardState",
         "getAdoptedOrigins",
         "getDeclaredQueryNames",
+        "getDependencyKeys",
+        "getExternalGuardNames",
+        "getForwardMap",
         "getOptions",
+        "getResolvedLimits",
         "getRootPath",
         "getRouteConfig",
         "getTree",
+        "getUrlParams",
         "logger",
         "makeState",
         "matchPath",
         "setRootPath",
       ],
-      getRoutesApi: ["subscribeChanges"],
+      getRoutesApi: ["get", "subscribeChanges"],
       // ⚠ An empty row here is NOT an unused surface — see the cell below.
       getNavigator: [],
       getDependenciesApi: [],
@@ -572,21 +572,21 @@ describe("consumer census (#2303)", () => {
     // ⚠ **What this walk still cannot see, recorded rather than left to read as
     // absence (#2343).** It is syntactic: it follows a value while the value
     // stays in the expression. A value that LEAVES — passed whole into a
-    // function — is invisible on the far side, and two shipped channels do
-    // exactly that with the route store. `validationPlugin` hands
-    // `ctx.routeGetStore()` to `validators/retrospective.ts`, whose functions
-    // take `store: unknown` and read `definitions` / `config` / `tree` there;
-    // and core itself passes the live store to validator methods as an
-    // ARGUMENT, so those reads never pass through `routeGetStore()` in the
-    // plugin at all. `routeGetStore`'s empty `src` therefore means "no reach
-    // this instrument can see", not "no reach" — #2339 §4 question 4 owns that
-    // channel and prices closing it.
+    // function — is invisible on the far side: `validationPlugin` hands what
+    // `getRoutesApi.get()` and `getPluginApi.getForwardMap()` return to
+    // `validators/retrospective.ts`, which reads route fields and map entries
+    // there. An empty or missing `src` for either means "no reach this
+    // instrument can see", not "no reach".
     expect(rows).toStrictEqual({
+      "getInternals.dependenciesGetStore()": {
+        src: ["dependencies"],
+        tests: [],
+      },
       "getInternals.getCloneState()": { src: [], tests: ["limits"] },
       "getInternals.getOptions()": { src: [], tests: ["queryParams"] },
       "getInternals.routeGetStore()": {
         src: [],
-        tests: ["config", "matcher", "matcherOptions", "tree"],
+        tests: ["matcherOptions"],
       },
       "getInternals.validator": { src: ["options"], tests: ["dependencies"] },
       "getNavigator.getState()": { src: [], tests: ["name"] },
@@ -602,8 +602,13 @@ describe("consumer census (#2303)", () => {
         src: ["name", "params", "search"],
         tests: ["name"],
       },
+      "getPluginApi.getDependencyKeys()": { src: ["length"], tests: [] },
       "getPluginApi.getOptions()": {
         src: ["allowNotFound", "defaultRoute", "limits"],
+        tests: [],
+      },
+      "getPluginApi.getResolvedLimits()": {
+        src: ["maxDependencies"],
         tests: [],
       },
       "getPluginApi.makeState()": {

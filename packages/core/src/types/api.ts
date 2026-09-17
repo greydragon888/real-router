@@ -14,6 +14,7 @@ import type { EventMethodMap, EventName } from "./constants";
 // Augment-target interfaces are declared lexically in the entry (#1540); the
 // type-only cycle with the barrel is deliberate — see the note in ./index.
 import type { NavigationOptions, StateContext } from "./index";
+import type { LimitsConfig } from "./limits";
 import type {
   AdoptedOrigins,
   DefaultDependencies,
@@ -211,6 +212,57 @@ export interface PluginApi {
    * cannot grow the registry.
    */
   getDeclaredQueryNames: (name: string) => readonly string[];
+
+  /**
+   * The route's PATH slot names, ancestors included — the registry
+   * `buildPath` prints from. Answers `[]` for a route the tree does not hold;
+   * a name is not a claim that the route exists.
+   *
+   * ⚠ Handed out BY REFERENCE and frozen where it lives, with the same caveat as
+   * {@link getDeclaredQueryNames}: a held array describes the tree as it was
+   * when read, and a rebuild mints a new one (#2255).
+   */
+  getUrlParams: (name: string) => readonly string[];
+
+  /**
+   * The ONE-HOP forward map — each source route's STRING `forwardTo` target; a
+   * callback `forwardTo` is not in it — as a fresh frozen copy per call.
+   *
+   * ⚠ **One hop, not resolved.** A consumer that checks a PENDING forward for
+   * cycles overlays it onto this map and resolves the chain itself. A resolved
+   * map collapses each chain to its last hop, so a cycle closing through a
+   * source that ALREADY forwards is not constructible there, and the check
+   * would miss it silently. `resolveForwardChain` takes exactly this shape.
+   *
+   * ⚑ A copy, so writing to it reaches nothing — and frozen, so the write does
+   * not land either; strict-mode code (every ES module) gets a `TypeError`.
+   */
+  getForwardMap: () => Readonly<Record<string, string>>;
+
+  /**
+   * The resolved limits: the caller's `limits` over core's defaults, each
+   * coerced to a number once at construction. The frozen object core's own
+   * dependency-count check reads, handed out by reference.
+   */
+  getResolvedLimits: () => Readonly<LimitsConfig>;
+
+  /**
+   * The dependency names the router holds, as `Object.keys` lists them —
+   * `"__proto__"` included, a symbol key not. A fresh frozen array per call.
+   *
+   * ⚠ Not `Object.keys(getDependenciesApi(router).getAll())`: that container
+   * withholds `"__proto__"`, so a count taken from it comes out one short.
+   */
+  getDependencyKeys: () => readonly string[];
+
+  /**
+   * Route names carrying a guard added through `addActivateGuard` /
+   * `addDeactivateGuard` — deactivate first, each name once, including names
+   * the route tree does not hold. A fresh frozen array per call.
+   *
+   * ⚠ A guard declared on a route definition does not put its name here.
+   */
+  getExternalGuardNames: () => readonly string[];
 
   addEventListener: <E extends EventName>(
     eventName: E,

@@ -26,6 +26,7 @@ import type { RouterValidator } from "../types/RouterValidator";
  * (#1798), which is the doctrine's own caveat and travels with it.
  */
 const hasOwn = Object.hasOwn;
+const objectKeys = Object.keys;
 
 /**
  * One `ToPropertyKey`, at the door (#1843).
@@ -67,6 +68,9 @@ const hasOwn = Object.hasOwn;
 const asKey = (name: unknown): string | symbol =>
   typeof name === "symbol" ? name : String(name);
 
+/** The held-key list bare core asks: no validator reads the answer. */
+const NO_HELD_KEYS: readonly string[] = [];
+
 // =============================================================================
 // Module-private CRUD functions
 // =============================================================================
@@ -104,12 +108,16 @@ function setDependency(
   // uses below asked the name FOUR times, and each was a `ToPropertyKey` call
   // into application code.
   const key = asKey(dependencyName);
-  const isNewKey = !hasOwn(target, key);
 
-  if (isNewKey) {
-    // Only check limit when adding new keys (overwrites don't increase count)
-    validator?.dependencies.validateDependencyCount(store, "setDependency");
-  } else {
+  // ⚑ ONE question about the record's keys (#1815 / #2064): the count the limit
+  // judges and the membership that decides whether this write ADDS a key come
+  // from the same list, so they cannot disagree about a key the count does not
+  // see. Only the validator reads either answer, so bare core asks an empty one.
+  const heldKeys: readonly PropertyKey[] = validator
+    ? objectKeys(target)
+    : NO_HELD_KEYS;
+
+  if (heldKeys.includes(key)) {
     const oldValue = target[key];
     const isChanging = oldValue !== dependencyValue;
     // Special case for NaN idempotency (NaN !== NaN is always true)
@@ -120,6 +128,13 @@ function setDependency(
       // MESSAGE, and this is the opt-in diagnostic path.
       validator?.dependencies.warnOverwrite(String(key), "setDependency");
     }
+  } else {
+    // Only check limit when adding new keys (overwrites don't increase count)
+    validator?.dependencies.validateDependencyCount(
+      heldKeys.length,
+      store.limits.maxDependencies,
+      "setDependency",
+    );
   }
 
   target[key] = dependencyValue;
@@ -148,11 +163,21 @@ function setMultipleDependencies(
   // pass (#1861). Before this, `setAll` reached no structural check at all: a
   // string, an array, a class instance, a `Map` and an own enumerable getter all
   // went straight in, the last of them RUNNING the caller's code.
+  // ⚑ ONE list of held keys (#1815 / #2064), read once per call and grown as the
+  // loop admits keys: the count and the membership test both come from it.
+  // Only the validator reads either answer, so bare core starts it empty.
+  const held = new Set(validator ? objectKeys(target) : NO_HELD_KEYS);
+
   ingestDependencies(deps, (key, value) => {
-    if (hasOwn(target, key)) {
+    if (held.has(key)) {
       overwrittenKeys.push(key);
     } else {
-      validator?.dependencies.validateDependencyCount(store, "setDependencies");
+      validator?.dependencies.validateDependencyCount(
+        held.size,
+        store.limits.maxDependencies,
+        "setDependencies",
+      );
+      held.add(key);
     }
 
     storeDependency(target, key, value);
@@ -184,7 +209,7 @@ export function getDependenciesApi<
 
       ctx.validator?.dependencies.validateDependencyExists(
         name as string,
-        store,
+        value,
       );
 
       return value;

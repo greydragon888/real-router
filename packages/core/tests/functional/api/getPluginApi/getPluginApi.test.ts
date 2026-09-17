@@ -7,6 +7,7 @@ import {
   RouterError,
 } from "@real-router/core";
 import {
+  getDependenciesApi,
   getLifecycleApi,
   getPluginApi,
   getRoutesApi,
@@ -509,6 +510,130 @@ describe("setRootPath refuses while a navigation is in flight (#1755)", () => {
         ["warn", "ctx", "warn-message"],
         ["error", "ctx", "error-message"],
       ]);
+    });
+  });
+
+  describe("the two route facts published by #2382", () => {
+    it("getUrlParams answers a route's PATH slots, ancestors included", () => {
+      expect(api.getUrlParams("section.view")).toStrictEqual(["section", "id"]);
+      // `param1..3` are QUERY names on this route, so they are not path slots
+      expect(api.getUrlParams("section.query")).toStrictEqual(["section"]);
+      expect(api.getUrlParams("nope")).toStrictEqual([]);
+    });
+
+    it("getUrlParams hands out one frozen array until a rebuild mints another", () => {
+      const held = api.getUrlParams("section.view");
+
+      expect(Object.isFrozen(held)).toBe(true);
+      expect(api.getUrlParams("section.view")).toBe(held);
+
+      getRoutesApi(router).add({ name: "extra", path: "/extra" });
+
+      expect(api.getUrlParams("section.view")).not.toBe(held);
+      expect(api.getUrlParams("section.view")).toStrictEqual(held);
+    });
+
+    describe("getForwardMap", () => {
+      beforeEach(() => {
+        router = createRouter([
+          { name: "a", path: "/a", forwardTo: "b" },
+          { name: "b", path: "/b", forwardTo: "c" },
+          { name: "c", path: "/c" },
+          { name: "d", path: "/d", forwardTo: () => "c" },
+        ]);
+        api = getPluginApi(router);
+      });
+
+      it("is ONE hop per source, and holds only string forwards", () => {
+        // `a` stays on `b` rather than resolving to `c`, and the callback on `d`
+        // is not in it.
+        expect({ ...api.getForwardMap() }).toStrictEqual({ a: "b", b: "c" });
+      });
+
+      it("is a fresh frozen null-prototype copy that no write reaches", () => {
+        const first = api.getForwardMap();
+
+        expect(api.getForwardMap()).not.toBe(first);
+        expect(Object.isFrozen(first)).toBe(true);
+        expect(Object.getPrototypeOf(first)).toBeNull();
+        expect(() => {
+          (first as Record<string, string>).c = "a";
+        }).toThrow(TypeError);
+
+        expect({ ...api.getForwardMap() }).toStrictEqual({ a: "b", b: "c" });
+        expect(api.forwardState("c", {}).name).toBe("c");
+      });
+
+      it("follows update() and remove()", () => {
+        const routes = getRoutesApi(router);
+
+        routes.add({ name: "e", path: "/e" });
+        routes.update("c", { forwardTo: "e" });
+        routes.remove("a");
+
+        expect({ ...api.getForwardMap() }).toStrictEqual({ b: "c", c: "e" });
+      });
+    });
+  });
+
+  describe("the dependency and guard facts published by #2382", () => {
+    it("getResolvedLimits is the frozen resolved object, coerced once", () => {
+      const limited = createRouter([], {
+        limits: { maxDependencies: "7" as unknown as number },
+      });
+      const limits = getPluginApi(limited).getResolvedLimits();
+
+      expect(limits.maxDependencies).toBe(7);
+      // An unset limit arrives resolved, not absent.
+      expect(limits.maxPlugins).toBe(api.getResolvedLimits().maxPlugins);
+      expect(typeof limits.maxPlugins).toBe("number");
+      expect(Object.isFrozen(limits)).toBe(true);
+      expect(getPluginApi(limited).getResolvedLimits()).toBe(limits);
+    });
+
+    it("getDependencyKeys lists own string keys, __proto__ included, as a fresh frozen array", () => {
+      const withDeps = createRouter([], {}, { a: 1 });
+      const deps = getDependenciesApi(withDeps);
+      const pluginApi = getPluginApi(withDeps);
+
+      deps.setAll(JSON.parse('{"__proto__": 2}') as never);
+      deps.set(Symbol.for("sym") as never, 3 as never);
+
+      const keys = pluginApi.getDependencyKeys();
+
+      expect(keys).toStrictEqual(["a", "__proto__"]);
+      expect(Object.isFrozen(keys)).toBe(true);
+      expect(pluginApi.getDependencyKeys()).not.toBe(keys);
+      // The container `getAll` hands out withholds `__proto__`.
+      expect(Object.keys(deps.getAll())).toStrictEqual(["a"]);
+
+      deps.remove("a");
+
+      expect(pluginApi.getDependencyKeys()).toStrictEqual(["__proto__"]);
+    });
+
+    it("getExternalGuardNames lists external guard names, deactivate first, each once", () => {
+      const guarded = createRouter([
+        { name: "a", path: "/a", canActivate: () => () => true },
+        { name: "b", path: "/b" },
+      ]);
+      const lifecycle = getLifecycleApi(guarded);
+      const pluginApi = getPluginApi(guarded);
+
+      lifecycle.addActivateGuard("orphan", () => () => true);
+      lifecycle.addActivateGuard("b", () => () => true);
+      lifecycle.addDeactivateGuard("b", () => () => true);
+
+      const names = pluginApi.getExternalGuardNames();
+
+      // `a` carries only a DEFINITION guard, so it is absent.
+      expect(names).toStrictEqual(["b", "orphan"]);
+      expect(Object.isFrozen(names)).toBe(true);
+      expect(pluginApi.getExternalGuardNames()).not.toBe(names);
+
+      lifecycle.removeActivateGuard("orphan");
+
+      expect(pluginApi.getExternalGuardNames()).toStrictEqual(["b"]);
     });
   });
 });
