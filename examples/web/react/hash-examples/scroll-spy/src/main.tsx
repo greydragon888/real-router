@@ -1,7 +1,6 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
 import { navigationPluginFactory } from "@real-router/navigation-plugin";
-import { RouterProvider } from "@real-router/react";
 import { createRoot } from "react-dom/client";
 
 import { App } from "./App";
@@ -55,6 +54,7 @@ function applyInitialAnchorScroll(): void {
 
   let attempts = 0;
   const tryScroll = (): void => {
+    // eslint-disable-next-line unicorn/prefer-query-selector -- id may contain CSS-unsafe chars
     const element = document.getElementById(id);
 
     if (element) {

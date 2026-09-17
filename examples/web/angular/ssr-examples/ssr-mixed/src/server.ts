@@ -1,4 +1,4 @@
-import { dirname, resolve } from "node:path";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -15,13 +15,13 @@ import {
   createRequestScope,
   serializeRouterState,
 } from "@real-router/ssr-utils";
-import express from "express";
+import express, { static as serveStatic } from "express";
 
 import { createBaseRouter } from "./router/createBaseRouter";
 import { loaders } from "./router/loaders";
 
-const serverDistFolder = dirname(fileURLToPath(import.meta.url));
-const browserDistFolder = resolve(serverDistFolder, "../browser");
+const serverDistFolder = path.dirname(fileURLToPath(import.meta.url));
+const browserDistFolder = path.resolve(serverDistFolder, "../browser");
 
 export const app = express();
 const angularApp = new AngularNodeAppEngine();
@@ -30,7 +30,7 @@ const baseRouter = createBaseRouter();
 app.disable("x-powered-by");
 
 app.use(
-  express.static(browserDistFolder, {
+  serveStatic(browserDistFolder, {
     maxAge: "1y",
     index: false,
     redirect: false,
@@ -49,7 +49,7 @@ function escapeHtmlAttribute(value: string): string {
  * below, which runs the canonical SSR pipeline.
  */
 app.use((request, nodeResponse, next) => {
-  const url = request.originalUrl ?? request.url ?? "/";
+  const url = request.originalUrl;
   // createRequestScope: AbortController + req.on("close") + cloneRouter +
   // dispose, all in one. abortSignal is injected into deps so loaders can
   // read getDep("abortSignal") for cooperative cancellation when the
@@ -131,6 +131,7 @@ app.use((request, nodeResponse, next) => {
 });
 
 if (isMainModule(import.meta.url)) {
+  // eslint-disable-next-line turbo/no-undeclared-env-vars -- PORT is conventional Express override, not turbo task input
   const port = Number(process.env.PORT) || 4173;
 
   app.listen(port, () => {

@@ -36,20 +36,27 @@ instrumentationHost.__LOADER_CALLS__ = loaderCalls;
 // have no factory to wrap — pass them through untouched. Without this guard
 // the wrapper crashes at `factory(...)` during plugin registration, breaking
 // hydration entirely.
+const countCalls = (
+  name: string,
+  factory: DataLoaderFnFactory,
+): DataLoaderFnFactory => {
+  return (r, getDep) => {
+    const loader = factory(r, getDep);
+
+    return (params, ctx) => {
+      loaderCalls[name] = (loaderCalls[name] ?? 0) + 1;
+
+      return loader(params, ctx);
+    };
+  };
+};
+
 const instrumentedLoaders: DataLoaderFactoryMap = Object.fromEntries(
   (Object.entries(loaders) as [string, DataRouteEntry][]).map(
     ([name, entry]) => {
       if (typeof entry === "function") {
         const factory = entry as DataLoaderFnFactory;
-        const wrapped: DataLoaderFnFactory = (r, getDep) => {
-          const loader = factory(r, getDep);
-
-          return (params, ctx) => {
-            loaderCalls[name] = (loaderCalls[name] ?? 0) + 1;
-
-            return loader(params, ctx);
-          };
-        };
+        const wrapped = countCalls(name, factory);
 
         return [name, wrapped];
       }
@@ -59,15 +66,7 @@ const instrumentedLoaders: DataLoaderFactoryMap = Object.fromEntries(
       }
 
       const factory = entry.loader;
-      const wrapped: DataLoaderFnFactory = (r, getDep) => {
-        const loader = factory(r, getDep);
-
-        return (params, ctx) => {
-          loaderCalls[name] = (loaderCalls[name] ?? 0) + 1;
-
-          return loader(params, ctx);
-        };
-      };
+      const wrapped = countCalls(name, factory);
 
       return [name, { ...entry, loader: wrapped }];
     },

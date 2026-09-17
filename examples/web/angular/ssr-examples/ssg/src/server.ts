@@ -17,9 +17,13 @@ app.disable("x-powered-by");
 app.use((request, nodeResponse, next) => {
   angularApp
     .handle(request)
-    .then((response) =>
-      response ? writeResponseToNodeResponse(response, nodeResponse) : next(),
-    )
+    .then((response) => {
+      if (response) {
+        writeResponseToNodeResponse(response, nodeResponse);
+      } else {
+        next();
+      }
+    })
     .catch(next);
 });
 

@@ -56,8 +56,8 @@ function preHideNewItems(
   knownKeys: Set<string>,
 ): MutationObserver {
   const observer = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      for (const node of mutation.addedNodes) {
+    const preHideAdded = (nodes: NodeList): void => {
+      for (const node of nodes) {
         if (!(node instanceof HTMLElement)) {
           continue;
         }
@@ -68,6 +68,10 @@ function preHideNewItems(
           node.style.opacity = "0";
         }
       }
+    };
+
+    for (const mutation of mutations) {
+      preHideAdded(mutation.addedNodes);
     }
   });
 

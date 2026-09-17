@@ -11,7 +11,7 @@ import { appConfig } from "./app.config";
 bootstrapApplication(AppComponent, {
   ...appConfig,
   providers: [
-    ...(appConfig.providers ?? []),
+    ...appConfig.providers,
     provideClientHydration(withIncrementalHydration(), withEventReplay()),
   ],
 }).catch((error: unknown) => {

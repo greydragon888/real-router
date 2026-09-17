@@ -37,7 +37,7 @@ export function DocumentPage() {
   return (
     <main data-testid="doc">
       <h1>Doc (mode: {mode})</h1>
-      {data === null || data === undefined ? (
+      {data === null ? (
         <p data-testid="doc-loading">Loading…</p>
       ) : (
         <div>

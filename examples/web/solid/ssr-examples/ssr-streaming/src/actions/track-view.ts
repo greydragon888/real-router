@@ -55,7 +55,7 @@ export function trackView(
   let currentProductId = params().productId;
 
   const observer = new IntersectionObserver(([entry]) => {
-    if (entry?.isIntersecting) {
+    if (entry.isIntersecting) {
       instrumentationHost.__VIEW_LOG__ ??= [];
       instrumentationHost.__VIEW_LOG__.push({
         productId: currentProductId,
