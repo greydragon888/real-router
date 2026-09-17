@@ -70,8 +70,8 @@ async function startDevServer(): Promise<void> {
 
       const ssrScript = `<script>window.__SSR_STATE__=${ssrJson}</script>`;
       const templateWithState = template
-        .replace("<!--ssr-state-->", ssrScript)
-        .replace("<!--defer-bootstrap-->", deferBootstrap);
+        .replace("<!--ssr-state-->", () => ssrScript)
+        .replace("<!--defer-bootstrap-->", () => deferBootstrap);
       const [headPart, footerPart] = templateWithState.split(
         "<!--ssr-outlet-->",
         2,

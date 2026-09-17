@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import express from "express";
+import express, { static as serveStatic } from "express";
 
 import { getCurrentUserFromCookies } from "./_auth";
 import { getCachePolicy } from "../src/router/cache-policies";
@@ -52,7 +52,7 @@ async function startServer(): Promise<void> {
     response.json({ abortObserved });
   });
 
-  app.use(express.static(path.resolve(root, "dist/client"), { index: false }));
+  app.use(serveStatic(path.resolve(root, "dist/client"), { index: false }));
 
   const template = readFileSync(
     path.resolve(root, "dist/client/index.html"),
@@ -112,9 +112,9 @@ async function startServer(): Promise<void> {
     }
 
     const page = template
-      .replace("<!--ssr-meta-->", result.head)
-      .replace("<!--ssr-outlet-->", result.html)
-      .replace("<!--ssr-state-->", result.serializedData);
+      .replace("<!--ssr-meta-->", () => result.head)
+      .replace("<!--ssr-outlet-->", () => result.html)
+      .replace("<!--ssr-state-->", () => result.serializedData);
 
     // ETag is computed over the final HTML — same input bytes => same
     // ETag, so two consecutive identical requests yield 304. We use a

@@ -59,12 +59,12 @@ function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
-function joinUrl(origin: string, path: string): string {
-  if (!path.startsWith("/")) {
-    return `${origin}/${path}`;
+function joinUrl(origin: string, pathname: string): string {
+  if (!pathname.startsWith("/")) {
+    return `${origin}/${pathname}`;
   }
 
-  return `${origin}${path}`;
+  return `${origin}${pathname}`;
 }
 
 function renderMetaBlock(meta: PageMeta): string {
@@ -85,7 +85,7 @@ function renderMetaBlock(meta: PageMeta): string {
 }
 
 function injectMeta(html: string, meta: PageMeta): string {
-  return html.replace("<!--ssg-meta-->", renderMetaBlock(meta));
+  return html.replace("<!--ssg-meta-->", () => renderMetaBlock(meta));
 }
 
 async function resolveMetaForUrl(url: string): Promise<PageMeta> {

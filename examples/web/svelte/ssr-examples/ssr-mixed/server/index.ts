@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import express from "express";
+import express, { static as serveStatic } from "express";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
@@ -24,7 +24,7 @@ async function startServer(): Promise<void> {
 
   app.disable("x-powered-by");
 
-  app.use(express.static(path.resolve(root, "dist/client"), { index: false }));
+  app.use(serveStatic(path.resolve(root, "dist/client"), { index: false }));
 
   const template = readFileSync(
     path.resolve(root, "dist/client/index.html"),
@@ -40,9 +40,9 @@ async function startServer(): Promise<void> {
     const result = await module_.renderApp(url, { req: request });
 
     const page = template
-      .replace("<!--ssr-head-->", result.head)
-      .replace("<!--ssr-outlet-->", result.html)
-      .replace("<!--ssr-state-->", result.serializedData);
+      .replace("<!--ssr-head-->", () => result.head)
+      .replace("<!--ssr-outlet-->", () => result.html)
+      .replace("<!--ssr-state-->", () => result.serializedData);
 
     response
       .status(result.statusCode)

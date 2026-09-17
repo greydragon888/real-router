@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import express from "express";
+import express, { static as serveStatic } from "express";
 
 import { expressToFetchRequest, streamResponseToExpress } from "./_helpers";
 import { getCachePolicy } from "../src/router/cache-policies";
@@ -27,7 +27,7 @@ async function startServer(): Promise<void> {
 
   app.disable("x-powered-by");
 
-  app.use(express.static(path.resolve(root, "dist/client"), { index: false }));
+  app.use(serveStatic(path.resolve(root, "dist/client"), { index: false }));
 
   const rscModule = (await import(path.resolve(root, "dist/rsc/index.js"))) as {
     default: { fetch: (request: Request) => Promise<Response> };

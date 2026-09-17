@@ -93,9 +93,9 @@ async function startServer(): Promise<void> {
       }
 
       const page = template
-        .replace("<!--ssr-head-->", result.head)
-        .replace("<!--ssr-outlet-->", result.html)
-        .replace("<!--ssr-state-->", result.serializedData);
+        .replace("<!--ssr-head-->", () => result.head)
+        .replace("<!--ssr-outlet-->", () => result.html)
+        .replace("<!--ssr-state-->", () => result.serializedData);
 
       const cacheControl = getCachePolicy(url);
 

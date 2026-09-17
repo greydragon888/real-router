@@ -48,9 +48,9 @@ async function startServer(): Promise<void> {
       const result = await module_.renderApp(url, { req: request });
 
       const page = template
-        .replace("<!--ssr-head-->", result.head)
-        .replace("<!--ssr-outlet-->", result.html)
-        .replace("<!--ssr-state-->", result.serializedData);
+        .replace("<!--ssr-head-->", () => result.head)
+        .replace("<!--ssr-outlet-->", () => result.html)
+        .replace("<!--ssr-state-->", () => result.serializedData);
 
       response
         .status(result.statusCode)

@@ -1,4 +1,4 @@
-import { extname } from "node:path";
+import path from "node:path";
 
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { defineConfig, type Plugin } from "vite";
@@ -7,12 +7,12 @@ function ssgServe(): Plugin {
   return {
     name: "ssg-serve",
     configurePreviewServer(server) {
-      server.middlewares.use((request, res, next) => {
+      server.middlewares.use((request, response, next) => {
         const url = request.url ?? "";
 
-        if (!url.endsWith("/") && !extname(url)) {
-          res.writeHead(301, { Location: `${url}/` });
-          res.end();
+        if (!url.endsWith("/") && !path.extname(url)) {
+          response.writeHead(301, { Location: `${url}/` });
+          response.end();
 
           return;
         }
