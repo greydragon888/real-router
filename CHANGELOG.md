@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-09-17]
+
+### @real-router/core@0.139.1
+
+### Patch Changes
+
+- [#2384](https://github.com/greydragon888/real-router/pull/2384) [`daa083f`](https://github.com/greydragon888/real-router/commit/daa083f370b90c15c51ff7f5e961beee1b1a05e3) Thanks [@greydragon888](https://github.com/greydragon888)! - Say what the PluginApi membership rule's cells actually derive ([#2383](https://github.com/greydragon888/real-router/issues/2383))
+
+  `packages/core/CLAUDE.md` states that neither clause of the membership rule has a
+  cell that derives it. Clause (a) is not answered by `door-census/consumers.test.ts`:
+  its reverse column asks whether a member is untouched by shipped code **and** tests
+  together, which is wider than the clause, and the walk behind it records reach only
+  where it can resolve the owner of a property access — so an api arriving as a bag
+  field, a class field or a destructured parameter stays invisible to it. [#2350](https://github.com/greydragon888/real-router/issues/2350) and
+  [#2383](https://github.com/greydragon888/real-router/issues/2383) own the two gaps.
+
+  The census's own `getPluginApi: []` comment carries the same limit and now names it.
+  `Router.ts`'s per-router logger comment names the frozen three-method view a plugin
+  reads on `PluginApi` ([#2339](https://github.com/greydragon888/real-router/issues/2339)).
+
+  Comments only — no behaviour change.
+
 ## [2026-09-16]
 
 ### @real-router/validation-plugin@0.23.0
