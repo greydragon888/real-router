@@ -49,7 +49,7 @@ const _rcuPreload: Merged<RouteConfigUpdate["preload"]> = true;
 const _searchSchema: Merged<Route["searchSchema"]> = true;
 const _rcuSearchSchema: Merged<RouteConfigUpdate["searchSchema"]> = true;
 
-// eslint-disable-next-line sonarjs/void-use -- the `void` discards type-level witnesses; they exist to be checked by tsc, never to be read
+// eslint-disable-next-line sonarjs/void-use, @typescript-eslint/no-meaningless-void-operator -- the `void` discards type-level witnesses; they exist to be checked by tsc, never to be read
 void [
   _onEnter,
   _onStay,
