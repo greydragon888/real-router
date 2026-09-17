@@ -6,7 +6,8 @@
     "predev": "pnpm turbo run bundle --filter=...angular-lazy-loading-example",
     "dev": "ng serve",
     "build": "ng build",
-    "preview": "sirv dist/angular-lazy-loading-example/browser --port 4173 --single --quiet"
+    "preview": "sirv dist/angular-lazy-loading-example/browser --port 4173 --single --quiet",
+    "lint:example": "eslint --cache . --max-warnings 0"
   },
   "dependencies": {
     "@angular/common": "~22.1.6",

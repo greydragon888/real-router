@@ -97,6 +97,9 @@ fi
 # runner, and nothing started until it finished). It is now a sibling task, so it
 # runs in parallel with the tests instead of gating them. Dropping it from this
 # line would silently stop linting on commit.
+#
+# Examples stay out: their lint resolves @real-router/* through dist/, and this
+# hook builds none. pre-push lints them after its build (`lint:example`).
 echo "🧪 Running tests + lint (type-check rides along via turbo)..."
 pnpm turbo run test lint --filter='!./examples/**'
 

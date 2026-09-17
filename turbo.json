@@ -41,7 +41,14 @@
       "cache": true
     },
     "build": {
-      "dependsOn": ["^bundle", "bundle", "test", "test:properties", "lint"],
+      "dependsOn": [
+        "^bundle",
+        "bundle",
+        "test",
+        "test:properties",
+        "lint",
+        "lint:example"
+      ],
       "inputs": [
         "src/**/*.{ts,tsx,vue,svelte,html,css}",
         "index.html",
@@ -117,6 +124,19 @@
         "!coverage/**",
         "!**/node_modules/**",
         "eslint.config.*"
+      ],
+      "outputLogs": "errors-only",
+      "cache": true
+    },
+    "lint:example": {
+      "dependsOn": ["^bundle"],
+      "outputs": [],
+      "inputs": [
+        "**/*.{ts,tsx,mts,cts,js,jsx,cjs}",
+        "**/tsconfig*.json",
+        "package.json",
+        "!dist/**",
+        "!**/node_modules/**"
       ],
       "outputLogs": "errors-only",
       "cache": true

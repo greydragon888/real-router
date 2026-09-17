@@ -12,6 +12,8 @@
 # - scripts tests: The repo's own tooling tests (scripts/*.test.mjs), the
 #                  suite CI's Repo Lints runs
 # - build: Final build to ensure compilation
+# - lint:example: ESLint over every example app, after build — examples
+#                 resolve @real-router/* through the dist/ it produces
 # - test:stress: Heap/timing stress suites, isolated at --concurrency=1 so
 #                heap measurements are free of build contention (#1423)
 # - lint:types: Validate TypeScript types in dist (arethetypeswrong)
@@ -94,6 +96,11 @@ echo "🧰 Testing repo scripts..."
 # Build packages and validate published artifacts
 echo "📦 Building packages..."
 pnpm turbo run build lint:package lint:types --filter='!./examples/**'
+
+# Examples resolve @real-router/* through dist/, so they are linted after the
+# build above; `lint:example` depends on `^bundle` for a run from zero dists.
+echo "🧹 Linting examples..."
+pnpm turbo run lint:example --filter='./examples/**'
 
 # Heap/timing stress suites — run isolated at --concurrency=1 (they were
 # dropped from build.dependsOn in #1423). Under the concurrent build, up to 4

@@ -7,7 +7,8 @@
   "scripts": {
     "predev": "pnpm turbo run bundle --filter=...react-ink-demo-example",
     "dev": "tsx src/main.tsx",
-    "build": "tsc --noEmit"
+    "build": "tsc --noEmit",
+    "lint:example": "eslint --cache . --max-warnings 0"
   },
   "dependencies": {
     "@real-router/core": "workspace:^",

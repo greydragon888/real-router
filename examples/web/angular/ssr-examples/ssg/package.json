@@ -8,7 +8,8 @@
     "dev": "ng serve",
     "build:app": "ng build && tsx scripts/ssg-build.ts",
     "preview": "sirv dist/ssg-angular-example/browser --port 4210 --quiet",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "lint:example": "eslint --cache . --max-warnings 0"
   },
   "dependencies": {
     "@angular/common": "~22.1.6",

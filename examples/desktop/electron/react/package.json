@@ -11,7 +11,8 @@
     "start": "electron dist-electron/main.js",
     "preview": "vite preview",
     "app:build": "pnpm build && electron-builder",
-    "test:e2e": "pnpm build && playwright test"
+    "test:e2e": "pnpm build && playwright test",
+    "lint:example": "eslint --cache . --max-warnings 0"
   },
   "dependencies": {
     "@real-router/browser-plugin": "workspace:^",
