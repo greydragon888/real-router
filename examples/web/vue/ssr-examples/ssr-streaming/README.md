@@ -15,13 +15,13 @@ The router does **nothing streaming-specific**. All streaming behavior comes fro
 
 ## How This Differs From React / Solid / Angular streaming
 
-Vue 3 SSR streaming is **structurally different** from React 19's `renderToReadableStream`, Solid's `renderToStream`, and Angular's `@defer` + `withIncrementalHydration` model:
+Vue 3 SSR streaming is **structurally different** from React 19's `renderToReadableStream`, Solid's `renderToStream`, and Angular's `@defer` + incremental hydration model:
 
 | | React 19 | Vue 3 | Solid | Angular 21 |
 | --- | --- | --- | --- | --- |
 | Streaming primitive | `renderToReadableStream` + `<Suspense>` | `renderToWebStream` + `<Suspense>` | `renderToStream` + `<Suspense>` + `createResource` | `AngularNodeAppEngine.handle()` returning a Web `Response` |
 | Out-of-order placeholders in shell | Yes — `<!--$?-->` markers + `<template>` chunks | **No — sequential, top-down** | Yes — inline `<script>` patches replace fallbacks | No — `@placeholder` rendered into the same single document |
-| Selective hydration | Yes — hydrates resolved islands as chunks arrive | **No — `app.mount()` hydrates atomically** | Yes — selective per `<Suspense>` island | Yes — per-`@defer` block via `withIncrementalHydration()` |
+| Selective hydration | Yes — hydrates resolved islands as chunks arrive | **No — `app.mount()` hydrates atomically** | Yes — selective per `<Suspense>` island | Yes — per-`@defer` block via incremental hydration |
 | `<Suspense>` semantics in SSR | Non-blocking — emits fallback marker, real content follows in a later chunk | **Blocking — content after the boundary waits for async children** | Non-blocking — both fallback marker + resolved chunk in same response | n/a — uses `@defer` instead of Suspense |
 
 What this example actually demonstrates for Vue:

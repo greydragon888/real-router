@@ -2,7 +2,6 @@ import {
   bootstrapApplication,
   provideClientHydration,
   withEventReplay,
-  withIncrementalHydration,
 } from "@angular/platform-browser";
 
 import { AppComponent } from "./app.component";
@@ -12,7 +11,7 @@ bootstrapApplication(AppComponent, {
   ...appConfig,
   providers: [
     ...appConfig.providers,
-    provideClientHydration(withIncrementalHydration(), withEventReplay()),
+    provideClientHydration(withEventReplay()),
   ],
 }).catch((error: unknown) => {
   console.error(error);

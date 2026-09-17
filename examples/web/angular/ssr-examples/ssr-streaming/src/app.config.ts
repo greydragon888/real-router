@@ -25,7 +25,7 @@ const baseRouter = createBaseRouter();
 /**
  * Wrap each loader factory to count invocations on `window.__LOADER_CALLS__`.
  * Browser-only — verifies post-hydration loader skip works under streaming
- * SSR (`withIncrementalHydration()` + `@defer`) — sister test to ssr/ (#599).
+ * SSR (incremental hydration + `@defer`) — sister test to ssr/ (#599).
  */
 function withLoaderCounter(map: DataLoaderFactoryMap): DataLoaderFactoryMap {
   const win = globalThis as unknown as {

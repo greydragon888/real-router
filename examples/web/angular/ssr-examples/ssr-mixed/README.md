@@ -42,7 +42,7 @@ pnpm test:e2e # Playwright assertions on each mode's HTTP response
   hydration-able Angular page. Application code that needs Angular hooks on
   these routes must redirect to a separate Angular-rendered URL or boot a
   CSR-only entry — out of scope for this dogfooding example.
-- For `"full"` mode Angular's `provideClientHydration(withIncrementalHydration())`
+- For `"full"` mode Angular's `provideClientHydration()`
   works as in the canonical `ssr/` example, **including the post-hydration
   loader skip via the TransferState bridge (#599)** — verified by the
   `post-hydration loader skip (#599)` e2e test in `e2e/ssr-mixed.spec.ts`

@@ -640,12 +640,12 @@ Existing `provideRealRouter(router)` is unchanged — keep using it for SPA / po
 
 **SSR / SSG examples** — `provideRealRouterFactory({ baseRouter, plugins, deps })`:
 
-| Example                                                                                                     | Demonstrates                                                                                   |
-| ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| [`examples/web/angular/ssr-examples/ssr/`](../../examples/web/angular/ssr-examples/ssr)                     | Classical SSR with cookie-based DI, auth guards, nested loaders                                |
-| [`examples/web/angular/ssr-examples/ssr-mixed/`](../../examples/web/angular/ssr-examples/ssr-mixed)         | Mixed SSR/CSR routes — some routes server-rendered, others CSR-only                            |
-| [`examples/web/angular/ssr-examples/ssr-streaming/`](../../examples/web/angular/ssr-examples/ssr-streaming) | Streaming SSR with `@defer (on viewport)` + `@defer (on hover)` + `withIncrementalHydration()` |
-| [`examples/web/angular/ssr-examples/ssg/`](../../examples/web/angular/ssr-examples/ssg)                     | Static site generation via in-process AngularNodeAppEngine + `getStaticPaths()`                |
+| Example                                                                                                     | Demonstrates                                                                            |
+| ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| [`examples/web/angular/ssr-examples/ssr/`](../../examples/web/angular/ssr-examples/ssr)                     | Classical SSR with cookie-based DI, auth guards, nested loaders                         |
+| [`examples/web/angular/ssr-examples/ssr-mixed/`](../../examples/web/angular/ssr-examples/ssr-mixed)         | Mixed SSR/CSR routes — some routes server-rendered, others CSR-only                     |
+| [`examples/web/angular/ssr-examples/ssr-streaming/`](../../examples/web/angular/ssr-examples/ssr-streaming) | Streaming SSR with `@defer (on viewport)` + `@defer (on hover)` + incremental hydration |
+| [`examples/web/angular/ssr-examples/ssg/`](../../examples/web/angular/ssr-examples/ssg)                     | Static site generation via in-process AngularNodeAppEngine + `getStaticPaths()`         |
 
 **Post-hydration loader skip (#599)** — `provideRealRouterFactory` automatically bridges Angular's `TransferState` to the cross-adapter hydration scratchpad. On the server pass, the resolved router state is written to `TransferState`; on the client, the bootstrap consumes the seed via `hydrateRouter(...)` and `ssr-data-plugin` reuses the server-resolved `state.context.data` without re-invoking the loader on first paint. Requires `provideServerRendering()` (server) + `provideClientHydration()` (client) — both standard for Angular SSR apps. Verified end-to-end in `ssr/` and `ssr-streaming/` examples via `window.__LOADER_CALLS__` counter assertion.
 

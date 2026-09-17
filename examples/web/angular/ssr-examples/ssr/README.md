@@ -22,7 +22,7 @@ Server-side rendering with Real-Router, Angular 21, `@angular/ssr` (`AngularNode
   - `legacyUser` (`/legacy-user/:id`) throws `LoaderRedirect("/users/:id", 301)` — demonstrates the canonical-URL pattern (Next.js-style `redirect()` from a loader).
   - `slow` (`/slow`) demonstrates `withTimeout()` (#598) — the loader fetches `/__bench/slow-fetch` (a 5 s endpoint instrumented to count client-side aborts) with the composed `AbortSignal` that `withTimeout` passes in. The 250 ms deadline elapses well before the fetch can complete; `withTimeout` aborts the signal *before* rejecting with `LoaderTimeout`, so the upstream `fetch` is cancelled at the network layer (server's `req.on("close")` fires) and the SSR worker is freed. Server returns 504 Gateway Timeout. Verified by `withTimeout (#598) network cancellation` e2e.
 - **Client-side navigation** — after hydration, `@real-router/browser-plugin` handles SPA navigation through `realLink` directive.
-- **Incremental hydration + event replay** — `provideClientHydration(withIncrementalHydration(), withEventReplay())`. Event replay captures clicks/keydowns issued before a block hydrates and replays them once the component takes over. Critical for streaming SSR UX where the user can interact with placeholders before their JS arrives.
+- **Incremental hydration + event replay** — `provideClientHydration(withEventReplay())`. Incremental hydration needs no feature function: it is on by default under `provideClientHydration` since Angular 22. Event replay captures clicks/keydowns issued before a block hydrates and replays them once the component takes over. Critical for streaming SSR UX where the user can interact with placeholders before their JS arrives.
 - **Mixed `RenderMode`** — `app.routes.server.ts` maps `/marketing` to `RenderMode.Client` (CSR shell, identical bytes for every visitor, content materialises after JS bootstrap) and `/live` to `RenderMode.Server` (fresh per-request render with timestamp proof). All other paths default to `RenderMode.Server`. See "Mixed RenderMode" section below for the trade-offs and the unsupported `RenderMode.Prerender` known limitation.
 - **SSR boundaries demo** — `<client-only>` + `<server-only>` from `@real-router/angular/ssr` on the Home page (#604). `e2e/ssr-boundaries.spec.ts` verifies server HTML emits the SSR-side branch with JS disabled and the post-hydration DOM swaps both branches without console hydration mismatch warnings.
 
@@ -43,7 +43,7 @@ src/
                          Deprecation/Link headers, ** → Server (default)
   app.component.ts       Root standalone component — <route-view> + <ng-template routeMatch>
   main.ts                Client entry — bootstrapApplication + provideClientHydration(
-                         withIncrementalHydration(), withEventReplay())
+                         withEventReplay())
   main.server.ts         Server bootstrap — accepts BootstrapContext, returns bootstrapApplication
   server.ts              Express + AngularNodeAppEngine; maps CANNOT_ACTIVATE → 302,
                          LOADER_REDIRECT → 301/302, LOADER_NOT_FOUND → 404 text/plain,
@@ -90,7 +90,7 @@ Server (per request, via AngularNodeAppEngine):
 
 Client (once, after hydration):
   bootstrapApplication(AppComponent, { ...appConfig, providers: [...,
-    provideClientHydration(withIncrementalHydration())] })
+    provideClientHydration()] })
     → REQUEST is null on client
     → provideRealRouterFactory's useFactory:
         cloneRouter(baseRouter, deps(null))         # currentUser from document.cookie
@@ -128,7 +128,7 @@ Server-resolved router state survives the bootstrap hand-off without re-running 
 
 The e2e test `post-hydration loader skip (#599)` in `e2e/ssr.spec.ts` wraps each loader factory with a counter exposed on `window.__LOADER_CALLS__` (browser-only — see `app.config.ts` `withLoaderCounter`). After deep-link navigation to a route with a loader, the counter must be empty — proving the client did not invoke the loader.
 
-Sister test in `examples/web/angular/ssr-examples/ssr-streaming/e2e/` verifies the same skip works under Angular's streaming SSR (`withIncrementalHydration()` + `@defer`).
+Sister test in `examples/web/angular/ssr-examples/ssr-streaming/e2e/` verifies the same skip works under Angular's streaming SSR (incremental hydration + `@defer`).
 
 ## SSR-Only Plugin Contract
 
