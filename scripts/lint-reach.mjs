@@ -1,0 +1,236 @@
+// Which workspace packages the lint steps of a hook actually read (#2370).
+//
+// Pure functions: `check-lint-reach.mjs` feeds them the hook, turbo's dry-run
+// output and the tracked tree; `check-lint-reach.test.mjs` feeds them fixtures.
+
+/** Tasks that run ESLint over a package. */
+export const LINT_TASKS = new Set(["lint", "lint:example"]);
+
+/** What ESLint reads here: `eslint.config.mjs` ignores `*.mjs` and `*.d.ts` globally. */
+const LINTABLE = /(?<!\.d)\.(?:[cm]?ts|tsx|c?js|jsx)$/;
+
+const TURBO_RUN = "pnpm turbo run ";
+
+/**
+ * The `pnpm turbo run …` invocations of a shell hook.
+ *
+ * ⚠ An invocation it cannot read faithfully throws instead of being skipped:
+ * a skipped invocation is a gate the guard does not count.
+ *
+ * @param {string} hookText
+ * @returns {{ line: number, tasks: string[], flags: string[] }[]}
+ */
+export function turboRuns(hookText) {
+  const runs = [];
+
+  for (const [index, raw] of hookText.split("\n").entries()) {
+    const text = raw.trim();
+
+    if (text.startsWith("#") || !/\bturbo\s+run\b/.test(text)) {
+      continue;
+    }
+
+    if (!text.startsWith(TURBO_RUN)) {
+      throw new Error(
+        `line ${String(index + 1)}: \`turbo run\` in a shape this guard cannot read: ${text}`,
+      );
+    }
+
+    if (/[$`\\;&|<>()]/.test(text)) {
+      throw new Error(
+        `line ${String(index + 1)}: expansion, chaining or redirection in a turbo invocation: ${text}`,
+      );
+    }
+
+    const words =
+      text.slice(TURBO_RUN.length).match(/(?:[^\s'"]+|'[^']*'|"[^"]*")+/g) ?? [];
+    const args = words.map((word) => word.replaceAll(/['"]/g, ""));
+
+    runs.push({
+      line: index + 1,
+      tasks: args.filter((arg) => !arg.startsWith("-")),
+      flags: args.filter((arg) => arg.startsWith("-")),
+    });
+  }
+
+  return runs;
+}
+
+/**
+ * Packages for which a lint task would execute a real command, read from
+ * `turbo run … --dry=json`. A package without the script is listed with the
+ * command `<NONEXISTENT>` and does not count.
+ *
+ * @param {{ tasks: { task: string, package: string, command: string }[] }} dryRun
+ * @returns {Map<string, string[]>} package name → its lint commands
+ */
+export function lintedPackages(dryRun) {
+  const linted = new Map();
+
+  for (const { task, package: name, command } of dryRun.tasks) {
+    if (LINT_TASKS.has(task) && command !== "<NONEXISTENT>") {
+      linted.set(name, [...(linted.get(name) ?? []), command]);
+    }
+  }
+
+  return linted;
+}
+
+/**
+ * The `shared/<dir>` directories that no linted consumer names.
+ *
+ * ESLint does not walk into a symlinked directory it was not given, so a
+ * consumer whose command lints `src/` alone does not read `src/<alias>`.
+ *
+ * @param {string[]} sharedDirs
+ * @param {{ dir: string, pkg: string, alias: string }[]} aliases
+ * @param {Map<string, string[]>} linted
+ * @returns {string[]}
+ */
+export function unreadSharedDirs(sharedDirs, aliases, linted) {
+  const names = (command, alias) =>
+    command.split(/\s+/).some((word) => word.replace(/\/+$/, "") === alias);
+
+  return sharedDirs.filter(
+    (dir) =>
+      !aliases.some(
+        ({ dir: target, pkg, alias }) =>
+          target === dir &&
+          (linted.get(pkg) ?? []).some((command) => names(command, alias)),
+      ),
+  );
+}
+
+/**
+ * Workspace packages whose own tracked files hold nothing ESLint reads. A file
+ * under a nested workspace package belongs to that package.
+ *
+ * @param {{ name: string, dir: string }[]} packages
+ * @param {string[]} trackedFiles
+ * @returns {Set<string>}
+ */
+export function packagesWithNothingToRead(packages, trackedFiles) {
+  const byDepth = [...packages].sort((a, b) => b.dir.length - a.dir.length);
+  const reading = new Set();
+
+  for (const file of trackedFiles) {
+    if (!LINTABLE.test(file)) {
+      continue;
+    }
+
+    const owner = byDepth.find(({ dir }) => file.startsWith(`${dir}/`));
+
+    if (owner !== undefined) {
+      reading.add(owner.name);
+    }
+  }
+
+  return new Set(
+    packages.filter(({ name }) => !reading.has(name)).map(({ name }) => name),
+  );
+}
+
+/**
+ * @param {object} input
+ * @param {string[]} input.workspace package names, the root excluded
+ * @param {Map<string, string[]>} input.linted
+ * @param {Set<string>} input.nothingToRead
+ * @param {Map<string, string>} input.exempt name → the issue that tracks it
+ * @param {string} input.sharedPackage read through consumers instead
+ * @param {string[]} input.unreadShared
+ */
+export function reachVerdict({
+  workspace,
+  linted,
+  nothingToRead,
+  exempt,
+  sharedPackage,
+  unreadShared,
+}) {
+  return {
+    unreached: workspace.filter(
+      (name) =>
+        !linted.has(name) &&
+        !nothingToRead.has(name) &&
+        !exempt.has(name) &&
+        name !== sharedPackage,
+    ),
+    staleExemptions: [...exempt.keys()].filter(
+      (name) => !workspace.includes(name) || linted.has(name),
+    ),
+    unreadShared,
+  };
+}
+
+/**
+ * The whole chain, with turbo injected: hook → runs → dry-runs → verdict.
+ *
+ * @param {object} input
+ * @param {string} input.hookText
+ * @param {Set<string>} input.knownTasks the task names in turbo.json
+ * @param {(run: { tasks: string[], flags: string[] }) => { tasks: object[] }} input.dryRun
+ * @param {{ name: string, dir: string }[]} input.packages the root excluded
+ * @param {string[]} input.trackedFiles
+ * @param {string[]} input.sharedDirs
+ * @param {{ dir: string, pkg: string, alias: string }[]} input.aliases
+ * @param {Map<string, string>} input.exempt
+ * @param {string} input.sharedPackage
+ */
+export function evaluateReach({
+  hookText,
+  knownTasks,
+  dryRun,
+  packages,
+  trackedFiles,
+  sharedDirs,
+  aliases,
+  exempt,
+  sharedPackage,
+}) {
+  const runs = turboRuns(hookText);
+
+  for (const { line, tasks } of runs) {
+    for (const task of tasks) {
+      if (!knownTasks.has(task)) {
+        throw new Error(
+          `line ${String(line)}: \`${task}\` is not a task in turbo.json`,
+        );
+      }
+    }
+  }
+
+  const workspace = packages.map(({ name }) => name);
+  const linted = new Map();
+
+  for (const run of runs) {
+    for (const [name, commands] of lintedPackages(dryRun(run))) {
+      linted.set(name, [...(linted.get(name) ?? []), ...commands]);
+    }
+  }
+
+  let vacuous = null;
+
+  if (runs.length === 0) {
+    vacuous = "the hook has no `pnpm turbo run` line";
+  } else if (workspace.length === 0) {
+    vacuous = "the workspace lists no packages";
+  } else if (linted.size === 0) {
+    vacuous = "no run lints any package";
+  } else if (workspace.includes(sharedPackage) && sharedDirs.length === 0) {
+    vacuous = `${sharedPackage} is in the workspace but no shared/<dir> was found`;
+  }
+
+  return {
+    runs,
+    linted,
+    vacuous,
+    ...reachVerdict({
+      workspace,
+      linted,
+      nothingToRead: packagesWithNothingToRead(packages, trackedFiles),
+      exempt,
+      sharedPackage,
+      unreadShared: unreadSharedDirs(sharedDirs, aliases, linted),
+    }),
+  };
+}

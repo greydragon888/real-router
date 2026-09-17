@@ -11,6 +11,8 @@
 # - lint:doc-dup: Docblock sentences that restate the package's own docs
 # - scripts tests: The repo's own tooling tests (scripts/*.test.mjs), the
 #                  suite CI's Repo Lints runs
+# - lint:reach: Every workspace package is read by a lint step of this hook,
+#               derived from its own `turbo run` lines (#2370)
 # - build: Final build to ensure compilation
 # - lint:example: ESLint over every example app, after build — examples
 #                 resolve @real-router/* through the dist/ it produces
@@ -94,6 +96,10 @@ echo "🧰 Testing repo scripts..."
 (unset $(git rev-parse --local-env-vars); node --test --test-reporter=dot scripts/*.test.mjs)
 
 # Build packages and validate published artifacts
+# Every workspace package must be read by a lint step of this hook (#2370).
+echo "🧭 Checking that every workspace package is linted..."
+pnpm lint:reach
+
 echo "📦 Building packages..."
 pnpm turbo run build lint:package lint:types --filter='!./examples/**'
 
