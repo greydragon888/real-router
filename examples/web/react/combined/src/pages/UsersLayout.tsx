@@ -82,11 +82,8 @@ function UsersList(): JSX.Element {
 
 function UserProfile(): JSX.Element {
   const { route } = useRouteNode("users.profile");
-  let id = "?";
-
-  if (route && typeof route.params.id === "string") {
-    id = route.params.id;
-  }
+  const id =
+    route && typeof route.params.id === "string" ? route.params.id : "?";
 
   return (
     <div>

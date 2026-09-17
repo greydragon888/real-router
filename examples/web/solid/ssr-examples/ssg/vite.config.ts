@@ -1,18 +1,19 @@
-import { extname } from "node:path";
+import path from "node:path";
 
-import solid from "vite-plugin-solid";
 import { defineConfig, type Plugin } from "vite";
+import solid from "vite-plugin-solid";
 
 function ssgServe(): Plugin {
   return {
     name: "ssg-serve",
     configurePreviewServer(server) {
-      server.middlewares.use((req, res, next) => {
-        const url = req.url ?? "";
+      server.middlewares.use((request, response, next) => {
+        const url = request.url ?? "";
 
-        if (!url.endsWith("/") && !extname(url)) {
-          res.writeHead(301, { Location: url + "/" });
-          res.end();
+        if (!url.endsWith("/") && !path.extname(url)) {
+          response.writeHead(301, { Location: `${url}/` });
+          response.end();
+
           return;
         }
 

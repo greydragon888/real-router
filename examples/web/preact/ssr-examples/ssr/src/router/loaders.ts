@@ -33,17 +33,34 @@ const SLOW_LOADER_TIMEOUT_MS = 250;
 const SLOW_FETCH_URL = "http://localhost:3003/__bench/slow-fetch";
 
 export const loaders: DataLoaderFactoryMap = {
-  users: () => ({ search }) => {
-    const sort: "asc" | "desc" = search.sort === "desc" ? "desc" : "asc";
+  users:
+    () =>
+    ({ search }) => {
+      const sort: "asc" | "desc" = search.sort === "desc" ? "desc" : "asc";
 
-    return Promise.resolve<UsersListData>({
-      users: database.users.list(sort),
-      sort,
-    });
-  },
+      return Promise.resolve<UsersListData>({
+        users: database.users.list(sort),
+        sort,
+      });
+    },
 
-  "users.profile": () => ({ params }) =>
-    withTimeout("users.profile", PROFILE_TIMEOUT_MS, () => {
+  "users.profile":
+    () =>
+    ({ params }) =>
+      withTimeout("users.profile", PROFILE_TIMEOUT_MS, () => {
+        const id = params.id as string;
+        const user = database.users.findById(id);
+
+        if (!user) {
+          throw new LoaderNotFound(`user:${id}`);
+        }
+
+        return Promise.resolve<UserProfileData>({ user });
+      }),
+
+  "users.profile.posts":
+    () =>
+    ({ params }) => {
       const id = params.id as string;
       const user = database.users.findById(id);
 
@@ -51,28 +68,19 @@ export const loaders: DataLoaderFactoryMap = {
         throw new LoaderNotFound(`user:${id}`);
       }
 
-      return Promise.resolve<UserProfileData>({ user });
-    }),
+      return Promise.resolve<UserPostsData>({
+        user,
+        posts: database.posts.listByAuthor(id),
+      });
+    },
 
-  "users.profile.posts": () => ({ params }) => {
-    const id = params.id as string;
-    const user = database.users.findById(id);
+  legacyUser:
+    () =>
+    ({ params }) => {
+      const id = params.id as string;
 
-    if (!user) {
-      throw new LoaderNotFound(`user:${id}`);
-    }
-
-    return Promise.resolve<UserPostsData>({
-      user,
-      posts: database.posts.listByAuthor(id),
-    });
-  },
-
-  legacyUser: () => ({ params }) => {
-    const id = params.id as string;
-
-    throw new LoaderRedirect(`/users/${id}`, 301);
-  },
+      throw new LoaderRedirect(`/users/${id}`, 301);
+    },
 
   // Intentional throw — verifies loader rejections propagate through
   // router.start(), bypass partial render, let entry-server.tsx
@@ -96,6 +104,7 @@ export const loaders: DataLoaderFactoryMap = {
       SLOW_LOADER_TIMEOUT_MS,
       async ({ signal }) => {
         const response = await fetch(SLOW_FETCH_URL, { signal });
+
         return (await response.json()) as { message: string };
       },
       { upstreamSignal },

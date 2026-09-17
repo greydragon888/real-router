@@ -28,10 +28,12 @@ async function startServer(): Promise<void> {
 
   // /__bench/* — instrumentation for the #598 e2e test (mirror of server/index.ts).
   let abortObserved = 0;
+
   app.get("/__bench/slow-fetch", (request, response) => {
     const timer = setTimeout(() => {
       response.json({ ok: true });
     }, 5000);
+
     request.on("close", () => {
       if (!response.writableEnded) {
         clearTimeout(timer);
@@ -91,9 +93,9 @@ async function startServer(): Promise<void> {
       }
 
       const page = template
-        .replace("<!--ssr-head-->", result.head)
-        .replace("<!--ssr-outlet-->", result.html)
-        .replace("<!--ssr-state-->", result.serializedData);
+        .replace("<!--ssr-head-->", () => result.head)
+        .replace("<!--ssr-outlet-->", () => result.html)
+        .replace("<!--ssr-state-->", () => result.serializedData);
 
       const cacheControl = getCachePolicy(url);
 

@@ -129,7 +129,7 @@ pnpm resolve:dependabot <PR#>  # Rebase+dedupe a Dependabot PR — conflicting O
 - Pre-push hook runs a full build plus a column of linters — **budget minutes, not seconds.** ⚠ The count is deliberately not repeated here: it read `EIGHT` while the hook ran nine, because a number in a second home goes stale on its own schedule. `.husky/pre-push` is the list, and it names each step in its header block
 - Pre-push refuses a push that is not its working tree: before any step, every branch the push updates must receive `HEAD` and `git status --porcelain` must be empty, and both are checked again before its final ✅ — every step reads the working tree, not the pushed commits. When the main checkout holds other work, push from a clean worktree
 - Pre-commit hook runs `lint:deps` + `lint:coverage-scope` + tests + `lint:e2e` + `scripts/check-angular-dom-utils-sync.mjs` (and auto-dedupes the lockfile when it's staged); `knip` + `jscpd` run in **pre-push**, not pre-commit
-- `outputLogs: "errors-only"` in turbo.json for the seven REPORTING tasks; the four orchestrators (`build`, `lint:fix`, `lint:package`, `lint:types`) leave it unset — silent on success, full output on failure. Use `build:verbose`/`test:verbose` for debugging
+- `outputLogs: "errors-only"` in turbo.json for the REPORTING tasks; the four orchestrators (`build`, `lint:fix`, `lint:package`, `lint:types`) leave it unset — silent on success, full output on failure. Use `build:verbose`/`test:verbose` for debugging
 - knip uses `ignoreWorkspaces: ["examples/**", "benchmarks"]` — example apps are excluded from unused code analysis
 - Vue examples use `vue-tsc -b` (not `tsc -b`) for SFC type checking
 - Svelte examples use `vite build` only (no tsc step — Svelte compiler handles types)

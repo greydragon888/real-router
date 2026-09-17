@@ -1,4 +1,4 @@
-import { extname } from "node:path";
+import path from "node:path";
 
 import vue from "@vitejs/plugin-vue";
 import { defineConfig, type Plugin } from "vite";
@@ -13,32 +13,32 @@ import { defineConfig, type Plugin } from "vite";
 // Rules are inline rather than in src/router/cache-policies.ts because
 // vite.config.ts is loaded outside the project's main tsconfig and
 // cross-imports between them trigger moduleResolution warnings.
-const CACHE_RULES: ReadonlyArray<{
-  match: (path: string) => boolean;
+const CACHE_RULES: readonly {
+  matches: (pathname: string) => boolean;
   header: string;
-}> = [
+}[] = [
   // Home: cacheable and long-lived; same for everyone.
   {
-    match: (p) => p === "/" || p === "",
+    matches: (p) => p === "/" || p === "",
     header: "public, max-age=300, s-maxage=3600, must-revalidate",
   },
   // Users list: short public cache.
   {
-    match: (p) => /^\/users\/?$/.test(p),
+    matches: (p) => /^\/users\/?$/.test(p),
     header: "public, max-age=60, must-revalidate",
   },
   // User profile: per-user but not auth-private; medium cache.
   {
-    match: (p) => /^\/users\/[^/]+\/?$/.test(p),
+    matches: (p) => /^\/users\/[^/]+\/?$/.test(p),
     header: "public, max-age=120, must-revalidate",
   },
 ];
 
-function getCachePolicy(path: string): string | undefined {
-  const onlyPath = path.split("?")[0] ?? path;
+function getCachePolicy(pathname: string): string | undefined {
+  const onlyPath = pathname.split("?", 1)[0] ?? pathname;
 
   for (const rule of CACHE_RULES) {
-    if (rule.match(onlyPath) || rule.match(path)) {
+    if (rule.matches(onlyPath) || rule.matches(pathname)) {
       return rule.header;
     }
   }
@@ -50,12 +50,13 @@ function ssgServe(): Plugin {
   return {
     name: "ssg-serve",
     configurePreviewServer(server) {
-      server.middlewares.use((req, res, next) => {
-        const url = req.url ?? "";
+      server.middlewares.use((request, response, next) => {
+        const url = request.url ?? "";
 
-        if (!url.endsWith("/") && !extname(url)) {
-          res.writeHead(301, { Location: url + "/" });
-          res.end();
+        if (!url.endsWith("/") && !path.extname(url)) {
+          response.writeHead(301, { Location: `${url}/` });
+          response.end();
+
           return;
         }
 
@@ -68,12 +69,14 @@ function ssgServe(): Plugin {
         // emits its own weak ETag (file mtime) which gives us the
         // conditional-GET 304 fast path for free.
         const cacheControl = getCachePolicy(url);
-        if (cacheControl) {
-          const originalWriteHead = res.writeHead.bind(res);
-          res.writeHead = (...args: unknown[]) => {
-            res.setHeader("Cache-Control", cacheControl);
 
-            return (originalWriteHead as (...a: unknown[]) => typeof res)(
+        if (cacheControl) {
+          const originalWriteHead = response.writeHead.bind(response);
+
+          response.writeHead = (...args: unknown[]) => {
+            response.setHeader("Cache-Control", cacheControl);
+
+            return (originalWriteHead as (...a: unknown[]) => typeof response)(
               ...args,
             );
           };

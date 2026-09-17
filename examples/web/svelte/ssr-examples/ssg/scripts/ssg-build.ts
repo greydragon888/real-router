@@ -87,10 +87,10 @@ function buildHtml(
     : "";
 
   return template
-    .replace("<!--ssr-meta-->", renderMetaBlock(result.meta))
-    .replace("<!--ssr-head-->", result.head)
-    .replace("<!--ssr-outlet-->", result.html)
-    .replace("<!--ssr-state-->", ssrScript);
+    .replace("<!--ssr-meta-->", () => renderMetaBlock(result.meta))
+    .replace("<!--ssr-head-->", () => result.head)
+    .replace("<!--ssr-outlet-->", () => result.html)
+    .replace("<!--ssr-state-->", () => ssrScript);
 }
 
 // `getStaticPaths` enumerates leaf routes only — it returns

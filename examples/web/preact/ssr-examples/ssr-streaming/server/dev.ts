@@ -68,18 +68,21 @@ async function startServer(): Promise<void> {
         const stateScript = `<script>window.__SSR_STATE__=${result.ssrJson}</script>`;
         const templateWithBootstrap = template.replace(
           "<!--defer-bootstrap-->",
-          result.deferBootstrap,
+          () => result.deferBootstrap,
         );
-        const [head, tail] = templateWithBootstrap.split("<!--ssr-outlet-->");
-        const finalTail = (tail ?? "").replace("<!--ssr-state-->", stateScript);
+        const [head, tail] = templateWithBootstrap.split(
+          "<!--ssr-outlet-->",
+          2,
+        );
+        const finalTail = tail.replace("<!--ssr-state-->", () => stateScript);
 
         response.status(result.statusCode).set("Content-Type", "text/html");
-        response.write(head ?? "");
+        response.write(head);
 
         if (result.stream) {
           const reader = result.stream.getReader();
 
-          while (true) {
+          for (;;) {
             if (result.signal.aborted) {
               break;
             }

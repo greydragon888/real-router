@@ -1,14 +1,14 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
 import {
-  createRequestScope,
-  serializeRouterState,
-} from "@real-router/ssr-utils";
-import {
   rscActionPluginFactory,
   rscServerPluginFactory,
   type RscActionResult,
   type RscPayload,
 } from "@real-router/rsc-server-plugin";
+import {
+  createRequestScope,
+  serializeRouterState,
+} from "@real-router/ssr-utils";
 import {
   createTemporaryReferenceSet,
   decodeAction,
@@ -54,7 +54,7 @@ async function handler(request: Request): Promise<Response> {
   // Server Action handling — runs BEFORE rendering so the new render
   // reflects the mutation (single round-trip mutate + fetch).
   let actionResult: RscActionResult<unknown, ReactFormState> | undefined;
-  let temporaryReferences: unknown | undefined;
+  let temporaryReferences: unknown;
   let actionStatus: number | undefined;
 
   if (request.method === "POST") {
@@ -75,10 +75,7 @@ async function handler(request: Request): Promise<Response> {
       const action = await loadServerAction(actionId);
 
       try {
-        const data = (await (action as (...a: unknown[]) => unknown).apply(
-          null,
-          args as unknown[],
-        )) as unknown;
+        const data = await (action as (...a: unknown[]) => unknown)(...args);
 
         actionResult = { returnValue: { ok: true, data } };
       } catch (error) {
@@ -94,8 +91,10 @@ async function handler(request: Request): Promise<Response> {
       const decodedAction = await decodeAction(formData);
 
       try {
+        // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -- React types the decoded action as returning void, but the value it resolves to is the action result that decodeFormState consumes
         const result = await decodedAction();
         const formState = await decodeFormState(result, formData);
+
         actionResult = { formState };
       } catch {
         return new Response("Internal Server Error: server action failed", {
@@ -174,7 +173,7 @@ async function handler(request: Request): Promise<Response> {
     };
     const flightStream = renderRscToReadableStream(rscPayload, {
       temporaryReferences,
-    } as Record<string, unknown>);
+    });
 
     if (url.pathname === "/__rsc" || request.method === "POST") {
       return new Response(flightStream, {

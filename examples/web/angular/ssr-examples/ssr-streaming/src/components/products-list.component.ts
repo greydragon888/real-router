@@ -31,8 +31,7 @@ export class ProductsListComponent {
 
   readonly data = computed<ProductsListData>(() => {
     const data = this.route.routeState().route.context.data as
-      | ProductsListData
-      | undefined;
+      ProductsListData | undefined;
 
     return data ?? { products: [] };
   });

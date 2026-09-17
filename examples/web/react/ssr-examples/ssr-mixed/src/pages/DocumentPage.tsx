@@ -1,18 +1,18 @@
-import { useRoute } from "@real-router/preact";
+import { useRoute } from "@real-router/react";
 import { getSsrDataMode } from "@real-router/ssr-data-plugin";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useState } from "react";
 
-interface DocData {
+interface DocumentData {
   id: string;
   format: string;
   body: string;
 }
 
-export function Doc() {
+export function DocumentPage() {
   const { route } = useRoute();
   const mode = getSsrDataMode(route);
-  const ssrData = route.context.data as DocData | undefined;
-  const [clientData, setClientData] = useState<DocData | null>(null);
+  const ssrData = route.context.data as DocumentData | undefined;
+  const [clientData, setClientData] = useState<DocumentData | null>(null);
 
   useEffect(() => {
     if (mode !== "client-only" || ssrData !== undefined) {
@@ -21,9 +21,9 @@ export function Doc() {
 
     const handle = setTimeout(() => {
       setClientData({
-        id: String(route.params.id),
-        format: String(route.search.format),
-        body: `(client) PDF placeholder for ${String(route.params.id)}`,
+        id: route.params.id as string,
+        format: route.search.format as string,
+        body: `(client) PDF placeholder for ${route.params.id as string}`,
       });
     }, 50);
 
@@ -37,7 +37,7 @@ export function Doc() {
   return (
     <main data-testid="doc">
       <h1>Doc (mode: {mode})</h1>
-      {data === null || data === undefined ? (
+      {data === null ? (
         <p data-testid="doc-loading">Loading…</p>
       ) : (
         <div>

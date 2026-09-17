@@ -25,8 +25,8 @@ export function SearchForm(): JSX.Element {
   return (
     <form
       data-testid="search-form"
-      onSubmit={(e) => {
-        e.preventDefault();
+      onSubmit={(event) => {
+        event.preventDefault();
       }}
     >
       <fieldset>
@@ -40,8 +40,8 @@ export function SearchForm(): JSX.Element {
             id={queryId}
             type="text"
             value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
+            onChange={(event) => {
+              setQuery(event.target.value);
             }}
             data-testid="query-input"
           />
@@ -54,8 +54,8 @@ export function SearchForm(): JSX.Element {
           <select
             id={sortId}
             value={sort}
-            onChange={(e) => {
-              setSort(e.target.value as "asc" | "desc");
+            onChange={(event) => {
+              setSort(event.target.value as "asc" | "desc");
             }}
             data-testid="sort-select"
           >

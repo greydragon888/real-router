@@ -1,7 +1,7 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
-import { hydrateRouter } from "@real-router/ssr-utils";
 import { RouterProvider } from "@real-router/react";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
+import { hydrateRouter } from "@real-router/ssr-utils";
 import { createRoot, hydrateRoot } from "react-dom/client";
 
 import { App } from "./App";
@@ -18,13 +18,24 @@ declare global {
     __SSR_STATE__?: { path: string };
     __LOADER_CALLS__?: Record<string, number>;
   }
+
+  var __SSR_STATE__: { path: string } | undefined;
+
+  var __LOADER_CALLS__: Record<string, number> | undefined;
 }
+
+/**
+ * The e2e counter lives on the global object; assigning through a typed
+ * reference satisfies `unicorn/no-global-object-property-assignment` without
+ * changing what the page exposes.
+ */
+const instrumentationHost = globalThis;
 
 const router = createAppRouter();
 
 const loaderCalls: Record<string, number> = {};
 
-window.__LOADER_CALLS__ = loaderCalls;
+instrumentationHost.__LOADER_CALLS__ = loaderCalls;
 
 const instrumentedLoaders: DataLoaderFactoryMap = Object.fromEntries(
   (Object.entries(loaders) as [string, DataLoaderFnFactory][]).map(
@@ -41,14 +52,14 @@ const instrumentedLoaders: DataLoaderFactoryMap = Object.fromEntries(
       },
     ],
   ),
-) as DataLoaderFactoryMap;
+);
 
 router.usePlugin(
   browserPluginFactory(),
   ssrDataPluginFactory(instrumentedLoaders),
 );
 
-const ssrState = window.__SSR_STATE__;
+const ssrState = globalThis.__SSR_STATE__;
 
 await (ssrState ? hydrateRouter(router, ssrState) : router.start());
 

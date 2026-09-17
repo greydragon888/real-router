@@ -50,8 +50,7 @@ const CACHE_RULES: readonly {
   // Slow / boom / async-page / form: skip caching (demo / error /
   // form-with-tokens).
   {
-    match: (p) =>
-      p === "/slow" || p === "/boom" || p === "/async-page" || p === "/form",
+    match: (p) => ["/slow", "/boom", "/async-page", "/form"].includes(p),
     header: "no-store",
   },
 ];
@@ -59,7 +58,7 @@ const CACHE_RULES: readonly {
 export function getCachePolicy(path: string): string | undefined {
   // Strip query string for matching (we keep ?sort handling in the
   // user list rule via regex).
-  const onlyPath = path.split("?")[0] ?? path;
+  const onlyPath = path.split("?", 1)[0] ?? path;
 
   for (const rule of CACHE_RULES) {
     if (rule.match(onlyPath) || rule.match(path)) {

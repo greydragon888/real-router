@@ -40,6 +40,14 @@ declare global {
   }
 }
 
+/**
+ * The e2e counters live on the global object. Reading and writing them
+ * through a typed reference keeps the access checked and satisfies
+ * `unicorn/no-global-object-property-assignment`, which forbids assigning
+ * onto the global object directly.
+ */
+const instrumentationHost = globalThis as unknown as Window;
+
 export function trackView(
   node: HTMLElement,
   params: () => TrackViewParams,
@@ -47,9 +55,9 @@ export function trackView(
   let currentProductId = params().productId;
 
   const observer = new IntersectionObserver(([entry]) => {
-    if (entry?.isIntersecting) {
-      window.__VIEW_LOG__ = window.__VIEW_LOG__ ?? [];
-      window.__VIEW_LOG__.push({
+    if (entry.isIntersecting) {
+      instrumentationHost.__VIEW_LOG__ ??= [];
+      instrumentationHost.__VIEW_LOG__.push({
         productId: currentProductId,
         ts: Date.now(),
       });

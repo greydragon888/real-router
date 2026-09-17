@@ -1,14 +1,14 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
-import {
-  createRequestScope,
-  serializeRouterState,
-  type IncomingMessageLike,
-} from "@real-router/ssr-utils";
 import { RouterProvider } from "@real-router/solid";
 import {
   getSsrDataMode,
   ssrDataPluginFactory,
 } from "@real-router/ssr-data-plugin";
+import {
+  createRequestScope,
+  serializeRouterState,
+  type IncomingMessageLike,
+} from "@real-router/ssr-utils";
 import { generateHydrationScript, renderToStringAsync } from "solid-js/web";
 
 import { App } from "./App";

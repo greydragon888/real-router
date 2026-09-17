@@ -54,9 +54,9 @@ async function startDevServer(): Promise<void> {
 
       const ssrScript = `<script>window.__SSR_STATE__=${result.ssrJson}</script>`;
       const page = template
-        .replace("<!--ssr-head-->", result.head)
-        .replace("<!--ssr-outlet-->", result.html)
-        .replace("<!--ssr-state-->", ssrScript);
+        .replace("<!--ssr-head-->", () => result.head)
+        .replace("<!--ssr-outlet-->", () => result.html)
+        .replace("<!--ssr-state-->", () => ssrScript);
 
       response
         .status(result.statusCode)

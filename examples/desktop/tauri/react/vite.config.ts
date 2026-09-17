@@ -8,6 +8,7 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: true,
+    // eslint-disable-next-line turbo/no-undeclared-env-vars -- TAURI_DEV_HOST only picks the dev server's host, which no build output depends on
     host: process.env.TAURI_DEV_HOST || false,
     watch: {
       ignored: ["**/src-tauri/**"],

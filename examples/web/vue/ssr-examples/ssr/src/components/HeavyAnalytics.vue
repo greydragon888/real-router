@@ -15,7 +15,7 @@ import { onMounted, ref } from "vue";
 //
 // Pure savings: the JS for this component (and its onMounted/event
 // handlers) is loaded + executed only when the user actually sees it.
-// Maps to Angular's @defer (on viewport) + withIncrementalHydration().
+// Maps to Angular's @defer (on viewport) + incremental hydration.
 
 const count = ref(0);
 

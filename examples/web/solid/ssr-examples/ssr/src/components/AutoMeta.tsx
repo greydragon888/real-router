@@ -31,6 +31,7 @@ import type { JSX } from "solid-js";
 // For applications using the **streaming** SSR mode (`renderToStream`,
 // see ../../../ssr-examples/ssr-streaming/), `@solidjs/meta` integrates
 // cleanly via `useAssets` and `<MetaProvider>` is the canonical pattern.
+// eslint-disable-next-line sonarjs/no-invariant-returns -- the component renders nothing by design; it exists for the title/description effect
 export function AutoMeta(): JSX.Element {
   if (isServer) {
     return null;
@@ -41,8 +42,8 @@ export function AutoMeta(): JSX.Element {
   createEffect(() => {
     const meta = getMetaForState({
       name: routeState().route.name,
-      params: routeState().route.params as Record<string, unknown>,
-      search: routeState().route.search as Record<string, unknown>,
+      params: routeState().route.params,
+      search: routeState().route.search,
     });
 
     document.title = meta.title;

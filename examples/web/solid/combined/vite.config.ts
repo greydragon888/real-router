@@ -1,5 +1,5 @@
-import solid from "vite-plugin-solid";
 import { defineConfig } from "vite";
+import solid from "vite-plugin-solid";
 
 export default defineConfig({
   plugins: [solid()],
@@ -11,4 +11,3 @@ export default defineConfig({
     port: 4252,
   },
 });
-

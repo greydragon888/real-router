@@ -1,9 +1,9 @@
+import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import {
   createRequestScope,
   serializeRouterState,
   type IncomingMessageLike,
 } from "@real-router/ssr-utils";
-import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { createHttpStatusSink } from "@real-router/svelte/ssr";
 import { render } from "svelte/server";
 

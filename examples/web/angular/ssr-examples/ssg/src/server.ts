@@ -14,13 +14,17 @@ const angularApp = new AngularNodeAppEngine();
 
 app.disable("x-powered-by");
 
-app.use((req, res, next) => {
+app.use((request, nodeResponse, next) => {
   angularApp
-    .handle(req)
-    .then((response) =>
-      response ? writeResponseToNodeResponse(response, res) : next(),
-    )
+    .handle(request)
+    .then((response) => {
+      if (response) {
+        writeResponseToNodeResponse(response, nodeResponse);
+      } else {
+        next();
+      }
+    })
     .catch(next);
 });
 
-export const reqHandler = createNodeRequestHandler(app);
+export const requestHandler = createNodeRequestHandler(app);

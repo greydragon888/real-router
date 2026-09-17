@@ -1,5 +1,5 @@
-import { defineConfig } from "vite";
 import rsc from "@vitejs/plugin-rsc";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [

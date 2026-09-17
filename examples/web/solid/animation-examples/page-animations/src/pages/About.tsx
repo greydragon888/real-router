@@ -104,6 +104,7 @@ export function About(): JSX.Element {
       <p>
         <strong>Solid pattern:</strong> pages declare{" "}
         <code>let ref: HTMLDivElement | undefined</code>, bind via{" "}
+        {/* eslint-disable-next-line unicorn/no-incorrect-template-string-interpolation -- sample text showing Solid's `ref={ref}` syntax to the reader, not an interpolation */}
         <code>{`ref={ref}`}</code>, and pass <code>{`() => ref`}</code> to the
         hook. The getter is read inside the handler at exit / enter time — no{" "}
         <code>useRef</code> abstraction needed.

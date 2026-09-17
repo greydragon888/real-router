@@ -191,7 +191,7 @@ test.describe("Streaming SSR Example (Angular)", () => {
   test("response includes incremental hydration markers", async ({
     request,
   }) => {
-    // Angular's withIncrementalHydration() emits markers like ngh="..." or
+    // Angular's incremental hydration emits markers like ngh="..." or
     // [jsaction] on @defer block boundaries. Verify at least one such marker
     // is present in the response — this proves incremental hydration is
     // active (vs traditional full-tree hydration).
@@ -208,7 +208,7 @@ test.describe("Streaming SSR Example (Angular)", () => {
   }) => {
     // Streaming SSR responses must advertise text/html with utf-8 and not
     // expose Express's identity. We do not assert Transfer-Encoding here
-    // because Angular's @defer + withIncrementalHydration() builds a single
+    // because Angular's @defer + incremental hydration builds a single
     // HTML payload server-side (incremental hydration is a CLIENT-side
     // mechanism — chunks of the deferred component bundle download lazily
     // when the @defer trigger fires, not during SSR).
@@ -570,7 +570,7 @@ test.describe("Streaming SSR Example (Angular)", () => {
   }) => {
     // Sister test to ssr/ post-hydration loader skip — verifies the
     // TransferState bridge keeps working when Angular's
-    // `withIncrementalHydration()` + `@defer` are active. The bridge writes
+    // incremental hydration + `@defer` are active. The bridge writes
     // serialized router state to TransferState during the
     // `provideAppInitializer` callback, before `@defer` blocks even
     // register their hydration triggers — so the client's app-initializer

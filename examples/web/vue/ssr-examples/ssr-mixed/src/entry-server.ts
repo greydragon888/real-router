@@ -1,13 +1,13 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
 import {
+  getSsrDataMode,
+  ssrDataPluginFactory,
+} from "@real-router/ssr-data-plugin";
+import {
   createRequestScope,
   serializeRouterState,
   type IncomingMessageLike,
 } from "@real-router/ssr-utils";
-import {
-  getSsrDataMode,
-  ssrDataPluginFactory,
-} from "@real-router/ssr-data-plugin";
 import { RouterProvider } from "@real-router/vue";
 import { createSSRApp, h } from "vue";
 import { renderToString } from "vue/server-renderer";
@@ -70,6 +70,7 @@ export async function render(
             { default: () => h(App) },
           ),
       });
+
       html = await renderToString(app);
     } else {
       html = `<div data-ssr-shell data-ssr-mode="${mode}">SSR mode: ${mode}</div>`;

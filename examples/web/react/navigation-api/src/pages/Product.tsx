@@ -11,9 +11,10 @@ export function Product(): JSX.Element {
   const navigator = useNavigator();
   const id = Number(route.params.id);
   const currentIndex = PRODUCT_IDS.indexOf(id);
+  // eslint-disable-next-line unicorn/no-useless-undefined -- the explicit branch states the intent: no previous product at the first index
   const prevId = currentIndex > 0 ? PRODUCT_IDS[currentIndex - 1] : undefined;
   const nextId =
-    currentIndex >= 0 && currentIndex < PRODUCT_IDS.length - 1
+    currentIndex !== -1 && currentIndex < PRODUCT_IDS.length - 1
       ? PRODUCT_IDS[currentIndex + 1]
       : undefined;
 

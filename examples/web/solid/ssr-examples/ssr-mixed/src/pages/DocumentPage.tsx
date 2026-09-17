@@ -4,30 +4,32 @@ import { Show, createSignal, onCleanup, onMount } from "solid-js";
 
 import type { JSX } from "solid-js";
 
-interface DocData {
+interface DocumentData {
   id: string;
   format: string;
   body: string;
 }
 
-export function Doc(): JSX.Element {
+export function DocumentPage(): JSX.Element {
   const routeState = useRoute();
   const mode = (): "full" | "data-only" | "client-only" =>
     getSsrDataMode(routeState().route);
-  const ssrData = (): DocData | undefined =>
-    routeState().route.context.data as DocData | undefined;
-  const [clientData, setClientData] = createSignal<DocData | null>(null);
+  const ssrData = (): DocumentData | undefined =>
+    routeState().route.context.data as DocumentData | undefined;
+  const [clientData, setClientData] = createSignal<DocumentData | null>(null);
 
   onMount(() => {
-    if (mode() !== "client-only" || ssrData() !== undefined) return;
+    if (mode() !== "client-only" || ssrData() !== undefined) {
+      return;
+    }
 
     const params = routeState().route.params;
     const search = routeState().route.search;
     const handle = setTimeout(() => {
       setClientData({
-        id: String(params.id),
-        format: String(search.format),
-        body: `(client) PDF placeholder for ${String(params.id)}`,
+        id: params.id as string,
+        format: search.format as string,
+        body: `(client) PDF placeholder for ${params.id as string}`,
       });
     }, 50);
 
@@ -36,15 +38,12 @@ export function Doc(): JSX.Element {
     });
   });
 
-  const data = (): DocData | null | undefined => ssrData() ?? clientData();
+  const data = (): DocumentData | null | undefined => ssrData() ?? clientData();
 
   return (
     <main data-testid="doc">
       <h1>Doc (mode: {mode()})</h1>
-      <Show
-        when={data()}
-        fallback={<p data-testid="doc-loading">Loading…</p>}
-      >
+      <Show when={data()} fallback={<p data-testid="doc-loading">Loading…</p>}>
         {(d) => (
           <div>
             <p data-testid="doc-id">id: {d().id}</p>

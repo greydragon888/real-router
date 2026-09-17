@@ -162,6 +162,7 @@ if ("navigation" in globalThis) {
     applyInitialF5Restore(router, mode);
   }
 } else {
+  // eslint-disable-next-line unicorn/no-unsafe-dom-html -- a static template with no interpolation; it renders the unsupported-browser notice before the app mounts
   document.body.innerHTML = `
     <div class="fallback">
       <h1>Navigation API is required</h1>

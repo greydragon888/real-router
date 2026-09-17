@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import express from "express";
+import express, { static as serveStatic } from "express";
 
 import type { RenderResult } from "../src/entry-server";
 
@@ -14,7 +14,7 @@ async function startServer(): Promise<void> {
 
   app.disable("x-powered-by");
 
-  app.use(express.static(path.resolve(root, "dist/client"), { index: false }));
+  app.use(serveStatic(path.resolve(root, "dist/client"), { index: false }));
 
   const template = readFileSync(
     path.resolve(root, "dist/client/index.html"),
@@ -68,10 +68,12 @@ async function startServer(): Promise<void> {
 
       const ssrScript = `<script>window.__SSR_STATE__=${ssrJson}</script>`;
       const templateWithStateAndHydration = template
-        .replace("<!--ssr-hydration-script-->", hydrationScript)
-        .replace("<!--ssr-state-->", ssrScript);
-      const [headPart, footerPart] =
-        templateWithStateAndHydration.split("<!--ssr-outlet-->");
+        .replace("<!--ssr-hydration-script-->", () => hydrationScript)
+        .replace("<!--ssr-state-->", () => ssrScript);
+      const [headPart, footerPart] = templateWithStateAndHydration.split(
+        "<!--ssr-outlet-->",
+        2,
+      );
 
       response.status(statusCode);
       response.set("Content-Type", "text/html; charset=utf-8");
@@ -107,6 +109,7 @@ async function startServer(): Promise<void> {
     }
   });
 
+  // eslint-disable-next-line turbo/no-undeclared-env-vars -- PORT is conventional Express override, not turbo task input
   const port = Number(process.env.PORT) || 3000;
 
   app.listen(port, () => {

@@ -1,11 +1,11 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
 import { cloneRouter } from "@real-router/core/api";
+import { RouterProvider } from "@real-router/react";
+import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import {
   getStaticPaths as getStaticPathsFromRouter,
   serializeRouterState,
 } from "@real-router/ssr-utils";
-import { RouterProvider } from "@real-router/react";
-import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { renderToString } from "react-dom/server";
 
 import { App } from "./App";

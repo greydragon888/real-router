@@ -1,6 +1,6 @@
 # SSR Streaming Angular Example
 
-Real-Router with Angular 21 SSR + `@defer` + `withIncrementalHydration()` — and **zero router-specific streaming API**.
+Real-Router with Angular 21 SSR + `@defer` + incremental hydration — and **zero router-specific streaming API**.
 
 > **Terminology disclaimer.** "Streaming" in this example means **client-side incremental hydration**, not HTTP progressive flush. Angular 21's `AngularNodeAppEngine` does send the response with `Transfer-Encoding: chunked` (HTTP/1.1 default when the server doesn't know `Content-Length` upfront), but the body is rendered fully before any byte goes out: empirically the entire HTML lands in **one TCP frame, ~0 ms span** — there is no progressive flush, no `<!--$?-->`-style suspense markers, no out-of-order shell. The actual streaming win is that each `@defer` block ships as its own JS chunk and is downloaded + hydrated only when its trigger fires on the client. This is structurally different from React 19 / Solid streaming SSR (where the server progressively flushes HTML chunks as async data resolves). See "How This Differs From React / Vue / Svelte Streaming" below for the full comparison; reproduce the wire-format behavior with the Node `http.request` snippet at the bottom of this file.
 
@@ -8,7 +8,7 @@ Real-Router with Angular 21 SSR + `@defer` + `withIncrementalHydration()` — an
 
 - **`provideRealRouterFactory({ baseRouter, plugins })`** — same factory as `ssr/`, with `REQUEST` flowing per-request through `AngularNodeAppEngine`'s scope.
 - **`@real-router/ssr-data-plugin` for critical data** — `state.context.data.product` resolves before the shell renders, mirrors React/Vue/Solid streaming examples.
-- **Why no `defer()` from `@real-router/ssr-data-plugin` here?** Angular's native `@defer` blocks + `withIncrementalHydration()` already cover chunk-level lazy hydration with first-class viewport / hover / interaction / idle / timer / predicate triggers (demonstrated below). The cross-adapter `defer()` API is exposed via `@real-router/angular/ssr` (`injectDeferred()` returning `Signal<T | undefined>` — Angular asymmetric: no `<Await>` / `<Streamed>`), but **this example uses Angular-native `@defer`** for chunk-loading + hydration triggers + the routing layer for critical data. See `packages/ssr-data-plugin/CLAUDE.md` ("Adapters that intentionally don't dogfood `defer()`") for the full rationale
+- **Why no `defer()` from `@real-router/ssr-data-plugin` here?** Angular's native `@defer` blocks + incremental hydration already cover chunk-level lazy hydration with first-class viewport / hover / interaction / idle / timer / predicate triggers (demonstrated below). The cross-adapter `defer()` API is exposed via `@real-router/angular/ssr` (`injectDeferred()` returning `Signal<T | undefined>` — Angular asymmetric: no `<Await>` / `<Streamed>`), but **this example uses Angular-native `@defer`** for chunk-loading + hydration triggers + the routing layer for critical data. See `packages/ssr-data-plugin/CLAUDE.md` ("Adapters that intentionally don't dogfood `defer()`") for the full rationale
 - **`@defer (on viewport)` for Reviews** — server emits `@placeholder` content; client downloads + hydrates the Reviews component when its placeholder enters the viewport.
 - **`@defer (on hover)` for RelatedItems** — server emits `@placeholder`; client downloads + hydrates only when the user hovers the placeholder area.
 - **`@defer (on idle; prefetch on viewport; hydrate on idle)` for SpecSheet** — *decoupled triggers*. Chunk download starts as soon as the placeholder enters the viewport (prefetch), but the JS doesn't run on the main thread until `requestIdleCallback` fires (hydrate). Optimal for low-priority interactive content where TTI matters.
@@ -16,13 +16,13 @@ Real-Router with Angular 21 SSR + `@defer` + `withIncrementalHydration()` — an
 - **`@defer (when signal())` for Tech details** — predicate-based trigger. Unique to Angular: chunk loads + component hydrates when the bound signal flips truthy. **One-shot** — once activated, the component stays mounted even if the predicate flips back to false (use a regular `@if` for reactive show/hide).
 - **`@defer (on timer(1500ms))` for News banner** — pure-time-based trigger. Block hydrates 1.5 s after the placeholder enters the DOM, no user interaction needed.
 - **`@defer (on immediate)` for Analytics pixel** — code-split chunk that loads as soon as the app bootstraps. Equivalent to a regular eagerly-loaded component, but the chunk boundary keeps the main bundle small (useful for cache-bustable third-party SDKs).
-- **`provideClientHydration(withIncrementalHydration(), withEventReplay())`** — Angular 21 stable. Per-`@defer` block hydration **plus** event replay: clicks/keydowns issued before a block hydrates are captured globally and replayed once the component takes over. Verified by an e2e test that clicks "Mark all read" while the Reviews chunk is artificially delayed by 1.2 s — the click survives the gap and `data-marked` flips to `"true"` after hydration.
-- **`provideZonelessChangeDetection()`** — full Angular 21 zoneless mode; signals + `computed` drive change detection without `zone.js`. Compatible with `withIncrementalHydration()` + `ssr-data-plugin` end-to-end (no zone-related warnings on hydration).
+- **`provideClientHydration(withEventReplay())`** — incremental hydration is on by default under `provideClientHydration` since Angular 22, so this gives per-`@defer` block hydration **plus** event replay: clicks/keydowns issued before a block hydrates are captured globally and replayed once the component takes over. Verified by an e2e test that clicks "Mark all read" while the Reviews chunk is artificially delayed by 1.2 s — the click survives the gap and `data-marked` flips to `"true"` after hydration.
+- **`provideZonelessChangeDetection()`** — full Angular 21 zoneless mode; signals + `computed` drive change detection without `zone.js`. Compatible with incremental hydration + `ssr-data-plugin` end-to-end (no zone-related warnings on hydration).
 - **`provideServerRendering(withRoutes(serverRoutes), withAppShell(AppComponent))`** — server-side bootstrap. `withAppShell` registers `AppComponent` as the root for the SSR pipeline; without it `AngularNodeAppEngine` cannot serialize the component tree. `withRoutes` wires `RenderMode.Server` to all paths so every URL goes through per-request `cloneRouter()`.
 - **`@angular/router` + `NgRouterStub`** — required peer for `@angular/ssr`'s URL matching pipeline (`@angular/ssr` rejects bootstraps without `provideRouter(...)`). `NgRouterStub` is a no-op standalone Component routed under `path: "**"` so all routing decisions fall through to Real-Router's `<route-view>`. Pure SSR-pipeline placeholder, never visible.
 - **`AngularNodeAppEngine` Web `Response`** — `Response.body` is a `ReadableStream` (Web Streams API) and `writeResponseToNodeResponse` pipes it to the Node `res` with `Transfer-Encoding: chunked` framing. **Don't confuse this with React 19 / Solid progressive streaming**: Angular fully renders the HTML before flushing the first byte (empirically: 1 TCP frame, ~0 ms span — the disclaimer above explains how to reproduce). Chunked transfer here is just HTTP/1.1 default framing for an unknown-length body, not out-of-order streaming.
 
-The router does **nothing streaming-specific**. All streaming behavior comes from Angular's native `@defer` blocks + `withIncrementalHydration()` + `AngularNodeAppEngine`. Real-Router's role is identical to non-streaming SSR: per-request `cloneRouter()`, `start(url)`, plugin-driven critical data via `state.context.data`.
+The router does **nothing streaming-specific**. All streaming behavior comes from Angular's native `@defer` blocks + incremental hydration + `AngularNodeAppEngine`. Real-Router's role is identical to non-streaming SSR: per-request `cloneRouter()`, `start(url)`, plugin-driven critical data via `state.context.data`.
 
 ## How This Differs From React / Vue / Svelte Streaming
 
@@ -32,7 +32,7 @@ Angular 21 streaming SSR is **structurally different** from React 19's `renderTo
 | --- | --- | --- | --- | --- |
 | Streaming primitive | `renderToReadableStream` + `<Suspense>` | `renderToWebStream` + `<Suspense>` | `await render()` + `{#await}` | `AngularNodeAppEngine.handle()` returning a Web `Response` |
 | Out-of-order placeholders in shell | Yes — `<!--$?-->` markers + chunks | No — sequential, top-down | No — pending snippet only | No — `@placeholder` is rendered into the same single HTML document; `@defer` is a *client-side* trigger boundary |
-| Selective hydration | Yes — hydrates resolved islands | No — atomic `app.mount()` | No — atomic `mount` / `hydrate` | **Yes — `withIncrementalHydration()` hydrates per-`@defer` block on its trigger** |
+| Selective hydration | Yes — hydrates resolved islands | No — atomic `app.mount()` | No — atomic `mount` / `hydrate` | **Yes — incremental hydration, per `@defer` block on its trigger** |
 | Server resolves async | progressive | blocking | pending only | full critical render server-side; deferred sections lazy on client |
 | HTTP wire format | `Transfer-Encoding: chunked` + progressive flush (multiple frames over time) | chunked + progressive flush | single payload | **chunked framing, single TCP frame** (no progressive flush — body rendered in full before flush) |
 | Network model | true HTTP streaming | true HTTP streaming | deferred-data SSR (no chunked HTTP) | **lazy hydration only** (HTTP body arrives at once) |
@@ -53,7 +53,7 @@ src/
   app.config.server.ts            Server-only — provideServerRendering(withRoutes(...) + withAppShell(AppComponent))
   app.routes.server.ts            ServerRoute[] with RenderMode.Server (per-request SSR)
   app.component.ts                Root standalone — <route-view> with home/products/notfound
-  main.ts                         Client entry — bootstrapApplication + provideClientHydration(withIncrementalHydration(), withEventReplay())
+  main.ts                         Client entry — bootstrapApplication + provideClientHydration(withEventReplay())
   main.server.ts                  Server bootstrap — accepts BootstrapContext
   server.ts                       Express + AngularNodeAppEngine + writeResponseToNodeResponse
   router/
@@ -165,7 +165,7 @@ Key constraints:
 
 - **`@defer (on viewport)`** triggers when the placeholder enters viewport — for content above the fold this fires immediately on hydration; the placeholder may flash briefly. End-state assertion in tests is the resolved component, not the fallback.
 - **`@defer (on hover)`** triggers only on actual user hover — the placeholder remains in the DOM until interaction, useful for low-priority content.
-- **`hydrate on <trigger>`** is required (Angular 21 syntax) for `withIncrementalHydration()` to take ownership of the `@defer` block during hydration, not just lazy-load.
+- **`hydrate on <trigger>`** is required (Angular 21 syntax) for incremental hydration to take ownership of the `@defer` block during hydration, not just lazy-load.
 - **`@placeholder` content is rendered server-side** — same pattern as Vue's `<Suspense fallback>` and Svelte's pending snippet, but Angular wraps it in lazy-loadable `<ng-container>` boundaries.
 
 ## Run
@@ -252,11 +252,11 @@ Real-Router intentionally does **not** ship a `<Suspense>` component or `defer()
 
 ## Library Philosophy
 
-This example demonstrates Real-Router's library-first stance: **delegate to Angular 21 native primitives instead of inventing router-specific streaming APIs**. `@defer (on viewport)`, `@defer (on hover)`, `withIncrementalHydration()`, and `AngularNodeAppEngine` form the complete streaming SSR contract that Angular ships — the router just provides per-request isolation and per-route critical data.
+This example demonstrates Real-Router's library-first stance: **delegate to Angular 21 native primitives instead of inventing router-specific streaming APIs**. `@defer (on viewport)`, `@defer (on hover)`, incremental hydration, and `AngularNodeAppEngine` form the complete streaming SSR contract that Angular ships — the router just provides per-request isolation and per-route critical data.
 
 ## Post-hydration loader skip via TransferState bridge (#599)
 
-Same flow as the runtime SSR sibling: `provideRealRouterFactory` writes the SSR-resolved router state to Angular's `TransferState` after `await router.start(path)` resolves on the server, and the client's bootstrap reads the seed and calls `hydrateRouter(router, ssrJson)` instead of `router.start(path)` — `ssr-data-plugin`'s start interceptor reuses the server-resolved `state.context.data` without re-invoking the critical loader on first paint. Streaming-specific note: `withIncrementalHydration()` + `@defer` blocks register their own hydration triggers (viewport / hover / timer / immediate) **after** bootstrap completes, so the TransferState write timing is unaffected by deferred-block hydration. The deferred `@defer` blocks own their own data fetching (independent of `ssr-data-plugin`). See [`ssr/README.md`](../ssr/README.md) → "Post-hydration loader skip via TransferState bridge (#599)" for the full server↔client lifecycle. Verified end-to-end in `e2e/ssr-streaming.spec.ts` via `window.__LOADER_CALLS__` counter assertion.
+Same flow as the runtime SSR sibling: `provideRealRouterFactory` writes the SSR-resolved router state to Angular's `TransferState` after `await router.start(path)` resolves on the server, and the client's bootstrap reads the seed and calls `hydrateRouter(router, ssrJson)` instead of `router.start(path)` — `ssr-data-plugin`'s start interceptor reuses the server-resolved `state.context.data` without re-invoking the critical loader on first paint. Streaming-specific note: incremental hydration + `@defer` blocks register their own hydration triggers (viewport / hover / timer / immediate) **after** bootstrap completes, so the TransferState write timing is unaffected by deferred-block hydration. The deferred `@defer` blocks own their own data fetching (independent of `ssr-data-plugin`). See [`ssr/README.md`](../ssr/README.md) → "Post-hydration loader skip via TransferState bridge (#599)" for the full server↔client lifecycle. Verified end-to-end in `e2e/ssr-streaming.spec.ts` via `window.__LOADER_CALLS__` counter assertion.
 
 ## See Also
 

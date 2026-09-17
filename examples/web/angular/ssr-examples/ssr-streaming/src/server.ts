@@ -1,4 +1,4 @@
-import { dirname, resolve } from "node:path";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -7,10 +7,10 @@ import {
   isMainModule,
   writeResponseToNodeResponse,
 } from "@angular/ssr/node";
-import express from "express";
+import express, { static as serveStatic } from "express";
 
-const serverDistFolder = dirname(fileURLToPath(import.meta.url));
-const browserDistFolder = resolve(serverDistFolder, "../browser");
+const serverDistFolder = path.dirname(fileURLToPath(import.meta.url));
+const browserDistFolder = path.resolve(serverDistFolder, "../browser");
 
 export const app = express();
 const angularApp = new AngularNodeAppEngine();
@@ -18,19 +18,19 @@ const angularApp = new AngularNodeAppEngine();
 app.disable("x-powered-by");
 
 app.use(
-  express.static(browserDistFolder, {
+  serveStatic(browserDistFolder, {
     maxAge: "1y",
     index: false,
     redirect: false,
   }),
 );
 
-app.use((req, res, next) => {
+app.use((request, nodeResponse, next) => {
   angularApp
-    .handle(req)
+    .handle(request)
     .then((response) => {
       if (response) {
-        writeResponseToNodeResponse(response, res);
+        writeResponseToNodeResponse(response, nodeResponse);
       } else {
         next();
       }
@@ -39,6 +39,7 @@ app.use((req, res, next) => {
 });
 
 if (isMainModule(import.meta.url)) {
+  // eslint-disable-next-line turbo/no-undeclared-env-vars -- PORT is conventional Express override, not turbo task input
   const port = Number(process.env.PORT) || 4173;
 
   app.listen(port, () => {
@@ -46,4 +47,4 @@ if (isMainModule(import.meta.url)) {
   });
 }
 
-export const reqHandler = createNodeRequestHandler(app);
+export const requestHandler = createNodeRequestHandler(app);
