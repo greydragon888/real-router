@@ -317,17 +317,12 @@ describe("injectDeferredScripts", () => {
       // but cannot prove the .then implementation does not throw.
       const makeEvilThenable = (): Promise<never> => {
         const target = Object.create(null) as Record<string, unknown>;
+        // Joined at runtime: `unicorn/no-thenable` reports a literal `then` key.
         const thenKey = ["t", "h", "e", "n"].join("");
 
-        /* eslint-disable unicorn/no-thenable --
-         * Intentional: this test exercises the misbehaving-thenable codepath
-         * in injectDeferredScripts. `defer()` validates
-         * `typeof .then === "function"` but cannot prove the implementation
-         * does not throw. */
         target[thenKey] = (): never => {
           throw new Error("evil thenable");
         };
-        /* eslint-enable unicorn/no-thenable */
 
         return target as unknown as Promise<never>;
       };

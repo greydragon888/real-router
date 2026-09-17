@@ -97,7 +97,6 @@ describe("dependencies: the copy loop and getAll (#1823)", () => {
     // silently removed the whole point of the cell.
     const merged: Record<string, unknown> = {};
 
-    // eslint-disable-next-line unicorn/no-immediate-mutation -- see above: [[Set]] is the subject under test, a spread DEFINES and cannot reproduce it
     Object.assign(merged, all);
 
     expect(Object.getPrototypeOf(merged)).toBe(Object.prototype);

@@ -286,21 +286,15 @@ describe("@real-router/rsc-server-plugin — rscActionPluginFactory", () => {
     });
 
     it("rejects a duck-typed thenable return", async () => {
-      /* eslint-disable unicorn/no-thenable --
-       * Intentional: this test exercises the duck-type branch of the runtime
-       * guard. `unicorn/no-thenable` matches both object-literal `then` and
-       * dynamic assignment of a function-valued `then` property. The whole
-       * point of the test is to construct exactly that shape and assert
-       * the guard rejects it. */
       const buildThenable = (): RscActionResult => {
         const target: Record<string, unknown> = {};
+        // Joined at runtime: `unicorn/no-thenable` reports a literal `then` key.
         const thenKey = ["t", "h", "e", "n"].join("");
 
         target[thenKey] = (): undefined => undefined;
 
         return target;
       };
-      /* eslint-enable unicorn/no-thenable */
 
       router.usePlugin(rscActionPluginFactory(buildThenable));
 

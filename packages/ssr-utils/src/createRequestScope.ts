@@ -185,7 +185,6 @@ export function createRequestScope<
   // host has none. A computed key would instead coerce that host's `undefined`
   // into a string member (#2117). This package's `CLAUDE.md` carries why the
   // registry key is the right stand-in.
-  // eslint-disable-next-line unicorn/no-nonstandard-builtin-properties -- reading the well-known `await using` symbol off the host is the point
   const hostSymbol = (Symbol as { asyncDispose?: symbol }).asyncDispose;
   // ⚠ The annotation is load-bearing: without a DECLARED unique-symbol type
   // the computed key below degrades into an index signature (tsc TS2741).

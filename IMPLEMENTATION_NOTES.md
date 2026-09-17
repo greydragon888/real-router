@@ -10697,3 +10697,37 @@ A pin that encodes a registry incident is a promise to remove it, and this one h
 The findings were suppressed rather than fixed because they are not defects: the rules cannot see a getter's side effect or an intentional `{}`. Scoping by file keeps both rules on for the code they were added to protect, and keeps an infrastructure bump out of published source.
 
 ⚠ `pnpm dedupe` does not collapse a family split across peer variants, and a green `lint:dedupe` does not show the split. Read the resolved versions of the family itself — `pnpm update -r '<scope>/*'` is the step that re-resolves them, and it needs no pin.
+
+## eslint-plugin-unicorn 75: five rules configured around their new reach, nine stale directives removed (2026-09-17)
+
+### Problem
+
+Releases 73–75 add 25 rules, 10 of them to `recommended`, and widen several rules already on. The census ran the way `.husky/pre-push` lints, read-only: every `packages/*` workspace through `lint`, every example through `lint:example`, and `benchmarks` through `lint:bench`. The gate was clean on 72.0.0; on 75.0.0 the same 3768 files gave 1362 messages.
+
+Five rules account for 1357 of them:
+
+- `single-line-block-comment-style`, new in `recommended` with a default `multiline` style: 978, on the one-line `/** … */` and `/* … */` comments the code is written with. Its fix also strips the leading `*`.
+- `prefer-ternary`, which the root config sets to `warn`: 289. It now reports a guard followed by a return, `if (c) { return a; } return b;`.
+- `prefer-combined-guards`, new in `recommended`: 44 adjacent guards, which here often carry their own comments.
+- `no-immediate-mutation`, set to `error` in the root config: 39. It now reports a mutation under `if`, and its docs leave that form without a fix in TypeScript because the spread can lose contextual typing.
+- `prefer-continue`, from `recommended` and on in production src only: 7. It now reports a trailing `if` that follows other statements in the loop body.
+
+The other five are `eslint-disable` directives that 75 made unused by fixing false positives: `no-thenable` no longer resolves a key built with `.join("")`, `no-this-outside-of-class` accepts an explicit `this` parameter, and `no-nonstandard-builtin-properties` treats `Symbol.asyncDispose` as standard.
+
+### Solution
+
+Configuration only, with no statement of code changed:
+
+- `single-line-block-comment-style` is `["error", "single-line"]`, which reports nothing here. A probe shows that in this mode the rule rewrites a plain `/*\n…\n*/` block and leaves JSDoc blocks alone.
+- `prefer-ternary`, `prefer-combined-guards` and `no-immediate-mutation` are off. For `prefer-ternary`, `only-single-line` still leaves 150 findings; the other two have no options.
+- `prefer-continue` is `["error", { maximumStatements: 3 }]`. Measured at 1, 2 and 3, the trailing form gives 7, 1 and 0 findings.
+- Nine directives are removed: the five above, three `no-immediate-mutation` directives in core's tests and benchmarks, and `unicorn/prefer-continue` from a two-rule directive in validation-plugin. The `Object.assign` rationale in the benchmark stays as a plain comment. Two of the nine sit in `packages/*/src`; both edits are comment-only and carry no changeset.
+- Outside the unicorn subtree, `pnpm dedupe` moves `@eslint-community/eslint-utils` 4.9.1 → 4.10.1 and `globals` 17.7.0 → 17.12.0, the ranges 75 declares.
+
+The final census gives the same 3768 files and 0 messages.
+
+### Why
+
+All five are style rules — ESLint `meta.type` `suggestion`, or `layout` for the comment style — and fixing their findings would rewrite published source with no change at runtime. Setting a rule's direction or threshold keeps what still guards something at no cost; the three rules turned off have no option that separates their new form from the one they reported before.
+
+⚠ Switching a rule off makes its `eslint-disable` directives unused, and `reportUnusedDisableDirectives: "warn"` under `--max-warnings 0` fails the gate on them.

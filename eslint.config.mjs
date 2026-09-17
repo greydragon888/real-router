@@ -673,7 +673,7 @@ export default tsEslint.config(
   // ============================================
   // 8. UNICORN CONFIGURATION (Modern JS/TS patterns)
   // ============================================
-  // Updated for eslint-plugin-unicorn v69.0.0
+  // Updated for eslint-plugin-unicorn v75.0.0
   // Changelog: https://github.com/sindresorhus/eslint-plugin-unicorn/releases
   // v68 audit (38 new rules + prevent-abbreviations→name-replacements rename):
   // .claude/unicorn-v68-rules-audit.md
@@ -690,8 +690,11 @@ export default tsEslint.config(
       // ============================================
       // NEW RULES (v56-v64)
       // ============================================
-      // v62: Disallow mutating variables immediately after declaration
-      "unicorn/no-immediate-mutation": "error",
+      // v62: Disallow mutating variables immediately after declaration. Off: the
+      // rule also reports a mutation under `if` and wants it folded into the
+      // initializer as `...(cond && { key })`, a form its own docs leave without
+      // a fix in TypeScript because the spread can lose contextual typing.
+      "unicorn/no-immediate-mutation": "off",
       // v62: Disallow unnecessary arguments for collection methods
       "unicorn/no-useless-collection-argument": "error",
       // v61: Prefer class field declarations over constructor assignments
@@ -728,6 +731,19 @@ export default tsEslint.config(
       // check emptiness before knowing x is a string). A style micro-opt, not a
       // bug-catcher — declined under the same doctrine as the style opinions below.
       "unicorn/prefer-simple-condition-first": "off",
+      // A guard here often carries its own comment, and folding it into the
+      // previous one with `||` leaves one explanation over two conditions. A
+      // style opinion, declined under the same doctrine.
+      "unicorn/prefer-combined-guards": "off",
+      // The default `multiline` style unfolds every one-line `/** … */` and
+      // strips the leading `*` in its fix. `single-line` matches the code as
+      // written, and in that mode the rule leaves JSDoc blocks alone.
+      "unicorn/single-line-block-comment-style": ["error", "single-line"],
+      // A trailing `if` of up to three statements stays as written: inverting it
+      // into `continue` at the end of the body gains nothing. Larger wrapped
+      // bodies are still reported. UNICORN_NON_SHIPPED_OFF keeps it off outside
+      // production src.
+      "unicorn/prefer-continue": ["error", { maximumStatements: 3 }],
       // v64: Enforce consistent break position in switch cases
       "unicorn/switch-case-break-position": "warn",
 
@@ -833,7 +849,10 @@ export default tsEslint.config(
       // rule is turned OFF for tests below (section 12) to avoid churning 165
       // readable test usages into `for…of`.
       "unicorn/prefer-spread": "warn",
-      "unicorn/prefer-ternary": "warn",
+      // Off: the rule also reports a guard followed by a return
+      // (`if (c) { return a; } return b;`) and folds guard chains into long
+      // ternaries; `only-single-line` does not exclude that form.
+      "unicorn/prefer-ternary": "off",
       "unicorn/no-useless-undefined": [
         "warn",
         { checkArguments: false, checkArrowFunctionBody: false },

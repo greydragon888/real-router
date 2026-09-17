@@ -48,7 +48,7 @@ export function throwIfInternalRouteInArray(
   methodName: string,
 ): void {
   for (const route of routes) {
-    // eslint-disable-next-line unicorn/prefer-continue, @typescript-eslint/no-unnecessary-condition -- runtime safety guard; prefer-continue inversion would split the condition off this single-line disable
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety guard
     if (route && typeof route === "object" && typeof route.name === "string") {
       throwIfInternalRoute(route.name, methodName);
 

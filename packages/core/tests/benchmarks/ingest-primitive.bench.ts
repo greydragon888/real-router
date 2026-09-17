@@ -132,7 +132,8 @@ export async function run(): Promise<void> {
     batched(ITER, () => {
       const target: Record<string, unknown> = {};
 
-      // eslint-disable-next-line unicorn/no-immediate-mutation -- the point of this arm IS the `Object.assign` call; the rule's autofix rewrites it to `{ ...source }`, a different operation, and leaves the arm name saying otherwise
+      // The point of this arm IS the `Object.assign` call: `{ ...source }` is a
+      // different operation, and the arm name would then say otherwise.
       Object.assign(target, source);
       keep(target);
     }),
@@ -170,7 +171,7 @@ export async function run(): Promise<void> {
       batched(ITER, () => {
         const target: Record<string, unknown> = {};
 
-        // eslint-disable-next-line unicorn/no-immediate-mutation -- see the 5-key arm above
+        // `Object.assign` on purpose — see the five-key arm above.
         Object.assign(target, bag);
         keep(target);
       }),

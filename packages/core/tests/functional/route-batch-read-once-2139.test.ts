@@ -189,7 +189,6 @@ describe("a route batch is judged and copied in one walk (#2139)", () => {
       // Addressed at the route named `u` and its snapshot, so unrelated readers
       // of `.children` do not spend the experiment — the accessor's RECEIVER is
       // the only thing that can tell them apart.
-      /* eslint-disable unicorn/no-this-outside-of-class -- an accessor's receiver is the addressing mechanism */
       const descriptor: PropertyDescriptor = {
         configurable: true,
         get(this: unknown): unknown {
@@ -200,7 +199,6 @@ describe("a route batch is judged and copied in one walk (#2139)", () => {
             : undefined;
         },
       };
-      /* eslint-enable unicorn/no-this-outside-of-class */
 
       if (withSetter) {
         descriptor.set = function (): void {
