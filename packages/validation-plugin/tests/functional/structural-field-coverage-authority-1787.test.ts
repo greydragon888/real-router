@@ -289,8 +289,11 @@ describe("structural-field coverage, classified per cell (#1787)", () => {
     }
 
     expect(byOutcome).toStrictEqual({
-      core: 16,
-      plugin: 118,
+      // `forwardTo: []` and `forwardTo: 42` at all four doors are core's: a
+      // truthy forward that is neither a string nor a function is refused
+      // before anything is stored (#2394).
+      core: 24,
+      plugin: 110,
       unreachable: 31,
       // `forwardTo: ""` at the three doors that admit a string — see `typeValid`.
       valid: 3,
