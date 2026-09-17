@@ -72,8 +72,10 @@ async function startDevServer(): Promise<void> {
       const templateWithState = template
         .replace("<!--ssr-state-->", ssrScript)
         .replace("<!--defer-bootstrap-->", deferBootstrap);
-      const [headPart, footerPart] =
-        templateWithState.split("<!--ssr-outlet-->");
+      const [headPart, footerPart] = templateWithState.split(
+        "<!--ssr-outlet-->",
+        2,
+      );
 
       const cacheControl = getCachePolicy(url);
 

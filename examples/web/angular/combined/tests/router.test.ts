@@ -255,14 +255,9 @@ describe("AbortSignal cancellation", () => {
     vi.useFakeTimers();
 
     const controller = new AbortController();
-    const navPromise = router.navigate(
-      "checkout",
-      {},
-      undefined,
-      {
-        signal: controller.signal,
-      },
-    );
+    const navPromise = router.navigate("checkout", {}, undefined, {
+      signal: controller.signal,
+    });
 
     controller.abort();
 

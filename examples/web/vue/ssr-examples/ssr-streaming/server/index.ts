@@ -73,8 +73,10 @@ async function startServer(): Promise<void> {
 
       const ssrScript = `<script>window.__SSR_STATE__=${result.ssrJson}</script>`;
       const templateWithState = template.replace("<!--ssr-state-->", ssrScript);
-      const [headPart, footerPart] =
-        templateWithState.split("<!--ssr-outlet-->");
+      const [headPart, footerPart] = templateWithState.split(
+        "<!--ssr-outlet-->",
+        2,
+      );
 
       const cacheControl = getCachePolicy(url);
 

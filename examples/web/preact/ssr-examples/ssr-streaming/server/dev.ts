@@ -70,7 +70,10 @@ async function startServer(): Promise<void> {
           "<!--defer-bootstrap-->",
           result.deferBootstrap,
         );
-        const [head, tail] = templateWithBootstrap.split("<!--ssr-outlet-->");
+        const [head, tail] = templateWithBootstrap.split(
+          "<!--ssr-outlet-->",
+          2,
+        );
         const finalTail = (tail ?? "").replace("<!--ssr-state-->", stateScript);
 
         response.status(result.statusCode).set("Content-Type", "text/html");

@@ -35,10 +35,12 @@ async function startServer(): Promise<void> {
   // network layer — request.on("close") fires here and increments the
   // counter that the test reads via /__bench/abort-count.
   let abortObserved = 0;
+
   app.get("/__bench/slow-fetch", (request, response) => {
     const timer = setTimeout(() => {
       response.json({ ok: true });
     }, 5000);
+
     request.on("close", () => {
       if (!response.writableEnded) {
         clearTimeout(timer);

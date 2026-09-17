@@ -14,8 +14,8 @@ import { fileURLToPath } from "node:url";
 
 import { UNKNOWN_ROUTE } from "@real-router/core";
 import { cloneRouter } from "@real-router/core/api";
-import { getStaticPaths } from "@real-router/ssr-utils";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
+import { getStaticPaths } from "@real-router/ssr-utils";
 
 import { createBaseRouter } from "../src/router/createBaseRouter";
 import { entries } from "../src/router/entries";

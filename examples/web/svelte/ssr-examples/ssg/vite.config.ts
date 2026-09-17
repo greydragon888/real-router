@@ -7,12 +7,13 @@ function ssgServe(): Plugin {
   return {
     name: "ssg-serve",
     configurePreviewServer(server) {
-      server.middlewares.use((req, res, next) => {
-        const url = req.url ?? "";
+      server.middlewares.use((request, res, next) => {
+        const url = request.url ?? "";
 
         if (!url.endsWith("/") && !extname(url)) {
-          res.writeHead(301, { Location: url + "/" });
+          res.writeHead(301, { Location: `${url}/` });
           res.end();
+
           return;
         }
 

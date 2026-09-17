@@ -108,23 +108,25 @@ test("view-transitions walkthrough → looped GIF", async ({ page, context }) =>
   let lastTimestamp = -Infinity;
 
   for (const frame of frames) {
-    if ((frame.timestamp - lastTimestamp) * 1000 >= MIN_DELAY_MS) {
-      sampled.push(frame);
-      lastTimestamp = frame.timestamp;
+    if (!((frame.timestamp - lastTimestamp) * 1000 >= MIN_DELAY_MS)) {
+      continue;
     }
+
+    sampled.push(frame);
+    lastTimestamp = frame.timestamp;
   }
 
   const encoder = GIFEncoder();
 
   for (let i = 0; i < sampled.length; i++) {
-    const cur = sampled[i];
+    const current = sampled[i];
     const next = sampled[i + 1];
-    const png = PNG.sync.read(cur.buffer);
+    const png = PNG.sync.read(current.buffer);
     const palette = quantize(png.data, 256, { format: "rgb565" });
     const indexed = applyPalette(png.data, palette, "rgb565");
 
     const deltaMs = next
-      ? Math.round((next.timestamp - cur.timestamp) * 1000)
+      ? Math.round((next.timestamp - current.timestamp) * 1000)
       : 150;
     const delay = Math.max(MIN_DELAY_MS, Math.min(MAX_DELAY_MS, deltaMs));
 
