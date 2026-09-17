@@ -162,8 +162,7 @@ export async function mountTestApp(
   const app = createApp(
     defineComponent({
       setup() {
-        return () =>
-          h(RouterProvider, { router }, { default: () => h(App) });
+        return () => h(RouterProvider, { router }, { default: () => h(App) });
       },
     }),
   );
@@ -181,6 +180,7 @@ export async function mountTestApp(
       } else {
         router.forward();
       }
+
       await nextTick();
     },
     unmount: () => {

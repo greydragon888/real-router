@@ -23,6 +23,7 @@ import type { JSX } from "react";
 function SearchLeaf(): JSX.Element {
   const [sp] = useSearchParams();
   const { count, checksum } = readSearch(sp.entries());
+
   return (
     <main data-testid="page-search" data-count={count}>
       {count} search · Σ{checksum}
@@ -54,7 +55,10 @@ const router = createBrowserRouter([
     path: "/",
     Component: Layout,
     children: [
-      { index: true, Component: () => <main data-testid="page-home">Home</main> },
+      {
+        index: true,
+        Component: () => <main data-testid="page-home">Home</main>,
+      },
       ...SEARCH_COUNTS.map((n) => ({ path: `s${n}`, Component: SearchLeaf })),
     ],
   },

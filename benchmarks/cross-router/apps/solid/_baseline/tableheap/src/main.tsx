@@ -3,6 +3,7 @@
 import { render } from "solid-js/web";
 
 const root = document.querySelector("#root");
+
 if (root) {
   render(() => <main data-testid="page-ready">home</main>, root);
 }

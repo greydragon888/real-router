@@ -19,10 +19,14 @@ function Ready(): JSX.Element {
 
 const routes: RouteDefinition[] = [
   { path: "/", component: Ready },
-  ...Array.from({ length: n }, (_, i) => ({ path: `/r${i}`, component: Ready })),
+  ...Array.from({ length: n }, (_, i) => ({
+    path: `/r${i}`,
+    component: Ready,
+  })),
 ];
 
 const root = document.querySelector("#root");
+
 if (root) {
   render(() => <Router>{routes}</Router>, root);
 }

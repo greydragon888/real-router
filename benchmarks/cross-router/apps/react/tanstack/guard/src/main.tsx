@@ -30,7 +30,9 @@ function Editor(): JSX.Element {
         data-testid="btn-save"
         onClick={() => {
           setDirty(false);
-          if (blocker.status === "blocked") blocker.reset();
+          if (blocker.status === "blocked") {
+            blocker.reset();
+          }
         }}
       >
         Save

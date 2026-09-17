@@ -3,6 +3,13 @@
 // ALL links → cost ∝ link count. Driver navigates tab-1 → tab-2.
 // Sweep-aware: link count comes from `?n=` at load (default 100) so the
 // active-links scenario measures 10 / 100 / 1000 links from one app.
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
+
 export const TAB_COUNT = _n > 0 ? _n : 100;
-export const tabs: number[] = Array.from({ length: TAB_COUNT }, (_, i) => i + 1);
+
+export const tabs: number[] = Array.from(
+  { length: TAB_COUNT },
+  (_, i) => i + 1,
+);

@@ -2,17 +2,24 @@
 // (from `?n=`, default 1) with sibling leaves a/b at the bottom. Switching a↔b
 // keeps the D-deep chain mounted; each Outlet swaps only its child.
 import { createRoot } from "react-dom/client";
-import { Link, Outlet, RouterProvider, createBrowserRouter } from "react-router";
+import {
+  Link,
+  Outlet,
+  RouterProvider,
+  createBrowserRouter,
+} from "react-router";
 
 import type { JSX } from "react";
 import type { RouteObject } from "react-router";
 
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
 const DEPTH = _n > 0 ? _n : 1;
 const deepPrefix =
   "/sec" + Array.from({ length: DEPTH - 1 }, (_, i) => `/l${i + 2}`).join("");
 
-function Leaf({ n }: { n: string }): JSX.Element {
+function Leaf({ n }: Readonly<{ n: string }>): JSX.Element {
   return (
     <main data-testid="page-item" data-n={n}>
       <h1>{n}</h1>
@@ -54,6 +61,7 @@ function secSubtree(): RouteObject {
     Component: BottomLayout,
     children,
   };
+
   for (let k = DEPTH - 1; k >= 1; k--) {
     node = {
       path: k === 1 ? "sec" : `l${k}`,
@@ -61,6 +69,7 @@ function secSubtree(): RouteObject {
       children: [node],
     };
   }
+
   return node;
 }
 

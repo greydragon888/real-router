@@ -9,7 +9,9 @@ import App from "./App.svelte";
 
 import type { Route } from "@real-router/core";
 
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
 const COUNT = _n > 0 ? _n : 1000;
 const items: number[] = Array.from({ length: COUNT }, (_, i) => i);
 
@@ -22,10 +24,12 @@ const router = createRouter(routes, {
   defaultRoute: "home",
   allowNotFound: true,
 });
+
 router.usePlugin(browserPluginFactory());
 await router.start();
 
 const rootElement = document.querySelector("#root");
+
 if (rootElement) {
   mount(App, { target: rootElement, props: { router } });
 }

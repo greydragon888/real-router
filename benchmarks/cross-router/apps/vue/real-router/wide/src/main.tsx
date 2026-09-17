@@ -26,13 +26,19 @@ await router.start();
 const App = defineComponent({
   setup() {
     const { route } = useRoute();
+
     return () => {
       const { name } = route.value;
+
       return (
         <>
           <nav>
             {WIDE_TARGETS.map((n) => (
-              <Link key={n} routeName={`item${n}`} data-testid={`link-item-${n}`}>
+              <Link
+                key={n}
+                routeName={`item${n}`}
+                data-testid={`link-item-${n}`}
+              >
                 Item {n}
               </Link>
             ))}

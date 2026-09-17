@@ -19,7 +19,12 @@ const rootRoute = createRootRoute({
       <>
         <nav>
           {tabs.map((i) => (
-            <Link key={i} to="/tab/$i" params={{ i: String(i) }} data-testid={`link-tab-${i}`}>
+            <Link
+              key={i}
+              to="/tab/$i"
+              params={{ i: String(i) }}
+              data-testid={`link-tab-${i}`}
+            >
               Tab {i}
             </Link>
           ))}
@@ -33,15 +38,19 @@ const rootRoute = createRootRoute({
 const homeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  component: defineComponent({ setup: () => () => <main data-testid="page-home">Home</main> }),
+  component: defineComponent({
+    setup: () => () => <main data-testid="page-home">Home</main>,
+  }),
 });
 
+/* eslint-disable @typescript-eslint/no-unsafe-member-access -- TanStack types these hooks through a registered router, and registration is global to the TypeScript program: this cohort's shells share one tsconfig, so each would take the others' routes (TS2717) */
 const tabRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/tab/$i",
   component: defineComponent({
     setup() {
       const params = useParams({ strict: false });
+
       return () => (
         <main data-testid="page-tab" data-n={String(params.value.i)}>
           Tab {params.value.i}
@@ -54,6 +63,8 @@ const tabRoute = createRoute({
 const routeTree = rootRoute.addChildren([homeRoute, tabRoute]);
 const router = createRouter({ routeTree });
 
-const App = defineComponent({ setup: () => () => h(RouterProvider, { router }) });
+const App = defineComponent({
+  setup: () => () => h(RouterProvider, { router }),
+});
 
 createApp(App).mount("#root");

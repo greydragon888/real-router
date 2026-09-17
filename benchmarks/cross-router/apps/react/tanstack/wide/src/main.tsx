@@ -18,7 +18,11 @@ function Root() {
     <>
       <nav>
         {WIDE_TARGETS.map((n) => (
-          <Link key={n} to={`/catalog/item-${n}`} data-testid={`link-item-${n}`}>
+          <Link
+            key={n}
+            to={`/catalog/item-${n}`}
+            data-testid={`link-item-${n}`}
+          >
             Item {n}
           </Link>
         ))}

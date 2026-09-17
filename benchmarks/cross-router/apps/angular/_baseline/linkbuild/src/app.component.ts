@@ -1,6 +1,8 @@
 import { Component, signal } from "@angular/core";
 
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
 
 // _baseline linkbuild — 1000 plain <a>, NO router. The FLOOR for link-build:
 // raw <a> render cost (href is a literal, no reverse-matcher).

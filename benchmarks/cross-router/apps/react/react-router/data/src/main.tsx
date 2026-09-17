@@ -25,7 +25,8 @@ function Layout(): JSX.Element {
 }
 
 function DataPage(): JSX.Element {
-  const loaded = useLoaderData() as { value: string };
+  const loaded = useLoaderData<{ value: string }>();
+
   return <main data-testid="loaded-value">{loaded.value}</main>;
 }
 
@@ -34,7 +35,10 @@ const router = createBrowserRouter([
     path: "/",
     Component: Layout,
     children: [
-      { index: true, Component: () => <main data-testid="page-home">Home</main> },
+      {
+        index: true,
+        Component: () => <main data-testid="page-home">Home</main>,
+      },
       {
         path: "data",
         loader: async () => ({ value: "loaded-42" }),

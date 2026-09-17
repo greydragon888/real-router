@@ -45,7 +45,7 @@ const routes: Route[] = [
 
 const indices = [0, 1, 2, 3, 4];
 
-function RootSubscriber({ index }: { index: number }) {
+function RootSubscriber({ index }: Readonly<{ index: number }>) {
   const { route } = useRoute();
 
   return (
@@ -55,7 +55,7 @@ function RootSubscriber({ index }: { index: number }) {
   );
 }
 
-function ItemsSubscriber({ index }: { index: number }) {
+function ItemsSubscriber({ index }: Readonly<{ index: number }>) {
   const { route } = useRouteNode("items");
 
   return (

@@ -48,6 +48,7 @@ export async function mountTestApp(
       } else {
         router.forward();
       }
+
       flushSync();
     },
     unmount: () => {

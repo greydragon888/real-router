@@ -22,9 +22,11 @@ import {
 
 import type { JSX } from "react";
 
+/* eslint-disable @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment -- TanStack types these hooks through a registered router, and registration is global to the TypeScript program: this cohort's shells share one tsconfig, so each would take the others' routes (TS2717) */
 function SearchLeaf(): JSX.Element {
   const search = useSearch({ strict: false });
   const { count, checksum } = readSearch(Object.entries(search));
+
   return (
     <main data-testid="page-search" data-count={count}>
       {count} search · Σ{checksum}

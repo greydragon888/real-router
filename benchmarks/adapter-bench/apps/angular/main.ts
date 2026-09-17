@@ -57,8 +57,7 @@ class RootSubscriberComponent {
 })
 class ItemsSubscriberComponent {
   readonly node = injectRouteNode("items");
-  readonly id = () =>
-    String(this.node.routeState().route?.params["id"] ?? "");
+  readonly id = () => String(this.node.routeState().route?.params["id"] ?? "");
   index = 0;
 }
 
@@ -167,6 +166,7 @@ export async function mountTestApp(
       } else {
         router.forward();
       }
+
       appRef.tick();
     },
     unmount: () => {

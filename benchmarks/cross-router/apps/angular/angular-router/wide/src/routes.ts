@@ -13,6 +13,7 @@ export const routes: Routes = [
   { path: "", component: HomeComponent },
   ...Array.from({ length: WIDE_COUNT }, (_, i) => {
     const n = i + 1;
+
     return {
       path: `catalog/item-${n}`,
       component: CatalogItemComponent,

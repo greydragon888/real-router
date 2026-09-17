@@ -33,21 +33,36 @@ const rootRoute = createRootRoute({
   }),
 });
 
-const homeRoute = createRoute({ getParentRoute: () => rootRoute, path: "/", component: Home });
-const aboutRoute = createRoute({ getParentRoute: () => rootRoute, path: "/about", component: About });
+const homeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/",
+  component: Home,
+});
+const aboutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/about",
+  component: About,
+});
+/* eslint-disable @typescript-eslint/no-unsafe-member-access -- TanStack types these hooks through a registered router, and registration is global to the TypeScript program: this cohort's shells share one tsconfig, so each would take the others' routes (TS2717) */
 const userRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/users/$id",
   component: defineComponent({
     setup() {
       const params = useParams({ strict: false });
+
       return () => {
         const id = String(params.value.id);
         const next = String(Number(id) + 1);
+
         return (
           <>
             <User id={id} />
-            <Link to="/users/$id" params={{ id: next }} data-testid="link-user-next">
+            <Link
+              to="/users/$id"
+              params={{ id: next }}
+              data-testid="link-user-next"
+            >
               Next
             </Link>
           </>
@@ -60,6 +75,8 @@ const userRoute = createRoute({
 const routeTree = rootRoute.addChildren([homeRoute, aboutRoute, userRoute]);
 const router = createRouter({ routeTree });
 
-const App = defineComponent({ setup: () => () => h(RouterProvider, { router }) });
+const App = defineComponent({
+  setup: () => () => h(RouterProvider, { router }),
+});
 
 createApp(App).mount("#root");

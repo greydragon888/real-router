@@ -10,7 +10,9 @@ import {
 } from "@tanstack/vue-router";
 import { createApp, defineComponent, h, ref } from "vue";
 
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
 const COUNT = _n > 0 ? _n : 1000;
 
 const rootRoute = createRootRoute({
@@ -23,9 +25,15 @@ const homeRoute = createRoute({
   component: defineComponent({
     setup() {
       const show = ref(false);
+
       return () => (
         <>
-          <button data-testid="mount-links" onClick={() => { show.value = true; }}>
+          <button
+            data-testid="mount-links"
+            onClick={() => {
+              show.value = true;
+            }}
+          >
             mount
           </button>
           <main data-testid="page-ready">{show.value ? "shown" : "idle"}</main>
@@ -59,6 +67,8 @@ const rRoutes = Array.from({ length: COUNT }, (_, i) =>
 const routeTree = rootRoute.addChildren([homeRoute, ...rRoutes]);
 const router = createRouter({ routeTree });
 
-const App = defineComponent({ setup: () => () => h(RouterProvider, { router }) });
+const App = defineComponent({
+  setup: () => () => h(RouterProvider, { router }),
+});
 
 createApp(App).mount("#root");

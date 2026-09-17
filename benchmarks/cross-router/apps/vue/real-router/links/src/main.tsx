@@ -33,9 +33,11 @@ await router.start();
 const TabMain = defineComponent({
   setup() {
     const { route } = useRoute();
+
     return () => {
       const { name } = route.value;
       const n = name.startsWith("tab") ? name.slice(3) : "";
+
       return n ? (
         <main data-testid="page-tab" data-n={n}>
           Tab {n}

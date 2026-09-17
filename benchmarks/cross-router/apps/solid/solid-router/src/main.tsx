@@ -7,7 +7,7 @@ import { About, Home, User } from "../../_shared/pages";
 
 import type { JSX } from "solid-js";
 
-function Layout(props: { children?: JSX.Element }): JSX.Element {
+function Layout(props: Readonly<{ children?: JSX.Element }>): JSX.Element {
   return (
     <>
       <nav>
@@ -26,13 +26,11 @@ function Layout(props: { children?: JSX.Element }): JSX.Element {
 
 function UserRoute(): JSX.Element {
   const params = useParams();
+
   return (
     <>
       <User id={params.id ?? ""} />
-      <A
-        href={`/users/${Number(params.id) + 1}`}
-        data-testid="link-user-next"
-      >
+      <A href={`/users/${Number(params.id) + 1}`} data-testid="link-user-next">
         Next
       </A>
     </>
@@ -40,6 +38,7 @@ function UserRoute(): JSX.Element {
 }
 
 const root = document.querySelector("#root");
+
 if (root) {
   render(
     () => (

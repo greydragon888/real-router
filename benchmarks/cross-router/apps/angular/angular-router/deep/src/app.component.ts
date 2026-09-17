@@ -9,7 +9,11 @@ import { DEEP_TARGETS } from "./routes";
 // URL path to depth d: /deep/l1/l2/.../ld
 function deepPath(d: number): string {
   let p = "/deep";
-  for (let i = 1; i <= d; i++) p += `/l${i}`;
+
+  for (let i = 1; i <= d; i++) {
+    p += `/l${i}`;
+  }
+
   return p;
 }
 

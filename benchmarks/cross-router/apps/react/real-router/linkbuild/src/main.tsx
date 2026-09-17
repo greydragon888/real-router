@@ -10,12 +10,17 @@ import { createRoot } from "react-dom/client";
 import type { Route } from "@real-router/core";
 import type { JSX } from "react";
 
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
 const COUNT = _n > 0 ? _n : 1000;
 
 const routes: Route[] = [
   { name: "home", path: "/" },
-  ...Array.from({ length: COUNT }, (_, i) => ({ name: `r${i}`, path: `/r${i}` })),
+  ...Array.from({ length: COUNT }, (_, i) => ({
+    name: `r${i}`,
+    path: `/r${i}`,
+  })),
 ];
 
 const router = createRouter(routes, {
@@ -29,6 +34,7 @@ await router.start();
 
 function App(): JSX.Element {
   const [show, setShow] = useState(false);
+
   return (
     <>
       <button data-testid="mount-links" onClick={() => setShow(true)}>

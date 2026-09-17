@@ -10,7 +10,7 @@ import { render } from "solid-js/web";
 
 import {
   SEARCH_COUNTS,
-  searchDecl,
+  searchDeclaration,
   searchValues,
   readSearch,
 } from "../../../_shared/search-param-spec";
@@ -20,7 +20,10 @@ import type { JSX } from "solid-js";
 
 const routes: Route[] = [
   { name: "home", path: "/" },
-  ...SEARCH_COUNTS.map((n) => ({ name: `s${n}`, path: `/s${n}${searchDecl(n)}` })),
+  ...SEARCH_COUNTS.map((n) => ({
+    name: `s${n}`,
+    path: `/s${n}${searchDeclaration(n)}`,
+  })),
 ];
 
 const router = createRouter(routes, {
@@ -34,7 +37,10 @@ await router.start();
 
 function SearchLeaf(): JSX.Element {
   const state = useRoute();
-  const info = createMemo(() => readSearch(Object.entries(state().route.search)));
+  const info = createMemo(() =>
+    readSearch(Object.entries(state().route.search)),
+  );
+
   return (
     <main data-testid="page-search" data-count={info().count}>
       {info().count} search · Σ{info().checksum}

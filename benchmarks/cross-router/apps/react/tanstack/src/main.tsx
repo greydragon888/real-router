@@ -46,6 +46,7 @@ const userRoute = createRoute({
   component: UserRoute,
 });
 
+/* eslint-disable @typescript-eslint/no-unsafe-assignment -- TanStack types these hooks through a registered router, and registration is global to the TypeScript program: this cohort's shells share one tsconfig, so each would take the others' routes (TS2717) */
 function UserRoute() {
   const { id } = userRoute.useParams();
   const next = String(Number(id) + 1);

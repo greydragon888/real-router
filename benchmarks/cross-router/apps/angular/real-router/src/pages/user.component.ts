@@ -7,7 +7,9 @@ import { injectRoute, RealLink } from "@real-router/angular";
   selector: "user-page",
   imports: [RealLink],
   template: `
-    <main data-testid="page-user" [attr.data-id]="id()"><h1>User {{ id() }}</h1></main>
+    <main data-testid="page-user" [attr.data-id]="id()">
+      <h1>User {{ id() }}</h1>
+    </main>
     <a
       realLink
       routeName="user"

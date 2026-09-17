@@ -13,7 +13,9 @@ import type { Routes } from "sv-router";
 
 const routes = {
   "/": Home,
-  ...Object.fromEntries(wideItems.map((n) => [`/catalog/item-${n}`, ItemRoute])),
+  ...Object.fromEntries(
+    wideItems.map((n) => [`/catalog/item-${n}`, ItemRoute]),
+  ),
 } as unknown as Routes;
 
 export const { p, navigate, route } = createRouter(routes);

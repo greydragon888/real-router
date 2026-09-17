@@ -40,6 +40,7 @@ function App(): JSX.Element {
 }
 
 const root = document.querySelector("#root");
+
 if (root) {
   render(() => <App />, root);
 }

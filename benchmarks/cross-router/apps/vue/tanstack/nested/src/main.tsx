@@ -11,7 +11,9 @@ import {
 } from "@tanstack/vue-router";
 import { createApp, defineComponent, h } from "vue";
 
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
 const DEPTH = _n > 0 ? _n : 1;
 const deepPrefix =
   "/sec" + Array.from({ length: DEPTH - 1 }, (_, i) => `/l${i + 2}`).join("");
@@ -66,10 +68,10 @@ const homeRoute = createRoute({
   }),
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -- the chain is built to a runtime depth, which TanStack's recursive Route generics cannot type */
 const levels: any[] = [];
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let parent: any = rootRoute;
+
 for (let k = 1; k <= DEPTH; k++) {
   const p = parent;
   const route = createRoute({
@@ -77,9 +79,11 @@ for (let k = 1; k <= DEPTH; k++) {
     path: k === 1 ? "sec" : `l${k}`,
     component: k === DEPTH ? BottomLayout : PassLayout,
   });
+
   levels.push(route);
   parent = route;
 }
+
 const bottom = levels[levels.length - 1];
 const aRoute = createRoute({
   getParentRoute: () => bottom,
@@ -91,13 +95,18 @@ const bRoute = createRoute({
   path: "b",
   component: defineComponent({ setup: () => () => <Leaf n="b" /> }),
 });
+
 bottom.addChildren([aRoute, bRoute]);
-for (let k = 0; k < levels.length - 1; k++) levels[k].addChildren([levels[k + 1]]);
+for (let k = 0; k < levels.length - 1; k++) {
+  levels[k].addChildren([levels[k + 1]]);
+}
 
 const router = createRouter({
   routeTree: rootRoute.addChildren([homeRoute, levels[0]]),
 });
 
-const App = defineComponent({ setup: () => () => h(RouterProvider, { router }) });
+const App = defineComponent({
+  setup: () => () => h(RouterProvider, { router }),
+});
 
 createApp(App).mount("#root");

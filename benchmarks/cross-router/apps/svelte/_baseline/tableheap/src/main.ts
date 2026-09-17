@@ -4,7 +4,8 @@ import { mount } from "svelte";
 
 import App from "./App.svelte";
 
-const el = document.querySelector("#root");
-if (el) {
-  mount(App, { target: el });
+const element = document.querySelector("#root");
+
+if (element) {
+  mount(App, { target: element });
 }

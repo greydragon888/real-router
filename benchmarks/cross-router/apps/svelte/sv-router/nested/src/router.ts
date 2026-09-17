@@ -10,17 +10,20 @@ import SecA from "./SecA.svelte";
 import SecB from "./SecB.svelte";
 import SectionLayout from "./SectionLayout.svelte";
 
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
 const DEPTH = _n > 0 ? _n : 1;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment -- the route map nests to a runtime depth, so it is built as `any` */
 function buildSec(): any {
   // deepest level owns the nav + a/b leaves
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let node: any = { layout: SectionLayout, "/a": SecA, "/b": SecB };
+
   for (let k = DEPTH - 1; k >= 1; k--) {
     node = { layout: PassLayout, [`/l${k + 1}`]: node };
   }
+
   return node;
 }
 

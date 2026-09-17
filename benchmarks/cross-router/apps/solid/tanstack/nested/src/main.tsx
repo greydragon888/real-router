@@ -14,12 +14,14 @@ import { render } from "solid-js/web";
 
 import type { JSX } from "solid-js";
 
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
 const DEPTH = _n > 0 ? _n : 1;
 const deepPrefix =
   "/sec" + Array.from({ length: DEPTH - 1 }, (_, i) => `/l${i + 2}`).join("");
 
-function Leaf(props: { n: string }): JSX.Element {
+function Leaf(props: Readonly<{ n: string }>): JSX.Element {
   return (
     <main data-testid="page-item" data-n={props.n}>
       <h1>{props.n}</h1>
@@ -62,10 +64,10 @@ const indexRoute = createRoute({
   ),
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -- the chain is built to a runtime depth, which TanStack's recursive Route generics cannot type */
 const levels: any[] = [];
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let parent: any = rootRoute;
+
 for (let k = 1; k <= DEPTH; k++) {
   const p = parent;
   const route = createRoute({
@@ -73,9 +75,11 @@ for (let k = 1; k <= DEPTH; k++) {
     path: k === 1 ? "/sec" : `l${k}`,
     component: k === DEPTH ? BottomLayout : PassLayout,
   });
+
   levels.push(route);
   parent = route;
 }
+
 const bottom = levels[levels.length - 1];
 const aRoute = createRoute({
   getParentRoute: () => bottom,
@@ -87,8 +91,11 @@ const bRoute = createRoute({
   path: "b",
   component: () => <Leaf n="b" />,
 });
+
 bottom.addChildren([aRoute, bRoute]);
-for (let k = 0; k < levels.length - 1; k++) levels[k].addChildren([levels[k + 1]]);
+for (let k = 0; k < levels.length - 1; k++) {
+  levels[k].addChildren([levels[k + 1]]);
+}
 
 const router = createRouter({
   routeTree: rootRoute.addChildren([indexRoute, levels[0]]),
@@ -96,6 +103,7 @@ const router = createRouter({
 });
 
 const root = document.querySelector("#root");
+
 if (root) {
   render(() => <RouterProvider router={router} />, root);
 }

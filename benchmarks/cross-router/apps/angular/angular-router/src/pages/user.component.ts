@@ -6,7 +6,9 @@ import { RouterLink } from "@angular/router";
   selector: "user-page",
   imports: [RouterLink],
   template: `
-    <main data-testid="page-user" [attr.data-id]="id()"><h1>User {{ id() }}</h1></main>
+    <main data-testid="page-user" [attr.data-id]="id()">
+      <h1>User {{ id() }}</h1>
+    </main>
     <a [routerLink]="['/users', nextId()]" data-testid="link-user-next">Next</a>
   `,
 })

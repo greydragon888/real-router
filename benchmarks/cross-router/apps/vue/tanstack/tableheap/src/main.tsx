@@ -37,6 +37,8 @@ const rRoutes = Array.from({ length: n }, (_, i) =>
 const routeTree = rootRoute.addChildren([readyRoute, ...rRoutes]);
 const router = createRouter({ routeTree });
 
-const App = defineComponent({ setup: () => () => h(RouterProvider, { router }) });
+const App = defineComponent({
+  setup: () => () => h(RouterProvider, { router }),
+});
 
 createApp(App).mount("#root");

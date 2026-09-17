@@ -43,9 +43,10 @@ await router.start();
 // materialize prop values). Capturing here makes each level O(1) → the curve
 // reflects the router, not the app. (Navigation mounts a NEW Level per depth,
 // so a level's k/name never change in place — capturing loses no reactivity.)
-function Level(props: { k: number; name: string }): JSX.Element {
+function Level(props: Readonly<{ k: number; name: string }>): JSX.Element {
   const k = props.k;
   const name = props.name;
+
   return (
     <div class="lvl">
       <RouteView nodeName={name}>

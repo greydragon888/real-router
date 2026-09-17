@@ -14,6 +14,7 @@ import { tabs } from "../../../_shared/links-spec";
 const TabPage = defineComponent({
   setup() {
     const route = useRoute();
+
     return () => (
       <main data-testid="page-tab" data-n={String(route.params.i)}>
         Tab {route.params.i}
@@ -25,7 +26,12 @@ const TabPage = defineComponent({
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: "/", component: defineComponent({ setup: () => () => <main data-testid="page-home">Home</main> }) },
+    {
+      path: "/",
+      component: defineComponent({
+        setup: () => () => <main data-testid="page-home">Home</main>,
+      }),
+    },
     { path: "/tab/:i", component: TabPage },
   ],
 });

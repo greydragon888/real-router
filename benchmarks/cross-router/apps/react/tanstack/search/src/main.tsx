@@ -15,8 +15,10 @@ import type { JSX } from "react";
 
 const searchSchema = z.object({ n: z.coerce.number().default(1) });
 
+/* eslint-disable @typescript-eslint/no-unsafe-assignment -- TanStack types these hooks through a registered router, and registration is global to the TypeScript program: this cohort's shells share one tsconfig, so each would take the others' routes (TS2717) */
 function SearchPage(): JSX.Element {
   const { n } = searchRoute.useSearch();
+
   return (
     <main>
       <span data-testid="validated-n">{String(n)}</span>

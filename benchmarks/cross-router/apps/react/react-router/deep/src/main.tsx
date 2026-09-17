@@ -2,7 +2,12 @@
 // level is a layout (Outlet) with [index leaf, next level]. Root "/" has no
 // Component → renders an implicit <Outlet/>.
 import { createRoot } from "react-dom/client";
-import { Link, Outlet, RouterProvider, createBrowserRouter } from "react-router";
+import {
+  Link,
+  Outlet,
+  RouterProvider,
+  createBrowserRouter,
+} from "react-router";
 
 import { CatalogItem } from "../../../_shared/pages";
 import { DEEP_DEPTH, DEEP_TARGETS, deepPath } from "../../../_shared/deep-spec";
@@ -22,7 +27,11 @@ function buildLevel(k: number): RouteObject {
   const children: RouteObject[] = [
     { index: true, Component: () => <CatalogItem n={String(k)} /> },
   ];
-  if (k < DEEP_DEPTH) children.push(buildLevel(k + 1));
+
+  if (k < DEEP_DEPTH) {
+    children.push(buildLevel(k + 1));
+  }
+
   return { path: `l${k}`, Component: LevelLayout, children };
 }
 

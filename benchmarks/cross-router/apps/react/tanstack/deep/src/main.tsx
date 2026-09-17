@@ -58,8 +58,13 @@ function buildLevel(k: number, parent: AnyRoute): AnyRoute {
     component: () => <CatalogItem n={String(k)} />,
   });
   const children: AnyRoute[] = [leaf];
-  if (k < DEEP_DEPTH) children.push(buildLevel(k + 1, route));
+
+  if (k < DEEP_DEPTH) {
+    children.push(buildLevel(k + 1, route));
+  }
+
   route.addChildren(children);
+
   return route;
 }
 

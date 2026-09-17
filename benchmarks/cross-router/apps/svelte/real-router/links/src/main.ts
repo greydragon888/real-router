@@ -19,10 +19,12 @@ const router = createRouter(routes, {
   defaultRoute: "home",
   allowNotFound: true,
 });
+
 router.usePlugin(browserPluginFactory());
 await router.start();
 
 const rootElement = document.querySelector("#root");
+
 if (rootElement) {
   mount(App, { target: rootElement, props: { router } });
 }

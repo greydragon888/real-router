@@ -1,6 +1,11 @@
 // react-router v8 (Data mode) wide variant — 1000 flat sibling child routes.
 import { createRoot } from "react-dom/client";
-import { Link, Outlet, RouterProvider, createBrowserRouter } from "react-router";
+import {
+  Link,
+  Outlet,
+  RouterProvider,
+  createBrowserRouter,
+} from "react-router";
 
 import { CatalogItem } from "../../../_shared/pages";
 import { WIDE_TARGETS, wideItems } from "../../../_shared/wide-spec";
@@ -12,7 +17,11 @@ function Layout(): JSX.Element {
     <>
       <nav>
         {WIDE_TARGETS.map((n) => (
-          <Link key={n} to={`/catalog/item-${n}`} data-testid={`link-item-${n}`}>
+          <Link
+            key={n}
+            to={`/catalog/item-${n}`}
+            data-testid={`link-item-${n}`}
+          >
             Item {n}
           </Link>
         ))}

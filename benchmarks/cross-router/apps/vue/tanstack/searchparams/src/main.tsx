@@ -18,11 +18,14 @@ import {
   readSearch,
 } from "../../../_shared/search-param-spec";
 
+/* eslint-disable @typescript-eslint/no-unsafe-argument -- TanStack types these hooks through a registered router, and registration is global to the TypeScript program: this cohort's shells share one tsconfig, so each would take the others' routes (TS2717) */
 const SearchLeaf = defineComponent({
   setup() {
     const search = useSearch({ strict: false });
+
     return () => {
       const { count, checksum } = readSearch(Object.entries(search.value));
+
       return (
         <main data-testid="page-search" data-count={count}>
           {count} search · Σ{checksum}
@@ -74,6 +77,8 @@ const searchRoutes = SEARCH_COUNTS.map((n) =>
 const routeTree = rootRoute.addChildren([homeRoute, ...searchRoutes]);
 const router = createRouter({ routeTree });
 
-const App = defineComponent({ setup: () => () => h(RouterProvider, { router }) });
+const App = defineComponent({
+  setup: () => () => h(RouterProvider, { router }),
+});
 
 createApp(App).mount("#root");

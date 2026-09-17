@@ -7,12 +7,17 @@ import { createApp, defineComponent, h, ref } from "vue";
 
 import type { Route } from "@real-router/core";
 
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
 const COUNT = _n > 0 ? _n : 1000;
 
 const routes: Route[] = [
   { name: "home", path: "/" },
-  ...Array.from({ length: COUNT }, (_, i) => ({ name: `r${i}`, path: `/r${i}` })),
+  ...Array.from({ length: COUNT }, (_, i) => ({
+    name: `r${i}`,
+    path: `/r${i}`,
+  })),
 ];
 
 const router = createRouter(routes, {
@@ -27,9 +32,15 @@ await router.start();
 const App = defineComponent({
   setup() {
     const show = ref(false);
+
     return () => (
       <>
-        <button data-testid="mount-links" onClick={() => { show.value = true; }}>
+        <button
+          data-testid="mount-links"
+          onClick={() => {
+            show.value = true;
+          }}
+        >
           mount
         </button>
         <main data-testid="page-ready">{show.value ? "shown" : "idle"}</main>

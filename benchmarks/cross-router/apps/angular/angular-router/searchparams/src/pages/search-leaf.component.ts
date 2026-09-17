@@ -11,11 +11,16 @@ function readSearch(entries: Iterable<[string, unknown]>): {
 } {
   let count = 0;
   let checksum = 0;
+
   for (const [k, v] of entries) {
-    if (!/^k\d+$/.test(k)) continue;
+    if (!/^k\d+$/.test(k)) {
+      continue;
+    }
+
     count += 1;
     checksum += String(v).length;
   }
+
   return { count, checksum };
 }
 

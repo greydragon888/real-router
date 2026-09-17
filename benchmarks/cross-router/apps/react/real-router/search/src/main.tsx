@@ -34,6 +34,7 @@ await router.start();
 function SearchPage(): JSX.Element {
   const { route } = useRoute();
   const n = route.search.n as number;
+
   return (
     <main>
       <span data-testid="validated-n">{String(n)}</span>

@@ -15,13 +15,18 @@ const App = defineComponent({
       history.pushState(null, "", path);
       view.value = v;
     };
+
     return () => (
       <>
         <nav>
           <a href="/" data-testid="link-home" onClick={go("home", "/")}>
             Home
           </a>
-          <a href="/about" data-testid="link-about" onClick={go("about", "/about")}>
+          <a
+            href="/about"
+            data-testid="link-about"
+            onClick={go("about", "/about")}
+          >
             About
           </a>
         </nav>

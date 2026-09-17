@@ -22,7 +22,7 @@ import {
 
 import type { MountTestApp } from "../shared/bench-utils.mjs";
 
-type AppModule = { mountTestApp: MountTestApp };
+interface AppModule { mountTestApp: MountTestApp }
 
 const { mountTestApp } = (await import(
   // @ts-expect-error -- vite prebuild artifact, no declarations

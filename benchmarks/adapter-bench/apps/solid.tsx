@@ -33,7 +33,7 @@ const routes: Route[] = [
 
 const indices = [0, 1, 2, 3, 4];
 
-function RootSubscriber(props: { index: number }) {
+function RootSubscriber(props: Readonly<{ index: number }>) {
   const state = useRoute();
 
   return (
@@ -43,14 +43,11 @@ function RootSubscriber(props: { index: number }) {
   );
 }
 
-function ItemsSubscriber(props: { index: number }) {
+function ItemsSubscriber(props: Readonly<{ index: number }>) {
   const state = useRouteNode("items");
 
   return (
-    <span
-      data-i={props.index}
-      data-id={String(state().route?.params.id ?? "")}
-    >
+    <span data-i={props.index} data-id={String(state().route?.params.id ?? "")}>
       {props.index}
     </span>
   );
