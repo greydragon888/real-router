@@ -1,0 +1,72 @@
+name: Examples Lint
+
+# Each push to master, asked what `ci.yml`'s `examples-lint` job asks of a PR:
+# which examples and benchmarks does it reach from OUTSIDE them (#2402)? A
+# direct push reaches master without a PR, and without this nothing but the
+# next pre-push lints what it moved.
+#
+# ⚠ Its own workflow, not a job in post-merge.yml. `changesets.yml` runs only
+# after a SUCCESSFUL Post-Merge Build, so a red lint there would hold a release.
+on:
+  push:
+    branches: [master]
+
+# ⚠ No concurrency group. Each run plans only its own push, `before..after`;
+# a cancelled run would leave that range unlinted, and the next push's range
+# starts after it.
+
+permissions:
+  contents: read
+
+# Self-hosted ducktors/turborepo-remote-cache on Cloud Run + Cloudflare R2 (#490)
+env:
+  TURBO_API: ${{ vars.TURBO_API }}
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    outputs:
+      filter: ${{ steps.plan.outputs.examples_lint_filter }}
+      reasons: ${{ steps.plan.outputs.examples_lint_reasons }}
+    steps:
+      # Full history: `before` is the previous tip, any number of commits back.
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # turbo ships its binary through optionalDependencies, with no postinstall.
+      - name: Setup (pnpm + Node + minimal install)
+        uses: ./.github/actions/setup
+        with:
+          install-args: --frozen-lockfile --ignore-scripts
+
+      - name: Plan examples lint
+        id: plan
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: node scripts/examples-lint-filter.mjs "$BEFORE" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+
+  lint:
+    name: Examples lint (outside changes)
+    runs-on: ubuntu-latest
+    needs: [plan]
+    if: needs.plan.outputs.filter != ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup (pnpm + Node + install)
+        uses: ./.github/actions/setup
+
+      # Unquoted on purpose: one `--filter=<pkg>` token per workspace.
+      - name: Lint examples and benchmarks
+        env:
+          EXAMPLES_LINT_FILTER: ${{ needs.plan.outputs.filter }}
+          EXAMPLES_LINT_REASONS: ${{ needs.plan.outputs.reasons }}
+        run: |
+          echo "Reached from outside — turbo's reasons: $EXAMPLES_LINT_REASONS"
+          pnpm turbo run lint:example lint:bench $EXAMPLES_LINT_FILTER

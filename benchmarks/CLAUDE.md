@@ -95,7 +95,8 @@ pnpm cpu                # Check CPU load before benchmarking (run from benchmark
 ```
 
 `lint:bench` is ESLint over this whole tree, and pre-push runs it after its
-build. Run it through turbo — `pnpm turbo run lint:bench --filter=router-benchmarks`
+build. CI runs it too when a lockfile or global-input change reaches the tree,
+such as an ESLint bump (#2402). Run it through turbo — `pnpm turbo run lint:bench --filter=router-benchmarks`
 — because the Angular apps resolve `@real-router/*` through `dist/`, which
 `^bundle` builds first.
 

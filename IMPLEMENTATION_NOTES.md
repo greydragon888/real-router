@@ -2,6 +2,68 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## CI lints the examples and benchmarks a change reaches from outside them, by turbo's attribution (#2402, 2026-09-17)
+
+**Problem.** The only CI job that linted examples, "Examples (affected)", builds
+the examples a PR edits. `lint:bench` ran in no workflow, and `post-merge.yml`
+filters examples out. A change outside them — an ESLint bump, the root
+`eslint.config.mjs` — edits none, so nothing in CI linted what it moved. On
+2026-09-17 a direct push carrying typescript-eslint 8.70.0 left `lint:example`
+red on `master`; #2395's CI then ran on a merge commit containing it, skipped
+"Examples (affected)", and passed. The next pre-push, on a branch that did not
+touch the failing file, was the first thing to fail.
+
+**Solution.**
+
+- `scripts/examples-lint-filter.mjs <base> <head>` prints a `--filter=<pkg>`
+  token for every workspace with `lint:example` or `lint:bench` that turbo's
+  `query affected --packages` reports for a reason other than `FileChanged` (the
+  range edits it) or `DependencyChanged` (a library under it changed).
+- `ci.yml`: the `check` job plans over `HEAD^1..HEAD` of the PR's merge commit,
+  and `examples-lint` runs `turbo run lint:example lint:bench` with the filter.
+  It sits in `CI Result`'s `needs`, skippable like `examples-build`.
+- `examples-lint.yml` plans and lints the same way over each push to `master`,
+  `before..after`.
+
+**Why turbo's reason, not a list of root files.** A list cannot tell a bump from
+a script edit in `package.json`; turbo reads the lockfile. Measured on
+`master`: the eslint 10.7.0 → 10.10.0 bump (`f9915f567`, `package.json` and
+lockfile only) comes back `LockfileChanged` for all 144 lint workspaces; an edit
+to the root `eslint.config.mjs` or `tsconfig.json` `GlobalDepsChanged`; to
+`turbo.json` `DefaultGlobalFileChanged`; a script edit in `package.json` or a
+README edit nothing; `packages/core` edits `DependencyChanged`. Local reasons
+are the ones excluded, so a reason a later turbo adds lints — erring toward a
+run that passes — and a test checks turbo's schema still emits both local ones.
+
+**Why `affectedPackages`, not `affectedTasks`.** On turbo 2.10.13 a one-line edit
+to one example reports all 143 `lint:example` tasks as `TaskFileChanged` naming
+that file, and a task keeps the first reason it is given, so a lockfile change
+in the same range reads as a file change. Package-level reasons report that
+edit on one workspace.
+
+**Why its own workflow on `master`.** `changesets.yml` releases only after a
+successful Post-Merge Build, so a red lint job in `post-merge.yml` would hold a
+release. There is no concurrency group: each run plans only its own push, and a
+cancelled one would leave that range unplanned.
+
+**Cost, measured.** Over the last 120 first-parent commits on `master`
+(2026-09-13 to 09-17) the plan is non-empty for 19, 108 to 144 workspaces each;
+17 of them change the lockfile, the other two `turbo.json`. A cold `lint:example` over every
+example took 2m56s on #2370's branch. The other 101 cost the plan step.
+
+**Not covered.** A library change breaking an example stays `examples.yml`'s, as
+"Examples (affected)" records. An edit inside `benchmarks/` is `FileChanged`,
+so `lint:bench` still meets it only in pre-push. The root `.gitignore`, which
+`eslint.config.mjs` imports, is in no lint task's inputs, and turbo attributes
+an edit to it to no lint task.
+
+**Verified.** Eight tests; each of six mutants fails at least one (local reasons
+moved or renamed, the lint-task check dropped, an allow-list instead of a
+deny-list, the missing-data throw removed). `ci-gate-completeness` fails with
+`examples-lint` dropped from `needs`. The filter planned for `f9915f567` gives
+`turbo run --dry=json` the same 144 lint tasks as the pre-push line. `actionlint`
+at CI's severity reports nothing.
+
 ## The Bundle Size base is picked by commit, not by the first run the API lists (#2396, 2026-09-17)
 
 **Problem.** The Bundle Size job diffed a PR against the `master-bundle-sizes`
