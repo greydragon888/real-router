@@ -31,19 +31,18 @@ export interface RouterValidator {
       caller: string,
     ) => void;
     validateAddRouteArgs: (routes: unknown) => void;
-    validateRoutes: (
-      routes: unknown[],
-      tree: unknown,
-      parentName?: string,
-    ) => void;
+    /**
+     * ⚑ Takes no store (#2382). The analyser reads the three facts it judges
+     * from `PluginApi`: the path slots and the ONE-HOP forward map come back as
+     * frozen values, and the tree is the published one `getTree()` already hands
+     * out — no container travels that the curated surface does not.
+     */
+    validateRoutes: (routes: unknown[], parentName?: string) => void;
     validateRemoveRouteArgs: (name: unknown) => void;
     validateUpdateRouteBasicArgs: (name: unknown, updates: unknown) => void;
     validateUpdateRoutePropertyTypes: (name: string, updates: unknown) => void;
-    validateUpdateRoute: (
-      name: string,
-      updates: unknown,
-      tree: unknown,
-    ) => void;
+    /** Reads the same three facts from `PluginApi` as `validateRoutes` (#2382). */
+    validateUpdateRoute: (name: string, updates: unknown) => void;
     /**
      * ⚑ Takes no tree (#2382): the analyser reads it from `PluginApi.getTree()`,
      * which hands out the same object — the tree is published already, so

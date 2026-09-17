@@ -2,7 +2,7 @@
 "@real-router/core": minor
 ---
 
-The dependency validators take facts rather than the store (#2382)
+`RouterValidator` methods take facts rather than stores (#2382)
 
 `RouterValidator.dependencies.validateDependencyCount` now takes
 `(currentCount, maxDependencies, methodName)` and `validateDependencyExists`
@@ -26,6 +26,19 @@ passing it as an argument added a second address to a published object and
 nothing else. The second of the two sits on the NAVIGATION path — it runs from
 `navigateToDefault()` whenever `defaultRoute` is a callback — so the container
 channel was never a configuration-time concern only.
+
+`routes.validateRoutes` now takes `(routes, parentName?)` and
+`routes.validateUpdateRoute` takes `(name, updates)`. The facts they judge besides
+the tree come from two new `PluginApi` members:
+
+- `getUrlParams(name)` — a route's path slot names, ancestors included; `[]` for
+  a route the tree does not hold. Frozen and handed out by reference, like
+  `getDeclaredQueryNames`, so a tree rebuild mints a new array.
+- `getForwardMap()` — each source route's string `forwardTo` target, ONE hop and
+  not resolved, as a fresh frozen null-prototype copy per call. One hop is the
+  shape a cycle check needs: a resolved map collapses each chain to its last hop,
+  and a cycle closing through a source that already forwards is not
+  constructible there.
 
 Breaking for anything that implements `RouterValidator` directly; pre-1.0, so
 `minor`.

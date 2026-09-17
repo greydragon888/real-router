@@ -511,4 +511,67 @@ describe("setRootPath refuses while a navigation is in flight (#1755)", () => {
       ]);
     });
   });
+
+  describe("the two route facts published by #2382", () => {
+    it("getUrlParams answers a route's PATH slots, ancestors included", () => {
+      expect(api.getUrlParams("section.view")).toStrictEqual(["section", "id"]);
+      // `param1..3` are QUERY names on this route, so they are not path slots
+      expect(api.getUrlParams("section.query")).toStrictEqual(["section"]);
+      expect(api.getUrlParams("nope")).toStrictEqual([]);
+    });
+
+    it("getUrlParams hands out one frozen array until a rebuild mints another", () => {
+      const held = api.getUrlParams("section.view");
+
+      expect(Object.isFrozen(held)).toBe(true);
+      expect(api.getUrlParams("section.view")).toBe(held);
+
+      getRoutesApi(router).add({ name: "extra", path: "/extra" });
+
+      expect(api.getUrlParams("section.view")).not.toBe(held);
+      expect(api.getUrlParams("section.view")).toStrictEqual(held);
+    });
+
+    describe("getForwardMap", () => {
+      beforeEach(() => {
+        router = createRouter([
+          { name: "a", path: "/a", forwardTo: "b" },
+          { name: "b", path: "/b", forwardTo: "c" },
+          { name: "c", path: "/c" },
+          { name: "d", path: "/d", forwardTo: () => "c" },
+        ]);
+        api = getPluginApi(router);
+      });
+
+      it("is ONE hop per source, and holds only string forwards", () => {
+        // `a` stays on `b` rather than resolving to `c`, and the callback on `d`
+        // is not in it.
+        expect({ ...api.getForwardMap() }).toStrictEqual({ a: "b", b: "c" });
+      });
+
+      it("is a fresh frozen null-prototype copy that no write reaches", () => {
+        const first = api.getForwardMap();
+
+        expect(api.getForwardMap()).not.toBe(first);
+        expect(Object.isFrozen(first)).toBe(true);
+        expect(Object.getPrototypeOf(first)).toBeNull();
+        expect(() => {
+          (first as Record<string, string>).c = "a";
+        }).toThrow(TypeError);
+
+        expect({ ...api.getForwardMap() }).toStrictEqual({ a: "b", b: "c" });
+        expect(api.forwardState("c", {}).name).toBe("c");
+      });
+
+      it("follows update() and remove()", () => {
+        const routes = getRoutesApi(router);
+
+        routes.add({ name: "e", path: "/e" });
+        routes.update("c", { forwardTo: "e" });
+        routes.remove("a");
+
+        expect({ ...api.getForwardMap() }).toStrictEqual({ b: "c", c: "e" });
+      });
+    });
+  });
 });

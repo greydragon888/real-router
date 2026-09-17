@@ -1,6 +1,5 @@
 import { createRouter } from "@real-router/core";
-import { getRoutesApi } from "@real-router/core/api";
-import { getInternals } from "@real-router/core/validation";
+import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { validationPlugin } from "@real-router/validation-plugin";
@@ -21,6 +20,7 @@ import {
   validateUpdateRoute,
 } from "../../../src/validators/routes";
 
+import type { RouteLookup } from "../../../src/validators/forwardTo";
 import type { Router } from "@real-router/core";
 import type { RoutesApi } from "@real-router/core/api";
 
@@ -251,23 +251,21 @@ describe("validateSetRootPathArgs — direct", () => {
   });
 });
 
-describe("validateRoutes — direct calls", () => {
-  it("passes without tree — covers FALSE branch of tree+forwardMap check", () => {
-    expect(() => {
-      validateRoutes([{ name: "child", path: "/child" }]);
-    }).not.toThrow();
-  });
+/**
+ * A `RouteLookup` built from a plain table: which names exist, and each one's
+ * path slots. The real one reads `PluginApi.getTree()` and `getUrlParams` (#2382).
+ */
+function lookupOf(table: Record<string, readonly string[]>): RouteLookup {
+  return {
+    hasRoute: (name) => Object.hasOwn(table, name),
+    getUrlParams: (name) => table[name] ?? [],
+  };
+}
 
-  it("passes with undefined tree and forwardMap — skips forwardTo targets check", () => {
-    expect(() => {
-      validateRoutes(
-        [{ name: "child", path: "/child" }],
-        undefined,
-        undefined,
-        {},
-      );
-    }).not.toThrow();
-  });
+describe("validateRoutes — direct calls", () => {
+  // ⚑ The "no tree" and "undefined tree and forwardMap" arms are GONE with the
+  // store parameter (#2382): the tree, the lookup and the one-hop map are
+  // required, because the wrapper always has all three from `PluginApi`.
 
   it("throws when parentName segment not found in tree", () => {
     const mockTree = {
@@ -279,7 +277,7 @@ describe("validateRoutes — direct calls", () => {
       validateRoutes(
         [{ name: "child", path: "/child" }],
         mockTree as never,
-        undefined,
+        lookupOf({}),
         {},
         "nonexistent",
       );
@@ -293,15 +291,14 @@ describe("validateRoutes — direct calls", () => {
     ]);
 
     r.usePlugin(validationPlugin());
-    const ctx = getInternals(r);
-    const store = ctx.routeGetStore();
+    const api = getPluginApi(r);
 
     expect(() => {
       validateRoutes(
         [{ name: "child", path: "/child" }],
-        store.tree as never,
-        store.matcher as never,
-        store.config.forwardMap,
+        api.getTree(),
+        { hasRoute: () => true, getUrlParams: (n) => api.getUrlParams(n) },
+        api.getForwardMap(),
         "home",
       );
     }).not.toThrow();
@@ -312,59 +309,21 @@ describe("validateRoutes — direct calls", () => {
 
 describe("validateForwardToParamCompatibility — direct", () => {
   it("throws when target requires params not in source", () => {
-    const mockMatcher = {
-      getSegmentsByName: (name: string) => {
-        if (name === "source") {
-          return [
-            {
-              paramMeta: { urlParams: [] },
-              children: new Map(),
-            },
-          ];
-        }
-        if (name === "target") {
-          return [
-            {
-              paramMeta: { urlParams: ["id"] },
-              children: new Map(),
-            },
-          ];
-        }
-
-        return null;
-      },
-    };
-
     expect(() => {
       validateForwardToParamCompatibility(
         "source",
         "target",
-        mockMatcher as never,
+        lookupOf({ source: [], target: ["id"] }),
       );
     }).toThrow(/params/i);
   });
 
   it("passes when source has all required params of target", () => {
-    const mockMatcher = {
-      getSegmentsByName: (name: string) => {
-        if (name === "source" || name === "target") {
-          return [
-            {
-              paramMeta: { urlParams: ["id"] },
-              children: new Map(),
-            },
-          ];
-        }
-
-        return null;
-      },
-    };
-
     expect(() => {
       validateForwardToParamCompatibility(
         "source",
         "target",
-        mockMatcher as never,
+        lookupOf({ source: ["id"], target: ["id"] }),
       );
     }).not.toThrow();
   });
@@ -372,144 +331,61 @@ describe("validateForwardToParamCompatibility — direct", () => {
 
 describe("validateForwardToCycle — direct", () => {
   it("throws when cycle is created", () => {
-    const config = { forwardMap: { a: "b", b: "a" } };
-
     expect(() => {
-      validateForwardToCycle("a", "b", config);
+      validateForwardToCycle("a", "b", { a: "b", b: "a" });
     }).toThrow(/[Cc]ircular|[Cc]ycle/);
   });
 
   it("passes when no cycle exists", () => {
-    const config = { forwardMap: {} };
-
     expect(() => {
-      validateForwardToCycle("a", "b", config);
+      validateForwardToCycle("a", "b", {});
     }).not.toThrow();
   });
 });
 
 describe("validateUpdateRoute — direct", () => {
   it("throws ReferenceError when route does not exist", () => {
-    const mockMatcher = {
-      getSegmentsByName: () => [
-        { paramMeta: { urlParams: [] }, children: new Map() },
-      ],
-    };
-    const config = { forwardMap: {} };
-
     expect(() => {
-      validateUpdateRoute(
-        "nonexistent",
-        undefined,
-        () => false,
-        mockMatcher as never,
-        config,
-      );
+      validateUpdateRoute("nonexistent", undefined, lookupOf({}), {});
     }).toThrow(ReferenceError);
   });
 
   it("throws when forwardTo target does not exist", () => {
-    const mockMatcher = {
-      getSegmentsByName: () => [
-        { paramMeta: { urlParams: [] }, children: new Map() },
-      ],
-    };
-    const config = { forwardMap: {} };
-
     expect(() => {
-      validateUpdateRoute(
-        "home",
-        "nonexistent",
-        (n: string) => n === "home",
-        mockMatcher as never,
-        config,
-      );
+      validateUpdateRoute("home", "nonexistent", lookupOf({ home: [] }), {});
     }).toThrow(/does not exist/);
   });
 
   it("throws when forwardTo target requires params not in source", () => {
-    const mockMatcher = {
-      getSegmentsByName: (name: string) => {
-        if (name === "home") {
-          return [
-            {
-              paramMeta: { urlParams: [] },
-              children: new Map(),
-            },
-          ];
-        }
-        if (name === "items") {
-          return [
-            {
-              paramMeta: { urlParams: ["id"] },
-              children: new Map(),
-            },
-          ];
-        }
-
-        return null;
-      },
-    };
-    const config = { forwardMap: {} };
-
     expect(() => {
       validateUpdateRoute(
         "home",
         "items",
-        () => true,
-        mockMatcher as never,
-        config,
+        lookupOf({ home: [], items: ["id"] }),
+        {},
       );
     }).toThrow(/params/i);
   });
 
   it("throws when forwardTo creates a cycle", () => {
-    const mockMatcher = {
-      getSegmentsByName: () => [
-        { paramMeta: { urlParams: [] }, children: new Map() },
-      ],
-    };
-    const config = { forwardMap: { a: "b" } };
-
     expect(() => {
-      validateUpdateRoute("b", "a", () => true, mockMatcher as never, config);
+      validateUpdateRoute("b", "a", lookupOf({ a: [], b: [] }), { a: "b" });
     }).toThrow(/[Cc]ircular|[Cc]ycle/);
   });
 
   it("passes when route exists with no forwardTo", () => {
-    const mockMatcher = {
-      getSegmentsByName: () => [
-        { paramMeta: { urlParams: [] }, children: new Map() },
-      ],
-    };
-    const config = { forwardMap: {} };
-
     expect(() => {
-      validateUpdateRoute(
-        "home",
-        undefined,
-        () => true,
-        mockMatcher as never,
-        config,
-      );
+      validateUpdateRoute("home", undefined, lookupOf({ home: [] }), {});
     }).not.toThrow();
   });
 
   it("passes when route exists with valid forwardTo", () => {
-    const mockMatcher = {
-      getSegmentsByName: () => [
-        { paramMeta: { urlParams: [] }, children: new Map() },
-      ],
-    };
-    const config = { forwardMap: {} };
-
     expect(() => {
       validateUpdateRoute(
         "home",
         "about",
-        () => true,
-        mockMatcher as never,
-        config,
+        lookupOf({ home: [], about: [] }),
+        {},
       );
     }).not.toThrow();
   });

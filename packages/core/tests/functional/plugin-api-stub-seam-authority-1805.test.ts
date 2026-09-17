@@ -245,7 +245,9 @@ describe("the stub seam below getPluginApi (#1805)", () => {
       "buildNavigationState",
       "claimContextNamespace",
       "extendRouter",
+      "getForwardMap",
       "getRouteConfig",
+      "getUrlParams",
     ]);
 
     expect(

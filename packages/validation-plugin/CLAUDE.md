@@ -194,7 +194,7 @@ Callbacks are intentionally **not** probed at registration time — their return
 
 ### Reaches the engine only through `@real-router/core` (#1301)
 
-The plugin does **not** import the foundation `route-tree` package. `validateRoute` (the batch route/path validator — no matcher equivalent) comes from the `@real-router/core/validation` subpath; forwardTo segment lookup + target existence use the matcher's own `getSegmentsByName` / `hasRoute` (via `store.matcher`, threaded into `validateRoutes` → `validateForwardToTargets`); the `RouteTree` / `Matcher` types come from core. This keeps core the sole consumer of the routing engine. `tests/functional/no-route-tree.test.ts` scans `src/` for any `route-tree` import and fails on a regression — keep it green (and `route-tree` out of `devDependencies`).
+The plugin does **not** import the foundation `route-tree` package. `validateRoute` (the batch route/path validator — no matcher equivalent) comes from the `@real-router/core/validation` subpath; the route validators ask existence by walking `PluginApi.getTree()` and read path slots from `PluginApi.getUrlParams` (a `RouteLookup`, threaded into `validateRoutes` → `validateForwardToTargets`), while the retrospective pass reads segments off the route store it is handed; the `RouteTree` type comes from core. This keeps core the sole consumer of the routing engine. `tests/functional/no-route-tree.test.ts` scans `src/` for any `route-tree` import and fails on a regression — keep it green (and `route-tree` out of `devDependencies`).
 
 ### Core's limit defaults live in ONE place here (#1879)
 

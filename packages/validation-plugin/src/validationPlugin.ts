@@ -93,6 +93,7 @@ import {
 } from "./validators/state";
 
 import type { EventName, EventMethodMap } from "./validators/eventBus";
+import type { RouteLookup } from "./validators/forwardTo";
 import type {
   DefaultDependencies,
   PluginApi,
@@ -102,7 +103,12 @@ import type {
   RouteTree,
   Plugin,
 } from "@real-router/core";
-import type { RouterInternals, Matcher } from "@real-router/core/validation";
+import type { RouterInternals } from "@real-router/core/validation";
+
+/** The one question existence asks of a tree node: its children by segment. */
+interface TreeNode {
+  children: ReadonlyMap<string, TreeNode>;
+}
 
 function buildValidatorObject<
   Dependencies extends DefaultDependencies = DefaultDependencies,
@@ -118,6 +124,32 @@ function buildValidatorObject<
   const reportMisChanneledKey = createMisChanneledKeyReporter((routeName) =>
     api.getDeclaredQueryNames(routeName),
   );
+
+  // ⚑ The two questions the route validators ask about routes that already
+  // exist, answered from the curated surface (#2382). Existence WALKS the
+  // published tree rather than asking the matcher: `getRoutesApi.has` would do
+  // the lookup too, but it runs `validateRouteName` first and would rename a
+  // malformed `forwardTo` target's refusal to `[router.hasRoute]`.
+  //
+  // ⚠ The walk answers what `matcher.hasRoute` answers except after
+  // `children.set` on a handed-out tree — the Map shell-freeze exception
+  // `engine/INVARIANTS.md` records.
+  const lookup: RouteLookup = {
+    hasRoute: (name) => {
+      let node = api.getTree() as TreeNode | undefined;
+
+      for (const segment of name.split(".")) {
+        node = node?.children.get(segment);
+
+        if (!node) {
+          return false;
+        }
+      }
+
+      return true;
+    },
+    getUrlParams: (name) => api.getUrlParams(name),
+  };
 
   return {
     routes: {
@@ -139,18 +171,12 @@ function buildValidatorObject<
         validateAddRouteArgs(routes as readonly Route[]);
       },
 
-      validateRoutes(routes, store, parentName) {
-        const typedStore = store as {
-          tree?: unknown;
-          matcher?: unknown;
-          config?: { forwardMap?: Record<string, string> };
-        };
-
+      validateRoutes(routes, parentName) {
         validateRoutes(
           routes as Route[],
-          typedStore.tree as RouteTree | undefined,
-          typedStore.matcher as Matcher | undefined,
-          typedStore.config?.forwardMap,
+          api.getTree() as RouteTree,
+          lookup,
+          api.getForwardMap(),
           parentName,
         );
       },
@@ -169,41 +195,24 @@ function buildValidatorObject<
           canDeactivate: upd.canDeactivate,
         });
       },
-      validateUpdateRoute(name, updates, store) {
-        const typedStore = store as {
-          matcher: {
-            hasRoute: (routeName: string) => boolean;
-            getSegmentsByName: (routeName: string) => unknown;
-          };
-          config: { forwardMap: Record<string, string> };
-        };
+      validateUpdateRoute(name, updates) {
         const forwardTo = (updates as Record<string, unknown>).forwardTo;
 
         validateUpdateRoute(
           name,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
           forwardTo as any,
-          (routeName: string) => typedStore.matcher.hasRoute(routeName),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-          typedStore.matcher as any,
-          typedStore.config,
+          lookup,
+          api.getForwardMap(),
         );
       },
       validateParentOption(parent) {
         validateParentOptionRaw(parent);
-        let node = api.getTree() as { children: ReadonlyMap<string, unknown> };
 
-        for (const segment of parent.split(".")) {
-          const child = node.children.get(segment) as
-            { children: ReadonlyMap<string, unknown> } | undefined;
-
-          if (!child) {
-            throw new ReferenceError(
-              `[router.addRoute] Parent route "${parent}" does not exist`,
-            );
-          }
-
-          node = child;
+        if (!lookup.hasRoute(parent)) {
+          throw new ReferenceError(
+            `[router.addRoute] Parent route "${parent}" does not exist`,
+          );
         }
       },
       validateRouteName(name, caller) {

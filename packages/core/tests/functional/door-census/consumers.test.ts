@@ -506,10 +506,12 @@ describe("consumer census (#2303)", () => {
         "forwardState",
         "getAdoptedOrigins",
         "getDeclaredQueryNames",
+        "getForwardMap",
         "getOptions",
         "getRootPath",
         "getRouteConfig",
         "getTree",
+        "getUrlParams",
         "logger",
         "makeState",
         "matchPath",
@@ -573,20 +575,19 @@ describe("consumer census (#2303)", () => {
     // absence (#2343).** It is syntactic: it follows a value while the value
     // stays in the expression. A value that LEAVES — passed whole into a
     // function — is invisible on the far side, and two shipped channels do
-    // exactly that with the route store. `validationPlugin` hands
+    // exactly that with the route store: `validationPlugin` hands
     // `ctx.routeGetStore()` to `validators/retrospective.ts`, whose functions
-    // take `store: unknown` and read `definitions` / `config` / `tree` there;
-    // and core itself passes the live store to validator methods as an
-    // ARGUMENT, so those reads never pass through `routeGetStore()` in the
-    // plugin at all. `routeGetStore`'s empty `src` therefore means "no reach
-    // this instrument can see", not "no reach" — #2339 §4 question 4 owns that
-    // channel and prices closing it.
+    // take `store: unknown` and read `definitions` / `config` / `tree` there.
+    // `routeGetStore`'s empty `src` therefore means "no reach this instrument
+    // can see", not "no reach". (Core no longer passes the store to validator
+    // methods as an argument — #2382 closed that channel — so the retrospective
+    // pass is the one remaining place the walk is blind to.)
     expect(rows).toStrictEqual({
       "getInternals.getCloneState()": { src: [], tests: ["limits"] },
       "getInternals.getOptions()": { src: [], tests: ["queryParams"] },
       "getInternals.routeGetStore()": {
         src: [],
-        tests: ["config", "matcher", "matcherOptions", "tree"],
+        tests: ["matcherOptions"],
       },
       "getInternals.validator": { src: ["options"], tests: ["dependencies"] },
       "getNavigator.getState()": { src: [], tests: ["name"] },

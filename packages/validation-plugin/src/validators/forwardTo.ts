@@ -6,7 +6,19 @@ import { putField } from "@real-router/core/utils";
 import { getTypeDescription } from "../type-guards";
 
 import type { Route, DefaultDependencies } from "@real-router/core";
-import type { Matcher, RouteTree } from "@real-router/core/validation";
+
+/**
+ * What a route validator asks about routes that ALREADY exist (#2382).
+ *
+ * ⚑ Two questions, both answered from the curated surface: existence walks
+ * `PluginApi.getTree()`, and the path slots come from `PluginApi.getUrlParams`.
+ * These validators need exactly these two answers about routes that already
+ * exist, and both are data — so the route matcher is not handed to them.
+ */
+export interface RouteLookup {
+  hasRoute: (name: string) => boolean;
+  getUrlParams: (name: string) => readonly string[];
+}
 
 /**
  * Intrinsics captured at module load (#1971).
@@ -237,30 +249,14 @@ function collectForwardMappings<Dependencies extends DefaultDependencies>(
   return mappings;
 }
 
-function getRequiredParams(segments: readonly RouteTree[]): Set<string> {
-  const params = new Set<string>();
-
-  for (const segment of segments) {
-    for (const param of segment.paramMeta.urlParams) {
-      params.add(param);
-    }
-  }
-
-  return params;
-}
-
 function getTargetParams<Dependencies extends DefaultDependencies>(
   targetRoute: string,
-  existsInMatcher: boolean,
-  matcher: Matcher,
+  exists: boolean,
+  lookup: RouteLookup,
   routes: readonly Route<Dependencies>[],
 ): Set<string> {
-  if (existsInMatcher) {
-    /* v8 ignore next -- @preserve: ?? fallback unreachable — existsInMatcher guarantees non-null */
-    return getRequiredParams(
-      (matcher.getSegmentsByName(targetRoute) as
-        readonly RouteTree[] | undefined) ?? [],
-    );
+  if (exists) {
+    return new Set(lookup.getUrlParams(targetRoute));
   }
 
   return extractParamsFromPaths(collectPathsToRoute(routes, targetRoute));
@@ -273,13 +269,13 @@ function validateSingleForward<Dependencies extends DefaultDependencies>(
   targetRoute: string,
   routes: readonly Route<Dependencies>[],
   batchNames: Set<string>,
-  matcher: Matcher,
+  lookup: RouteLookup,
   parentParams: ReadonlySet<string>,
 ): void {
-  const existsInMatcher = matcher.hasRoute(targetRoute);
+  const exists = lookup.hasRoute(targetRoute);
   const existsInBatch = batchNames.has(targetRoute);
 
-  if (!existsInMatcher && !existsInBatch) {
+  if (!exists && !existsInBatch) {
     throw new ReferenceError(
       `[router.addRoute] forwardTo target "${targetRoute}" does not exist ` +
         `for route "${fromRoute}"`,
@@ -293,12 +289,7 @@ function validateSingleForward<Dependencies extends DefaultDependencies>(
     ...extractParamsFromPaths(collectPathsToRoute(routes, fromRoute)),
   ]);
 
-  const toParams = getTargetParams(
-    targetRoute,
-    existsInMatcher,
-    matcher,
-    routes,
-  );
+  const toParams = getTargetParams(targetRoute, exists, lookup, routes);
 
   const missingParams = [...toParams].filter((param) => !fromParams.has(param));
 
@@ -314,8 +305,8 @@ export function validateForwardToTargets<
   Dependencies extends DefaultDependencies,
 >(
   routes: readonly Route<Dependencies>[],
-  existingForwardMap: Record<string, string>,
-  matcher: Matcher,
+  existingForwardMap: Readonly<Record<string, string>>,
+  lookup: RouteLookup,
   parentName?: string,
 ): void {
   const batchNames = collectRouteNames(routes);
@@ -324,13 +315,11 @@ export function validateForwardToTargets<
   const batchFullNames = parentName
     ? new Set([...batchNames].map((name) => `${parentName}.${name}`))
     : batchNames;
-  // `validateRoutes` throws on a missing parent before forwardTo validation runs
-  // (both go through the `add({ parent })` path with tree + matcher present), so
-  // the parent's segments are always resolvable here — assert non-null.
+  // `validateRoutes` throws on a missing parent before forwardTo validation runs,
+  // so these are the parent's own slots, never the empty answer `getUrlParams`
+  // gives for a route the tree does not hold.
   const parentParams: ReadonlySet<string> = parentName
-    ? getRequiredParams(
-        matcher.getSegmentsByName(parentName) as readonly RouteTree[],
-      )
+    ? new Set(lookup.getUrlParams(parentName))
     : EMPTY_PARENT_PARAMS;
 
   const batchForwards = collectForwardMappings(routes);
@@ -350,7 +339,7 @@ export function validateForwardToTargets<
       targetRoute,
       routes,
       batchFullNames,
-      matcher,
+      lookup,
       parentParams,
     );
   }
