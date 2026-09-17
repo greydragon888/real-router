@@ -1025,7 +1025,7 @@ export default tsEslint.config(
   // ============================================
   // 11. SONARJS CONFIGURATION
   // ============================================
-  // Updated for eslint-plugin-sonarjs v4.1.0
+  // Updated for eslint-plugin-sonarjs v4.2.1
   // Repo moved from archived SonarSource/eslint-plugin-sonarjs to SonarSource/SonarJS
   // Changelog: https://github.com/SonarSource/SonarJS/blob/master/packages/analysis/src/jsts/rules/CHANGELOG.md
   // v4 breaking: removed enforce-trailing-comma, super-invocation (covered by eslint core)
@@ -1036,6 +1036,11 @@ export default tsEslint.config(
   //         3 test-assertion/float ones below are disabled (see rules), and the
   //         new ReDoS rule super-linear-regex is kept on (inline-disabled at the
   //         3 already-vetted bounded-input regexes in path-matcher, alongside slow-regex)
+  // v4.2.1: 16 new rules, 15 of them recommended, none firing here (kept on);
+  //         vitest-mock-at-module-scope and testing-library-query-assertion report
+  //         the same lines as vitest/hoisted-apis-on-top and
+  //         testing-library/prefer-presence-queries. no-mixed-completion-style
+  //         left recommended upstream.
   {
     files: ["**/*.ts", "**/*.tsx"],
     plugins: {
