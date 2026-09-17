@@ -2,6 +2,49 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## The Bundle Size base is picked by commit, not by the first run the API lists (#2396, 2026-09-17)
+
+**Problem.** The Bundle Size job diffed a PR against the `master-bundle-sizes`
+artifact of `gh run list --workflow=post-merge.yml --branch=master
+--status=success --limit=1` — whichever run the API listed first — and nothing
+compared that run's commit with the PR. On #2395 the query returned run
+`30979695163`, the post-merge build of `d2efd0f72` from 2026-08-05, 685 commits
+behind `master`'s tip, and the report presented six weeks of `master` as the
+PR's growth: `core` +11.2%, the total +8.0%, two entries "new". Nothing in the
+report said what it compared against. The same query answered correctly
+afterwards; why the API listed that run is not established.
+
+Taking the newest successful run is not right either: a push that follows
+quickly cancels the previous post-merge run, so some `master` commits never get
+one. Of the last 60 post-merge runs on `master`, 4 were cancelled and 2 failed,
+and the longest streak without a success in the last 100 was 5.
+
+**Solution.** `scripts/bundle-size-base.mjs` replaces the step's shell.
+
+- The base is the first parent of the merge commit `actions/checkout` puts at
+  HEAD: the commit the PR's `dist` was built on. Checkout fetches the event's
+  merge SHA, so every job of the run sees the same commit. `PR_BASE_SHA` stands
+  in if HEAD is not a merge.
+- The run for that commit wins, whatever order the runs arrive in. Otherwise
+  the closest ancestor within 20 commits, found through the compare API while
+  walking the runs newest first — `master` is linear, so the first ancestor is
+  the closest. Otherwise there is no base.
+- The report opens with a line naming the base commit and its run, how many
+  commits it trails the PR's base, or why there is no base.
+
+**Why 20 commits.** It covers the longest measured streak of unbuilt commits
+(5) four times over, and refuses the base #2395 got (685 behind) by a wide
+margin.
+
+**Verified.** Eight tests, and every check fails its own mutant (9 of 9),
+including trusting the API's order, which is #2395's shape. Against the real
+repository: `5ba84e8ac` gets its own run; `4589339dd`, whose post-merge run was
+cancelled, gets `63da02502`, 1 commit behind; `d2efd0f72` gets no base within
+the 50 runs listed. The compare step's script, run with stubbed `github`,
+`context` and `core`, puts the note on the line under the heading and adds
+nothing when it is unset. `actionlint` at CI's severity reports nothing, as it
+did before.
+
 ## benchmarks/ is linted in pre-push, and no lint fix may change a bundle the results were measured on (#2390, 2026-09-17)
 
 **Problem.** No gate read `benchmarks/`: the package declared no lint script, and
