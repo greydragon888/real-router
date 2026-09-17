@@ -166,8 +166,8 @@ importers:
         specifier: 72.0.0
         version: 72.0.0(eslint@10.7.0(jiti@2.7.0)(supports-color@10.2.2))
       fast-check:
-        specifier: 4.10.0
-        version: 4.10.0
+        specifier: 4.10.1
+        version: 4.10.1
       husky:
         specifier: 9.1.7
         version: 9.1.7
@@ -11822,8 +11822,8 @@ packages:
   exsolve@1.1.0:
     resolution: {integrity: sha512-D+42+T12DdIlJM3uepa55qGiL3sYdLBOxIl2ifQCzCHz4c7eiolaHsi3BIqEr7JxBzxv2pYZQX9kw16ziMcEmw==}
 
-  fast-check@4.10.0:
-    resolution: {integrity: sha512-hhqQL+IJllZi3aM4TKvmCj3bywLEcycNTTLZeLhA9ttMxBrCqM07q7Di4kl+j9EWSTXvJH1+EpIgsDbF/+8H5Q==}
+  fast-check@4.10.1:
+    resolution: {integrity: sha512-sB5Vghiu8MyCyToHoBVGsT0baZg3sZWNIY+a6Ct2EDrQJlT4YdH6MC1BSLNe3kX1k5i5g0q1O52XFgcKK/rGHg==}
     engines: {node: '>=12.17.0'}
 
   fast-deep-equal@3.1.3:
@@ -16361,7 +16361,7 @@ snapshots:
 
   '@fast-check/vitest@0.5.0(vitest@4.1.11)':
     dependencies:
-      fast-check: 4.10.0
+      fast-check: 4.10.1
       vitest: 4.1.11(@types/node@24.13.4)(@vitest/coverage-v8@4.1.11)(@vitest/ui@4.1.11)(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.2.2(@types/node@24.13.4)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
 
   '@gitbeaker/core@38.12.1':
@@ -20286,7 +20286,7 @@ snapshots:
 
   exsolve@1.1.0: {}
 
-  fast-check@4.10.0:
+  fast-check@4.10.1:
     dependencies:
       pure-rand: 8.4.2
 
