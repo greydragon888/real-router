@@ -699,10 +699,13 @@ describe("consumer census (#2303)", () => {
         "systemCommit",
         "treeChanged",
       ],
-      // ⚑ Both plugin-facing surfaces come back EMPTY: every member of
-      // `getPluginApi` and of `getRoutesApi` has a caller outside core. That is
-      // the sharpest single answer this census gives to "did we guard doors
-      // nobody uses" — on these two surfaces, nobody is nobody.
+      // ⚑ Both plugin-facing surfaces come back EMPTY: no member of
+      // `getPluginApi` or of `getRoutesApi` is untouched by shipped code and
+      // tests TOGETHER. That is the sharpest single answer this census gives to
+      // "did we guard doors nobody uses" — on these two surfaces, nobody is
+      // nobody.
+      // ⚠ It does NOT say each member has a SHIPPED caller: this column is the
+      // union of the two buckets, and separating them is #2383.
       getPluginApi: [],
       getRoutesApi: [],
       getNavigator: ["canNavigateTo", "isLeaveApproved", "subscribeLeave"],

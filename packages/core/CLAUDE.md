@@ -365,11 +365,13 @@ of `RouterInternals` that fail it are exactly the ones carrying a type no subpat
 publishes. Designing a member for `PluginApi` out of one that fails (b) is
 therefore the same work as choosing a published type for it.
 
-⚠ **Clause (b) has no cell — it was measured by hand (#2350).** Clause (a) is
-derived: `door-census/consumers.test.ts` walks what shipped code outside core
-reaches and its untouched column is what makes "nobody is nobody" checkable.
-Nothing walks signatures against the published type names, so (b) is a claim in
-prose until that issue lands.
+⚠ **Neither clause has a cell that answers it.** (b) has none at all — nothing
+walks signatures against the published type names (#2350). (a) has a PARTIAL one
+(#2383): the reverse column of `door-census/consumers.test.ts` answers "nobody,
+not even a test" — a wider question than the clause asks — and the walk behind it
+records reach only where it can resolve the owner, so an api arriving as a bag
+field, a class field or a destructured parameter is invisible to it. Both clauses
+are claims in prose until those issues land.
 
 ⚠ **No refusal has ever been recorded, and that is the gap.** The rule describes
 the surface that exists; it has never turned a member away. A criterion with no
