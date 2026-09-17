@@ -7,6 +7,7 @@ import {
   RouterError,
 } from "@real-router/core";
 import {
+  getDependenciesApi,
   getLifecycleApi,
   getPluginApi,
   getRoutesApi,
@@ -572,6 +573,67 @@ describe("setRootPath refuses while a navigation is in flight (#1755)", () => {
 
         expect({ ...api.getForwardMap() }).toStrictEqual({ b: "c", c: "e" });
       });
+    });
+  });
+
+  describe("the dependency and guard facts published by #2382", () => {
+    it("getResolvedLimits is the frozen resolved object, coerced once", () => {
+      const limited = createRouter([], {
+        limits: { maxDependencies: "7" as unknown as number },
+      });
+      const limits = getPluginApi(limited).getResolvedLimits();
+
+      expect(limits.maxDependencies).toBe(7);
+      // An unset limit arrives resolved, not absent.
+      expect(limits.maxPlugins).toBe(api.getResolvedLimits().maxPlugins);
+      expect(typeof limits.maxPlugins).toBe("number");
+      expect(Object.isFrozen(limits)).toBe(true);
+      expect(getPluginApi(limited).getResolvedLimits()).toBe(limits);
+    });
+
+    it("getDependencyKeys lists own string keys, __proto__ included, as a fresh frozen array", () => {
+      const withDeps = createRouter([], {}, { a: 1 });
+      const deps = getDependenciesApi(withDeps);
+      const pluginApi = getPluginApi(withDeps);
+
+      deps.setAll(JSON.parse('{"__proto__": 2}') as never);
+      deps.set(Symbol.for("sym") as never, 3 as never);
+
+      const keys = pluginApi.getDependencyKeys();
+
+      expect(keys).toStrictEqual(["a", "__proto__"]);
+      expect(Object.isFrozen(keys)).toBe(true);
+      expect(pluginApi.getDependencyKeys()).not.toBe(keys);
+      // The container `getAll` hands out withholds `__proto__`.
+      expect(Object.keys(deps.getAll())).toStrictEqual(["a"]);
+
+      deps.remove("a");
+
+      expect(pluginApi.getDependencyKeys()).toStrictEqual(["__proto__"]);
+    });
+
+    it("getExternalGuardNames lists external guard names, deactivate first, each once", () => {
+      const guarded = createRouter([
+        { name: "a", path: "/a", canActivate: () => () => true },
+        { name: "b", path: "/b" },
+      ]);
+      const lifecycle = getLifecycleApi(guarded);
+      const pluginApi = getPluginApi(guarded);
+
+      lifecycle.addActivateGuard("orphan", () => () => true);
+      lifecycle.addActivateGuard("b", () => () => true);
+      lifecycle.addDeactivateGuard("b", () => () => true);
+
+      const names = pluginApi.getExternalGuardNames();
+
+      // `a` carries only a DEFINITION guard, so it is absent.
+      expect(names).toStrictEqual(["b", "orphan"]);
+      expect(Object.isFrozen(names)).toBe(true);
+      expect(pluginApi.getExternalGuardNames()).not.toBe(names);
+
+      lifecycle.removeActivateGuard("orphan");
+
+      expect(pluginApi.getExternalGuardNames()).toStrictEqual(["b"]);
     });
   });
 });

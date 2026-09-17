@@ -159,7 +159,7 @@
       "64547fa1dec5"
     ],
     "packages/core/src/dependenciesStore.ts": [
-      "39738c161a94",
+      "5950ce1d5302",
       "d5b5e80fbe8a",
       "9c02305b8687",
       "3134ec6834ac",
@@ -907,6 +907,8 @@
       "a8e38a061e72",
       "5e6ea52a5e7e",
       "6e1086fc75ab",
+      "ff1016afd7e2",
+      "f2d50012530d",
       "665682d5adb4",
       "82b51dfed35c",
       "ae74ecdfb885",
@@ -1169,7 +1171,7 @@
       "53ad4226340d"
     ],
     "packages/validation-plugin/src/validationPlugin.ts": [
-      "d8217bae82d1",
+      "a7d9d2e5665c",
       "4e9bb19d9393",
       "48a89b2d4227",
       "704d1c57a59f",
@@ -1200,7 +1202,7 @@
       "1375827e9c5c",
       "5a38c110a7be",
       "6bd571d74d8a",
-      "458a2f768e0a"
+      "8ef321a92a01"
     ],
     "packages/validation-plugin/src/validators/forwardTo.ts": [
       "235292f28a1d",
@@ -1225,7 +1227,7 @@
       "1a9864dfed80",
       "d7294177f708",
       "1445410b4e2b",
-      "ca23f48b1a91",
+      "b29fd4b33c0b",
       "cfd981f6ec0e",
       "33fddb44dd09",
       "50d6c27cf998",
@@ -1242,15 +1244,13 @@
     "packages/validation-plugin/src/validators/retrospective.ts": [
       "1a9864dfed80",
       "d7294177f708",
-      "c2ade9ca7bd5",
-      "1270d9bae8b6",
-      "8eff56d4bc30",
+      "5cb0784c6ec3",
       "6141e683da17",
-      "0f4642ebf40d",
+      "d78282cbd09e",
+      "289ccd6a2171",
       "61af2e0ed3e3",
       "6b41e44865cd",
-      "ae85efe21874",
-      "83b8685831b4"
+      "041d12da3c39"
     ],
     "packages/validation-plugin/src/validators/routes.ts": [
       "60deacb9290d",
@@ -1749,7 +1749,7 @@
       "c8537dc41f1f",
       "23b367096d4f",
       "f3043589c680",
-      "b00205a19ad1",
+      "e72c5a66f211",
       "401bebc3e86e",
       "8da0051899ff",
       "842014339d2e",
@@ -1927,7 +1927,7 @@
       "592e1eb0b1ae",
       "13113acd12d4",
       "9bc488169d45",
-      "423442d02536",
+      "7bcec890f556",
       "6c43793526e7"
     ],
     "packages/vue/CLAUDE.md": [

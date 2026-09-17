@@ -55,15 +55,15 @@ router.usePlugin(validationPlugin())
     ├── ctx.validator = validator   ← core now calls validators on every operation
     │
     ├── Retrospective pass (try/catch with rollback)
-    │       ├── retroV.validateExistingRoutes(store)
-    │       ├── retroV.validateForwardToConsistency(store)
-    │       ├── retroV.validateRoutePropertiesStore(store)
-    │       ├── retroV.validateForwardToTargetsStore(store)
-    │       ├── retroV.validateDependenciesStructure(deps)
-    │       ├── retroV.validateLimitsConsistency(options, deps)
+    │       ├── retroV.validateExistingRoutes(routes)
+    │       ├── retroV.validateForwardToConsistency(forwardMap, lookup)
+    │       ├── retroV.validateRoutePropertiesStore(routes)
+    │       ├── retroV.validateForwardToTargetsStore(forwardMap, lookup)
+    │       ├── retroV.validateDependenciesStructure(dependencies, limits)
+    │       ├── retroV.validateLimitsConsistency(options, dependencyCount, maxDependencies)
     │       ├── validator.options.validateOptions(options)
     │       │       └── cross-field: warnListeners ≤ maxListeners, callbackIgnoresLevel requires callback
-    │       └── retroV.validateResolvedDefaultRoute(options.defaultRoute, store)  ← string defaultRoute only
+    │       └── retroV.validateResolvedDefaultRoute(options.defaultRoute, lookup)  ← string defaultRoute only
     │               (callback defaultRoute is validated at runtime via ctx.validator?.options.validateResolvedDefaultRoute,
     │                called from core's resolveDefault() on each navigateToDefault() / start() fallback)
     │
@@ -88,7 +88,7 @@ This is intentional: users often call `addRoute()` or `setDependency()` before `
 
 The pass runs inside a `try/catch`. If any check fails, `ctx.validator` is rolled back to `null` before the error propagates. The router is left in a clean state — no partial validation active.
 
-Retrospective validators receive store objects typed as `unknown` and cast internally using local structural interfaces. This avoids tight coupling to core's internal types while still accessing the data needed for validation.
+Retrospective validators receive facts read from the published surface — routes as `RoutesApi.get` reports them, `PluginApi.getForwardMap()`, `getResolvedLimits()`, `getDependencyKeys()`, `getExternalGuardNames()` — never a core store. The one exception is the dependency getter walk, which reads core's live record: `getInternals` still hands that record out, so a getter can still be planted in it.
 
 ## Plugin Lifecycle
 
@@ -118,9 +118,9 @@ Validation is a plugin, not a core feature. This keeps the core bundle small and
 
 Core checks `ctx.validator?.ns.fn()` — optional chaining means zero overhead when the plugin is absent. The slot is typed as `RouterValidator | null` in core internals. The plugin is the only thing that sets it.
 
-### Retrospective validators use `unknown` parameters
+### Retrospective validators take facts, not stores
 
-Retrospective functions accept `unknown` and cast internally. This decouples the plugin from core's internal store types. If core refactors its store shape, only the cast logic in `retrospective.ts` needs updating, not the function signatures.
+Retrospective functions take values whose types core publishes — `Route`, `LimitsConfig`, a one-hop forward map, a `RouteLookup` — so no local mirror of a core store type exists to drift. A field core adds to `Route` reaches this pass through the type, and a store refactor inside core does not reach it at all.
 
 ### Rollback on retrospective failure
 

@@ -14,6 +14,7 @@ import type { EventMethodMap, EventName } from "./constants";
 // Augment-target interfaces are declared lexically in the entry (#1540); the
 // type-only cycle with the barrel is deliberate — see the note in ./index.
 import type { NavigationOptions, StateContext } from "./index";
+import type { LimitsConfig } from "./limits";
 import type {
   AdoptedOrigins,
   DefaultDependencies,
@@ -237,6 +238,31 @@ export interface PluginApi {
    * not land either; strict-mode code (every ES module) gets a `TypeError`.
    */
   getForwardMap: () => Readonly<Record<string, string>>;
+
+  /**
+   * The resolved limits: the caller's `limits` over core's defaults, each
+   * coerced to a number once at construction. The frozen object core's own
+   * dependency-count check reads, handed out by reference.
+   */
+  getResolvedLimits: () => Readonly<LimitsConfig>;
+
+  /**
+   * The dependency names the router holds, as `Object.keys` lists them —
+   * `"__proto__"` included, a symbol key not. A fresh frozen array per call.
+   *
+   * ⚠ Not `Object.keys(getDependenciesApi(router).getAll())`: that container
+   * withholds `"__proto__"`, so a count taken from it comes out one short.
+   */
+  getDependencyKeys: () => readonly string[];
+
+  /**
+   * Route names carrying a guard added through `addActivateGuard` /
+   * `addDeactivateGuard` — deactivate first, each name once, including names
+   * the route tree does not hold. A fresh frozen array per call.
+   *
+   * ⚠ A guard declared on a route definition does not put its name here.
+   */
+  getExternalGuardNames: () => readonly string[];
 
   addEventListener: <E extends EventName>(
     eventName: E,

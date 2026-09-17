@@ -13,8 +13,8 @@ const objectCreate = Object.create;
  * sake lives in this module; the edits a caller asks for live in
  * `getDependenciesApi`.
  *
- * ⚠ `limits` is read by `@real-router/validation-plugin` off the store it is
- * handed, and by nothing in core.
+ * ⚠ `limits` is read by `getDependenciesApi` for the count check and handed
+ * out as `PluginApi.getResolvedLimits()`.
  */
 export interface DependenciesStore<
   Dependencies extends DefaultDependencies = DefaultDependencies,

@@ -21,4 +21,14 @@ slots come from `PluginApi.getUrlParams`. The forward map they check for cycles 
 `PluginApi.getForwardMap()`. The route matcher is not handed to these validators,
 and the path-slot walk they need lives in core.
 
-Behaviour is identical: same refusals, same messages, same thresholds.
+The retrospective pass at `usePlugin()` takes facts as well. Routes come from
+`getRoutesApi(router).get`, and the forward map, resolved limits, dependency names
+and external guard names from `PluginApi`; the batch limit on `setDependencies`
+reads the dependency names and the resolved limit there too. The one core record
+the plugin reads is the dependency record, for the getter check. Its local
+mirrors of core's route-config and limit types are gone, and with them their rows
+in `core-union-mirror-authority-2091`.
+
+Behaviour is identical — same refusals, same messages, same thresholds — with one
+ordering detail: when several routes carry a bad default bag, the route named
+first follows the route tree's order.

@@ -1,7 +1,7 @@
 // packages/validation-plugin/src/validationPlugin.ts
 
 import { RouterError } from "@real-router/core";
-import { getPluginApi } from "@real-router/core/api";
+import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 import { freezeThrownError } from "@real-router/core/utils";
 import { getInternals } from "@real-router/core/validation";
 
@@ -100,41 +100,30 @@ import type {
   PluginFactory,
   RouterValidator,
   Route,
+  RoutesApi,
   RouteTree,
   Plugin,
 } from "@real-router/core";
-import type { RouterInternals } from "@real-router/core/validation";
 
 /** The one question existence asks of a tree node: its children by segment. */
 interface TreeNode {
   children: ReadonlyMap<string, TreeNode>;
 }
 
-function buildValidatorObject<
-  Dependencies extends DefaultDependencies = DefaultDependencies,
->(
-  ctx: RouterInternals<Dependencies>,
-  api: PluginApi,
-  defaultsWatch: DefaultsMutationWatch,
-): RouterValidator {
-  // One de-dup cache per validator object, i.e. per registration, i.e. per router
-  // (#1583) — the same lifetime the mode gate's reporters get, for the same
-  // reason: a module-level Set would let the first router in a process silence
-  // every one after it.
-  const reportMisChanneledKey = createMisChanneledKeyReporter((routeName) =>
-    api.getDeclaredQueryNames(routeName),
-  );
-
-  // ⚑ The two questions the route validators ask about routes that already
-  // exist, answered from the curated surface (#2382). Existence WALKS the
-  // published tree rather than asking the matcher: `getRoutesApi.has` would do
-  // the lookup too, but it runs `validateRouteName` first and would rename a
-  // malformed `forwardTo` target's refusal to `[router.hasRoute]`.
+/**
+ * The two questions the validators ask about routes that already exist,
+ * answered from the curated surface (#2382).
+ */
+function createRouteLookup(api: PluginApi): RouteLookup {
+  // ⚑ Existence WALKS the published tree rather than asking the matcher:
+  // `getRoutesApi.has` would do the lookup too, but it runs `validateRouteName`
+  // first and would rename a malformed `forwardTo` target's refusal to
+  // `[router.hasRoute]`.
   //
   // ⚠ The walk answers what `matcher.hasRoute` answers except after
   // `children.set` on a handed-out tree — the Map shell-freeze exception
   // `engine/INVARIANTS.md` records.
-  const lookup: RouteLookup = {
+  return {
     hasRoute: (name) => {
       let node = api.getTree() as TreeNode | undefined;
 
@@ -150,6 +139,38 @@ function buildValidatorObject<
     },
     getUrlParams: (name) => api.getUrlParams(name),
   };
+}
+
+/**
+ * Every top-level route, nested, as `RoutesApi.get` reports it — the config
+ * slots the retrospective pass judges included.
+ */
+function readRoutes<Dependencies extends DefaultDependencies>(
+  api: PluginApi,
+  routesApi: RoutesApi<Dependencies>,
+): Route<Dependencies>[] {
+  const routes: Route<Dependencies>[] = [];
+
+  for (const name of (api.getTree() as TreeNode).children.keys()) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- a top-level name of the tree always names a route
+    routes.push(routesApi.get(name)!);
+  }
+
+  return routes;
+}
+
+function buildValidatorObject(
+  api: PluginApi,
+  lookup: RouteLookup,
+  defaultsWatch: DefaultsMutationWatch,
+): RouterValidator {
+  // One de-dup cache per validator object, i.e. per registration, i.e. per router
+  // (#1583) — the same lifetime the mode gate's reporters get, for the same
+  // reason: a module-level Set would let the first router in a process silence
+  // every one after it.
+  const reportMisChanneledKey = createMisChanneledKeyReporter((routeName) =>
+    api.getDeclaredQueryNames(routeName),
+  );
 
   return {
     routes: {
@@ -232,7 +253,7 @@ function buildValidatorObject<
     options: {
       validateOptions,
       validateResolvedDefaultRoute(routeName) {
-        validateResolvedDefaultRoute(routeName, api.getTree());
+        validateResolvedDefaultRoute(routeName, lookup);
       },
     },
     dependencies: {
@@ -250,7 +271,8 @@ function buildValidatorObject<
         // carries a getter, is refused for what it IS before it is measured.
         validateDependencyBatchLimit(
           deps,
-          ctx.dependenciesGetStore(),
+          api.getDependencyKeys(),
+          api.getResolvedLimits().maxDependencies,
           methodName,
         );
       },
@@ -465,7 +487,8 @@ export function validationPlugin<
     // Same shape as `claimContextNamespace`, which checks the holder on
     // write and on release (#2059 / #1929) — here only the release half is
     // reachable, and the write half waits for the slot to go away.
-    const ownValidator = buildValidatorObject(ctx, api, defaultsWatch);
+    const lookup = createRouteLookup(api);
+    const ownValidator = buildValidatorObject(api, lookup, defaultsWatch);
     // One branch, shared by the error path below and by `teardown`: both ask
     // the same question, so they share the site rather than each growing an
     // arm the other's test has to reach.
@@ -478,23 +501,31 @@ export function validationPlugin<
     ctx.validator = ownValidator;
 
     try {
-      const store = ctx.routeGetStore();
-      const deps = ctx.dependenciesGetStore();
+      const routes = readRoutes(api, getRoutesApi(router));
+      const forwardMap = api.getForwardMap();
+      const limits = api.getResolvedLimits();
       const options = api.getOptions();
 
-      validateExistingRoutes(store);
-      validateForwardToConsistency(store);
-      validateRoutePropertiesStore(store);
-      validateForwardToTargetsStore(store);
-      validateDependenciesStructure(deps);
-      validateLimitsConsistency(options, deps);
+      validateExistingRoutes(routes);
+      validateForwardToConsistency(forwardMap, lookup);
+      validateRoutePropertiesStore(routes);
+      validateForwardToTargetsStore(forwardMap, lookup);
+      validateDependenciesStructure(
+        ctx.dependenciesGetStore().dependencies,
+        limits,
+      );
+      validateLimitsConsistency(
+        options,
+        api.getDependencyKeys().length,
+        limits.maxDependencies,
+      );
       ctx.validator.options.validateOptions(
         options,
         "constructor (retrospective)",
       );
 
       if (typeof options.defaultRoute === "string") {
-        validateResolvedDefaultRoute(options.defaultRoute, api.getTree());
+        validateResolvedDefaultRoute(options.defaultRoute, lookup);
       }
     } catch (error) {
       releaseIfStillOurs();
@@ -526,7 +557,7 @@ export function validationPlugin<
            throws, so the arm has no reachable input. Removing it is the change
            this comment exists to argue against. */
       try {
-        warnOrphanedGuards(ctx.routeGetStore(), api.logger);
+        warnOrphanedGuards(api.getExternalGuardNames(), lookup, api.logger);
       } catch {
         // A broken diagnostic is not the application's problem.
       }

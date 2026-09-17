@@ -402,31 +402,9 @@ describe("navigation validators", () => {
   });
 });
 
-function makeStore(
-  depCount: number,
-  maxDeps?: number,
-): {
-  dependencies: Record<string, unknown>;
-  limits?: { maxDependencies?: number };
-} {
-  const deps: Record<string, unknown> = {};
-
-  for (let i = 0; i < depCount; i++) {
-    deps[`dep${i}`] = i;
-  }
-
-  const result: {
-    dependencies: Record<string, unknown>;
-    limits?: { maxDependencies?: number };
-  } = {
-    dependencies: deps,
-  };
-
-  if (maxDeps !== undefined) {
-    result.limits = { maxDependencies: maxDeps };
-  }
-
-  return result;
+/** The names a router holding `depCount` dependencies reports. */
+function heldKeys(depCount: number): string[] {
+  return Array.from({ length: depCount }, (_, i) => `dep${i}`);
 }
 
 describe("helpers", () => {
@@ -511,7 +489,7 @@ describe("Phase 2 dependency validators", () => {
   describe("validateDependencyBatchLimit", () => {
     it("returns early when maxDependencies is 0 (unlimited)", () => {
       expect(() => {
-        validateDependencyBatchLimit({ a: 1, b: 2 }, makeStore(999, 0), "test");
+        validateDependencyBatchLimit({ a: 1, b: 2 }, heldKeys(999), 0, "test");
       }).not.toThrow();
     });
 
@@ -519,7 +497,8 @@ describe("Phase 2 dependency validators", () => {
       expect(() => {
         validateDependencyBatchLimit(
           { dep0: 1, dep1: 2 },
-          makeStore(2, 2),
+          heldKeys(2),
+          2,
           "setDependencies",
         );
       }).not.toThrow();
@@ -529,7 +508,8 @@ describe("Phase 2 dependency validators", () => {
       expect(() => {
         validateDependencyBatchLimit(
           { x: 1, y: 2 },
-          makeStore(2, 3),
+          heldKeys(2),
+          3,
           "setDependencies",
         );
       }).toThrow(/limit exceeded \(3\).*Current: 2, this batch adds 2/s);
@@ -539,26 +519,11 @@ describe("Phase 2 dependency validators", () => {
       expect(() => {
         validateDependencyBatchLimit(
           { x: 1 },
-          makeStore(2, 3),
+          heldKeys(2),
+          3,
           "setDependencies",
         );
       }).not.toThrow();
-    });
-
-    it("uses default maxDependencies of 100 when limits absent", () => {
-      const deps: Record<string, unknown> = {};
-
-      for (let i = 0; i < 100; i++) {
-        deps[`new${i}`] = i;
-      }
-
-      expect(() => {
-        validateDependencyBatchLimit(
-          deps,
-          { dependencies: { held: 1 } },
-          "setDependencies",
-        );
-      }).toThrow("Dependency limit exceeded");
     });
   });
 

@@ -416,23 +416,6 @@ const PAIRS: readonly Pair[] = [
         (key) => key !== "signal",
       ),
   },
-  {
-    what: "the route-config STORE slots — an interface mirror, not a union",
-    mirror: () =>
-      interfaceKeys(
-        "validators/retrospective.ts",
-        "LocalRouteConfig",
-        PLUGIN_SRC,
-      ),
-    owner: () =>
-      interfaceKeys("namespaces/RoutesNamespace/types.ts", "RouteConfig"),
-  },
-  {
-    what: "the limit KEYS — a two-level mirror the type system watches only half of",
-    mirror: () =>
-      literalArray("validators/retrospective.ts", "expectedLimitKeys"),
-    owner: () => interfaceKeys("types/limits.ts", "LimitsConfig"),
-  },
 ];
 
 describe("every core union this package mirrors is bound to it (#2091)", () => {

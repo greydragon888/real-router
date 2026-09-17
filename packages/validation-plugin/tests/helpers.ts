@@ -2,6 +2,7 @@ import { createRouter } from "@real-router/core";
 
 import { validationPlugin } from "@real-router/validation-plugin";
 
+import type { RouteLookup } from "../src/validators/forwardTo";
 import type { Options, Route, Router } from "@real-router/core";
 
 export const TEST_ROUTES: Route[] = [
@@ -40,4 +41,17 @@ export function createValidationRouter(options?: Partial<Options>): Router {
   router.usePlugin(validationPlugin());
 
   return router;
+}
+
+/**
+ * A `RouteLookup` built from a plain table: which names exist, and each one's
+ * path slots. The real one reads `PluginApi.getTree()` and `getUrlParams` (#2382).
+ */
+export function lookupOf(
+  table: Record<string, readonly string[]>,
+): RouteLookup {
+  return {
+    hasRoute: (name) => Object.hasOwn(table, name),
+    getUrlParams: (name) => table[name] ?? [],
+  };
 }

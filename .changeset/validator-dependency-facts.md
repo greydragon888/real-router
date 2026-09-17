@@ -40,5 +40,23 @@ the tree come from two new `PluginApi` members:
   and a cycle closing through a source that already forwards is not
   constructible there.
 
+Three more `PluginApi` members hand out what `@real-router/validation-plugin`
+reads when it is installed, so it reads no route store and no limits off a
+dependency store:
+
+- `getResolvedLimits()` — the frozen resolved limits, the object core's own
+  dependency-count check reads.
+- `getDependencyKeys()` — the dependency names as `Object.keys` lists them,
+  `"__proto__"` included, as a fresh frozen array per call.
+  `Object.keys(getDependenciesApi(router).getAll())` comes out one short on a
+  `"__proto__"` dependency, because that container withholds it.
+- `getExternalGuardNames()` — route names carrying a guard added through
+  `addActivateGuard` / `addDeactivateGuard`, deactivate first, each once, as a
+  fresh frozen array per call. A guard declared on a route definition does not
+  put its name there.
+
+A route's own config slots need no member: `getRoutesApi(router).get(name)`
+reports every one of them.
+
 Breaking for anything that implements `RouterValidator` directly; pre-1.0, so
 `minor`.

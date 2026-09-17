@@ -19,8 +19,8 @@ import {
   validateForwardToCycle,
   validateUpdateRoute,
 } from "../../../src/validators/routes";
+import { lookupOf } from "../../helpers";
 
-import type { RouteLookup } from "../../../src/validators/forwardTo";
 import type { Router } from "@real-router/core";
 import type { RoutesApi } from "@real-router/core/api";
 
@@ -250,17 +250,6 @@ describe("validateSetRootPathArgs — direct", () => {
     }).not.toThrow();
   });
 });
-
-/**
- * A `RouteLookup` built from a plain table: which names exist, and each one's
- * path slots. The real one reads `PluginApi.getTree()` and `getUrlParams` (#2382).
- */
-function lookupOf(table: Record<string, readonly string[]>): RouteLookup {
-  return {
-    hasRoute: (name) => Object.hasOwn(table, name),
-    getUrlParams: (name) => table[name] ?? [],
-  };
-}
 
 describe("validateRoutes — direct calls", () => {
   // ⚑ The "no tree" and "undefined tree and forwardMap" arms are GONE with the
