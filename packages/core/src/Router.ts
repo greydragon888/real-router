@@ -204,7 +204,8 @@ export class Router<
     // Per-router logger instance, so a configure() reaches one router rather
     // than the process (#724). Stored on ctx (registerInternals below), so the
     // facade reads getInternals(this).logger; namespaces receive it via their
-    // deps at wiring; a plugin reads it there too — PluginApi carries no logger.
+    // deps at wiring; a plugin reads the frozen three-method view PluginApi
+    // carries (#2339 slice 2), not this instance.
     const logger = new RouterLogger(normalizedLogger);
 
     // Per-instance fire-and-forget suppressor (see the field declaration): it
