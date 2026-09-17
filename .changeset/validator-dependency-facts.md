@@ -14,10 +14,12 @@ no validator installed short-circuits the whole chain and never walks the key
 list. `maxDependencies` arrives resolved by `createLimits`, which puts this path
 outside the reach of the default-drift #1879 names.
 
-`dependency-argument-channel-2382.test.ts` gates it by REACHABILITY rather than
-identity — an identity check against the store admits every narrowed form, such
-as `store.dependencies` or a `{ dependencies }` wrapper — and runs those rejected
-forms through the same gate as negative controls.
+`validator-argument-channel-2382.test.ts` gates every validator method against
+both stores by REACHABILITY rather than identity — an identity check admits every
+narrowed form, such as `store.matcher`, `config.forwardMap` or a
+`{ dependencies }` wrapper — judged at call time, with what `PluginApi` publishes
+(`getTree()`, `getResolvedLimits()`) subtracted, and runs the rejected forms
+through the same gate as negative controls.
 
 `routes.validateParentOption` now takes `(parent)` and
 `options.validateResolvedDefaultRoute` takes `(routeName)`. Both judge only the
