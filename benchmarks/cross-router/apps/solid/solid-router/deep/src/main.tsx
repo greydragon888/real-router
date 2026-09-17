@@ -12,7 +12,7 @@ import { DEEP_DEPTH, DEEP_TARGETS, deepPath } from "../../../_shared/deep-spec";
 import type { RouteDefinition } from "@solidjs/router";
 import type { JSX } from "solid-js";
 
-function LevelLayout(props: { children?: JSX.Element }): JSX.Element {
+function LevelLayout(props: Readonly<{ children?: JSX.Element }>): JSX.Element {
   return <div class="lvl">{props.children}</div>;
 }
 
@@ -21,7 +21,11 @@ function buildLevel(k: number): RouteDefinition {
     // index equivalent: child path "/" matches the parent level exactly.
     { path: "/", component: () => <CatalogItem n={String(k)} /> },
   ];
-  if (k < DEEP_DEPTH) children.push(buildLevel(k + 1));
+
+  if (k < DEEP_DEPTH) {
+    children.push(buildLevel(k + 1));
+  }
+
   return { path: `l${k}`, component: LevelLayout, children };
 }
 
@@ -45,6 +49,7 @@ const routes: RouteDefinition[] = [
 ];
 
 const root = document.querySelector("#root");
+
 if (root) {
   render(() => <Router>{routes}</Router>, root);
 }

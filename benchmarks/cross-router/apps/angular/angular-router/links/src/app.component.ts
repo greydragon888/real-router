@@ -1,7 +1,9 @@
 import { Component } from "@angular/core";
 import { RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
 
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
 const TAB_COUNT = _n > 0 ? _n : 100;
 
 @Component({

@@ -28,13 +28,19 @@ await router.start();
 const UserRoute = defineComponent({
   setup() {
     const { route } = useRoute<{ id: string }>();
+
     return () => {
       const id = route.value.params.id;
       const next = String(Number(id) + 1);
+
       return (
         <>
           <User id={id} />
-          <Link routeName="user" routeParams={{ id: next }} data-testid="link-user-next">
+          <Link
+            routeName="user"
+            routeParams={{ id: next }}
+            data-testid="link-user-next"
+          >
             Next
           </Link>
         </>

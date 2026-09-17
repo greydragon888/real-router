@@ -26,8 +26,10 @@ function Root(): JSX.Element {
   );
 }
 
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- TanStack types these hooks through a registered router, and registration is global to the TypeScript program: this cohort's shells share one tsconfig, so each would take the others' routes (TS2717) */
 function DataPage(): JSX.Element {
   const loaded = dataRoute.useLoaderData();
+
   return <main data-testid="loaded-value">{loaded.value}</main>;
 }
 

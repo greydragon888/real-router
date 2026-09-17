@@ -10,7 +10,9 @@ import { render } from "solid-js/web";
 import type { Route } from "@real-router/core";
 import type { JSX } from "solid-js";
 
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
 const COUNT = _n > 0 ? _n : 1000;
 const items: number[] = Array.from({ length: COUNT }, (_, i) => i);
 
@@ -30,6 +32,7 @@ await router.start();
 
 function App(): JSX.Element {
   const [show, setShow] = createSignal(false);
+
   return (
     <>
       <button data-testid="mount-links" onClick={() => setShow(true)}>

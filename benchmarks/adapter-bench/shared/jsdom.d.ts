@@ -5,7 +5,6 @@ declare module "jsdom" {
       html?: string,
       options?: { url?: string; pretendToBeVisual?: boolean },
     );
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    window: any;
+    window: Window & typeof globalThis;
   }
 }

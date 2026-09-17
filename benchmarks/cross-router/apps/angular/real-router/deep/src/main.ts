@@ -11,6 +11,7 @@ const router = createRouter(routes, {
   defaultRoute: "home",
   allowNotFound: true,
 });
+
 router.usePlugin(browserPluginFactory());
 
 void router.start().then(() => {

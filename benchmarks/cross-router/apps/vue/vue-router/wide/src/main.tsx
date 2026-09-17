@@ -25,7 +25,9 @@ const router = createRouter({
     },
     ...wideItems.map((n) => ({
       path: `/catalog/item-${n}`,
-      component: defineComponent({ setup: () => () => <CatalogItem n={String(n)} /> }),
+      component: defineComponent({
+        setup: () => () => <CatalogItem n={String(n)} />,
+      }),
     })),
   ],
 });
@@ -36,7 +38,11 @@ const App = defineComponent({
       <>
         <nav>
           {WIDE_TARGETS.map((n) => (
-            <RouterLink key={n} to={`/catalog/item-${n}`} data-testid={`link-item-${n}`}>
+            <RouterLink
+              key={n}
+              to={`/catalog/item-${n}`}
+              data-testid={`link-item-${n}`}
+            >
               Item {n}
             </RouterLink>
           ))}

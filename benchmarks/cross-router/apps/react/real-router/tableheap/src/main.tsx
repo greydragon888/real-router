@@ -28,6 +28,7 @@ await router.start();
 
 function App(): JSX.Element {
   const { route } = useRoute();
+
   return (
     <main data-testid="page-ready" data-n={String(n)}>
       {route.name}

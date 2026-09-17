@@ -26,7 +26,7 @@ export function searchQuery(n: number): string {
 }
 
 // real-router query declaration appended to a route path: ?k1&k2&...&kN
-export function searchDecl(n: number): string {
+export function searchDeclaration(n: number): string {
   return `?${searchKeys(n).join("&")}`;
 }
 
@@ -40,10 +40,15 @@ export function readSearch(entries: Iterable<[string, unknown]>): {
 } {
   let count = 0;
   let checksum = 0;
+
   for (const [k, v] of entries) {
-    if (!/^k\d+$/.test(k)) continue;
+    if (!/^k\d+$/.test(k)) {
+      continue;
+    }
+
     count += 1;
     checksum += String(v).length;
   }
+
   return { count, checksum };
 }

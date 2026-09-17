@@ -10,7 +10,9 @@ import { tabs } from "./routes";
   selector: "links-content",
   template: `
     @if (n()) {
-      <main data-testid="page-tab" [attr.data-n]="n()"><h1>Tab {{ n() }}</h1></main>
+      <main data-testid="page-tab" [attr.data-n]="n()">
+        <h1>Tab {{ n() }}</h1>
+      </main>
     } @else {
       <main data-testid="page-home"><h1>Home</h1></main>
     }

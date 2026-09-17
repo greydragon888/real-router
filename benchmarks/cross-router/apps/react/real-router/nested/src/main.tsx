@@ -10,7 +10,9 @@ import { createRoot } from "react-dom/client";
 import type { Route } from "@real-router/core";
 import type { JSX } from "react";
 
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
 const DEPTH = _n > 0 ? _n : 1; // shared-layout levels above the a/b switch
 
 // Route tree: sec(/sec) → l2(/l2) → … → lDEPTH → { a, b }. Level 1 is "sec".
@@ -20,13 +22,16 @@ function buildRoutes(): Route[] {
     { name: "b", path: "/b" },
   ];
   let node: Route = { name: `l${DEPTH}`, path: `/l${DEPTH}`, children: ab };
+
   for (let k = DEPTH - 1; k >= 2; k--) {
     node = { name: `l${k}`, path: `/l${k}`, children: [node] };
   }
+
   const sec: Route =
     DEPTH === 1
       ? { name: "sec", path: "/sec", children: ab }
       : { name: "sec", path: "/sec", children: [node] };
+
   return [{ name: "home", path: "/" }, sec];
 }
 
@@ -39,7 +44,7 @@ router.usePlugin(browserPluginFactory());
 
 await router.start();
 
-function Leaf({ n }: { n: string }): JSX.Element {
+function Leaf({ n }: Readonly<{ n: string }>): JSX.Element {
   return (
     <main data-testid="page-item" data-n={n}>
       <h1>{n}</h1>
@@ -52,10 +57,10 @@ function Leaf({ n }: { n: string }): JSX.Element {
 function Chain({
   level,
   dotted,
-}: {
+}: Readonly<{
   level: number;
   dotted: string;
-}): JSX.Element {
+}>): JSX.Element {
   if (level === DEPTH) {
     return (
       <div className="sec">
@@ -78,7 +83,9 @@ function Chain({
       </div>
     );
   }
+
   const childSeg = `l${level + 1}`;
+
   return (
     <div className="lvl">
       <RouteView nodeName={dotted}>

@@ -9,7 +9,9 @@ import { render } from "solid-js/web";
 import type { Route } from "@real-router/core";
 import type { JSX } from "solid-js";
 
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
 const DEPTH = _n > 0 ? _n : 1;
 
 function buildRoutes(): Route[] {
@@ -18,13 +20,16 @@ function buildRoutes(): Route[] {
     { name: "b", path: "/b" },
   ];
   let node: Route = { name: `l${DEPTH}`, path: `/l${DEPTH}`, children: ab };
+
   for (let k = DEPTH - 1; k >= 2; k--) {
     node = { name: `l${k}`, path: `/l${k}`, children: [node] };
   }
+
   const sec: Route =
     DEPTH === 1
       ? { name: "sec", path: "/sec", children: ab }
       : { name: "sec", path: "/sec", children: [node] };
+
   return [{ name: "home", path: "/" }, sec];
 }
 
@@ -38,7 +43,7 @@ router.usePlugin(browserPluginFactory());
 await router.start();
 
 // props NOT destructured — Solid props are getters.
-function Leaf(props: { n: string }): JSX.Element {
+function Leaf(props: Readonly<{ n: string }>): JSX.Element {
   return (
     <main data-testid="page-item" data-n={props.n}>
       <h1>{props.n}</h1>
@@ -46,7 +51,9 @@ function Leaf(props: { n: string }): JSX.Element {
   );
 }
 
-function Chain(props: { level: number; dotted: string }): JSX.Element {
+function Chain(
+  props: Readonly<{ level: number; dotted: string }>,
+): JSX.Element {
   if (props.level === DEPTH) {
     return (
       <div class="sec">
@@ -69,12 +76,17 @@ function Chain(props: { level: number; dotted: string }): JSX.Element {
       </div>
     );
   }
+
   const childSeg = `l${props.level + 1}`;
+
   return (
     <div class="lvl">
       <RouteView nodeName={props.dotted}>
         <RouteView.Match segment={childSeg}>
-          <Chain level={props.level + 1} dotted={`${props.dotted}.${childSeg}`} />
+          <Chain
+            level={props.level + 1}
+            dotted={`${props.dotted}.${childSeg}`}
+          />
         </RouteView.Match>
       </RouteView>
     </div>

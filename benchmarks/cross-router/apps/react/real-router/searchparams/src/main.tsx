@@ -10,7 +10,7 @@ import { createRoot } from "react-dom/client";
 
 import {
   SEARCH_COUNTS,
-  searchDecl,
+  searchDeclaration,
   searchValues,
   readSearch,
 } from "../../../_shared/search-param-spec";
@@ -20,7 +20,10 @@ import type { JSX } from "react";
 
 const routes: Route[] = [
   { name: "home", path: "/" },
-  ...SEARCH_COUNTS.map((n) => ({ name: `s${n}`, path: `/s${n}${searchDecl(n)}` })),
+  ...SEARCH_COUNTS.map((n) => ({
+    name: `s${n}`,
+    path: `/s${n}${searchDeclaration(n)}`,
+  })),
 ];
 
 const router = createRouter(routes, {
@@ -35,6 +38,7 @@ await router.start();
 function SearchLeaf(): JSX.Element {
   const { route } = useRoute();
   const { count, checksum } = readSearch(Object.entries(route.search));
+
   return (
     <main data-testid="page-search" data-count={count}>
       {count} search · Σ{checksum}

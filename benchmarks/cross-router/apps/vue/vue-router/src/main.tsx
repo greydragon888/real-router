@@ -14,9 +14,11 @@ import { About, Home, User } from "../../_shared/pages";
 const UserRoute = defineComponent({
   setup() {
     const route = useRoute();
+
     return () => {
       const id = String(route.params.id);
       const next = String(Number(id) + 1);
+
       return (
         <>
           <User id={id} />

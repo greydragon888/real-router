@@ -11,7 +11,7 @@ import { WIDE_TARGETS, wideItems } from "../../../_shared/wide-spec";
 import type { RouteDefinition } from "@solidjs/router";
 import type { JSX } from "solid-js";
 
-function Layout(props: { children?: JSX.Element }): JSX.Element {
+function Layout(props: Readonly<{ children?: JSX.Element }>): JSX.Element {
   return (
     <>
       <nav>
@@ -37,6 +37,7 @@ const routes: RouteDefinition[] = [
 ];
 
 const root = document.querySelector("#root");
+
 if (root) {
   render(() => <Router root={Layout}>{routes}</Router>, root);
 }

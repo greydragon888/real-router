@@ -8,7 +8,9 @@ import { createApp, defineComponent, h } from "vue";
 
 import type { Route } from "@real-router/core";
 
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
 const DEPTH = _n > 0 ? _n : 1;
 
 function buildRoutes(): Route[] {
@@ -17,13 +19,16 @@ function buildRoutes(): Route[] {
     { name: "b", path: "/b" },
   ];
   let node: Route = { name: `l${DEPTH}`, path: `/l${DEPTH}`, children: ab };
+
   for (let k = DEPTH - 1; k >= 2; k--) {
     node = { name: `l${k}`, path: `/l${k}`, children: [node] };
   }
+
   const sec: Route =
     DEPTH === 1
       ? { name: "sec", path: "/sec", children: ab }
       : { name: "sec", path: "/sec", children: [node] };
+
   return [{ name: "home", path: "/" }, sec];
 }
 
@@ -76,12 +81,17 @@ const Chain = defineComponent({
           </div>
         );
       }
+
       const childSeg = `l${props.level + 1}`;
+
       return (
         <div class="lvl">
           <RouteView nodeName={props.dotted}>
             <RouteView.Match segment={childSeg}>
-              <Chain level={props.level + 1} dotted={`${props.dotted}.${childSeg}`} />
+              <Chain
+                level={props.level + 1}
+                dotted={`${props.dotted}.${childSeg}`}
+              />
             </RouteView.Match>
           </RouteView>
         </div>

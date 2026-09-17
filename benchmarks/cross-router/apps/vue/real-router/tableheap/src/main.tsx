@@ -26,6 +26,7 @@ await router.start();
 const App = defineComponent({
   setup() {
     const { route } = useRoute();
+
     return () => (
       <main data-testid="page-ready" data-n={String(n)}>
         {route.value.name}

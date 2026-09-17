@@ -141,6 +141,20 @@
       "outputLogs": "errors-only",
       "cache": true
     },
+    "lint:bench": {
+      "dependsOn": ["^bundle"],
+      "outputs": [],
+      "inputs": [
+        "**/*.{ts,tsx,mts,cts,js,jsx,cjs}",
+        "**/tsconfig*.json",
+        "eslint.config.*",
+        "package.json",
+        "!**/dist/**",
+        "!**/node_modules/**"
+      ],
+      "outputLogs": "errors-only",
+      "cache": true
+    },
     "lint:fix": {
       "outputs": [],
       "inputs": [

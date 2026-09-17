@@ -34,40 +34,56 @@ const homeRoute = createRoute({
   }),
 });
 
-const deepRoute = createRoute({ getParentRoute: () => rootRoute, path: "deep", component: OutletComp });
+const deepRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "deep",
+  component: OutletComp,
+});
 
 // Create layout + leaf routes per level; parent chain via thunks. Typed `any`:
 // a 90-deep programmatic route tree blows up tanstack's recursive Route generics
 // under exactOptionalPropertyTypes (a type-inference limit, not a runtime issue).
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return */
 const layoutRoutes: any[] = [];
 const leafRoutes: any[] = [];
+
 for (let k = 1; k <= DEEP_DEPTH; k++) {
   const layout = createRoute({
     getParentRoute: () => (k === 1 ? deepRoute : layoutRoutes[k - 2]),
     path: `l${k}`,
     component: OutletComp,
   });
+
   layoutRoutes.push(layout);
   leafRoutes.push(
     createRoute({
       getParentRoute: () => layoutRoutes[k - 1],
       path: "/",
-      component: defineComponent({ setup: () => () => <CatalogItem n={String(k)} /> }),
+      component: defineComponent({
+        setup: () => () => <CatalogItem n={String(k)} />,
+      }),
     }),
   );
 }
 
 // Assemble bottom-up: each layout owns [leaf, deeper-layout].
-let built: any = layoutRoutes[DEEP_DEPTH - 1].addChildren([leafRoutes[DEEP_DEPTH - 1]]);
+let built: any = layoutRoutes[DEEP_DEPTH - 1].addChildren([
+  leafRoutes[DEEP_DEPTH - 1],
+]);
+
 for (let k = DEEP_DEPTH - 1; k >= 1; k--) {
   built = layoutRoutes[k - 1].addChildren([leafRoutes[k - 1], built]);
 }
 
-const routeTree = rootRoute.addChildren([homeRoute, deepRoute.addChildren([built])]);
+const routeTree = rootRoute.addChildren([
+  homeRoute,
+  deepRoute.addChildren([built]),
+]);
 /* eslint-enable @typescript-eslint/no-explicit-any */
 const router = createRouter({ routeTree });
 
-const App = defineComponent({ setup: () => () => h(RouterProvider, { router }) });
+const App = defineComponent({
+  setup: () => () => h(RouterProvider, { router }),
+});
 
 createApp(App).mount("#root");

@@ -1,7 +1,10 @@
 import { Component, computed, forwardRef, input } from "@angular/core";
 import { RealLink, RouteMatch, RouteView } from "@real-router/angular";
 
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
+
 export const DEPTH = _n > 0 ? _n : 1;
 
 @Component({
@@ -30,8 +33,12 @@ export class LeafComponent {
     @if (level() === depth()) {
       <div class="sec">
         <nav>
-          <a realLink [routeName]="dotted() + '.a'" data-testid="link-sec-a">A</a>
-          <a realLink [routeName]="dotted() + '.b'" data-testid="link-sec-b">B</a>
+          <a realLink [routeName]="dotted() + '.a'" data-testid="link-sec-a"
+            >A</a
+          >
+          <a realLink [routeName]="dotted() + '.b'" data-testid="link-sec-b"
+            >B</a
+          >
         </nav>
         <route-view [routeNode]="dotted()">
           <ng-template routeMatch="a"><sec-leaf n="a" /></ng-template>

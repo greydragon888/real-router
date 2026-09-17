@@ -1,12 +1,14 @@
 import { Component, input } from "@angular/core";
 import { RouterLink, RouterOutlet } from "@angular/router";
 
-import type { Routes } from "@angular/router";
+import type { Route, Routes } from "@angular/router";
 
 // angular-router nested variant — shared layout chain of DEPTH D (from `?n=`,
 // default 1) with sibling leaves a/b at the bottom. Toggling a↔b reuses every
 // parent Section/Pass component (only the deepest outlet swaps) — the reuse axis.
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
 const DEPTH = _n > 0 ? _n : 1;
 const deepPrefix =
   "/sec" + Array.from({ length: DEPTH - 1 }, (_, i) => `/l${i + 2}`).join("");
@@ -19,7 +21,9 @@ export class HomeComponent {}
 
 @Component({
   selector: "leaf-cmp",
-  template: `<main data-testid="page-item" [attr.data-n]="n()"><h1>{{ n() }}</h1></main>`,
+  template: `<main data-testid="page-item" [attr.data-n]="n()">
+    <h1>{{ n() }}</h1>
+  </main>`,
 })
 export class LeafComponent {
   readonly n = input<string>("");
@@ -50,10 +54,8 @@ export class BottomComponent {
   readonly bPath = `${deepPrefix}/b`;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildSec(): any {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let node: any = {
+function buildSec(): Route {
+  let node: Route = {
     path: DEPTH === 1 ? "sec" : `l${DEPTH}`,
     component: BottomComponent,
     children: [
@@ -61,6 +63,7 @@ function buildSec(): any {
       { path: "b", component: LeafComponent, data: { n: "b" } },
     ],
   };
+
   for (let k = DEPTH - 1; k >= 1; k--) {
     node = {
       path: k === 1 ? "sec" : `l${k}`,
@@ -68,6 +71,7 @@ function buildSec(): any {
       children: [node],
     };
   }
+
   return node;
 }
 

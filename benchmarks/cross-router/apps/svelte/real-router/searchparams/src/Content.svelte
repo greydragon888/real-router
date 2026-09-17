@@ -1,6 +1,6 @@
 <script lang="ts">
   // useRoute() in a CHILD of RouterProvider. real-router puts the declared query
-  // params (searchDecl → `?k1&k2&...`) in the active route's search object; the
+  // params (searchDeclaration → `?k1&k2&...`) in the active route's search object; the
   // leaf reads EVERY value via readSearch (checksum forces materialization). `stats`
   // is $derived, so it recomputes across navigations.
   import { Link, useRoute } from "@real-router/svelte";

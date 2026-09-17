@@ -13,12 +13,15 @@ import { render } from "solid-js/web";
 
 import type { JSX } from "solid-js";
 
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
 const COUNT = _n > 0 ? _n : 1000;
 const rIndexes = Array.from({ length: COUNT }, (_, i) => i);
 
 function Home(): JSX.Element {
   const [show, setShow] = createSignal(false);
+
   return (
     <>
       <button data-testid="mount-links" onClick={() => setShow(true)}>
@@ -63,6 +66,7 @@ const router = createRouter({
 });
 
 const root = document.querySelector("#root");
+
 if (root) {
   render(() => <RouterProvider router={router} />, root);
 }

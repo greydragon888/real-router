@@ -6,7 +6,9 @@ import { ChangeDetectorRef, Component, inject, signal } from "@angular/core";
   selector: "app-root",
   template: `
     <nav>
-      <a href="/" data-testid="link-home" (click)="go($event, 'home', '/')">Home</a>
+      <a href="/" data-testid="link-home" (click)="go($event, 'home', '/')"
+        >Home</a
+      >
       <a
         href="/about"
         data-testid="link-about"
@@ -31,8 +33,8 @@ export class AppComponent {
   // cohort. Flush synchronously so the floor measures the render itself.
   private readonly cdr = inject(ChangeDetectorRef);
 
-  go(e: Event, v: "home" | "about", path: string): void {
-    e.preventDefault();
+  go(event: Event, v: "home" | "about", path: string): void {
+    event.preventDefault();
     history.pushState(null, "", path);
     this.view.set(v);
     this.cdr.detectChanges();

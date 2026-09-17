@@ -26,7 +26,7 @@ const HOOK = ".husky/pre-push";
 const SHARED_PACKAGE = "@real-router/shared-sources";
 
 /** No lint step reads these yet. An entry that stops being true fails the check. */
-const EXEMPT = new Map([["router-benchmarks", "#2390"]]);
+const EXEMPT = new Map();
 
 const sh = (command, args) =>
   execFileSync(command, args, {
@@ -48,7 +48,9 @@ const trackedFiles = sh("git", ["ls-files"]).split("\n").filter(Boolean);
 const sharedDirs = [
   ...new Set(
     trackedFiles
-      .filter((file) => file.startsWith("shared/") && file.split("/").length > 2)
+      .filter(
+        (file) => file.startsWith("shared/") && file.split("/").length > 2,
+      )
       .map((file) => file.split("/")[1]),
   ),
 ];
@@ -106,7 +108,9 @@ const result = evaluateReach({
 });
 
 if (result.vacuous) {
-  console.error(`lint:reach: refusing to pass over nothing — ${result.vacuous}.`);
+  console.error(
+    `lint:reach: refusing to pass over nothing — ${result.vacuous}.`,
+  );
   process.exit(2);
 }
 
@@ -116,7 +120,8 @@ const failures = [
       `${name}: no lint step of ${HOOK} reads it — give it a lint script the hook runs, or name it in EXEMPT with an issue`,
   ),
   ...result.staleExemptions.map(
-    (name) => `${name}: EXEMPT names it, but it is linted now or no longer exists — drop the entry`,
+    (name) =>
+      `${name}: EXEMPT names it, but it is linted now or no longer exists — drop the entry`,
   ),
   ...result.unreadShared.map(
     (dir) =>

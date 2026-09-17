@@ -22,6 +22,7 @@ const store = {
   },
   subscribe(listener: () => void) {
     listeners.add(listener);
+
     return () => listeners.delete(listener);
   },
 };
@@ -50,6 +51,7 @@ function DataPage(): JSX.Element {
     store.subscribe,
     () => store.get("data:value") as string | undefined,
   );
+
   return value ? (
     <main data-testid="loaded-value">{value}</main>
   ) : (

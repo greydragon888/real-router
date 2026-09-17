@@ -22,9 +22,11 @@ import {
 
 import type { JSX } from "solid-js";
 
+/* eslint-disable @typescript-eslint/no-unsafe-argument -- TanStack types these hooks through a registered router, and registration is global to the TypeScript program: this cohort's shells share one tsconfig, so each would take the others' routes (TS2717) */
 function SearchLeaf(): JSX.Element {
   const search = useSearch({ strict: false });
   const info = createMemo(() => readSearch(Object.entries(search())));
+
   return (
     <main data-testid="page-search" data-count={info().count}>
       {info().count} search · Σ{info().checksum}
@@ -74,6 +76,7 @@ const router = createRouter({
 });
 
 const root = document.querySelector("#root");
+
 if (root) {
   render(() => <RouterProvider router={router} />, root);
 }

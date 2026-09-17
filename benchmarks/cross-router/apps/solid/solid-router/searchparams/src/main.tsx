@@ -18,6 +18,7 @@ import type { JSX } from "solid-js";
 function SearchLeaf(): JSX.Element {
   const [searchParams] = useSearchParams();
   const info = createMemo(() => readSearch(Object.entries(searchParams)));
+
   return (
     <main data-testid="page-search" data-count={info().count}>
       {info().count} search · Σ{info().checksum}
@@ -25,13 +26,16 @@ function SearchLeaf(): JSX.Element {
   );
 }
 
-function Layout(props: { children?: JSX.Element }): JSX.Element {
+function Layout(props: Readonly<{ children?: JSX.Element }>): JSX.Element {
   return (
     <>
       <nav>
         <For each={SEARCH_COUNTS}>
           {(n) => (
-            <A href={`/s${n}?${searchQuery(n)}`} data-testid={`link-search-${n}`}>
+            <A
+              href={`/s${n}?${searchQuery(n)}`}
+              data-testid={`link-search-${n}`}
+            >
               {n}
             </A>
           )}
@@ -48,6 +52,7 @@ const routes: RouteDefinition[] = [
 ];
 
 const root = document.querySelector("#root");
+
 if (root) {
   render(() => <Router root={Layout}>{routes}</Router>, root);
 }

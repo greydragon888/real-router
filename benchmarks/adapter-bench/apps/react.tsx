@@ -33,7 +33,7 @@ const routes: Route[] = [
 const indices = [0, 1, 2, 3, 4];
 
 /** 5 useRoute subscribers — the uSES fan-out every mounted component pays. */
-function RootSubscriber({ index }: { index: number }) {
+function RootSubscriber({ index }: Readonly<{ index: number }>) {
   const { route } = useRoute();
 
   return (
@@ -44,7 +44,7 @@ function RootSubscriber({ index }: { index: number }) {
 }
 
 /** 5 node-scoped subscribers — shouldUpdateNode-gated re-render path. */
-function ItemsSubscriber({ index }: { index: number }) {
+function ItemsSubscriber({ index }: Readonly<{ index: number }>) {
   const { route } = useRouteNode("items");
 
   return (

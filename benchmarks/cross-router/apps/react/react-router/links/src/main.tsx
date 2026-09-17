@@ -1,13 +1,18 @@
 // react-router links variant — 100 <NavLink> (built-in active-aware) to sibling
 // /tab/i routes; className callback recomputes on every navigation.
 import { createRoot } from "react-dom/client";
-import { NavLink, Outlet, RouterProvider, createBrowserRouter } from "react-router";
+import {
+  NavLink,
+  Outlet,
+  RouterProvider,
+  createBrowserRouter,
+} from "react-router";
 
 import { tabs } from "../../../_shared/links-spec";
 
 import type { JSX } from "react";
 
-function TabPage({ n }: { n: string }): JSX.Element {
+function TabPage({ n }: Readonly<{ n: string }>): JSX.Element {
   return (
     <main data-testid="page-tab" data-n={n}>
       <h1>Tab {n}</h1>

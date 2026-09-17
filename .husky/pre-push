@@ -14,8 +14,9 @@
 # - lint:reach: Every workspace package is read by a lint step of this hook,
 #               derived from its own `turbo run` lines (#2370)
 # - build: Final build to ensure compilation
-# - lint:example: ESLint over every example app, after build — examples
-#                 resolve @real-router/* through the dist/ it produces
+# - lint:example / lint:bench: ESLint over every example app and over
+#                 benchmarks/, after build — the examples and the Angular
+#                 benchmark apps resolve @real-router/* through its dist/
 # - test:stress: Heap/timing stress suites, isolated at --concurrency=1 so
 #                heap measurements are free of build contention (#1423)
 # - lint:types: Validate TypeScript types in dist (arethetypeswrong)
@@ -103,10 +104,11 @@ pnpm lint:reach
 echo "📦 Building packages..."
 pnpm turbo run build lint:package lint:types --filter='!./examples/**'
 
-# Examples resolve @real-router/* through dist/, so they are linted after the
-# build above; `lint:example` depends on `^bundle` for a run from zero dists.
-echo "🧹 Linting examples..."
-pnpm turbo run lint:example --filter='./examples/**'
+# Examples and the Angular benchmark apps resolve @real-router/* through dist/,
+# so they are linted after the build above; both tasks depend on `^bundle` for a
+# run from zero dists.
+echo "🧹 Linting examples and benchmarks..."
+pnpm turbo run lint:example lint:bench --filter='./examples/**' --filter=router-benchmarks
 
 # Heap/timing stress suites — run isolated at --concurrency=1 (they were
 # dropped from build.dependsOn in #1423). Under the concurrent build, up to 4

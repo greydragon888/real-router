@@ -24,7 +24,9 @@ function Editor(): JSX.Element {
         data-testid="btn-save"
         onClick={() => {
           setDirty(false);
-          if (blocker.state === "blocked") blocker.reset();
+          if (blocker.state === "blocked") {
+            blocker.reset();
+          }
         }}
       >
         Save
@@ -41,7 +43,10 @@ const router = createBrowserRouter([
     path: "/",
     Component: () => <Outlet />,
     children: [
-      { index: true, Component: () => <main data-testid="page-home">Home</main> },
+      {
+        index: true,
+        Component: () => <main data-testid="page-home">Home</main>,
+      },
       { path: "editor", Component: Editor },
     ],
   },

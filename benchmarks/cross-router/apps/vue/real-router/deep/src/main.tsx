@@ -46,7 +46,10 @@ const Level = defineComponent({
         </RouteView.Self>
         {props.k < DEEP_DEPTH ? (
           <RouteView.Match segment={`l${props.k + 1}`}>
-            <Level k={props.k + 1} nodeName={`${props.nodeName}.l${props.k + 1}`} />
+            <Level
+              k={props.k + 1}
+              nodeName={`${props.nodeName}.l${props.k + 1}`}
+            />
           </RouteView.Match>
         ) : null}
       </RouteView>
@@ -61,7 +64,11 @@ const App = defineComponent({
         <RouteView.Match segment="home">
           <nav>
             {DEEP_TARGETS.map((d) => (
-              <Link key={d} routeName={deepName(d)} data-testid={`link-deep-${d}`}>
+              <Link
+                key={d}
+                routeName={deepName(d)}
+                data-testid={`link-deep-${d}`}
+              >
                 Depth {d}
               </Link>
             ))}

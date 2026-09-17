@@ -23,6 +23,7 @@ const store = {
   },
   subscribe(listener: () => void) {
     listeners.add(listener);
+
     return () => listeners.delete(listener);
   },
 };
@@ -55,13 +56,11 @@ function DataPage(): JSX.Element {
   const unsubscribe = store.subscribe(() =>
     setValue(store.get("data:value") as string | undefined),
   );
+
   onCleanup(unsubscribe);
 
   return (
-    <Show
-      when={value()}
-      fallback={<main data-testid="loading">loading…</main>}
-    >
+    <Show when={value()} fallback={<main data-testid="loading">loading…</main>}>
       <main data-testid="loaded-value">{value()}</main>
     </Show>
   );

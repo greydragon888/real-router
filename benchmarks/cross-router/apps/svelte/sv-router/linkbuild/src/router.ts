@@ -8,7 +8,9 @@ import Home from "../../../_shared/Home.svelte";
 
 import type { Routes } from "sv-router";
 
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
 const COUNT = _n > 0 ? _n : 1000;
 
 const routes = {

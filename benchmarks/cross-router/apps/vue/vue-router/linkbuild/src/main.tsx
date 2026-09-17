@@ -8,15 +8,23 @@ import {
   createWebHistory,
 } from "vue-router";
 
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
 const COUNT = _n > 0 ? _n : 1000;
 
 const App = defineComponent({
   setup() {
     const show = ref(false);
+
     return () => (
       <>
-        <button data-testid="mount-links" onClick={() => { show.value = true; }}>
+        <button
+          data-testid="mount-links"
+          onClick={() => {
+            show.value = true;
+          }}
+        >
           mount
         </button>
         <main data-testid="page-ready">{show.value ? "shown" : "idle"}</main>
@@ -44,7 +52,10 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: "/", component: App },
-    ...Array.from({ length: COUNT }, (_, i) => ({ path: `/r${i}`, component: Empty })),
+    ...Array.from({ length: COUNT }, (_, i) => ({
+      path: `/r${i}`,
+      component: Empty,
+    })),
   ],
 });
 

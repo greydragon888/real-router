@@ -17,7 +17,10 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: "/", component: Ready },
-    ...Array.from({ length: n }, (_, i) => ({ path: `/r${i}`, component: Empty })),
+    ...Array.from({ length: n }, (_, i) => ({
+      path: `/r${i}`,
+      component: Empty,
+    })),
   ],
 });
 

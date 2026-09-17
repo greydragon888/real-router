@@ -15,7 +15,7 @@ import { tabs } from "../../../_shared/links-spec";
 
 import type { JSX } from "solid-js";
 
-function TabPage(props: { n: string }): JSX.Element {
+function TabPage(props: Readonly<{ n: string }>): JSX.Element {
   return (
     <main data-testid="page-tab" data-n={props.n}>
       <h1>Tab {props.n}</h1>
@@ -68,6 +68,7 @@ const router = createRouter({
 });
 
 const root = document.querySelector("#root");
+
 if (root) {
   render(() => <RouterProvider router={router} />, root);
 }

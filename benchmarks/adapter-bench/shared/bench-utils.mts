@@ -111,6 +111,7 @@ export async function selfCheck(
       `${fw} self-check failed: DOM did not commit (before=${before}, after=${after})`,
     );
   }
+
   app.unmount();
   container.remove();
   console.log(`${fw} self-check: navigation commits to DOM synchronously`);

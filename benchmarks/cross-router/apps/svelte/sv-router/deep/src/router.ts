@@ -13,13 +13,15 @@ import type { Routes } from "sv-router";
 
 function buildLevel(k: number): Routes {
   const node: Routes = { layout: DeepLayout, "/": DeepLeaf };
+
   if (k < DEEP_DEPTH) {
     node[`/l${k + 1}`] = buildLevel(k + 1);
   }
+
   return node;
 }
 
 export const { p, navigate, route } = createRouter({
   "/": Home,
   "/deep": { "/l1": buildLevel(1) },
-} as Routes);
+});

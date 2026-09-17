@@ -5,11 +5,14 @@ import { render } from "solid-js/web";
 
 import type { JSX } from "solid-js";
 
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
 const COUNT = _n > 0 ? _n : 1000;
 
 function App(): JSX.Element {
   const [show, setShow] = createSignal(false);
+
   return (
     <>
       <button data-testid="mount-links" onClick={() => setShow(true)}>
@@ -35,6 +38,7 @@ function App(): JSX.Element {
 }
 
 const root = document.querySelector("#root");
+
 if (root) {
   render(() => <App />, root);
 }

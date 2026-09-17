@@ -211,7 +211,17 @@ export default tsEslint.config(
   tsEslint.configs.strictTypeChecked,
   tsEslint.configs.stylisticTypeChecked,
   {
-    files: ["**/*.ts", "**/*.tsx"],
+    // ⚠ The root is set for EVERY file, not only for those given a project
+    // service below. Left unset, the parser infers it from the configs that read
+    // a preset off `tseslint.configs`, each of which registers its own directory;
+    // `benchmarks/eslint.config.mjs` is one, and with two candidates a file no
+    // block names fails to parse at all (#2390).
+    languageOptions: {
+      parserOptions: { tsconfigRootDir: import.meta.dirname },
+    },
+  },
+  {
+    files: ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
     languageOptions: {
       parserOptions: {
         // projectService is stable in v8 (was EXPERIMENTAL_useProjectService)

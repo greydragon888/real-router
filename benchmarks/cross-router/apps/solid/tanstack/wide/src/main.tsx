@@ -57,6 +57,7 @@ const router = createRouter({
 });
 
 const root = document.querySelector("#root");
+
 if (root) {
   render(() => <RouterProvider router={router} />, root);
 }

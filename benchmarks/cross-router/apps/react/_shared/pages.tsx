@@ -22,7 +22,7 @@ export function About(): JSX.Element {
 // Param page — `data-id` lets the driver detect the param actually changed.
 // Each engine reads its param idiomatically and passes `id` as a prop, so the
 // rendered DOM stays identical across engines.
-export function User({ id }: { id: string }): JSX.Element {
+export function User({ id }: Readonly<{ id: string }>): JSX.Element {
   return (
     <main data-testid="page-user" data-id={id}>
       <h1>User {id}</h1>
@@ -32,7 +32,7 @@ export function User({ id }: { id: string }): JSX.Element {
 
 // Wide/deep config leaf — `data-n` lets the sweep driver confirm it reached the
 // right item (position N in a flat table, or depth D in a nested chain).
-export function CatalogItem({ n }: { n: string }): JSX.Element {
+export function CatalogItem({ n }: Readonly<{ n: string }>): JSX.Element {
   return (
     <main data-testid="page-item" data-n={n}>
       <h1>Item {n}</h1>

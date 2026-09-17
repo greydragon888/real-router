@@ -34,7 +34,10 @@ router.usePlugin(browserPluginFactory());
 
 await router.start();
 
-function Level({ k, name }: { k: number; name: string }): JSX.Element {
+function Level({
+  k,
+  name,
+}: Readonly<{ k: number; name: string }>): JSX.Element {
   return (
     <div className="lvl">
       <RouteView nodeName={name}>
@@ -57,7 +60,11 @@ function App(): JSX.Element {
       <RouteView.Match segment="home">
         <nav>
           {DEEP_TARGETS.map((d) => (
-            <Link key={d} routeName={deepName(d)} data-testid={`link-deep-${d}`}>
+            <Link
+              key={d}
+              routeName={deepName(d)}
+              data-testid={`link-deep-${d}`}
+            >
               Depth {d}
             </Link>
           ))}

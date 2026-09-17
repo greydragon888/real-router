@@ -20,8 +20,10 @@ import {
 const SearchLeaf = defineComponent({
   setup() {
     const route = useRoute();
+
     return () => {
       const { count, checksum } = readSearch(Object.entries(route.query));
+
       return (
         <main data-testid="page-search" data-count={count}>
           {count} search · Σ{checksum}

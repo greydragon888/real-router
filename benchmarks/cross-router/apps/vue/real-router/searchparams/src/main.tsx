@@ -8,7 +8,7 @@ import { createApp, defineComponent, h } from "vue";
 
 import {
   SEARCH_COUNTS,
-  searchDecl,
+  searchDeclaration,
   searchValues,
   readSearch,
 } from "../../../_shared/search-param-spec";
@@ -17,7 +17,10 @@ import type { Route } from "@real-router/core";
 
 const routes: Route[] = [
   { name: "home", path: "/" },
-  ...SEARCH_COUNTS.map((n) => ({ name: `s${n}`, path: `/s${n}${searchDecl(n)}` })),
+  ...SEARCH_COUNTS.map((n) => ({
+    name: `s${n}`,
+    path: `/s${n}${searchDeclaration(n)}`,
+  })),
 ];
 
 const router = createRouter(routes, {
@@ -32,8 +35,12 @@ await router.start();
 const SearchLeaf = defineComponent({
   setup() {
     const { route } = useRoute();
+
     return () => {
-      const { count, checksum } = readSearch(Object.entries(route.value.search));
+      const { count, checksum } = readSearch(
+        Object.entries(route.value.search),
+      );
+
       return (
         <main data-testid="page-search" data-count={count}>
           {count} search · Σ{checksum}

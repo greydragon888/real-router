@@ -1,7 +1,9 @@
 import { Component, signal } from "@angular/core";
 import { RouterLink, RouterOutlet } from "@angular/router";
 
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
 const COUNT = _n > 0 ? _n : 1000;
 
 // The mount-links button flips `show`, rendering 1000 <a routerLink>. Each link

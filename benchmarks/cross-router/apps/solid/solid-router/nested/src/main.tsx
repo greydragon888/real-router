@@ -9,12 +9,14 @@ import { Home } from "../../../_shared/pages";
 import type { RouteDefinition } from "@solidjs/router";
 import type { JSX } from "solid-js";
 
-const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
+const _n = Number(
+  new URLSearchParams(globalThis.location?.search ?? "").get("n"),
+);
 const DEPTH = _n > 0 ? _n : 1;
 const deepPrefix =
   "/sec" + Array.from({ length: DEPTH - 1 }, (_, i) => `/l${i + 2}`).join("");
 
-function Leaf(props: { n: string }): JSX.Element {
+function Leaf(props: Readonly<{ n: string }>): JSX.Element {
   return (
     <main data-testid="page-item" data-n={props.n}>
       <h1>{props.n}</h1>
@@ -22,7 +24,9 @@ function Leaf(props: { n: string }): JSX.Element {
   );
 }
 
-function BottomLayout(props: { children?: JSX.Element }): JSX.Element {
+function BottomLayout(
+  props: Readonly<{ children?: JSX.Element }>,
+): JSX.Element {
   return (
     <div class="sec">
       <nav>
@@ -38,7 +42,7 @@ function BottomLayout(props: { children?: JSX.Element }): JSX.Element {
   );
 }
 
-function PassLayout(props: { children?: JSX.Element }): JSX.Element {
+function PassLayout(props: Readonly<{ children?: JSX.Element }>): JSX.Element {
   return <div class="lvl">{props.children}</div>;
 }
 
@@ -52,6 +56,7 @@ function buildSec(): RouteDefinition {
     component: BottomLayout,
     children: abChildren,
   };
+
   for (let k = DEPTH - 1; k >= 1; k--) {
     node = {
       path: k === 1 ? "/sec" : `l${k}`,
@@ -59,12 +64,14 @@ function buildSec(): RouteDefinition {
       children: [node],
     };
   }
+
   return node;
 }
 
 const routes: RouteDefinition[] = [{ path: "/", component: Home }, buildSec()];
 
 const root = document.querySelector("#root");
+
 if (root) {
   render(() => <Router>{routes}</Router>, root);
 }

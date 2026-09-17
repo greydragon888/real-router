@@ -20,12 +20,14 @@ const router = createRouter(routes, {
   defaultRoute: "home",
   allowNotFound: true,
 });
+
 router.usePlugin(browserPluginFactory());
 await router.start();
 
 function UserRoute(): JSX.Element {
   // useRoute() returns a Solid Accessor — call it to read the reactive state.
   const state = useRoute<{ id: string }>();
+
   return (
     <>
       <User id={state().route.params.id} />
@@ -68,6 +70,7 @@ function App(): JSX.Element {
 }
 
 const rootElement = document.querySelector("#root");
+
 if (rootElement) {
   render(
     () => (

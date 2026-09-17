@@ -18,7 +18,11 @@ const rootRoute = createRootRoute({
       <>
         <nav>
           {WIDE_TARGETS.map((n) => (
-            <Link key={n} to={`/catalog/item-${n}`} data-testid={`link-item-${n}`}>
+            <Link
+              key={n}
+              to={`/catalog/item-${n}`}
+              data-testid={`link-item-${n}`}
+            >
               Item {n}
             </Link>
           ))}
@@ -45,13 +49,17 @@ const itemRoutes = wideItems.map((n) =>
   createRoute({
     getParentRoute: () => rootRoute,
     path: `/catalog/item-${n}`,
-    component: defineComponent({ setup: () => () => <CatalogItem n={String(n)} /> }),
+    component: defineComponent({
+      setup: () => () => <CatalogItem n={String(n)} />,
+    }),
   }),
 );
 
 const routeTree = rootRoute.addChildren([homeRoute, ...itemRoutes]);
 const router = createRouter({ routeTree });
 
-const App = defineComponent({ setup: () => () => h(RouterProvider, { router }) });
+const App = defineComponent({
+  setup: () => () => h(RouterProvider, { router }),
+});
 
 createApp(App).mount("#root");
