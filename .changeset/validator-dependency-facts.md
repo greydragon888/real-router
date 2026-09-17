@@ -9,9 +9,13 @@
 takes `(name, value)`. Core reads all three facts at the call site, so the
 analyser receives no container and reaches nothing through one.
 
-Both arguments of the count check sit inside the optional chain, so a router with
-no validator installed short-circuits the whole chain and never walks the key
-list. `maxDependencies` arrives resolved by `createLimits`, which puts this path
+A router with no validator installed never walks the key list. With one, the
+count and the membership test that decides whether a write adds a key come from
+the same `Object.keys` list (#1815 / #2064), so they cannot disagree, and
+`setDependencies` reads that list once per call rather than once per new key. A
+symbol dependency name — outside what `set` is typed to accept — is never in the
+list, so overwriting one reports as a new key rather than as an overwrite.
+`maxDependencies` arrives resolved by `createLimits`, which puts this path
 outside the reach of the default-drift #1879 names.
 
 `validator-argument-channel-2382.test.ts` gates every validator method against
