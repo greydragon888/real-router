@@ -1377,6 +1377,20 @@ export default tsEslint.config(
   },
 
   // ============================================
+  // 15.1 PLAIN JAVASCRIPT (no program to type it)
+  // ============================================
+  {
+    files: ["**/*.{js,cjs,jsx}"],
+    rules: {
+      // ⚠ Section 5 applies the type-checked presets to every file but gives a
+      // project service only to `*.ts` / `*.tsx`. A plain-JS file that is not
+      // ignored meets a typed rule with no program, and ESLint aborts the whole
+      // run rather than skipping the rule (#2370).
+      ...tsEslint.configs.disableTypeChecked.rules,
+    },
+  },
+
+  // ============================================
   // 16. TURBO CONFIGURATION (must be last)
   // ============================================
   // eslint-config-turbo — co-versioned with the turbo CLI, so it moves with it
