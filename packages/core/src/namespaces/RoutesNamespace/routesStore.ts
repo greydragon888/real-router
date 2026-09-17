@@ -314,18 +314,35 @@ export function refreshForwardMap(config: RouteConfig): Record<string, string> {
 // =============================================================================
 
 /**
- * Throws if `forwardTo` is an async function (native or transpiled). Async
- * forwardTo callbacks break the synchronous matchPath/buildPath contract.
- * Runs inside `registerForwardTo` (the add/replace build path, before any store
- * mutation) AND inside `getRoutesApi`'s `updateForwardTo` (the update path), so
- * `update(name, { forwardTo: async })` is rejected at registration with the same
- * actionable error instead of deferring a generic TypeError to navigation (#967).
+ * Throws unless `forwardTo` is a target name, a callback that is not async
+ * (native or transpiled), or — on `update` — `null`, which removes the forward.
+ * Runs inside `registerForwardTo` (the build path, before any store mutation) AND
+ * inside `prepareForwardTo` (the update path), so every registration door refuses
+ * the same values with the same message.
+ *
+ * ⚑ Both halves exist for one reason: anything else is stored as a callback, and
+ * the failure waits for the first read of the route — `navigate`, `matchPath`,
+ * `start` on that URL — without naming the route: `forwardTo callback must
+ * return a string, got object` for an async callback (#967), `startFn is not a
+ * function` for any other value (#2394).
+ *
+ * ⚠ The refusal of a value that is neither a string nor a function is worded as
+ * `@real-router/validation-plugin` words it on `add`, minus its door prefix,
+ * pinned by that plugin's `bare-core-message-parity.test.ts` — except the type,
+ * which is `typeof` here and the plugin's `getTypeDescription` there.
  */
-export function assertForwardToNotAsync(
+export function assertForwardToShape(
   forwardTo: unknown,
   fullName: string,
 ): void {
   if (typeof forwardTo !== "function") {
+    if (typeof forwardTo !== "string" && forwardTo !== null) {
+      throw new TypeError(
+        `forwardTo must be a string or function for route "${fullName}", ` +
+          `got ${typeof forwardTo}`,
+      );
+    }
+
     return;
   }
 
@@ -350,6 +367,9 @@ function registerForwardTo<Dependencies extends DefaultDependencies>(
   config: RouteConfig,
   logger: RouterLogger,
 ): void {
+  // Before the warnings below, which would describe a forward that is refused.
+  assertForwardToShape(route.forwardTo, fullName);
+
   if (route.canActivate) {
     /* v8 ignore next -- @preserve: edge case, both string and function tested separately */
     const forwardTarget =
@@ -375,8 +395,6 @@ function registerForwardTo<Dependencies extends DefaultDependencies>(
         `Move canDeactivate to the target route "${forwardTarget}".`,
     );
   }
-
-  assertForwardToNotAsync(route.forwardTo, fullName);
 
   // forwardTo is guaranteed to exist at this point
   if (typeof route.forwardTo === "string") {
@@ -1276,12 +1294,10 @@ function prepareForwardTo<
   forwardFnMap: RouteConfig["forwardFnMap"];
   resolved: Record<string, string>;
 } {
-  // #967: reject an async forwardTo at update time — parity with add/replace
-  // (registerForwardTo runs the same check on the build path). A no-op for
-  // string/null. Without this the async callback is stored silently and
-  // surfaces later as a generic "must return a string, got object" TypeError
-  // from #resolveDynamicForward at navigation. Runs first, before any clone.
-  assertForwardToNotAsync(forwardTo, name);
+  // The same check `registerForwardTo` runs on the build path, so `update`
+  // refuses exactly what `add` / `replace` refuse (#967, #2394). Runs first,
+  // before any clone.
+  assertForwardToShape(forwardTo, name);
 
   const forwardMap = Object.assign(
     objectCreate(null) as RouteConfig["forwardMap"],

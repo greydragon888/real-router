@@ -212,4 +212,20 @@ describe("bare core matches the validated build, message for message (#1896)", (
       }),
     ).toBe(bareMessage);
   });
+
+  it("add: both layers refuse `forwardTo: 42` with one wording, minus the door prefix (#2394)", () => {
+    // ⚑ Two code paths, not one: with the plugin installed its own check
+    // refuses first, so the validated message never reaches core's copy.
+    const refuse = (api: RoutesApi): string =>
+      messageOf(() => {
+        api.add([{ name: "kid", path: "/kid", forwardTo: 42 }] as never);
+      });
+
+    const bareMessage = refuse(bare());
+
+    expect(bareMessage).toBe(
+      'forwardTo must be a string or function for route "kid", got number',
+    );
+    expect(refuse(withPlugin())).toBe(`[router.addRoute] ${bareMessage}`);
+  });
 });
