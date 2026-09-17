@@ -350,10 +350,7 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
       const search = resolveOption(options.defaultSearch, getDependencyByName);
 
       if (typeof options.defaultRoute === "function") {
-        ctx.validator?.options.validateResolvedDefaultRoute(
-          route,
-          ctx.routeGetStore(),
-        );
+        ctx.validator?.options.validateResolvedDefaultRoute(route);
       }
 
       return { route, params, search };

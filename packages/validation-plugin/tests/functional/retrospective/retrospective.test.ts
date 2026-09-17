@@ -759,16 +759,16 @@ describe("validateResolvedDefaultRoute", () => {
     const store = makeStore({ treeRoutes: [{ name: "home" }] });
 
     expect(() => {
-      validateResolvedDefaultRoute(undefined, store);
+      validateResolvedDefaultRoute(undefined, store.tree);
     }).not.toThrow();
     expect(() => {
-      validateResolvedDefaultRoute(null, store);
+      validateResolvedDefaultRoute(null, store.tree);
     }).not.toThrow();
     expect(() => {
-      validateResolvedDefaultRoute(42, store);
+      validateResolvedDefaultRoute(42, store.tree);
     }).not.toThrow();
     expect(() => {
-      validateResolvedDefaultRoute({}, store);
+      validateResolvedDefaultRoute({}, store.tree);
     }).not.toThrow();
   });
 
@@ -776,7 +776,7 @@ describe("validateResolvedDefaultRoute", () => {
     const store = makeStore({ treeRoutes: [{ name: "home" }] });
 
     expect(() => {
-      validateResolvedDefaultRoute("", store);
+      validateResolvedDefaultRoute("", store.tree);
     }).not.toThrow();
   });
 
@@ -786,7 +786,7 @@ describe("validateResolvedDefaultRoute", () => {
     });
 
     expect(() => {
-      validateResolvedDefaultRoute("home", store);
+      validateResolvedDefaultRoute("home", store.tree);
     }).not.toThrow();
   });
 
@@ -824,7 +824,7 @@ describe("validateResolvedDefaultRoute", () => {
     };
 
     expect(() => {
-      validateResolvedDefaultRoute("admin.dashboard", store);
+      validateResolvedDefaultRoute("admin.dashboard", store.tree);
     }).not.toThrow();
   });
 
@@ -832,7 +832,7 @@ describe("validateResolvedDefaultRoute", () => {
     const store = makeStore({ treeRoutes: [{ name: "home" }] });
 
     expect(() => {
-      validateResolvedDefaultRoute("missing", store);
+      validateResolvedDefaultRoute("missing", store.tree);
     }).toThrow(/defaultRoute resolved to non-existent route: "missing"/);
   });
 
@@ -840,13 +840,11 @@ describe("validateResolvedDefaultRoute", () => {
     const store = makeStore({ treeRoutes: [{ name: "home" }] });
 
     expect(() => {
-      validateResolvedDefaultRoute("admin.dashboard", store);
+      validateResolvedDefaultRoute("admin.dashboard", store.tree);
     }).toThrow(/non-existent route: "admin.dashboard"/);
   });
 
-  it("throws TypeError when store is invalid", () => {
-    expect(() => {
-      validateResolvedDefaultRoute("home", null);
-    }).toThrow(TypeError);
-  });
+  // ⚑ The "invalid store" arm is GONE with the store parameter (#2382): the
+  // function takes the tree `PluginApi.getTree()` hands out, which is never
+  // null, so there is no container left to be the wrong shape.
 });

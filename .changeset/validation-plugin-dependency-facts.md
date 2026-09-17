@@ -10,4 +10,9 @@ limit it is given; the resolved limit comes from `createLimits`, so the plugin
 carries no default of its own on this path — `limits.test.ts` › _"should enforce
 default maxDependencies limit (100)"_ owns that number through the public door.
 
+`validateParentOption` and `validateResolvedDefaultRoute` read the tree from
+`PluginApi.getTree()`. The retrospective default-route check reads it there too,
+so it no longer demands a whole routes store — `definitions`, `config` and
+`tree` — to consult one of them.
+
 Behaviour is identical: same refusals, same messages, same thresholds.

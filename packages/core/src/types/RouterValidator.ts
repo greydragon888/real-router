@@ -44,7 +44,12 @@ export interface RouterValidator {
       updates: unknown,
       tree: unknown,
     ) => void;
-    validateParentOption: (parent: unknown, tree: unknown) => void;
+    /**
+     * ⚑ Takes no tree (#2382): the analyser reads it from `PluginApi.getTree()`,
+     * which hands out the same object — the tree is published already, so
+     * passing it as an argument added a second address and nothing else.
+     */
+    validateParentOption: (parent: unknown) => void;
     validateRouteName: (name: unknown, caller: string) => void;
     throwIfInternalRoute: (name: unknown, caller: string) => void;
     throwIfInternalRouteInArray: (routes: unknown[], caller: string) => void;
@@ -58,7 +63,8 @@ export interface RouterValidator {
    */
   options: {
     validateOptions: (options: unknown, methodName: string) => void;
-    validateResolvedDefaultRoute: (routeName: unknown, store: unknown) => void;
+    /** Reads the tree from `PluginApi.getTree()`, like `validateParentOption` (#2382). */
+    validateResolvedDefaultRoute: (routeName: unknown) => void;
   };
 
   /**

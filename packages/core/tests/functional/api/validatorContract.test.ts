@@ -389,9 +389,11 @@ describe("core/validator call-site contract", () => {
 
       routes.add({ name: "child", path: "/child" }, { parent: "admin" });
 
+      // ⚑ The name ALONE (#2382): the analyser reads the tree from
+      // `PluginApi.getTree()`, so no container travels with the call. Pinned as
+      // an exact argument list, which a second argument would break.
       expect(validator.routes.validateParentOption).toHaveBeenCalledWith(
         "admin",
-        expect.anything(),
       );
     });
 

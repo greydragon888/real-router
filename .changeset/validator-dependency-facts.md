@@ -19,5 +19,13 @@ identity — an identity check against the store admits every narrowed form, suc
 as `store.dependencies` or a `{ dependencies }` wrapper — and runs those rejected
 forms through the same gate as negative controls.
 
+`routes.validateParentOption` now takes `(parent)` and
+`options.validateResolvedDefaultRoute` takes `(routeName)`. Both judge only the
+route tree, which `PluginApi.getTree()` already hands out as the same object, so
+passing it as an argument added a second address to a published object and
+nothing else. The second of the two sits on the NAVIGATION path — it runs from
+`navigateToDefault()` whenever `defaultRoute` is a callback — so the container
+channel was never a configuration-time concern only.
+
 Breaking for anything that implements `RouterValidator` directly; pre-1.0, so
 `minor`.

@@ -924,7 +924,7 @@ export function getRoutesApi<
       guardRouteCallbacks(batch, ctx.validator);
 
       if (parentName !== undefined) {
-        ctx.validator?.routes.validateParentOption(parentName, store.tree);
+        ctx.validator?.routes.validateParentOption(parentName);
       }
 
       ctx.validator?.routes.throwIfInternalRouteInArray(batch, "addRoute");

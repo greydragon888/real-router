@@ -45,7 +45,7 @@ interface LocalRouteSegment {
 }
 
 interface LocalRouteTree {
-  children: Map<string, LocalRouteTree>;
+  children: ReadonlyMap<string, LocalRouteTree>;
   paramMeta: LocalSegmentParamMeta;
 }
 
@@ -585,15 +585,15 @@ export function validateLimitsConsistency(
  */
 export function validateResolvedDefaultRoute(
   routeName: unknown,
-  store: unknown,
+  tree: unknown,
 ): void {
   if (typeof routeName !== "string" || !routeName) {
     return;
   }
 
-  const routesStore = assertRoutesStore(store, "validateResolvedDefaultRoute");
-
-  if (!routeExistsInTree(routesStore.tree, routeName)) {
+  // The tree is core's own — `PluginApi.getTree()` at both call sites — so it
+  // is typed here rather than validated.
+  if (!routeExistsInTree(tree as LocalRouteTree, routeName)) {
     throw new Error(
       `[validation-plugin] defaultRoute resolved to non-existent route: "${routeName}"`,
     );

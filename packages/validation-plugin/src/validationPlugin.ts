@@ -189,13 +189,13 @@ function buildValidatorObject<
           typedStore.config,
         );
       },
-      validateParentOption(parent, tree) {
+      validateParentOption(parent) {
         validateParentOptionRaw(parent);
-        let node = tree as { children: Map<string, unknown> };
+        let node = api.getTree() as { children: ReadonlyMap<string, unknown> };
 
         for (const segment of parent.split(".")) {
           const child = node.children.get(segment) as
-            { children: Map<string, unknown> } | undefined;
+            { children: ReadonlyMap<string, unknown> } | undefined;
 
           if (!child) {
             throw new ReferenceError(
@@ -222,7 +222,9 @@ function buildValidatorObject<
     },
     options: {
       validateOptions,
-      validateResolvedDefaultRoute,
+      validateResolvedDefaultRoute(routeName) {
+        validateResolvedDefaultRoute(routeName, api.getTree());
+      },
     },
     dependencies: {
       validateDependencyName,
@@ -483,7 +485,7 @@ export function validationPlugin<
       );
 
       if (typeof options.defaultRoute === "string") {
-        validateResolvedDefaultRoute(options.defaultRoute, store);
+        validateResolvedDefaultRoute(options.defaultRoute, api.getTree());
       }
     } catch (error) {
       releaseIfStillOurs();
