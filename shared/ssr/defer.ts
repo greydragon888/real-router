@@ -157,7 +157,8 @@ export function defer<
   }) as DeferredPayload<C, D>;
 }
 
-/** Type guard — `true` iff `value` is a payload returned by `defer()`.
+/**
+ * Type guard — `true` iff `value` is a payload returned by `defer()`.
  *
  * The brand check uses `Object.hasOwn(value, DEFER_BRAND)` rather than a
  * plain property read so a prototype-chain inheritance bypass —

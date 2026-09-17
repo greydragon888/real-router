@@ -584,7 +584,7 @@ export default tsEslint.config(
   // ============================================
   // 7. JSDOC CONFIGURATION (for public APIs)
   // ============================================
-  // Updated for eslint-plugin-jsdoc v63.2.0
+  // Updated for eslint-plugin-jsdoc v64.5.2
   // Changelog: https://github.com/gajus/eslint-plugin-jsdoc/releases
   {
     files: [
