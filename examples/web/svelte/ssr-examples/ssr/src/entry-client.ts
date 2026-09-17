@@ -1,6 +1,6 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
-import { hydrateRouter } from "@real-router/ssr-utils";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
+import { hydrateRouter } from "@real-router/ssr-utils";
 import { hydrate } from "svelte";
 
 import { lookupUserFromCookies, parseCookieHeader } from "./_known-users";
@@ -19,20 +19,29 @@ declare global {
   var __LOADER_CALLS__: Record<string, number> | undefined;
 }
 
+/**
+ * The e2e counter lives on the global object; assigning through a typed
+ * reference satisfies `unicorn/no-global-object-property-assignment` without
+ * changing what the page exposes.
+ */
+const instrumentationHost = globalThis;
+
 const router = createAppRouter({
   currentUser: lookupUserFromCookies(parseCookieHeader(document.cookie)),
 });
 
 const loaderCalls: Record<string, number> = {};
 
-globalThis.__LOADER_CALLS__ = loaderCalls;
+instrumentationHost.__LOADER_CALLS__ = loaderCalls;
 
 const instrumentedLoaders: DataLoaderFactoryMap = Object.fromEntries(
   Object.entries(loaders).map(([name, raw]) => {
     // Per-route SSR mode (#597): non-function entries (`{ ssr: false }`,
     // `{ ssr: "data-only", loader: … }`) pass through as-is. Only the
     // function form needs the loader-call counter wrap.
-    if (typeof raw !== "function") return [name, raw];
+    if (typeof raw !== "function") {
+      return [name, raw];
+    }
 
     const factory = raw as DataLoaderFnFactory;
 

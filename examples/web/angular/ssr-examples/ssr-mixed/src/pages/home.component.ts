@@ -20,11 +20,7 @@ interface HomeData {
       @if (data()?.aborts !== undefined) {
         <p data-testid="aborts">{{ data()?.aborts }}</p>
       }
-      <button
-        type="button"
-        data-testid="refresh-btn"
-        (click)="onRefresh()"
-      >
+      <button type="button" data-testid="refresh-btn" (click)="onRefresh()">
         Refresh data
       </button>
     </main>
@@ -45,11 +41,8 @@ export class HomeComponent {
     const current = this.route.routeState().route;
 
     invalidate(this.router, "data");
-    void this.router.navigate(
-      current.name,
-      current.params,
-      undefined,
-      { reload: true },
-    );
+    void this.router.navigate(current.name, current.params, undefined, {
+      reload: true,
+    });
   }
 }

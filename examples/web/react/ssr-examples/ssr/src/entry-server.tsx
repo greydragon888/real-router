@@ -1,14 +1,14 @@
-import {
-  createRequestScope,
-  serializeRouterState,
-  type IncomingMessageLike,
-} from "@real-router/ssr-utils";
 import { RouterProvider } from "@real-router/react";
 import {
   HttpStatusProvider,
   createHttpStatusSink,
 } from "@real-router/react/ssr";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
+import {
+  createRequestScope,
+  serializeRouterState,
+  type IncomingMessageLike,
+} from "@real-router/ssr-utils";
 import { renderToString } from "react-dom/server";
 
 import { App } from "./App";
@@ -126,8 +126,8 @@ export async function render(
 
     const meta = getMetaForState({
       name: state.name,
-      params: state.params as Record<string, unknown>,
-      search: state.search as Record<string, unknown>,
+      params: state.params,
+      search: state.search,
     });
 
     // Hydration payload (#563): full server-resolved State (incl.

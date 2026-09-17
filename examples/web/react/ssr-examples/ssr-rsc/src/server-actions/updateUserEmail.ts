@@ -13,6 +13,7 @@ import { database } from "../database";
 // secrets, mutate the database, etc., without exposing any of that
 // to the client bundle. The return value is serialized through Flight
 // back to the caller.
+// eslint-disable-next-line @typescript-eslint/require-await -- React server actions are async by contract; the body happens to be synchronous
 export async function updateUserEmail(
   _prevState: { ok: boolean; message: string } | null,
   formData: FormData,

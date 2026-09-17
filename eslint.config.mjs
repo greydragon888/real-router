@@ -87,6 +87,7 @@ export default tsEslint.config(
     "cz.config.js", // cz-git configuration
     ".changeset/**", // Changesets configuration and markdown files
     "**/e2e/**", // Playwright e2e tests — not type-checked by ESLint
+    "**/e2e-recording/**", // Playwright recording specs — the same reason
   ]),
 
   // ============================================
@@ -1360,18 +1361,33 @@ export default tsEslint.config(
       },
     },
     rules: {
+      // ⚠ The project service is OFF above, so EVERY rule that needs a program
+      // must be off too — the preset, never a hand-kept list (#2370). A rule
+      // outside such a list does not merely go unchecked: it aborts the whole
+      // run on the first matching file with "you have used a rule which
+      // requires type information". `no-array-delete` did exactly that, and
+      // this mask matches 464 tracked files — every example's `*.config.ts`,
+      // the four Angular `app.config.ts` app sources, and 46 package configs.
+      ...tsEslint.configs.disableTypeChecked.rules,
+
       "import-x/no-default-export": "off",
       "@typescript-eslint/explicit-function-return-type": "off",
       "@typescript-eslint/explicit-module-boundary-types": "off",
       "unicorn/prefer-module": "off", // Config files can use CommonJS
+    },
+  },
 
-      // Disable type-aware rules for config files
-      "@typescript-eslint/await-thenable": "off",
-      "@typescript-eslint/no-floating-promises": "off",
-      "@typescript-eslint/no-misused-promises": "off",
-      "@typescript-eslint/require-await": "off",
-      "@typescript-eslint/no-unnecessary-type-assertion": "off",
-      "@typescript-eslint/unbound-method": "off",
+  // ============================================
+  // 15.1 PLAIN JAVASCRIPT (no program to type it)
+  // ============================================
+  {
+    files: ["**/*.{js,cjs,jsx}"],
+    rules: {
+      // ⚠ Section 5 applies the type-checked presets to every file but gives a
+      // project service only to `*.ts` / `*.tsx`. A plain-JS file that is not
+      // ignored meets a typed rule with no program, and ESLint aborts the whole
+      // run rather than skipping the rule (#2370).
+      ...tsEslint.configs.disableTypeChecked.rules,
     },
   },
 

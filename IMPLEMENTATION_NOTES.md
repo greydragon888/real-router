@@ -2,6 +2,88 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## Examples are linted in pre-push, after the build, and a guard derives which packages any lint step reads (#2370, 2026-09-17)
+
+**Problem.** No gate read `examples/**`. None of the example manifests declared a
+lint script, so `turbo run lint` had nothing to run for them, and both hooks
+dropped the workspace outright with `--filter='!./examples/**'`. The rules for
+examples existed (`eslint.config.mjs` section 13.1) and never executed. Measured
+once the gate could see: 725 errors and 67 warnings in the apps' `src/`, and 232
+errors and 77 warnings more in their servers, configs, scripts and tests.
+
+Looking also surfaced defects that no rule had been positioned to report:
+
+- The block-15 config mask (`**/*.config.{js,ts,mjs,mts}`) turned the project
+  service off but disabled only six of the 61 type-aware rules by hand. Any
+  remaining one aborted the WHOLE run on the first matching file — 464 tracked
+  files matched, including the four Angular `src/app.config.ts` app sources.
+- Section 5 applies the type-checked presets to every file but gives a program
+  only to `*.ts` / `*.tsx`, so any non-ignored `.js` aborted a run the same way.
+- `react/ssr-examples/ssr-mixed` carried committed `tsc` output beside its
+  sources; Playwright collected the stale spec twin and ran 11 tests in 2 files
+  instead of 7 in 1.
+- 36 SSR servers and SSG scripts spliced rendered HTML in with
+  `template.replace(marker, html)`. A string replacement expands `$&`, `` $` ``
+  and `$'`, so rendered text containing them pasted the marker or the template
+  around it into the page.
+
+**Solution.**
+
+- Both config holes take the `disableTypeChecked` preset instead of a hand list:
+  block 15, and a new section 15.1 for `**/*.{js,cjs,jsx}`.
+- Every example app has `lint:example` — `eslint --cache . --max-warnings 0`
+  over the whole app directory. The four framework aggregators that keep a
+  shared layout lint `shared/`; the two that hold no JS or TS have none.
+- `lint:example` is its own turbo task with `dependsOn: ["^bundle"]`, and
+  `build` depends on it. The CI jobs that build examples (`ci.yml` "Examples
+  (affected)", `examples.yml`) therefore lint them after bundling, with no
+  workflow edit.
+- pre-push runs `turbo run lint:example --filter='./examples/**'` right after
+  its build. pre-commit keeps the filter.
+- `scripts/check-lint-reach.mjs` (`pnpm lint:reach`, in pre-push before the
+  build) fails when a workspace package is not read by a lint step of the
+  pre-push hook. It replays the hook's own `turbo run` lines with `--dry=json`
+  and counts a package only when a lint task would execute a real command for
+  it. `shared/<dir>` counts when a linted consumer's command names its symlink.
+  `router-benchmarks` is its one named exemption, tracked in #2390.
+- `**/e2e-recording/**` joins the global Playwright ignore beside `**/e2e/**`.
+
+**Why a separate task, not `^bundle` on `lint`.** Examples resolve
+`@real-router/*` through `dist/` by design, so their type-aware lint needs the
+libraries bundled — measured, one example reports 27 errors instead of 1 with a
+single package's `dist` moved away. `lint` dropped `^bundle` because every
+package resolves through `src/` ("test/lint tiers dropped `^bundle`" above);
+putting it back would rebuild upstream dists on every commit and in every test
+shard, for the examples' sake. A sibling edge is not enough either: `build`
+lists `lint` as a sibling of `^bundle`, so a `lint` script in an example would
+race the bundles it reads.
+
+**Why the whole directory, not `src/`.** A list of directories is a list that
+drifts: the next `server/` or `scripts/` would sit outside it silently, which is
+the class this entry is about. `eslint .` reads what the global ignores leave;
+measured, it reached no untracked file.
+
+**Why the guard reads the hook instead of a list.** The blind spot had two
+independent halves — a missing script and a hook filter — and a guard that
+checked manifests alone would have passed with the filter in place. The same
+class has now surfaced for `shared/` (#1838 → #1913), `examples/**` and
+`benchmarks/`. Each check of the guard was validated by a mutant that must turn
+its test red (13 of 13 did), including the two historical shapes run through the
+whole chain rather than piece by piece.
+
+**Cost, measured on the branch.** A cold `turbo run lint:example
+--filter='./examples/**'` ran 165 tasks — 143 lints and the 22 bundles they
+depend on — in 2m56s; a warm run replayed 161 from cache in 1.7s. The eslint
+config is a global turbo input, so a rule change re-lints every example once.
+`lint:reach` takes about a second, 661 ms of it in the two dry-runs.
+
+**The two deprecations were migrated, not disabled.** The three Angular SSR
+apps drop `withIncrementalHydration()`, deprecated since Angular 22.0.0 because
+`provideClientHydration` enables incremental hydration by default. The RSC
+example replaces `loadBootstrapScriptContent`, which returned script content,
+with `bootstrapModules: [getClientEntryUrl()]`, which takes a URL. Their e2e
+suites passed against fresh production builds: 49, 8, 23 and 27 tests.
+
 ## The bench runner reclaims under its cgroup ceiling, and nothing read the counter (2026-09-16)
 
 **Problem.** The runner unit carries `MemoryMax=5G`, added by #1746 so that a runaway becomes a local cgroup event instead of a global OOM that picks a victim on the co-tenant production workload. Reaching that ceiling makes the kernel force-**reclaim**, not kill. So `oom_kill` stays 0, the journal records nothing, and the unit's `OOMScoreAdjust=-800` / `OOMPolicy=continue` never fire — they guard the kill path, and there is no kill. Direct reclaim stalls the measured process mid-collection and re-faults its file pages, which moves exactly the components a CodSpeed `simulation` run reports. A run corrupted that way is indistinguishable from a clean one, and a CodSpeed run is not discarded whole: it seeds the baseline every later PR is compared against (#2375).

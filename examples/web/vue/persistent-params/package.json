@@ -7,7 +7,8 @@
     "predev": "pnpm turbo run bundle --filter=...vue-persistent-params-example",
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint:example": "eslint --cache . --max-warnings 0"
   },
   "dependencies": {
     "@real-router/browser-plugin": "workspace:^",

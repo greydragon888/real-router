@@ -55,7 +55,7 @@ const CACHE_RULES: readonly {
 export function getCachePolicy(path: string): string | undefined {
   // Strip query string for matching (we keep ?sort handling in the
   // user list rule via regex).
-  const onlyPath = path.split("?")[0] ?? path;
+  const onlyPath = path.split("?", 1)[0] ?? path;
 
   for (const rule of CACHE_RULES) {
     if (rule.match(onlyPath) || rule.match(path)) {

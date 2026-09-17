@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import express from "express";
+import express, { static as serveStatic } from "express";
 
 import { getCurrentUserFromCookies } from "./_auth";
 import { getCachePolicy } from "../src/router/cache-policies";
@@ -30,10 +30,12 @@ async function startServer(): Promise<void> {
 
   // /__bench/* — instrumentation for the #598 e2e test.
   let abortObserved = 0;
+
   app.get("/__bench/slow-fetch", (request, response) => {
     const timer = setTimeout(() => {
       response.json({ ok: true });
     }, 5000);
+
     request.on("close", () => {
       if (!response.writableEnded) {
         clearTimeout(timer);
@@ -45,7 +47,7 @@ async function startServer(): Promise<void> {
     response.json({ abortObserved });
   });
 
-  app.use(express.static(path.resolve(root, "dist/client"), { index: false }));
+  app.use(serveStatic(path.resolve(root, "dist/client"), { index: false }));
 
   const template = readFileSync(
     path.resolve(root, "dist/client/index.html"),
@@ -105,9 +107,9 @@ async function startServer(): Promise<void> {
     }
 
     const page = template
-      .replace("<!--ssr-meta-->", result.head)
-      .replace("<!--ssr-outlet-->", result.html)
-      .replace("<!--ssr-state-->", result.serializedData);
+      .replace("<!--ssr-meta-->", () => result.head)
+      .replace("<!--ssr-outlet-->", () => result.html)
+      .replace("<!--ssr-state-->", () => result.serializedData);
 
     // ETag is computed over the final HTML — same input bytes => same
     // ETag, so two consecutive identical requests yield 304. We use a
@@ -138,6 +140,7 @@ async function startServer(): Promise<void> {
       .send(page);
   });
 
+  // eslint-disable-next-line turbo/no-undeclared-env-vars -- PORT is conventional Express override, not turbo task input
   const port = Number(process.env.PORT) || 3000;
 
   app.listen(port, () => {

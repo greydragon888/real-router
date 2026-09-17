@@ -1,10 +1,10 @@
+import type { State } from "@real-router/core";
 import type {
   DataLoaderFactoryMap,
   DataLoaderTarget,
   SsrLoaderContext,
   SsrMode,
 } from "@real-router/ssr-data-plugin";
-import type { State } from "@real-router/core";
 
 /**
  * Per-route SSR mode demonstration.
@@ -53,10 +53,13 @@ export const loaders: DataLoaderFactoryMap = {
 
   "users.profile": {
     ssr: "data-only",
-    loader: () => ({ params }) => ({
-      id: String(params.id),
-      name: `User-${String(params.id)}`,
-    }),
+    loader:
+      () =>
+      ({ params }) => {
+        const id = params.id as string;
+
+        return { id, name: `User-${id}` };
+      },
   },
 
   "docs.detail": {
@@ -64,10 +67,13 @@ export const loaders: DataLoaderFactoryMap = {
     // `state.params` (RFC-4 M2 / #1548). `id` stays path (`/:id`).
     ssr: (state: State): SsrMode =>
       state.search.format === "pdf" ? "client-only" : "full",
-    loader: () => ({ params, search }) => ({
-      id: String(params.id),
-      format: String(search.format),
-      body: `Doc body for ${String(params.id)}`,
-    }),
+    loader:
+      () =>
+      ({ params, search }) => {
+        const id = params.id as string;
+        const format = search.format as string;
+
+        return { id, format, body: `Doc body for ${id}` };
+      },
   },
 };

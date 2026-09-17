@@ -1,12 +1,7 @@
-import {
-  Component,
-  OnDestroy,
-  OnInit,
-  PLATFORM_ID,
-  inject,
-  signal,
-} from "@angular/core";
 import { isPlatformBrowser } from "@angular/common";
+import { Component, PLATFORM_ID, inject, signal } from "@angular/core";
+
+import type { OnDestroy, OnInit } from "@angular/core";
 
 interface DashboardData {
   alerts: number;
@@ -35,7 +30,9 @@ export class AdminComponent implements OnInit, OnDestroy {
   readonly data = signal<DashboardData | null>(null);
 
   ngOnInit(): void {
-    if (!isPlatformBrowser(this.platformId)) return;
+    if (!isPlatformBrowser(this.platformId)) {
+      return;
+    }
 
     // Simulates a client-side fetch — server skipped the loader because of
     // `ssr: false`, so we fetch (or compute) the data here on hydration.
@@ -45,6 +42,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    if (this.handle !== undefined) clearTimeout(this.handle);
+    if (this.handle !== undefined) {
+      clearTimeout(this.handle);
+    }
   }
 }

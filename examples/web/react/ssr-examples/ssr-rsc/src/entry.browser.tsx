@@ -54,13 +54,13 @@ const SERVER_ACTION_RESPONSE_EVENT = "rsc:server-action-response";
 setServerCallback(async (id: string, args: unknown[]) => {
   const url = new URL(globalThis.location.href);
   const body = await encodeReply(args);
-  const response = await fetch(url.toString(), {
+  const response = await fetch(url.href, {
     method: "POST",
     headers: {
       "x-rsc-action": id,
-      ...(typeof body === "string"
-        ? { "content-type": "text/plain;charset=utf-8" }
-        : {}),
+      ...(typeof body === "string" && {
+        "content-type": "text/plain;charset=utf-8",
+      }),
     },
     body,
   });

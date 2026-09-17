@@ -1,7 +1,7 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
-import { hydrateRouter } from "@real-router/ssr-utils";
 import { RouterProvider } from "@real-router/react";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
+import { hydrateRouter } from "@real-router/ssr-utils";
 import { hydrateRoot } from "react-dom/client";
 
 import { App } from "./App";
@@ -12,6 +12,8 @@ declare global {
   interface Window {
     __SSR_STATE__?: { path: string };
   }
+
+  var __SSR_STATE__: { path: string } | undefined;
 }
 
 const router = createAppRouter();

@@ -24,7 +24,7 @@ export const Body: FC = () => {
   // Intra-subtree navigation (e.g. users → users.view) is handled inside
   // UserList via useRouteNode("users").
   const { route } = useRouteNode("");
-  const topSegment = route?.name.split(".")[0];
+  const topSegment = route?.name.split(".", 1)[0];
 
   switch (topSegment) {
     case "home": {

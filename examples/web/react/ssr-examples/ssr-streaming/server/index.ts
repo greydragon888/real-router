@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import express from "express";
+import express, { static as serveStatic } from "express";
 
 import { getCachePolicy } from "../src/router/cache-policies";
 
@@ -16,7 +16,7 @@ async function startServer(): Promise<void> {
 
   app.disable("x-powered-by");
 
-  app.use(express.static(path.resolve(root, "dist/client"), { index: false }));
+  app.use(serveStatic(path.resolve(root, "dist/client"), { index: false }));
 
   const template = readFileSync(
     path.resolve(root, "dist/client/index.html"),
@@ -71,10 +71,12 @@ async function startServer(): Promise<void> {
 
       const ssrScript = `<script>window.__SSR_STATE__=${result.ssrJson}</script>`;
       const templateWithState = template
-        .replace("<!--ssr-state-->", ssrScript)
-        .replace("<!--defer-bootstrap-->", result.deferBootstrap);
-      const [headPart, footerPart] =
-        templateWithState.split("<!--ssr-outlet-->");
+        .replace("<!--ssr-state-->", () => ssrScript)
+        .replace("<!--defer-bootstrap-->", () => result.deferBootstrap);
+      const [headPart, footerPart] = templateWithState.split(
+        "<!--ssr-outlet-->",
+        2,
+      );
 
       const cacheControl = getCachePolicy(url);
 

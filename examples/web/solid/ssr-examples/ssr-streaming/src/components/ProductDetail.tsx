@@ -27,7 +27,9 @@ const _ensureTrackViewBinding = trackView;
 // plugin's hydration-key generator stabilises. Same root cause as the
 // `RouteView.NotFound` workaround in App.tsx (top-level <Show> guard).
 //
+
 // PR #643 attempted three layout-level workarounds to unblock the
+// eslint-disable-next-line sonarjs/fixme-tag -- `test.fixme` is the name of the Playwright annotation this paragraph explains; the investigation it records is closed
 // `test.fixme` Scenarios 19/20/23 in `e2e/ssr-streaming.spec.ts`:
 // wrapping `<ProductActions />` in its own `<Suspense>`, moving it
 // AFTER the streaming siblings, and inlining `CrashOnDemand` to drop

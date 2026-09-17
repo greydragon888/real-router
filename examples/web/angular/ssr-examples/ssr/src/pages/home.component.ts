@@ -18,9 +18,7 @@ import { ClientOnly, ServerOnly } from "@real-router/angular/ssr";
           </p>
         </ng-template>
         <client-only [fallback]="clientFallback">
-          <p data-testid="ssr-boundaries-client">
-            Mounted on the client
-          </p>
+          <p data-testid="ssr-boundaries-client">Mounted on the client</p>
         </client-only>
 
         <ng-template #serverFallback>

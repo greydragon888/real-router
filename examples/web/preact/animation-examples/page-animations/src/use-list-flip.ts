@@ -119,6 +119,7 @@ export function useListFlip<T extends HTMLElement>(): RefObject<T> {
 
       const wrapper = document.createElement("div");
 
+      // eslint-disable-next-line unicorn/no-unsafe-dom-html -- the FLIP ghost replays markup this hook captured itself from `item.outerHTML`; no external input reaches it
       wrapper.innerHTML = prev.html;
 
       const ghost = wrapper.firstElementChild as HTMLElement | null;

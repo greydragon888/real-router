@@ -29,10 +29,6 @@ import type { Router } from "@real-router/core";
  * promotes that element to `view-transition-name: hero`; the matching
  * names on both sides let the browser FLIP-morph them.
  *
- * @returns a teardown function that unsubscribes all listeners and
- *          removes the popstate listener. Not used by main.ts (policy
- *          lives for the page lifetime), but available for tests or HMR
- *          cleanup if needed.
  */
 function activateHero(targetId: string | null): void {
   for (const element of document.querySelectorAll(".vt-hero-active")) {
@@ -45,11 +41,18 @@ function activateHero(targetId: string | null): void {
   }
 }
 
+/**
+ * Installs the demo's View-Transition policy on the router.
+ *
+ * @returns a teardown function that unsubscribes all listeners and removes
+ *          the popstate listener. Not used by main.ts (policy lives for the
+ *          page lifetime), but available for tests or HMR cleanup if needed.
+ */
 export function installViewTransitionPolicy(router: Router): () => void {
   // SSR safety: `typeof` avoids both the ReferenceError on pre-global-runtime
   // hosts and the TS "no overlap" error from DOM lib's `Window` type. unicorn
   // prefers direct comparison but it doesn't typecheck here.
-  // eslint-disable-next-line unicorn/prefer-global-this
+
   if (typeof window === "undefined") {
     return () => {
       /* no-op on server */

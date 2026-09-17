@@ -58,10 +58,12 @@ async function startDevServer(): Promise<void> {
 
       const ssrScript = `<script>window.__SSR_STATE__=${ssrJson}</script>`;
       const templateWithStateAndHydration = template
-        .replace("<!--ssr-hydration-script-->", hydrationScript)
-        .replace("<!--ssr-state-->", ssrScript);
-      const [headPart, footerPart] =
-        templateWithStateAndHydration.split("<!--ssr-outlet-->");
+        .replace("<!--ssr-hydration-script-->", () => hydrationScript)
+        .replace("<!--ssr-state-->", () => ssrScript);
+      const [headPart, footerPart] = templateWithStateAndHydration.split(
+        "<!--ssr-outlet-->",
+        2,
+      );
 
       response.status(statusCode);
       response.set("Content-Type", "text/html; charset=utf-8");

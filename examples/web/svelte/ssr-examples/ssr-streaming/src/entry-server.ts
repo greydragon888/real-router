@@ -1,10 +1,10 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
+import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import {
   createRequestScope,
   serializeRouterState,
   type IncomingMessageLike,
 } from "@real-router/ssr-utils";
-import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { render } from "svelte/server";
 
 import App from "./App.svelte";

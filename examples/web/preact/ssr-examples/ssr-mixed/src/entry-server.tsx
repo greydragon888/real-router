@@ -1,14 +1,14 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
-import {
-  createRequestScope,
-  serializeRouterState,
-  type IncomingMessageLike,
-} from "@real-router/ssr-utils";
 import { RouterProvider } from "@real-router/preact";
 import {
   getSsrDataMode,
   ssrDataPluginFactory,
 } from "@real-router/ssr-data-plugin";
+import {
+  createRequestScope,
+  serializeRouterState,
+  type IncomingMessageLike,
+} from "@real-router/ssr-utils";
 import { renderToStringAsync } from "preact-render-to-string";
 
 import { App } from "./App";

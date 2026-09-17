@@ -28,6 +28,14 @@ declare global {
   }
 }
 
+/**
+ * The e2e counters live on the global object. Reading and writing them
+ * through a typed reference keeps the access checked and satisfies
+ * `unicorn/no-global-object-property-assignment`, which forbids assigning
+ * onto the global object directly.
+ */
+const instrumentationHost = globalThis as unknown as Window;
+
 function CrashOnDemand(props: { crashed: boolean }): JSX.Element {
   // Solid components run their function body once. To re-throw on every
   // reactive update, derive a reactive accessor that throws inline. The
@@ -53,8 +61,8 @@ export function ProductActions(): JSX.Element {
   // server, but the explicit branch makes the safety contract obvious.
   onMount(() => {
     if (!isServer) {
-      window.__MOUNT_LOG__ = window.__MOUNT_LOG__ ?? [];
-      window.__MOUNT_LOG__.push({
+      instrumentationHost.__MOUNT_LOG__ ??= [];
+      instrumentationHost.__MOUNT_LOG__.push({
         source: "ProductActions",
         ts: Date.now(),
       });

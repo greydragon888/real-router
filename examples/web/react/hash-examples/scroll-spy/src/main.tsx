@@ -1,7 +1,6 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
 import { navigationPluginFactory } from "@real-router/navigation-plugin";
-import { RouterProvider } from "@real-router/react";
 import { createRoot } from "react-dom/client";
 
 import { App } from "./App";
@@ -33,7 +32,12 @@ if (pluginKind === "browser") {
 
 await router.start();
 
-(globalThis as unknown as { __router: Router }).__router = router;
+// The e2e suite reaches the router through this handle. Assigning via a typed
+// local reference keeps `unicorn/no-global-object-property-assignment`
+// satisfied without changing what the page exposes.
+const debugHost = globalThis as unknown as { __router: Router };
+
+debugHost.__router = router;
 
 function applyInitialAnchorScroll(): void {
   if (globalThis.location.hash.length <= 1) {
@@ -50,6 +54,7 @@ function applyInitialAnchorScroll(): void {
 
   let attempts = 0;
   const tryScroll = (): void => {
+    // eslint-disable-next-line unicorn/prefer-query-selector -- id may contain CSS-unsafe chars
     const element = document.getElementById(id);
 
     if (element) {

@@ -70,7 +70,7 @@ examples/
       nested-routes/
       ssr-examples/         ← (angular) thematic subgroup — three server-rendering approaches
         ssr/                ← classical Express + AngularNodeAppEngine (provideRealRouterFactory + REQUEST per request)
-        ssr-streaming/      ← AngularNodeAppEngine + @defer (on viewport/hover) + withIncrementalHydration() — per-defer block lazy hydration
+        ssr-streaming/      ← AngularNodeAppEngine + @defer (on viewport/hover) + incremental hydration — per-defer block lazy hydration
         ssg/                ← static site generation (in-process AngularNodeAppEngine on build-only port + getStaticPaths + sirv preview)
       ...
   desktop/                  ← native-host runtime, webview-based apps

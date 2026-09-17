@@ -24,30 +24,34 @@ export const loaders: DataLoaderFactoryMap = {
       users: database.users.list(),
     }),
 
-  "users.profile": () => ({ params }) => {
-    const id = params.id as string;
-    const user = database.users.findById(id);
+  "users.profile":
+    () =>
+    ({ params }) => {
+      const id = params.id as string;
+      const user = database.users.findById(id);
 
-    if (!user) {
-      throw new LoaderNotFound(`user:${id}`);
-    }
+      if (!user) {
+        throw new LoaderNotFound(`user:${id}`);
+      }
 
-    return Promise.resolve<UserProfileData>({ user });
-  },
+      return Promise.resolve<UserProfileData>({ user });
+    },
 
   // Leaf loader for nested /users/:id/posts route. Charlie ("3") has
   // no posts → empty array exercises the empty-state UI.
-  "users.profile.posts": () => ({ params }) => {
-    const id = params.id as string;
-    const user = database.users.findById(id);
+  "users.profile.posts":
+    () =>
+    ({ params }) => {
+      const id = params.id as string;
+      const user = database.users.findById(id);
 
-    if (!user) {
-      throw new LoaderNotFound(`user:${id}`);
-    }
+      if (!user) {
+        throw new LoaderNotFound(`user:${id}`);
+      }
 
-    return Promise.resolve<UserPostsData>({
-      user,
-      posts: database.posts.listByAuthor(id),
-    });
-  },
+      return Promise.resolve<UserPostsData>({
+        user,
+        posts: database.posts.listByAuthor(id),
+      });
+    },
 };

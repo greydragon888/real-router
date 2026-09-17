@@ -47,9 +47,7 @@ export function NotificationBanner({ action }: Props): ReactElement | null {
 
   // Action returned a typed business result. Inspect it.
   const data = returnValue.data as
-    | { ok?: unknown; message?: unknown }
-    | null
-    | undefined;
+    { ok?: unknown; message?: unknown } | null | undefined;
 
   if (data && typeof data === "object" && data.ok === false) {
     const message =

@@ -35,16 +35,18 @@ export const loaders: DataLoaderFactoryMap = {
   "products.list": () => () =>
     Promise.resolve({ products: listProducts() } satisfies ProductsListData),
 
-  "products.detail": () => ({ params }) => {
-    const id = params.id as string;
-    const product = getProduct(id);
+  "products.detail":
+    () =>
+    ({ params }) => {
+      const id = params.id as string;
+      const product = getProduct(id);
 
-    if (!product) {
-      throw new LoaderNotFound(`product:${id}`);
-    }
+      if (!product) {
+        throw new LoaderNotFound(`product:${id}`);
+      }
 
-    return Promise.resolve({ product } satisfies ProductDetailData);
-  },
+      return Promise.resolve({ product } satisfies ProductDetailData);
+    },
 
   // Per-route SSR mode (#597): `ssr: false` aliases to `"client-only"`.
   widget: { ssr: false },

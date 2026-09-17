@@ -1,4 +1,4 @@
-import { dirname, resolve } from "node:path";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -8,20 +8,20 @@ import {
 } from "@angular/ssr/node";
 import { UNKNOWN_ROUTE } from "@real-router/core";
 import {
-  createRequestScope,
-  serializeRouterState,
-} from "@real-router/ssr-utils";
-import {
   getSsrDataMode,
   ssrDataPluginFactory,
 } from "@real-router/ssr-data-plugin";
-import express from "express";
+import {
+  createRequestScope,
+  serializeRouterState,
+} from "@real-router/ssr-utils";
+import express, { static as serveStatic } from "express";
 
 import { createBaseRouter } from "./router/createBaseRouter";
 import { loaders } from "./router/loaders";
 
-const serverDistFolder = dirname(fileURLToPath(import.meta.url));
-const browserDistFolder = resolve(serverDistFolder, "../browser");
+const serverDistFolder = path.dirname(fileURLToPath(import.meta.url));
+const browserDistFolder = path.resolve(serverDistFolder, "../browser");
 
 export const app = express();
 const angularApp = new AngularNodeAppEngine();
@@ -30,7 +30,7 @@ const baseRouter = createBaseRouter();
 app.disable("x-powered-by");
 
 app.use(
-  express.static(browserDistFolder, {
+  serveStatic(browserDistFolder, {
     maxAge: "1y",
     index: false,
     redirect: false,
@@ -38,7 +38,7 @@ app.use(
 );
 
 function escapeHtmlAttribute(value: string): string {
-  return value.replace(/"/g, "&quot;");
+  return value.replaceAll('"', "&quot;");
 }
 
 /**
@@ -48,13 +48,13 @@ function escapeHtmlAttribute(value: string): string {
  * `"full"` requests fall through to the AngularNodeAppEngine middleware
  * below, which runs the canonical SSR pipeline.
  */
-app.use((req, res, next) => {
-  const url = req.originalUrl ?? req.url ?? "/";
+app.use((request, nodeResponse, next) => {
+  const url = request.originalUrl;
   // createRequestScope: AbortController + req.on("close") + cloneRouter +
   // dispose, all in one. abortSignal is injected into deps so loaders can
   // read getDep("abortSignal") for cooperative cancellation when the
   // client disconnects mid-render.
-  const scope = createRequestScope(req, baseRouter);
+  const scope = createRequestScope(request, baseRouter);
 
   scope.router.usePlugin(ssrDataPluginFactory(loaders));
 
@@ -91,7 +91,7 @@ app.use((req, res, next) => {
   </body>
 </html>`;
 
-      res
+      nodeResponse
         .status(200)
         .set("Content-Type", "text/html; charset=utf-8")
         .send(shell);
@@ -106,9 +106,9 @@ app.use((req, res, next) => {
 
 // Angular SSR middleware — only reached when mode === "full" (or for the
 // not-found pass).
-app.use((req, res, next) => {
+app.use((request, nodeResponse, next) => {
   angularApp
-    .handle(req)
+    .handle(request)
     .then((response) => {
       if (!response) {
         next();
@@ -117,12 +117,12 @@ app.use((req, res, next) => {
       }
 
       response.headers.forEach((value, key) => {
-        res.setHeader(key, value);
+        nodeResponse.setHeader(key, value);
       });
 
-      res.statusCode = response.status;
+      nodeResponse.statusCode = response.status;
       void response.arrayBuffer().then((buffer) => {
-        res.end(new Uint8Array(buffer));
+        nodeResponse.end(new Uint8Array(buffer));
       });
     })
     .catch((error: unknown) => {
@@ -131,6 +131,7 @@ app.use((req, res, next) => {
 });
 
 if (isMainModule(import.meta.url)) {
+  // eslint-disable-next-line turbo/no-undeclared-env-vars -- PORT is conventional Express override, not turbo task input
   const port = Number(process.env.PORT) || 4173;
 
   app.listen(port, () => {
@@ -138,4 +139,4 @@ if (isMainModule(import.meta.url)) {
   });
 }
 
-export const reqHandler = createNodeRequestHandler(app);
+export const requestHandler = createNodeRequestHandler(app);
