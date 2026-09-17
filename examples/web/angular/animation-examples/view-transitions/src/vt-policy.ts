@@ -50,7 +50,7 @@ export function installViewTransitionPolicy(router: Router): () => void {
   // SSR safety: `typeof` avoids both the ReferenceError on pre-global-runtime
   // hosts and the TS "no overlap" error from DOM lib's `Window` type. unicorn
   // prefers direct comparison but it doesn't typecheck here.
-  // eslint-disable-next-line unicorn/prefer-global-this
+
   if (typeof window === "undefined") {
     return () => {
       /* no-op on server */

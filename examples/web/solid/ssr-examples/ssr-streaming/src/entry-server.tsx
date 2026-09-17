@@ -1,11 +1,11 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
+import { RouterProvider } from "@real-router/solid";
+import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import {
   createRequestScope,
   serializeRouterState,
   type IncomingMessageLike,
 } from "@real-router/ssr-utils";
-import { RouterProvider } from "@real-router/solid";
-import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { generateHydrationScript, renderToStream } from "solid-js/web";
 
 import { App } from "./App";

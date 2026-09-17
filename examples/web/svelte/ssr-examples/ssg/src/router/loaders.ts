@@ -21,16 +21,20 @@ export const loaders: DataLoaderFactoryMap = {
     Promise.resolve<UsersListData>({
       users: database.users.list(),
     }),
-  "users.profile": () => ({ params }) =>
-    Promise.resolve<UserProfileData>({
-      user: database.users.findById(params.id as string),
-    }),
-  "users.profile.posts": () => ({ params }) => {
-    const id = params.id as string;
+  "users.profile":
+    () =>
+    ({ params }) =>
+      Promise.resolve<UserProfileData>({
+        user: database.users.findById(params.id as string),
+      }),
+  "users.profile.posts":
+    () =>
+    ({ params }) => {
+      const id = params.id as string;
 
-    return Promise.resolve<UserPostsData>({
-      user: database.users.findById(id),
-      posts: database.posts.listByAuthor(id),
-    });
-  },
+      return Promise.resolve<UserPostsData>({
+        user: database.users.findById(id),
+        posts: database.posts.listByAuthor(id),
+      });
+    },
 };

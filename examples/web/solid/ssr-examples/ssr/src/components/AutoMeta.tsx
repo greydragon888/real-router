@@ -41,8 +41,8 @@ export function AutoMeta(): JSX.Element {
   createEffect(() => {
     const meta = getMetaForState({
       name: routeState().route.name,
-      params: routeState().route.params as Record<string, unknown>,
-      search: routeState().route.search as Record<string, unknown>,
+      params: routeState().route.params,
+      search: routeState().route.search,
     });
 
     document.title = meta.title;

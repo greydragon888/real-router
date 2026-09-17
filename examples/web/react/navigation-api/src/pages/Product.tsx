@@ -13,7 +13,7 @@ export function Product(): JSX.Element {
   const currentIndex = PRODUCT_IDS.indexOf(id);
   const prevId = currentIndex > 0 ? PRODUCT_IDS[currentIndex - 1] : undefined;
   const nextId =
-    currentIndex >= 0 && currentIndex < PRODUCT_IDS.length - 1
+    currentIndex !== -1 && currentIndex < PRODUCT_IDS.length - 1
       ? PRODUCT_IDS[currentIndex + 1]
       : undefined;
 

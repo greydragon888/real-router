@@ -36,7 +36,8 @@ export function Home(): JSX.Element {
           }
         >
           <p data-testid="ssr-boundaries-client">
-            Mounted on the client (window: {String(typeof window !== "undefined")})
+            Mounted on the client (window:{" "}
+            {String(typeof window !== "undefined")})
           </p>
         </ClientOnly>
         <ServerOnly

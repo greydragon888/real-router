@@ -34,11 +34,7 @@ export function Home() {
       {data?.aborts !== undefined && (
         <p data-testid="aborts">{String(data.aborts)}</p>
       )}
-      <button
-        type="button"
-        data-testid="refresh-btn"
-        onClick={handleRefresh}
-      >
+      <button type="button" data-testid="refresh-btn" onClick={handleRefresh}>
         Refresh data
       </button>
     </main>

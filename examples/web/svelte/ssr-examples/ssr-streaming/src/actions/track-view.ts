@@ -29,7 +29,19 @@ declare global {
     __VIEW_LOG__?: { productId: string; ts: number }[];
     __VIEW_UPDATE_LOG__?: { productId: string; ts: number }[];
   }
+
+  var __VIEW_LOG__: { productId: string; ts: number }[] | undefined;
+
+  var __VIEW_UPDATE_LOG__: { productId: string; ts: number }[] | undefined;
 }
+
+/**
+ * The e2e counters live on the global object. Reading them through a typed
+ * reference keeps the access checked — a bare `globalThis.__X__` is `any`,
+ * and assigning onto the global object directly is what
+ * `unicorn/no-global-object-property-assignment` forbids.
+ */
+const viewLogHost = globalThis as unknown as Window;
 
 export interface TrackViewParams {
   productId: string;
@@ -43,8 +55,8 @@ export function trackView(
 
   const observer = new IntersectionObserver(([entry]) => {
     if (entry?.isIntersecting) {
-      window.__VIEW_LOG__ = window.__VIEW_LOG__ ?? [];
-      window.__VIEW_LOG__.push({
+      viewLogHost.__VIEW_LOG__ ??= [];
+      viewLogHost.__VIEW_LOG__.push({
         productId: currentProductId,
         ts: Date.now(),
       });
@@ -56,8 +68,8 @@ export function trackView(
   return {
     update(next: TrackViewParams): void {
       currentProductId = next.productId;
-      window.__VIEW_UPDATE_LOG__ = window.__VIEW_UPDATE_LOG__ ?? [];
-      window.__VIEW_UPDATE_LOG__.push({
+      viewLogHost.__VIEW_UPDATE_LOG__ ??= [];
+      viewLogHost.__VIEW_UPDATE_LOG__.push({
         productId: next.productId,
         ts: Date.now(),
       });

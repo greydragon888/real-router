@@ -7,7 +7,7 @@ import {
 } from "@real-router/angular";
 
 import { AdminComponent } from "./pages/admin.component";
-import { DocComponent } from "./pages/doc.component";
+import { DocumentComponent } from "./pages/doc.component";
 import { HomeComponent } from "./pages/home.component";
 import { NotFoundComponent } from "./pages/not-found.component";
 import { UserProfileComponent } from "./pages/user-profile.component";
@@ -21,7 +21,7 @@ import { UserProfileComponent } from "./pages/user-profile.component";
     RouteNotFound,
     HomeComponent,
     AdminComponent,
-    DocComponent,
+    DocumentComponent,
     NotFoundComponent,
     UserProfileComponent,
   ],
@@ -59,7 +59,9 @@ import { UserProfileComponent } from "./pages/user-profile.component";
         </ng-template>
         <ng-template routeMatch="users">
           <route-view [routeNode]="'users'">
-            <ng-template routeMatch="profile"><user-profile-page /></ng-template>
+            <ng-template routeMatch="profile"
+              ><user-profile-page
+            /></ng-template>
           </route-view>
         </ng-template>
         <ng-template routeMatch="docs">

@@ -1,14 +1,11 @@
+import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import {
   createRequestScope,
   serializeRouterState,
   type IncomingMessageLike,
 } from "@real-router/ssr-utils";
-import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { RouterProvider } from "@real-router/vue";
-import {
-  HttpStatusProvider,
-  createHttpStatusSink,
-} from "@real-router/vue/ssr";
+import { HttpStatusProvider, createHttpStatusSink } from "@real-router/vue/ssr";
 import { createSSRApp, h } from "vue";
 import { renderToString } from "vue/server-renderer";
 
@@ -140,8 +137,8 @@ export async function render(
 
     const meta = getMetaForState({
       name: state.name,
-      params: state.params as Record<string, unknown>,
-      search: state.search as Record<string, unknown>,
+      params: state.params,
+      search: state.search,
     });
 
     return {

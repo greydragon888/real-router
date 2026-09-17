@@ -3,7 +3,7 @@ import { Link, useRoute } from "@real-router/solid";
 import { Match, Switch } from "solid-js";
 
 import { AdminDashboard } from "./pages/Admin";
-import { Doc } from "./pages/Doc";
+import { DocumentPage } from "./pages/DocumentPage";
 import { Home } from "./pages/Home";
 import { NotFound } from "./pages/NotFound";
 import { UserProfile } from "./pages/UserProfile";
@@ -49,7 +49,7 @@ export function App(): JSX.Element {
           <UserProfile />
         </Match>
         <Match when={name() === "docs.detail"}>
-          <Doc />
+          <DocumentPage />
         </Match>
         <Match when={name() === UNKNOWN_ROUTE}>
           <NotFound />

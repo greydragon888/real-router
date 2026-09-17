@@ -41,8 +41,7 @@ export class UsersListComponent {
 
   readonly data = computed<UsersListData>(() => {
     const data = this.route.routeState().route.context.data as
-      | UsersListData
-      | undefined;
+      UsersListData | undefined;
 
     return data ?? { users: [], sort: "asc" };
   });

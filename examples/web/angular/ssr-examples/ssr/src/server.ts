@@ -30,10 +30,12 @@ app.disable("x-powered-by");
 // observes the disconnect and increments the counter exposed via
 // /__bench/abort-count. Registered BEFORE the catch-all Angular handler.
 let abortObserved = 0;
+
 app.get("/__bench/slow-fetch", (request, response) => {
   const timer = setTimeout(() => {
     response.json({ ok: true });
   }, 5000);
+
   request.on("close", () => {
     if (!response.writableEnded) {
       clearTimeout(timer);
@@ -79,7 +81,7 @@ function computeStrongEtag(body: Uint8Array): string {
   return `"${hash}"`;
 }
 
-app.use((req, res, next) => {
+app.use((request, nodeResponse, next) => {
   // AbortController per request — server fires .abort() if the client
   // disconnects mid-render (browser tab closed, fetch cancelled,
   // network drop). The signal is attached to the Express request so
@@ -88,9 +90,10 @@ app.use((req, res, next) => {
   // — see /slow loader for the demonstrated pattern.
   const abortController = new AbortController();
 
-  (req as { abortSignal?: AbortSignal }).abortSignal = abortController.signal;
-  req.on("close", () => {
-    if (!res.writableEnded) {
+  (request as { abortSignal?: AbortSignal }).abortSignal =
+    abortController.signal;
+  request.on("close", () => {
+    if (!nodeResponse.writableEnded) {
       abortController.abort();
     }
   });
@@ -110,7 +113,7 @@ app.use((req, res, next) => {
   const httpStatusSink: HttpStatusSink = createHttpStatusSink();
 
   angularApp
-    .handle(req, { httpStatusSink })
+    .handle(request, { httpStatusSink })
     .then(async (response) => {
       if (!response) {
         next();
@@ -128,28 +131,28 @@ app.use((req, res, next) => {
       // no-store`; public paths get long max-age + s-maxage. Combined
       // with ETag, even short max-age routes serve cheap 304s on
       // revalidate.
-      const cacheControl = getCachePolicy(req.url ?? "/");
+      const cacheControl = getCachePolicy(request.url ?? "/");
 
       // ETag is computed over the final SSR bytes — same input bytes
       // => same ETag, so two consecutive identical requests yield 304.
       // We use a STRONG etag (no W/ prefix) because the body is
       // byte-identical when the rendered output hasn't changed.
       const etag = computeStrongEtag(buffer);
-      const ifNoneMatch = req.headers["if-none-match"];
+      const ifNoneMatch = request.headers["if-none-match"];
 
-      // Mirror the Web Response headers onto Node res first.
+      // Mirror the Web Response headers onto Node nodeResponse first.
       response.headers.forEach((value, key) => {
-        res.setHeader(key, value);
+        nodeResponse.setHeader(key, value);
       });
 
-      res.setHeader("ETag", etag);
+      nodeResponse.setHeader("ETag", etag);
       if (cacheControl) {
-        res.setHeader("Cache-Control", cacheControl);
+        nodeResponse.setHeader("Cache-Control", cacheControl);
       }
 
       if (ifNoneMatch === etag) {
-        res.statusCode = 304;
-        res.end();
+        nodeResponse.statusCode = 304;
+        nodeResponse.end();
 
         return;
       }
@@ -159,14 +162,14 @@ app.use((req, res, next) => {
       // fall back to Angular's response.status). Loader-driven errors fall
       // through to the catch branch below, so this only applies to the
       // happy path + render-time decisions like the NotFound page.
-      res.statusCode = httpStatusSink.code ?? response.status;
-      res.end(buffer);
+      nodeResponse.statusCode = httpStatusSink.code ?? response.status;
+      nodeResponse.end(buffer);
     })
     .catch((error: unknown) => {
       const code = readErrorCode(error);
 
       if (code === "CANNOT_ACTIVATE") {
-        res.redirect(302, "/");
+        nodeResponse.redirect(302, "/");
 
         return;
       }
@@ -176,19 +179,22 @@ app.use((req, res, next) => {
         const target = redirect.target ?? "/";
         const status = redirect.status ?? 302;
 
-        res.redirect(status, target);
+        nodeResponse.redirect(status, target);
 
         return;
       }
 
       if (code === "LOADER_NOT_FOUND") {
-        res.status(404).type("text/plain; charset=utf-8").send("Not Found");
+        nodeResponse
+          .status(404)
+          .type("text/plain; charset=utf-8")
+          .send("Not Found");
 
         return;
       }
 
       if (code === "LOADER_TIMEOUT") {
-        res
+        nodeResponse
           .status(504)
           .type("text/plain; charset=utf-8")
           .send("Gateway Timeout");
@@ -208,4 +214,4 @@ if (isMainModule(import.meta.url)) {
   });
 }
 
-export const reqHandler = createNodeRequestHandler(app);
+export const requestHandler = createNodeRequestHandler(app);

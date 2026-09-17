@@ -1,13 +1,13 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
 import {
+  getSsrDataMode,
+  ssrDataPluginFactory,
+} from "@real-router/ssr-data-plugin";
+import {
   createRequestScope,
   serializeRouterState,
   type IncomingMessageLike,
 } from "@real-router/ssr-utils";
-import {
-  getSsrDataMode,
-  ssrDataPluginFactory,
-} from "@real-router/ssr-data-plugin";
 import { render } from "svelte/server";
 
 import App from "./App.svelte";
@@ -58,6 +58,7 @@ export async function renderApp(
 
     if (mode === "full") {
       const { head, body } = render(App, { props: { router: scope.router } });
+
       return {
         html: body,
         head,

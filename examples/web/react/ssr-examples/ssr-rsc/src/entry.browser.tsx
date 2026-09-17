@@ -58,9 +58,9 @@ setServerCallback(async (id: string, args: unknown[]) => {
     method: "POST",
     headers: {
       "x-rsc-action": id,
-      ...(typeof body === "string"
-        ? { "content-type": "text/plain;charset=utf-8" }
-        : {}),
+      ...(typeof body === "string" && {
+        "content-type": "text/plain;charset=utf-8",
+      }),
     },
     body,
   });

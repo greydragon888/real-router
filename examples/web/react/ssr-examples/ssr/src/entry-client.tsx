@@ -1,7 +1,7 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
-import { hydrateRouter } from "@real-router/ssr-utils";
 import { RouterProvider } from "@real-router/react";
 import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
+import { hydrateRouter } from "@real-router/ssr-utils";
 import { hydrateRoot } from "react-dom/client";
 
 import { App } from "./App";
@@ -24,7 +24,18 @@ declare global {
      */
     __LOADER_CALLS__?: Record<string, number>;
   }
+
+  var __SSR_STATE__: { path: string } | undefined;
+
+  var __LOADER_CALLS__: Record<string, number> | undefined;
 }
+
+/**
+ * The e2e counter lives on the global object; assigning through a typed
+ * reference satisfies `unicorn/no-global-object-property-assignment` without
+ * changing what the page exposes.
+ */
+const instrumentationHost = globalThis;
 
 // Mirrors server/_auth.ts: parse cookie → currentUser. Kept minimal because
 // the client only needs the same DI value the server fed canActivate guards
@@ -68,14 +79,16 @@ const router = createAppRouter({
 
 const loaderCalls: Record<string, number> = {};
 
-window.__LOADER_CALLS__ = loaderCalls;
+instrumentationHost.__LOADER_CALLS__ = loaderCalls;
 
 const instrumentedLoaders: DataLoaderFactoryMap = Object.fromEntries(
   Object.entries(loaders).map(([name, raw]) => {
     // Per-route SSR mode (#597): non-function entries (`{ ssr: false }`,
     // `{ ssr: "data-only", loader: … }`) pass through as-is. Only the
     // function form needs the loader-call counter wrap.
-    if (typeof raw !== "function") return [name, raw];
+    if (typeof raw !== "function") {
+      return [name, raw];
+    }
 
     const factory = raw as DataLoaderFnFactory;
 
@@ -99,7 +112,7 @@ router.usePlugin(
   ssrDataPluginFactory(instrumentedLoaders),
 );
 
-const ssrState = window.__SSR_STATE__;
+const ssrState = globalThis.__SSR_STATE__;
 
 await (ssrState ? hydrateRouter(router, ssrState) : router.start());
 

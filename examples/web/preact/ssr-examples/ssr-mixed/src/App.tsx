@@ -2,7 +2,7 @@ import { UNKNOWN_ROUTE } from "@real-router/core";
 import { Link, useRoute } from "@real-router/preact";
 
 import { AdminDashboard } from "./pages/Admin";
-import { Doc } from "./pages/Doc";
+import { DocumentPage } from "./pages/DocumentPage";
 import { Home } from "./pages/Home";
 import { NotFound } from "./pages/NotFound";
 import { UserProfile } from "./pages/UserProfile";
@@ -37,7 +37,7 @@ export function App() {
       {route.name === "home" && <Home />}
       {route.name === "admin.dashboard" && <AdminDashboard />}
       {route.name === "users.profile" && <UserProfile />}
-      {route.name === "docs.detail" && <Doc />}
+      {route.name === "docs.detail" && <DocumentPage />}
       {route.name === UNKNOWN_ROUTE && <NotFound />}
     </div>
   );

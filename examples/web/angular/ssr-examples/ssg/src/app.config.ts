@@ -33,24 +33,31 @@ function withLoaderCounter(map: DataLoaderFactoryMap): DataLoaderFactoryMap {
   const win = globalThis as unknown as {
     __LOADER_CALLS__?: Record<string, number>;
   };
+
   win.__LOADER_CALLS__ = {};
 
   const wrapped: Record<string, DataLoaderFactoryMap[string]> = {};
+
   for (const [routeName, entry] of Object.entries(map)) {
     if (typeof entry !== "function") {
       wrapped[routeName] = entry;
       continue;
     }
+
     const factory = entry as DataLoaderFnFactory;
+
     wrapped[routeName] = ((router, getDep) => {
       const inner = factory(router, getDep);
+
       return (params) => {
         win.__LOADER_CALLS__![routeName] =
           (win.__LOADER_CALLS__![routeName] ?? 0) + 1;
+
         return inner(params);
       };
     }) satisfies DataLoaderFnFactory;
   }
+
   return wrapped;
 }
 

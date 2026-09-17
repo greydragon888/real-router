@@ -25,12 +25,12 @@ app.use(
   }),
 );
 
-app.use((req, res, next) => {
+app.use((request, nodeResponse, next) => {
   angularApp
-    .handle(req)
+    .handle(request)
     .then((response) => {
       if (response) {
-        writeResponseToNodeResponse(response, res);
+        writeResponseToNodeResponse(response, nodeResponse);
       } else {
         next();
       }
@@ -46,4 +46,4 @@ if (isMainModule(import.meta.url)) {
   });
 }
 
-export const reqHandler = createNodeRequestHandler(app);
+export const requestHandler = createNodeRequestHandler(app);

@@ -1,10 +1,10 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
 import { cloneRouter } from "@real-router/core/api";
+import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import {
   getStaticPaths as getStaticPathsFromRouter,
   serializeRouterState,
 } from "@real-router/ssr-utils";
-import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
 import { RouterProvider } from "@real-router/vue";
 import { createSSRApp, h } from "vue";
 import { renderToString } from "vue/server-renderer";

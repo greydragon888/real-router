@@ -120,8 +120,7 @@ export class ProductDetailComponent {
   readonly data = computed<ProductDetailData | undefined>(
     () =>
       this.route.routeState().route.context.data as
-        | ProductDetailData
-        | undefined,
+        ProductDetailData | undefined,
   );
 
   readonly showTech = signal(false);

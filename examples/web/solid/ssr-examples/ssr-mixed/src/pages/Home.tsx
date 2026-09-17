@@ -38,11 +38,7 @@ export function Home(): JSX.Element {
       <Show when={data()?.aborts !== undefined}>
         <p data-testid="aborts">{String(data()?.aborts)}</p>
       </Show>
-      <button
-        type="button"
-        data-testid="refresh-btn"
-        onClick={handleRefresh}
-      >
+      <button type="button" data-testid="refresh-btn" onClick={handleRefresh}>
         Refresh data
       </button>
     </main>

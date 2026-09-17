@@ -1,8 +1,6 @@
 import { isPlatformBrowser } from "@angular/common";
 import {
   Component,
-  OnDestroy,
-  OnInit,
   PLATFORM_ID,
   computed,
   inject,
@@ -11,7 +9,9 @@ import {
 import { injectRoute } from "@real-router/angular";
 import { getSsrDataMode } from "@real-router/ssr-data-plugin";
 
-interface DocData {
+import type { OnDestroy, OnInit } from "@angular/core";
+
+interface DocumentData {
   id: string;
   format: string;
   body: string;
@@ -34,35 +34,43 @@ interface DocData {
     </main>
   `,
 })
-export class DocComponent implements OnInit, OnDestroy {
+export class DocumentComponent implements OnInit, OnDestroy {
   private readonly route = injectRoute();
   private readonly platformId = inject(PLATFORM_ID);
   private handle: ReturnType<typeof setTimeout> | undefined;
 
   readonly mode = computed(() => getSsrDataMode(this.route.routeState().route));
-  readonly ssrData = computed<DocData | undefined>(
-    () => this.route.routeState().route.context.data as DocData | undefined,
+  readonly ssrData = computed<DocumentData | undefined>(
+    () =>
+      this.route.routeState().route.context.data as DocumentData | undefined,
   );
-  readonly clientData = signal<DocData | null>(null);
-  readonly data = computed<DocData | null | undefined>(
+  readonly clientData = signal<DocumentData | null>(null);
+  readonly data = computed<DocumentData | null | undefined>(
     () => this.ssrData() ?? this.clientData(),
   );
 
   ngOnInit(): void {
-    if (!isPlatformBrowser(this.platformId)) return;
-    if (this.mode() !== "client-only" || this.ssrData() !== undefined) return;
+    if (!isPlatformBrowser(this.platformId)) {
+      return;
+    }
+    if (this.mode() !== "client-only" || this.ssrData() !== undefined) {
+      return;
+    }
 
     const { params, search } = this.route.routeState().route;
+
     this.handle = setTimeout(() => {
       this.clientData.set({
-        id: String(params.id),
-        format: String(search.format),
-        body: `(client) PDF placeholder for ${String(params.id)}`,
+        id: params.id as string,
+        format: search.format as string,
+        body: `(client) PDF placeholder for ${params.id as string}`,
       });
     }, 50);
   }
 
   ngOnDestroy(): void {
-    if (this.handle !== undefined) clearTimeout(this.handle);
+    if (this.handle !== undefined) {
+      clearTimeout(this.handle);
+    }
   }
 }

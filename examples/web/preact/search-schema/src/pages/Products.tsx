@@ -54,8 +54,8 @@ export function Products(): JSX.Element {
             type="text"
             value={q}
             placeholder="Search products..."
-            onInput={(e) => {
-              const value = (e.target as HTMLInputElement).value;
+            onInput={(event) => {
+              const value = (event.target as HTMLInputElement).value;
 
               navigate(
                 value ? { q: value, page: 1 } : { q: undefined, page: 1 },
@@ -69,8 +69,8 @@ export function Products(): JSX.Element {
           <select
             id="sort-select"
             value={sort}
-            onChange={(e) => {
-              navigate({ sort: (e.target as HTMLSelectElement).value });
+            onChange={(event) => {
+              navigate({ sort: (event.target as HTMLSelectElement).value });
             }}
           >
             <option value="name">Name</option>

@@ -35,17 +35,34 @@ export const loaders: DataLoaderFactoryMap = {
   // `sort` is the `users` route's query param (declared `?sort`) — it lives
   // in the `search` channel of the loader target, not `params` (RFC-4 M2 /
   // #1548).
-  users: () => ({ search }) => {
-    const sort: "asc" | "desc" = search.sort === "desc" ? "desc" : "asc";
+  users:
+    () =>
+    ({ search }) => {
+      const sort: "asc" | "desc" = search.sort === "desc" ? "desc" : "asc";
 
-    return Promise.resolve<UsersListData>({
-      users: database.users.list(sort),
-      sort,
-    });
-  },
+      return Promise.resolve<UsersListData>({
+        users: database.users.list(sort),
+        sort,
+      });
+    },
 
-  "users.profile": () => ({ params }) =>
-    withTimeout("users.profile", PROFILE_TIMEOUT_MS, () => {
+  "users.profile":
+    () =>
+    ({ params }) =>
+      withTimeout("users.profile", PROFILE_TIMEOUT_MS, () => {
+        const id = params.id as string;
+        const user = database.users.findById(id);
+
+        if (!user) {
+          throw new LoaderNotFound(`user:${id}`);
+        }
+
+        return Promise.resolve<UserProfileData>({ user });
+      }),
+
+  "users.profile.posts":
+    () =>
+    ({ params }) => {
       const id = params.id as string;
       const user = database.users.findById(id);
 
@@ -53,28 +70,19 @@ export const loaders: DataLoaderFactoryMap = {
         throw new LoaderNotFound(`user:${id}`);
       }
 
-      return Promise.resolve<UserProfileData>({ user });
-    }),
+      return Promise.resolve<UserPostsData>({
+        user,
+        posts: database.posts.listByAuthor(id),
+      });
+    },
 
-  "users.profile.posts": () => ({ params }) => {
-    const id = params.id as string;
-    const user = database.users.findById(id);
+  legacyUser:
+    () =>
+    ({ params }) => {
+      const id = params.id as string;
 
-    if (!user) {
-      throw new LoaderNotFound(`user:${id}`);
-    }
-
-    return Promise.resolve<UserPostsData>({
-      user,
-      posts: database.posts.listByAuthor(id),
-    });
-  },
-
-  legacyUser: () => ({ params }) => {
-    const id = params.id as string;
-
-    throw new LoaderRedirect(`/users/${id}`, 301);
-  },
+      throw new LoaderRedirect(`/users/${id}`, 301);
+    },
 
   // The `slow` loader makes a real HTTP fetch to /__bench/slow-fetch,
   // which is instrumented to count client-side aborts (server/index.ts).
@@ -93,6 +101,7 @@ export const loaders: DataLoaderFactoryMap = {
       SLOW_LOADER_TIMEOUT_MS,
       async ({ signal }) => {
         const response = await fetch(SLOW_FETCH_URL, { signal });
+
         return (await response.json()) as SlowData;
       },
       { upstreamSignal },
