@@ -2,6 +2,77 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## benchmarks/ is linted in pre-push, and no lint fix may change a bundle the results were measured on (#2390, 2026-09-17)
+
+**Problem.** No gate read `benchmarks/`: the package declared no lint script, and
+turbo runs only package scripts. Linting it once surfaced three things.
+
+- 19 files could not be parsed at all, 17 `.mts` and 2 `.js`. typescript-eslint
+  infers `tsconfigRootDir` when a block leaves it unset, from the configs that
+  read a preset off `tseslint.configs`; each such read registers the reading
+  file's directory. `benchmarks/eslint.config.mjs` reads one, so under
+  `benchmarks/` there were two candidates, and every file outside the `.ts` /
+  `.tsx` block failed before a single rule ran.
+- The debt: 962 errors and 382 warnings with the libraries bundled. Without
+  `dist/` there were 127 more, all `no-unsafe-*` and all in
+  `cross-router/apps/angular`, whose tsconfigs do not inherit
+  `@real-router/internal-source`.
+- Most of that code is measured. `cross-router/apps` are the shells the
+  reference results were measured on, and `adapter-bench/apps` build the
+  bundles CodSpeed measures, so a lint fix that changes their built output
+  invalidates the numbers it sits next to.
+
+**Solution.**
+
+- The root config sets `tsconfigRootDir` for every file, and `.mts` / `.cts` join
+  `.ts` / `.tsx` in the typed block.
+- `lint:bench` is a turbo task with `dependsOn: ["^bundle"]`, as `lint:example`
+  is, with the package's own `eslint.config.*` among its inputs. pre-push runs
+  both in one line after its build; pre-commit and the test shards never see it.
+  `lint:reach` counts it, and its `EXEMPT` list is empty.
+- `benchmarks/eslint.config.mjs` ignores the deck's template sources
+  (`deck-config.js`, `deck-render.js`, whose `__TOKEN__` placeholders the build
+  replaces verbatim), turns off `no-floating-promises` in the CodSpeed benches
+  and `no-unresolved` where an import is absent by construction, and turns off,
+  for the measured apps only, every rule that could not be satisfied without
+  changing their program.
+- The TanStack shells whose hooks came back `any` carry a directive with the
+  reason, and `react-router`'s `useLoaderData` takes the loader type through its
+  own type parameter.
+
+**How "without changing the program" was established.** Every measured bundle
+(139 `cross-router` apps and 6 `adapter-bench` bundles) was built the way the
+harness builds it, before the cleanup and after each step, and compared file by
+file by sha256. A control rebuilt 46 of them with no edit and got identical
+output; another planted a difference in a manifest and the comparison reported
+it. Rules were kept on or turned off by that comparison, not by reading them:
+
+- `import-x/order`'s fix changed 21 of the 139 app bundles, because rollup emits
+  modules in import order.
+- `prefer-template` changed 7: esbuild keeps a template literal a template.
+- `adapter-bench` builds with `minify: false`, which keeps identifiers and
+  property access as written: `dot-notation`'s fix changed the Angular adapter
+  bundle, and `name-replacements` is off there on the same ground without its
+  own measurement. In the minified cross-router apps, the renames it asked for
+  left every bundle identical.
+- Typing an adapter route param as `string` made `String(param)` redundant to
+  `no-unnecessary-type-conversion`, and the follow-up `--fix` removed the call:
+  five of the six adapter bundles changed, and `no-base-to-string` is off
+  there instead.
+
+The final state rebuilt all 145 bundles byte-identical to the baseline, with
+0 errors and 0 warnings over 391 files, and each of the six type-check configs
+listed in `benchmarks/CLAUDE.md` reporting 0 errors, as on `master`.
+
+**Why the TanStack hooks are not typed by registering the router.** TanStack
+types those hooks through module augmentation of `Register`, and augmentation is
+global to the TypeScript program. Each cohort's shells share one tsconfig, so a
+registration in one shell reached every other: `tsc` reported the other shells'
+`Link` targets as unassignable, and TS2717 for the second registration.
+
+**Cost, measured.** With the libraries already bundled, `lint:bench` runs in
+about 40 s cold and replays from cache warm.
+
 ## Examples are linted in pre-push, after the build, and a guard derives which packages any lint step reads (#2370, 2026-09-17)
 
 **Problem.** No gate read `examples/**`. None of the example manifests declared a
