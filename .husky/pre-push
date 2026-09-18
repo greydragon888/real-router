@@ -11,6 +11,10 @@
 # - lint:doc-dup: Docblock sentences that restate the package's own docs
 # - scripts tests: The repo's own tooling tests (scripts/*.test.mjs), the
 #                  suite CI's Repo Lints runs
+# - lint:membership: One record counted with Object.keys and tested with
+#                    hasOwnProperty — the #1815 / #2064 class. pre-commit
+#                    runs it too; this hook is the one that sees a merged
+#                    or rebased tree (#2392)
 # - lint:reach: Every workspace package is read by a lint step of this hook,
 #               derived from its own `turbo run` lines (#2370)
 # - build: Final build to ensure compilation
@@ -92,6 +96,13 @@ pnpm lint:doc-dup
 # repositories: with GIT_DIR inherited, their `git init` / `git config` /
 # `git worktree add` write to THIS repository instead (core.bare=true and a
 # test identity in .git/config — see IMPLEMENTATION_NOTES).
+# The predicate check pre-commit also runs (#2392). Repeated on purpose: git runs
+# no pre-commit for a tree `git merge` or `git rebase` produced, and this hook
+# reads the tree that is actually leaving — the push guard above has just proved
+# it is the pushed one. ~0.6 s, pure Node, no skip arm.
+echo "🔑 Checking membership predicates..."
+pnpm lint:membership
+
 echo "🧰 Testing repo scripts..."
 # shellcheck disable=SC2046 # the names must split: one operand per variable
 (unset $(git rev-parse --local-env-vars); node --test --test-reporter=dot scripts/*.test.mjs)
