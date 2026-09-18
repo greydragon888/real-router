@@ -404,6 +404,7 @@
       "3c362f3f73cc",
       "b468256e67d4",
       "e46acbea007d",
+      "bd3fcfa21b09",
       "8838e0b5d4ea",
       "805efef69d6d",
       "f1b292f53fba",
@@ -744,7 +745,7 @@
       "01d0db3b46c7",
       "2b5fa2430231",
       "86e08e4ea555",
-      "ed8d12f96c02",
+      "4f2c08b98b77",
       "6beedc9bfd1f"
     ],
     "packages/core/src/namespaces/RoutesNamespace/types.ts": [
@@ -908,6 +909,7 @@
       "97fd4214f924",
       "1e875de4519f",
       "bf8954b9cf46",
+      "bd652a383bdf",
       "a8e38a061e72",
       "5e6ea52a5e7e",
       "6e1086fc75ab",

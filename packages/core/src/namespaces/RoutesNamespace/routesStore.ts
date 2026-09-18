@@ -1590,7 +1590,7 @@ export function createRoutesStore<
   //
   // ⚠ State the level you closed, and only that one. This shape repeated three
   // times on the way here — snapshot, container, slot — and it does NOT stop
-  // here: `routeGetStore()` hands out fifteen slots, of which EIGHT are
+  // here: `routeGetStore()` hands out the whole store, of which EIGHT slots are
   // destructive when replaced (`matcher`, `tree`, `config`, both caches,
   // `rootPath`, `depsStore`, `lifecycleNamespace`). Only this one is sealed,
   // because only this one was made load-bearing by the snapshot work; the others
