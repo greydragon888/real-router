@@ -204,12 +204,12 @@ rule.** That issue asked whether `RouterValidator` should grow a member for each
 the rule above was decided after it was written and answers all four without one.
 Recorded here so the question is answered rather than re-opened.
 
-| door | outcome | measured reason |
-| --- | --- | --- |
-| `PluginApi.addInterceptor` | always-on, already there | `assertInterceptableSeam` — core cannot run a seam it cannot call |
-| `PluginApi.claimContextNamespace` | always-on, already there | a non-string or empty namespace would key the claim registry on nothing, so core cannot keep working |
-| `PluginApi.getRouteConfig` | neither — core stays neutral | `hasRoute` gates before the lookup, so `__proto__`, `constructor`, `toString`, a Symbol, `42`, `null` and an unknown name all answer `undefined`. Nothing to corrupt and nothing to print |
-| `PluginApi.emitTransitionError` | neither — the record is the `#2303` bullet above | — |
+| door                              | outcome                                          | measured reason                                                                                                                                                                           |
+| --------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PluginApi.addInterceptor`        | always-on, already there                         | `assertInterceptableSeam` — core cannot run a seam it cannot call                                                                                                                         |
+| `PluginApi.claimContextNamespace` | always-on, already there                         | a non-string or empty namespace would key the claim registry on nothing, so core cannot keep working                                                                                      |
+| `PluginApi.getRouteConfig`        | neither — core stays neutral                     | `hasRoute` gates before the lookup, so `__proto__`, `constructor`, `toString`, a Symbol, `42`, `null` and an unknown name all answer `undefined`. Nothing to corrupt and nothing to print |
+| `PluginApi.emitTransitionError`   | neither — the record is the `#2303` bullet above | —                                                                                                                                                                                         |
 
 ⚠ **`claim.write(state, value)`'s VALUE is unchecked by every tier, and that is
 the same shape as the door above it rather than a fifth case.** Measured: a
@@ -370,12 +370,17 @@ which of them a subpath publishes. That cell owns the verdict and the
 counter-example — the `RouterInternals` members carrying a type no subpath
 publishes — so neither is restated here.
 
-⚠ **(a) has only a PARTIAL cell (#2383).** The reverse column of
-`door-census/consumers.test.ts` answers "nobody, not even a test" — a wider
-question than the clause asks — and the walk behind it records reach only where
-it can resolve the owner, so an api arriving as a bag field, a class field or a
-destructured parameter is invisible to it. That clause is a claim in prose until
-the issue lands.
+**(a) is derived by `door-census/consumers.test.ts`** (#2383): a typed census
+asks the compiler what each receiver IS, so the idiom a surface arrives by — a
+local, a typed parameter, a class field, a field of a dependency bag — stops
+deciding whether its reach is seen. The cell owns the verdict for `PluginApi`.
+
+⚠ **Two columns in that file answer different questions, and only one is the
+clause.** The reverse column is `src ∪ tests`, so a member only a test reaches
+counts as reached there; the clause asks about shipped code alone. And the
+syntactic walk beside the typed one still undercounts — what it cannot see is
+asserted as a difference rather than described, so a new invisible idiom is an
+event rather than a silence.
 
 ⚠ **No refusal has ever been recorded, and that is the gap.** The rule describes
 the surface that exists; it has never turned a member away. A criterion with no
