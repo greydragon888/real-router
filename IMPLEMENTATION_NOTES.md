@@ -10848,3 +10848,70 @@ Weighed with measurements; the owner decided on 2026-09-17.
 ⚠ **Revisit once the packages have an audience, and before 1.0 at the latest.** Turning the dependency into a peer later is breaking for every consumer — a major after 1.0. The plain dependency is acceptable now because of the owner's measurement of the audience, not because the duplicate-copy hazard is gone: an application that pins its own `ssr-utils` to another minor than the plugin's gets two copies and a silent loader re-run. If that becomes real, #2294's remedy applies — the `WeakMap` keeps deciding, and a message-only brand turns the silent miss into a warning.
 
 ⚠ If a peer is ever chosen, the Angular adapter should stop being the one that calls `hydrateRouter`. The shape to start from — not prototyped — is a separate SSR entry point with `ssr-utils` as an optional peer, rather than threading `hydrate` / `serialize` options through `provideRealRouterFactory`.
+
+## Retiring `getInternals`: what the shipped slices measured, and what the validator's conversion inherits (2026-09-18)
+
+### Problem
+
+Core published two objects nobody chose the size of. `@real-router/core/validation` handed out `getInternals` — an assembly bag core itself never imports, whose members landed **by default rather than by decision**, because no criterion for the curated surface existed. `RouterValidator` is the same shape one level over: a 55-method interface exactly one package implements, held in a writable slot on that bag, admitted by "everything core does not guard itself".
+
+The owner's scope, stated 2026-09-17 and not open to widening: delete **four names** — `getInternals` with `RouterInternals`, `getValidator` with `RouterValidator`. `addInterceptor` is not among them; it exists, works and stays.
+
+⚠ The door bought less than it looked like it would. Everything that hurt lay NEXT to it, so it read as the cause: the live stores reached the plugin by a second channel (an argument on seven public doors), the phantom cache grew through the bare public `navigate`, a double installation zeroed the shared slot. Each was fixed **without touching the door** (#2347, #2349, #2382). The honest formulation is that `getInternals` was not a crutch holding the construction up but an unlocked door through which somebody else's mess was visible.
+
+### Solution
+
+Shipped in slices, each its own issue and release: the members shipped code actually reached moved onto `PluginApi` as narrow, named readers (#2339 slices 1, 2, 5+6 — the last as #2382), the hydration scratchpad left core for `ssr-utils` (#2361), and both clauses of the membership rule got a derivation instead of prose (#2350, #2383). What the surface holds and who reaches it is owned by `door-census/` — this record names no member count, because those files derive one and a second copy here would rot on its own schedule.
+
+The validator's own conversion (#2388) is decided but not built: the 45 refusing methods move onto a **refusal-only check channel** — a registration at a NAMED position that may throw but can neither replace arguments nor skip the call — and the 10 reporting ones onto the event emitter.
+
+### Why a check channel and not interception
+
+Three grounds, each measured rather than argued.
+
+- **It hands out the right that is actually used.** Measured 2026-09-18 across the six shipped `addInterceptor` sites outside core: ONE replaces the argument (`shared/browser-env/plugin-utils.ts` — `next(path ?? browser.getLocation())`), two transform state on `forwardState` (`persistent-params-plugin`, `search-schema-plugin`), and three await `next` and then do their work (`shared/ssr/createSsrLoaderPlugin.ts`, `rsc-server-plugin/actionFactory.ts`, the validator's own pass). **Not one of them refuses**, and not one of the 45 validator methods replaces anything. Widening interception to ~27 doors would hand replacement rights where nobody replaces — and the validator's own interceptor wraps its body in a `catch` precisely because wrapping is stronger than it needs.
+
+  ⚠ The RFC stated this as "every call site either replaces an argument or transforms state on `forwardState`" and named three sites. There are six; the other three wrap to run work AFTER the call. The conclusion is unchanged and the reason is sharper: what no consumer does is REFUSE.
+
+- **It needs no `next`.** A channel is a list of predicates run at a position, so there is no closure chain to rebuild — which is why #2374 is NOT a precondition of the conversion, though it remains a real defect of shipped code on its own.
+- **It is the only one of the two that can express a mid-body check.** An interceptor is a wrapper and exists only at the call boundary; `ownParams` after `adoptChannel` is visible neither before `next()` nor after it. Roughly twenty consultations sit mid-body, so they become named positions (`navigate:entry` for the caller's arguments, `navigate:params` for core's copy).
+
+⚠ **This does not reinstate the crutch.** What made `RouterValidator` situational is that core held a PLUGIN-SUPPLIED object typed by a 55-method interface. A `Map<seam, Check[]>` that plugins register into is core's own data structure — the same shape `interceptors` already has.
+
+### One constraint the channel inherits, and two that died with interception
+
+Measured on 2026-09-16/17 while pricing the rejected option.
+
+- **Inherited: the registry must live in a fixed-shape literal, not a computed-key bag.** A computed-key bag cost **+18–22 % of a router build** when it was tried. This applies to the channel unchanged.
+- Died with interception: _wrappers must not share a code object_ (thirty wrappers from one factory shared theirs, and the `Map` lookup inside saw thirty keys), and _the chain is assembled at registration, not at call_. A channel has neither wrappers nor a chain.
+
+⚠ **The interception A/B numbers do NOT describe the channel, and #2388's acceptance says so.** For the record of what was priced: an empty wrapper cost `+3.82 ns` per door separately generated and `+6.70` from a shared factory, against `0–0.6 ns` for the slot check it would replace; a non-empty chain cost `+34.8 ns` as written and `+10.9 ns` assembled once, which is `+64 %` and `+20 %` on the cheapest render-path door. The channel is a different shape and must be measured on the real doors with its own A/A floor.
+
+⚑ **And the cost is not dev-only, which is what settled the weighting.** A library cannot make a cost dev-only: `__DEV__` is the APPLICATION's build constant, and `packages/validation-plugin/README.md` installs the plugin unconditionally. Whoever installs it pays in production.
+
+### What each shipped slice got wrong — the half worth keeping
+
+**Slice 1 (#2339, `getAdoptedOrigins`).** Three premises the plan carried were refuted on implementation.
+
+- The member did **not** leave `RouterInternals`: `getPluginApi` takes its context from `getInternals(router)`, so removing it leaves `Router.#adoptedOrigins` unread and the plugin door unwritable. It is a PAIR until the door goes, not a move — so §2's pair constraint applies to every slice, not only where a member is duplicated on purpose.
+- The form is an **alias, not a call**. A call makes the member a distinguishable pair for `internals-parity-authority-2258`, which demands a hostile-input vector — and a member with no arguments could only be given a vacuous one. **Rule: a call is chosen when the member is spy-replaceable OR takes input; a member with neither is an alias.**
+- The census bill was **eight authorities, not five**, and `total.test.ts` moved although the slice promised it would not — a direct consequence of the first correction.
+
+**Slice 2 (#2371, `getOptions` / `logger` / `getDeclaredQueryNames`).** The lesson is procedural: the slice first shipped in the WRONG FORM because the form was derived from fresh measurements while the plan — carrying both details — sat in the issue body the whole time. **Rule: your own derivation does not replace reading the issue body.**
+
+- The logger moves as a **frozen VIEW**, not the instance: the instance carries `configure`, so any holder could silence a router's logging for every consumer at once. Moving the same view onto internals was proposed, measured and refuted — `vi.spyOn` on a frozen object throws `Cannot redefine property`.
+- Parity grew a third class: `VIEW` — a pair whose public side is an object that forwards rather than the identical reference. Views are exempt from the vector ratchet; the cell checks that the view still forwards.
+- ⚑ **Delivery hazard, and it is not in any plan: a red CodSpeed check on a slice may have nothing to do with the slice.** PR #2371 showed `−14 %`; the gate skips the bench on commits that do not touch the measured program, so the report's base had drifted back a dozen commits onto a spoiled measurement (#2375, tooling #2376). **Before explaining a red check with your diff, look at which base it was computed against.**
+
+**Slices 5+6 (#2382).** The plan's member list survived; two behaviour deltas and one CI failure did not appear in it.
+
+- `getRouteDefaults` was **not needed** — `getRoutesApi(router).get` already answers it, so the type never had to be published.
+- `getDependencyKeys` is paid for by a **measurement, not a shape**: `Object.keys(getAll())` is one key short when `__proto__` is among the dependencies, while `has("__proto__")` answers `true`. Without the member a plugin would have to know what the container retains.
+- The slice **introduced** its own CI failure: moving a key count from the plugin into `getDependenciesApi.ts` put a `Object.keys` count and a `hasOwn` membership test in one function — the #1815/#2064 shape, which a package boundary had been hiding. It passed pre-commit on five commits and a full pre-push, because `lint:membership` ran only in CI; that gap is closed (#2392, `8d4a74ea0`).
+- Two inputs changed behaviour and both are in the changeset: with a bad default bag on several routes the FIRST route named is now tree-order rather than insertion-order, and a symbol dependency name is counted as a new key rather than an overwrite.
+- ⚠ **A first fix hid two consultations from an authority.** `validator-boundary-authority-2322` derives core's consultations from the spelling `validator?.ns.method(...)`, so rewriting one as `if (validator) { validator.ns.method() }` removed two from its set. The optional-chained spelling is load-bearing.
+
+### What stays open
+
+- **The spy seam gates slice 7 (#2386).** Eight files outside core use `getInternals` as a seam for a spy — twenty places — because `PluginApi` is frozen and `vitest` cannot redefine a property on it. A replacement is measured for thirteen of them (a `subscribeLeave` listener that throws makes `navigateToState` refuse with a non-`RouterError`); the seven OBSERVING places have none, and #2339's acceptance asks for a seam that does not publish the bag.
+- **The membership rule has never refused anyone.** A criterion with no negative example is indistinguishable from a description of the current set. Both clauses now derive (#2350, #2383); the first member that satisfies both and is still turned away is the one that makes it a rule, and whoever meets it writes it down.
