@@ -2,6 +2,61 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## Every check a workflow runs is also run by a hook, or says why not (#2406, 2026-09-18)
+
+**Problem.** A check wired into `ci.yml` and into neither hook is first heard of
+as a red **Repo Lints** job, after the push. Four of the eleven check steps
+shipped that way — `lint:deps` and the `scripts/*.test.mjs` suite waited 76 days
+for a hook, `lint:doc-dup` 8, `lint:membership` 14 (#2392) — and 8 of the 11
+non-Dependabot Repo Lints failures since 2026-09-04 came from a step that had no
+hook at the time. Nothing structural refused the next one.
+
+**Solution.** `scripts/ci-hook-parity.test.mjs`, a third meta-test in the family
+of `ci-gate-completeness` (jobs against the gate) and `check-lint-reach`
+(workspaces against the hooks' lint steps). This one pairs checks against the
+hooks.
+
+- A check is an npm script named `lint*` or `test*`, or the `node --test` suite.
+  Pairing is by that identifier rather than by the command text, so a subshell,
+  a reporter flag or a filter does not read as drift.
+- Every workflow is read, not only `ci.yml`: a check added to another job or
+  another workflow drifts the same way. Measured today, every script-level check
+  sits in `repo-lints`, plus `lint:bench-apps` in `cross-router-bench.yml`.
+- Two allowlists, each entry carrying its reason: `CI_ONLY` and, for the steps of
+  the checks job that run no check, `NOT_A_CHECK`. An entry that becomes paired,
+  or names a check no workflow runs, fails the hygiene cell.
+- Inside `repo-lints` the rule is stricter: a step that runs no recognised check
+  is refused rather than ignored, because a check written in another shape is
+  invisible to the pairing.
+
+**Why a test rather than a script plus a hook step.** The suite it joins already
+runs in both places — Repo Lints runs `node --test scripts/*.test.mjs` and so
+does pre-push. A guard wired into CI alone would be the defect it names:
+measured, 5 of the 6 commits that added or moved these steps reached `master` by
+direct push, where no `ci.yml` runs at all.
+
+**Why its own file.** `scripts/` holds twenty meta-tests, each with one subject
+and named after it; `release-workflow.test.mjs` states that it copies
+`ci-gate-completeness`'s approach, and imports nothing from it. `lint:duplicates`
+reads `packages/*/src` and `shared` only, so the copied approach meets no
+duplication gate. It also keeps the more brittle input — two hooks and every
+workflow, against `ci.yml` alone — away from the file that guards the #1127
+class, where a false red would be read as the gate being broken.
+
+**What it cannot see.** Parity is not effectiveness: `lint:prose` pairs while its
+hook arm skips when Vale is absent, and a PR reddened on prose on 2026-09-09
+with that line in place. The reverse direction — a check in a hook and in no
+workflow — is deliberate here and stays unguarded (#813).
+
+**Verified.** Thirteen cells, nine of them fixtures that must fail. Then six
+mutations of the REAL files: `lint:membership` deleted from both hooks, and
+`lint:doc-dup` from pre-push, each come back unpaired; a new CI-only step is
+named; deleting the allowlisted `lint:dedupe` step reports both a stale
+allowlist entry and an unclassified step; a `bash`-shaped step in the checks job
+is refused; the scripts suite deleted from pre-push comes back unpaired. One
+cell guards vacuity — extractors that read nothing would satisfy every
+assertion above.
+
 ## An empty shard plan skips `pipeline-sharded` instead of failing it (#2411, 2026-09-18)
 
 **Problem.** #2411 changed one file under core, the claim ledger in
