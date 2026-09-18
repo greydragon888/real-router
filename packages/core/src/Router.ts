@@ -758,7 +758,6 @@ export class Router<
       },
       routerExtensions: [],
       contextClaimRecords: new Map(),
-      hydrationState: null,
     };
 
     registerInternals(this, internals);

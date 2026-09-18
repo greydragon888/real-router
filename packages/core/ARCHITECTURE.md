@@ -861,10 +861,10 @@ They consume core through its public subpaths only. ⚠ The
 `@real-router/core/utils` specifier is live and holds something else entirely —
 `putField` / `copyFields` / `freezeThrownError`, core's discipline primitives.
 
-**Hydration scratchpad**: `RouterInternals.hydrationState` is `null` outside
-`hydrateRouter`. SSR loader plugins read it from inside their `start` interceptor
-and reuse the parsed value instead of invoking the loader. Single-shot — only the
-first `start()` consumes it.
+**Hydration scratchpad** lives there too, and core holds no slot for it:
+`hydrateRouter` deposits the parsed state for the duration of its `start()`, and
+SSR loader plugins read it through `getHydrationState(router)` from inside their
+`start` interceptor, reusing the parsed value instead of invoking the loader.
 
 ### Facade Rules
 

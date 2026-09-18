@@ -1,10 +1,13 @@
 import { test } from "@fast-check/vitest";
-import { hydrateRouter, serializeRouterState } from "@real-router/ssr-utils";
+import {
+  getHydrationState,
+  hydrateRouter,
+  serializeRouterState,
+} from "@real-router/ssr-utils";
 import { describe, expect, it } from "vitest";
 
 import { errorCodes, RouterError } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
-import { getInternals } from "@real-router/core/validation";
 
 import {
   createFixtureRouter,
@@ -14,6 +17,7 @@ import {
 } from "./helpers";
 
 import type { State } from "@real-router/core";
+import type { SerializedRouterState } from "@real-router/core/types";
 
 describe("start / stop / dispose Lifecycle Properties", () => {
   test.prop([arbStartPath], { numRuns: NUM_RUNS.standard })(
@@ -160,14 +164,12 @@ describe("start / stop / dispose Lifecycle Properties", () => {
       // Capture exactly what the start interceptor saw on each invocation. The
       // scratchpad is a per-call snapshot, so we record one entry per start
       // rather than relying on a post-hoc read (avoids ordering ambiguity).
-      const seenInScratchpad: ReturnType<
-        typeof getInternals
-      >["hydrationState"][] = [];
+      const seenInScratchpad: (SerializedRouterState | null)[] = [];
 
       const removeInterceptor = getPluginApi(router).addInterceptor(
         "start",
         async (next, startPath) => {
-          seenInScratchpad.push(getInternals(router).hydrationState);
+          seenInScratchpad.push(getHydrationState(router));
 
           return next(startPath);
         },
@@ -183,7 +185,7 @@ describe("start / stop / dispose Lifecycle Properties", () => {
 
       // After hydrateRouter resolves, its `finally` must have cleared the
       // scratchpad — single-shot, no leakage past the awaited start.
-      expect(getInternals(router).hydrationState).toBeNull();
+      expect(getHydrationState(router)).toBeNull();
 
       router.stop();
 
@@ -193,7 +195,7 @@ describe("start / stop / dispose Lifecycle Properties", () => {
 
       expect(seenInScratchpad).toHaveLength(2);
       expect(seenInScratchpad[1]).toBeNull();
-      expect(getInternals(router).hydrationState).toBeNull();
+      expect(getHydrationState(router)).toBeNull();
 
       removeInterceptor();
       router.stop();

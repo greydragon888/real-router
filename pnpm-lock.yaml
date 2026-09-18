@@ -6397,6 +6397,10 @@ importers:
         version: link:../core
 
   packages/rsc-server-plugin:
+    dependencies:
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../ssr-utils
     devDependencies:
       '@real-router/core':
         specifier: workspace:^
@@ -6404,9 +6408,6 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../ssr-data-plugin
-      '@real-router/ssr-utils':
-        specifier: workspace:^
-        version: link:../ssr-utils
       '@types/react':
         specifier: 19.3.0
         version: 19.3.0
@@ -6498,13 +6499,14 @@ importers:
         version: link:../core
 
   packages/ssr-data-plugin:
+    dependencies:
+      '@real-router/ssr-utils':
+        specifier: workspace:^
+        version: link:../ssr-utils
     devDependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/ssr-utils':
-        specifier: workspace:^
-        version: link:../ssr-utils
 
   packages/ssr-utils:
     dependencies:
@@ -6597,6 +6599,9 @@ importers:
       '@real-router/sources':
         specifier: workspace:*
         version: link:../packages/sources
+      '@real-router/ssr-utils':
+        specifier: workspace:*
+        version: link:../packages/ssr-utils
 
 packages:
 

@@ -82,10 +82,9 @@ describe("consumer census (#2303)", () => {
    * router. Reading the types answers the same question without running
    * anything.
    *
-   * ⚠ **`null` on a bare router is not "flat".** `validator` and
-   * `hydrationState` are empty until a plugin fills them, and the shipped reach
-   * this census exists to find — `ctx.validator.options.validateOptions(…)` —
-   * happens on exactly those. The declaration is what decides; the value on an
+   * ⚠ **`null` on a bare router is not "flat".** `validator` is empty until a
+   * plugin fills it, and the shipped reach this census exists to find —
+   * `ctx.validator.options.validateOptions(…)` — happens on exactly that slot. The declaration is what decides; the value on an
    * unconfigured router is not evidence.
    */
   /**
@@ -488,9 +487,8 @@ describe("consumer census (#2303)", () => {
       getLifecycleApi: sorted(hits.getLifecycleApi.src),
     }).toStrictEqual({
       // ⚠ What is LEFT here: the dependency record the getter walk reads until
-      // its door goes (#2386), the validator slot (#2388) and the hydration
-      // scratchpad (#2361).
-      getInternals: ["dependenciesGetStore", "hydrationState", "validator"],
+      // its door goes (#2386), and the validator slot (#2388).
+      getInternals: ["dependenciesGetStore", "validator"],
       getPluginApi: [
         "addEventListener",
         "addInterceptor",

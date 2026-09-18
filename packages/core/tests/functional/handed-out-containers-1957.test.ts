@@ -1139,7 +1139,6 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
           "getRootPath",
           "getStateName",
           "getTree",
-          "hydrationState",
           "interceptors",
           "isDisposed",
           "isTransitioning",

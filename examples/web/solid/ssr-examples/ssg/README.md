@@ -60,7 +60,7 @@ Client (vite dev mode):
     → render(...)      # firstElementChild is null in dev (no SSG content)
 ```
 
-**Post-hydration loader skip (#596).** Build-time loader resolves data → static HTML written with embedded `__SSR_STATE__`. On first paint `hydrateRouter(router, ssrState)` deposits the parsed state into a one-shot scratchpad on `RouterInternals.hydrationState`; `ssr-data-plugin`'s start interceptor reads it and writes `state.context.data` directly — no second loader call, no extra roundtrip per route. Verified by `post-hydration loader skip (#596)` Playwright tests in [`e2e/ssg.spec.ts`](e2e/ssg.spec.ts).
+**Post-hydration loader skip (#596).** Build-time loader resolves data → static HTML written with embedded `__SSR_STATE__`. On first paint `hydrateRouter(router, ssrState)` deposits the parsed state into a one-shot scratchpad in `@real-router/ssr-utils`; `ssr-data-plugin`'s start interceptor reads it and writes `state.context.data` directly — no second loader call, no extra roundtrip per route. Verified by `post-hydration loader skip (#596)` Playwright tests in [`e2e/ssg.spec.ts`](e2e/ssg.spec.ts).
 
 ## Output
 

@@ -58,7 +58,7 @@ External dependencies:
 | Dependency                        | What it provides                                                                | Used in                                |
 | --------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------- |
 | `@real-router/core/api`           | `getPluginApi`                                                                  | `shared-ssr/createSsrLoaderPlugin.ts`  |
-| `@real-router/core/validation`    | `getInternals` (read-only access to internals.hydrationState scratchpad)        | `shared-ssr/createSsrLoaderPlugin.ts`  |
+| `@real-router/ssr-utils`          | `getHydrationState` (read-only access to the hydration scratchpad)              | `shared-ssr/createSsrLoaderPlugin.ts`  |
 | `@real-router/core/types`              | `StateContext` (module augmentation target), `Plugin`, `PluginFactory`, `State` | `index.ts`, all factories              |
 
 ## Shared SSR Scaffolding

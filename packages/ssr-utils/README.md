@@ -37,6 +37,7 @@ await hydrateRouter(router, window.__SSR_STATE__);
 | `serializeState(data, opts?)`              | XSS-safe JSON serialization for embedding in HTML `<script>` tags  |
 | `serializeRouterState(state, opts?)`       | XSS-safe `State` serializer — strips `transition`, keeps `context` |
 | `hydrateRouter(router, source, opts?)`     | Hydrate a fresh router from server-serialized state                |
+| `getHydrationState(router)`                | The state an in-flight `hydrateRouter` call deposited, or `null`   |
 | `getStaticPaths(router, entries?)`         | Enumerate leaf routes and build URLs for SSG pre-rendering         |
 | `createRequestScope(request, base, deps?)` | Per-request SSR isolation via a cloned router                      |
 
@@ -69,6 +70,30 @@ await hydrateRouter(router, window.__SSR_STATE__, {
 SSR loader plugins (`@real-router/ssr-data-plugin`, `@real-router/rsc-server-plugin`)
 automatically skip their post-hydration re-fetch when the server-resolved
 value is already present in the hydrated state — no extra wiring needed.
+
+### `getHydrationState(router)`
+
+For plugin authors: returns what the in-flight `hydrateRouter` call deposited
+for `router`, or `null` outside one. Read it from a `start` interceptor — the
+value is restored when `hydrateRouter`'s `start()` settles, so later starts
+read `null`. There is no way to write it: only `hydrateRouter` does.
+
+```typescript
+getPluginApi(router).addInterceptor("start", async (next, path) => {
+  const state = await next(path);
+  const hydrated = getHydrationState(router); // SerializedRouterState | null
+
+  if (hydrated?.name === state.name) {
+    // reuse hydrated.context instead of loading again
+  }
+
+  return state;
+});
+```
+
+⚠ The plugin and `hydrateRouter` must resolve the same copy of
+`@real-router/ssr-utils` — two copies hold two scratchpads, and the read
+returns `null` without an error.
 
 ### `getStaticPaths(router, entries?)`
 

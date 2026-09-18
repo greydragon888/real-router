@@ -9,6 +9,8 @@ export type {
 
 export { getStaticPaths } from "./getStaticPaths";
 
+export { getHydrationState } from "./hydrationScratchpad";
+
 export { hydrateRouter } from "./hydrateRouter";
 
 export type { Deserialize, HydrateRouterOptions } from "./hydrateRouter";

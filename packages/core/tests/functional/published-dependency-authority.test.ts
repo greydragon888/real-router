@@ -23,7 +23,7 @@
 // gone, and what replaces it is exactly this invariant plus one question: is the
 // package a public `peerDependencies` entry? The invariant is only load-bearing
 // while something holds it, and that is this file.
-import { globSync, readFileSync } from "node:fs";
+import { globSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -92,5 +92,110 @@ describe("a public package installs nothing external on its consumer", () => {
     );
 
     expect(externalPeers.length).toBeGreaterThan(0);
+  });
+});
+
+/** Every file under `directory`, FOLLOWING symlinks — `globSync` does not enter `src/shared-ssr` and its siblings. */
+const walk = (directory: string): string[] =>
+  readdirSync(directory).flatMap((entry) => {
+    const full = path.join(directory, entry);
+
+    return statSync(full).isDirectory() ? walk(full) : [full];
+  });
+
+const sourceFiles = (directory: string): string[] =>
+  walk(directory).filter((file) => /\.(?:ts|tsx|svelte|vue)$/.test(file));
+
+/** An import or re-export statement's head, and the `@real-router/*` package it names. */
+const SPECIFIER =
+  /(?:import|export)([^"';]*)from\s*["'](@real-router\/[^"'/]+)/g;
+
+const TYPE_ONLY_HEAD = /^\s*type\s/;
+
+const runtimeImports = (text: string): string[] =>
+  [...text.matchAll(SPECIFIER)]
+    .filter((match) => !TYPE_ONLY_HEAD.test(match[1]))
+    .map((match) => match[2]);
+
+interface PackageImports {
+  readonly name: string;
+  readonly imported: readonly string[];
+  readonly undeclared: readonly string[];
+}
+
+const publicPackageImports = (): PackageImports[] =>
+  globSync("packages/*/package.json", { cwd: REPO_ROOT })
+    .map((file) => ({
+      dir: path.join(REPO_ROOT, path.dirname(file)),
+      manifest: JSON.parse(
+        readFileSync(path.join(REPO_ROOT, file), "utf8"),
+      ) as Manifest & { readonly name: string },
+    }))
+    .filter(({ manifest }) => manifest.private !== true)
+    .map(({ dir, manifest }) => {
+      const declared = new Set([
+        ...Object.keys(manifest.dependencies ?? {}),
+        ...Object.keys(manifest.peerDependencies ?? {}),
+      ]);
+      const imported = [
+        ...new Set(
+          sourceFiles(path.join(dir, "src")).flatMap((file) =>
+            runtimeImports(readFileSync(file, "utf8")),
+          ),
+        ),
+      ].filter((name) => name !== manifest.name);
+
+      return {
+        name: manifest.name,
+        imported,
+        undeclared: imported.filter((name) => !declared.has(name)),
+      };
+    });
+
+// CLASS guard (#2361): `tsdown` externalises `dependencies` and
+// `peerDependencies` and BUNDLES an imported `devDependencies` entry, so an
+// undeclared import ships as a private copy inside the importer. For a package
+// that holds module state that is a silent split — `ssr-utils`' hydration
+// scratchpad is written by one copy and read from another, and the loader runs
+// again with no error. Nothing else notices: unit tests resolve `src`, and the
+// bundle succeeds.
+describe("a public package declares every @real-router/* package its source imports", () => {
+  const packages = publicPackageImports();
+  const importsOf = (name: string): readonly string[] =>
+    packages.find((entry) => entry.name === name)?.imported ?? [];
+
+  it("imports at runtime only what dependencies or peerDependencies declare", () => {
+    expect(
+      packages
+        .filter(({ undeclared }) => undeclared.length > 0)
+        .map(({ name, undeclared }) => ({ name, undeclared })),
+    ).toStrictEqual([]);
+  });
+
+  // CONTROL: `shared/ssr` is the only place the SSR plugins import `ssr-utils`,
+  // so a walk that skips symlinks reports both clean for the wrong reason.
+  it("reads the symlinked shared sources", () => {
+    expect(importsOf("@real-router/ssr-data-plugin")).toContain(
+      "@real-router/ssr-utils",
+    );
+    expect(importsOf("@real-router/rsc-server-plugin")).toContain(
+      "@real-router/ssr-utils",
+    );
+  });
+
+  // CONTROL for the parser: type-only imports ship nothing, and a re-export
+  // ships its package the way an import does.
+  it("counts runtime imports and re-exports, and skips type-only ones", () => {
+    expect(
+      runtimeImports(
+        [
+          'import type { A } from "@real-router/a";',
+          'import { b } from "@real-router/b/api";',
+          'export type { C } from "@real-router/c";',
+          'export { d } from "@real-router/d";',
+          "import {\n  e,\n  f as g,\n} from '@real-router/e';",
+        ].join("\n"),
+      ),
+    ).toStrictEqual(["@real-router/b", "@real-router/d", "@real-router/e"]);
   });
 });

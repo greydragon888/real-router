@@ -62,7 +62,7 @@ Client (once):
     → hydrate(<RouterProvider><App /></RouterProvider>, rootElement)   ─ Preact hydrate
 ```
 
-The client-side `ssrDataPluginFactory` registration handles **hydration**: `hydrateRouter(router, ssrState)` deposits the parsed state into a one-shot internal scratchpad on `RouterInternals.hydrationState`, then calls `router.start(state.path)`. The plugin's `start` interceptor reads the scratchpad and reuses the server-resolved `state.context.data` instead of re-running the loader (#596) — no flash, no mismatch, no second round-trip on first paint. Verified by `post-hydration loader skip (#596)` Playwright tests in [`e2e/ssr.spec.ts`](e2e/ssr.spec.ts).
+The client-side `ssrDataPluginFactory` registration handles **hydration**: `hydrateRouter(router, ssrState)` deposits the parsed state into a one-shot internal scratchpad in `@real-router/ssr-utils`, then calls `router.start(state.path)`. The plugin's `start` interceptor reads the scratchpad and reuses the server-resolved `state.context.data` instead of re-running the loader (#596) — no flash, no mismatch, no second round-trip on first paint. Verified by `post-hydration loader skip (#596)` Playwright tests in [`e2e/ssr.spec.ts`](e2e/ssr.spec.ts).
 
 ## `renderToStringAsync` — Preact-unique async-single-shot SSR
 

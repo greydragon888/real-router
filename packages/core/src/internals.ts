@@ -22,7 +22,6 @@ import type {
   RouterLogger,
   RouteTreeState,
   SearchParams,
-  SerializedRouterState,
   SimpleState,
   State,
   TreeChangedEvent,
@@ -287,17 +286,6 @@ export interface RouterInternals<
   ) => State;
   readonly routerExtensions: { keys: string[] }[];
   readonly contextClaimRecords: Map<string, ContextNamespaceClaim>;
-
-  /**
-   * One-shot hydration scratchpad populated by `hydrateRouter` immediately
-   * before delegating to `router.start(parsed.path)` and cleared in the
-   * matching `finally`. SSR loader plugins read this slot directly via
-   * `getInternals(router).hydrationState` to short-circuit their own loader
-   * call when the server-resolved namespace value is already present in the
-   * parsed state (#596). `null` outside of an active `hydrateRouter`
-   * invocation.
-   */
-  hydrationState: SerializedRouterState | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- existential type: stores RouterInternals for all Dependencies types
