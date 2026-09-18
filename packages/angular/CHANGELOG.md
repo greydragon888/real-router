@@ -1,5 +1,19 @@
 # @real-router/angular
 
+## 0.22.1
+
+### Patch Changes
+
+- [#2408](https://github.com/greydragon888/real-router/pull/2408) [`c4c47b6`](https://github.com/greydragon888/real-router/commit/c4c47b66aec487ad637d921bd17b25d1d28debad) Thanks [@greydragon888](https://github.com/greydragon888)! - A bootstrap comment names where the hydration scratchpad lives ([#2361](https://github.com/greydragon888/real-router/issues/2361))
+
+  `provideRealRouterFactory`'s comment said `hydrateRouter` writes
+  `RouterInternals.hydrationState`; the scratchpad now lives in
+  `@real-router/ssr-utils`. No behaviour change.
+
+- Updated dependencies [[`c4c47b6`](https://github.com/greydragon888/real-router/commit/c4c47b66aec487ad637d921bd17b25d1d28debad), [`c4c47b6`](https://github.com/greydragon888/real-router/commit/c4c47b66aec487ad637d921bd17b25d1d28debad)]:
+  - @real-router/core@0.141.0
+  - @real-router/ssr-utils@0.3.0
+
 ## 0.22.0
 
 ### Minor Changes

@@ -6511,7 +6511,7 @@ importers:
   packages/ssr-utils:
     dependencies:
       '@real-router/core':
-        specifier: workspace:>=0.1.0
+        specifier: workspace:>=0.141.0
         version: link:../core
 
   packages/svelte:

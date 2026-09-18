@@ -1,5 +1,20 @@
 # @real-router/core
 
+## 0.141.0
+
+### Minor Changes
+
+- [#2408](https://github.com/greydragon888/real-router/pull/2408) [`c4c47b6`](https://github.com/greydragon888/real-router/commit/c4c47b66aec487ad637d921bd17b25d1d28debad) Thanks [@greydragon888](https://github.com/greydragon888)! - `RouterInternals` no longer carries `hydrationState` ([#2361](https://github.com/greydragon888/real-router/issues/2361))
+
+  Core never read the hydration scratchpad — it only initialised the slot that
+  `@real-router/ssr-utils`' `hydrateRouter` wrote and the SSR loader plugins read.
+  The scratchpad now lives in `@real-router/ssr-utils` and is read through its
+  `getHydrationState(router)`, so `getInternals(router).hydrationState` no longer
+  exists. `validator` is the one writable member left on `RouterInternals`.
+
+  `SerializedRouterState` stays in `@real-router/core/types`: the shape is core's
+  own `State`.
+
 ## 0.140.1
 
 ### Patch Changes
