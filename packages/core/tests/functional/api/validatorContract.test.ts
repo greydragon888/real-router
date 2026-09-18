@@ -1,4 +1,4 @@
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import {
   getDependenciesApi,
@@ -8,7 +8,10 @@ import {
 } from "@real-router/core/api";
 
 import { createTestRouter } from "../../helpers";
-import { installSpyValidator } from "../../helpers/spyValidator";
+import {
+  consultationsOn,
+  installSpyValidator,
+} from "../../helpers/spyValidator";
 
 import type { RouterValidator, Router } from "@real-router/core";
 import type { DependenciesApi } from "@real-router/core/api";
@@ -382,81 +385,22 @@ describe("core/validator call-site contract", () => {
       routes = getRoutesApi(router);
     });
 
-    it("add: validateParentOption called ONLY when a parent option is provided", () => {
+    it("route CRUD consults the validator only BELOW itself now (#2388)", () => {
+      // The fifteen consultations this surface made are checks. What the
+      // derived set still reports is what the LIFECYCLE namespace asks while a
+      // route registers, which the #1046 cells below own.
+      vi.clearAllMocks();
+
       routes.add({ name: "loose", path: "/loose" });
+      routes.update("loose", { forwardTo: "admin" });
+      routes.has("loose");
+      routes.get("loose");
+      routes.remove("loose");
+      routes.replace([{ name: "fresh", path: "/fresh" }]);
 
-      expect(validator.routes.validateParentOption).not.toHaveBeenCalled();
-
-      routes.add({ name: "child", path: "/child" }, { parent: "admin" });
-
-      // ⚑ The name ALONE (#2382): the analyser reads the tree from
-      // `PluginApi.getTree()`, so no container travels with the call. Pinned as
-      // an exact argument list, which a second argument would break.
-      expect(validator.routes.validateParentOption).toHaveBeenCalledWith(
-        "admin",
-      );
+      expect(consultationsOn(validator)).toStrictEqual([]);
     });
 
-    it("add: internal-route guard uses caller 'addRoute'", () => {
-      routes.add({ name: "x", path: "/x" });
-
-      expect(validator.routes.throwIfInternalRouteInArray).toHaveBeenCalledWith(
-        expect.any(Array),
-        "addRoute",
-      );
-    });
-
-    it("remove: internal-route guard uses caller 'removeRoute'", () => {
-      routes.remove("home");
-
-      expect(validator.routes.throwIfInternalRoute).toHaveBeenCalledWith(
-        "home",
-        "removeRoute",
-      );
-    });
-
-    it("update: internal-route guard uses caller 'updateRoute'", () => {
-      routes.update("home", { defaultParams: { a: "1" } });
-
-      expect(validator.routes.throwIfInternalRoute).toHaveBeenCalledWith(
-        "home",
-        "updateRoute",
-      );
-    });
-
-    it("has: validates name with caller 'hasRoute'", () => {
-      routes.has("home");
-
-      expect(validator.routes.validateRouteName).toHaveBeenCalledWith(
-        "home",
-        "hasRoute",
-      );
-    });
-
-    it("get: validates name with caller 'getRoute'", () => {
-      routes.get("home");
-
-      expect(validator.routes.validateRouteName).toHaveBeenCalledWith(
-        "home",
-        "getRoute",
-      );
-    });
-
-    it("replace: internal-route guard uses caller 'replaceRoutes'", () => {
-      routes.replace([{ name: "only", path: "/only" }]);
-
-      expect(validator.routes.throwIfInternalRouteInArray).toHaveBeenCalledWith(
-        expect.any(Array),
-        "replaceRoutes",
-      );
-    });
-
-    // #1046: prepare-phase handler-limit pre-flight (preflightHandlerLimit) —
-    // verify core consults the limit for a NEW guard slot BEFORE the swap/commit,
-    // and skips it for an overwrite (existing slot). The limit source is the
-    // namespace, so the validator call carries (projectedCount, "canActivate" |
-    // "canDeactivate"). Atomicity itself (no torn state on throw) is asserted in
-    // @real-router/validation-plugin's handler-limit-atomicity test (real plugin).
     it("add (#1046): pre-flights the limit for a new canDeactivate ('canDeactivate')", () => {
       routes.add([
         { name: "pf-d", path: "/pf-d", canDeactivate: () => () => true },

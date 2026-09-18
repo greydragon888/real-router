@@ -1,5 +1,5 @@
 import { createRouter } from "@real-router/core";
-import { getPluginApi } from "@real-router/core/api";
+import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 import { describe, it, expect } from "vitest";
 
 import { validationPlugin } from "../../src/validationPlugin";
@@ -170,6 +170,38 @@ describe("the validation plugin refuses through the check channel (#2388)", () =
     expect(() =>
       router.canNavigateTo("items", { id: Symbol("x") } as never),
     ).not.toThrow();
+  });
+
+  it("the batch check WALKS INTO CHILDREN, which core no longer does for it", () => {
+    // ⚑ The walk moved here with #2388 — core hands the whole snapshot to
+    // `addRoute:batch` and the plugin recurses. Without this cell the walk is
+    // held up by COVERAGE alone, and a check that stopped at the top level
+    // would keep every behavioural test green.
+    //
+    // ⚠ An async `decodeParams`, and the choice is what makes the cell
+    // discriminate: bare core admits it, and no always-on guard refuses it, so
+    // the ONLY thing that can throw here is this plugin's per-route walk
+    // reaching the child. A `canActivate` was tried first and was useless —
+    // core's own factory-shape guard refuses that whether the walk runs or not.
+    const router = createRouter([]);
+
+    router.usePlugin(validationPlugin());
+
+    expect(() => {
+      getRoutesApi(router).add([
+        {
+          name: "parent",
+          path: "/parent",
+          children: [
+            {
+              name: "child",
+              path: "/child",
+              decodeParams: async () => ({}),
+            },
+          ],
+        },
+      ] as never);
+    }).toThrow('decodeParams cannot be async for route "child"');
   });
 
   it("ANTI-VACUUM: the door still builds a path with the plugin installed", () => {
