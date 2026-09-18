@@ -86,7 +86,7 @@
     "preact-render-to-string": "~6.7.0"
   },
   "peerDependencies": {
-    "@real-router/core": "workspace:>=0.143.0",
+    "@real-router/core": "workspace:>=0.144.0",
     "preact": ">=10.28.0 || ^11.0.0-0"
   }
 }
