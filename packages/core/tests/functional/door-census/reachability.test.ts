@@ -240,6 +240,8 @@ describe("reachability census (#2303)", () => {
     expect(types).toStrictEqual([
       "AdoptedOrigins",
       "AnyOptions",
+      "CheckFn",
+      "CheckPositionMap",
       "ContextNamespaceClaim",
       "DefaultDependencies",
       "DefaultParamsCallback",

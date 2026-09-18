@@ -30,7 +30,9 @@ import {
   createInterceptable,
   createTernaryInterceptable,
   getInternals,
+  POSITION,
   registerInternals,
+  runChecks,
   SEAM,
   throwIfDisposed,
   throwOnMisChanneledKey,
@@ -310,6 +312,7 @@ export class Router<
     // constructor see a fully-registered instance.
 
     const interceptorsMap: RouterInternals["interceptors"] = new Map();
+    const checksMap: RouterInternals["checks"] = new Map();
 
     // THE single forwardState boundary (#1548/#1549). The interceptable resolves
     // the route (forwardTo) and runs the whole interceptor chain — a plugin
@@ -595,9 +598,12 @@ export class Router<
           search,
           "buildPathResolved",
         );
-        internals.validator?.navigation.validateParams(
+        // ⚑ Core does not hold the refusal here — it asks whether anyone
+        // objects (#2388), at the position handed the copy that ships.
+        runChecks(
+          internals.checks,
+          POSITION["buildPathResolved:params"],
           ownParams,
-          "buildPathResolved",
         );
 
         return this.#routes.buildPathFromIntent(
@@ -695,6 +701,7 @@ export class Router<
         );
       },
       interceptors: interceptorsMap,
+      checks: checksMap,
       setRootPath: (rootPath) => {
         internals.validator?.routes.validateSetRootPathArgs(rootPath);
         this.#routes.setRootPath(rootPath);
@@ -916,7 +923,12 @@ export class Router<
     // the same value it is printed with.
     const ownParams = adoptChannel(params);
 
-    ctx.validator?.navigation.validateParams(ownParams, "buildPath");
+    // ⚑ Core does not hold the refusal here — it asks whether anyone objects
+    // (#2388). `@real-router/validation-plugin` registers the value walk at this
+    // position; with no plugin installed nothing is registered and the call runs
+    // on. The three consultations above still reach `ctx.validator`, so this
+    // door is the one where both shapes stand side by side.
+    runChecks(ctx.checks, POSITION["buildPath:params"], ownParams);
 
     // `search` (RFC-4 M2 / #1548) is the explicit query channel; the matcher
     // builds the query string from it and the path from `params`, resolving a
@@ -1073,6 +1085,12 @@ export class Router<
     // and reads this Map live, so a leaked interceptor would otherwise still run
     // on the disposed router.
     ctx.interceptors.clear();
+
+    // The FOURTH such channel (#2388), and it needs the net for the same reason
+    // the one above states: `buildPath` reads this Map live and is not
+    // method-swapped by dispose, so a check a plugin failed to remove in
+    // teardown would keep refusing on a disposed router.
+    ctx.checks.clear();
 
     this.#routes.clearRoutes();
     this.#routeLifecycle.clearAll();

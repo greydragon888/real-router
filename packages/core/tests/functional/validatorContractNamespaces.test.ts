@@ -44,8 +44,9 @@ describe("core/validator call-site contract (facade + namespaces)", () => {
       );
     });
 
-    it("buildPath: validates params with caller 'buildPath'", () => {
+    it("BOTH printers consult the validator at ENTRY, and neither for the copy's values", () => {
       router.buildPath("items", { id: "1" });
+      getPluginApi(router).buildPathResolved("items", { id: "1" });
 
       // Both halves since #2238: the plugin reports the retired single-bag
       // spelling out of this call, so the bag travels with the name it is about.
@@ -53,10 +54,16 @@ describe("core/validator call-site contract (facade + namespaces)", () => {
         "items",
         { id: "1" },
       );
-      expect(validator.navigation.validateParams).toHaveBeenCalledWith(
-        { id: "1" },
-        "buildPath",
-      );
+
+      // ⚑ The value walk left this tier for the check channel (#2388): core asks
+      // at each printer's `…:params` position instead, because those are handed
+      // `ownParams` — the copy that ships. A call here would mean the refusal is
+      // raised TWICE, on two different objects.
+      //
+      // ⚠ The resolved printer is asserted in the SAME cell deliberately: it is
+      // reached independently of the facade's, so a pin on one says nothing
+      // about the other.
+      expect(validator.navigation.validateParams).not.toHaveBeenCalled();
     });
 
     it("canNavigateTo: validates name + params with caller 'canNavigateTo'", async () => {

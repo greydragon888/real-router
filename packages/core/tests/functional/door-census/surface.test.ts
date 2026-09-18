@@ -46,6 +46,7 @@ describe("surface census (#2303)", () => {
     "addEventListener",
     "buildPathResolved",
     "buildStateResolved",
+    "checks",
     "contextClaimRecords",
     "dependenciesGetStore",
     "emitTransitionError",
@@ -78,6 +79,7 @@ describe("surface census (#2303)", () => {
   ];
 
   const PLUGIN_API = [
+    "addCheck",
     "addEventListener",
     "addInterceptor",
     "buildNavigationState",

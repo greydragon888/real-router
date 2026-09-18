@@ -241,6 +241,7 @@ describe("the stub seam below getPluginApi (#1805)", () => {
 
     // Composes its answer locally — no seam one layer down at all.
     expect(composedLocally).toStrictEqual([
+      "addCheck",
       "addInterceptor",
       "buildNavigationState",
       "claimContextNamespace",

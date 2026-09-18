@@ -2,7 +2,7 @@
 
 import { events } from "./constants";
 import { validateRouteType } from "./engine";
-import { SEAM } from "./internals";
+import { POSITION, SEAM } from "./internals";
 import { emptyRecord, putField } from "./utils/ingest";
 
 import type { LoggerConfig, LogLevelConfig, Route } from "./types";
@@ -177,6 +177,33 @@ export function assertInterceptableSeam(method: unknown, fn: unknown): void {
   if (typeof fn !== "function") {
     throw new TypeError(
       `[router.addInterceptor] interceptor must be a function, got ${typeof fn}`,
+    );
+  }
+}
+
+/**
+ * The check channel's registration door (#2388) — the same two refusals
+ * {@link assertInterceptableSeam} makes, for the same two reasons.
+ *
+ * ⚑ Membership is asked of `POSITION`, the object the call sites take their own
+ * names from, so the set that decides is the set that acts.
+ *
+ * ⚠ Nothing COERCES the name: `hasOwn` performs `ToPropertyKey` and the message
+ * renders a non-string by its type rather than through `String()`, so neither
+ * half runs the caller's `toString`.
+ */
+export function assertCheckPosition(position: unknown, check: unknown): void {
+  if (typeof position !== "string" || !hasOwn(POSITION, position)) {
+    throw new TypeError(
+      `[router.addCheck] Invalid position: ${
+        typeof position === "string" ? `"${position}"` : typeof position
+      }. Must be one of: ${objectKeys(POSITION).join(", ")}`,
+    );
+  }
+
+  if (typeof check !== "function") {
+    throw new TypeError(
+      `[router.addCheck] check must be a function, got ${typeof check}`,
     );
   }
 }

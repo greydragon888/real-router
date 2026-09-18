@@ -1089,6 +1089,7 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
           "removeDeactivateGuard",
         ],
         plugin: [
+          "addCheck",
           "addEventListener",
           "addInterceptor",
           "buildNavigationState",
@@ -1127,6 +1128,7 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
           "addEventListener",
           "buildPathResolved",
           "buildStateResolved",
+          "checks",
           "contextClaimRecords",
           "dependenciesGetStore",
           "emitTransitionError",

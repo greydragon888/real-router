@@ -2,7 +2,11 @@ import { assertShippedChannelCorrect } from "../channels";
 import { buildURL, canonicalize, materialize } from "../pipeline";
 import { throwIfReentrantTreeMutation } from "./helpers";
 import { errorCodes } from "../constants";
-import { assertExtensionsShape, assertInterceptableSeam } from "../guards";
+import {
+  assertCheckPosition,
+  assertExtensionsShape,
+  assertInterceptableSeam,
+} from "../guards";
 import { adoptChannel } from "../helpers";
 import {
   getInternals,
@@ -336,6 +340,33 @@ export function getPluginApi<
 
         removed = true;
         list.splice(list.indexOf(fn), 1);
+      };
+    },
+    addCheck: (position, check) => {
+      throwIfDisposed(ctx.isDisposed);
+      assertCheckPosition(position, check);
+
+      let list = ctx.checks.get(position);
+
+      if (!list) {
+        list = [];
+        ctx.checks.set(position, list);
+      }
+
+      list.push(check);
+
+      // Idempotent, for the reason the interceptor door above states: a second
+      // call would `indexOf` again and splice a DUPLICATE registration of the
+      // same function, silently removing someone else's check.
+      let removed = false;
+
+      return () => {
+        if (removed) {
+          return;
+        }
+
+        removed = true;
+        list.splice(list.indexOf(check), 1);
       };
     },
     getRouteConfig: (name) => {
