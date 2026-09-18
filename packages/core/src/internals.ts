@@ -511,6 +511,12 @@ export const POSITION = {
   "canNavigateTo:params": "canNavigateTo:params",
   "navigate:entry": "navigate:entry",
   "navigate:params": "navigate:params",
+  "addRoute:batch": "addRoute:batch",
+  "replaceRoutes:batch": "replaceRoutes:batch",
+  "removeRoute:entry": "removeRoute:entry",
+  "updateRoute:entry": "updateRoute:entry",
+  "hasRoute:entry": "hasRoute:entry",
+  "getRoute:entry": "getRoute:entry",
 } as const satisfies { [K in keyof CheckPositionMap]: K };
 
 /**

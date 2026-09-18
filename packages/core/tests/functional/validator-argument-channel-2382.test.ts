@@ -214,12 +214,12 @@ describe("the validator takes facts, not containers (#2382)", () => {
     // Anti-vacuum: every door of the recorded channel was exercised.
     const methods = new Set(calls.map((call) => call.method));
 
+    // ⚠ The route-CRUD members left this channel with #2388 — their arguments
+    // now reach a CHECK, and `checks-take-facts-2388` is the authority for that
+    // side. What stays here is the channel that still exists.
     const unexercised = [
       "dependencies.validateDependencyCount",
       "dependencies.validateDependencyExists",
-      "routes.validateParentOption",
-      "routes.validateRoutes",
-      "routes.validateUpdateRoute",
       "options.validateResolvedDefaultRoute",
       "plugins.validatePluginLimit",
     ].filter((method) => !methods.has(method));

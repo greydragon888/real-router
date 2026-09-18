@@ -143,6 +143,37 @@ export interface CheckPositionMap {
    * answers with is a promise.
    */
   "navigate:params": [ownParams: Params | undefined];
+
+  /**
+   * The route batch `guardRouteStructure` snapshotted, plus the parent the
+   * caller named.
+   *
+   * ⚑ `:batch` rather than `:entry`, because the array a check receives is
+   * core's OWN — judged and snapshotted in one walk so guards, checks and
+   * registration all decide from one object (#1899 / #1911 / #2139). The
+   * caller's array is not what registers.
+   */
+  /* eslint-disable @typescript-eslint/no-explicit-any -- mirrors `guardRouteStructure`'s variance: the batch is `Route<Dependencies>[]` at every call site and this map is not generic */
+  "addRoute:batch": [
+    batch: readonly Route<any>[],
+    parentName: string | undefined,
+  ];
+
+  /** The same snapshot for `replace`, which names no parent. */
+  "replaceRoutes:batch": [batch: readonly Route<any>[]];
+
+  /** `remove`'s argument, as the caller spelled it. */
+  "removeRoute:entry": [name: string];
+
+  /** `update`'s two arguments, as the caller spelled them. */
+  "updateRoute:entry": [name: string, updates: RouteConfigUpdate<any>];
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+
+  /** `has`'s argument. A read door, so a check here only refuses the NAME. */
+  "hasRoute:entry": [name: string];
+
+  /** `get`'s argument, for the reason above. */
+  "getRoute:entry": [name: string];
 }
 
 /**

@@ -6,7 +6,6 @@ import { POSITION, SEAM } from "./internals";
 import { emptyRecord, putField } from "./utils/ingest";
 
 import type { LoggerConfig, LogLevelConfig, Route } from "./types";
-import type { RouterValidator } from "./types/RouterValidator";
 
 /**
  * Intrinsics captured at module load (#1971).
@@ -534,39 +533,6 @@ export function guardRouteStructure<T extends Route<any>>(routes: T[]): T[] {
   }
 
   return batch;
-}
-
-/**
- * The validator's per-route CALLBACK guards, walked over a batch.
- *
- * ⚑ Separate from {@link guardRouteStructure} because the two need different
- * operands (#1911). The structural check must see the CALLER's value — a spread
- * turns every shape it exists to refuse into a plain object — while these read
- * the route's own keys and must therefore see the SNAPSHOT, or a definition that
- * answers differently per read is validated under one callback and registered
- * with another. Run this on what `guardRouteStructure` RETURNS, never on the
- * caller's array.
- */
-/* eslint-disable @typescript-eslint/no-explicit-any -- mirrors guardRouteStructure's variance */
-export function guardRouteCallbacks(
-  routes: readonly Route<any>[],
-  validator?: RouterValidator | null,
-): void {
-  /* eslint-enable @typescript-eslint/no-explicit-any */
-  if (!validator) {
-    return;
-  }
-
-  for (const route of routes) {
-    validator.routes.guardRouteCallbacks(route as Route);
-    validator.routes.guardNoAsyncCallbacks(route as Route);
-
-    const children = (route as Route).children;
-
-    if (children) {
-      guardRouteCallbacks(children, validator);
-    }
-  }
 }
 
 // ============================================================================

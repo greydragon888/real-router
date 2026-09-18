@@ -105,22 +105,13 @@ const OWNER: Record<string, string> = {
     "integration/retrospective-integration.test.ts",
   "plugins.validateNoDuplicatePlugins": "integration/plugin-lifecycle.test.ts",
   "plugins.validatePluginLimit": "limits.test.ts",
-  "routes.throwIfInternalRoute": MIRRORED,
-  "routes.throwIfInternalRouteInArray": SELF,
-  "routes.validateAddRouteArgs": "routes.validation.test.ts",
   "routes.validateBuildPathArgs": "router-methods.validation.test.ts",
   "routes.validateIsActiveRouteArgs": "predicate-totality-2245.test.ts",
   "routes.validateMatchPathArgs": SELF,
-  "routes.validateParentOption": SELF,
-  "routes.validateRemoveRouteArgs": "bare-core-message-parity.test.ts",
   "routes.validateRouteName": "route-name-doors.test.ts",
-  "routes.validateRoutes": "structural-field-coverage-authority-1787.test.ts",
   "routes.validateSetRootPathArgs": "routes.validation.test.ts",
   "routes.validateShouldUpdateNodeArgs": "router-methods.validation.test.ts",
   "routes.validateStateBuilderArgs": "plugin-api.validation.test.ts",
-  "routes.validateUpdateRoute": "integration/routes-coverage.test.ts",
-  "routes.validateUpdateRouteBasicArgs": "bare-core-message-parity.test.ts",
-  "routes.validateUpdateRoutePropertyTypes": "routes.validation.test.ts",
   "state.reportDroppedQueryKey": "dropped-query-key.test.ts",
   "state.reportUndeclaredParamKey": "undeclared-param-key.test.ts",
   "state.validateAreStatesEqualArgs": "plugin-api.validation.test.ts",
@@ -199,10 +190,7 @@ describe("every consultation core makes is classified (#2322)", () => {
           .filter(([, owner]) => owner === MIRRORED)
           .map(([key]) => key),
       ),
-    ).toStrictEqual([
-      "eventBus.validateListenerArgs",
-      "routes.throwIfInternalRoute",
-    ]);
+    ).toStrictEqual(["eventBus.validateListenerArgs"]);
   });
 
   it("CONTROL — the walk reaches core and sees a consultation made twice", () => {

@@ -1,12 +1,13 @@
 import { nodeToDefinition } from "../engine";
 import { throwIfReentrantTreeMutation } from "./helpers";
 import { errorCodes } from "../constants";
+import { assertTreeChangeListener, guardRouteStructure } from "../guards";
 import {
-  assertTreeChangeListener,
-  guardRouteCallbacks,
-  guardRouteStructure,
-} from "../guards";
-import { getInternals, throwIfDisposed } from "../internals";
+  getInternals,
+  POSITION,
+  runChecks,
+  throwIfDisposed,
+} from "../internals";
 import {
   assertRouteDefaultChannelsFor,
   clearConfigEntries,
@@ -921,15 +922,7 @@ export function getRoutesApi<
       // Per-key counts are the `registration · route.*` rows' business.
       const batch = guardRouteStructure(routeArray);
 
-      guardRouteCallbacks(batch, ctx.validator);
-
-      if (parentName !== undefined) {
-        ctx.validator?.routes.validateParentOption(parentName);
-      }
-
-      ctx.validator?.routes.throwIfInternalRouteInArray(batch, "addRoute");
-      ctx.validator?.routes.validateAddRouteArgs(batch);
-      ctx.validator?.routes.validateRoutes(batch, parentName);
+      runChecks(ctx.checks, POSITION["addRoute:batch"], batch, parentName);
 
       addRoutes(store, batch, parentName, ctx.logger);
 
@@ -957,8 +950,7 @@ export function getRoutesApi<
         () => store.revalidating,
       );
 
-      ctx.validator?.routes.validateRemoveRouteArgs(name);
-      ctx.validator?.routes.throwIfInternalRoute(name, "removeRoute");
+      runChecks(ctx.checks, POSITION["removeRoute:entry"], name);
       // Always-on parity backstop (#1047 / #238): a reserved "@@" name is
       // internal and cannot be removed, with or without the validation-plugin.
       assertNoInternalRouteName(name, "removeRoute");
@@ -1007,15 +999,10 @@ export function getRoutesApi<
         () => store.revalidating,
       );
 
-      ctx.validator?.routes.validateUpdateRouteBasicArgs(name, updates);
-      ctx.validator?.routes.throwIfInternalRoute(name, "updateRoute");
+      runChecks(ctx.checks, POSITION["updateRoute:entry"], name, updates);
       // Always-on parity backstop (#1047 / #238): a reserved "@@" name is
       // internal and cannot be updated, with or without the validation-plugin.
       assertNoInternalRouteName(name, "updateRoute");
-
-      ctx.validator?.routes.validateUpdateRoutePropertyTypes(name, updates);
-
-      ctx.validator?.routes.validateUpdateRoute(name, updates);
 
       // #1205: bare-core existence backstop as a TRUE no-op — NOT a throw
       // (validation is opt-in). Without it, update() of a route that does not
@@ -1124,13 +1111,13 @@ export function getRoutesApi<
     },
 
     has: (name) => {
-      ctx.validator?.routes.validateRouteName(name, "hasRoute");
+      runChecks(ctx.checks, POSITION["hasRoute:entry"], name);
 
       return store.matcher.hasRoute(name);
     },
 
     get: (name) => {
-      ctx.validator?.routes.validateRouteName(name, "getRoute");
+      runChecks(ctx.checks, POSITION["getRoute:entry"], name);
 
       return getRoute(store, name);
     },
@@ -1154,11 +1141,7 @@ export function getRoutesApi<
       // (#1899 / #1911 / #2139).
       const batch = guardRouteStructure(routeArray);
 
-      guardRouteCallbacks(batch, ctx.validator);
-
-      ctx.validator?.routes.throwIfInternalRouteInArray(batch, "replaceRoutes");
-      ctx.validator?.routes.validateAddRouteArgs(batch);
-      ctx.validator?.routes.validateRoutes(batch);
+      runChecks(ctx.checks, POSITION["replaceRoutes:batch"], batch);
 
       const currentState = router.getState();
 

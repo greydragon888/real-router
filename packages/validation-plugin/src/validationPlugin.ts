@@ -101,7 +101,6 @@ import type {
   RouterValidator,
   Route,
   RoutesApi,
-  RouteTree,
   Plugin,
 } from "@real-router/core";
 
@@ -188,67 +187,10 @@ function buildValidatorObject(
       validateShouldUpdateNodeArgs,
       validateStateBuilderArgs,
 
-      validateAddRouteArgs(routes) {
-        validateAddRouteArgs(routes as readonly Route[]);
-      },
-
-      validateRoutes(routes, parentName) {
-        validateRoutes(
-          routes as Route[],
-          api.getTree() as RouteTree,
-          lookup,
-          api.getForwardMap(),
-          parentName,
-        );
-      },
-      validateRemoveRouteArgs,
-      validateUpdateRouteBasicArgs,
-      validateUpdateRoutePropertyTypes(_name, updates) {
-        const upd = updates as Record<string, unknown>;
-
-        validateUpdateRoutePropertyTypes({
-          forwardTo: upd.forwardTo,
-          defaultParams: upd.defaultParams,
-          defaultSearch: upd.defaultSearch,
-          decodeParams: upd.decodeParams,
-          encodeParams: upd.encodeParams,
-          canActivate: upd.canActivate,
-          canDeactivate: upd.canDeactivate,
-        });
-      },
-      validateUpdateRoute(name, updates) {
-        const forwardTo = (updates as Record<string, unknown>).forwardTo;
-
-        validateUpdateRoute(
-          name,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-          forwardTo as any,
-          lookup,
-          api.getForwardMap(),
-        );
-      },
-      validateParentOption(parent) {
-        validateParentOptionRaw(parent);
-
-        if (!lookup.hasRoute(parent)) {
-          throw new ReferenceError(
-            `[router.addRoute] Parent route "${parent}" does not exist`,
-          );
-        }
-      },
       validateRouteName(name, caller) {
         validateRouteName(name, caller);
       },
-      throwIfInternalRoute(name, caller) {
-        throwIfInternalRoute(name as string, caller);
-      },
-
-      throwIfInternalRouteInArray(routes, caller) {
-        throwIfInternalRouteInArray(routes as readonly Route[], caller);
-      },
       validateSetRootPathArgs,
-      guardRouteCallbacks,
-      guardNoAsyncCallbacks,
     },
     options: {
       validateOptions,
@@ -621,6 +563,101 @@ export function validationPlugin<
       },
     );
 
+    // ⚠ The callback walk runs FIRST at both batch positions, because that is
+    // where core ran it: a route whose `canActivate` is not a function is
+    // refused before anything asks about names or paths.
+    const walkRouteCallbacks = (batch: readonly Route[]): void => {
+      for (const route of batch) {
+        guardRouteCallbacks(route);
+        guardNoAsyncCallbacks(route);
+
+        if (route.children !== undefined) {
+          walkRouteCallbacks(route.children);
+        }
+      }
+    };
+
+    const checkRouteBatch = (
+      batch: readonly Route[],
+      caller: "addRoute" | "replaceRoutes",
+      parentName: string | undefined,
+    ): void => {
+      walkRouteCallbacks(batch);
+
+      if (parentName !== undefined) {
+        validateParentOptionRaw(parentName);
+
+        if (!lookup.hasRoute(parentName)) {
+          throw new ReferenceError(
+            `[router.addRoute] Parent route "${parentName}" does not exist`,
+          );
+        }
+      }
+
+      throwIfInternalRouteInArray(batch, caller);
+      validateAddRouteArgs(batch);
+      validateRoutes(
+        batch as Route[],
+        api.getTree(),
+        lookup,
+        api.getForwardMap(),
+        parentName,
+      );
+    };
+
+    const removeAddRouteCheck = api.addCheck(
+      "addRoute:batch",
+      (batch, parentName) => {
+        checkRouteBatch(batch as readonly Route[], "addRoute", parentName);
+      },
+    );
+
+    const removeReplaceRoutesCheck = api.addCheck(
+      "replaceRoutes:batch",
+      (batch) => {
+        checkRouteBatch(batch as readonly Route[], "replaceRoutes", undefined);
+      },
+    );
+
+    const removeRemoveRouteCheck = api.addCheck("removeRoute:entry", (name) => {
+      validateRemoveRouteArgs(name);
+      throwIfInternalRoute(name, "removeRoute");
+    });
+
+    const removeUpdateRouteCheck = api.addCheck(
+      "updateRoute:entry",
+      (name, updates) => {
+        const upd = updates as Record<string, unknown>;
+
+        validateUpdateRouteBasicArgs(name, updates);
+        throwIfInternalRoute(name, "updateRoute");
+        validateUpdateRoutePropertyTypes({
+          forwardTo: upd.forwardTo,
+          defaultParams: upd.defaultParams,
+          defaultSearch: upd.defaultSearch,
+          decodeParams: upd.decodeParams,
+          encodeParams: upd.encodeParams,
+          canActivate: upd.canActivate,
+          canDeactivate: upd.canDeactivate,
+        });
+        validateUpdateRoute(
+          name,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+          upd.forwardTo as any,
+          lookup,
+          api.getForwardMap(),
+        );
+      },
+    );
+
+    const removeHasRouteCheck = api.addCheck("hasRoute:entry", (name) => {
+      validateRouteName(name, "hasRoute");
+    });
+
+    const removeGetRouteCheck = api.addCheck("getRoute:entry", (name) => {
+      validateRouteName(name, "getRoute");
+    });
+
     return {
       teardown() {
         removeParamsCheck();
@@ -634,6 +671,18 @@ export function validationPlugin<
         removeNavigateEntryCheck();
 
         removeNavigateParamsCheck();
+
+        removeAddRouteCheck();
+
+        removeReplaceRoutesCheck();
+
+        removeRemoveRouteCheck();
+
+        removeUpdateRouteCheck();
+
+        removeHasRouteCheck();
+
+        removeGetRouteCheck();
 
         removeInterceptor();
 
