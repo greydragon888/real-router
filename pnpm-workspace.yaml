@@ -114,7 +114,11 @@ overrides:
   # shipped surface; the floor is still the cheaper answer than an ignore entry.
   smol-toml: '>=1.7.1'
   defu: '>=6.1.5'
-  devalue: '>=5.8.1'
+  # Floor at 5.9.2 for GHSA-9rgm-9g3h-6x36 (Medium; 5.3) — denial of service via
+  # malformed input. Transitive via `svelte`, which declares `^5.8.1`, so the floor
+  # holds; `svelte` is a peer of `@real-router/svelte` and is never bundled into it,
+  # which leaves the examples' builds and this audit gate as the exposure.
+  devalue: '>=5.9.2'
   esbuild: '>=0.28.1'
   # Collapses every transitive vite copy onto the one the manifests pin, which is an
   # exact 8.2.2 in all 127 of them (`vite` is not in syncpack's `~`-float group). This
