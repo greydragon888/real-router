@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-18]
 
+### @real-router/core@0.143.0
+
+### Minor Changes
+
+- [#2419](https://github.com/greydragon888/real-router/pull/2419) [`1565076`](https://github.com/greydragon888/real-router/commit/15650769f811719f0801c906d78b984451d40c77) Thanks [@greydragon888](https://github.com/greydragon888)! - `navigate` and `canNavigateTo` stop consulting the validator ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  Both doors register all nine of their refusals on the check channel, at four new
+  positions: `navigate:entry`, `navigate:params`, `canNavigateTo:entry` and
+  `canNavigateTo:params`. Messages, order and failure shape are unchanged.
+
+  **Two members leave `RouterValidator`**, because these were their last
+  consultations in core:
+
+  - `navigation.validateParams` — its four callers (both printers in the previous
+    slice, these two doors now) are all checks.
+  - `navigation.validateNavigateArgs` — `navigate` was its only caller.
+
+  `@real-router/validation-plugin` registers the same walks; nothing an
+  application observes moves.
+
+  ⚠ **An entry position is one position per door, not one per consultation.** The
+  three or four calls a door made are run in order by a single check, because the
+  first refusal is the message the caller gets and reordering them changes which
+  defect a caller hears about.
+
+  ⚠ **`canNavigateTo` stays total in bare core.** With no plugin nothing is
+  registered and the predicate answers as before; the refusal is the analyser's
+  documented divergence, the same shape it had when the validator answered there.
+
+  ⚠ **`navigate` is converted at the FACADE only.** The pipeline underneath still
+  consults `routes.validateStateBuilderArgs` on the state it builds — a door is
+  converted at its own layer, and the remainder is pinned rather than described.
+
+### @real-router/validation-plugin@0.25.0
+
+### Minor Changes
+
+- [#2419](https://github.com/greydragon888/real-router/pull/2419) [`1565076`](https://github.com/greydragon888/real-router/commit/15650769f811719f0801c906d78b984451d40c77) Thanks [@greydragon888](https://github.com/greydragon888)! - The `navigate` family's refusals are registered as checks ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  Four more registrations at install, all removed on `teardown`:
+  `canNavigateTo:entry`, `canNavigateTo:params`, `navigate:entry` and
+  `navigate:params`. Each entry check runs the door's calls in the order core
+  consulted them, so the first refusal a caller hears about is the same one.
+
+  `RouterValidator` loses `navigation.validateParams` and
+  `navigation.validateNavigateArgs` — core has no consultation left for either.
+  The underlying validator functions are unchanged and now run from the checks.
+
+### Patch Changes
+
+- Updated dependencies [[`1565076`](https://github.com/greydragon888/real-router/commit/15650769f811719f0801c906d78b984451d40c77)]:
+  - @real-router/core@0.143.0
+
+
 ### @real-router/core@0.142.0
 
 ### Minor Changes
