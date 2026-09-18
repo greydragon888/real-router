@@ -31,6 +31,13 @@ import { getInternals } from "@real-router/core/validation";
  * takes `ctx: RouterInternals<D>`, so a census of the first two forms reports
  * zero consumers for `getQueryParams` while a shipped one exists.
  *
+ * ⚑ **Three is not all of them, and the walk below is not where that is
+ * fixed.** A surface also arrives as a class field and as a field of a
+ * dependency bag, and no count of idioms closes the list. The typed census
+ * further down asks the CHECKER instead, which answers for every idiom at once;
+ * this walk stays as it is, and the difference between the two is asserted
+ * rather than described (#2383).
+ *
  * ⚠ **Membership is pinned, not call counts.** A count moves with every test
  * that happens to touch a door; the SET moves when a consumer starts or stops
  * depending on a member, which is the fact a decision rests on.
@@ -249,6 +256,18 @@ describe("consumer census (#2303)", () => {
     tests: number;
   }
 
+  /**
+   * Every file outside core that could reach a surface — the scope BOTH walks
+   * below read, so the idiom census and the typed census can never disagree
+   * about what they looked at.
+   */
+  const consumerFiles = (): string[] =>
+    [
+      ...globSync("packages/*/src/**/*.{ts,tsx}", { cwd: ROOT }),
+      ...globSync("packages/*/tests/**/*.{ts,tsx}", { cwd: ROOT }),
+      ...globSync("shared/**/*.ts", { cwd: ROOT }),
+    ].filter((f) => !f.startsWith("packages/core/"));
+
   function scan(): {
     hits: Record<string, Reached>;
     second: Record<string, Reached>;
@@ -256,11 +275,7 @@ describe("consumer census (#2303)", () => {
     files: number;
     readers: number;
   } {
-    const files = [
-      ...globSync("packages/*/src/**/*.{ts,tsx}", { cwd: ROOT }),
-      ...globSync("packages/*/tests/**/*.{ts,tsx}", { cwd: ROOT }),
-      ...globSync("shared/**/*.ts", { cwd: ROOT }),
-    ].filter((f) => !f.startsWith("packages/core/"));
+    const files = consumerFiles();
 
     const hits: Record<string, Reached> = {};
     const calls: Record<string, Called> = {};
@@ -468,6 +483,119 @@ describe("consumer census (#2303)", () => {
 
   const sorted = (s: Set<string>): string[] =>
     [...s].toSorted((a, b) => a.localeCompare(b));
+
+  /** What each surface CONTAINS, read off the live object. */
+  const live = (): Record<string, string[]> => {
+    const router = createRouter([{ name: "a", path: "/a" }]);
+
+    const names = (surface: object): string[] =>
+      Object.getOwnPropertyNames(surface);
+
+    return {
+      getInternals: names(getInternals(router)),
+      getPluginApi: names(getPluginApi(router)),
+      getRoutesApi: names(getRoutesApi(router)),
+      getNavigator: names(getNavigator(router)),
+      getDependenciesApi: names(getDependenciesApi(router)),
+      getLifecycleApi: names(getLifecycleApi(router)),
+    };
+  };
+
+  const LIVE = live();
+
+  /**
+   * Clause (a) of the `PluginApi` membership rule, asked of the CHECKER (#2383).
+   *
+   * ⚑ **The idiom walk above answers a narrower question than it looks.** It
+   * records reach where it can resolve the owner of an access, so a surface
+   * arriving as a class field (`this.#api.x`) or as a field of a dependency bag
+   * (`deps.api.x`) is invisible to it — and `membership.test.ts`'s rule turns on
+   * "shipped code outside core reaches it", which is exactly what those two
+   * idioms are. The checker answers for every idiom at once, because the
+   * question it is asked is "what IS this value", not "how was it written".
+   *
+   * ⚠ **The member NAME is the only pre-filter, and it bounds nothing.** Reach
+   * for `X` can be recorded off an `.X` access and nowhere else, so skipping
+   * every other access is exact rather than heuristic — unlike a filter on the
+   * file's text, which is the bound this walk exists to remove.
+   *
+   * ⚠ What it still cannot see is an access whose name is computed
+   * (`api[pick]()`): no walk can, and no shipped consumer writes one — the cell
+   * below asserts the difference it DOES find, so a new invisible idiom shows
+   * up as a shrinking difference rather than as silence.
+   */
+  const typedScan = (): {
+    reach: Record<string, Reached>;
+    accesses: number;
+  } => {
+    const memberNames = new Set(Object.values(LIVE).flat());
+    const paths = consumerFiles().map((f) => path.join(ROOT, f));
+    const config = ts.readConfigFile(
+      path.join(ROOT, "tsconfig.json"),
+      ts.sys.readFile,
+    );
+    const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, ROOT);
+    const program = ts.createProgram(paths, {
+      ...parsed.options,
+      noEmit: true,
+      skipLibCheck: true,
+      jsx: ts.JsxEmit.Preserve,
+    });
+    const checker = program.getTypeChecker();
+
+    const reach: Record<string, Reached> = {};
+
+    for (const factory of FACTORIES) {
+      reach[factory] = { src: new Set(), tests: new Set() };
+    }
+
+    /** Every surface a value's type is, unions included. */
+    const surfacesOf = (type: ts.Type): string[] => {
+      const parts = type.isUnionOrIntersection() ? type.types : [type];
+
+      return parts.flatMap((part) => {
+        const name = (part.aliasSymbol ?? part.getSymbol())?.getName();
+        const factory = name === undefined ? undefined : FACTORY_BY_TYPE[name];
+
+        return factory === undefined ? [] : [factory];
+      });
+    };
+
+    let accesses = 0;
+
+    for (const file of paths) {
+      const source = program.getSourceFile(file);
+
+      if (!source) {
+        continue;
+      }
+
+      const bucket = file.includes("/tests/") ? "tests" : "src";
+
+      const visit = (node: ts.Node): void => {
+        if (
+          ts.isPropertyAccessExpression(node) &&
+          memberNames.has(node.name.text)
+        ) {
+          accesses += 1;
+
+          for (const factory of surfacesOf(
+            checker.getTypeAtLocation(node.expression),
+          )) {
+            reach[factory][bucket].add(node.name.text);
+          }
+        }
+
+        ts.forEachChild(node, visit);
+      };
+
+      visit(source);
+    }
+
+    return { reach, accesses };
+  };
+
+  const typed = typedScan();
 
   it("the scan reaches the tree — anti-vacuum", () => {
     // ⚠ A glob that matches nothing, or a rename of the package scope, would
@@ -714,6 +842,51 @@ describe("consumer census (#2303)", () => {
       getNavigator: ["canNavigateTo", "isLeaveApproved", "subscribeLeave"],
       getDependenciesApi: ["has"],
       getLifecycleApi: ["removeActivateGuard"],
+    });
+  });
+
+  it("the typed walk reaches the tree — anti-vacuum", () => {
+    // ⚠ A program that resolved nothing would type every receiver as `any`,
+    // report zero surfaces and leave the two cells below green on an empty set.
+    expect(typed.accesses).toBeGreaterThan(100);
+    expect(sorted(typed.reach.getPluginApi.src).length).toBeGreaterThan(5);
+  });
+
+  it("clause (a): every member of `PluginApi` has a SHIPPED caller (#2383)", () => {
+    // ⚑ The narrow question the membership rule asks, and the one the reverse
+    // column cannot answer: that column is `src ∪ tests`, so a member only a
+    // test reaches counts as reached there. Here shipped code alone does.
+    expect(sorted(typed.reach.getPluginApi.src)).toStrictEqual(
+      LIVE.getPluginApi.toSorted((a, b) => a.localeCompare(b)),
+    );
+  });
+
+  it("what the idiom walk cannot see, named by derivation rather than prose", () => {
+    // ⚑ The bound is a DIFFERENCE, not a caveat: these members are reached by
+    // shipped code through an idiom the syntactic census has no owner for — a
+    // class field in `memory-plugin`, a dependency-bag field in
+    // `shared/browser-env`. A new invisible idiom makes this set grow; teaching
+    // the idiom walk one makes it shrink. Either way it is an event, which a
+    // sentence in a docblock is not.
+    const missed = (factory: string): string[] =>
+      sorted(typed.reach[factory].src).filter(
+        (member) => !hits[factory].src.has(member),
+      );
+
+    expect({
+      getInternals: missed("getInternals"),
+      getPluginApi: missed("getPluginApi"),
+      getRoutesApi: missed("getRoutesApi"),
+      getNavigator: missed("getNavigator"),
+      getDependenciesApi: missed("getDependenciesApi"),
+      getLifecycleApi: missed("getLifecycleApi"),
+    }).toStrictEqual({
+      getInternals: [],
+      getPluginApi: ["emitTransitionError", "navigateToState"],
+      getRoutesApi: [],
+      getNavigator: [],
+      getDependenciesApi: [],
+      getLifecycleApi: [],
     });
   });
 });
