@@ -566,8 +566,33 @@ export function validationPlugin<
       return next(path);
     });
 
+    // ⚠ A CHECK, not a `RouterValidator` member, and the distinction is the
+    // argument rather than the style: core hands this position `ownParams` —
+    // the copy it will print the path from — which no seam can reach, because
+    // at the call boundary that object does not exist yet (#2134 / #2388).
+    //
+    // ⚠ Registered AFTER the retrospective pass above, so the error path's
+    // `releaseIfStillOurs` leaves nothing registered behind it.
+    const removeParamsCheck = api.addCheck("buildPath:params", (ownParams) => {
+      validateNavigateParams(ownParams, "buildPath");
+    });
+
+    // ⚠ The resolved printer is reached INDEPENDENTLY of the facade's — the
+    // href door runs the forward chain itself and lands here — so it carries its
+    // own registration rather than sharing one, and the message names it.
+    const removeResolvedParamsCheck = api.addCheck(
+      "buildPathResolved:params",
+      (ownParams) => {
+        validateNavigateParams(ownParams, "buildPathResolved");
+      },
+    );
+
     return {
       teardown() {
+        removeParamsCheck();
+
+        removeResolvedParamsCheck();
+
         removeInterceptor();
 
         releaseIfStillOurs();

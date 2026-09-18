@@ -354,6 +354,7 @@ describe("door total (#2303)", () => {
     // Handed out by core: counted as members of a live surface, not as a bag.
     ContextNamespaceClaim: "surface",
     DependenciesApi: "surface",
+    CheckPositionMap: "surface",
     InterceptableMethodMap: "surface",
     LifecycleApi: "surface",
     Navigator: "surface",
@@ -977,6 +978,7 @@ describe("door total (#2303)", () => {
     RouterSource: "round-trip — a source core built",
     RouteTree: "round-trip — the tree core built",
     InterceptableMethodMap: "callback — `InterceptorFn`",
+    CheckPositionMap: "callback — `CheckFn`",
     ParamsSearch: "callback — a route's `encodeParams` / `decodeParams`",
     PreloadTarget: "callback — `PreloadFn`",
     RouterError: "callback — `onError`, `fallback`, `Plugin.onTransitionError`",
@@ -1131,13 +1133,13 @@ describe("door total (#2303)", () => {
       "plugin augmentations": 15,
       "plugin factory params": 14,
       "provider props": 6,
-      "surface members": 82,
+      "surface members": 84,
     });
   });
 
   it("the total", () => {
     // ⚠ The bucket table above is what a reader diffs; this line exists so the
     // headline is a test rather than a sentence somebody wrote down once.
-    expect(union.size).toBe(293);
+    expect(union.size).toBe(295);
   });
 });

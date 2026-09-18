@@ -214,6 +214,7 @@ describe("return-door census (#2303)", () => {
     );
 
     expect(supplied).toStrictEqual({
+      CheckFn: "void",
       DefaultParamsCallback: "Params",
       DefaultRouteCallback: "string",
       DefaultSearchCallback: "SearchParams",

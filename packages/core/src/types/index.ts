@@ -336,6 +336,8 @@ export type {
   LifecycleApi,
   InterceptableMethodMap,
   InterceptorFn,
+  CheckPositionMap,
+  CheckFn,
   ContextNamespaceClaim,
 } from "./api";
 

@@ -670,6 +670,7 @@ describe("consumer census (#2303)", () => {
       // its door goes (#2386), and the validator slot (#2388).
       getInternals: ["dependenciesGetStore", "validator"],
       getPluginApi: [
+        "addCheck",
         "addEventListener",
         "addInterceptor",
         "buildNavigationState",
@@ -854,6 +855,7 @@ describe("consumer census (#2303)", () => {
       getInternals: [
         "buildPathResolved",
         "buildStateResolved",
+        "checks",
         "contextClaimRecords",
         "emitTransitionError",
         "forwardState",

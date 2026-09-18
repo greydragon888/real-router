@@ -148,6 +148,7 @@ describe("#1702 — every RouterInternals channel is released by dispose()", () 
 
   it("names them, so a change to the set is a decision and not a diff", () => {
     expect(sorted(channels)).toStrictEqual([
+      "checks",
       "contextClaimRecords",
       "interceptors",
       "routerExtensions",

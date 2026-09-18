@@ -28,6 +28,7 @@ import type {
   Unsubscribe,
   EventMethodMap,
   InterceptableMethodMap,
+  CheckPositionMap,
   PluginFactory,
 } from "./types";
 import type { Limits } from "./types/internal";
@@ -190,6 +191,18 @@ export interface RouterInternals<
     string,
     ((next: (...args: any[]) => any, ...args: any[]) => any)[]
   >;
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+
+  /**
+   * Checks registered per position (#2388) — the channel's whole state.
+   *
+   * ⚑ `readonly`, and that is load-bearing rather than tidy: the slot it
+   * replaces (`validator`) was one of the two WRITABLE members that kept this
+   * bag out of `Object.freeze`. A map mutated in place adds no writable member,
+   * so retiring the validator still leaves the bag freezable.
+   */
+  /* eslint-disable @typescript-eslint/no-explicit-any -- heterogeneous map: stores different CheckFn<P> types under different keys, exactly as `interceptors` above does */
+  readonly checks: Map<string, ((...args: any[]) => void)[]>;
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
   readonly setRootPath: (rootPath: string) => void;
@@ -428,7 +441,7 @@ export function registerInternals<D extends DefaultDependencies>(
   Object.defineProperty(router, ROUTER_BRAND, { value: true });
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument -- internal chain execution: type safety enforced at public API boundary (PluginApi.addInterceptor) */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument -- internal chain and check execution: type safety enforced at the public API boundary (`PluginApi.addInterceptor` / `PluginApi.addCheck`) */
 function executeInterceptorChain<T>(
   interceptors: ((next: (...args: any[]) => any, ...args: any[]) => any)[],
   original: (...args: any[]) => T,
@@ -480,6 +493,59 @@ export const SEAM = {
   start: "start",
   forwardState: "forwardState",
 } as const satisfies { [K in keyof InterceptableMethodMap]: K };
+
+/**
+ * The runtime half of the check channel (#2388) — the same pair-with-the-type
+ * construction {@link SEAM} uses, for the same reason.
+ *
+ * ⚑ A position added to {@link CheckPositionMap} and not here fails this object
+ * to compile; a key here the map does not declare fails too; and the mapped type
+ * makes a value that drifts from its key an error rather than a silent alias.
+ * The call sites below read a PROPERTY of this object rather than spelling a
+ * literal, so the set that decides is the set that acts.
+ */
+export const POSITION = {
+  "buildPath:params": "buildPath:params",
+  "buildPathResolved:params": "buildPathResolved:params",
+} as const satisfies { [K in keyof CheckPositionMap]: K };
+
+/**
+ * Runs every check registered at a position, in registration order.
+ *
+ * ⚠ **No `try`/`catch` and no collecting.** A check exists to refuse, so its
+ * throw is the answer and the first one wins — wrapping would turn a refusal
+ * into a log, and collecting would hand the caller a second opinion about a
+ * value already refused.
+ *
+ * ⚑ **Re-entrancy is expected rather than guarded against.** A plugin's own
+ * registration pass reaches core doors — `@real-router/validation-plugin` walks
+ * the route table through `getRoutesApi` while installing — so a check can be
+ * asked while the plugin that registered it is still starting.
+ *
+ * ⚠ **The list is read by INDEX, bounded by its length at entry**, and both
+ * halves are deliberate. `for…of` over a live array sees what a check appends to
+ * it mid-run — measured, a check that registers another had the new one called
+ * by the same call — and copying the array would allocate on `buildPath`, which
+ * is the render path. So a registration made during a run is not seen by that
+ * run, and a removal made during one simply is not called.
+ */
+export function runChecks<P extends keyof CheckPositionMap>(
+  checks: ReadonlyMap<string, ((...args: any[]) => void)[]>,
+  position: P,
+  ...args: CheckPositionMap[P]
+): void {
+  const registered = checks.get(position);
+
+  if (registered === undefined) {
+    return;
+  }
+
+  const atEntry = registered.length;
+
+  for (let i = 0; i < atEntry && i < registered.length; i++) {
+    registered[i](...args);
+  }
+}
 
 /**
  * Variadic interceptor wrapper — wraps a function of any arity, returning the

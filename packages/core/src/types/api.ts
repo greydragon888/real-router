@@ -54,6 +54,67 @@ export interface InterceptableMethodMap {
 }
 
 /**
+ * Every position at which core asks whether anyone OBJECTS, and the values it
+ * hands the question (#2388).
+ *
+ * ⚑ **A position is not a seam, and the difference is the right it hands out.**
+ * An interceptor receives `next` and may call it with other arguments, or not at
+ * all — it REPLACES behaviour. A check receives values and may only throw: it
+ * cannot alter what core does next, only stop it. Measured across the six
+ * shipped `addInterceptor` sites outside core, not one of them refuses, and not
+ * one of the validator's refusals replaces; the two rights are disjoint in
+ * practice, so they are disjoint in the API.
+ *
+ * ⚑ **What refuses a position: a consultation standing at it.** A name lands
+ * here when shipped code asks the question there, never because a door looks
+ * like it might want one — an eligible-looking position with no consultation is
+ * how a vocabulary grows by default rather than by decision (core/CLAUDE.md
+ * › _Before adding an aggregating entity_). A refusal has been recorded:
+ * `buildPath`'s ENTRY is eligible and absent, because the consultation standing
+ * there mixes a refusal with a diagnostic and a diagnostic is not this
+ * channel's to carry.
+ *
+ * ⚠ The map's VALUE is the argument tuple, so a check registered at a position
+ * is typed by what that position judges rather than by the door's signature.
+ */
+export interface CheckPositionMap {
+  /**
+   * The bag core adopted from the caller's, and prints the path from (#2134).
+   *
+   * ⚑ The case an interceptor cannot express: at the call boundary this object
+   * does not exist yet, so a seam could only judge the caller's bag — and a key
+   * that answers differently per read is admitted on the one that SHIPS.
+   *
+   * ⚠ `undefined` when the caller passed no bag: `adoptChannel` is identity on
+   * the type, so "no params" survives the copy rather than becoming an empty
+   * object. A check here judges absence as well as content.
+   */
+  "buildPath:params": [ownParams: Params | undefined];
+
+  /**
+   * The same judgement for the printer a caller reaches having ALREADY resolved
+   * the forward chain (`PluginApi.buildPathResolved`).
+   *
+   * ⚠ A separate position rather than a shared one, because the value a check
+   * refuses names its own door in the message. The two printers are reached
+   * independently — the href door runs the chain itself and comes here — so a
+   * refusal naming the wrong one sends the reader to a call that did not happen.
+   */
+  "buildPathResolved:params": [ownParams: Params | undefined];
+}
+
+/**
+ * A check: it may THROW, and its return value is ignored by construction.
+ *
+ * ⚠ `void` rather than `boolean` is deliberate — a boolean would make silence
+ * ambiguous (did it pass, or did the check forget to return?) and would tempt a
+ * caller to treat the channel as a predicate. Refusal has exactly one spelling.
+ */
+export type CheckFn<P extends keyof CheckPositionMap> = (
+  ...args: CheckPositionMap[P]
+) => void;
+
+/**
  * Type-safe interceptor callback.
  * Receives `next` (the next function in the chain) followed by the method's original parameters.
  */
@@ -319,6 +380,23 @@ export interface PluginApi {
   addInterceptor: <M extends keyof InterceptableMethodMap>(
     method: M,
     fn: InterceptorFn<M>,
+  ) => Unsubscribe;
+
+  /**
+   * Registers a REFUSAL at a named position (#2388).
+   *
+   * The check runs where core chose, receives what that position judges, and may
+   * throw. It cannot replace an argument, skip the call, or change an answer —
+   * for those there is {@link addInterceptor}, and the two seams it carries are
+   * the ones with shipped consumers that genuinely replace.
+   *
+   * ⚠ Checks at one position run in registration order, and the FIRST throw
+   * wins: core does not collect refusals, because the caller gets one error and
+   * a second check's opinion about a value already refused is not actionable.
+   */
+  addCheck: <P extends keyof CheckPositionMap>(
+    position: P,
+    check: CheckFn<P>,
   ) => Unsubscribe;
 
   extendRouter: (extensions: Record<string, unknown>) => Unsubscribe;

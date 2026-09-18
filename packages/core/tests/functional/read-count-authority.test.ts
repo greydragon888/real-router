@@ -2069,6 +2069,7 @@ describe("the public door inventory (#1901)", () => {
     "getLifecycleApi.addDeactivateGuard",
     "getLifecycleApi.removeActivateGuard",
     "getLifecycleApi.removeDeactivateGuard",
+    "getPluginApi.addCheck",
     "getPluginApi.addEventListener",
     "getPluginApi.addInterceptor",
     "getPluginApi.buildNavigationState",

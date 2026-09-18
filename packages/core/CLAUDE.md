@@ -36,7 +36,7 @@ least once; the derivation is green or it is red.
 
 ## Invariant Guards (always active, no plugin required)
 
-Nine, and the criterion for another is **(a)** silent corruption or **(b)** a
+Ten, and the criterion for another is **(a)** silent corruption or **(b)** a
 deferred crash in a user-facing API. (The count is written as a cardinal, not an
 ordinal naming "the next one": it went stale twice as `five`, and an ordinal adds
 a second edit to every addition.)
@@ -93,6 +93,14 @@ InterceptableMethodMap]: K }` ties it to the type in both directions: a seam
   is an error rather than a silent alias. ⚠ Nothing COERCES the name — `hasOwn`
   performs `ToPropertyKey`, and the message renders a non-string by its type
   rather than through `String()`, so neither half runs the caller's `toString`.
+- **`addCheck(position, check)`** — refuses both arguments (#2388), by criterion
+  **(a)** and for the reason its `addInterceptor` sibling gives: a position no
+  call site reads registers cleanly, never fires and hands back a working
+  `Unsubscribe`. Membership is asked of `POSITION` in `internals.ts`, tied to
+  `CheckPositionMap` by `satisfies` in both directions, and neither half coerces
+  the name. ⚑ The channel is REFUSAL-ONLY — a check may throw and may do nothing
+  else — which is what separates it from a seam: measured, no shipped interceptor
+  refuses and no validator refusal replaces an argument.
 - **`extendRouter(extensions)`** — the argument must be a plain object (#2243).
   Criterion **(a)**, and the refused write lands on the router ITSELF rather than
   in an internal registry: own enumerable keys are copied onto the live router,

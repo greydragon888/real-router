@@ -47,6 +47,7 @@ describe("every door taking both channels validates both (#1972)", () => {
     subscribeLeave: "not-a-channel-door",
     usePlugin: "not-a-channel-door",
     // plugin API
+    addCheck: "not-a-channel-door",
     addEventListener: "not-a-channel-door",
     addInterceptor: "not-a-channel-door",
     buildNavigationState: "both-channels",
