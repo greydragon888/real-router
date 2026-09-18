@@ -6475,8 +6475,8 @@ importers:
         specifier: '>=4.59.0'
         version: 4.63.2
       rollup-plugin-dts:
-        specifier: 6.4.1
-        version: 6.4.1(rollup@4.63.2)(typescript@6.0.3)
+        specifier: 6.5.1
+        version: 6.5.1(rollup@4.63.2)(typescript@6.0.3)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.14
@@ -13843,6 +13843,17 @@ packages:
     peerDependencies:
       rollup: '>=4.59.0'
       typescript: ^4.5 || ^5.0 || ^6.0
+
+  rollup-plugin-dts@6.5.1:
+    resolution: {integrity: sha512-jODTXp3H7MK/Ur/ErtsrQ0G1GvaCmc3du+y5pNrdBMf6d7HlL2Nd/N6TkEr+f75CkUj01zEoEd7y2elH0eHi1Q==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@typescript/typescript6': ^6
+      rollup: '>=4.59.0'
+      typescript: ^4.5 || ^5 || ^6 || ^7
+    peerDependenciesMeta:
+      '@typescript/typescript6':
+        optional: true
 
   rollup@4.63.2:
     resolution: {integrity: sha512-l5eyksV4tPBj6lJyEa37YzIOCSOV7lkZzEHUdpjWZbtD7wTcFYmEYXSgm5bT4vV+dZLb9rBG1W9GROOG4NS4Ew==}
@@ -22383,6 +22394,17 @@ snapshots:
       typescript: 6.0.3
     optionalDependencies:
       '@babel/code-frame': 7.29.7
+
+  rollup-plugin-dts@6.5.1(rollup@4.63.2)(typescript@6.0.3):
+    dependencies:
+      '@jridgewell/remapping': 2.3.5
+      '@jridgewell/sourcemap-codec': 1.6.0
+      convert-source-map: 2.0.0
+      magic-string: 0.30.21
+      rollup: 4.63.2
+      typescript: 6.0.3
+    optionalDependencies:
+      '@babel/code-frame': 8.0.0
 
   rollup@4.63.2:
     dependencies:
