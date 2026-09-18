@@ -353,7 +353,6 @@ function buildValidatorObject(
       },
     },
     navigation: {
-      validateNavigateArgs,
       validateNavigateToDefaultArgs(opts) {
         validateNavigateToDefaultArgs(opts);
         // ⚑ HERE, and not on every navigation. No door READS the watched bags
@@ -368,7 +367,6 @@ function buildValidatorObject(
       },
       validateNavigateToStateArgs,
       validateNavigationOptions,
-      validateParams: validateNavigateParams,
       validateParamsShape: validateNavigateParamsShape,
       validateSearch,
       validateStartArgs,
@@ -587,11 +585,55 @@ export function validationPlugin<
       },
     );
 
+    // ⚠ The calls inside each ENTRY check keep the order core consulted them
+    // in: the first refusal is the message the caller gets, so reordering them
+    // changes which defect a caller hears about when an argument has two.
+    const removeCanNavigateToEntryCheck = api.addCheck(
+      "canNavigateTo:entry",
+      (name, params, search) => {
+        validateRouteName(name, "canNavigateTo");
+        validateNavigateParamsShape(params, "canNavigateTo");
+        validateSearch(search, "canNavigateTo");
+      },
+    );
+
+    const removeCanNavigateToParamsCheck = api.addCheck(
+      "canNavigateTo:params",
+      (ownParams) => {
+        validateNavigateParams(ownParams, "canNavigateTo");
+      },
+    );
+
+    const removeNavigateEntryCheck = api.addCheck(
+      "navigate:entry",
+      (routeName, routeParams, search, options) => {
+        validateNavigateArgs(routeName);
+        validateNavigateParamsShape(routeParams, "navigate");
+        validateSearch(search, "navigate");
+        validateNavigationOptions(options, "navigate");
+      },
+    );
+
+    const removeNavigateParamsCheck = api.addCheck(
+      "navigate:params",
+      (ownParams) => {
+        validateNavigateParams(ownParams, "navigate");
+      },
+    );
+
     return {
       teardown() {
         removeParamsCheck();
 
         removeResolvedParamsCheck();
+
+        removeCanNavigateToEntryCheck();
+
+        removeCanNavigateToParamsCheck();
+
+        removeNavigateEntryCheck();
+
+        removeNavigateParamsCheck();
 
         removeInterceptor();
 

@@ -107,6 +107,71 @@ describe("the validation plugin refuses through the check channel (#2388)", () =
     ).not.toThrow();
   });
 
+  it("navigate refuses at BOTH of its positions", async () => {
+    const router = createRouter(routes);
+
+    router.usePlugin(validationPlugin());
+
+    await router.start("/items/1");
+
+    // ⚑ ENTRY refuses SYNCHRONOUSLY, from a method whose declared return is a
+    // promise — the facade's own shape for programmer error, pinned by #1572
+    // and unchanged by the conversion. `validateNavigateArgs` is the member
+    // that left `RouterValidator` with this slice: this was its only caller.
+    expect(() => router.navigate(42 as never)).toThrow(
+      "[router.navigate] Invalid route name: expected string, got number",
+    );
+
+    // ⚠ PARAMS refuses the same way, and the asymmetry with the REJECTION one
+    // line above it in core is deliberate: a throwing accessor on the caller's
+    // bag rejects, a bad value refuses.
+    expect(() =>
+      router.navigate("items", { id: Symbol("x") } as never),
+    ).toThrow("cannot be a symbol");
+
+    router.stop();
+  });
+
+  it("canNavigateTo refuses through the channel, and the message names IT", () => {
+    // ⚠ This door is TOTAL in bare core, and refusing here is the analyser's
+    // documented divergence rather than a regression — the same shape it had
+    // when the validator answered at this position.
+    const router = createRouter(routes);
+
+    router.usePlugin(validationPlugin());
+
+    expect(() =>
+      router.canNavigateTo("items", { id: Symbol("x") } as never),
+    ).toThrow('[router.canNavigateTo] param "id" cannot be a symbol');
+  });
+
+  it("CONTROL — bare core answers at the predicate instead of refusing", () => {
+    const router = createRouter(routes);
+
+    expect(() =>
+      router.canNavigateTo("items", { id: Symbol("x") } as never),
+    ).not.toThrow();
+  });
+
+  it("teardown removes every registration this plugin made", () => {
+    const router = createRouter(routes);
+    const remove = router.usePlugin(validationPlugin());
+
+    remove();
+
+    expect(() =>
+      router.buildPath("items", { id: Symbol("x") } as never),
+    ).not.toThrow();
+    expect(() =>
+      getPluginApi(router).buildPathResolved("items", {
+        id: Symbol("x"),
+      } as never),
+    ).not.toThrow();
+    expect(() =>
+      router.canNavigateTo("items", { id: Symbol("x") } as never),
+    ).not.toThrow();
+  });
+
   it("ANTI-VACUUM: the door still builds a path with the plugin installed", () => {
     const router = createRouter(routes);
 

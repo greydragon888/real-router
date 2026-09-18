@@ -1106,9 +1106,13 @@ export class Router<
   canNavigateTo(name: string, params?: Params, search?: SearchParams): boolean {
     const ctx = getInternals(this);
 
-    ctx.validator?.routes.validateRouteName(name, "canNavigateTo");
-    ctx.validator?.navigation.validateParamsShape(params, "canNavigateTo");
-    ctx.validator?.navigation.validateSearch(search, "canNavigateTo");
+    runChecks(
+      ctx.checks,
+      POSITION["canNavigateTo:entry"],
+      name,
+      params,
+      search,
+    );
 
     // The same single read as the two producers (#2134) — the predicate must
     // answer about the bag they would ship, not about an earlier read of it.
@@ -1133,7 +1137,7 @@ export class Router<
       return false;
     }
 
-    ctx.validator?.navigation.validateParams(ownParams, "canNavigateTo");
+    runChecks(ctx.checks, POSITION["canNavigateTo:params"], ownParams);
 
     if (!this.#routes.hasRoute(name)) {
       return false;
@@ -1371,10 +1375,14 @@ export class Router<
 
     throwOnMisChanneledKey(ctx, "navigate", routeName, routeParams);
 
-    ctx.validator?.navigation.validateNavigateArgs(routeName);
-    ctx.validator?.navigation.validateParamsShape(routeParams, "navigate");
-    ctx.validator?.navigation.validateSearch(search, "navigate");
-    ctx.validator?.navigation.validateNavigationOptions(opts, "navigate");
+    runChecks(
+      ctx.checks,
+      POSITION["navigate:entry"],
+      routeName,
+      routeParams,
+      search,
+      opts,
+    );
 
     // ⚑ One read for the whole navigation (#2134). `buildNavigateState` runs
     // `validateStateBuilderArgs` further down the pipeline, and it now receives
@@ -1395,7 +1403,7 @@ export class Router<
       return Promise.reject(error);
     }
 
-    ctx.validator?.navigation.validateParams(ownParams, "navigate");
+    runChecks(ctx.checks, POSITION["navigate:params"], ownParams);
 
     return Router.#asPromise(
       this.#navigation.navigate(

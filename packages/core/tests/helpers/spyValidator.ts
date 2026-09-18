@@ -29,10 +29,37 @@ import type { Router } from "@real-router/core/types";
  * Each accessed method returns a STABLE `vi.fn()` (cached per name), so
  * `expect(v.dependencies.warnOverwrite).toHaveBeenCalledWith(...)` works.
  */
+/**
+ * The spies each validator materialised, by namespace — the side channel
+ * {@link consultationsOn} reads.
+ *
+ * ⚠ The surface is nested PROXIES with no `ownKeys` trap, so `Object.entries`
+ * on a spy validator answers `[]` for every namespace however many calls it
+ * recorded. A census built on enumeration is therefore not merely incomplete,
+ * it is empty — which reads as "this door consults nothing".
+ */
+const RECORDED = new WeakMap<RouterValidator, Map<string, Map<string, Mock>>>();
+
+/** Every member a call was recorded on, as `namespace.member`, sorted. */
+export function consultationsOn(validator: RouterValidator): string[] {
+  const made: string[] = [];
+
+  for (const [ns, fns] of RECORDED.get(validator) ?? []) {
+    for (const [member, fn] of fns) {
+      if (fn.mock.calls.length > 0) {
+        made.push(`${ns}.${member}`);
+      }
+    }
+  }
+
+  return made.toSorted((left, right) => left.localeCompare(right));
+}
+
 export function createSpyValidator(): RouterValidator {
   const namespaces = new Map<string, Record<string, Mock>>();
+  const recorded = new Map<string, Map<string, Mock>>();
 
-  return new Proxy({} as RouterValidator, {
+  const validator = new Proxy({} as RouterValidator, {
     get(_target, nsName) {
       if (typeof nsName !== "string") {
         return;
@@ -42,6 +69,8 @@ export function createSpyValidator(): RouterValidator {
 
       if (!ns) {
         const fns = new Map<string, Mock>();
+
+        recorded.set(nsName, fns);
 
         ns = new Proxy({} as Record<string, Mock>, {
           get(_t, fnName) {
@@ -66,6 +95,10 @@ export function createSpyValidator(): RouterValidator {
       return ns;
     },
   });
+
+  RECORDED.set(validator, recorded);
+
+  return validator;
 }
 
 /**

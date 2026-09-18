@@ -1,10 +1,10 @@
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { events } from "@real-router/core";
 import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../helpers";
-import { installSpyValidator } from "../helpers/spyValidator";
+import { consultationsOn, installSpyValidator } from "../helpers/spyValidator";
 
 import type { RouterValidator, PluginFactory, Router } from "@real-router/core";
 
@@ -60,39 +60,40 @@ describe("core/validator call-site contract (facade + namespaces)", () => {
       // `ownParams` — the copy that ships. A call here would mean the refusal is
       // raised TWICE, on two different objects.
       //
-      // ⚠ The resolved printer is asserted in the SAME cell deliberately: it is
-      // reached independently of the facade's, so a pin on one says nothing
-      // about the other.
-      expect(validator.navigation.validateParams).not.toHaveBeenCalled();
+      // ⚠ No assertion that `validateParams` was NOT called: the member has left
+      // `RouterValidator` entirely (#2388), so the compiler owns that now and a
+      // runtime cell would only restate it.
     });
 
-    it("canNavigateTo: validates name + params with caller 'canNavigateTo'", async () => {
+    it("CONTROL — the consultation census sees a door that still consults", () => {
+      // Without this the two cells below would agree with a census that reports
+      // an empty set for every door, including one nothing was converted at.
+      router.buildPath("items", { id: "1" });
+
+      expect(consultationsOn(validator)).not.toStrictEqual([]);
+    });
+
+    it("canNavigateTo consults the validator for NOTHING — its refusals are checks (#2388)", async () => {
       await router.start("/home");
+      vi.clearAllMocks();
 
       router.canNavigateTo("items", { id: "1" });
 
-      expect(validator.routes.validateRouteName).toHaveBeenCalledWith(
-        "items",
-        "canNavigateTo",
-      );
-      expect(validator.navigation.validateParams).toHaveBeenCalledWith(
-        { id: "1" },
-        "canNavigateTo",
-      );
+      expect(consultationsOn(validator)).toStrictEqual([]);
     });
 
-    it("navigate: validates params + options with caller 'navigate'", async () => {
+    it("navigate: the facade consults nothing, and the pipeline below is its own layer (#2388)", async () => {
       await router.start("/home");
+      vi.clearAllMocks();
 
       await router.navigate("items", { id: "1" });
 
-      expect(validator.navigation.validateParams).toHaveBeenCalledWith(
-        { id: "1" },
-        "navigate",
-      );
-      expect(
-        validator.navigation.validateNavigationOptions,
-      ).toHaveBeenCalledWith(expect.anything(), "navigate");
+      // ⚑ Not empty, and the remainder is the statement: the facade's four
+      // consultations became one check, while the pipeline underneath still
+      // judges the state it BUILDS. A door is converted at its own layer.
+      expect(consultationsOn(validator)).toStrictEqual([
+        "routes.validateStateBuilderArgs",
+      ]);
     });
 
     it("navigateToDefault: validates options with caller 'navigateToDefault'", async () => {

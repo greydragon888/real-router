@@ -101,6 +101,48 @@ export interface CheckPositionMap {
    * refusal naming the wrong one sends the reader to a call that did not happen.
    */
   "buildPathResolved:params": [ownParams: Params | undefined];
+
+  /**
+   * `canNavigateTo`'s arguments, as the caller spelled them.
+   *
+   * ⚠ This door is documented TOTAL in bare core (INVARIANTS `canNavigateTo`
+   * #5), and a check here can throw. That divergence is the analyser's to own,
+   * not this position's: it is the same shape the door already had when the
+   * validator answered here, and `predicate-totality-2245.test.ts` pins both
+   * arms.
+   */
+  "canNavigateTo:entry": [
+    name: string,
+    params: Params | undefined,
+    search: SearchParams | undefined,
+  ];
+
+  /** The copy the predicate answers about, for the reason above `buildPath:params`. */
+  "canNavigateTo:params": [ownParams: Params | undefined];
+
+  /**
+   * `navigate`'s arguments AFTER the two call shapes are unpacked, so a check
+   * sees one spelling whether the caller passed a name or a target object.
+   *
+   * ⚠ `options` is never absent here: core substitutes its own `EMPTY_OPTS`
+   * singleton when the caller passes none, so a check judges that object rather
+   * than `undefined`.
+   */
+  "navigate:entry": [
+    routeName: string,
+    routeParams: Params | undefined,
+    search: SearchParams | undefined,
+    options: NavigationOptions,
+  ];
+
+  /**
+   * The copy the whole navigation runs on (#2134).
+   *
+   * ⚠ Reached only when `adoptChannel` did not throw — a caller's accessor that
+   * throws becomes a REJECTION one line above, because everything this door
+   * answers with is a promise.
+   */
+  "navigate:params": [ownParams: Params | undefined];
 }
 
 /**

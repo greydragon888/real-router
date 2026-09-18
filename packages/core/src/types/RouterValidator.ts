@@ -134,11 +134,9 @@ export interface RouterValidator {
    * Navigation validation methods
    */
   navigation: {
-    validateNavigateArgs: (name: unknown) => void;
     validateNavigateToDefaultArgs: (options: unknown) => void;
     validateNavigateToStateArgs: (state: unknown) => void;
     validateNavigationOptions: (options: unknown, caller: string) => void;
-    validateParams: (params: unknown, methodName: string) => void;
     /**
      * The path bag's SHAPE, on the object the caller still owns (#2134).
      *

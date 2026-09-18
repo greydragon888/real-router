@@ -507,6 +507,10 @@ export const SEAM = {
 export const POSITION = {
   "buildPath:params": "buildPath:params",
   "buildPathResolved:params": "buildPathResolved:params",
+  "canNavigateTo:entry": "canNavigateTo:entry",
+  "canNavigateTo:params": "canNavigateTo:params",
+  "navigate:entry": "navigate:entry",
+  "navigate:params": "navigate:params",
 } as const satisfies { [K in keyof CheckPositionMap]: K };
 
 /**
