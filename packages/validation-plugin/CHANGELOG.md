@@ -1,5 +1,31 @@
 # @real-router/validation-plugin
 
+## 0.26.0
+
+### Minor Changes
+
+- [#2421](https://github.com/greydragon888/real-router/pull/2421) [`6fb23f2`](https://github.com/greydragon888/real-router/commit/6fb23f219a0817eec1acd7732c43b0d32ef171c6) Thanks [@greydragon888](https://github.com/greydragon888)! - Route-CRUD refusals are registered as checks, and the per-route walk moves here ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  Six more registrations at install, all removed on `teardown`. Each runs the
+  door's calls in the order core consulted them, so the first refusal a caller
+  hears about is the same one.
+
+  ⚑ **The per-route callback walk is this package's now.** Core deleted the
+  `guardRouteCallbacks` helper that existed only to thread the validator into it,
+  so the plugin recurses into `children` itself and `guardRouteCallbacks` /
+  `guardNoAsyncCallbacks` leave `RouterValidator` with the nine other route
+  members.
+
+  ⚠ The walk is pinned by a cell that refuses an async `decodeParams` on a CHILD —
+  the one input nothing else catches. A `canActivate` was tried first and could not
+  discriminate: core's own factory-shape guard refuses that whether the walk runs
+  or not.
+
+### Patch Changes
+
+- Updated dependencies [[`6fb23f2`](https://github.com/greydragon888/real-router/commit/6fb23f219a0817eec1acd7732c43b0d32ef171c6)]:
+  - @real-router/core@0.144.0
+
 ## 0.25.0
 
 ### Minor Changes

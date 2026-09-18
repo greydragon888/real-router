@@ -1,5 +1,36 @@
 # @real-router/core
 
+## 0.144.0
+
+### Minor Changes
+
+- [#2421](https://github.com/greydragon888/real-router/pull/2421) [`6fb23f2`](https://github.com/greydragon888/real-router/commit/6fb23f219a0817eec1acd7732c43b0d32ef171c6) Thanks [@greydragon888](https://github.com/greydragon888)! - Route CRUD stops consulting the validator, and `RouterValidator` loses eleven members ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  `getRoutesApi`'s six doors register their refusals on the check channel, at six
+  new positions: `addRoute:batch`, `replaceRoutes:batch`, `removeRoute:entry`,
+  `updateRoute:entry`, `hasRoute:entry` and `getRoute:entry`. Messages and order
+  are unchanged.
+
+  **Eleven members leave `RouterValidator`** — every one whose only consultations
+  were on this surface: `validateAddRouteArgs`, `validateRoutes`,
+  `validateRemoveRouteArgs`, `validateUpdateRouteBasicArgs`,
+  `validateUpdateRoutePropertyTypes`, `validateUpdateRoute`, `validateParentOption`,
+  `throwIfInternalRoute`, `throwIfInternalRouteInArray`, `guardRouteCallbacks` and
+  `guardNoAsyncCallbacks`.
+
+  `guards.ts`'s `guardRouteCallbacks` helper is **deleted**. It existed only to
+  thread the validator into a per-route walk; the walk is the checking plugin's
+  now.
+
+  ⚑ **`:batch`, not `:entry`.** `add` and `replace` hand over the array
+  `guardRouteStructure` snapshotted, never the caller's — judged and snapshotted in
+  one walk so guards, checks and registration all decide from one object
+  ([#1899](https://github.com/greydragon888/real-router/issues/1899) / [#1911](https://github.com/greydragon888/real-router/issues/1911) / [#2139](https://github.com/greydragon888/real-router/issues/2139)). The position name says which object a check receives.
+
+  ⚠ **`validateRouteName` stays.** It has seven consultations and only two were
+  here; `hasRoute` and `getRoute` reach it through a check now, `isActiveRoute` and
+  the lifecycle doors still consult it.
+
 ## 0.143.0
 
 ### Minor Changes
