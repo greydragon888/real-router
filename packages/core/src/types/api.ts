@@ -214,9 +214,14 @@ export interface PluginApi {
   getDeclaredQueryNames: (name: string) => readonly string[];
 
   /**
-   * The route's PATH slot names, ancestors included — the registry
-   * `buildPath` prints from. Answers `[]` for a route the tree does not hold;
-   * a name is not a claim that the route exists.
+   * The route's PATH slot names, ancestors included. Answers `[]` for a route
+   * the tree does not hold; a name is not a claim that the route exists.
+   *
+   * ⚠ **Not the full set `buildPath` requires.** A root path carrying slots —
+   * `setRootPath("/app/:tenant")` — prefixes every URL, so `buildPath` demands
+   * `tenant` while this answers the route's own chain alone. Measured: a route
+   * declaring `:id` under that root answers `["id"]` and builds only when
+   * `tenant` is supplied too.
    *
    * ⚠ Handed out BY REFERENCE and frozen where it lives, with the same caveat as
    * {@link getDeclaredQueryNames}: a held array describes the tree as it was

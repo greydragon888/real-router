@@ -54,7 +54,8 @@ describe("the membership rule, clause (b) (#2350)", () => {
   type Surface = (typeof SURFACES)[number];
 
   /** Which of the three answers a referenced name earns; `unnamed` is a refusal. */
-  type Verdict = "global" | "published" | "type parameter" | "unnamed";
+  type Verdict =
+    "global" | "not a type" | "published" | "type parameter" | "unnamed";
 
   interface Reference {
     surface: Surface;
@@ -87,18 +88,58 @@ describe("the membership rule, clause (b) (#2350)", () => {
     return out;
   };
 
-  /** Every type-reference identifier under a declaration. */
-  const referencedNames = (node: ts.Node): ts.Identifier[] => {
+  /**
+   * The SIGNATURE's type nodes — return type, parameter types, type-parameter
+   * constraints and defaults — and nothing else.
+   *
+   * ⚠ **A method BODY is not the signature, and collecting it produces false
+   * offenders.** Measured while this cell was widened: `Router.shouldUpdateNode`
+   * calls `RoutesNamespace.shouldUpdateNode` in its body, `subscribe` reaches
+   * `EventBusNamespace` in its own — both are classes, so a walk over the whole
+   * declaration reported three members as naming an unpublished type when their
+   * signatures name nothing of the sort. Clause (b) asks what a caller must be
+   * able to DECLARE, which is the signature alone.
+   */
+  const signatureTypes = (declaration: ts.Declaration): ts.Node[] => {
+    const parts = declaration as {
+      type?: ts.TypeNode;
+      parameters?: readonly ts.ParameterDeclaration[];
+      typeParameters?: readonly ts.TypeParameterDeclaration[];
+    };
+
+    return [
+      parts.type,
+      ...(parts.parameters ?? []).map((parameter) => parameter.type),
+      ...(parts.typeParameters ?? []).flatMap((parameter) => [
+        parameter.constraint,
+        parameter.default,
+      ]),
+    ].filter((node) => node !== undefined);
+  };
+
+  /**
+   * Every identifier under those type nodes — the position inside a type is not
+   * asked.
+   *
+   * ⚑ **The scope is the compiler's answer too, not just the verdict.** Reading
+   * only `TypeReferenceNode` is a PARSER-level predicate that has to be taught
+   * each syntax a type can be written in — the defect the census README names one
+   * level up. Measured: a member typed
+   * `() => import("../namespaces/RoutesNamespace").RoutesStore` passed this cell
+   * GREEN while naming a type no subpath publishes. Collecting every identifier
+   * and letting the SYMBOL decide what is a type removes that whole class.
+   *
+   * ⚠ One position stays out of reach and is named rather than implied: a
+   * `typeof X` member depends on the type of a VALUE, whose symbol is a variable
+   * — nameable or not for reasons this cell does not model. No handed-out
+   * surface uses that form today.
+   */
+  const identifiersIn = (node: ts.Node): ts.Identifier[] => {
     const out: ts.Identifier[] = [];
 
     const visit = (current: ts.Node): void => {
-      if (ts.isTypeReferenceNode(current)) {
-        const { typeName } = current;
-        const identifier = ts.isIdentifier(typeName) ? typeName : typeName.left;
-
-        if (ts.isIdentifier(identifier)) {
-          out.push(identifier);
-        }
+      if (ts.isIdentifier(current)) {
+        out.push(current);
       }
 
       ts.forEachChild(current, visit);
@@ -109,13 +150,25 @@ describe("the membership rule, clause (b) (#2350)", () => {
     return out;
   };
 
-  const declaredByLibrary = (declaration: ts.Declaration): boolean => {
-    const file = declaration.getSourceFile().fileName;
+  /** Symbol kinds that ARE a type an application would have to name. */
+  const TYPE_KINDS =
+    ts.SymbolFlags.Interface |
+    ts.SymbolFlags.TypeAlias |
+    ts.SymbolFlags.Class |
+    ts.SymbolFlags.Enum;
 
-    return (
-      file.includes("/typescript/lib/") || /\/lib\.[\w.]*d\.ts$/.test(file)
-    );
-  };
+  /**
+   * Can this name be used without importing anything?
+   *
+   * ⚑ **AMBIENT, not "the file is called lib".** The question clause (b) asks is
+   * whether an application can NAME the type, and the answer is whether its
+   * declaration is global — a source file that is not a module. `lib.*.d.ts`
+   * qualifies and so does `@types/node`, which is correct: `NodeJS.Timeout` is
+   * nameable anywhere. A type from a dependency that IS a module does not, which
+   * is also correct — that one needs an import the surface never declared.
+   */
+  const isAmbient = (declaration: ts.Declaration): boolean =>
+    !ts.isExternalModule(declaration.getSourceFile());
 
   interface Analysis {
     references: Reference[];
@@ -123,6 +176,8 @@ describe("the membership rule, clause (b) (#2350)", () => {
     missing: Surface[];
     surfaces: Surface[];
     publishedNames: number;
+    /** Names waved through as globals whose declaration is core's own source. */
+    globalsFromOwnSource: string[];
   }
 
   /**
@@ -164,13 +219,15 @@ describe("the membership rule, clause (b) (#2350)", () => {
       }
     }
 
+    const ownSourceGlobals = new Set<string>();
+
     const verdictOf = (identifier: ts.Identifier): Verdict => {
       const symbol = checker.getSymbolAtLocation(identifier);
 
-      // ⚠ A name the checker cannot resolve is REFUSED rather than skipped:
-      // "could not tell" must not read as "nothing to see".
+      // Not a type — a member name, a parameter name, a namespace qualifier.
+      // Clause (b) has nothing to ask about it.
       if (!symbol) {
-        return "unnamed";
+        return "not a type";
       }
 
       if (symbol.flags & ts.SymbolFlags.TypeParameter) {
@@ -178,12 +235,25 @@ describe("the membership rule, clause (b) (#2350)", () => {
       }
 
       const target = resolve(symbol);
+
+      if ((target.flags & TYPE_KINDS) === 0) {
+        return "not a type";
+      }
+
       const declarations = target.declarations ?? [];
 
       if (
         declarations.length > 0 &&
-        declarations.every((declaration) => declaredByLibrary(declaration))
+        declarations.every((declaration) => isAmbient(declaration))
       ) {
+        for (const declaration of declarations) {
+          const file = declaration.getSourceFile().fileName;
+
+          if (file.startsWith(CORE) && !file.includes("node_modules")) {
+            ownSourceGlobals.add(identifier.text);
+          }
+        }
+
         return "global";
       }
 
@@ -217,12 +287,14 @@ describe("the membership rule, clause (b) (#2350)", () => {
     const references = found.flatMap(({ name, members }) =>
       members.flatMap((member) =>
         (member.declarations ?? []).flatMap((declaration) =>
-          referencedNames(declaration).map((identifier) => ({
-            surface: name,
-            member: member.getName(),
-            name: identifier.text,
-            verdict: verdictOf(identifier),
-          })),
+          signatureTypes(declaration)
+            .flatMap((node) => identifiersIn(node))
+            .map((identifier) => ({
+              surface: name,
+              member: member.getName(),
+              name: identifier.text,
+              verdict: verdictOf(identifier),
+            })),
         ),
       ),
     );
@@ -232,6 +304,7 @@ describe("the membership rule, clause (b) (#2350)", () => {
       missing: found.filter((s) => s.members.length === 0).map((s) => s.name),
       surfaces: found.map((s) => s.name),
       publishedNames: publishedNames.size,
+      globalsFromOwnSource: [...ownSourceGlobals].toSorted(byName),
     };
   };
 
@@ -307,16 +380,45 @@ describe("the membership rule, clause (b) (#2350)", () => {
     ]);
   });
 
-  it("the two escape hatches are pinned, so widening one cannot pass a real type", () => {
-    // ⚠ A type reference is waved through on exactly two grounds. Both sets are
-    // asserted rather than counted: a hatch that silently grew would let an
-    // unpublished type through under the name of a type parameter or a global.
+  it("the classifier answers four known references the way the clause needs", () => {
+    // ⚑ **The CLASSIFIER is pinned, not the extension of its output.** The set of
+    // type parameters and the set of globals grow with ordinary work — a member
+    // taking a `Set` or introducing a `T` is not an event — so pinning those
+    // sets reds on work that carries no defect, which the folder README forbids
+    // ("only the load-bearing side is pinned"). Measured: the previous form of
+    // this cell reddened on `<T>(seen: Set<string>) => ReadonlyArray<T>` and did
+    // NOT red when the global hatch was widened from TypeScript's own lib to
+    // every `node_modules` declaration — noisy in one direction and silent in
+    // the other. These four cases move only when the classifier itself breaks.
+    const verdictFor = (surface: Surface, member: string, name: string) =>
+      analysis.references.find(
+        (r) => r.surface === surface && r.member === member && r.name === name,
+      )?.verdict;
+
     expect({
-      typeParameters: wavedThrough("type parameter"),
-      globals: wavedThrough("global"),
+      global: verdictFor("Router", "start", "Promise"),
+      published: verdictFor("PluginApi", "makeState", "State"),
+      unnamed: verdictFor("RouterInternals", "routeGetStore", "RoutesStore"),
+      parameter: verdictFor("PluginApi", "makeState", "P"),
     }).toStrictEqual({
-      typeParameters: ["D", "Dependencies", "E", "K", "M", "P", "S"],
-      globals: ["Error", "Map", "Partial", "Promise", "Readonly", "Record"],
+      global: "global",
+      published: "published",
+      unnamed: "unnamed",
+      parameter: "type parameter",
     });
+  });
+
+  it("nothing waved through as a global is declared in core's own source", () => {
+    // ⚠ The one widening this file CAN catch without a synthetic fixture: a
+    // classifier that starts admitting the repository's own types under the
+    // name of a global.
+    expect(analysis.globalsFromOwnSource).toStrictEqual([]);
+
+    // ⚠ **What it cannot catch, named rather than implied:** a classifier
+    // widened to admit a MODULE-scoped dependency type would pass unnoticed,
+    // because no handed-out surface references one — there is nothing in the
+    // real data for the widening to change. Closing that needs a fixture
+    // declaration, which this cell deliberately does not carry.
+    expect(wavedThrough("global").length).toBeGreaterThan(0);
   });
 });

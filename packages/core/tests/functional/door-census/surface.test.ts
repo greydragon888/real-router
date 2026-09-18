@@ -225,8 +225,9 @@ describe("surface census (#2303)", () => {
     }));
 
     // ⚠ `getInternals` is the one cached-but-unfrozen surface, and that is the
-    // `LIVE_BY_CONTRACT` carve-out `handed-out-containers-1957` owns: the handle
-    // exists to hand out core's live stores.
+    // `LIVE_BY_CONTRACT` carve-out `factory-surface-freeze-authority-1805` owns:
+    // the handle exists to hand out core's live stores. (`handed-out-containers-1957`
+    // was named here and does not carry the carve-out at all.)
     expect(table).toStrictEqual([
       { name: "getInternals", cached: true, frozen: false, sealed: false },
       { name: "getPluginApi", cached: true, frozen: true, sealed: true },

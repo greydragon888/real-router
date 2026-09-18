@@ -519,14 +519,21 @@ describe("consumer census (#2303)", () => {
    * every other access is exact rather than heuristic — unlike a filter on the
    * file's text, which is the bound this walk exists to remove.
    *
-   * ⚠ What it still cannot see is an access whose name is computed
-   * (`api[pick]()`): no walk can, and no shipped consumer writes one — the cell
-   * below asserts the difference it DOES find, so a new invisible idiom shows
-   * up as a shrinking difference rather than as silence.
+   * ⚠ **Two spellings stay outside ANY walk of accesses, and they are watched
+   * rather than described:** a computed member name (`api[pick]()`) and a
+   * surface taken apart by a binding pattern (`const { navigateToState } = api`).
+   * Neither can be attributed to a member, so a cell below keeps the REGISTER of
+   * such sites — the residual is something this census watches, not a caveat a
+   * reader has to carry. Today it holds one, and it is real reach.
+   *
+   * ⚠ And the DIFFERENCE cell cannot stand in for that: it compares two walks
+   * blind the same way, so a spelling both miss is invisible to it by
+   * construction.
    */
   const typedScan = (): {
     reach: Record<string, Reached>;
     accesses: number;
+    opaque: string[];
   } => {
     const memberNames = new Set(Object.values(LIVE).flat());
     const paths = consumerFiles().map((f) => path.join(ROOT, f));
@@ -561,7 +568,29 @@ describe("consumer census (#2303)", () => {
       });
     };
 
+    /**
+     * The member a reach is recorded FOR — both spellings of a literal name.
+     *
+     * ⚠ **`obj["member"]` is the same reach as `obj.member`, and reading only
+     * the first makes a live member look unreached.** Measured: rewriting
+     * `api.getUrlParams(name)` — the member's only shipped site — into
+     * `api["getUrlParams"](name)` made the clause cell below report it as having
+     * NO shipped caller, which is a wrong verdict presented as a derivation.
+     * `seam-census-authority-2090` counts both spellings for the same reason.
+     */
+    const memberNameOf = (node: ts.Node): string | undefined => {
+      if (ts.isPropertyAccessExpression(node)) {
+        return node.name.text;
+      }
+
+      return ts.isElementAccessExpression(node) &&
+        ts.isStringLiteralLike(node.argumentExpression)
+        ? node.argumentExpression.text
+        : undefined;
+    };
+
     let accesses = 0;
+    const opaque: string[] = [];
 
     for (const file of paths) {
       const source = program.getSourceFile(file);
@@ -570,20 +599,43 @@ describe("consumer census (#2303)", () => {
         continue;
       }
 
+      const relative = path.relative(ROOT, file);
       const bucket = file.includes("/tests/") ? "tests" : "src";
+      const isSurface = (node: ts.Expression): boolean =>
+        surfacesOf(checker.getTypeAtLocation(node)).length > 0;
 
       const visit = (node: ts.Node): void => {
-        if (
-          ts.isPropertyAccessExpression(node) &&
-          memberNames.has(node.name.text)
-        ) {
+        const member = memberNameOf(node);
+
+        if (member !== undefined && memberNames.has(member)) {
           accesses += 1;
 
           for (const factory of surfacesOf(
-            checker.getTypeAtLocation(node.expression),
+            checker.getTypeAtLocation(
+              (node as ts.PropertyAccessExpression).expression,
+            ),
           )) {
-            reach[factory][bucket].add(node.name.text);
+            reach[factory][bucket].add(member);
           }
+        }
+
+        // The two spellings no walk of ACCESSES can attribute to a member: a
+        // computed name, and a surface taken apart by a binding pattern.
+        if (
+          ts.isElementAccessExpression(node) &&
+          !ts.isStringLiteralLike(node.argumentExpression) &&
+          isSurface(node.expression)
+        ) {
+          opaque.push(`${relative}: computed member name`);
+        }
+
+        if (
+          ts.isVariableDeclaration(node) &&
+          ts.isObjectBindingPattern(node.name) &&
+          node.initializer !== undefined &&
+          isSurface(node.initializer)
+        ) {
+          opaque.push(`${relative}: destructured surface`);
         }
 
         ts.forEachChild(node, visit);
@@ -592,7 +644,7 @@ describe("consumer census (#2303)", () => {
       visit(source);
     }
 
-    return { reach, accesses };
+    return { reach, accesses, opaque };
   };
 
   const typed = typedScan();
@@ -850,6 +902,22 @@ describe("consumer census (#2303)", () => {
     // report zero surfaces and leave the two cells below green on an empty set.
     expect(typed.accesses).toBeGreaterThan(100);
     expect(sorted(typed.reach.getPluginApi.src).length).toBeGreaterThan(5);
+  });
+
+  it("no file reaches a surface through a spelling no walk can attribute", () => {
+    // ⚑ The residual of BOTH walks, kept as an invariant instead of a sentence.
+    // A computed member name and a destructured surface carry real reach that
+    // neither census can credit to a member, so what is pinned is the REGISTER
+    // of such sites — a new one reds and names its file.
+    //
+    // ⚠ The one entry is real reach, not a false positive:
+    // `getRoutesApi(router)[door]([route])` drives `add` and `replace` from one
+    // table, so both doors are called and neither census sees it. Rewriting that
+    // test to a literal spelling would bend a legitimate test to the census's
+    // convenience, which is backwards — the census records what it cannot see.
+    expect(typed.opaque).toStrictEqual([
+      "packages/validation-plugin/tests/functional/drifting-route-batch-1911.test.ts: computed member name",
+    ]);
   });
 
   it("clause (a): every member of `PluginApi` has a SHIPPED caller (#2383)", () => {

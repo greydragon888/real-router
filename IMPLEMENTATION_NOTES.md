@@ -329,7 +329,7 @@ suites passed against fresh production builds: 49, 8, 23 and 27 tests.
 
 **Problem.** The runner unit carries `MemoryMax=5G`, added by #1746 so that a runaway becomes a local cgroup event instead of a global OOM that picks a victim on the co-tenant production workload. Reaching that ceiling makes the kernel force-**reclaim**, not kill. So `oom_kill` stays 0, the journal records nothing, and the unit's `OOMScoreAdjust=-800` / `OOMPolicy=continue` never fire — they guard the kill path, and there is no kill. Direct reclaim stalls the measured process mid-collection and re-faults its file pages, which moves exactly the components a CodSpeed `simulation` run reports. A run corrupted that way is indistinguishable from a clean one, and a CodSpeed run is not discarded whole: it seeds the baseline every later PR is compared against (#2375).
 
-**Solution.** `scripts/cgroup-sample.sh`, called around the measured step of all three benchmark jobs — `core` and `adapters` in `codspeed.yml`, and the matrix step of `cross-router-bench.yml`, which shares the host, the unit and therefore the cgroup. `capture` writes a snapshot of `memory.events` + `memory.pressure`; `report` prints the delta into the job summary and raises a `::warning` when the job reclaimed. The after-sample runs under `if: always()`, because a reclaim may be *why* the step above failed.
+**Solution.** `scripts/cgroup-sample.sh`, called around the measured step of all three benchmark jobs — `core` and `adapters` in `codspeed.yml`, and the matrix step of `cross-router-bench.yml`, which shares the host, the unit and therefore the cgroup. `capture` writes a snapshot of `memory.events` + `memory.pressure`; `report` prints the delta into the job summary and raises a `::warning` when the job reclaimed. The after-sample runs under `if: always()`, because a reclaim may be _why_ the step above failed.
 
 **Measured on the host, 2026-09-16, read-only.** Cgroup started 2026-09-11 06:21 MSK, so the counters cover 5.5 days: `memory.events max` **2208** with `oom` and `oom_kill` both **0**; `MemoryPeak` 5 368 713 216 against `MemoryMax` 5 368 709 120, exactly one page over; `pgscan_direct` / `pgsteal_direct` 691 749 / 687 162; `workingset_refault_file` 87 160; `memory.pressure full` 4.62 s cumulative.
 
@@ -424,18 +424,18 @@ The measured packages are derived: `@real-router/core` plus the workspace depend
 
 **Solution.** Each check skips the PR the way its own mechanics allow:
 
-| Check | Where | Predicate |
-| --- | --- | --- |
-| Coverage (Codecov) | `ci.yml` job `if:` | PR author `dependabot[bot]`; `ci` already reads a skipped `coverage` through `ok()` |
-| Bundle Size | `ci.yml` job `if:` | PR author; not on the `ci` gate's path |
-| Require Changeset, Validate Changesets | `changeset-check.yml` job `if:` | PR author. Both are REQUIRED — a job skipped by `if:` reports success, while a filter under `on:` would report nothing and block the PR forever |
-| SonarCloud | `sonar-trusted.yml` `gate` | head branch `dependabot/*` AND head repository == this repository; posts `success — Not analysed: dependabot`, because the required context is a commit status only this job produces |
-| CodSpeed push run | `codspeed.yml`, both jobs | push whose `head_commit.author.email` is Dependabot's noreply address |
-| CodeQL Analyze | `codeql.yml` job `if:` | PR author, except on a `dependabot/github_actions/*` branch: when the bump is `codeql-action` itself, this job is the only run of the new version before master (#2315 ran v4.38.0 there) |
-| Danger JS | `danger.yml` job `if:` | PR author. Every rule is advisory, and `checkLockfileSync`, the one about bumps, has nothing to find — Dependabot changes the lockfile with the manifests |
-| Code Duplication (SARIF) | `ci.yml` job `if:` | PR author; not on the `ci` gate's path |
-| Repo Lints, all but four checks | `ci.yml` step `if:` on the job env `DEPENDABOT_PR` | PR author. Kept: `lint:deps`, `lint:dedupe`, the repository-wide scans and knip. Since 2026-07-15 the job failed on 11 Dependabot PRs: 8 on dedupe, 2 on knip (#1654, #1774), 1 on a scan (#2318), none on the skipped steps |
-| actionlint | `ci.yml` job `if:`; `ci` treats the skip as a pass on a Dependabot PR only | PR author. A Dependabot workflow change is a `uses:` ref; on every other PR the #733 guarantee stands |
+| Check                                  | Where                                                                      | Predicate                                                                                                                                                                                                                    |
+| -------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Coverage (Codecov)                     | `ci.yml` job `if:`                                                         | PR author `dependabot[bot]`; `ci` already reads a skipped `coverage` through `ok()`                                                                                                                                          |
+| Bundle Size                            | `ci.yml` job `if:`                                                         | PR author; not on the `ci` gate's path                                                                                                                                                                                       |
+| Require Changeset, Validate Changesets | `changeset-check.yml` job `if:`                                            | PR author. Both are REQUIRED — a job skipped by `if:` reports success, while a filter under `on:` would report nothing and block the PR forever                                                                              |
+| SonarCloud                             | `sonar-trusted.yml` `gate`                                                 | head branch `dependabot/*` AND head repository == this repository; posts `success — Not analysed: dependabot`, because the required context is a commit status only this job produces                                        |
+| CodSpeed push run                      | `codspeed.yml`, both jobs                                                  | push whose `head_commit.author.email` is Dependabot's noreply address                                                                                                                                                        |
+| CodeQL Analyze                         | `codeql.yml` job `if:`                                                     | PR author, except on a `dependabot/github_actions/*` branch: when the bump is `codeql-action` itself, this job is the only run of the new version before master (#2315 ran v4.38.0 there)                                    |
+| Danger JS                              | `danger.yml` job `if:`                                                     | PR author. Every rule is advisory, and `checkLockfileSync`, the one about bumps, has nothing to find — Dependabot changes the lockfile with the manifests                                                                    |
+| Code Duplication (SARIF)               | `ci.yml` job `if:`                                                         | PR author; not on the `ci` gate's path                                                                                                                                                                                       |
+| Repo Lints, all but four checks        | `ci.yml` step `if:` on the job env `DEPENDABOT_PR`                         | PR author. Kept: `lint:deps`, `lint:dedupe`, the repository-wide scans and knip. Since 2026-07-15 the job failed on 11 Dependabot PRs: 8 on dedupe, 2 on knip (#1654, #1774), 1 on a scan (#2318), none on the skipped steps |
+| actionlint                             | `ci.yml` job `if:`; `ci` treats the skip as a pass on a Dependabot PR only | PR author. A Dependabot workflow change is a `uses:` ref; on every other PR the #733 guarantee stands                                                                                                                        |
 
 **Why these predicates.** The PR author (`github.event.pull_request.user.login`) is GitHub's payload and does not change when someone else pushes to the branch, which is exactly where the actor did. A squash-merge keeps the PR author as the commit author even when the branch's last commit is not Dependabot's (`8074d67dc`, #2317's merge, is authored by `dependabot[bot]` over a dedupe commit), so the CodSpeed push predicate holds for the same reason. `sonar-trusted.yml` runs on `workflow_run`, whose payload carries no PR author, and the PR number it has comes from an artifact the PR's own run wrote — a fork could name a Dependabot PR's number there. The branch comes from the trusted payload instead, paired with the head repository because a fork can name its branch `dependabot/anything`.
 
@@ -3036,7 +3036,7 @@ Per-workspace configurations in `knip.json`:
 
 **Solution:** knip 6.35.1 exits **2** on the same failure (upstream #1947). No config change on our side — the bump alone converts the log line into a gate.
 
-**Why it is worth a note:** measured, not read off the release title. The same throwing `packages/memory-plugin/vitest.config.mts` under both versions produced the *identical* stderr line; the only difference was `exit=0` versus `exit=2`. That is the shape this repo keeps meeting — #2154 (SARIF uploaded, zero alerts), #2159 (recipe naming the wrong config), #2155 (publint/attw reaching nobody): a channel that reports truthfully into something nothing reads.
+**Why it is worth a note:** measured, not read off the release title. The same throwing `packages/memory-plugin/vitest.config.mts` under both versions produced the _identical_ stderr line; the only difference was `exit=0` versus `exit=2`. That is the shape this repo keeps meeting — #2154 (SARIF uploaded, zero alerts), #2159 (recipe naming the wrong config), #2155 (publint/attw reaching nobody): a channel that reports truthfully into something nothing reads.
 
 ⚠ Not every entry in `knip.json` goes through that loader. `syncpack.config.{mjs,cjs,js}` is taken as an **entry file** (it appears as `entry:syncpack.config.mjs` under `knip --debug`) and is parsed, not executed — a syntax error there still exits 0. The exit-2 path covers configs knip evaluates, which is why the probe has to break one of those to measure it.
 
@@ -9237,7 +9237,7 @@ with "add SWC or Babel".
   so outright.
 - `esbuild: { tsconfigRaw: … }` — vite converts esbuild options to oxc, but only when `oxc`
   is unset. Vitest sets it, so the run prints `Both esbuild and oxc options were set. oxc
-  options will be used` and the config is ignored.
+options will be used` and the config is ignored.
 - a tsconfig scoped to `tests/` — a self-contained probe passes and the real suites still
   fail, because they import components from `src/`, which that tsconfig does not cover.
 
@@ -9261,12 +9261,12 @@ It ignores every range that BEGINS within the next N lines, and a range carries 
 nested inside it. Measured on `search-schema-plugin`'s `plugin.ts`, whose `next 1` sits
 over `if (!tree) {`:
 
-| form | statements | branches |
-| --- | --- | --- |
-| `next 1`, as written | 84/84 | 51/51 |
-| the ignore deleted | 85/86 | 52/53 |
-| `start`/`stop` around that ONE line | 84/85 | 51/51 |
-| `start`/`stop` around the whole block | 84/84 | 51/51 |
+| form                                  | statements | branches |
+| ------------------------------------- | ---------- | -------- |
+| `next 1`, as written                  | 84/84      | 51/51    |
+| the ignore deleted                    | 85/86      | 52/53    |
+| `start`/`stop` around that ONE line   | 84/85      | 51/51    |
+| `start`/`stop` around the whole block | 84/84      | 51/51    |
 
 So `next 1` equals the whole block, and a mechanical `next N` → `start`/`stop` conversion
 that spans N LINES silently changes what is measured. The first wrong conclusion is that
@@ -9503,10 +9503,10 @@ no Chromium process at all, so the browser was already closed. `pgtables` was 23
 **What actually accretes, measured.** An in-process `vite build()` **retains ~73 MB of live
 heap (~105 MB RSS) per call** — after two forced GCs, perfectly linear, no saturation:
 
-| | 12 builds | 24 builds |
-| --- | --- | --- |
-| macOS (M3 Pro) | 1956 MB | 3097 MB |
-| the CI host itself | 1999 MB | 2759 MB |
+|                    | 12 builds | 24 builds |
+| ------------------ | --------- | --------- |
+| macOS (M3 Pro)     | 1956 MB   | 3097 MB   |
+| the CI host itself | 1999 MB   | 2759 MB   |
 
 The measure phase adds nothing: 120 contexts moved `heapUsed` 253 → 247 MB locally, and on
 the host at the weekly `n` every scenario probed came back flat (`nav-latency` 1069 → 941,
@@ -9802,7 +9802,7 @@ beneath it.
 ## The release job counted changesets in a tree its own action then discarded (2026-09-12)
 
 **Problem.** `Changesets / Release` failed on `master` with the release chain's own
-signature — `changeset version` printing *"No unreleased changesets found."* and exiting 1,
+signature — `changeset version` printing _"No unreleased changesets found."_ and exiting 1,
 which fails `pnpm run version` and the job with it. A failed post-merge in this workflow is
 not cosmetic: `changesets.yml` triggers on a SUCCESSFUL `workflow_run`, so the next push
 inherits a chain that never armed.
@@ -9862,21 +9862,21 @@ The real set was derived by COUNTING: register an interceptor, call every public
 method, see whose call increments it. Reading call sites cannot answer it —
 `router.isActiveRoute` reaches `forwardState` in the source and runs the chain
 **zero** times, because `RoutesNamespace` calls the namespace primitive instead,
-with the reason written beside it: *"a predicate on the render path must not run
-the plugin interceptor chain once per `<Link>`"*.
+with the reason written beside it: _"a predicate on the render path must not run
+the plugin interceptor chain once per `<Link>`"_.
 
-| runs the chain | does not |
-| --- | --- |
+| runs the chain                                                         | does not                                                                                                                                                                  |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `buildPath`, `canNavigateTo`, `navigate`, `navigateToDefault`, `start` | `isActiveRoute`, `getState`, `getPreviousState`, `areStatesEqual`, `shouldUpdateNode`, `isActive`, `navigateToNotFound`, `subscribe`, `subscribeLeave`, `isLeaveApproved` |
 
 **What a slowdown at each door costs.** Per-call medians, four arms per door, each
 door read against its own `none` arm measured first and last:
 
-| door | baseline | `schema` | `persistent` | `both` | drift floor |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| `buildPath` | 614 ns | +315 | +811 | **+958** | −5.0 % |
-| `canNavigateTo` | 848 ns | +308 | +801 | **+1026** | +1.6 % |
-| `navigate` | 1498 ns | +271 | +998 | **+1362** | −6.1 % |
+| door            | baseline | `schema` | `persistent` |    `both` | drift floor |
+| --------------- | -------: | -------: | -----------: | --------: | ----------: |
+| `buildPath`     |   614 ns |     +315 |         +811 |  **+958** |      −5.0 % |
+| `canNavigateTo` |   848 ns |     +308 |         +801 | **+1026** |      +1.6 % |
+| `navigate`      |  1498 ns |     +271 |         +998 | **+1362** |      −6.1 % |
 
 ⚑ **The chain costs about the same number of NANOSECONDS wherever it runs.** The
 percentages differ only because the baselines do, so a door curve is flat in the
@@ -9908,9 +9908,9 @@ untracked.
 ⚠ **The original motivation misattributed its own number.** The `+9.3 %` on
 `isActiveRoute-exact` disqualified the variant that put the seam INSIDE
 `canonicalize`'s literal branch, not O-1b — `benchmarks/seam-rig/README.md` says
-so in the sentence that reports it, and O-1b's line beside it reads *"every arm
-inside the floor, `navigate` −1.4 %"*. O-1b shipped as #1938. The rule a curve was
-meant to produce — *"the seam belongs at the DOOR"* — was already produced, by a
+so in the sentence that reports it, and O-1b's line beside it reads _"every arm
+inside the floor, `navigate` −1.4 %"_. O-1b shipped as #1938. The rule a curve was
+meant to produce — _"the seam belongs at the DOOR"_ — was already produced, by a
 MULTI-door experiment, and is written in that README.
 
 ⚑ **The guard reads `benchmarks/`, so it is a repository-wide scan**, and
@@ -9937,12 +9937,12 @@ every href is a second pass of every plugin's interceptor.
 **Solution.** A second set of arms, `seam/resolveThenPrint-*`, over the same four
 plugin arms. Per-call medians:
 
-| arm | `buildPath` | `resolveThenPrint` |
-| --- | ---: | ---: |
-| `none` | 599 ns | 730 ns |
-| `schema` | 999 | 1480 |
-| `persistent` | 1083 | 1512 |
-| `both` | 1440 | 2219 |
+| arm          | `buildPath` | `resolveThenPrint` |
+| ------------ | ----------: | -----------------: |
+| `none`       |      599 ns |             730 ns |
+| `schema`     |         999 |               1480 |
+| `persistent` |        1083 |               1512 |
+| `both`       |        1440 |               2219 |
 
 The plugin delta is **+841 ns at the door against +1489 ns at the shape** — pricing
 only the door under-reported what an adapter runs by **1.77×**.
@@ -9989,11 +9989,11 @@ shape measured, with the plugins installed and without.
 Two shapes print without the seam. Per-call medians, `before` measured first and
 last as the drift control:
 
-| shape | bare | both plugins |
-| --- | ---: | ---: |
-| `forwardState` + `buildPath` (before) | 780 → 770 ns | 3435 → 3372 ns |
-| `forwardState` + `makeState().path` | 910 ns (**+17 %**) | 2338 ns (−32 %) |
-| `forwardState` + a seam-free printer | 763 ns (flat) | 2102 ns (−39 %) |
+| shape                                 |               bare |    both plugins |
+| ------------------------------------- | -----------------: | --------------: |
+| `forwardState` + `buildPath` (before) |       780 → 770 ns |  3435 → 3372 ns |
+| `forwardState` + `makeState().path`   | 910 ns (**+17 %**) | 2338 ns (−32 %) |
+| `forwardState` + a seam-free printer  |      763 ns (flat) | 2102 ns (−39 %) |
 
 ⚑ **`makeState` needed no new API and lost on WHO PAYS.** It is already a public
 seam-free printer (#1938), but it prints by building and discarding a whole
@@ -10064,20 +10064,20 @@ stub router.
 ⚑ **The arm fixed first is the one applications do not take.** `buildHref` prefers
 `router.buildUrl`; the `shared/dom-utils` pair is reached only when no URL plugin
 is installed. `plugin-utils.ts` says so in the comment directly above its own copy
-of the defect — *"a fix that lands on the fallback alone is green in tests and dead
-in production"* — which is precisely what landed, until a census of every
+of the defect — _"a fix that lands on the fallback alone is green in tests and dead
+in production"_ — which is precisely what landed, until a census of every
 `forwardState` call site outside core turned up two more sites:
 
-| site | reached by |
-| --- | --- |
-| `shared/dom-utils/link-utils.ts::buildHref` | adapters with no URL plugin |
+| site                                                       | reached by                  |
+| ---------------------------------------------------------- | --------------------------- |
+| `shared/dom-utils/link-utils.ts::buildHref`                | adapters with no URL plugin |
 | `shared/browser-env/plugin-utils.ts::createPluginBuildUrl` | browser-, navigation-plugin |
-| `packages/hash-plugin/src/plugin.ts::pluginBuildUrl` | hash-plugin's own copy |
+| `packages/hash-plugin/src/plugin.ts::pluginBuildUrl`       | hash-plugin's own copy      |
 
 ⚠ **hash-plugin's file already knew about the second pass and fixed half of it.**
 `createReplaceHistoryState` is handed the prefixing half of the builder with a
-comment saying it omits *"the `buildPath` that would ask the `forwardState` seam a
-second time (#2087)"* — while the builder ten lines above it did exactly that on
+comment saying it omits _"the `buildPath` that would ask the `forwardState` seam a
+second time (#2087)"_ — while the builder ten lines above it did exactly that on
 every `<Link>` render. A sweep of the shared factory alone would have missed this
 one: a copy is a place the door can differ, and here it did not differ, which is
 why reasoning by analogy from the shared factory would also have been wrong in the
@@ -10205,11 +10205,11 @@ of #2295 it was that line plus core's frozen `errorCodes` table, because a bundl
 keeps an `Object.freeze({...})` initializer (#2210 has the mechanism). That is how
 a PR touching no solid file moved solid's size-limit entry:
 
-| state | size-limit `@real-router/solid (ESM)` |
-| --- | --- |
-| core from `master` | 8 689 B |
-| core from #2295 | 8 901 B |
-| either core, subpath external | 8 643 B |
+| state                         | size-limit `@real-router/solid (ESM)` |
+| ----------------------------- | ------------------------------------- |
+| core from `master`            | 8 689 B                               |
+| core from #2295               | 8 901 B                               |
+| either core, subpath external | 8 643 B                               |
 
 ### Solution
 
@@ -10258,12 +10258,12 @@ build reads beside it, so the three packages not built by tsdown were hashed
 without their build configuration. Measured with `turbo run --dry=json`, editing
 the config and comparing the task hash:
 
-| task | old `turbo.json` | new `turbo.json` |
-| --- | --- | --- |
-| `solid#bundle` (`rollup.*`) | same hash | moves |
-| `solid#test` (reads `rollup.*`) | same hash | moves |
-| `svelte#bundle` (`svelte.config.*`) | same hash | moves |
-| `angular#bundle` (`ng-package.json`) | same hash | moves |
+| task                                 | old `turbo.json` | new `turbo.json` |
+| ------------------------------------ | ---------------- | ---------------- |
+| `solid#bundle` (`rollup.*`)          | same hash        | moves            |
+| `solid#test` (reads `rollup.*`)      | same hash        | moves            |
+| `svelte#bundle` (`svelte.config.*`)  | same hash        | moves            |
+| `angular#bundle` (`ng-package.json`) | same hash        | moves            |
 
 `bundle` now also carries `rollup.*`, `svelte.config.*`, `ng-package.json`,
 `tsconfig.build.json` and `tsconfig.lib.json`; `test` and `type-check` carry
@@ -10298,7 +10298,7 @@ named none of them:
 2. **a PROXY over a real router** — `reactive()` / Pinia. `packages/vue/CLAUDE.md`
    already documented the trap and its `markRaw` remedy, quoting the message
    verbatim — and the message said "Invalid router instance", which reads as
-   *you passed the wrong object*;
+   _you passed the wrong object_;
 3. **a router built by ANOTHER COPY of core.** Core is a plain `dependency` of
    every adapter and plugin (verified on the published artefact: `@real-router/react`
    declares `"@real-router/core": "^0.133.0"`), a caret range on a `0.x` version
@@ -10335,7 +10335,7 @@ call instead of their lockfile.
 branch that had added ~20 lines to the same file.
 
 ⚑ **The first two harnesses gave no verdict, and the CONTROL is what showed it.**
-Both reported the defect *and* failed their control — a module under `shared/`
+Both reported the defect _and_ failed their control — a module under `shared/`
 loaded as TS source always binds to `src` while the probe's router comes from
 `dist`, so "healthy" and "split" printed the same literal. Two physical copies of
 `dist` under two paths was the first harness whose control was green.
@@ -10698,16 +10698,16 @@ failure has so far been closed as flake once the next run came back green.
 
 ### Problem
 
-`size-limit` 13 → 14 swaps the bundler inside `@size-limit/preset-small-lib`: esbuild out, **rolldown** in. The root manifest declared the preset *and* `@size-limit/esbuild`, which was harmless in 13 (the preset shipped the same plugin) and is not in 14. Both plugins register the same steps — `step20`, `step40`, `step61` — `loadPlugins` imports every `@size-limit/*` it finds, and `calc` walks them in manifest key order, so **which bundler measures the repo was decided by the order of two lines in `package.json`**.
+`size-limit` 13 → 14 swaps the bundler inside `@size-limit/preset-small-lib`: esbuild out, **rolldown** in. The root manifest declared the preset _and_ `@size-limit/esbuild`, which was harmless in 13 (the preset shipped the same plugin) and is not in 14. Both plugins register the same steps — `step20`, `step40`, `step61` — `loadPlugins` imports every `@size-limit/*` it finds, and `calc` walks them in manifest key order, so **which bundler measures the repo was decided by the order of two lines in `package.json`**.
 
 Measured on three representatives, all four states disagree:
 
-| | core | solid | route-utils |
-| --- | --- | --- | --- |
-| 13.0.3 (esbuild) | 26324 | 8847 | 738 |
-| 14, esbuild only | 26340 | 8863 | 754 |
-| 14, rolldown only | 26001 | 8140 | 796 |
-| 14, both declared | 25985 | 8124 | 780 |
+|                   | core  | solid | route-utils |
+| ----------------- | ----- | ----- | ----------- |
+| 13.0.3 (esbuild)  | 26324 | 8847  | 738         |
+| 14, esbuild only  | 26340 | 8863  | 754         |
+| 14, rolldown only | 26001 | 8140  | 796         |
+| 14, both declared | 25985 | 8124  | 780         |
 
 Two consequences the release notes do not mention:
 
@@ -10730,7 +10730,7 @@ A size limit only means something against a fixed instrument. Swapping the bundl
 
 The dedupe check earns its place here. A dev-only measurement tool is exactly the kind of bump nobody validates against the published artifacts, and the only reason this one did not ship unexamined is that `lint:dedupe` turned red and named tsdown.
 
-⚠ One claim in `.size-limit.js` inverted with the bundler and was removed rather than re-worded: under esbuild, marking core external made `logger-plugin` *bigger* (1.66 kB without `ignoreCore`, 1.74 kB with). Under rolldown the same pair measures 2168 B without and 1666 B with. The configuration was correct for reasons that never depended on that number, and the surprise it documented no longer exists.
+⚠ One claim in `.size-limit.js` inverted with the bundler and was removed rather than re-worded: under esbuild, marking core external made `logger-plugin` _bigger_ (1.66 kB without `ignoreCore`, 1.74 kB with). Under rolldown the same pair measures 2168 B without and 1666 B with. The configuration was correct for reasons that never depended on that number, and the surprise it documented no longer exists.
 
 ## A duplication scan that analyses nothing now fails instead of reporting clean (2026-09-16)
 
@@ -10848,3 +10848,70 @@ Weighed with measurements; the owner decided on 2026-09-17.
 ⚠ **Revisit once the packages have an audience, and before 1.0 at the latest.** Turning the dependency into a peer later is breaking for every consumer — a major after 1.0. The plain dependency is acceptable now because of the owner's measurement of the audience, not because the duplicate-copy hazard is gone: an application that pins its own `ssr-utils` to another minor than the plugin's gets two copies and a silent loader re-run. If that becomes real, #2294's remedy applies — the `WeakMap` keeps deciding, and a message-only brand turns the silent miss into a warning.
 
 ⚠ If a peer is ever chosen, the Angular adapter should stop being the one that calls `hydrateRouter`. The shape to start from — not prototyped — is a separate SSR entry point with `ssr-utils` as an optional peer, rather than threading `hydrate` / `serialize` options through `provideRealRouterFactory`.
+
+## Retiring `getInternals`: what the shipped slices measured, and what the validator's conversion inherits (2026-09-18)
+
+### Problem
+
+Core published two objects nobody chose the size of. `@real-router/core/validation` handed out `getInternals` — an assembly bag core itself never imports, whose members landed **by default rather than by decision**, because no criterion for the curated surface existed. `RouterValidator` is the same shape one level over: a 55-method interface exactly one package implements, held in a writable slot on that bag, admitted by "everything core does not guard itself".
+
+The owner's scope, stated 2026-09-17 and not open to widening: delete **four names** — `getInternals` with `RouterInternals`, `getValidator` with `RouterValidator`. `addInterceptor` is not among them; it exists, works and stays.
+
+⚠ The door bought less than it looked like it would. Everything that hurt lay NEXT to it, so it read as the cause: the live stores reached the plugin by a second channel (an argument on seven public doors), the phantom cache grew through the bare public `navigate`, a double installation zeroed the shared slot. Each was fixed **without touching the door** (#2347, #2349, #2382). The honest formulation is that `getInternals` was not a crutch holding the construction up but an unlocked door through which somebody else's mess was visible.
+
+### Solution
+
+Shipped in slices, each its own issue and release: the members shipped code actually reached moved onto `PluginApi` as narrow, named readers (#2339 slices 1, 2, 5+6 — the last as #2382), the hydration scratchpad left core for `ssr-utils` (#2361), and both clauses of the membership rule got a derivation instead of prose (#2350, #2383). What the surface holds and who reaches it is owned by `door-census/` — this record names no member count, because those files derive one and a second copy here would rot on its own schedule.
+
+The validator's own conversion (#2388) is decided but not built: the 45 refusing methods move onto a **refusal-only check channel** — a registration at a NAMED position that may throw but can neither replace arguments nor skip the call — and the 10 reporting ones onto the event emitter.
+
+### Why a check channel and not interception
+
+Three grounds, each measured rather than argued.
+
+- **It hands out the right that is actually used.** Measured 2026-09-18 across the six shipped `addInterceptor` sites outside core: ONE replaces the argument (`shared/browser-env/plugin-utils.ts` — `next(path ?? browser.getLocation())`), two transform state on `forwardState` (`persistent-params-plugin`, `search-schema-plugin`), and three await `next` and then do their work (`shared/ssr/createSsrLoaderPlugin.ts`, `rsc-server-plugin/actionFactory.ts`, the validator's own pass). **Not one of them refuses**, and not one of the 45 validator methods replaces anything. Widening interception to ~27 doors would hand replacement rights where nobody replaces — and the validator's own interceptor wraps its body in a `catch` precisely because wrapping is stronger than it needs.
+
+  ⚠ The RFC stated this as "every call site either replaces an argument or transforms state on `forwardState`" and named three sites. There are six; the other three wrap to run work AFTER the call. The conclusion is unchanged and the reason is sharper: what no consumer does is REFUSE.
+
+- **It needs no `next`.** A channel is a list of predicates run at a position, so there is no closure chain to rebuild — which is why #2374 is NOT a precondition of the conversion, though it remains a real defect of shipped code on its own.
+- **It is the only one of the two that can express a mid-body check.** An interceptor is a wrapper and exists only at the call boundary; `ownParams` after `adoptChannel` is visible neither before `next()` nor after it. Roughly twenty consultations sit mid-body, so they become named positions (`navigate:entry` for the caller's arguments, `navigate:params` for core's copy).
+
+⚠ **This does not reinstate the crutch.** What made `RouterValidator` situational is that core held a PLUGIN-SUPPLIED object typed by a 55-method interface. A `Map<seam, Check[]>` that plugins register into is core's own data structure — the same shape `interceptors` already has.
+
+### One constraint the channel inherits, and two that died with interception
+
+Measured on 2026-09-16/17 while pricing the rejected option.
+
+- **Inherited: the registry must live in a fixed-shape literal, not a computed-key bag.** A computed-key bag cost **+18–22 % of a router build** when it was tried. This applies to the channel unchanged.
+- Died with interception: _wrappers must not share a code object_ (thirty wrappers from one factory shared theirs, and the `Map` lookup inside saw thirty keys), and _the chain is assembled at registration, not at call_. A channel has neither wrappers nor a chain.
+
+⚠ **The interception A/B numbers do NOT describe the channel, and #2388's acceptance says so.** For the record of what was priced: an empty wrapper cost `+3.82 ns` per door separately generated and `+6.70` from a shared factory, against `0–0.6 ns` for the slot check it would replace; a non-empty chain cost `+34.8 ns` as written and `+10.9 ns` assembled once, which is `+64 %` and `+20 %` on the cheapest render-path door. The channel is a different shape and must be measured on the real doors with its own A/A floor.
+
+⚑ **And the cost is not dev-only, which is what settled the weighting.** A library cannot make a cost dev-only: `__DEV__` is the APPLICATION's build constant, and `packages/validation-plugin/README.md` installs the plugin unconditionally. Whoever installs it pays in production.
+
+### What each shipped slice got wrong — the half worth keeping
+
+**Slice 1 (#2339, `getAdoptedOrigins`).** Three premises the plan carried were refuted on implementation.
+
+- The member did **not** leave `RouterInternals`: `getPluginApi` takes its context from `getInternals(router)`, so removing it leaves `Router.#adoptedOrigins` unread and the plugin door unwritable. It is a PAIR until the door goes, not a move — so §2's pair constraint applies to every slice, not only where a member is duplicated on purpose.
+- The form is an **alias, not a call**. A call makes the member a distinguishable pair for `internals-parity-authority-2258`, which demands a hostile-input vector — and a member with no arguments could only be given a vacuous one. **Rule: a call is chosen when the member is spy-replaceable OR takes input; a member with neither is an alias.**
+- The census bill was **eight authorities, not five**, and `total.test.ts` moved although the slice promised it would not — a direct consequence of the first correction.
+
+**Slice 2 (#2371, `getOptions` / `logger` / `getDeclaredQueryNames`).** The lesson is procedural: the slice first shipped in the WRONG FORM because the form was derived from fresh measurements while the plan — carrying both details — sat in the issue body the whole time. **Rule: your own derivation does not replace reading the issue body.**
+
+- The logger moves as a **frozen VIEW**, not the instance: the instance carries `configure`, so any holder could silence a router's logging for every consumer at once. Moving the same view onto internals was proposed, measured and refuted — `vi.spyOn` on a frozen object throws `Cannot redefine property`.
+- Parity grew a third class: `VIEW` — a pair whose public side is an object that forwards rather than the identical reference. Views are exempt from the vector ratchet; the cell checks that the view still forwards.
+- ⚑ **Delivery hazard, and it is not in any plan: a red CodSpeed check on a slice may have nothing to do with the slice.** PR #2371 showed `−14 %`; the gate skips the bench on commits that do not touch the measured program, so the report's base had drifted back a dozen commits onto a spoiled measurement (#2375, tooling #2376). **Before explaining a red check with your diff, look at which base it was computed against.**
+
+**Slices 5+6 (#2382).** The plan's member list survived; two behaviour deltas and one CI failure did not appear in it.
+
+- `getRouteDefaults` was **not needed** — `getRoutesApi(router).get` already answers it, so the type never had to be published.
+- `getDependencyKeys` is paid for by a **measurement, not a shape**: `Object.keys(getAll())` is one key short when `__proto__` is among the dependencies, while `has("__proto__")` answers `true`. Without the member a plugin would have to know what the container retains.
+- The slice **introduced** its own CI failure: moving a key count from the plugin into `getDependenciesApi.ts` put a `Object.keys` count and a `hasOwn` membership test in one function — the #1815/#2064 shape, which a package boundary had been hiding. It passed pre-commit on five commits and a full pre-push, because `lint:membership` ran only in CI; that gap is closed (#2392, `8d4a74ea0`).
+- Two inputs changed behaviour and both are in the changeset: with a bad default bag on several routes the FIRST route named is now tree-order rather than insertion-order, and a symbol dependency name is counted as a new key rather than an overwrite.
+- ⚠ **A first fix hid two consultations from an authority.** `validator-boundary-authority-2322` derives core's consultations from the spelling `validator?.ns.method(...)`, so rewriting one as `if (validator) { validator.ns.method() }` removed two from its set. The optional-chained spelling is load-bearing.
+
+### What stays open
+
+- **The spy seam gates slice 7 (#2386).** Eight files outside core use `getInternals` as a seam for a spy — twenty places — because `PluginApi` is frozen and `vitest` cannot redefine a property on it. A replacement is measured for thirteen of them (a `subscribeLeave` listener that throws makes `navigateToState` refuse with a non-`RouterError`); the seven OBSERVING places have none, and #2339's acceptance asks for a seam that does not publish the bag.
+- **The membership rule has never refused anyone.** A criterion with no negative example is indistinguishable from a description of the current set. Both clauses now derive (#2350, #2383); the first member that satisfies both and is still turned away is the one that makes it a rule, and whoever meets it writes it down.

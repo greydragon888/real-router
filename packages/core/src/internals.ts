@@ -204,8 +204,9 @@ export interface RouterInternals<
   // Per-router logger instance (built from `options.logger` in the Router
   // constructor), so a `configure()` reaches one router rather than the process
   // (#724). The facade reads it as `getInternals(this).logger` and namespaces
-  // receive it via their deps at wiring; a plugin reads it here too, because
-  // `PluginApi` carries no `logger` member.
+  // receive it via their deps at wiring. ⚠ A plugin does NOT read it here — it
+  // has `PluginApi.logger`, which #2339 added; the member survives for core's
+  // own readers.
   //
   // ⚠ Handed out with no guard and no recorded carve-out — the one member of
   // this surface in that position (#2303). Its radius is diagnostics: nothing
