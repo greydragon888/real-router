@@ -5,6 +5,102 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-09-18]
+
+### @real-router/core@0.141.0
+
+### Minor Changes
+
+- [#2408](https://github.com/greydragon888/real-router/pull/2408) [`c4c47b6`](https://github.com/greydragon888/real-router/commit/c4c47b66aec487ad637d921bd17b25d1d28debad) Thanks [@greydragon888](https://github.com/greydragon888)! - `RouterInternals` no longer carries `hydrationState` ([#2361](https://github.com/greydragon888/real-router/issues/2361))
+
+  Core never read the hydration scratchpad — it only initialised the slot that
+  `@real-router/ssr-utils`' `hydrateRouter` wrote and the SSR loader plugins read.
+  The scratchpad now lives in `@real-router/ssr-utils` and is read through its
+  `getHydrationState(router)`, so `getInternals(router).hydrationState` no longer
+  exists. `validator` is the one writable member left on `RouterInternals`.
+
+  `SerializedRouterState` stays in `@real-router/core/types`: the shape is core's
+  own `State`.
+
+### @real-router/rsc-server-plugin@0.4.0
+
+### Minor Changes
+
+- [#2408](https://github.com/greydragon888/real-router/pull/2408) [`c4c47b6`](https://github.com/greydragon888/real-router/commit/c4c47b66aec487ad637d921bd17b25d1d28debad) Thanks [@greydragon888](https://github.com/greydragon888)! - The post-hydration loader skip reads `@real-router/ssr-utils`' scratchpad, which is now a dependency ([#2361](https://github.com/greydragon888/real-router/issues/2361))
+
+  The plugin reads the state `hydrateRouter` deposited through
+  `getHydrationState(router)` instead of core's internals, and
+  `@real-router/ssr-utils` moves from `devDependencies` to `dependencies`.
+  Behaviour is unchanged, with one condition: `hydrateRouter` and the plugin must
+  resolve the same copy of `@real-router/ssr-utils`. Two copies — for example an
+  application pinning its own `@real-router/ssr-utils` to a different minor —
+  hold two scratchpads, and the loader then re-runs on first paint without an
+  error. Update `@real-router/ssr-utils` together with this plugin.
+
+### Patch Changes
+
+- Updated dependencies [[`c4c47b6`](https://github.com/greydragon888/real-router/commit/c4c47b66aec487ad637d921bd17b25d1d28debad), [`c4c47b6`](https://github.com/greydragon888/real-router/commit/c4c47b66aec487ad637d921bd17b25d1d28debad)]:
+  - @real-router/core@0.141.0
+  - @real-router/ssr-utils@0.3.0
+
+### @real-router/ssr-data-plugin@0.6.0
+
+### Minor Changes
+
+- [#2408](https://github.com/greydragon888/real-router/pull/2408) [`c4c47b6`](https://github.com/greydragon888/real-router/commit/c4c47b66aec487ad637d921bd17b25d1d28debad) Thanks [@greydragon888](https://github.com/greydragon888)! - The post-hydration loader skip reads `@real-router/ssr-utils`' scratchpad, which is now a dependency ([#2361](https://github.com/greydragon888/real-router/issues/2361))
+
+  The plugin reads the state `hydrateRouter` deposited through
+  `getHydrationState(router)` instead of core's internals, and
+  `@real-router/ssr-utils` moves from `devDependencies` to `dependencies`.
+  Behaviour is unchanged, with one condition: `hydrateRouter` and the plugin must
+  resolve the same copy of `@real-router/ssr-utils`. Two copies — for example an
+  application pinning its own `@real-router/ssr-utils` to a different minor —
+  hold two scratchpads, and the loader then re-runs on first paint without an
+  error. Update `@real-router/ssr-utils` together with this plugin.
+
+### Patch Changes
+
+- Updated dependencies [[`c4c47b6`](https://github.com/greydragon888/real-router/commit/c4c47b66aec487ad637d921bd17b25d1d28debad), [`c4c47b6`](https://github.com/greydragon888/real-router/commit/c4c47b66aec487ad637d921bd17b25d1d28debad)]:
+  - @real-router/core@0.141.0
+  - @real-router/ssr-utils@0.3.0
+
+### @real-router/ssr-utils@0.3.0
+
+### Minor Changes
+
+- [#2408](https://github.com/greydragon888/real-router/pull/2408) [`c4c47b6`](https://github.com/greydragon888/real-router/commit/c4c47b66aec487ad637d921bd17b25d1d28debad) Thanks [@greydragon888](https://github.com/greydragon888)! - The hydration scratchpad lives in this package, read through `getHydrationState(router)` ([#2361](https://github.com/greydragon888/real-router/issues/2361))
+
+  `hydrateRouter` deposits the parsed server state before `router.start()` and
+  restores the previous value when that call settles, exactly as before — but
+  into a scratchpad this package owns rather than a slot on core's internals.
+  `getHydrationState(router)` returns what the in-flight `hydrateRouter` call
+  deposited, or `null` outside one. There is no exported way to write it, so an
+  application cannot pre-populate it to skip a loader outside hydration.
+
+  `hydrateRouter` still refuses a value that is not a router, a `Proxy` over one
+  and a router built by another copy of `@real-router/core`, with core's message:
+  the scratchpad is keyed by router identity, and a plugin reads it with the
+  router it was installed on.
+
+### Patch Changes
+
+- Updated dependencies [[`c4c47b6`](https://github.com/greydragon888/real-router/commit/c4c47b66aec487ad637d921bd17b25d1d28debad)]:
+  - @real-router/core@0.141.0
+
+### @real-router/angular@0.22.1
+
+### Patch Changes
+
+- [#2408](https://github.com/greydragon888/real-router/pull/2408) [`c4c47b6`](https://github.com/greydragon888/real-router/commit/c4c47b66aec487ad637d921bd17b25d1d28debad) Thanks [@greydragon888](https://github.com/greydragon888)! - A bootstrap comment names where the hydration scratchpad lives ([#2361](https://github.com/greydragon888/real-router/issues/2361))
+
+  `provideRealRouterFactory`'s comment said `hydrateRouter` writes
+  `RouterInternals.hydrationState`; the scratchpad now lives in
+  `@real-router/ssr-utils`. No behaviour change.
+
+- Updated dependencies [[`c4c47b6`](https://github.com/greydragon888/real-router/commit/c4c47b66aec487ad637d921bd17b25d1d28debad), [`c4c47b6`](https://github.com/greydragon888/real-router/commit/c4c47b66aec487ad637d921bd17b25d1d28debad)]:
+  - @real-router/core@0.141.0
+  - @real-router/ssr-utils@0.3.0
+
 ## [2026-09-17]
 
 ### @real-router/core@0.140.1

@@ -1,6 +1,6 @@
 {
   "name": "@real-router/ssr-utils",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "type": "commonjs",
   "description": "Router-level SSR/SSG/hydration helpers for Real-Router",
   "main": "./dist/cjs/index.js",
@@ -49,6 +49,6 @@
   },
   "sideEffects": false,
   "peerDependencies": {
-    "@real-router/core": "workspace:>=0.1.0"
+    "@real-router/core": "workspace:>=0.141.0"
   }
 }

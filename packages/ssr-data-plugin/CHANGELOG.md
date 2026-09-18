@@ -1,5 +1,26 @@
 # ssr-data-plugin
 
+## 0.6.0
+
+### Minor Changes
+
+- [#2408](https://github.com/greydragon888/real-router/pull/2408) [`c4c47b6`](https://github.com/greydragon888/real-router/commit/c4c47b66aec487ad637d921bd17b25d1d28debad) Thanks [@greydragon888](https://github.com/greydragon888)! - The post-hydration loader skip reads `@real-router/ssr-utils`' scratchpad, which is now a dependency ([#2361](https://github.com/greydragon888/real-router/issues/2361))
+
+  The plugin reads the state `hydrateRouter` deposited through
+  `getHydrationState(router)` instead of core's internals, and
+  `@real-router/ssr-utils` moves from `devDependencies` to `dependencies`.
+  Behaviour is unchanged, with one condition: `hydrateRouter` and the plugin must
+  resolve the same copy of `@real-router/ssr-utils`. Two copies — for example an
+  application pinning its own `@real-router/ssr-utils` to a different minor —
+  hold two scratchpads, and the loader then re-runs on first paint without an
+  error. Update `@real-router/ssr-utils` together with this plugin.
+
+### Patch Changes
+
+- Updated dependencies [[`c4c47b6`](https://github.com/greydragon888/real-router/commit/c4c47b66aec487ad637d921bd17b25d1d28debad), [`c4c47b6`](https://github.com/greydragon888/real-router/commit/c4c47b66aec487ad637d921bd17b25d1d28debad)]:
+  - @real-router/core@0.141.0
+  - @real-router/ssr-utils@0.3.0
+
 ## 0.5.11
 
 ### Patch Changes
