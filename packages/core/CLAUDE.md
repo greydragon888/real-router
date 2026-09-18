@@ -359,19 +359,23 @@ until it lands, treat any hand-written set as a sample.
 > **A member belongs on `PluginApi` when BOTH hold: (a) shipped code outside core
 > reaches it, and (b) its signature is expressible in already-published types.**
 
-Derived from the surface as it stands, not invented: measured 2026-09-15, every
-member of `PluginApi` satisfies (b) and none of them fails it, while the members
-of `RouterInternals` that fail it are exactly the ones carrying a type no subpath
-publishes. Designing a member for `PluginApi` out of one that fails (b) is
-therefore the same work as choosing a published type for it.
+Derived from the surface as it stands, not invented. Designing a member for
+`PluginApi` out of one that fails (b) is the same work as choosing a published
+type for it — measured when #2339 slice 1 had to publish `AdoptedOrigins` before
+`getAdoptedOrigins` could move.
 
-⚠ **Neither clause has a cell that answers it.** (b) has none at all — nothing
-walks signatures against the published type names (#2350). (a) has a PARTIAL one
-(#2383): the reverse column of `door-census/consumers.test.ts` answers "nobody,
-not even a test" — a wider question than the clause asks — and the walk behind it
-records reach only where it can resolve the owner, so an api arriving as a bag
-field, a class field or a destructured parameter is invisible to it. Both clauses
-are claims in prose until those issues land.
+**(b) is derived by `door-census/membership.test.ts`** (#2350): it asks the
+compiler which types every member of every handed-out surface references, and
+which of them a subpath publishes. That cell owns the verdict and the
+counter-example — the `RouterInternals` members carrying a type no subpath
+publishes — so neither is restated here.
+
+⚠ **(a) has only a PARTIAL cell (#2383).** The reverse column of
+`door-census/consumers.test.ts` answers "nobody, not even a test" — a wider
+question than the clause asks — and the walk behind it records reach only where
+it can resolve the owner, so an api arriving as a bag field, a class field or a
+destructured parameter is invisible to it. That clause is a claim in prose until
+the issue lands.
 
 ⚠ **No refusal has ever been recorded, and that is the gap.** The rule describes
 the surface that exists; it has never turned a member away. A criterion with no

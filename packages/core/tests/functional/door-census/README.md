@@ -32,6 +32,7 @@ fails rather than shrinking a number quietly.
 | `surface.test.ts`      | What does each handed-out surface CONTAIN? Composition from the live object, including symbols, accessors, the frozen/cached split, and the second level.                                                                                                                                                                                               |
 | `reachability.test.ts` | What can an application NAME? Every published entry point of every package, resolved through its manifest, against every symbol `shared/` exports. Separates a door from a site.                                                                                                                                                                        |
 | `consumers.test.ts`    | Who actually REACHES for a member? Three call idioms, what a shipped consumer reads one level down, and — separately — which factories shipped code CALLS, so an empty member row reads as handed-on rather than unwanted.                                                                                                                              |
+| `membership.test.ts`   | Could an application NAME the types a handed-out member's signature uses? Clause (b) of the rule that admits a member to `PluginApi`: every type a member references is published by a subpath, is a type parameter, or is TypeScript's own. `RouterInternals` is the counter-example it pins.                                                                                                  |
 | `core-config.test.ts`  | What does an application FILL on core? Config fields keyed on the argument position of a known core door, so a plugin's augmentation of `Route` is visible.                                                                                                                                                                                             |
 | `application.test.ts`  | The same question for everything that is not core: plugin factory signatures, the `Link` surface of six adapters, and the provider door in the five shapes they declare it.                                                                                                                                                                             |
 | `returns.test.ts`      | What does core take BACK? The functions an application supplies, their declared returns, and where core distrusts one.                                                                                                                                                                                                                                  |
@@ -95,8 +96,9 @@ fails rather than shrinking a number quietly.
 `total` read beyond their own workspace, so turbo's per-package cache cannot answer for them.
 They are registered in `scripts/repo-wide-scans.json` and run by
 `pnpm lint:repo-scans`; `repo-scan-authority-2241` derives that list from the
-AST and reds when an entry is missing. `surface` and `returns` stay home —
-`surface` reads the live objects, `returns` reads core's own types.
+AST and reds when an entry is missing. `surface`, `returns` and `membership`
+stay home — `surface` reads the live objects, `returns` reads core's own types,
+and `membership` asks the compiler about core's own published entries.
 
 ## Two axes this folder does NOT own
 
