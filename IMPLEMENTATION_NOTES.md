@@ -2,6 +2,49 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## The release PR regenerates the lockfile, because a peer floor can be a lockfile specifier (#2410, 2026-09-18)
+
+**Problem.** Release PR #2410 failed every job that installs with
+`--frozen-lockfile`: `ERR_PNPM_OUTDATED_LOCKFILE` on
+`importers["packages/ssr-utils"]`, lockfile `workspace:>=0.1.0`, manifest
+`workspace:>=0.141.0`. `changeset version` had rewritten the `>=` peer floor of
+`ssr-utils`, which shipped beside core on its own changeset (#2408), and the root
+`version` script left `pnpm-lock.yaml` as it was. Two facts kept this out of
+sight until then:
+
+- **Only a peer-only edge reaches the lockfile.** pnpm writes an auto-installed
+  peer's specifier into the importer. A package that also lists core in
+  `devDependencies` gets that `workspace:^` entry there instead, so rewriting its
+  peer floor changes nothing the lockfile holds. `ssr-utils` is the one package
+  without the dev edge (the turbo-cycle exception); its entry is the lockfile's
+  only `specifier: workspace:>=`.
+- **The flag the changesets 3 migration removed was not dead.**
+  `apply-release-plan@8.1.1` reads `onlyUpdatePeerDependentsWhenOutOfRange` in
+  `shouldUpdateDependencyBasedOnConfig`. At `false`, the default, it rewrites the
+  in-range peer floor of a package released together with the dependency; at
+  `true` it leaves the floor alone. `assemble-release-plan@7.0.0` does not read it,
+  and that was the package the migration checked. Its sandbox never released the
+  peer-dependent, so the flag had nothing to act on there. Measured on a
+  two-package fixture — core `patch` or `minor`, plus a `patch` of a dependent
+  whose peer is `workspace:>=0.1.0`: 2.31.1 and 3.0.3 both rewrite the floor
+  without the flag, and 3.0.3 leaves it with the flag. `ssr-utils` last shipped
+  beside core in #2105, on 2.31.1 with the flag set. Between the migration and
+  #2410 it shipped once (#2351), and core was not in that release.
+
+**Solution.** The root `version` script ends with `pnpm install --lockfile-only`,
+so the release commit carries every specifier `changeset version` rewrote. Run
+against the #2410 changesets on `c4c47b66a`, the lockfile diff is that one
+`ssr-utils` line, and `pnpm install --frozen-lockfile --ignore-scripts` passes
+afterwards. `--lockfile-only` runs no lifecycle script: `--reporter ndjson` emits
+0 `pnpm:lifecycle` events, against 12 for a full install. The release job's
+no-scripts posture holds.
+
+**Why not restore the flag.** It would stop this rewrite, and with it the one
+every other peer-dependent gets on each core minor — the moving floor CLAUDE.md
+describes. Whether published floors track core is a contract decision, not a CI
+fix. The lockfile step also covers any manifest edit `changeset version` makes,
+not just peer floors.
+
 ## CI lints the examples and benchmarks a change reaches from outside them, by turbo's attribution (#2402, 2026-09-17)
 
 **Problem.** The only CI job that linted examples, "Examples (affected)", builds
@@ -1003,6 +1046,7 @@ Scripts executed:
 1. `changeset version` — updates package versions and changelogs
 2. `.changeset/sync-version.mjs` — syncs root package.json version from core
 3. `.changeset/aggregate-changelog.mjs` — aggregates package changelogs to root CHANGELOG.md
+4. `pnpm install --lockfile-only` — carries the specifiers step 1 rewrote into `pnpm-lock.yaml` (see "The release PR regenerates the lockfile", 2026-09-18)
 
 Root package is private and never published (cosmetic only).
 
@@ -8782,7 +8826,7 @@ The fragments are what make 50 cheaper than our 20: 0.8.0 inlined the whole comm
 
 **What did NOT change, verified rather than assumed.** A sandbox mirroring this repo's release topology — a core package, a `workspace:^` dependent, a `workspace:>=0.1.0` peer-dependent and an ignored private example — produced **byte-identical** results under 2.31.1 and 3.0.2: core `0.126.4 → 0.127.0`, the dependent `patch`, the peer-dependent untouched, the example ignored, and CHANGELOG entries identical after SHA normalisation. `pnpm publish` keeps its `--access/--tag/--no-git-checks` arguments and `sanitizeEnv` blanks only `*_OTP`, so OIDC Trusted Publishing is unaffected. Tags are still annotated (`git tag -m`), so the `GIT_COMMITTER_*`/`GIT_AUTHOR_*` env on the publish step stays load-bearing.
 
-**The peer rule moved from a config flag into the ranges.** v3 bumps peer-dependents `patch` rather than `major` (changesets#2090) and `assemble-release-plan@7` no longer reads `___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH.onlyUpdatePeerDependentsWhenOutOfRange` at all — `config@4`'s schema still _accepts_ the key, which is exactly how a dead flag survives unnoticed. It is removed from `.changeset/config.json` (proven inert: the topology sandbox gives identical versions and changelogs with and without it). The protection it provided is now structural: the five internal peers declare `workspace:>=0.1.0`, a range core cannot leave, so a core release bumps none of them either way.
+**The peer rule moved from a config flag into the ranges.** v3 bumps peer-dependents `patch` rather than `major` (changesets#2090) and `assemble-release-plan@7` no longer reads `___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH.onlyUpdatePeerDependentsWhenOutOfRange` at all — `config@4`'s schema still _accepts_ the key, which is exactly how a dead flag survives unnoticed. It is removed from `.changeset/config.json` (proven inert: the topology sandbox gives identical versions and changelogs with and without it). The protection it provided is now structural: the five internal peers declare `workspace:>=0.1.0`, a range core cannot leave, so a core release bumps none of them either way. ⚠ Calling the flag dead was WRONG: `apply-release-plan@8` still reads it, and without it `changeset version` rewrites the in-range peer floor of every package released together with core. The sandbox never released its peer-dependent, so "inert" was measured where the flag had nothing to act on. See "The release PR regenerates the lockfile" (2026-09-18).
 
 **One behaviour worth knowing at the terminal.** `changeset version` now exits **1** when there are no unreleased changesets (changesets#1860), where v2 exited 0. The workflow is unaffected — its version step is gated on `changesets_count != '0'` — but `pnpm run version` run by hand on a clean tree now fails instead of doing nothing, and that failure short-circuits the rest of the chain (`cap-major-bumps` → `sync-version` → `aggregate-changelog`).
 
@@ -10430,7 +10474,7 @@ to hide that the artefact is gone would falsify the release record.
 
 The 204-line post-`version` script capped any major bump that arrived without an explicit `major` changeset. It existed for [changesets#822](https://github.com/changesets/changesets/issues/822): on a 0.x package a `workspace:^` peer range is patch-only, so a core minor took the peer out of range and changesets escalated the dependent to a **major**. The section "peerDep range fix — `workspace:^` → `workspace:>=0.1.0`" above narrowed the cause at the source and marked this file PENDING REMOVAL, gated on the first real release with a core minor bump confirming no major surfaces. The gate passed and went unread.
 
-Its header had gone stale on two independent claims. The three plugins it named no longer declare `>=0.1.0` — `changeset version` rewrites a `>=` peer floor to the new core version on every release, for every package that also carries a `devDependencies` edge on core, so they sit on the current core minor. And `onlyUpdatePeerDependentsWhenOutOfRange: true`, which the header called load-bearing, is not in `.changeset/config.json` at all.
+Its header had gone stale on two independent claims. The three plugins it named no longer declare `>=0.1.0` — `changeset version` rewrites a `>=` peer floor to the new core version on every release, for every package that also carries a `devDependencies` edge on core, so they sit on the current core minor. And `onlyUpdatePeerDependentsWhenOutOfRange: true`, which the header called load-bearing, is not in `.changeset/config.json` at all. ⚠ The rewrite condition stated above is incomplete: the rewrite reaches every package released together with core, whatever brought it into the release. `ssr-utils`, with no dev edge, had its floor rewritten the first time it shipped beside core after the flag left the config (#2410). See "The release PR regenerates the lockfile" (2026-09-18).
 
 ### Solution
 
