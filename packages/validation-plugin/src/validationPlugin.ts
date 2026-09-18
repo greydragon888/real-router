@@ -267,7 +267,6 @@ function buildValidatorObject(
       },
     },
     lifecycle: {
-      validateHandler,
       validateHandlerLimit(count, methodName) {
         const maxHandlers =
           api.getOptions().limits?.maxLifecycleHandlers ??
@@ -658,6 +657,55 @@ export function validationPlugin<
       validateRouteName(name, "getRoute");
     });
 
+    // ⚠ The two state builders consult the SAME pair in opposite orders, and
+    // each check keeps its own door's order: the first refusal is the message
+    // the caller gets.
+    const removeForwardStateCheck = api.addCheck(
+      "forwardState:entry",
+      (routeName, routeParams, routeSearch) => {
+        validateStateBuilderArgs(routeName, routeParams, "forwardState");
+        validateSearch(routeSearch, "forwardState");
+      },
+    );
+
+    const removeBuildNavigationStateCheck = api.addCheck(
+      "buildNavigationState:state",
+      (name, ownParams, search) => {
+        validateSearch(search, "buildNavigationState");
+        validateStateBuilderArgs(name, ownParams, "buildNavigationState");
+      },
+    );
+
+    const removeAddActivateGuardCheck = api.addCheck(
+      "addActivateGuard:entry",
+      (name, handler) => {
+        validateRouteName(name, "addActivateGuard");
+        validateHandler(handler, "addActivateGuard");
+      },
+    );
+
+    const removeAddDeactivateGuardCheck = api.addCheck(
+      "addDeactivateGuard:entry",
+      (name, handler) => {
+        validateRouteName(name, "addDeactivateGuard");
+        validateHandler(handler, "addDeactivateGuard");
+      },
+    );
+
+    const removeRemoveActivateGuardCheck = api.addCheck(
+      "removeActivateGuard:entry",
+      (name) => {
+        validateRouteName(name, "removeActivateGuard");
+      },
+    );
+
+    const removeRemoveDeactivateGuardCheck = api.addCheck(
+      "removeDeactivateGuard:entry",
+      (name) => {
+        validateRouteName(name, "removeDeactivateGuard");
+      },
+    );
+
     return {
       teardown() {
         removeParamsCheck();
@@ -683,6 +731,18 @@ export function validationPlugin<
         removeHasRouteCheck();
 
         removeGetRouteCheck();
+
+        removeForwardStateCheck();
+
+        removeBuildNavigationStateCheck();
+
+        removeAddActivateGuardCheck();
+
+        removeAddDeactivateGuardCheck();
+
+        removeRemoveActivateGuardCheck();
+
+        removeRemoveDeactivateGuardCheck();
 
         removeInterceptor();
 

@@ -895,7 +895,7 @@ describe("consumer census (#2303)", () => {
       getRoutesApi: [],
       getNavigator: ["canNavigateTo", "isLeaveApproved", "subscribeLeave"],
       getDependenciesApi: ["has"],
-      getLifecycleApi: ["removeActivateGuard"],
+      getLifecycleApi: [],
     });
   });
 

@@ -242,46 +242,27 @@ describe("core/validator call-site contract", () => {
       lifecycle = getLifecycleApi(router);
     });
 
-    it("addActivateGuard: validates name + handler ('addActivateGuard'), limit ('canActivate')", () => {
+    it("the guard doors consult only the namespace LIMIT now (#2388)", () => {
+      // Name and handler are checks; the hard limit stays on the validator
+      // because it is enforced at the namespace registration choke point
+      // (#961), which is a different layer from the door. The derived set is
+      // what says so.
       const handler = (): (() => boolean) => () => true;
+
+      vi.clearAllMocks();
 
       lifecycle.addActivateGuard("home", handler);
-
-      expect(validator.routes.validateRouteName).toHaveBeenCalledWith(
-        "home",
-        "addActivateGuard",
-      );
-      expect(validator.lifecycle.validateHandler).toHaveBeenCalledWith(
-        handler,
-        "addActivateGuard",
-      );
-      // The hard limit is enforced at the namespace registration choke point
-      // (#961), so the validator call carries (count, methodName) — the namespace
-      // owns the limit source, not the API layer.
-      expect(validator.lifecycle.validateHandlerLimit).toHaveBeenCalledWith(
-        expect.any(Number),
-        "canActivate",
-      );
-    });
-
-    it("addDeactivateGuard: validates name + handler ('addDeactivateGuard'), limit ('canDeactivate')", () => {
-      const handler = (): (() => boolean) => () => true;
-
       lifecycle.addDeactivateGuard("home", handler);
+      lifecycle.removeActivateGuard("home");
+      lifecycle.removeDeactivateGuard("home");
 
-      expect(validator.routes.validateRouteName).toHaveBeenCalledWith(
-        "home",
-        "addDeactivateGuard",
-      );
-      expect(validator.lifecycle.validateHandler).toHaveBeenCalledWith(
-        handler,
-        "addDeactivateGuard",
-      );
-      // Limit enforced at the namespace choke point (#961): (count, methodName).
-      expect(validator.lifecycle.validateHandlerLimit).toHaveBeenCalledWith(
-        expect.any(Number),
-        "canDeactivate",
-      );
+      // ⚠ `validateCountThresholds` sits beside the limit and NEVER throws — it
+      // is one of the diagnostics the emitter half of #2388 will take, so it
+      // cannot follow the refusals onto this channel.
+      expect(consultationsOn(validator)).toStrictEqual([
+        "lifecycle.validateCountThresholds",
+        "lifecycle.validateHandlerLimit",
+      ]);
     });
 
     it("counts unique routes across definition + external guard maps (#961)", () => {
@@ -306,24 +287,6 @@ describe("core/validator call-site contract", () => {
         "canActivate",
       );
     });
-
-    it("removeActivateGuard: validates name ('removeActivateGuard')", () => {
-      lifecycle.removeActivateGuard("home");
-
-      expect(validator.routes.validateRouteName).toHaveBeenCalledWith(
-        "home",
-        "removeActivateGuard",
-      );
-    });
-
-    it("removeDeactivateGuard: validates name ('removeDeactivateGuard')", () => {
-      lifecycle.removeDeactivateGuard("home");
-
-      expect(validator.routes.validateRouteName).toHaveBeenCalledWith(
-        "home",
-        "removeDeactivateGuard",
-      );
-    });
   });
 
   // ===========================================================================
@@ -337,24 +300,15 @@ describe("core/validator call-site contract", () => {
       plugin = getPluginApi(router);
     });
 
-    it("forwardState: validates state-builder args with caller 'forwardState'", () => {
+    it("the two state builders consult the validator for NOTHING (#2388)", () => {
+      // Both doors' consultations are checks now, and each check keeps its own
+      // door's ORDER — the two consult the same pair in opposite sequences.
+      vi.clearAllMocks();
+
       plugin.forwardState("home", {});
-
-      expect(validator.routes.validateStateBuilderArgs).toHaveBeenCalledWith(
-        "home",
-        {},
-        "forwardState",
-      );
-    });
-
-    it("buildNavigationState: validates state-builder args with caller 'buildNavigationState'", () => {
       plugin.buildNavigationState("home", {});
 
-      expect(validator.routes.validateStateBuilderArgs).toHaveBeenCalledWith(
-        "home",
-        {},
-        "buildNavigationState",
-      );
+      expect(consultationsOn(validator)).toStrictEqual([]);
     });
 
     it("navigateToState: validates options ('navigateToState') ONLY when options provided", () => {

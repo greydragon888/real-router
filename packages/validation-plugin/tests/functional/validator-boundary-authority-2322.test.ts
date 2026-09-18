@@ -94,7 +94,6 @@ const OWNER: Record<string, string> = {
   "dependencies.warnOverwrite": "dependencies-reentrancy-1859.test.ts",
   "dependencies.warnRemoveNonExistent": "dependencies.validation.test.ts",
   "eventBus.validateListenerArgs": MIRRORED,
-  "lifecycle.validateHandler": "lifecycle.validation.test.ts",
   "navigation.validateNavigateToDefaultArgs": "defaults-mutation-2148.test.ts",
   "navigation.validateNavigateToStateArgs": "navigation.validation.test.ts",
   "navigation.validateNavigationOptions": "navigation.validation.test.ts",

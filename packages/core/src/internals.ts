@@ -517,6 +517,12 @@ export const POSITION = {
   "updateRoute:entry": "updateRoute:entry",
   "hasRoute:entry": "hasRoute:entry",
   "getRoute:entry": "getRoute:entry",
+  "forwardState:entry": "forwardState:entry",
+  "buildNavigationState:state": "buildNavigationState:state",
+  "addActivateGuard:entry": "addActivateGuard:entry",
+  "addDeactivateGuard:entry": "addDeactivateGuard:entry",
+  "removeActivateGuard:entry": "removeActivateGuard:entry",
+  "removeDeactivateGuard:entry": "removeDeactivateGuard:entry",
 } as const satisfies { [K in keyof CheckPositionMap]: K };
 
 /**

@@ -112,7 +112,6 @@ export interface RouterValidator {
    * Lifecycle guard validation methods
    */
   lifecycle: {
-    validateHandler: (handler: unknown, caller: string) => void;
     validateHandlerLimit: (count: number, methodName: string) => void;
     validateCountThresholds: (count: number, methodName: string) => void;
     warnOverwrite: (name: string, type: string, methodName: string) => void;

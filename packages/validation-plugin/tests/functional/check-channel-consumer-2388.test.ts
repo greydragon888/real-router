@@ -1,5 +1,9 @@
 import { createRouter } from "@real-router/core";
-import { getPluginApi, getRoutesApi } from "@real-router/core/api";
+import {
+  getLifecycleApi,
+  getPluginApi,
+  getRoutesApi,
+} from "@real-router/core/api";
 import { describe, it, expect } from "vitest";
 
 import { validationPlugin } from "../../src/validationPlugin";
@@ -202,6 +206,37 @@ describe("the validation plugin refuses through the check channel (#2388)", () =
         },
       ] as never);
     }).toThrow('decodeParams cannot be async for route "child"');
+  });
+
+  it("the lifecycle doors refuse a bad route name, add and remove alike", () => {
+    // ⚠ The REMOVE doors matter as much as the add ones: their only
+    // consultation was `validateRouteName`, so without a cell here their checks
+    // are registered and never run.
+    const router = createRouter(routes);
+    const lifecycle = getLifecycleApi(router);
+
+    router.usePlugin(validationPlugin());
+
+    // ⚠ A WHITESPACE name, not a number and not an empty string. Core's own
+    // `assertRouteNameIsString` stands above the check and refuses a non-string
+    // first, so a number never reaches the registration; and an empty name is
+    // VALID here — it is the root node.
+    expect(() => {
+      lifecycle.addActivateGuard("  ", () => () => true);
+    }) //
+      .toThrow("[router.addActivateGuard]");
+    expect(() => {
+      lifecycle.addDeactivateGuard("  ", () => () => true);
+    }) //
+      .toThrow("[router.addDeactivateGuard]");
+    expect(() => {
+      lifecycle.removeActivateGuard("  ");
+    }) //
+      .toThrow("[router.removeActivateGuard]");
+    expect(() => {
+      lifecycle.removeDeactivateGuard("  ");
+    }) //
+      .toThrow("[router.removeDeactivateGuard]");
   });
 
   it("ANTI-VACUUM: the door still builds a path with the plugin installed", () => {
