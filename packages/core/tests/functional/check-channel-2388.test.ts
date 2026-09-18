@@ -119,7 +119,7 @@ describe("the check channel (#2388)", () => {
       getPluginApi(router).addCheck("buildPath:entry", () => undefined),
     ).toThrow(
       new TypeError(
-        '[router.addCheck] Invalid position: "buildPath:entry". Must be one of: buildPath:params, buildPathResolved:params',
+        '[router.addCheck] Invalid position: "buildPath:entry". Must be one of: buildPath:params, buildPathResolved:params, canNavigateTo:entry, canNavigateTo:params, navigate:entry, navigate:params',
       ),
     );
   });
@@ -140,7 +140,7 @@ describe("the check channel (#2388)", () => {
       getPluginApi(router).addCheck(hostile, () => undefined),
     ).toThrow(
       new TypeError(
-        "[router.addCheck] Invalid position: object. Must be one of: buildPath:params, buildPathResolved:params",
+        "[router.addCheck] Invalid position: object. Must be one of: buildPath:params, buildPathResolved:params, canNavigateTo:entry, canNavigateTo:params, navigate:entry, navigate:params",
       ),
     );
   });

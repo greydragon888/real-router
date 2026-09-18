@@ -919,6 +919,9 @@
       "123caff580b1",
       "8443a2f25901",
       "3d6a96eb18f5",
+      "ea42fbbee2e9",
+      "922774e7df25",
+      "83e552414b96",
       "ff4ceb055cd1",
       "4fdfc78b5391",
       "a5ff539181a7",
@@ -1213,7 +1216,8 @@
       "41878ab5d475",
       "654e7aa35f25",
       "ff9120fd8549",
-      "1d8ff20231f0"
+      "1d8ff20231f0",
+      "2cc189d4ae31"
     ],
     "packages/validation-plugin/src/validators/defaultsMutation.ts": [
       "9c7a417f02bd",
@@ -1970,7 +1974,7 @@
       "8deaa71710f2"
     ],
     "packages/validation-plugin/CLAUDE.md": [
-      "e94b7c2293be",
+      "4319712a7f6e",
       "88e8a4a2f0d0",
       "c460d0800c1d",
       "651b745cc19a",
@@ -1981,6 +1985,9 @@
       "c308cefa4d00",
       "8167174669d4",
       "2a6057651557",
+      "4702974f7abe",
+      "7c1820b8cbfb",
+      "791e44bf4984",
       "56a35bce4d72",
       "c343645e6019",
       "1fbca30c319c",
