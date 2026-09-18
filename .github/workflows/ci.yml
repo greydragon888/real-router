@@ -679,7 +679,13 @@ jobs:
     name: Pipeline (shard ${{ matrix.name }})
     runs-on: ubuntu-latest
     needs: [check]
-    if: needs.check.outputs.mode == 'sharded'
+    # ⚠ An empty plan must be refused HERE. A matrix with no entries does not
+    # skip the job: GitHub fails it without creating it, and `ci`, `smoke` and
+    # `coverage` all read `skipped` as the empty-plan result. The planner emits
+    # an empty `include` for a core-layer-only change, which base-* cover.
+    if: >-
+      needs.check.outputs.mode == 'sharded' &&
+      needs.check.outputs.matrix != '{"include":[]}'
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.check.outputs.matrix || '{"include":[]}') }}

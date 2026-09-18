@@ -2,6 +2,28 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## An empty shard plan skips `pipeline-sharded` instead of failing it (#2411, 2026-09-18)
+
+**Problem.** #2411 changed one file under core, the claim ledger in
+`packages/core/tests/functional/`. `scripts/build-matrix.mjs` routed it
+`mode=sharded` with `matrix={"include":[]}`: a core-layer-only change, which
+`base-bundle` and `base-test` cover. `ci.yml` treats that plan as valid — `ci`,
+`smoke` and `coverage` each accept `skipped` from `pipeline-sharded` for it. On
+GitHub the job was not skipped. Run 35303494867 lists no shard job at all, and
+`CI Result` read `sharded=failure` and went red, with every other check green.
+
+**Solution.** `pipeline-sharded` runs only when `mode == 'sharded'` AND the
+matrix is not `{"include":[]}`, the literal the planner writes through
+`JSON.stringify`. The empty plan now reaches the three consumers as the
+`skipped` they already handle.
+
+**Why at the job and not in the planner.** The planner's output is correct: an
+empty shard set on the sharded path is the documented core-only case, and the
+#1067 guard already refuses it where it would be a misdetection
+(`shared/` edits). What was wrong is the assumption that GitHub turns an empty
+matrix into a skip. Refusing the job at `if:` puts the skip where every
+consumer already looks for it.
+
 ## The release PR regenerates the lockfile, because a peer floor can be a lockfile specifier (#2410, 2026-09-18)
 
 **Problem.** Release PR #2410 failed every job that installs with
