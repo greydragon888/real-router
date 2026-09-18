@@ -60,10 +60,12 @@
     "bundle": "tsdown --config-loader unrun"
   },
   "sideEffects": false,
+  "dependencies": {
+    "@real-router/ssr-utils": "workspace:^"
+  },
   "devDependencies": {
     "@real-router/core": "workspace:^",
     "@real-router/ssr-data-plugin": "workspace:^",
-    "@real-router/ssr-utils": "workspace:^",
     "@types/react": "19.3.0",
     "react": "~19.3.0"
   },

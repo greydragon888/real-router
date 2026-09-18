@@ -217,8 +217,8 @@ export function provideRealRouterFactory<
     //
     //   1. **Client after hydration** — server populated TransferState with
     //      the SSR-resolved router state. Consume it via `hydrateRouter`,
-    //      which deposits the parsed state into the one-shot
-    //      `RouterInternals.hydrationState` scratchpad before invoking
+    //      which deposits the parsed state into `@real-router/ssr-utils`'
+    //      one-shot scratchpad before invoking
     //      `router.start(state.path)`. SSR loader plugins
     //      (`@real-router/ssr-data-plugin`, `@real-router/rsc-server-plugin`)
     //      read the scratchpad and skip the loader on first paint — parity

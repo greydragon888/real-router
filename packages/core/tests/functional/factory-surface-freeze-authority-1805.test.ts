@@ -68,11 +68,10 @@ const OPEN = new Set<string>();
  * that breaks a shipped package.
  *
  * `getInternals` hands back the live internals bag on the published
- * `/validation` subpath, and two of its fields are declared WITHOUT `readonly`
- * on purpose: `hydrationState` is a one-shot scratchpad that
- * `ssr-utils/hydrateRouter` fills and restores in its `finally`, and `validator` is
- * installed by the validation plugin. Freezing this surface would break SSR
- * hydration. The cell below pins the write rather than merely excusing it.
+ * `/validation` subpath, and one of its fields is declared WITHOUT `readonly`
+ * on purpose: `validator`, which the validation plugin installs and its
+ * teardown clears. Freezing this surface would break that install. The cell
+ * below pins the write rather than merely excusing it.
  */
 const LIVE_BY_CONTRACT = new Set(["getInternals"]);
 
@@ -134,17 +133,18 @@ describe("factory surface freeze authority (#1805)", () => {
 
   it("getInternals stays writable, which is why it is exempt", () => {
     // The carve-out, pinned rather than asserted in prose: freezing this
-    // surface would break `hydrateRouter`, which writes `hydrationState` and
-    // clears it in a `finally`.
+    // surface would break the validation plugin, which writes `validator` on
+    // install and clears it on teardown.
     const ctx = getInternals(createRouter(ROUTES)) as unknown as Surface;
-    const previous = ctx.hydrationState;
+    const previous = ctx.validator;
+    const marker = { marker: true };
 
-    ctx.hydrationState = { marker: true };
+    ctx.validator = marker;
 
     expect(getInternals(createRouter(ROUTES))).toBeDefined();
-    expect(ctx.hydrationState).toStrictEqual({ marker: true });
+    expect(ctx.validator).toBe(marker);
 
-    ctx.hydrationState = previous;
+    ctx.validator = previous;
   });
 
   it.each(

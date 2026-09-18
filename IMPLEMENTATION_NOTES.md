@@ -5885,6 +5885,8 @@ Step 3 wastes one full RTT per hydration. Worse, it creates a visible flicker if
 
 A one-shot **hydration scratchpad** at the core level. Before `router.start(state.path)` the client deserialises the server state and parks it in a per-router `RouterInternals.hydrationState` slot. The `ssr-data-plugin` `start()` interceptor reads the scratchpad and short-circuits — instead of calling the loader, it writes the server's `state.context.data` straight to the new state via `claim.write()`.
 
+> ⚑ **Where the scratchpad lives changed (#2361).** It is no longer a slot on `RouterInternals`: `@real-router/ssr-utils` owns it, `hydrateRouter` writes it, and the plugins read it through `getHydrationState(router)`. The mechanics below are otherwise unchanged — read `RouterInternals.hydrationState` in them as that scratchpad. The decision is recorded in "Hydration scratchpad moves to `ssr-utils`".
+
 ```typescript
 // Client entry:
 import { hydrateRouter } from "@real-router/ssr-utils";
@@ -5931,6 +5933,7 @@ Symmetry with the other five adapters is preserved at the **contract level** (po
 ### Trade-offs
 
 - **Scratchpad is internal API.** `RouterInternals.hydrationState` is exposed only to the loader plugin via `getPluginApi(router)`. Apps cannot pre-populate the scratchpad to bypass loaders for non-hydration navigations — that would defeat the "scratchpad is hydration-specific" contract. Apps that need to inject pre-fetched data on regular navigation use `state.context.data` directly via a custom plugin.
+  ⚠ **Erratum (#2361):** the mechanism named here was never true — `hydrationState` was not on `PluginApi`; the plugins reached it through `getInternals` on the published `/validation` subpath, which any application could import. The intent stands and now holds by construction: the scratchpad is module-private in `ssr-utils`, and the package exports no way to write it.
 - **Path mismatch falls through to loader.** If the hydration `ssrState.path` does not match the URL the router resolves (mid-navigation redirect on the server, URL rewrite), the scratchpad is **not consumed** and the loader runs normally on the client. The mismatched scratchpad is then discarded on the next clear. Documented as a non-issue: server-side `LoaderRedirect` causes the server to render the _destination_ page, so `ssrState.path` already reflects the post-redirect URL.
 - **No retry on failure.** If the scratchpad write fails (claim was released, namespace re-claimed by a different plugin), the path falls through to the loader — degraded but not broken. The mismatched-claim case is structurally impossible if `usePlugin` registration order is identical between server and client (documented invariant).
 
@@ -5941,6 +5944,8 @@ Verified end-to-end across all six adapters via `post-hydration loader skip` Pla
 - Zero `/__bench/loader-call` increments are observed (server-side counter exposed by the test fixture for each loader)
 - Browser network panel shows zero loader-driven `fetch` requests on first paint
 - DOM content matches the SSR HTML byte-for-byte (no flicker between hydrated and re-fetched states)
+
+⚠ **Erratum (measured 2026-09-17, #2361):** the `post-hydration loader skip` scenario runs in 16 specs across five adapters — Angular 4; React, Solid, Svelte and Vue 3 each; Preact has none — and the Svelte `ssr` spec counts client loader calls through a `globalThis.__LOADER_CALLS__` counter its client entry installs, not a `/__bench/loader-call` endpoint.
 
 Angular `provideRealRouterFactory` extends this to all 4 of its pipelines including `ssr-mixed/` "full" mode (shell modes naturally skip Angular bootstrap, so the bridge is structurally inactive for them).
 
@@ -10746,3 +10751,34 @@ The final census gives the same 3768 files and 0 messages.
 All five are style rules — ESLint `meta.type` `suggestion`, or `layout` for the comment style — and fixing their findings would rewrite published source with no change at runtime. Setting a rule's direction or threshold keeps what still guards something at no cost; the three rules turned off have no option that separates their new form from the one they reported before.
 
 ⚠ Switching a rule off makes its `eslint-disable` directives unused, and `reportUnusedDisableDirectives: "warn"` under `--max-warnings 0` fails the gate on them.
+
+## Hydration scratchpad moves to `ssr-utils`, and the loader plugins take it as a dependency (2026-09-17)
+
+### Problem
+
+`RouterInternals.hydrationState` was state core never read — core only initialised the slot. `ssr-utils`' `hydrateRouter` wrote it and `shared/ssr`'s loader read it, both through `getInternals` on `@real-router/core/validation`. That kept a writable member on the internals bag, one of the two that stop it being frozen, and a reader of the door #2386 retires.
+
+Moving the scratchpad into `ssr-utils` means both SSR plugins import `ssr-utils`, and two facts decide how:
+
+- **`tsdown` bundles an imported `devDependency`.** Its default externalises `dependencies`, `peerDependencies` and `optionalDependencies` only. The plugins listed `ssr-utils` under `devDependencies`, so importing it unchanged would inline a private copy of the scratchpad into each plugin: `hydrateRouter` would write one `WeakMap` and the plugin would read another.
+- **Two copies of `ssr-utils` in an application split the scratchpad the same way**, with no error — the loader re-runs on first paint. It is #2294's class, one package over.
+
+### Solution
+
+`packages/ssr-utils/src/hydrationScratchpad.ts` keeps a module-private `WeakMap` keyed by router. `hydrateRouter` deposits into it and restores the previous value in `finally`; `getHydrationState(router)` is the only export, and it reads. `hydrateRouter` validates the router through `getPluginApi` first, so a `Proxy` over a router or a router from another copy of core is refused with core's #2294 message instead of hydrating a key no plugin reads.
+
+`ssr-data-plugin` and `rsc-server-plugin` move `@real-router/ssr-utils` from `devDependencies` to `dependencies`, and `shared/package.json` lists it so the symlinked source resolves it. Core drops the member; `SerializedRouterState` stays in `@real-router/core/types`.
+
+The manifest line is load-bearing and nothing else would notice it going: measured on `ssr-data-plugin`, with `ssr-utils` back under `devDependencies` the bundle succeeds without a warning, the ESM output names `@real-router/ssr-utils` zero times and carries two `WeakMap`s instead of one, and every unit test stays green because they resolve `src`. So `published-dependency-authority.test.ts` gains a class guard: every `@real-router/*` package a published package's `src` imports at runtime — walked following symlinks, since `globSync` does not enter `src/shared-ssr` — is declared in `dependencies` or `peerDependencies`. It held for every public package the day it was added.
+
+### Why a plain dependency, not a peer
+
+Weighed with measurements; the owner decided on 2026-09-17.
+
+- **A peer** lets the application control one copy, which helps only an application that manages versions itself. `@real-router/angular` already depends on `ssr-utils` as a plain dependency and calls `hydrateRouter` inside its own bootstrap, so under a peer an Angular application gets the adapter's copy plus a separately resolved peer copy — two scratchpads whenever the two resolutions differ. Of the 25 examples that use an SSR loader plugin, 23 install `ssr-utils` directly; the two that do not are Angular's.
+- **A plain dependency** asks nothing of the application. The adapter and both plugins declare the same `workspace:^` range, and changesets (`updateInternalDependencies: "patch"`) releases them together, so one release line resolves to one copy. The Angular adapter is the existing precedent.
+- **A shared global registry** (`Symbol.for`) would survive duplicate copies, but any code could write it — against this file's record that applications cannot pre-populate the scratchpad, and against core's bar for a global symbol at `ROUTER_BRAND`: forging it may buy a better error, never access.
+
+⚠ **Revisit once the packages have an audience, and before 1.0 at the latest.** Turning the dependency into a peer later is breaking for every consumer — a major after 1.0. The plain dependency is acceptable now because of the owner's measurement of the audience, not because the duplicate-copy hazard is gone: an application that pins its own `ssr-utils` to another minor than the plugin's gets two copies and a silent loader re-run. If that becomes real, #2294's remedy applies — the `WeakMap` keeps deciding, and a message-only brand turns the silent miss into a warning.
+
+⚠ If a peer is ever chosen, the Angular adapter should stop being the one that calls `hydrateRouter`. The shape to start from — not prototyped — is a separate SSR entry point with `ssr-utils` as an optional peer, rather than threading `hydrate` / `serialize` options through `provideRealRouterFactory`.

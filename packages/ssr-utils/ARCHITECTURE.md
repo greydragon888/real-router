@@ -8,13 +8,14 @@
 src/
 ├── serializeState.ts        — Self-contained: XSS-safe JSON escape, no core dependency
 ├── serializeRouterState.ts  — State → JSON, imports `State` from @real-router/core/types
-├── hydrateRouter.ts         — JSON/object → router.start(), imports getInternals from @real-router/core/validation
+├── hydrateRouter.ts         — JSON/object → router.start(), imports getPluginApi from @real-router/core/api
+├── hydrationScratchpad.ts   — Module-private WeakMap; getHydrationState (exported) and the deposit hydrateRouter uses
 ├── getStaticPaths.ts        — Leaf-route enumeration, imports getPluginApi from @real-router/core/api
 ├── createRequestScope.ts    — Per-request router clone, imports cloneRouter from @real-router/core/api
 └── index.ts                 — Public exports (incl. SerializedRouterState re-export from core)
 
 tests/
-├── functional/   — 5 files, one per src module (100% coverage)
+├── functional/   — one file per exported function (the scratchpad is exercised through hydrateRouter.test.ts), plus clone-behaviour-1893 (100% coverage)
 ├── property/     — getStaticPaths (model-based leaf-enumeration oracle), serializeRouterState (fast-check invariants)
 ├── stress/       — get-static-paths-scale, start-hydrate-cycles, serialize-state-xss (heap/timing regression guards)
 └── helpers/      — testRouters.ts (fixture router builder, public-API-only)
@@ -49,25 +50,31 @@ Extracting it:
 @real-router/ssr-utils
     │
     ├── @real-router/core/api          (cloneRouter, getPluginApi)
-    ├── @real-router/core/validation   (getInternals)
     └── @real-router/core/types        (State, Router, SerializedRouterState, ...)
 ```
 
 One-way: `ssr-utils` depends on `core`'s public subpaths, `core` has zero
-runtime edge back. The only historical coupling was **type-only** —
-`internals.ts`'s `RouterInternals.hydrationState: SerializedRouterState | null`
-— resolved by moving the type's *definition* into `core/src/types/base.ts`
-(core owns the shape of its own scratchpad) while the `serializeRouterState()`
-*function* stayed here, importing the type back from `@real-router/core/types`.
-No cycle: the type flows core → ssr-utils, the function stays ssr-utils-only.
+runtime edge back. `SerializedRouterState` is defined in `core/src/types/base.ts`
+— the shape is core's own `State` — and imported here from
+`@real-router/core/types`. No cycle: the type flows core → ssr-utils.
+
+## Hydration scratchpad
+
+`hydrationScratchpad.ts` owns a module-private `WeakMap` keyed by router.
+`hydrateRouter` is its only writer: it deposits the parsed state before
+`router.start()` and restores the previous value in `finally`.
+`getHydrationState(router)` is the only exported door, and it reads. SSR loader
+plugins call it from their `start` interceptor, so writer and reader must
+resolve the same copy of this package — `ssr-data-plugin` and
+`rsc-server-plugin` declare it as a `dependency` for that reason.
 
 ## Consumers
 
 | Consumer | How |
 |----------|-----|
 | `@real-router/angular` | `provideRealRouterFactory` — TransferState SSR bridge (server serialize, client hydrate) |
-| `@real-router/ssr-data-plugin` (tests only) | Fixture setup — `hydrateRouter` + `serializeRouterState` to build hydration-scratchpad scenarios |
-| `@real-router/rsc-server-plugin` (tests only) | Same fixture pattern |
+| `@real-router/ssr-data-plugin` | `getHydrationState` in the loader's `start` interceptor (runtime); `hydrateRouter` + `serializeRouterState` in test fixtures |
+| `@real-router/rsc-server-plugin` | Same, through the shared loader scaffolding |
 | 6 SSR/SSG/streaming/mixed example apps × 6 frameworks (React, Preact, Solid, Vue, Svelte, Angular) | `entry-client` / `entry-server` boilerplate |
 
 Not consumed by `@real-router/core` itself, and not merged into

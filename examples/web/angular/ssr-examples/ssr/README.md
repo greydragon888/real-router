@@ -99,7 +99,7 @@ Client (once, after hydration):
         # provideRealRouterFactory's TransferState bridge (#599):
         # 1) reads serialized router state from <script id="ng-state">
         # 2) calls hydrateRouter(router, ssrJson) → populates the
-        #    one-shot scratchpad on RouterInternals.hydrationState
+        #    one-shot scratchpad in @real-router/ssr-utils
         # 3) ssr-data-plugin's start interceptor reuses the
         #    server-resolved state.context.data — loader skipped
         # browser-plugin's start interceptor wraps with location-derived path.
@@ -120,7 +120,7 @@ Server-resolved router state survives the bootstrap hand-off without re-running 
 2. **Client pass.** Same `provideAppInitializer` callback runs on the client during bootstrap:
    - `transferState.get(ROUTER_STATE_KEY, null)` returns the server-seeded JSON string.
    - Calls `hydrateRouter(router, ssrJson)` instead of `router.start(path)`.
-   - `hydrateRouter` deposits the parsed state into `RouterInternals.hydrationState` (one-shot scratchpad — #596) before invoking `router.start(state.path)`.
+   - `hydrateRouter` deposits the parsed state into `@real-router/ssr-utils`' one-shot scratchpad (#596) before invoking `router.start(state.path)`.
    - `ssr-data-plugin`'s start interceptor reads the scratchpad and reuses the server-resolved `state.context.data` — **the loader is skipped**.
 3. **Pure CSR** (no `provideClientHydration()` / no `REQUEST`) — `transferState.get(...)` returns null → fall back to `router.start(path)`.
 

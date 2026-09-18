@@ -58,7 +58,6 @@ describe("surface census (#2303)", () => {
     "getRootPath",
     "getStateName",
     "getTree",
-    "hydrationState",
     "interceptors",
     "isDisposed",
     "isTransitioning",

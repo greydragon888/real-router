@@ -1,4 +1,6 @@
-import { getInternals } from "@real-router/core/validation";
+import { getPluginApi } from "@real-router/core/api";
+
+import { depositHydrationState } from "./hydrationScratchpad";
 
 import type {
   Router,
@@ -39,12 +41,12 @@ export interface HydrateRouterOptions {
  * URL is the source of truth for the router on hydration.
  *
  * The full parsed state (incl. `state.context.<namespace>` payloads) is
- * deposited into a one-shot scratchpad on `RouterInternals.hydrationState`
- * before `start()` is invoked and cleared in the matching `finally`. SSR
- * loader plugins (`@real-router/ssr-data-plugin`,
- * `@real-router/rsc-server-plugin`) read this scratchpad to skip their loader
- * call when the server-resolved namespace value is already present — avoiding
- * the post-hydration loader re-run on first paint.
+ * deposited into this package's one-shot scratchpad before `start()` is
+ * invoked and restored in the matching `finally`. SSR loader plugins
+ * (`@real-router/ssr-data-plugin`, `@real-router/rsc-server-plugin`) read it
+ * through {@link getHydrationState} to skip their loader call when the
+ * server-resolved namespace value is already present — avoiding the
+ * post-hydration loader re-run on first paint.
  *
  * Single-shot semantics: the scratchpad is consumed during the first `start()`
  * triggered by `hydrateRouter` regardless of route mismatch; subsequent
@@ -79,14 +81,17 @@ export async function hydrateRouter(
       ? (deserialize(source) as SerializedRouterState)
       : (source as SerializedRouterState);
 
-  const ctx = getInternals(router);
-  const previous = ctx.hydrationState;
+  // ⚑ Refuses a non-router, a Proxy over one and a router built by another
+  // copy of core, with core's own message (#2294). The scratchpad is keyed by
+  // identity and a plugin reads it with the router it was installed on, so
+  // without this a wrapper would hydrate a key nothing reads.
+  getPluginApi(router);
 
-  ctx.hydrationState = parsed;
+  const restore = depositHydrationState(router, parsed);
 
   try {
     return await router.start(parsed.path);
   } finally {
-    ctx.hydrationState = previous;
+    restore();
   }
 }

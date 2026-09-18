@@ -1148,6 +1148,12 @@
       "58bc53d37011",
       "041abef4cb04"
     ],
+    "packages/ssr-utils/src/hydrateRouter.ts": [
+      "e873ac630fc7"
+    ],
+    "packages/ssr-utils/src/hydrationScratchpad.ts": [
+      "31a39c6ea6af"
+    ],
     "packages/ssr-utils/src/serializeRouterState.ts": [
       "1a9864dfed80",
       "d7294177f708",
@@ -1484,6 +1490,9 @@
       "8f374f7e946d",
       "e7905100ce67",
       "3c4ac56d4ab8",
+      "6a1f1efba89e",
+      "f78f6edff94e",
+      "b219bc2c7a07",
       "eef1b6d3ceb7",
       "7ea2c0faff02",
       "606af2e6225d",
@@ -1628,7 +1637,9 @@
       "232fe7a40bbf",
       "9ab364f2f94d",
       "26b678ad9a84",
-      "952253fc046b"
+      "952253fc046b",
+      "90c32db47bbd",
+      "f6965754d4e2"
     ],
     "packages/angular/CLAUDE.md": [
       "b1af9733937e",
@@ -1910,8 +1921,13 @@
     ],
     "packages/ssr-utils/CLAUDE.md": [
       "87cff76f38e9",
+      "be9c5b15b4c6",
+      "d7d5aa8c9600",
       "fd510d6f5692",
       "91dc61f70b55"
+    ],
+    "packages/ssr-utils/README.md": [
+      "b3f5b6fd8235"
     ],
     "packages/svelte/CLAUDE.md": [
       "c1d11616294f",

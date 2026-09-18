@@ -1,12 +1,16 @@
 import { getPluginApi } from "@real-router/core/api";
-import { getInternals } from "@real-router/core/validation";
 import { describe, it, expect } from "vitest";
 
-import { hydrateRouter, serializeRouterState } from "@real-router/ssr-utils";
+import {
+  getHydrationState,
+  hydrateRouter,
+  serializeRouterState,
+} from "@real-router/ssr-utils";
 
 import { createTestRouter } from "../helpers";
 
 import type { Params, State } from "@real-router/core";
+import type { SerializedRouterState } from "@real-router/ssr-utils";
 
 // Guard-free leaf routes rotated so every hydration drives a distinct path and
 // a real transition. `admin.dashboard` is the dotted child of `admin`.
@@ -45,7 +49,7 @@ function makeServerJson(name: string, path: string, params: object): string {
 
 // These are correctness-under-load + invariant guards, NOT heap-leak guards.
 // The hydration scratchpad leak (S15.1) is checked DIRECTLY via
-// `getInternals(router).hydrationState === null` — a one-line invariant that
+// `getHydrationState(router) === null` — a one-line invariant that
 // fails the instant the `finally`-restore in hydrateRouter regresses, with zero
 // heap-snapshot noise (per the CLAUDE.md stress-discrimination rule: prefer a
 // direct invariant to a round-MB heap delta whenever one exists). A heap delta
@@ -53,11 +57,11 @@ function makeServerJson(name: string, path: string, params: object): string {
 // (last-write-wins), so a restore-leak is hard-capped to a single generation and
 // would never register against any MB threshold anyway.
 describe("S15: start()/hydrateRouter cycles", () => {
-  it("S15.1: 250 hydrate → stop → hydrate cycles — hydrationState restored to null every cycle, no scratchpad leak", async () => {
+  it("S15.1: 250 hydrate → stop → hydrate cycles — scratchpad restored to null every cycle, no leak", async () => {
     const router = createTestRouter();
 
     // Pre-condition: scratchpad is null on a fresh router.
-    expect(getInternals(router).hydrationState).toBeNull();
+    expect(getHydrationState(router)).toBeNull();
 
     let leakedCycles = 0;
     let wrongLanding = 0;
@@ -79,18 +83,18 @@ describe("S15: start()/hydrateRouter cycles", () => {
       }
 
       // (b) DIRECT leak invariant: after hydrateRouter resolves, the `finally`
-      //     in hydrateRouter must have restored hydrationState to its captured
+      //     in hydrateRouter must have restored the scratchpad to its captured
       //     `previous` (null at top level). A skipped/broken restore would leave
       //     the parsed SerializedRouterState pinned here — caught immediately,
       //     no heap measurement needed.
-      if (getInternals(router).hydrationState !== null) {
+      if (getHydrationState(router) !== null) {
         leakedCycles++;
       }
 
       router.stop();
 
       // (c) stop() does not resurrect the scratchpad either.
-      if (getInternals(router).hydrationState !== null) {
+      if (getHydrationState(router) !== null) {
         leakedCycles++;
       }
     }
@@ -113,12 +117,12 @@ describe("S15: start()/hydrateRouter cycles", () => {
     expect(router.isActive()).toBe(true);
 
     // ...and that final hydration also left the scratchpad clean.
-    expect(getInternals(router).hydrationState).toBeNull();
+    expect(getHydrationState(router)).toBeNull();
 
     router.dispose();
   }, 30_000);
 
-  it("S15.1b: hydrate that REJECTS still restores hydrationState to null (finally on the error path) ×200", async () => {
+  it("S15.1b: hydrate that REJECTS still restores the scratchpad to null (finally on the error path) ×200", async () => {
     // allowNotFound:false so an unmatched path rejects ROUTE_NOT_FOUND, driving
     // hydrateRouter's `finally` on the rejection branch. The scratchpad must be
     // cleared identically whether start() resolves or throws — a restore that
@@ -135,7 +139,7 @@ describe("S15: start()/hydrateRouter cycles", () => {
         rejections++;
       }
 
-      if (getInternals(router).hydrationState !== null) {
+      if (getHydrationState(router) !== null) {
         leakedAfterReject++;
       }
     }
@@ -143,13 +147,13 @@ describe("S15: start()/hydrateRouter cycles", () => {
     // Every attempt rejected, and every rejection left a clean (null) scratchpad.
     expect(rejections).toBe(200);
     expect(leakedAfterReject).toBe(0);
-    expect(getInternals(router).hydrationState).toBeNull();
+    expect(getHydrationState(router)).toBeNull();
 
     // Router is still usable after 200 failed hydrations: a matching path commits.
     const ok = await hydrateRouter(router, { path: "/home" });
 
     expect(ok.name).toBe("home");
-    expect(getInternals(router).hydrationState).toBeNull();
+    expect(getHydrationState(router)).toBeNull();
 
     router.stop();
     router.dispose();
@@ -179,12 +183,11 @@ describe("S15: start()/hydrateRouter cycles", () => {
 
     // Also observe the scratchpad from the DEEPEST point of the chain to prove
     // the 120-deep wrapper stack does not corrupt hydration plumbing.
-    let observedAtDepth: ReturnType<typeof getInternals>["hydrationState"] =
-      null;
+    let observedAtDepth: SerializedRouterState | null = null;
 
     removers.push(
       api.addInterceptor("start", (next, path) => {
-        observedAtDepth = getInternals(router).hydrationState;
+        observedAtDepth = getHydrationState(router);
 
         return next(path);
       }),
@@ -218,7 +221,7 @@ describe("S15: start()/hydrateRouter cycles", () => {
     expect(observedAtDepth).toMatchObject({ name: "orders", path: "/orders" });
 
     // (e) Scratchpad cleared after start resolved through the whole chain.
-    expect(getInternals(router).hydrationState).toBeNull();
+    expect(getHydrationState(router)).toBeNull();
 
     for (const remove of removers) {
       remove();
@@ -263,7 +266,7 @@ describe("S15: start()/hydrateRouter cycles", () => {
     const removeInterceptor = getPluginApi(router).addInterceptor(
       "start",
       (next, path) => {
-        const scratch = getInternals(router).hydrationState as
+        const scratch = getHydrationState(router) as
           | (State & { context: Record<string, { id: number; blob: string }> })
           | null;
 
@@ -294,7 +297,7 @@ describe("S15: start()/hydrateRouter cycles", () => {
       }
 
       // Scratchpad cleared after each hydration regardless of context width.
-      if (getInternals(router).hydrationState !== null) {
+      if (getHydrationState(router) !== null) {
         everShort = true;
       }
 
@@ -306,7 +309,7 @@ describe("S15: start()/hydrateRouter cycles", () => {
     expect(everShort).toBe(false);
     expect(observedNamespaceCount).toBe(NAMESPACE_COUNT);
     expect(observedSampleOk).toBe(true);
-    expect(getInternals(router).hydrationState).toBeNull();
+    expect(getHydrationState(router)).toBeNull();
 
     removeInterceptor();
     router.dispose();

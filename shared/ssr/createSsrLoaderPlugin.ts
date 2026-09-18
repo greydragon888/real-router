@@ -1,5 +1,5 @@
 import { getPluginApi } from "@real-router/core/api";
-import { getInternals } from "@real-router/core/validation";
+import { getHydrationState } from "@real-router/ssr-utils";
 
 import { isDeferred } from "./defer.js";
 import { ensureRegistryPromise } from "./deferRegistryClient.js";
@@ -375,8 +375,6 @@ export function createSsrLoaderPlugin<
       throw error;
     }
 
-    const internals = getInternals(router);
-
     // Hot path on every successful start() / subscribeLeave refresh. The
     // previous shape ran a `processLoaderResult` helper that always allocated
     // a `{ critical, deferred }` wrapper object — wasted on the common
@@ -527,7 +525,7 @@ export function createSsrLoaderPlugin<
           return state;
         }
 
-        const hydrationState = internals.hydrationState;
+        const hydrationState = getHydrationState(router);
 
         // ⚠ Read through an `unknown` view, and the widening is load-bearing.
         // The declared type promises a present object; that type is a CAST —

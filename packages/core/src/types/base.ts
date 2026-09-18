@@ -153,9 +153,8 @@ export interface ParamsSearch<
  * Parsed shape produced by `serializeRouterState()` (`@real-router/ssr-utils`,
  * after `JSON.parse`). Identical to {@link State} minus `transition`
  * (per-navigation `TransitionMeta` is meaningless after hydration; the client
- * builds its own on commit). Defined here (not in `ssr-utils`) because core's
- * own hydration scratchpad (`RouterInternals.hydrationState`) is typed against
- * it — see `internals.ts`.
+ * builds its own on commit). Defined here, not in `ssr-utils`, because the
+ * shape is core's own `State`; `ssr-utils` re-exports it.
  */
 export type SerializedRouterState<P extends Params = Params> = Omit<
   State<P>,
