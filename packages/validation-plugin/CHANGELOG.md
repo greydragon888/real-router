@@ -1,5 +1,30 @@
 # @real-router/validation-plugin
 
+## 0.24.0
+
+### Minor Changes
+
+- [#2417](https://github.com/greydragon888/real-router/pull/2417) [`f339875`](https://github.com/greydragon888/real-router/commit/f33987596c0c53104146ab553e76581228c6b7f4) Thanks [@greydragon888](https://github.com/greydragon888)! - Both printers' param-value walks are registered as checks, not consulted as validator methods ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  The plugin registers `addCheck("buildPath:params", …)` and
+  `addCheck("buildPathResolved:params", …)` at installation and removes both on
+  `teardown`. The refusals themselves are unchanged — same function, same
+  messages, same inputs — so no application behaviour moves.
+
+  ⚠ The SHAPE half stays on `RouterValidator`. `validateNavigateParamsShape` must
+  judge the caller's bag before core copies, because a copy launders every shape it
+  exists to refuse; only the VALUE half has an object worth moving, and that object
+  is core's own copy ([#2134](https://github.com/greydragon888/real-router/issues/2134)).
+
+  ⚠ `teardown` must remove the registration, and now does. Nulling `ctx.validator`
+  silences every other door and does nothing to a channel registration, so a leak
+  would leave a torn-down plugin still refusing.
+
+### Patch Changes
+
+- Updated dependencies [[`f339875`](https://github.com/greydragon888/real-router/commit/f33987596c0c53104146ab553e76581228c6b7f4)]:
+  - @real-router/core@0.142.0
+
 ## 0.23.1
 
 ### Patch Changes
