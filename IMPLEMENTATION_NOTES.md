@@ -1836,7 +1836,22 @@ watched for it — #1815 (`recordsShallowEqual`, `in`) and #2064 (`shallowEqual`
 `hasOwnProperty`).
 
 **Solution.** `scripts/check-membership-predicate.mjs`, wired as
-`pnpm lint:membership` in the CI **Repo Lints** job.
+`pnpm lint:membership` in the CI **Repo Lints** job, in `.husky/pre-commit`
+ahead of `lint:repo-scans`, and in `.husky/pre-push` after `lint:doc-dup`
+(#2392).
+
+⚠ **Both hooks, because neither covers the other's trees.** pre-commit is the
+earliest point the shape exists — measured on #2389, it refuses the FIRST of
+the five commits that carried it, 4 h 55 min before the push that CI refused.
+But git runs no pre-commit for a tree `git merge` or `git rebase` produced: a
+clean auto-merge looks for `pre-merge-commit`, which this repository does not
+have, and rebase gets `post-rewrite`, after the fact. Verified in a throwaway
+repository, where master's `hasOwn` and a branch's `Object.keys().length`
+landed in one function through a merge no hook saw. Three of the last 30
+merged PRs merged master into the branch. pre-push reads the tree that is
+leaving, whatever produced it; pre-commit reads the WORKING TREE, so a staged
+shape that the working copy no longer has passes it. Neither sees what CI
+sees, which is the branch merged with master's tip.
 
 ⚑ **The discriminator is the RECEIVER, not proximity.** Counting `a` beside
 `"x" in b` is ordinary code; the defect needs both halves aimed at one object.
