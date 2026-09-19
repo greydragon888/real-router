@@ -116,6 +116,11 @@
       "cache": true
     },
     "lint": {
+      // Typed rules read the UPSTREAM types, and `inputs` names this package's
+      // own files only — so a core change that only widens a type left every
+      // dependent's lint replaying a green it no longer earns (#2432). The
+      // upstream task whose hash covers those types is `type-check`.
+      "dependsOn": ["^type-check"],
       "outputs": [],
       "inputs": [
         "**/*.{ts,tsx,js,jsx}",

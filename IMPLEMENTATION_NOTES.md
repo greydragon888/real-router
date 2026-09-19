@@ -2,13 +2,37 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## `lint` depends on `^type-check`, because typed rules read types the hash did not (#2432, 2026-09-19)
+
+**Problem.** A core change that a dependent's typed lint rejects was replayed green. Measured on `master` @ `a1fa45202`: widen `getNavigator`'s return type to `any`, and `@real-router/react#lint` answers `cache hit, replaying logs (no errors)` at the unchanged hash `33c9df916296831b`, exit 0 — while the same command with `--force` exits 1 on six `@typescript-eslint/no-unsafe-*` errors. `lint` had no `dependsOn` and its `inputs` name the package's own files plus `../../shared/**`, so nothing about core entered the hash; the `@real-router/internal-source` condition means the typed rules resolve `packages/core/src`, which is exactly what the hash ignored. The dependent's `type-check` does invalidate, and catches nothing here — a widened return type is valid TypeScript, and only the lint objects.
+
+**Solution.** `"dependsOn": ["^type-check"]` on the `lint` task. With the plant, `react#lint` hashes `409812ddbe17c484` and goes red without `--force`; clean, `01163a692ffc59ee`. A change in an unrelated package (`packages/vue/src`) leaves that hash where it was.
+
+**Why not an input glob.** `inputs` are package-relative and cannot name "the packages I depend on", so a sibling glob such as `../*/src/**` would move every package's lint hash on every package's change — `react`'s edit would re-lint `vue`. `^type-check` is the upstream task whose hash already covers the upstream types, and it invalidates exactly the dependents.
+
+**Cost, measured on an 11-core M3 Pro under load 3–7, two rounds each, every round from a cold `.eslintcache` with the two configurations alternating.**
+
+| what was run                                                                                        | before      | after                             |
+| --------------------------------------------------------------------------------------------------- | ----------- | --------------------------------- |
+| warm cache, clean tree — `turbo run lint` over `packages/*`                                         | 0.24–0.25 s | 0.26 s                            |
+| the shard command — `turbo run test test:properties lint --filter=@real-router/react`, core changed | 29.4–29.6 s | 29.8 s                            |
+| standalone `turbo run lint` over all 23 packages, core changed                                      | —           | 8.6–9.2 s warm · 62.5–64.4 s cold |
+
+⚑ **The dependent's lint fits inside the window the run already occupied.** Cold and on its own it takes 14.4 s, and the shard command grows by 0.3 s: it runs beside the `type-check` → `test` chain rather than after it, because `test` already required `^type-check`. The planned task set is 9 either way.
+
+⚠ **That is one package's shard.** The real split puts several packages in one job, where their lints compete for the same cores; read the figure off the first post-merge run rather than scaling this one.
+
+⚠ **turbo does not cache `.eslintcache`** — `lint.outputs` is empty — so CI always pays the cold column, and a bare `turbo run lint` on a changed tree additionally pulls the 23 `type-check` tasks it now depends on, ~14 s. `--concurrency=4` moves none of these numbers.
+
+⚠ **The ESLint-level cache has the same blind spot, in both directions.** `--cache` keys on file content plus config, so it cannot see the types a file reads. Measured here by accident: with the plant reverted and the tree clean, a warmed `.eslintcache` kept reporting the plant's six errors until it was deleted. #2429's ESLint-cache step must therefore key its restored cache on the upstream type surface, or it reproduces this defect one level down.
+
 ## The checks that read code ask the diff whether there is any (#2433, 2026-09-19)
 
 **Problem.** A release PR ran SonarCloud, Codecov and jscpd over a tree that holds no code. Measured on #2424 (run 35413646693): Sonar took 95 s and was the LAST required check to report — `CI Result` at 01:50:48, Sonar at 01:52:19 — so it, not the pipeline, decided when the PR became mergeable. Its own comment on that PR reads _0 New issues · 0.0% Coverage on New Code_. Codecov re-uploaded the lcov the shards had just produced from master's code (14 s), and jscpd rescanned the same `packages/*/src` (26 s). Across the last twelve `release: version packages` commits the only paths are `package.json`, `CHANGELOG.md`, `.changeset/*.md` and `pnpm-lock.yaml` — not one source file.
 
 **Solution.** One predicate, three consumers: `scripts/diff-carries-no-source.mjs`, a pure function plus a CLI that reads paths on stdin and answers by exit code. `ci.yml`'s `check` job runs it over the PR's diff and publishes `no_source`; `coverage` and `duplication` add it to their `if:`; `sonar-trusted.yml`'s `gate` gains a third arm that computes it again from its own trusted inputs. `Bundle Size` and the smoke test keep running — on a release tree they assert something real (0 B of output change, and the exact artifacts about to be published), and so does the pipeline, which fills the remote cache the release commit's post-merge reads.
 
-**Why the diff and not the branch.** `changeset-release/*` is what the branch is called, not what it holds. A release PR that ever carried a code change — a hand-edit, a bad `version` script, a merge — would go unanalysed under a name-only rule. Asking the diff also covers a shape the branch name cannot name: a manifest-only bump, which is why four of the last two hundred commits on master match the predicate and should.
+**Why the diff and not the branch.** `changeset-release/*` is what the branch is called, not what it holds. A release PR that ever carried a code change — a hand-edit, a bad `version` script, a merge — would go unanalysed under a name-only rule. Asking the diff also covers a shape the branch name cannot name: a manifest-only bump, which is why 60 of the last two hundred commits on master match the predicate and should — 32 `release: version packages` commits and 28 dependency bumps, and nothing else.
 
 **Why the Sonar arm runs for this repository only.** Its file list comes from `compare/<default branch>...<head_sha>` on the TRUSTED `workflow_run` payload — never from the PR number in `pr-meta`, which is data a fork's run writes and could point at someone else's PR. A fork's head SHA is not in this repository, so `compare` would 404 and `set -e` would kill the gate on a PR it should have analysed; the repository check is what keeps that from happening. The branch name is deliberately NOT part of this arm, unlike the Dependabot arm above it, where the branch IS the criterion.
 
@@ -116,6 +140,10 @@ remains anywhere in it. Core's coverage is 100 % after the move, and
 **`lint` is still not wired.** It has no `dependsOn`, so a core change leaves
 `lint` hashes untouched for every package, `react` included — measured again
 here. That is unchanged by this move and remains deliberate.
+
+> ⚠ Superseded on 2026-09-19: that replay was a false green, and `lint` now
+> depends on `^type-check`. See "`lint` depends on `^type-check`, because typed
+> rules read types the hash did not".
 
 ## Every check a workflow runs is also run by a hook, or says why not (#2406, 2026-09-18)
 
@@ -7810,6 +7838,8 @@ The deck already renders every scenario the REPORTs did, from the same `results/
 
 **`lint` is deliberately not wired up.** It has no `dependsOn`, so for _all_ 23 packages a core change already leaves `lint` hashes untouched — adding core to ssr-utils' lint inputs would make one package behave unlike the other 22. Confirmed in the probe: `lint` was the one hash that stayed put on all four.
 
+> ⚠ Superseded on 2026-09-19. The consistency this paragraph protects was real and is kept — `lint` is wired for all 23 packages at once, through `^type-check` rather than through one package's inputs. What it did not claim, and what the probe did not test, is that the untouched hash was _earned_: #2432 measured a dependent's lint replaying green on a core change that reddens it. See "`lint` depends on `^type-check`, because typed rules read types the hash did not".
+
 **Checking for a regression.** `node -e` over `packages/*/package.json`: any `@real-router/*` in `peerDependencies` that is absent from the merged `dependencies`+`devDependencies`+`optionalDependencies` set is out of the graph and needs one of the two mechanisms above. Today `validation-plugin` is the reference shape — core in both `dependencies` and `peerDependencies`.
 
 ## Core's two dts/JS passes were racing for the CJS entry names — now sequenced (2026-08-01)
@@ -9898,9 +9928,10 @@ source-scanning tests, so neither is affected and neither needs the same clause.
 re-materialised by `prebundle` → `scripts/sync-dom-utils.mjs`. That script opened with
 `rmSync(targetDir, { recursive: true, force: true })` and then copied the tree back.
 
-Nothing orders that against the readers. In `turbo.json`, `lint` has no `dependsOn` at all
-and `bundle` depends only on `^bundle`, so within `@real-router/angular` the two run
-CONCURRENTLY in one working tree — one deleting the files the other is reading. The same
+Nothing orders that against the readers. In `turbo.json`, `lint` depends only on
+`^type-check` — upstream, never on this package's own `bundle` — and `bundle` depends only
+on `^bundle`, so within `@real-router/angular` the two run CONCURRENTLY in one working
+tree, one deleting the files the other is reading. The same
 script also runs from pre-commit, via `scripts/check-angular-dom-utils-sync.mjs`.
 
 The reader does not degrade gracefully. eslint exits **2** — a crash, not a lint failure:
