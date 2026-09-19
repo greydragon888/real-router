@@ -26,14 +26,23 @@ measured: on a loaded runner the property suite's slowest file went from 26.8 s
 for the whole suite to 257 s for one file, and two cells crossed the 60 s
 default. A job of its own keeps the tier's own 4 vCPUs.
 
-**What the numbers say to expect.** The chain becomes 13 + 197 s, so this job's
-wall should fall to about 210 s and the gate's to `max(base-test, the rest)`. The
+**After, measured where it could be.** The new job ran the tier cold —
+`core#test:properties` 69.8 s, against the 67 s median it had inside the chain —
+for a 97 s job including setup, entirely off the critical path. `base-test`'s own
+after-number is NOT the 23 s of that run: its three tasks kept their hashes and
+replayed. Cold, its chain is 13 + 197 s, so the job lands near 210 s against
+278 s before, and the first core-touching PR after this is what confirms it. The
 saving is bounded by `core#lint` at 196 s, which is why #2429 orders the ESLint
 cache work before any sharding of `core#test`: splitting a 197 s task under a
 196 s sibling buys seconds.
 
-⚠ **`turbo.json` is a global input**, so this change re-keys every task in the
-repository once. The first run after it is cold everywhere.
+**What it re-keys, measured.** One task's `dependsOn` re-keys that task and
+nothing else: with and without this edit, `@real-router/core`'s `test`, `lint`
+and `type-check` hash identically, and only `test:properties` moves
+(`578ecb6e9b` → `3823d8ae0a`). The blanket cache-buster is the `global` block,
+not the file. The PR's own CI run confirms it — `core#lint`, `core#test` and
+`core#type-check` came back HIT/REMOTE off master's post-merge, and
+`core#test:properties` was the only MISS.
 
 **Verified.** `turbo run test test:properties --filter=@real-router/core
 --dry=text` reports `type-check` as the only dependency of each tier and both as
