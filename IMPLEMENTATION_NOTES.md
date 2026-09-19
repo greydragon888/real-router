@@ -2,6 +2,20 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## `base-lint` left `base-test`'s runner, so either can be measured (#2429, 2026-09-19)
+
+**Problem.** `base-test` ran `pnpm turbo run test lint`, and over five runs the two took 197 s and 196 s — concurrently, on one 4-vCPU runner. `lint` never gated the tests, so the job was not a serial chain there; what it was is a pair of CPU-hungry processes sharing four cores. That makes every lever on either one unmeasurable: a change to `lint` moves `test`'s time, and the run cannot say which.
+
+The lever this blocks is concrete. Measured on core, 11-core M3 Pro, two rounds: `eslint --concurrency=4` takes **0.57×** the wall of today's `off` — 37.4 s → 21.4 s — for **2.23×** the total CPU, 53.8 s → 119.9 s, because each worker builds its own TypeScript program. On a shared runner that CPU comes out of the vitest process beside it.
+
+**Solution.** A `base-lint` job, `runs-on: ubuntu-latest`, with the same `CORE_LAYER` filter read from `build-matrix.mjs` — the same single source of truth `base-test` uses — and its own `--summarize` artifact. `base-test` keeps `test`. Both are in `CI Result`'s `needs` and in its `sharded` arm, so neither can be skipped into a pass.
+
+**Why this buys nothing by itself, and is still the right first step.** The gate waits for the slowest job, and `base-test` is still `type-check + test` = 13 + 197. The wall does not move. What moves is what the next run can tell: `lint` now has a runner whose time is its own, so `--concurrency`, a shard, or nothing at all can be compared on it without the vitest beside it confounding the number.
+
+⚑ **The precedent is one job over.** `base-properties` left this same runner in #2430 for the same class of reason — _"two vitest processes on one 4-vCPU runner is the contention the property suite timed out under in #2107"_.
+
+**Cost.** One more job: measured on this repository's ubuntu-latest jobs, a checkout is 2–7 s and the composite setup 11–28 s.
+
 ## The push-to-master examples lint is the weekly run's job (2026-09-19)
 
 **Problem.** `examples-lint.yml` ran on every push to `master` and cost 1 m 42 s each time. Measured on run 35442887524: the planner itself takes **1 s**, and the rest is two dependency installs (41 s), two checkouts (10 s), 9 s of queue and setup, and 33 s of remote-cache round-trips for 166 tasks that were **all hits** — `lint:example` declares no outputs, so most of that is latency, not artifacts. Thirty runs, thirty greens.
