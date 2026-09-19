@@ -2,6 +2,27 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## The `Examples lint` tail is accepted, and four ways out of it are closed by measurement (#2429, 2026-09-19)
+
+**Problem.** `Examples lint (outside changes)` is the gate's second floor. Over six runs where it was not skipped it took 56, 57, 169, 600, 686 and 689 s, and in run 35417257717 it took **689 s while `Base test` took 307 s** — 671 of those 689 s being the lint itself, against 2 s of checkout and 11 s of install. It fires when a change reaches the examples from outside them, which is 6 of the last 27 runs.
+
+**Decision: accepted as it stands.** The work is real — a lockfile change honestly invalidates all 144 examples and the 22 bundles under them — and every way of removing that work fails a measurement:
+
+| way out                              | what it does                           | measured                                                                                                                                                                               |
+| ------------------------------------ | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| one ESLint process over all examples | pays startup once instead of 144 times | **OOM at ~4 GB** — the project service loads 144 TSConfigs into one heap                                                                                                               |
+| the same, with typed rules off       | avoids the projects                    | 21.6 s and 1533 files, but **13 errors that are not real**: without type information `unicorn/prefer-regexp-test` fires where it is silent with it                                     |
+| one process per framework group      | fewer heaps, types kept                | 13.4 s for react — and **747 `no-unsafe-*` errors**, because from the repository root the project service does not find each example's own TSConfig and every import degrades to `any` |
+| drop `lint:example`'s `^bundle` edge | removes 35.6 s of bundle rebuild       | **load-bearing**: with every `packages/*/dist` hidden, one example's lint goes from 0 messages to 8                                                                                    |
+
+⚑ **The per-package fan-out is what gives each example its own TypeScript project.** It reads like 144 redundant ESLint startups — measured, ~1.7 s of the 2.35 s one example costs — and it is the only arrangement in which the examples are linted against real types.
+
+**Why not shard the job.** Four shards would take it from 689 s to about 310 s, a factor of 0.45 rather than 0.25, because each shard rebuilds the 22 bundles: measured, a rebuild is 35.6 s against 0.26 s for a cache restore, and in the runs that matter the bundles are a cache MISS (run 35417257717: 161 of 166 tasks). Against 3 heavy runs in 27 that is about 39 s of expected gate time, for three extra jobs and three extra bundle rebuilds.
+
+⚠ **And it would need the planner split, not just a matrix.** `examples-lint-filter.mjs` emits one `--filter=` token per workspace; partitioning that list across matrix jobs needs a guard proving the partition is total, because a lost token is an example that is not linted — the #2402 class this job exists to close.
+
+**What to spend the next effort on instead.** After #2435 and #2436 floor 1 is `base-lint` at ~122 s, and the measured lever there is `eslint --concurrency`: one flag, no new job, and it applies to every run rather than to the tail.
+
 ## `core#test` is sharded four ways, and its 100 % gate moved to the merged report (#2429, 2026-09-19)
 
 **Problem.** With `lint` off its runner, `base-test` is `type-check 9.3 s + test 153.9 s` of a 163.3 s turbo wall — `core#test` is the whole of what is left on floor 1 of the gate. Half of it is the instrument: measured locally, two rounds, the suite takes 49.9 / 51.9 s with coverage and 24.5 / 25.2 s without.
