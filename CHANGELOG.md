@@ -5,6 +5,58 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-09-19]
+
+### @real-router/core@0.145.0
+
+### Minor Changes
+
+- [#2423](https://github.com/greydragon888/real-router/pull/2423) [`37b6639`](https://github.com/greydragon888/real-router/commit/37b663906134e9302a695035d03d93b57d251233) Thanks [@greydragon888](https://github.com/greydragon888)! - `getLifecycleApi` and `getPluginApi`'s state builders stop consulting the validator ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  Six new positions: `addActivateGuard:entry`, `addDeactivateGuard:entry`,
+  `removeActivateGuard:entry`, `removeDeactivateGuard:entry`,
+  `forwardState:entry` and `buildNavigationState:state`. Messages and per-door
+  order are unchanged.
+
+  `lifecycle.validateHandler` leaves `RouterValidator` — these were its only
+  consultations.
+
+  ⚑ **`buildNavigationState:state`, not `:entry`.** That door's consultations
+  judge `ownParams`, the copy `adoptChannel` made ([#2134](https://github.com/greydragon888/real-router/issues/2134)), while the name and
+  search are the caller's. The position name says so rather than implying the
+  whole tuple is the caller's.
+
+  ⚠ **The two state builders consult the same pair in OPPOSITE orders**, so they
+  hold separate positions and each check keeps its own door's sequence: the first
+  refusal is the message the caller gets.
+
+  ⚠ **`forwardState` is also an interceptable seam**, and the two rights do not
+  overlap — an interceptor there may rewrite the intent, a check may only refuse
+  it.
+
+### @real-router/validation-plugin@0.27.0
+
+### Minor Changes
+
+- [#2423](https://github.com/greydragon888/real-router/pull/2423) [`37b6639`](https://github.com/greydragon888/real-router/commit/37b663906134e9302a695035d03d93b57d251233) Thanks [@greydragon888](https://github.com/greydragon888)! - The lifecycle and state-builder refusals are registered as checks ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  Six more registrations at install, all removed on `teardown`.
+  `RouterValidator` loses `lifecycle.validateHandler`; core has no consultation
+  left for it.
+
+  ⚠ `lifecycle.validateCountThresholds` stays on the validator and could not move
+  with them: measured, it never throws — it is one of the diagnostics the emitter
+  half of [#2388](https://github.com/greydragon888/real-router/issues/2388) takes, and the check channel is refusal-only.
+
+  ⚠ The new cells use a WHITESPACE route name. A number is refused by core's own
+  `assertRouteNameIsString` before the check runs, and an empty name is valid — it
+  is the root node — so neither reaches the registration.
+
+### Patch Changes
+
+- Updated dependencies [[`37b6639`](https://github.com/greydragon888/real-router/commit/37b663906134e9302a695035d03d93b57d251233)]:
+  - @real-router/core@0.145.0
+
 ## [2026-09-18]
 
 ### @real-router/core@0.144.0
