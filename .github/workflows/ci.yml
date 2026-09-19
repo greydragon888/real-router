@@ -488,9 +488,10 @@ jobs:
           # rides along in their shard jobs; there is no separate shared test node to
           # run here anymore.
           # shellcheck disable=SC2086
-          # `lint` explicit — see the note in pipeline-leaf's test step. This job
-          # is the gate's critical path, and lint gating the tests is exactly
-          # what made it 183 s (70 + 48 + 65, strictly sequential).
+          # `lint` is NOT here: it is `base-lint`'s job. It never gated the
+          # tests — the two ran concurrently on one 4-vCPU runner, at 197 s and
+          # 196 s, which is why neither could be optimised without the other's
+          # contention confounding the measurement (#2429).
           #
           # `test:properties` is NOT here: it is `base-properties`' job (#2429).
           # Measured over five runs, this job's wall was the serial chain
@@ -499,7 +500,7 @@ jobs:
           # chain in turbo.json; running it here in parallel instead would put two
           # vitest processes on one 4-vCPU runner, which is the contention #2107's
           # property-suite timeouts were measured under.
-          pnpm turbo run test lint $FILTERS --summarize
+          pnpm turbo run test $FILTERS --summarize
 
       # These summaries are what made #2429 measurable: the audit added them
       # because nothing said how this job's time split between core#test,
@@ -524,6 +525,52 @@ jobs:
           path: |
             packages/*/coverage/
           retention-days: 1
+
+  # ============================================
+  # BASE LINT: the core layer's lint, off base-test's runner (#2429). It never
+  # gated the tests — `test` and `lint` ran concurrently inside base-test at
+  # 197 s and 196 s — so this split does not shorten the gate by itself. What it
+  # buys is a runner each: measured locally, `eslint --concurrency=4` on core
+  # takes 0.57x the wall for 2.23x the CPU, and on a shared 4-vCPU runner that
+  # CPU comes out of the concurrent vitest. The same reasoning put
+  # `base-properties` on its own runner.
+  #
+  # No coverage upload: `lint` writes none.
+  # ============================================
+  base-lint:
+    name: Base lint (core layer)
+    runs-on: ubuntu-latest
+    needs: [check]
+    if: needs.check.outputs.mode == 'sharded'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Fetch master for Turbo comparison
+        if: github.event_name == 'pull_request'
+        run: git fetch origin master:master
+
+      - name: Setup (pnpm + Node + install)
+        uses: ./.github/actions/setup
+
+      # Same CORE_LAYER filter as base-test, from the same single source of
+      # truth, and unquoted for the same word-splitting reason.
+      - name: Lint core layer
+        run: |
+          FILTERS=$(node -e 'import("./scripts/build-matrix.mjs").then((m) => process.stdout.write([...m.CORE_LAYER].map((p) => "--filter=" + p).join(" ")))')
+          echo "Core-layer filters: $FILTERS"
+          # shellcheck disable=SC2086
+          pnpm turbo run lint $FILTERS --summarize
+
+      - name: Upload turbo run summaries (per-task timings)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: turbo-summary-base-lint
+          path: .turbo/runs/
+          retention-days: 14
 
   # ============================================
   # REPO-LINTS: repo-global lints (syncpack / pnpm dedupe / coverage-scope /
@@ -1441,7 +1488,7 @@ jobs:
     # beside "CI Result" / "Require Changeset" / "Validate Changesets" /
     # "Dependency Review". So a red quality gate blocks the merge without its
     # ~90s scan sitting on this job's critical path.
-    needs: [check, pipeline-leaf, base-bundle, base-test, base-properties, pipeline-sharded, repo-lints, smoke, coverage, actionlint, examples-build, examples-lint]
+    needs: [check, pipeline-leaf, base-bundle, base-test, base-lint, base-properties, pipeline-sharded, repo-lints, smoke, coverage, actionlint, examples-build, examples-lint]
     if: always()
     steps:
       - name: Determine result
@@ -1486,6 +1533,7 @@ jobs:
           LEAF="${{ needs.pipeline-leaf.result }}"
           BASE_BUNDLE="${{ needs.base-bundle.result }}"
           BASE_TEST="${{ needs.base-test.result }}"
+          BASE_LINT="${{ needs.base-lint.result }}"
           BASE_PROPS="${{ needs.base-properties.result }}"
           SHARDED="${{ needs.pipeline-sharded.result }}"
           SMOKE="${{ needs.smoke.result }}"
@@ -1493,7 +1541,7 @@ jobs:
           LINTS="${{ needs.repo-lints.result }}"
           EXAMPLES="${{ needs.examples-build.result }}"
           EXAMPLES_LINT="${{ needs.examples-lint.result }}"
-          echo "plan=$PLAN mode=$MODE leaf=$LEAF base_bundle=$BASE_BUNDLE base_test=$BASE_TEST base_props=$BASE_PROPS sharded=$SHARDED smoke=$SMOKE coverage=$COVERAGE lints=$LINTS examples=$EXAMPLES examples_lint=$EXAMPLES_LINT"
+          echo "plan=$PLAN mode=$MODE leaf=$LEAF base_bundle=$BASE_BUNDLE base_test=$BASE_TEST base_lint=$BASE_LINT base_props=$BASE_PROPS sharded=$SHARDED smoke=$SMOKE coverage=$COVERAGE lints=$LINTS examples=$EXAMPLES examples_lint=$EXAMPLES_LINT"
 
           # Defensive belt-and-suspenders on the shard-plan output (R2.19): the
           # check-result guard at the top of this step already exits on any check
@@ -1515,7 +1563,7 @@ jobs:
             leaf)
               [[ "$LEAF" == "success" ]] && PATH_OK=1 || PATH_OK=0 ;;
             sharded)
-              { [[ "$BASE_BUNDLE" == "success" ]] && [[ "$BASE_TEST" == "success" ]] && [[ "$BASE_PROPS" == "success" ]] && ok "$SHARDED"; } && PATH_OK=1 || PATH_OK=0 ;;
+              { [[ "$BASE_BUNDLE" == "success" ]] && [[ "$BASE_TEST" == "success" ]] && [[ "$BASE_LINT" == "success" ]] && [[ "$BASE_PROPS" == "success" ]] && ok "$SHARDED"; } && PATH_OK=1 || PATH_OK=0 ;;
             *)
               echo "❌ unknown shard-plan mode '$MODE'"
               exit 1 ;;
