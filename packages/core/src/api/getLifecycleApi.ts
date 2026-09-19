@@ -1,5 +1,10 @@
 import { assertRouteNameIsString } from "../guards";
-import { getInternals, throwIfDisposed } from "../internals";
+import {
+  getInternals,
+  POSITION,
+  runChecks,
+  throwIfDisposed,
+} from "../internals";
 
 import type { LifecycleApi } from "./types";
 import type { DefaultDependencies, Router } from "../types";
@@ -16,8 +21,7 @@ export function getLifecycleApi<
       throwIfDisposed(ctx.isDisposed);
 
       assertRouteNameIsString(name, "addActivateGuard");
-      ctx.validator?.routes.validateRouteName(name, "addActivateGuard");
-      ctx.validator?.lifecycle.validateHandler(handler, "addActivateGuard");
+      runChecks(ctx.checks, POSITION["addActivateGuard:entry"], name, handler);
 
       // Handler-limit enforcement lives at the namespace registration choke point
       // (RouteLifecycleNamespace.#registerHandler) so all paths are bounded
@@ -30,8 +34,12 @@ export function getLifecycleApi<
       throwIfDisposed(ctx.isDisposed);
 
       assertRouteNameIsString(name, "addDeactivateGuard");
-      ctx.validator?.routes.validateRouteName(name, "addDeactivateGuard");
-      ctx.validator?.lifecycle.validateHandler(handler, "addDeactivateGuard");
+      runChecks(
+        ctx.checks,
+        POSITION["addDeactivateGuard:entry"],
+        name,
+        handler,
+      );
 
       lifecycleNamespace.addCanDeactivate(name, handler, false);
     },
@@ -40,7 +48,7 @@ export function getLifecycleApi<
       throwIfDisposed(ctx.isDisposed);
 
       assertRouteNameIsString(name, "removeActivateGuard");
-      ctx.validator?.routes.validateRouteName(name, "removeActivateGuard");
+      runChecks(ctx.checks, POSITION["removeActivateGuard:entry"], name);
 
       // Inverse of addActivateGuard (external): clears only the external guard;
       // a route-config (definition) canActivate survives (#1171).
@@ -51,7 +59,7 @@ export function getLifecycleApi<
       throwIfDisposed(ctx.isDisposed);
 
       assertRouteNameIsString(name, "removeDeactivateGuard");
-      ctx.validator?.routes.validateRouteName(name, "removeDeactivateGuard");
+      runChecks(ctx.checks, POSITION["removeDeactivateGuard:entry"], name);
 
       // Inverse of addDeactivateGuard (external): clears only the external guard;
       // a route-config (definition) canDeactivate survives (#1171).

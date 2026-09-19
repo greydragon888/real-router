@@ -174,6 +174,42 @@ export interface CheckPositionMap {
 
   /** `get`'s argument, for the reason above. */
   "getRoute:entry": [name: string];
+
+  /**
+   * `forwardState`'s arguments, as the caller spelled them.
+   *
+   * ⚠ This door is ALSO an interceptable seam, and the two rights do not
+   * overlap: an interceptor here may rewrite the intent, a check may only
+   * refuse it.
+   */
+  "forwardState:entry": [
+    routeName: string,
+    routeParams: Params,
+    routeSearch: SearchParams | undefined,
+  ];
+
+  /**
+   * The arguments the state builder will receive — `:state` rather than
+   * `:entry` because `params` is already core's ADOPTED copy (#2134) while the
+   * name and search are the caller's.
+   */
+  "buildNavigationState:state": [
+    name: string,
+    ownParams: Params,
+    search: SearchParams,
+  ];
+
+  /** `addActivateGuard`'s two arguments. */
+  "addActivateGuard:entry": [name: string, handler: unknown];
+
+  /** `addDeactivateGuard`'s two arguments. */
+  "addDeactivateGuard:entry": [name: string, handler: unknown];
+
+  /** `removeActivateGuard`'s argument. */
+  "removeActivateGuard:entry": [name: string];
+
+  /** `removeDeactivateGuard`'s argument. */
+  "removeDeactivateGuard:entry": [name: string];
 }
 
 /**

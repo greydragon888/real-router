@@ -10,6 +10,8 @@ import {
 import { adoptChannel } from "../helpers";
 import {
   getInternals,
+  POSITION,
+  runChecks,
   throwIfDisposed,
   throwOnMisChanneledKey,
 } from "../internals";
@@ -113,12 +115,13 @@ export function getPluginApi<
       // intermediate check the pipeline migration was right to drop"). The
       // divergence this leaves is recorded in the parity ledger rather than
       // closed.
-      ctx.validator?.routes.validateStateBuilderArgs(
+      runChecks(
+        ctx.checks,
+        POSITION["forwardState:entry"],
         routeName,
         routeParams,
-        "forwardState",
+        routeSearch,
       );
-      ctx.validator?.navigation.validateSearch(routeSearch, "forwardState");
 
       return ctx.forwardState<P, S>(routeName, routeParams, routeSearch);
     },
@@ -212,11 +215,12 @@ export function getPluginApi<
 
       const ownParams = adoptChannel(params);
 
-      ctx.validator?.navigation.validateSearch(search, "buildNavigationState");
-      ctx.validator?.routes.validateStateBuilderArgs(
+      runChecks(
+        ctx.checks,
+        POSITION["buildNavigationState:state"],
         name,
         ownParams,
-        "buildNavigationState",
+        search,
       );
 
       // Stages ① + ③ + the mode gate, one pass through the pipeline
