@@ -70,6 +70,16 @@ jobs:
       sha: ${{ steps.meta.outputs.sha }}
       pr: ${{ steps.meta.outputs.pr }}
     steps:
+      # The DEFAULT BRANCH, which is what `GITHUB_SHA` is in a `workflow_run`
+      # workflow — so this is base-repository code by construction, the only
+      # kind this workflow may execute. It is here for one script, the predicate
+      # `decide` runs below. First, because checkout cleans the workspace and
+      # the artifact lands in it.
+      - name: Checkout trusted predicate
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
       # ⚠ The PR number is NOT in `github.event.workflow_run.pull_requests` for a
       # fork — GitHub leaves that array empty across repositories, which is the
       # single most common way this pattern breaks. `ci.yml` uploads it instead.
@@ -103,6 +113,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
           RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           set -euo pipefail
@@ -123,6 +134,34 @@ jobs:
             echo "analyse=false" >> "$GITHUB_OUTPUT"
             echo "why=Not analysed: dependabot" >> "$GITHUB_OUTPUT"
             exit 0
+          fi
+          # A diff that holds no code is not analysed either: `changeset version`
+          # writes manifests, CHANGELOGs and the lockfile, and Sonar's own
+          # comment on release PR #2424 read "0 New issues · 0.0% Coverage on New
+          # Code" (#2433). It is the LAST required check to report there, so this
+          # arm is what moves the merge-ready moment to `CI Result`.
+          #
+          # ⚠ Every input is from the TRUSTED payload: the head SHA and the
+          # repository, never the PR number in `pr-meta`. That is why the arm
+          # runs for this repository only — a fork's head SHA is not in this
+          # repository, `compare` would 404, and the gate would die on a PR it
+          # should have analysed. The branch name is deliberately NOT part of it:
+          # `changeset-release/*` is what a branch is called, not what it holds,
+          # and a release PR carrying one source file must still be analysed.
+          #
+          # ⚠ `compare` truncates its file list at 300. A truncated list could
+          # hide the one source file, so a full page is treated as unknown and
+          # analysed. Measured: a release PR touches ~50 paths.
+          if [[ "$HEAD_REPO" == "$GITHUB_REPOSITORY" ]]; then
+            CHANGED=$(gh api \
+              "repos/$GITHUB_REPOSITORY/compare/$BASE_BRANCH...${{ steps.meta.outputs.sha }}" \
+              --jq '.files[].filename')
+            COUNT=$(printf '%s\n' "$CHANGED" | grep -c . || true)
+            if [[ "$COUNT" -lt 300 ]] && printf '%s\n' "$CHANGED" | node scripts/diff-carries-no-source.mjs; then
+              echo "analyse=false" >> "$GITHUB_OUTPUT"
+              echo "why=Not analysed: no source changed" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
           fi
           # No coverage artifact means CI built nothing to analyse — a docs-only
           # PR, or one whose turbo filter selected zero packages. `ci.yml`'s job

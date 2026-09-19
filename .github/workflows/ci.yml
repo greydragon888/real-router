@@ -38,6 +38,7 @@ jobs:
       examples_filter: ${{ steps.plan.outputs.examples_filter }} # explicit --filter set for examples-build; empty when no example is affected
       examples_lint_filter: ${{ steps.examples_lint.outputs.examples_lint_filter }} # explicit --filter set for examples-lint; empty when no change reaches an example from outside
       examples_lint_reasons: ${{ steps.examples_lint.outputs.examples_lint_reasons }}
+      no_source: ${{ steps.source.outputs.no_source }} # 'true' when the diff holds no code a check could read
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -90,6 +91,28 @@ jobs:
           else
             echo "should_run=true" >> $GITHUB_OUTPUT
             echo "🔍 Code changes detected, running full CI"
+          fi
+
+      # Does this PR's diff hold anything a code reader reads (#2433)? A release
+      # PR's does not — `changeset version` writes manifests, CHANGELOGs and the
+      # lockfile — and neither does a manifest-only bump. `coverage` and
+      # `duplication` below consult this, and so does `sonar-trusted.yml`, which
+      # computes it again from the trusted payload rather than reading it here:
+      # this output travels in an artifact a fork's run writes.
+      #
+      # `git diff` runs on its OWN line, unpiped, for the reason the step above
+      # spells out: piped into the predicate, its failure would be
+      # indistinguishable from an empty diff. `set -e` covers it there; inside
+      # the `if` below only the predicate's exit code is read.
+      - name: Check for source in the diff
+        id: source
+        run: |
+          set -euo pipefail
+          CHANGED=$(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}")
+          if printf '%s\n' "$CHANGED" | node scripts/diff-carries-no-source.mjs; then
+            echo "no_source=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "no_source=false" >> "$GITHUB_OUTPUT"
           fi
 
       # Turbo `--affected` base. This is a pull_request-only workflow, so the
@@ -579,8 +602,14 @@ jobs:
       # IMPLEMENTATION_NOTES "Dependabot PRs skip every metric".
       DEPENDABOT_PR: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
     steps:
+      # Full history: three cells of `diff-carries-no-source.test.mjs` read real
+      # commits — release commits, dependency bumps, commits that touch source —
+      # and in the default `fetch-depth: 1` clone there is no parent to diff
+      # against, so they skip. Measured on this job: 3 s → 6 s for the checkout.
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
@@ -966,9 +995,11 @@ jobs:
     name: Code Duplication (SARIF)
     needs: [check]
     # Not on a Dependabot PR: a bump duplicates no source (IMPLEMENTATION_NOTES
-    # "Dependabot PRs skip every metric").
+    # "Dependabot PRs skip every metric"). Nor on a diff that holds no source at
+    # all — a release PR, where this would rescan master's code (#2433).
     if: >-
       needs.check.outputs.should_run == 'true' &&
+      needs.check.outputs.no_source != 'true' &&
       github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
@@ -1038,10 +1069,13 @@ jobs:
     needs: [check, pipeline-leaf, base-bundle, base-test, pipeline-sharded]
     # Skipped on a Dependabot PR, which changes manifests and the lockfile but
     # never a covered line (IMPLEMENTATION_NOTES "Dependabot PRs skip every
-    # metric"). `ci` reads the skip through `ok`.
+    # metric"), and on any diff that holds no source — a release PR uploads the
+    # lcov the shards just produced from master's code (#2433). `ci` reads
+    # either skip through `ok`.
     if: >-
       always() &&
       github.event.pull_request.user.login != 'dependabot[bot]' &&
+      needs.check.outputs.no_source != 'true' &&
       needs.check.outputs.should_run == 'true' &&
       (
         (needs.check.outputs.mode == 'leaf' &&
