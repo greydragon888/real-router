@@ -2,6 +2,20 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## The checks that read code ask the diff whether there is any (#2433, 2026-09-19)
+
+**Problem.** A release PR ran SonarCloud, Codecov and jscpd over a tree that holds no code. Measured on #2424 (run 35413646693): Sonar took 95 s and was the LAST required check to report — `CI Result` at 01:50:48, Sonar at 01:52:19 — so it, not the pipeline, decided when the PR became mergeable. Its own comment on that PR reads _0 New issues · 0.0% Coverage on New Code_. Codecov re-uploaded the lcov the shards had just produced from master's code (14 s), and jscpd rescanned the same `packages/*/src` (26 s). Across the last twelve `release: version packages` commits the only paths are `package.json`, `CHANGELOG.md`, `.changeset/*.md` and `pnpm-lock.yaml` — not one source file.
+
+**Solution.** One predicate, three consumers: `scripts/diff-carries-no-source.mjs`, a pure function plus a CLI that reads paths on stdin and answers by exit code. `ci.yml`'s `check` job runs it over the PR's diff and publishes `no_source`; `coverage` and `duplication` add it to their `if:`; `sonar-trusted.yml`'s `gate` gains a third arm that computes it again from its own trusted inputs. `Bundle Size` and the smoke test keep running — on a release tree they assert something real (0 B of output change, and the exact artifacts about to be published), and so does the pipeline, which fills the remote cache the release commit's post-merge reads.
+
+**Why the diff and not the branch.** `changeset-release/*` is what the branch is called, not what it holds. A release PR that ever carried a code change — a hand-edit, a bad `version` script, a merge — would go unanalysed under a name-only rule. Asking the diff also covers a shape the branch name cannot name: a manifest-only bump, which is why four of the last two hundred commits on master match the predicate and should.
+
+**Why the Sonar arm runs for this repository only.** Its file list comes from `compare/<default branch>...<head_sha>` on the TRUSTED `workflow_run` payload — never from the PR number in `pr-meta`, which is data a fork's run writes and could point at someone else's PR. A fork's head SHA is not in this repository, so `compare` would 404 and `set -e` would kill the gate on a PR it should have analysed; the repository check is what keeps that from happening. The branch name is deliberately NOT part of this arm, unlike the Dependabot arm above it, where the branch IS the criterion.
+
+**Three fail-closed edges, each because the failure direction is silence.** A check skipped on code that changed reports nothing and nothing reads as a pass — the #1127 class. So: an empty path list answers `false` (a `compare` that returned nothing is a failure to ask, not a diff without source); `compare` truncates at 300 files and a full page is treated as unknown and analysed (a release PR touches ~50); and `.changeset/` is matched at `*.md` only, because the directory also holds six `.mjs` scripts — the changelog formatter, the PR-ref extractor, the release-plan checks — that SonarCloud reads.
+
+**Why the Dependabot author arm stays beside it.** The two overlap on npm bumps and diverge on one reachable case: `.github/dependabot.yml` lists `/.github/actions/setup` explicitly (see _"Dependabot PRs skip every metric"_ and the config's own comment), and `ci.yml` deliberately treats a change under `.github/actions/` as code — so a bump of that composite action's pins is `should_run=true` and is not manifest-only. The author arm covers it; the diff predicate does not, and is not meant to.
+
 ## The gate's critical path was a serial chain, and the property tier left it (#2429, 2026-09-19)
 
 **Problem.** `Base test (core layer)` is the required gate's longest job, and the
