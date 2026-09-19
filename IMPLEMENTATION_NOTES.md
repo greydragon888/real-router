@@ -2,6 +2,32 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## `core#test` is sharded four ways, and its 100 % gate moved to the merged report (#2429, 2026-09-19)
+
+**Problem.** With `lint` off its runner, `base-test` is `type-check 9.3 s + test 153.9 s` of a 163.3 s turbo wall — `core#test` is the whole of what is left on floor 1 of the gate. Half of it is the instrument: measured locally, two rounds, the suite takes 49.9 / 51.9 s with coverage and 24.5 / 25.2 s without.
+
+**Solution.** `base-test` is a four-way matrix running `vitest --shard=i/4 --reporter=blob`, and a new `base-coverage` job merges the four blobs and checks the thresholds once.
+
+⚠ **The 100 % thresholds cannot stay in the shards.** Vitest checks them on every coverage-enabled run, and a shard's report counts every file `coverage.include` names — measured, shard 1 of 4 reads **85.64 % (3519/4109)** with the other three shards' files present at 0 %. So the shards zero all four thresholds and `base-coverage` owns the gate.
+
+⚑ **The merge is not an average of four reports.** `--merge-reports` combines the raw V8 script coverage before the Istanbul conversion, so the merged run prints the same **4109/2250/813/4078** an unsharded run does. It costs **0.91 s**.
+
+**Why four.** Measured, slowest shard against summed work and imbalance:
+
+| shards | slowest    | summed | imbalance |
+| ------ | ---------- | ------ | --------- |
+| 4      | **23.5 s** | 66.5 s | 1.41×     |
+| 6      | 20.5 s     | 72.9 s | 1.69×     |
+| 8      | 18.7 s     | 83.4 s | 1.79×     |
+
+`--shard` splits by a hash of the file path, by file count and not by duration, so one heavy file dominates whatever shard it lands in and the imbalance grows with N. Past four, more jobs buy less. The fixed cost is ~5 s per shard, and ~4 s of that is coverage — without it a shard costs ~1 s more than its share.
+
+⚠ **`base-coverage` is a hard requirement in `CI Result`, not an `ok()` one.** The existing `coverage` job is read through `ok()`, where a skip counts as a pass, and it skips on a Dependabot PR and on a diff with no source. The 100 % gate cannot live there. `scripts/coverage-threshold-authority.test.mjs` pins the whole arrangement — thresholds off in the shards and on in the merge, the matrix matching the denominator, the artifact names matching, and the gate requiring the job by equality.
+
+⚑ **Four shards do not replay one cache entry.** turbo hashes what `--` forwards (`cliArguments`), measured: four distinct hashes for `--shard=1..4/4` against the unsharded one.
+
+**Two levers measured and closed on the way.** The coverage reporter list (five entries, `lcov` and `lcovonly` overlapping) costs nothing — 54.6 / 51.5 s against 54.0 / 52.9 s with two. `--coverage.experimentalAstAwareRemapping` likewise: 52.2 / 50.9 s against 52.6 / 52.4 s.
+
 ## `base-lint` left `base-test`'s runner, so either can be measured (#2429, 2026-09-19)
 
 **Problem.** `base-test` ran `pnpm turbo run test lint`, and over five runs the two took 197 s and 196 s — concurrently, on one 4-vCPU runner. `lint` never gated the tests, so the job was not a serial chain there; what it was is a pair of CPU-hungry processes sharing four cores. That makes every lever on either one unmeasurable: a change to `lint` moves `test`'s time, and the run cannot say which.

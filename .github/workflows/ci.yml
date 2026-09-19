@@ -441,10 +441,22 @@ jobs:
   # nothing. Emits coverage-reports-base for the coverage / sonar merge.
   # ============================================
   base-test:
-    name: Base test (core layer)
+    name: Base test (core layer, shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     needs: [check]
     if: needs.check.outputs.mode == 'sharded'
+    strategy:
+      # Every shard's result is wanted: the merged coverage in `base-coverage`
+      # is only correct when all four blobs are present, and a cancelled shard
+      # would make the 100 % thresholds fail for a reason that is not a defect.
+      fail-fast: false
+      matrix:
+        # Four, measured. Local walls for the slowest shard: 23.5 s at 4, 20.5 s
+        # at 6, 18.7 s at 8 — while the summed work goes 66.5 -> 72.9 -> 83.4 s
+        # and the imbalance grows 1.41x -> 1.69x -> 1.79x, because `--shard`
+        # splits by a hash of the file path and one heavy file dominates whatever
+        # shard it lands in. Past four, more jobs buy less.
+        shard: [1, 2, 3, 4]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -500,7 +512,25 @@ jobs:
           # chain in turbo.json; running it here in parallel instead would put two
           # vitest processes on one 4-vCPU runner, which is the contention #2107's
           # property-suite timeouts were measured under.
-          pnpm turbo run test $FILTERS --summarize
+          # ⚠ Thresholds OFF here, and the 100 % gate moves to `base-coverage`.
+          # A shard's own report counts every file `coverage.include` names —
+          # measured, shard 1 of 4 reads 85.64 % (3519/4109) because the other
+          # three shards' files are present at 0 %. Vitest checks thresholds on
+          # every coverage-enabled run, so they have to be off per shard and on
+          # once, on the merged report.
+          #
+          # `--` forwards to `vitest`, and turbo hashes what it forwards
+          # (`cliArguments`), so the four shards have four distinct cache keys
+          # rather than replaying each other.
+          # shellcheck disable=SC2086
+          pnpm turbo run test $FILTERS --summarize -- \
+            --shard=${{ matrix.shard }}/4 \
+            --reporter=blob \
+            --outputFile.blob=.vitest/blob/${{ matrix.shard }}.json \
+            --coverage.thresholds.statements=0 \
+            --coverage.thresholds.branches=0 \
+            --coverage.thresholds.functions=0 \
+            --coverage.thresholds.lines=0
 
       # These summaries are what made #2429 measurable: the audit added them
       # because nothing said how this job's time split between core#test,
@@ -511,9 +541,70 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: turbo-summary-base-test
+          name: turbo-summary-base-test-${{ matrix.shard }}
           path: .turbo/runs/
           retention-days: 14
+
+      # The shard's raw V8 coverage, not a report. `--merge-reports` in
+      # `base-coverage` merges these before the Istanbul conversion, so the
+      # merged numbers are one measurement rather than four averaged ones.
+      - name: Upload coverage blob
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-blob-${{ matrix.shard }}
+          if-no-files-found: error
+          path: packages/core/.vitest/blob/
+          retention-days: 1
+
+  # ============================================
+  # BASE COVERAGE: where core's 100 % thresholds are checked (#2429). They used
+  # to run inside `base-test`'s single `vitest run`; with that job split four
+  # ways they cannot, because a shard sees only its own quarter — measured,
+  # shard 1 of 4 reports 85.64 % (3519/4109) with the other three shards' files
+  # present at 0 % through `coverage.include`.
+  #
+  # ⚠ Its own job, and a HARD requirement in `CI Result`. The existing
+  # `coverage` job is read through `ok()` — a skip counts as a pass there, and
+  # it skips on a Dependabot PR and on a diff with no source — so the 100 %
+  # gate cannot live in it without becoming skippable.
+  #
+  # The merge itself is cheap: measured locally at 0.91 s for four blobs, and it
+  # prints the same 4109/2250/813/4078 an unsharded run does.
+  # ============================================
+  base-coverage:
+    name: Base coverage (core layer)
+    runs-on: ubuntu-latest
+    needs: [check, base-test]
+    if: needs.check.outputs.mode == 'sharded'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup (pnpm + Node + install)
+        uses: ./.github/actions/setup
+
+      - name: Download coverage blobs
+        uses: actions/download-artifact@v6
+        with:
+          pattern: coverage-blob-*
+          merge-multiple: true
+          path: packages/core/.vitest/blob/
+
+      # Fail loud on a missing blob rather than merging three quarters and
+      # reporting a number that looks like a coverage regression.
+      - name: Verify all four blobs arrived
+        run: |
+          set -euo pipefail
+          count=$(find packages/core/.vitest/blob -name '*.json' | wc -l | tr -d ' ')
+          echo "blobs: $count"
+          if [ "$count" -ne 4 ]; then
+            echo "::error::expected 4 coverage blobs, found $count"
+            exit 1
+          fi
+
+      - name: Merge coverage and check thresholds
+        working-directory: packages/core
+        run: npx vitest --merge-reports=.vitest/blob --coverage
 
       - name: Fix coverage paths
         run: bash scripts/fix-lcov-paths.sh
@@ -1116,7 +1207,7 @@ jobs:
 
   coverage:
     name: Coverage (Codecov)
-    needs: [check, pipeline-leaf, base-bundle, base-test, pipeline-sharded]
+    needs: [check, pipeline-leaf, base-bundle, base-test, base-coverage, pipeline-sharded]
     # Skipped on a Dependabot PR, which changes manifests and the lockfile but
     # never a covered line (IMPLEMENTATION_NOTES "Dependabot PRs skip every
     # metric"), and on any diff that holds no source — a release PR uploads the
@@ -1488,7 +1579,7 @@ jobs:
     # beside "CI Result" / "Require Changeset" / "Validate Changesets" /
     # "Dependency Review". So a red quality gate blocks the merge without its
     # ~90s scan sitting on this job's critical path.
-    needs: [check, pipeline-leaf, base-bundle, base-test, base-lint, base-properties, pipeline-sharded, repo-lints, smoke, coverage, actionlint, examples-build, examples-lint]
+    needs: [check, pipeline-leaf, base-bundle, base-test, base-lint, base-coverage, base-properties, pipeline-sharded, repo-lints, smoke, coverage, actionlint, examples-build, examples-lint]
     if: always()
     steps:
       - name: Determine result
@@ -1534,6 +1625,7 @@ jobs:
           BASE_BUNDLE="${{ needs.base-bundle.result }}"
           BASE_TEST="${{ needs.base-test.result }}"
           BASE_LINT="${{ needs.base-lint.result }}"
+          BASE_COV="${{ needs.base-coverage.result }}"
           BASE_PROPS="${{ needs.base-properties.result }}"
           SHARDED="${{ needs.pipeline-sharded.result }}"
           SMOKE="${{ needs.smoke.result }}"
@@ -1541,7 +1633,7 @@ jobs:
           LINTS="${{ needs.repo-lints.result }}"
           EXAMPLES="${{ needs.examples-build.result }}"
           EXAMPLES_LINT="${{ needs.examples-lint.result }}"
-          echo "plan=$PLAN mode=$MODE leaf=$LEAF base_bundle=$BASE_BUNDLE base_test=$BASE_TEST base_lint=$BASE_LINT base_props=$BASE_PROPS sharded=$SHARDED smoke=$SMOKE coverage=$COVERAGE lints=$LINTS examples=$EXAMPLES examples_lint=$EXAMPLES_LINT"
+          echo "plan=$PLAN mode=$MODE leaf=$LEAF base_bundle=$BASE_BUNDLE base_test=$BASE_TEST base_lint=$BASE_LINT base_cov=$BASE_COV base_props=$BASE_PROPS sharded=$SHARDED smoke=$SMOKE coverage=$COVERAGE lints=$LINTS examples=$EXAMPLES examples_lint=$EXAMPLES_LINT"
 
           # Defensive belt-and-suspenders on the shard-plan output (R2.19): the
           # check-result guard at the top of this step already exits on any check
@@ -1563,7 +1655,7 @@ jobs:
             leaf)
               [[ "$LEAF" == "success" ]] && PATH_OK=1 || PATH_OK=0 ;;
             sharded)
-              { [[ "$BASE_BUNDLE" == "success" ]] && [[ "$BASE_TEST" == "success" ]] && [[ "$BASE_LINT" == "success" ]] && [[ "$BASE_PROPS" == "success" ]] && ok "$SHARDED"; } && PATH_OK=1 || PATH_OK=0 ;;
+              { [[ "$BASE_BUNDLE" == "success" ]] && [[ "$BASE_TEST" == "success" ]] && [[ "$BASE_LINT" == "success" ]] && [[ "$BASE_COV" == "success" ]] && [[ "$BASE_PROPS" == "success" ]] && ok "$SHARDED"; } && PATH_OK=1 || PATH_OK=0 ;;
             *)
               echo "❌ unknown shard-plan mode '$MODE'"
               exit 1 ;;
