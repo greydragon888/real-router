@@ -468,13 +468,21 @@ jobs:
           # `lint` explicit — see the note in pipeline-leaf's test step. This job
           # is the gate's critical path, and lint gating the tests is exactly
           # what made it 183 s (70 + 48 + 65, strictly sequential).
-          pnpm turbo run test test:properties lint $FILTERS --summarize
+          #
+          # `test:properties` is NOT here: it is `base-properties`' job (#2429).
+          # Measured over five runs, this job's wall was the serial chain
+          # type-check → test → test:properties (medians 13 + 197 + 67 = 277 of a
+          # 278 s job), with `lint` (196 s) fitting inside it. The tier left the
+          # chain in turbo.json; running it here in parallel instead would put two
+          # vitest processes on one 4-vCPU runner, which is the contention #2107's
+          # property-suite timeouts were measured under.
+          pnpm turbo run test lint $FILTERS --summarize
 
-      # THE reason Phase 0 exists: base-test is the critical path of the required
-      # gate (231 s of 297 s, measured on run 30693854030 — 2026-08-01 CI/CD audit
-      # §3.2), and until now nothing said how that time splits between core#test,
-      # core#test:properties and their lint/type-check dependencies. Any decision
-      # about splitting or sharding this job was guesswork without these numbers.
+      # These summaries are what made #2429 measurable: the audit added them
+      # because nothing said how this job's time split between core#test,
+      # core#test:properties and their lint/type-check dependencies. They now
+      # also carry the after-numbers of the split.
+      # (Phase 0, 2026-08-01 CI/CD audit §3.2.)
       - name: Upload turbo run summaries (per-task timings)
         if: always()
         uses: actions/upload-artifact@v7
@@ -503,6 +511,55 @@ jobs:
   # no coverage. Mode-independent: runs on every should_run PR; CI gate requires
   # it (hard, not ok()-skippable).
   # ============================================
+
+  # ============================================
+  # BASE PROPERTIES: the property tier of the base layer, off base-test's
+  # critical path (#2429). It used to run inside base-test, behind
+  # `test:properties.dependsOn: ["test"]`, which made that job a serial chain —
+  # medians over five runs: type-check 13 s → test 197 s → test:properties 67 s,
+  # 277 of a 278 s job. The edge is gone from turbo.json; a separate job rather
+  # than the same runner, because two vitest processes on one 4-vCPU runner is
+  # the contention the property suite timed out under in #2107.
+  #
+  # No coverage upload: `vitest.config.properties.mts` sets
+  # `coverage.enabled: false` — the tier asserts invariants, and core's 100 %
+  # comes from the `test` tier in base-test.
+  # ============================================
+  base-properties:
+    name: Base properties (core layer)
+    runs-on: ubuntu-latest
+    needs: [check]
+    if: needs.check.outputs.mode == 'sharded'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Fetch master for Turbo comparison
+        if: github.event_name == 'pull_request'
+        run: git fetch origin master:master
+
+      - name: Setup (pnpm + Node + install)
+        uses: ./.github/actions/setup
+
+      # Same CORE_LAYER source as base-test, for the same reason its comment
+      # gives: the list comes from build-matrix.mjs, so a future base-layer
+      # member runs its property tier here instead of nowhere.
+      - name: Property-test core layer
+        run: |
+          FILTERS=$(node -e 'import("./scripts/build-matrix.mjs").then((m) => process.stdout.write([...m.CORE_LAYER].map((p) => "--filter=" + p).join(" ")))')
+          echo "Core-layer filters: $FILTERS"
+          # shellcheck disable=SC2086
+          pnpm turbo run test:properties $FILTERS --summarize
+
+      - name: Upload turbo run summaries (per-task timings)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: turbo-summary-base-properties
+          path: .turbo/runs/
+          retention-days: 14
   repo-lints:
     name: Repo Lints
     runs-on: ubuntu-latest
@@ -1347,7 +1404,7 @@ jobs:
     # beside "CI Result" / "Require Changeset" / "Validate Changesets" /
     # "Dependency Review". So a red quality gate blocks the merge without its
     # ~90s scan sitting on this job's critical path.
-    needs: [check, pipeline-leaf, base-bundle, base-test, pipeline-sharded, repo-lints, smoke, coverage, actionlint, examples-build, examples-lint]
+    needs: [check, pipeline-leaf, base-bundle, base-test, base-properties, pipeline-sharded, repo-lints, smoke, coverage, actionlint, examples-build, examples-lint]
     if: always()
     steps:
       - name: Determine result
@@ -1392,13 +1449,14 @@ jobs:
           LEAF="${{ needs.pipeline-leaf.result }}"
           BASE_BUNDLE="${{ needs.base-bundle.result }}"
           BASE_TEST="${{ needs.base-test.result }}"
+          BASE_PROPS="${{ needs.base-properties.result }}"
           SHARDED="${{ needs.pipeline-sharded.result }}"
           SMOKE="${{ needs.smoke.result }}"
           COVERAGE="${{ needs.coverage.result }}"
           LINTS="${{ needs.repo-lints.result }}"
           EXAMPLES="${{ needs.examples-build.result }}"
           EXAMPLES_LINT="${{ needs.examples-lint.result }}"
-          echo "plan=$PLAN mode=$MODE leaf=$LEAF base_bundle=$BASE_BUNDLE base_test=$BASE_TEST sharded=$SHARDED smoke=$SMOKE coverage=$COVERAGE lints=$LINTS examples=$EXAMPLES examples_lint=$EXAMPLES_LINT"
+          echo "plan=$PLAN mode=$MODE leaf=$LEAF base_bundle=$BASE_BUNDLE base_test=$BASE_TEST base_props=$BASE_PROPS sharded=$SHARDED smoke=$SMOKE coverage=$COVERAGE lints=$LINTS examples=$EXAMPLES examples_lint=$EXAMPLES_LINT"
 
           # Defensive belt-and-suspenders on the shard-plan output (R2.19): the
           # check-result guard at the top of this step already exits on any check
@@ -1412,7 +1470,7 @@ jobs:
           # legitimately skip on a built==false leaf, and coverage on every
           # Dependabot PR) and an empty-include
           # pipeline-sharded — NEVER for the job that DEFINES the active path
-          # (pipeline-leaf / base-bundle + base-test), so a real failure there
+          # (pipeline-leaf / base-bundle + base-test + base-properties), so a real failure there
           # cannot be masked as a skip.
           ok() { [[ "$1" == "success" || "$1" == "skipped" ]]; }
 
@@ -1420,7 +1478,7 @@ jobs:
             leaf)
               [[ "$LEAF" == "success" ]] && PATH_OK=1 || PATH_OK=0 ;;
             sharded)
-              { [[ "$BASE_BUNDLE" == "success" ]] && [[ "$BASE_TEST" == "success" ]] && ok "$SHARDED"; } && PATH_OK=1 || PATH_OK=0 ;;
+              { [[ "$BASE_BUNDLE" == "success" ]] && [[ "$BASE_TEST" == "success" ]] && [[ "$BASE_PROPS" == "success" ]] && ok "$SHARDED"; } && PATH_OK=1 || PATH_OK=0 ;;
             *)
               echo "❌ unknown shard-plan mode '$MODE'"
               exit 1 ;;
