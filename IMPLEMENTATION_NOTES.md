@@ -2,6 +2,45 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## The gate's critical path was a serial chain, and the property tier left it (#2429, 2026-09-19)
+
+**Problem.** `Base test (core layer)` is the required gate's longest job, and the
+`--summarize` artifacts the 2026-08-01 audit added say why. Medians over five
+runs, per task: `core#lint` 196 s, `core#test` 197 s, `core#test:properties`
+67 s, `core#type-check` 13 s — against a 278 s job. The wall is not the slowest
+task: `test.dependsOn` is `["type-check"]` and `test:properties.dependsOn` was
+`["test", "type-check"]`, so 13 + 197 + 67 = 277 s ran end to end while `lint`
+finished inside it. All four tasks were a cache MISS in all five runs.
+
+**Solution.** `test:properties` no longer depends on `test`, and core's property
+tier runs in `base-properties`, its own job on the gate.
+
+**Why the edge could go.** It guarded no shared output:
+`vitest.config.properties.mts` sets `coverage.enabled: false`, so the two runs
+write nothing in common. `test:stress` keeps both edges, and `build` keeps its
+own list.
+
+**Why a separate job rather than the same runner.** Dropping the edge alone would
+put two vitest processes on one 4-vCPU runner. That is the contention #2107
+measured: on a loaded runner the property suite's slowest file went from 26.8 s
+for the whole suite to 257 s for one file, and two cells crossed the 60 s
+default. A job of its own keeps the tier's own 4 vCPUs.
+
+**What the numbers say to expect.** The chain becomes 13 + 197 s, so this job's
+wall should fall to about 210 s and the gate's to `max(base-test, the rest)`. The
+saving is bounded by `core#lint` at 196 s, which is why #2429 orders the ESLint
+cache work before any sharding of `core#test`: splitting a 197 s task under a
+196 s sibling buys seconds.
+
+⚠ **`turbo.json` is a global input**, so this change re-keys every task in the
+repository once. The first run after it is cold everywhere.
+
+**Verified.** `turbo run test test:properties --filter=@real-router/core
+--dry=text` reports `type-check` as the only dependency of each tier and both as
+its dependents; the two suites pass when run concurrently;
+`ci-gate-completeness` passes and fails when `base-properties` is dropped from
+the gate's `needs`; `actionlint` at CI's severity reports nothing.
+
 ## The core ↔ ssr-utils cycle is gone, and with it the exception it forced (#2426, 2026-09-19)
 
 **Problem.** `core` declared `@real-router/ssr-utils` in `devDependencies` for

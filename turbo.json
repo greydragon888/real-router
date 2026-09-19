@@ -87,7 +87,7 @@
       "cache": true
     },
     "test:properties": {
-      "dependsOn": ["test", "type-check"],
+      "dependsOn": ["type-check"],
       "outputs": [],
       "inputs": [
         "tests/property/**/*.{ts,tsx}",
