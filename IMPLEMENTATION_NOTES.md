@@ -2,6 +2,57 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## The core ↔ ssr-utils cycle is gone, and with it the exception it forced (#2426, 2026-09-19)
+
+**Problem.** `core` declared `@real-router/ssr-utils` in `devDependencies` for
+three test cases, so `ssr-utils` could not declare core in its own — turbo
+refused the loop: `Cyclic dependency detected: @real-router/ssr-utils#type-check,
+@real-router/core#type-check`. Three consequences followed from that one edge.
+pnpm reported the cycle on every install, one of the two known warnings.
+`packages/ssr-utils/turbo.json` hand-copied the dependency as
+`../core/src/**/*.ts` into two task input lists. And the package was the only one
+whose sole core edge was the peer, which is how a `>=` floor reached
+`pnpm-lock.yaml` and failed release PR #2410.
+
+**Solution.** The three cases moved to the package whose contract they assert,
+the way `clone-behaviour-1893.test.ts` already states it — "this package's
+contract, asserted in this package":
+
+- `"__proto__"` survives a `serializeRouterState` roundtrip (#1191) →
+  `serializeRouterState.test.ts`;
+- two concurrent `hydrateRouter()` calls, one winning (#1190) →
+  `hydrateRouter.test.ts`;
+- the hydration scratchpad is single-shot →
+  `tests/property/hydrateRouter.properties.ts`.
+
+`core` dropped the devDependency, `ssr-utils` gained
+`"@real-router/core": "workspace:^"` beside its peer entry, and
+`packages/ssr-utils/turbo.json` was deleted.
+
+**Why the cases could move.** They were written 2026-06-25, 07-10 and 07-17,
+before this package existed — `hydrateRouter` and `serializeRouterState` lived in
+`core/utils` until #1543 extracted them on 07-20, and the tests stayed behind.
+The exception was a leftover of that extraction rather than a placement.
+
+**Measured, before the move.** With the two functional cases skipped and the rest
+of core's suite untouched, coverage stayed at 100 % (4109/4109 statements,
+2250/2250 branches, 813/813 functions, 4078/4078 lines): they cover no core line
+that nothing else covers. That is the premise the 2026-08-01 record rejected the
+move on, and it does not hold.
+
+**Measured, after.** A one-line edit to `packages/core/src` still moves
+`ssr-utils`' `type-check`, `test` and `bundle` hashes — now through the declared
+edge rather than through the deleted input globs. `pnpm install` prints no
+cyclic-workspace warning. The lockfile importer changed from
+`dependencies: '@real-router/core': specifier: workspace:>=0.141.0` to
+`devDependencies: … specifier: workspace:^`, and no `specifier: workspace:>=`
+remains anywhere in it. Core's coverage is 100 % after the move, and
+`ssr-utils`' own `type-check` / `test` / `test:properties` / `lint` pass.
+
+**`lint` is still not wired.** It has no `dependsOn`, so a core change leaves
+`lint` hashes untouched for every package, `react` included — measured again
+here. That is unchanged by this move and remains deliberate.
+
 ## Every check a workflow runs is also run by a hook, or says why not (#2406, 2026-09-18)
 
 **Problem.** A check wired into `ci.yml` and into neither hook is first heard of
@@ -94,7 +145,10 @@ sight until then:
   `devDependencies` gets that `workspace:^` entry there instead, so rewriting its
   peer floor changes nothing the lockfile holds. `ssr-utils` is the one package
   without the dev edge (the turbo-cycle exception); its entry is the lockfile's
-  only `specifier: workspace:>=`.
+  only `specifier: workspace:>=`. **⚠ Superseded 2026-09-19 (#2426):** the cycle is
+  gone, `ssr-utils` carries the dev edge, and the lockfile now holds no
+  `specifier: workspace:>=` at all — this step is the general guard, not one
+  package's fix.
 - **The flag the changesets 3 migration removed was not dead.**
   `apply-release-plan@8.1.1` reads `onlyUpdatePeerDependentsWhenOutOfRange` in
   `shouldUpdateDependencyBasedOnConfig`. At `false`, the default, it rewrites the
@@ -415,7 +469,7 @@ suites passed against fresh production builds: 49, 8, 23 and 27 tests.
 - `pnpm install` with 12.4.1 exits 0 in 8 s. `pnpm dedupe --check` then fails once; one `pnpm dedupe` converges, and the second `--check` passes. The whole difference from the pnpm 11 lockfile is 56 added lines: two snapshots in the desktop examples' electron-builder chain, `app-builder-lib` with its `electron-builder-squirrel-windows` peer and `electron-builder-squirrel-windows` itself. `pnpm install --frozen-lockfile` passes.
 - osv-scanner 2.6.0 reads 1762 packages with the same three advisories as before.
 - `pnpm pack` of all 23 public packages under 11.26.0 and under 12.4.1 gives identical manifests and file lists, `workspace:` ranges rewritten the same way. The release job itself has not run on pnpm 12 yet.
-- At `--loglevel=warn` the install prints only the two known warnings: the `$` reference in the `@types/node` override and the `core ↔ ssr-utils` cycle.
+- At `--loglevel=warn` the install prints only the two known warnings then: the `$` reference in the `@types/node` override and the `core ↔ ssr-utils` cycle (#2426 removed the second).
 
 ⚠ **Dependabot cannot run pnpm 12 until dependabot-core #16170 reaches the hosted updater.** Until a job's log names an updater image whose commit contains `2a997d2c`, every npm Dependabot job fails at the download of the pnpm binary. The switch was made before that was observed, at the owner's call.
 
@@ -7686,9 +7740,9 @@ The deck already renders every scenario the REPORTs did, from the same `results/
 
 **Problem.** Turbo builds its task graph from `dependencies` / `devDependencies` / `optionalDependencies` — **not** `peerDependencies`. Four packages declared `@real-router/core` _only_ as a peer: `route-utils`, `ssr-utils`, `ssr-data-plugin`, `rsc-server-plugin`. Verified directly — `@real-router/ssr-utils#type-check <- []`, no edge at all — while those same packages import core in 3 / 16 / 15 / 14 files and, thanks to the `@real-router/internal-source` condition, compile against `packages/core/src` rather than its `dist`. So a core change invalidated nothing of theirs: measured by appending a line to `packages/core/src/helpers.ts` and re-hashing — all sixteen `type-check` / `test` / `test:properties` / `bundle` hashes came back byte-identical. Turbo replayed results computed against a _previous_ core, and a breaking core change would pass the pre-commit hook green, surfacing only where the cache happened to be cold. The other 20 packages were never exposed: they carry core in `dependencies`, so the edge exists.
 
-**Solution, and why it is two mechanisms rather than one.** Three of the four got `"@real-router/core": "workspace:^"` in `devDependencies` — the peer declaration is the published contract and stays untouched; the dev entry exists purely so turbo sees the edge (syncpack already sanctions this: its `workspace:^` group covers `dependencyTypes: ["prod", "dev"]`). `ssr-utils` could **not** take that fix: `core` keeps `@real-router/ssr-utils` in its own devDeps for three tests (`lifecycle.properties.ts`, `boundary-gaps.test.ts`, `claimContextNamespace.test.ts`), so the dev entry closes a loop and turbo refuses to run at all — `Cyclic dependency detected: @real-router/ssr-utils#type-check, @real-router/core#type-check`. It therefore gets `packages/ssr-utils/turbo.json` (`extends: ["//"]`) adding `../core/src/**/*.ts` to the `type-check` and `bundle` inputs. Those two are the only entry points needed: `test` depends on `type-check` and `test:properties` on `test`, so the invalidation cascades, while `bundle` (`dependsOn: ["^bundle"]`) has no path to either. `../`-escaping inputs do work in a package config — confirmed by the same probe, all four hashes moved.
+**Solution, and why it is two mechanisms rather than one.** Three of the four got `"@real-router/core": "workspace:^"` in `devDependencies` — the peer declaration is the published contract and stays untouched; the dev entry exists purely so turbo sees the edge (syncpack already sanctions this: its `workspace:^` group covers `dependencyTypes: ["prod", "dev"]`). `ssr-utils` could **not** take that fix at the time (it can now — #2426): `core` keeps `@real-router/ssr-utils` in its own devDeps for three tests (`lifecycle.properties.ts`, `boundary-gaps.test.ts`, `claimContextNamespace.test.ts`), so the dev entry closes a loop and turbo refuses to run at all — `Cyclic dependency detected: @real-router/ssr-utils#type-check, @real-router/core#type-check`. It therefore gets `packages/ssr-utils/turbo.json` (`extends: ["//"]`) adding `../core/src/**/*.ts` to the `type-check` and `bundle` inputs. Those two are the only entry points needed: `test` depends on `type-check` and `test:properties` on `test`, so the invalidation cascades, while `bundle` (`dependsOn: ["^bundle"]`) has no path to either. `../`-escaping inputs do work in a package config — confirmed by the same probe, all four hashes moved.
 
-**Why not break the cycle instead.** Relocating core's three ssr-utils-importing tests into `ssr-utils` would restore a properly-directed graph, but they exercise core branches under a 100 %-coverage gate, so the move trades a build-graph defect for a coverage one. Zeroing `dependsOn` on core's `type-check`/`bundle` in a `packages/core/turbo.json` would also break the loop, but it states something false about core and silently disarms a real edge the day core gains a workspace dependency. The input-based fix is local to the affected package and claims nothing about ownership.
+**Why not break the cycle instead.** Relocating core's three ssr-utils-importing tests into `ssr-utils` would restore a properly-directed graph, but they exercise core branches under a 100 %-coverage gate, so the move trades a build-graph defect for a coverage one. **⚠ Superseded 2026-09-19 (#2426): the premise was not measured, and it does not hold.** With those cases skipped and the rest of the suite untouched, core's coverage stays at 100 % — 4109/4109 statements, 2250/2250 branches, 813/813 functions, 4078/4078 lines — so they cover no core line that nothing else covers. The move was made, the cycle is gone, and `packages/ssr-utils/turbo.json` with it; see "The core ↔ ssr-utils cycle is gone" above. Zeroing `dependsOn` on core's `type-check`/`bundle` in a `packages/core/turbo.json` would also break the loop, but it states something false about core and silently disarms a real edge the day core gains a workspace dependency. The input-based fix is local to the affected package and claims nothing about ownership.
 
 **`lint` is deliberately not wired up.** It has no `dependsOn`, so for _all_ 23 packages a core change already leaves `lint` hashes untouched — adding core to ssr-utils' lint inputs would make one package behave unlike the other 22. Confirmed in the probe: `lint` was the one hash that stayed put on all four.
 

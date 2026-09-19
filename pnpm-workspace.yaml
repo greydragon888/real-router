@@ -37,13 +37,14 @@ overrides:
   # Parents are express / body-parser / @gitbeaker / typed-rest-client — dev servers and CI
   # tooling, never a published @real-router/* package.
   qs: '>=6.16.0'
-  # Force adm-zip past the path-traversal fix (GHSA-xcpc-8h2w-3j85, High). Its only consumer is
+  # Force adm-zip past the path-traversal fix (GHSA-xcpc-8h2w-3j85, High) and the
+  # uncompressed-size allocation fix (GHSA-7q85-xj36-vmfc, High; 0.6.1). Its only consumer is
   # @sonar/scan (root devDep, NOT shipped), which pins adm-zip EXACTLY at 0.5.17 in both 4.3.8 and
   # the latest 4.4.0 — so an override is the only bump path. Dev-only + trusted-input (the scanner
-  # extracts SonarSource's own zip), so 0.6.0's stricter extract can't break it. Drop when a
+  # extracts SonarSource's own zip), so the stricter extract can't break it. Drop when a
   # @sonar/scan release moves off 0.5.x. (Override, not an osv-scanner.toml allowlist, so a future
   # regression that drops it re-fails the gate instead of being silently masked.)
-  adm-zip: '>=0.6.0'
+  adm-zip: '>=0.6.1'
   # Floor raised for GHSA-mw96-cpmx-2vgc (arbitrary file write via path traversal,
   # High, fixed in 4.59.0). Written as a FLOOR, not the exact pin it started as:
   # an exact override silently overrides the consumer's own version too, so

@@ -1,13 +1,7 @@
 import { test } from "@fast-check/vitest";
-import {
-  getHydrationState,
-  hydrateRouter,
-  serializeRouterState,
-} from "@real-router/ssr-utils";
 import { describe, expect, it } from "vitest";
 
 import { errorCodes, RouterError } from "@real-router/core";
-import { getPluginApi } from "@real-router/core/api";
 
 import {
   createFixtureRouter,
@@ -15,9 +9,6 @@ import {
   arbStartPath,
   NUM_RUNS,
 } from "./helpers";
-
-import type { State } from "@real-router/core";
-import type { SerializedRouterState } from "@real-router/core/types";
 
 describe("start / stop / dispose Lifecycle Properties", () => {
   test.prop([arbStartPath], { numRuns: NUM_RUNS.standard })(
@@ -139,65 +130,6 @@ describe("start / stop / dispose Lifecycle Properties", () => {
         expect.objectContaining({ code: errorCodes.ROUTER_ALREADY_STARTED }),
       );
 
-      router.stop();
-    },
-  );
-
-  test.prop([arbStartPath], { numRuns: NUM_RUNS.standard })(
-    "hydration scratchpad is single-shot: first start consumes it, a later start sees null",
-    async (path) => {
-      const router = createFixtureRouter();
-
-      const serverState: State = {
-        name: "home",
-        params: {},
-        search: {},
-        path,
-        context: { data: { hydrated: true } },
-        transition: {
-          phase: "activating",
-          reason: "success",
-          segments: { deactivated: [], activated: [], intersection: "" },
-        },
-      };
-
-      // Capture exactly what the start interceptor saw on each invocation. The
-      // scratchpad is a per-call snapshot, so we record one entry per start
-      // rather than relying on a post-hoc read (avoids ordering ambiguity).
-      const seenInScratchpad: (SerializedRouterState | null)[] = [];
-
-      const removeInterceptor = getPluginApi(router).addInterceptor(
-        "start",
-        async (next, startPath) => {
-          seenInScratchpad.push(getHydrationState(router));
-
-          return next(startPath);
-        },
-      );
-
-      // (1) First start is driven by hydrateRouter — the scratchpad must be
-      // populated and observable from inside the start interceptor.
-      await hydrateRouter(router, serializeRouterState(serverState));
-
-      expect(seenInScratchpad).toHaveLength(1);
-      expect(seenInScratchpad[0]).not.toBeNull();
-      expect(seenInScratchpad[0]).toMatchObject({ path });
-
-      // After hydrateRouter resolves, its `finally` must have cleared the
-      // scratchpad — single-shot, no leakage past the awaited start.
-      expect(getHydrationState(router)).toBeNull();
-
-      router.stop();
-
-      // (2) Second start is a plain CSR start — because the scratchpad was
-      // already consumed, the interceptor must observe null this time.
-      await router.start(path);
-
-      expect(seenInScratchpad).toHaveLength(2);
-      expect(seenInScratchpad[1]).toBeNull();
-      expect(getHydrationState(router)).toBeNull();
-
-      removeInterceptor();
       router.stop();
     },
   );

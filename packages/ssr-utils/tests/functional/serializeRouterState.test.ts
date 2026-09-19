@@ -1,6 +1,9 @@
+import { getPluginApi } from "@real-router/core/api";
 import { describe, it, expect } from "vitest";
 
 import { serializeRouterState } from "@real-router/ssr-utils";
+
+import { createTestRouter } from "../helpers";
 
 import type { State } from "@real-router/core";
 
@@ -368,6 +371,34 @@ describe("serializeRouterState", () => {
       });
 
       expect(jsonExplicitJson).toBe(jsonNoOpt);
+    });
+  });
+
+  // A namespace a plugin claimed has to reach the client, and `__proto__` is the
+  // name where a serializer that reads `Object.keys` off a swapped prototype
+  // loses it (#1191). The transport is this package's contract, so the case is
+  // asserted in this package — it sat in core's `claimContextNamespace` suite
+  // until #2426, from before this package existed.
+  describe("a claimed context namespace survives the roundtrip (#1191)", () => {
+    it('"__proto__" namespace data survives a serializeRouterState roundtrip (N3 SSR transport)', async () => {
+      const router = createTestRouter();
+      const claim = getPluginApi(router).claimContextNamespace("__proto__");
+
+      await router.start("/home");
+
+      const state = router.getState()!;
+
+      claim.write(state, { data: 42 });
+
+      const parsed = JSON.parse(serializeRouterState(state)) as {
+        context: Record<string, unknown>;
+      };
+
+      // Pre-fix: context serializes as {} (no own keys) → plugin data lost.
+      expect(Object.keys(parsed.context)).toStrictEqual(["__proto__"]);
+      expect(parsed.context.__proto__).toStrictEqual({ data: 42 });
+
+      router.stop();
     });
   });
 });

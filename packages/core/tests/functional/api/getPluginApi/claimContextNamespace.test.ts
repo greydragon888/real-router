@@ -1,4 +1,3 @@
-import { serializeRouterState } from "@real-router/ssr-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { errorCodes, RouterError } from "@real-router/core";
@@ -312,24 +311,6 @@ describe("getPluginApi().claimContextNamespace()", () => {
       expect(Object.keys(state.context)).toContain("__proto__");
       expect(Object.getPrototypeOf(state.context)).toBe(Object.prototype);
       expect(state.context.__proto__).toStrictEqual({ data: 42 });
-    });
-
-    it('"__proto__" namespace data survives a serializeRouterState roundtrip (N3 SSR transport)', async () => {
-      const claim = api.claimContextNamespace("__proto__");
-
-      await router.start("/home");
-
-      const state = router.getState()!;
-
-      claim.write(state, { data: 42 });
-
-      const parsed = JSON.parse(serializeRouterState(state)) as {
-        context: Record<string, unknown>;
-      };
-
-      // Pre-fix: context serializes as {} (no own keys) → plugin data lost.
-      expect(Object.keys(parsed.context)).toStrictEqual(["__proto__"]);
-      expect(parsed.context.__proto__).toStrictEqual({ data: 42 });
     });
 
     it("rejects an empty-string namespace with a TypeError (N4)", () => {
