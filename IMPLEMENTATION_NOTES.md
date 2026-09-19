@@ -10,11 +10,22 @@ The lever this blocks is concrete. Measured on core, 11-core M3 Pro, two rounds:
 
 **Solution.** A `base-lint` job, `runs-on: ubuntu-latest`, with the same `CORE_LAYER` filter read from `build-matrix.mjs` — the same single source of truth `base-test` uses — and its own `--summarize` artifact. `base-test` keeps `test`. Both are in `CI Result`'s `needs` and in its `sharded` arm, so neither can be skipped into a pass.
 
-**Why this buys nothing by itself, and is still the right first step.** The gate waits for the slowest job, and `base-test` is still `type-check + test` = 13 + 197. The wall does not move. What moves is what the next run can tell: `lint` now has a runner whose time is its own, so `--concurrency`, a shard, or nothing at all can be compared on it without the vitest beside it confounding the number.
+**It was expected to buy nothing, and the first cold run refuted that.** The reasoning was `max(197, 196)` — remove one and the other stands. Both numbers were inflated by each other. Measured on run 35447769771, the first cold run with the jobs apart:
+
+| task        | sharing a runner | on its own  |
+| ----------- | ---------------- | ----------- |
+| `core#lint` | 196 s            | **94.4 s**  |
+| `core#test` | 197 s            | **153.9 s** |
+
+⚑ **`core#test` is 1.28× faster for having the runner to itself**, and that is the whole gain: `base-test` went from 278 s to **187 s** (turbo wall 163.3 s plus ~24 s of checkout and install), against `base-lint` at 122 s. Floor 1 of the gate dropped 91 s between #2430 and this change.
+
+⚠ **`core#lint` at 94.4 s is no longer on the critical path**, so #2429's step 2 — an ESLint cache, `--concurrency`, a lint shard — has nothing left to buy there. What remains is `core#test` at 153.9 s of the 163.3 s.
 
 ⚑ **The precedent is one job over.** `base-properties` left this same runner in #2430 for the same class of reason — _"two vitest processes on one 4-vCPU runner is the contention the property suite timed out under in #2107"_.
 
-**Cost.** One more job: measured on this repository's ubuntu-latest jobs, a checkout is 2–7 s and the composite setup 11–28 s.
+**Cost.** One more job, and its setup is visible in the numbers above: 122 s of job for 94.6 s of turbo.
+
+⚠ **Each job type-checks core separately** — 9.3 s in `base-test`, 12.7 s in `base-lint` — because `lint.dependsOn: ["^type-check"]` (#2432) makes turbo schedule the filtered package's own `type-check` even when that package has no workspace dependency for `^` to reach. Measured by `--dry=json` with and without the edge: two tasks against one. It runs concurrently with the lint, so it costs CPU on the runner rather than wall.
 
 ## The push-to-master examples lint is the weekly run's job (2026-09-19)
 
