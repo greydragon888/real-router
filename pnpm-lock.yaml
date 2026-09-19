@@ -11,7 +11,7 @@ overrides:
   axios: '>=1.16.0'
   follow-redirects: '>=1.16.0'
   qs: '>=6.16.0'
-  adm-zip: '>=0.6.0'
+  adm-zip: '>=0.6.1'
   rollup: '>=4.59.0'
   minimatch@3: ~3.1.4
   minimatch@9: ~9.0.7
@@ -10619,8 +10619,8 @@ packages:
     engines: {node: '>=0.4.0'}
     hasBin: true
 
-  adm-zip@0.6.0:
-    resolution: {integrity: sha512-XleryMhbuksdKtofnWZ9Sk+4CUTbms4Mb/EU32SZwToAyZ5RgVos/ki8n+yr0LWHOGKuakbXTuuYNHLQjhddgg==}
+  adm-zip@0.6.1:
+    resolution: {integrity: sha512-Xwrja8nx9e5o2N1my4DsKCeKpdrnACyr1wtbPxBDgGzKzKyE9kRtBFA8mWldI+RVlD7CBZNWY/wQ2+ydwOR6kQ==}
     engines: {node: '>=14.0'}
 
   agent-base@6.0.2:
@@ -17800,7 +17800,7 @@ snapshots:
 
   '@sonar/scan@5.0.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)':
     dependencies:
-      adm-zip: 0.6.0
+      adm-zip: 0.6.1
       axios: 1.18.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       commander: 15.0.0
       hpagent: 1.2.0
@@ -18791,7 +18791,7 @@ snapshots:
 
   acorn@8.17.0: {}
 
-  adm-zip@0.6.0: {}
+  adm-zip@0.6.1: {}
 
   agent-base@6.0.2(supports-color@10.2.2):
     dependencies:
