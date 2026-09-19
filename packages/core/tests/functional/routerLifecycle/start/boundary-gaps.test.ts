@@ -12,7 +12,6 @@
 //     isolates async listener rejections centrally; pinned in
 //     error-handling.test.ts (next to the sync-throw onStart isolation).
 
-import { hydrateRouter } from "@real-router/ssr-utils";
 import { describe, afterEach, it, expect } from "vitest";
 
 import { createRouter, errorCodes, events } from "@real-router/core";
@@ -327,34 +326,6 @@ describe("router.start() - boundary gaps (#1190)", () => {
         /returned without calling next/,
       );
       expect(router.isActive()).toBe(false);
-
-      router.dispose();
-    });
-  });
-
-  describe("concurrent hydrateRouter()", () => {
-    it("two concurrent hydrations — one starts, the other rejects ALREADY_STARTED", async () => {
-      const router = createRouter([
-        { name: "home", path: "/home" },
-        { name: "a", path: "/a" },
-      ]);
-      const serialized = JSON.stringify({ name: "a", params: {}, path: "/a" });
-
-      const [first, second] = await Promise.allSettled([
-        hydrateRouter(router, serialized),
-        hydrateRouter(router, serialized),
-      ]);
-
-      // Exactly one hydration wins; the other is rejected ALREADY_STARTED.
-      const fulfilled = [first, second].filter((r) => r.status === "fulfilled");
-      const rejected = [first, second].filter((r) => r.status === "rejected");
-
-      expect(fulfilled).toHaveLength(1);
-      expect(rejected).toHaveLength(1);
-      expect((rejected[0].reason as { code?: string }).code).toBe(
-        errorCodes.ROUTER_ALREADY_STARTED,
-      );
-      expect(router.getState()?.name).toBe("a");
 
       router.dispose();
     });

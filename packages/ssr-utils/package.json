@@ -50,5 +50,8 @@
   "sideEffects": false,
   "peerDependencies": {
     "@real-router/core": "workspace:>=0.141.0"
+  },
+  "devDependencies": {
+    "@real-router/core": "workspace:^"
   }
 }

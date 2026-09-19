@@ -1,4 +1,4 @@
-import { errorCodes } from "@real-router/core";
+import { createRouter, errorCodes } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
@@ -399,6 +399,38 @@ describe("hydrateRouter", () => {
       expect((parsedContext.data.fetchedAt as Date).toISOString()).toBe(
         date.toISOString(),
       );
+    });
+  });
+
+  // Two hydrations racing for one router: the start boundary admits one and
+  // refuses the other. Core owns the boundary, this package owns the call — and
+  // the case sat in core's start-boundary suite (#1190) until #2426, from before
+  // this package existed.
+  describe("concurrent hydrateRouter()", () => {
+    it("two concurrent hydrations — one starts, the other rejects ALREADY_STARTED", async () => {
+      const concurrent = createRouter([
+        { name: "home", path: "/home" },
+        { name: "a", path: "/a" },
+      ]);
+      const serialized = JSON.stringify({ name: "a", params: {}, path: "/a" });
+
+      const [first, second] = await Promise.allSettled([
+        hydrateRouter(concurrent, serialized),
+        hydrateRouter(concurrent, serialized),
+      ]);
+
+      // Exactly one hydration wins; the other is rejected ALREADY_STARTED.
+      const fulfilled = [first, second].filter((r) => r.status === "fulfilled");
+      const rejected = [first, second].filter((r) => r.status === "rejected");
+
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      expect((rejected[0].reason as { code?: string }).code).toBe(
+        errorCodes.ROUTER_ALREADY_STARTED,
+      );
+      expect(concurrent.getState()?.name).toBe("a");
+
+      concurrent.dispose();
     });
   });
 });
