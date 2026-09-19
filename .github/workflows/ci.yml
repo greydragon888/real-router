@@ -652,8 +652,22 @@ jobs:
         run: |
           FILTERS=$(node -e 'import("./scripts/build-matrix.mjs").then((m) => process.stdout.write([...m.CORE_LAYER].map((p) => "--filter=" + p).join(" ")))')
           echo "Core-layer filters: $FILTERS"
+          # ESLint's worker threads, and ONLY here (#2437). This job lints one
+          # package alone on its own runner; `turbo run lint` across the 25
+          # packages already saturates the machine, and adding workers inside
+          # each of them is over-subscription — measured, 74.7 s -> 83.0 s of
+          # wall for 1.73x the CPU. So the flag is a passthrough here rather
+          # than a change to the packages' `lint` scripts.
+          #
+          # `auto`, not a number: eslint@10.11 resolves it to
+          # `min(ceil(files / 50), floor(availableParallelism() / 2))`, which is
+          # 2 workers on a 4-vCPU runner — and 2 workers want 2.8 cores, which
+          # fit. An explicit 4 wants 5.6 on a runner that has four.
+          #
+          # ⚠ turbo hashes what `--` forwards, so this job's `core#lint` entries
+          # no longer share a cache key with the ones pre-push writes.
           # shellcheck disable=SC2086
-          pnpm turbo run lint $FILTERS --summarize
+          pnpm turbo run lint $FILTERS --summarize -- --concurrency=auto
 
       - name: Upload turbo run summaries (per-task timings)
         if: always()

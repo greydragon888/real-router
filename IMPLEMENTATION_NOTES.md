@@ -2,6 +2,28 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## `base-lint` gets ESLint's worker threads, and only `base-lint` (#2437, 2026-09-19)
+
+**Problem.** After #2430, #2435 and #2436 the gate's floor 1 is `base-lint` at ~122 s, level with the sharded `base-test` chain, and `core#lint` is 94.4 s of it. ESLint 10.11 has `--concurrency` and this repository never passed it; the default is `off`.
+
+**Measured on core, 11-core M3 Pro:**
+
+| `--concurrency` | wall       | CPU     | CPU/wall |
+| --------------- | ---------- | ------- | -------- |
+| `off`           | 38.1 s     | 54.1 s  | 1.4      |
+| 2               | 28.6 s     | 80.2 s  | 2.8      |
+| **4**           | **20.3 s** | 114.6 s | 5.6      |
+| 6               | 20.7 s     | 164.5 s | 8.0      |
+| 8               | 23.1 s     | 210.2 s | 9.1      |
+
+⚑ **The knee is at 4, and past it the wall gets worse** while the CPU keeps climbing. The flag finds the same things either way: with an upstream type widened to `any`, a dependent reports the same 6 `no-unsafe-*` errors at `off`, at `4` and at `auto`.
+
+**Solution, and why it is a passthrough rather than a change to the `lint` scripts.** The flag is passed in the `base-lint` job alone. That job lints one package on its own runner; `turbo run lint` across the 25 packages already saturates the machine, and workers inside each of them are over-subscription — measured over the whole set, cold: **74.7 s → 83.0 s of wall for 1.73× the CPU** (471 s → 816 s). Putting it in the package scripts would carry that into every pre-push.
+
+**Why `auto` and not a number.** Read from the installed `eslint@10.11.0`: `auto` is `min(ceil(files / 50), floor(availableParallelism() / 2))`, zero when that is ≤ 1. On a 4-vCPU runner that is **2 workers**, which want 2.8 cores and fit. An explicit `4` wants 5.6 on a runner that has four.
+
+⚠ **turbo hashes what `--` forwards.** This job's `core#lint` entries no longer share a cache key with the ones pre-push writes, so the two populate separate entries for the same tree.
+
 ## The `Examples lint` tail is accepted, and four ways out of it are closed by measurement (#2429, 2026-09-19)
 
 **Problem.** `Examples lint (outside changes)` is the gate's second floor. Over six runs where it was not skipped it took 56, 57, 169, 600, 686 and 689 s, and in run 35417257717 it took **689 s while `Base test` took 307 s** — 671 of those 689 s being the lint itself, against 2 s of checkout and 11 s of install. It fires when a change reaches the examples from outside them, which is 6 of the last 27 runs.
