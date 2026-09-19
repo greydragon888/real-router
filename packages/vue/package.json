@@ -85,7 +85,7 @@
     "vue": "~3.5.39"
   },
   "peerDependencies": {
-    "@real-router/core": "workspace:>=0.144.0",
+    "@real-router/core": "workspace:>=0.145.0",
     "vue": ">=3.3.0"
   }
 }

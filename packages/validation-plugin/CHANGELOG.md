@@ -1,5 +1,28 @@
 # @real-router/validation-plugin
 
+## 0.27.0
+
+### Minor Changes
+
+- [#2423](https://github.com/greydragon888/real-router/pull/2423) [`37b6639`](https://github.com/greydragon888/real-router/commit/37b663906134e9302a695035d03d93b57d251233) Thanks [@greydragon888](https://github.com/greydragon888)! - The lifecycle and state-builder refusals are registered as checks ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  Six more registrations at install, all removed on `teardown`.
+  `RouterValidator` loses `lifecycle.validateHandler`; core has no consultation
+  left for it.
+
+  ⚠ `lifecycle.validateCountThresholds` stays on the validator and could not move
+  with them: measured, it never throws — it is one of the diagnostics the emitter
+  half of [#2388](https://github.com/greydragon888/real-router/issues/2388) takes, and the check channel is refusal-only.
+
+  ⚠ The new cells use a WHITESPACE route name. A number is refused by core's own
+  `assertRouteNameIsString` before the check runs, and an empty name is valid — it
+  is the root node — so neither reaches the registration.
+
+### Patch Changes
+
+- Updated dependencies [[`37b6639`](https://github.com/greydragon888/real-router/commit/37b663906134e9302a695035d03d93b57d251233)]:
+  - @real-router/core@0.145.0
+
 ## 0.26.0
 
 ### Minor Changes
