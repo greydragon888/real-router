@@ -6,8 +6,7 @@
 //
 // prints `examples_lint_filter=--filter=<pkg> …`, empty when none, and
 // `examples_lint_reasons=<reason>=<count> …` for the log. `ci.yml` asks it about
-// a pull request and `examples-lint.yml` about each push to `master`; both run
-// `turbo run lint:example lint:bench` with the filter.
+// a pull request and runs `turbo run lint:example lint:bench` with the filter.
 //
 // The answer is turbo's package-level `affected` reason. A workspace counts
 // unless turbo gives it one of LOCAL_REASONS:

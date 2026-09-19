@@ -2,7 +2,7 @@ name: Examples
 
 on:
   schedule:
-    - cron: '0 22 * * 2' # Wed at 05:00 ICT (UTC+7)
+    - cron: "0 22 * * 2" # Wed at 05:00 ICT (UTC+7)
   workflow_dispatch: {}
 
 concurrency:
@@ -63,6 +63,13 @@ jobs:
       # remote-cache leftovers (#499 was this exact class).
       - name: Build (includes lib bundles + lint, type-check, test via turbo deps)
         run: pnpm turbo run build --filter='./examples/**'
+
+      # `build` reaches every example's `lint:example` through `dependsOn`, so
+      # the line above already lints all of them. `router-benchmarks` is not
+      # under `examples/`, and its `lint:bench` has no other weekly home — the
+      # same run it belongs to is the one `notify-failure` watches.
+      - name: Lint the benchmark apps
+        run: pnpm turbo run lint:bench --filter=router-benchmarks
 
   e2e:
     name: E2E Tests
@@ -162,7 +169,7 @@ jobs:
     # from filing issues. (Deliberately NOT copied to post-merge.yml, where
     # `cancel-in-progress: true` cancels superseded runs constantly and `!success()`
     # would open an issue on every quick second push.) (Audit §4.8.)
-    if: '!success() && github.event_name == ''schedule'''
+    if: "!success() && github.event_name == 'schedule'"
     permissions:
       issues: write
     steps:

@@ -909,8 +909,11 @@ jobs:
   # skipped while every one of their lints moved: #2395 merged green on a base
   # whose `lint:example` was red. `scripts/examples-lint-filter.mjs` takes the
   # set from turbo's own attribution and leaves out what the job above and
-  # examples.yml cover. `examples-lint.yml` asks the same about each push to
-  # master, which no PR carries.
+  # examples.yml cover.
+  #
+  # ⚠ This is the only arm that runs BEFORE a merge, and it has no Dependabot
+  # skip on purpose: the incident is an ESLint bump going green here and then
+  # failing every branch's pre-push, which lints the examples too.
   # ============================================
   examples-lint:
     name: Examples lint (outside changes)

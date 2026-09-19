@@ -2,6 +2,18 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## The push-to-master examples lint is the weekly run's job (2026-09-19)
+
+**Problem.** `examples-lint.yml` ran on every push to `master` and cost 1 m 42 s each time. Measured on run 35442887524: the planner itself takes **1 s**, and the rest is two dependency installs (41 s), two checkouts (10 s), 9 s of queue and setup, and 33 s of remote-cache round-trips for 166 tasks that were **all hits** — `lint:example` declares no outputs, so most of that is latency, not artifacts. Thirty runs, thirty greens.
+
+⚠ **And it is blind to the case it looks like it covers.** On a commit that touches only `examples/` the planner prints an empty filter and the job is skipped — measured on `1fe126611`, whose diff includes an example's `src/main.tsx`. `FileChanged` is a local reason because _"Examples (affected) builds the examples a pull request edits, and `build` lints them"_, and that holds for a pull request only. `post-merge.yml` runs with `--filter='!./examples/**'`. So nothing lints example code at the moment it lands by a direct push — only `.husky/pre-push` before it, and the weekly run after — and deleting this workflow takes nothing away from that.
+
+**Solution.** The workflow is deleted, and the weekly `examples.yml` is where a push to `master` is answered. It already lints **every** example rather than the subset a range reaches from outside: `turbo run build --filter='./examples/**'` plans **145** `lint:example` tasks, because `build` reaches each one through `dependsOn`. `router-benchmarks` was the gap — it is not under `examples/`, so its `lint:bench` had no weekly home — and it gains a step in the same job, which `notify-failure` already watches and turns into a tracking issue.
+
+**What still runs before a merge.** `ci.yml`'s `examples-lint`, and it is the arm that matters: it has no Dependabot skip, so the #2402 incident — an ESLint bump merging green and then failing every branch's pre-push, which lints the examples too — is caught on the pull request. It is also nearly free: of the last 27 runs it skipped 21.
+
+⚠ **What is weaker, stated plainly.** An _outside_ change pushed straight to `master` with the hook bypassed — a worktree without `.husky/_` — was reported within minutes and is now reported on Tuesday. Everything else that workflow covered is covered by `.husky/pre-push` on the same tree, or by the weekly run.
+
 ## `lint` depends on `^type-check`, because typed rules read types the hash did not (#2432, 2026-09-19)
 
 **Problem.** A core change that a dependent's typed lint rejects was replayed green. Measured on `master` @ `a1fa45202`: widen `getNavigator`'s return type to `any`, and `@real-router/react#lint` answers `cache hit, replaying logs (no errors)` at the unchanged hash `33c9df916296831b`, exit 0 — while the same command with `--force` exits 1 on six `@typescript-eslint/no-unsafe-*` errors. `lint` had no `dependsOn` and its `inputs` name the package's own files plus `../../shared/**`, so nothing about core entered the hash; the `@real-router/internal-source` condition means the typed rules resolve `packages/core/src`, which is exactly what the hash ignored. The dependent's `type-check` does invalidate, and catches nothing here — a widened return type is valid TypeScript, and only the lint objects.
@@ -292,8 +304,11 @@ touch the failing file, was the first thing to fail.
 - `ci.yml`: the `check` job plans over `HEAD^1..HEAD` of the PR's merge commit,
   and `examples-lint` runs `turbo run lint:example lint:bench` with the filter.
   It sits in `CI Result`'s `needs`, skippable like `examples-build`.
-- `examples-lint.yml` plans and lints the same way over each push to `master`,
-  `before..after`.
+- A push to `master` is the weekly `examples.yml`'s, not a workflow of its own.
+
+> ⚠ Superseded on 2026-09-19: `examples-lint.yml` planned and linted the same
+> way over each push to `master`, and is deleted. See "The push-to-master
+> examples lint is the weekly run's job".
 
 **Why turbo's reason, not a list of root files.** A list cannot tell a bump from
 a script edit in `package.json`; turbo reads the lockfile. Measured on
