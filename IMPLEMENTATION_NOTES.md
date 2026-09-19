@@ -47,6 +47,8 @@
 
 ⚑ **Four shards do not replay one cache entry.** turbo hashes what `--` forwards (`cliArguments`), measured: four distinct hashes for `--shard=1..4/4` against the unsharded one.
 
+⚠ **`.vitest/blob/**` is a declared output of `test`, and it has to be.** A cache HIT replays the log and restores the declared outputs — it does not re-run vitest — so a shard that hits leaves no blob and its upload fails on `if-no-files-found: error`. Measured as an A/B, the same command twice: without the directory in `outputs` a hit leaves **0** blobs, with it **1**. It landed in CI as four red shards on the first pull request whose `core#test` hash matched an earlier run, and `coverage-threshold-authority.test.mjs` now pins the directory against what the shards write.
+
 **Two levers measured and closed on the way.** The coverage reporter list (five entries, `lcov` and `lcovonly` overlapping) costs nothing — 54.6 / 51.5 s against 54.0 / 52.9 s with two. `--coverage.experimentalAstAwareRemapping` likewise: 52.2 / 50.9 s against 52.6 / 52.4 s.
 
 ## `base-lint` left `base-test`'s runner, so either can be measured (#2429, 2026-09-19)

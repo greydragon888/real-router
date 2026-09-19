@@ -126,6 +126,29 @@ test("the blob artifact the merge reads is the one the shards write", () => {
   );
 });
 
+test("the blob directory is a cached output of `test`", () => {
+  // A cache HIT replays the log and restores the declared outputs — it does not
+  // re-run vitest, so the blob only exists afterwards if turbo put it back.
+  // Measured: with the directory absent from `outputs`, a hit leaves 0 blobs and
+  // the shard's upload fails on `if-no-files-found: error`; with it, 1.
+  const turbo = JSON.parse(
+    readFileSync(join(repoRoot, "turbo.json"), "utf8").replace(
+      /^\s*\/\/.*$/gm,
+      "",
+    ),
+  );
+  const outputs = turbo.tasks.test.outputs;
+
+  const written = /--outputFile\.blob=([^\s\\]+)/.exec(ci);
+  assert.ok(written, "the shards no longer name a blob file");
+
+  const dir = written[1].slice(0, written[1].lastIndexOf("/"));
+  assert.ok(
+    outputs.some((o) => o.startsWith(dir)),
+    `test.outputs ${JSON.stringify(outputs)} does not cover ${dir}`,
+  );
+});
+
 test("base-coverage counts the blobs before merging them", () => {
   const body = step("Verify all four blobs arrived");
 

@@ -99,7 +99,7 @@
     },
     "test": {
       "dependsOn": ["type-check"],
-      "outputs": ["coverage/**"],
+      "outputs": ["coverage/**", ".vitest/blob/**"],
       "inputs": [
         "src/**/*.{ts,tsx}",
         "../../shared/**/*.ts",
