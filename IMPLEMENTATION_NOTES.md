@@ -20,7 +20,11 @@
 
 ⚑ **The dependent's lint fits inside the window the run already occupied.** Cold and on its own it takes 14.4 s, and the shard command grows by 0.3 s: it runs beside the `type-check` → `test` chain rather than after it, because `test` already required `^type-check`. The planned task set is 9 either way.
 
-⚠ **That is one package's shard.** The real split puts several packages in one job, where their lints compete for the same cores; read the figure off the first post-merge run rather than scaling this one.
+⚠ **That is one package's shard.** The real split puts several packages in one job, where their lints compete for the same cores, so it is a floor rather than the figure a shard pays.
+
+⚑ **The first post-merge run on this change** — 35442887435 — built 115 tasks with 93 cached in 2 m 34 s, and its 22 misses are the dependents' lint tier arriving all at once, which is the worst case this edge can produce and happens only on the commit that introduces it.
+
+⚠ **The edit re-keys `lint` and `build`, and nothing else.** Measured over the `build` graph's 1190 tasks: 338 hashes moved, 169 `lint` and 169 `build`, while `bundle`, `test`, `test:properties`, `type-check` and `lint:example` each stayed at 170. `@real-router/core` is the one package whose two did not move — it declares no workspace dependency, so `^type-check` adds nothing to its hash.
 
 ⚠ **turbo does not cache `.eslintcache`** — `lint.outputs` is empty — so CI always pays the cold column, and a bare `turbo run lint` on a changed tree additionally pulls the 23 `type-check` tasks it now depends on, ~14 s. `--concurrency=4` moves none of these numbers.
 
