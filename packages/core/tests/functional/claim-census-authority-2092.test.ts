@@ -400,3 +400,5 @@ describe("the #2092 claim census, as a ledger rather than a sweep", () => {
     ]);
   });
 });
+
+// measurement marker A — removed before merge (#2429)
