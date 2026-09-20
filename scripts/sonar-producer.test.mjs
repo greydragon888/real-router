@@ -14,9 +14,14 @@
 //                 ruleset reads is not something this repository decides.
 //   NEITHER     — the pull request waits on a context nobody produces, forever.
 //
-// So the two conditions have to be mirror images on the head repository, and
-// the in-CI job's own `if` must carry nothing else: a job skipped by `if:`
-// posts no status, which is the NEITHER direction.
+// So the conditions have to partition the cases, and the in-CI job's own `if`
+// must carry nothing else: a job skipped by `if:` posts no status, which is the
+// NEITHER direction.
+//
+// Since #2441 the fork side is two jobs rather than one — `gate` for a CI run
+// that succeeded and `ci-failed` for one that did not — so the partition is
+// over (head repository x conclusion) and the complement on `conclusion` is
+// pinned here as well.
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -78,6 +83,53 @@ test("the two are mirror images, so they cannot both fire or both stay silent", 
   assert.doesNotMatch(fork, /head_repository\.full_name == github\.repository/);
 });
 
+test("the fork side splits on the conclusion, and the split is a complement", () => {
+  // `gate` refuses a run that did not succeed, because it has no artifacts to
+  // read. A refusal that posts nothing leaves the required context on
+  // `Expected` for good — so the complement has to exist and has to report.
+  const gate = jobIf(trusted, "gate");
+  const failed = jobIf(trusted, "ci-failed");
+
+  assert.match(gate, /workflow_run\.conclusion == 'success'/);
+  assert.match(failed, /workflow_run\.conclusion != 'success'/);
+  // Neither may carry the other's polarity: that is how a complement silently
+  // becomes an overlap, or a gap, with both lines looking right alone.
+  assert.doesNotMatch(gate, /workflow_run\.conclusion != 'success'/);
+  assert.doesNotMatch(failed, /workflow_run\.conclusion == 'success'/);
+
+  // And it is the FORK side, not a third producer on the same-repository path.
+  assert.match(
+    failed,
+    /github\.event\.workflow_run\.head_repository\.full_name != github\.repository/,
+  );
+});
+
+test("the complement job posts the context, and is not named after it", () => {
+  const at = trusted.indexOf("\n  ci-failed:\n");
+  assert.notEqual(at, -1, "no ci-failed job");
+  const body = trusted.slice(at, trusted.indexOf("\n  gate:\n", at));
+
+  assert.match(
+    body,
+    /-f context="\$STATUS_CONTEXT"/,
+    "it must post the required context",
+  );
+  assert.match(
+    body,
+    /-f state=success/,
+    "a verdict that there is nothing to analyse is a PASS with a reason, " +
+      "not a failure — the PR is already blocked by `CI Result`",
+  );
+  // It reads no artifact: `pr-meta` is written by the last steps of `check`,
+  // so a run that died earlier never uploaded one.
+  assert.doesNotMatch(body, /download-artifact/);
+  assert.match(body, /workflow_run\.head_sha/);
+
+  const name = /\n {4}name: (.+)/.exec(body);
+  assert.ok(name, "the ci-failed job has no name");
+  assert.notEqual(name[1].trim(), CONTEXT);
+});
+
 test("the in-CI job's `if` carries NOTHING but always() and the repository test", () => {
   // Every other condition is decided inside and ends in a posted status. A
   // condition here skips the job, and a skipped job posts nothing.
@@ -111,6 +163,59 @@ test("the in-CI job posts the required context, and posts it on every path", () 
     /if: always\(\)/,
     "a failed scan, a dead step and `nothing to analyse` all have to report",
   );
+});
+
+test("the CI-state arm precedes every arm that reads an output of `check`", () => {
+  // Load-bearing, not cosmetic: a job that did not succeed publishes the empty
+  // string for its outputs, so `should_run` is empty exactly when `check`
+  // failed and the `docs or CI only` arm would claim the run first. Measured
+  // before the arm existed: a pull request of nothing but source was told
+  // "docs or CI only" (#2441).
+  const at = ci.indexOf("\n  sonar:\n");
+  const decide = ci.slice(at, ci.indexOf("- name: Checkout", at));
+
+  const failed = decide.indexOf('verdict "Not analysed: CI failed"');
+  const cancelled = decide.indexOf('verdict "Not analysed: CI cancelled"');
+  const noSource = decide.indexOf('verdict "Not analysed: no source changed"');
+  const docsOnly = decide.indexOf('verdict "Not analysed: docs or CI only"');
+
+  for (const [what, at_] of [
+    ["CI failed", failed],
+    ["CI cancelled", cancelled],
+    ["no source changed", noSource],
+    ["docs or CI only", docsOnly],
+  ]) {
+    assert.notEqual(at_, -1, `the ${what} arm is missing`);
+  }
+
+  assert.ok(failed < noSource, "the CI-failed arm must precede `no source`");
+  assert.ok(
+    failed < docsOnly,
+    "the CI-failed arm must precede `docs or CI only`",
+  );
+  assert.ok(
+    cancelled < docsOnly,
+    "the cancelled arm must precede `docs or CI only`",
+  );
+
+  // Both read job RESULTS, which stay readable when a job fails; reading an
+  // OUTPUT instead is the defect this arm exists to prevent. Asserted over the
+  // `run:` body, on the shell variables — the `env:` block names every output
+  // above every arm and would satisfy a looser check vacuously.
+  const script = decide.slice(decide.indexOf("set -euo pipefail"));
+  const failedInScript = script.indexOf('verdict "Not analysed: CI failed"');
+
+  assert.match(
+    script.slice(0, failedInScript),
+    /\$CHECK/,
+    "the CI-state arm must read `check`'s RESULT",
+  );
+  assert.doesNotMatch(
+    script.slice(0, failedInScript),
+    /\$NO_SOURCE|\$SHOULD_RUN|\$MODE/,
+    "no arm above the CI-state one may read an output of `check`",
+  );
+  assert.match(decide, /CHECK: \$\{\{ needs\.check\.result \}\}/);
 });
 
 test("the three arms the trusted gate decides are decided here too", () => {

@@ -2,6 +2,30 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## A red CI gets its own Sonar verdict, on both paths (#2441, 2026-09-20)
+
+**Problem.** The `SonarCloud` status had four verdicts and none of them fitted a failed run. Reproduced against the predicate as it stood, with fixture inputs:
+
+| the run                                  | what it said                                                              |
+| ---------------------------------------- | ------------------------------------------------------------------------- |
+| `check` failed, so its outputs are empty | `Not analysed: docs or CI only` — on a pull request of nothing but source |
+| `base-test` failed                       | `Not analysed: no coverage produced`                                      |
+| healthy, affected zero packages          | `Not analysed: no coverage produced` — the same string                    |
+
+⚠ **The first is a lie and the second is a collision.** A job that did not succeed publishes the **empty string** for its outputs rather than `false`, so `should_run` is empty exactly when `check` failed, and the arm that reads it claims the run first.
+
+**Solution.** An arm that settles the pipeline's state from job **results**, which stay readable whatever happened, placed above every arm that reads an output of `check`. `failure` gives `Not analysed: CI failed`; `cancelled` gives its own string, because a cancelled run is usually the concurrency group retiring a commit a newer push replaced.
+
+⚑ **The order is the fix, not the decoration.** Below the arms that read `check`'s outputs it would be unreachable in the case it exists for. `scripts/sonar-producer.test.mjs` pins the position by index and refuses an arm above it that reads an output.
+
+**And the fork path, which posted nothing at all.** `sonar-trusted.yml`'s `gate` runs only on `conclusion == 'success'` — correctly, since a failed run has no artifacts to read — so a fork's red CI left the required context on `Expected` for good. A second job, `ci-failed`, is the exact complement on `conclusion` and posts the same verdict.
+
+⚠ **It reads no artifact, deliberately.** `pr-meta` is written by the **last two steps** of `check`, so a run that died earlier never uploaded one — an arm that needed it would be unreachable in exactly the case it exists for. The head SHA comes from the `workflow_run` payload instead, the same address the gate's own `failure()` arm already uses.
+
+**Why a separate job rather than a relaxed condition.** The same reason `gate` is separate from `sonar`: a job cannot end early and still report, so a skip has to be a different job's success. Relaxing `gate`'s condition would have required guarding each of its eight remaining steps.
+
+⚠ **Three producers now share one required context, and the partition is over (head repository × conclusion).** `sonar-producer.test.mjs` refuses a state where two would fire or none would — nine mutations, each caught.
+
 ## Sonar's JS/TS program is seeded with the analysed set, not the repository (#2440, 2026-09-20)
 
 **Problem.** `sonar.typescript.tsconfigPath` named the root `tsconfig.json`, which declares no `include` — so TypeScript took every `.ts`/`.tsx` under the root: the 139 runnable example applications, the benchmark harness, `scripts/` and every test file. Measured on run 35482231673, `Analyzing 481 file(s) from tsconfig (4602 total files in program)`: ten files carried for every one analysed.
