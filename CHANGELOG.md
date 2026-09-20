@@ -7,6 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-20]
 
+### @real-router/core@0.145.1
+
+### Patch Changes
+
+- [#2462](https://github.com/greydragon888/real-router/pull/2462) [`9ea3bcd`](https://github.com/greydragon888/real-router/commit/9ea3bcd770fb8ad4d284d06b77ace0192eec93bf) Thanks [@greydragon888](https://github.com/greydragon888)! - Forward-chain refusals name `[router]` instead of nothing ([#2456](https://github.com/greydragon888/real-router/issues/2456))
+
+  Six forward-chain refusals carried no prefix, so a reader could not tell which call
+  produced them — while the refusal raised beside them at the same door said
+  `[router.addRoute] Route "x" already exists`. They now open with the bare
+  `[router]`:
+
+  ```diff
+  -Circular forwardTo: a → b → a
+  +[router] Circular forwardTo: a → b → a
+  ```
+
+  Two raisers, both serving several doors. `resolveForwardChain` runs at
+  registration, reached from every door that touches the forward map — the four that
+  register one (`createRouter`, `routes.add`, `routes.replace`, `routes.update`) plus
+  the re-resolve behind `routes.remove` — and it is a **root export**, so a caller
+  can invoke it directly and there is no facade door to name.
+  `#resolveDynamicForward` runs on the match path, so `start`, `navigate` and the
+  plugin primitives all surface it. The bare facade is the shape [#1845](https://github.com/greydragon888/real-router/issues/1845) settled on for
+  the twelve `registration/errors.ts` messages, for exactly this reason: a single
+  call name would be false at the other doors.
+
+  The four messages of the callback path — `Circular forwardTo`, `Route "x" does not
+exist`, `forwardTo callback must return a string` and `forwardTo exceeds maximum
+depth of 100` — take the prefix as well. The issue named one of them; the other
+  three are the same function and the same doors.
+
+  ⚠ **A caller matching on these strings sees a changed string.** No pin anchored one
+  of these six, so the substring matches kept working; the one that had to change is
+  the door table `@real-router/validation-plugin` added in [#2399](https://github.com/greydragon888/real-router/issues/2399), which registered
+  the cycle message as carrying no prefix and now registers `[router]`. An exact or
+  anchored match in application code is what stops firing.
+
+  The prefix authority gained the tier that makes this mechanical. It policed WHICH
+  prefix a message uses and answered `undefined` for a message with none, which is
+  how these six stayed invisible. It now also **partitions every `throw` in
+  `packages/core/src`** — a literal `throw new X("…")`, a `throw new X(value)` whose
+  text is not in the tree, a `throw factory(…)`, a re-thrown `throw error` — and
+  holds a register of the thirteen literal refusals that still carry no prefix. The
+  register is a backlog, not an approval: a new bare refusal reds until it is
+  prefixed or recorded, and a `throw` shape the rule cannot judge is still counted,
+  so it cannot arrive unnoticed either.
+
+### @real-router/validation-plugin@0.27.2
+
+### Patch Changes
+
+- [#2462](https://github.com/greydragon888/real-router/pull/2462) [`9ea3bcd`](https://github.com/greydragon888/real-router/commit/9ea3bcd770fb8ad4d284d06b77ace0192eec93bf) Thanks [@greydragon888](https://github.com/greydragon888)! - The retrospective pass names one subsystem, not two ([#2456](https://github.com/greydragon888/real-router/issues/2456))
+
+  `resolveForwardChainWithPrefix` prepends `[validation-plugin]` to whatever core
+  raised. Core's forward-chain refusals now open with `[router] ` themselves ([#2456](https://github.com/greydragon888/real-router/issues/2456)),
+  which would have stacked two prefixes on one message:
+
+  ```diff
+  -[validation-plugin] [router] Circular forwardTo: a → b → a
+  +[validation-plugin] Circular forwardTo: a → b → a
+  ```
+
+  The head is replaced rather than kept: the retrospective walk is not a `router.*`
+  call — it runs over a table that is already registered — so `[validation-plugin]`
+  is the name a reader can act on, and `packages/validation-plugin/README.md`
+  documents it for this pass. Core's own wording, prefix included, stays reachable on
+  `error.cause`.
+
+  ⚠ The plugin's **prospective** checks are not wrapped and were not changed:
+  `validateForwardToCycle` and `validateForwardToTargets` call core's
+  `resolveForwardChain` directly, so a cycle caught while registering reports
+  `[router]`. Both spellings are now pinned, so neither can drift.
+
+- Updated dependencies [[`9ea3bcd`](https://github.com/greydragon888/real-router/commit/9ea3bcd770fb8ad4d284d06b77ace0192eec93bf)]:
+  - @real-router/core@0.145.1
+
+
 ### @real-router/validation-plugin@0.27.1
 
 ### Patch Changes
