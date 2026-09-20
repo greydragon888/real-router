@@ -53,8 +53,8 @@ interface InternalLoggerConfig {
  * logger.configure({ level: 'warn-error' });
  *
  * // Use logger
- * logger.log('Router', 'Navigation started'); // Won't show (below threshold)
- * logger.warn('Router', 'Deprecated API used'); // Will show
+ * logger.log('router.navigate', 'Navigation started'); // Won't show (below threshold)
+ * logger.warn('router', 'Deprecated API used'); // Will show
  * ```
  */
 export class RouterLogger {
@@ -182,14 +182,15 @@ export class RouterLogger {
    *
    * This is the lowest severity level. Messages are shown when level is 'all'.
    *
-   * @param context - Context identifier (e.g., 'Router', 'Plugin')
+   * @param context - The call a reader can look up: `router` where several
+   *   doors reach one message, or `router.<door>` for one of them (#2461)
    * @param message - Main log message
    * @param args - Additional arguments to log (objects, arrays, etc.)
    *
    * @example
    * ```ts
-   * logger.log('Router', 'Navigation started', { from: '/home', to: '/about' });
-   * // Output: [Router] Navigation started { from: '/home', to: '/about' }
+   * logger.log('router.navigate', 'Navigation started', { from: '/home', to: '/about' });
+   * // Output: [router.navigate] Navigation started { from: '/home', to: '/about' }
    * ```
    */
   log(context: string, message: string, ...args: unknown[]): void {
@@ -202,14 +203,14 @@ export class RouterLogger {
    * Use for deprecation notices, non-critical issues, or potential problems.
    * Messages are shown when level is 'all' or 'warn-error'.
    *
-   * @param context - Context identifier (e.g., 'Router', 'Plugin')
+   * @param context - The call a reader can look up — see {@link RouterLogger.log}
    * @param message - Warning message
    * @param args - Additional arguments to log
    *
    * @example
    * ```ts
-   * logger.warn('Router', 'Using deprecated API', { method: 'oldNavigate' });
-   * // Output: [Router] Using deprecated API { method: 'oldNavigate' }
+   * logger.warn('router', 'Using deprecated API', { method: 'oldNavigate' });
+   * // Output: [router] Using deprecated API { method: 'oldNavigate' }
    * ```
    */
   warn(context: string, message: string, ...args: unknown[]): void {
@@ -222,14 +223,14 @@ export class RouterLogger {
    * Use for critical errors, exceptions, or failures that require attention.
    * Messages are shown when level is 'all', 'warn-error', or 'error-only'.
    *
-   * @param context - Context identifier (e.g., 'Router', 'Plugin')
+   * @param context - The call a reader can look up — see {@link RouterLogger.log}
    * @param message - Error message
    * @param args - Additional arguments to log (often error objects)
    *
    * @example
    * ```ts
-   * logger.error('Router', 'Navigation failed', new Error('Route not found'));
-   * // Output: [Router] Navigation failed Error: Route not found
+   * logger.error('router.navigate', 'Navigation failed', new Error('Route not found'));
+   * // Output: [router.navigate] Navigation failed Error: Route not found
    * ```
    */
   error(context: string, message: string, ...args: unknown[]): void {

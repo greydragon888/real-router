@@ -621,6 +621,16 @@ one raiser. `tests/functional/message-prefix-authority-1845.test.ts` derives the
 rule and owns two registers rather than carve-outs: the internal prefixes that
 stay (`CORE_INTERNAL`), and the refusals that carry no prefix at all (#2456).
 
+**Logger channels take the same rule, and the vocabulary is the DOOR** — `clear`
+logs and raises under `router.clearRoutes`, `add` under `router.addRoute` (#2461).
+The channel is the first argument of every `logger.*` call, printed as
+`[channel] message` and handed to the consumer's `callback` verbatim, so it is
+observable surface rather than an internal label.
+`tests/functional/logger-channel-authority-2461.test.ts` fails on a channel that
+names anything but `router` or `router.<door>`, and judges three forms: a literal,
+a `` `router.${method}` `` template, and a `…CONTEXT` / `…CTX` constant at its
+declaration, because the call site of an imported one holds only the name.
+
 ### Modifying Existing Methods
 
 Validation changes go in the namespace's `validators.ts`; logic changes in the

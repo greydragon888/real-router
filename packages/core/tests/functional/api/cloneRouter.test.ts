@@ -250,7 +250,7 @@ describe("cloneRouter() — logger inheritance", () => {
 
     expect(baseCallback).toHaveBeenCalledWith(
       "warn",
-      "real-router",
+      "router.isActiveRoute",
       expect.stringContaining("empty string"),
     );
   });
@@ -274,7 +274,7 @@ describe("cloneRouter() — logger inheritance", () => {
     // Override callback receives the log; the base callback is unused on this clone.
     expect(traceCallback).toHaveBeenCalledWith(
       "warn",
-      "real-router",
+      "router.isActiveRoute",
       expect.stringContaining("empty string"),
     );
     expect(baseCallback).not.toHaveBeenCalled();

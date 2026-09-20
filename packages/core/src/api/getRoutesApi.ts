@@ -1081,7 +1081,7 @@ export function getRoutesApi<
         throw freezeThrownError(
           new RouterError(errorCodes.ROUTER_NOT_STOPPED, {
             message:
-              "[router.clear] Cannot clear routes while a state is committed. " +
+              "[router.clearRoutes] Cannot clear routes while a state is committed. " +
               "Use replace(routes) to swap the tree on a running router, or stop() first.",
           }),
         );
