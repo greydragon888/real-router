@@ -154,7 +154,7 @@ If the retrospective pass fails, the plugin rolls back cleanly. The router is le
 
 ## Error Messages
 
-All errors from this plugin use a `[router.METHOD]` prefix so you can immediately tell which call failed.
+Errors this plugin raises itself use a `[router.METHOD]` prefix, so you can immediately tell which call failed. Two spellings are not that: the retrospective pass says `[validation-plugin]` (below), and the forward-chain checks hand the map to core, whose own refusal says `[router]` (#2456).
 
 ```
 [router.navigate] Invalid route name: expected string, got number

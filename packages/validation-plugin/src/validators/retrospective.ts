@@ -87,9 +87,14 @@ function collectSlot(
 }
 
 /**
- * Wraps core's resolveForwardChain with [validation-plugin] prefix on errors.
- * Core's version throws plain Error messages; retrospective validation
- * needs the [validation-plugin] prefix for consistency.
+ * Wraps core's `resolveForwardChain` so a retrospective refusal names the pass
+ * that raised it. The retrospective walk is not a `router.*` call — it runs over
+ * a table that is already registered — and `README.md` documents
+ * `[validation-plugin]` for this pass.
+ *
+ * ⚠ Core's own message opens with `[router] ` (#2456), and that head is
+ * REPLACED rather than stacked: two prefixes on one message name two subsystems
+ * for one fault.
  */
 function resolveForwardChainWithPrefix(
   startRoute: string,
@@ -98,9 +103,9 @@ function resolveForwardChainWithPrefix(
   try {
     return coreResolveForwardChain(startRoute, forwardMap);
   } catch (error) {
-    throw new Error(`[validation-plugin] ${(error as Error).message}`, {
-      cause: error,
-    });
+    const bare = (error as Error).message.replace(/^\[router\] /u, "");
+
+    throw new Error(`[validation-plugin] ${bare}`, { cause: error });
   }
 }
 

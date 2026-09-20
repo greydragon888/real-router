@@ -90,7 +90,7 @@ export function resolveForwardChain(
       const cycleStart = chain.indexOf(next);
       const cycle = [...chain.slice(cycleStart), next];
 
-      throw new Error(`Circular forwardTo: ${cycle.join(" → ")}`);
+      throw new Error(`[router] Circular forwardTo: ${cycle.join(" → ")}`);
     }
 
     visited.add(current);
@@ -99,7 +99,7 @@ export function resolveForwardChain(
 
     if (chain.length > maxDepth) {
       throw new Error(
-        `forwardTo chain exceeds maximum depth (${maxDepth}): ${chain.join(" → ")}`,
+        `[router] forwardTo chain exceeds maximum depth (${maxDepth}): ${chain.join(" → ")}`,
       );
     }
   }
