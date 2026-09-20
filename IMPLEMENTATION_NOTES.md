@@ -2,6 +2,22 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## A CodSpeed comparison names the sample it is read against (#2375, 2026-09-20)
+
+**Problem.** CodSpeed takes as base the most recent run that HAS data, and `scripts/codspeed-gate.mjs` skips both benchmark jobs on a push whose range does not reach the measured program. While the program is unchanged one sample answers for every pull request opened since — and the report does not say which sample or how old. CodSpeed prints a footnote only when it calls the base _unexpected_; on #2371 the second run dropped that footnote while keeping the same 13-commit-old base, and the PR carried a red −13 % that was a property of the base rather than of its diff.
+
+⚑ **The staleness itself is the gate working, not a defect.** The gate skips when the range does not reach the measured program, so the old sample measures the same program. What makes it harmful is a corrupt sample: one bad measurement then answers for as many pull requests as it survives. #2375 has one such sample on record, on `d0e0dff`, and none since.
+
+**Solution.** `scripts/codspeed-base-age.mjs` walks `master` newest-first, finds the first commit carrying CodSpeed's own `CodSpeed Performance Analysis` check, and puts the sample, its distance in commits and its age into the job summary. It changes nothing about which sample is used; it says which one, so a number quoted into a changeset carries its provenance. It raises a `::warning` past **24 h** — the measured cadence over 14 days is 28.2 commits a day against a measurement about every 5 hours, so a day is roughly five normal gaps.
+
+⚠ **`CodSpeed gate` is not the measurement check.** This repository's own gate reports success on every push, the skipped ones included, so matching the name by substring would read every skipped commit as measured — the failure direction that looks like good news. The check is matched by equality and `codspeed-base-age.test.mjs` refuses a substring match.
+
+⚠ **The step reads the API, not the working tree.** It runs on the self-hosted runner behind a `clean: false` checkout of unpinned depth, where `git log origin/master` is not a contract; both the commit list and the checks come from GitHub. The `core` job therefore carries `checks: read` — under the workflow's `contents: read` default that read 403s.
+
+⚠ **It sits AFTER the cgroup sampler's second half, never between the two.** The pair brackets the measured step, and a step inserted between them would put its own allocations inside the measurement's window.
+
+**Three mechanisms leave `master` unmeasured, not two.** The gate skip and a bare absence of work are the ones #2375 names; the third is `codspeed.yml`'s own `paths-ignore` (`.github/**`, `scripts/**`, `**/*.md`, `.claude/**`, `.husky/**`, `knip.json`), under which a push touching only those produces **no run at all** — not even a gate record. Measured on `a1fa45202`. A push of several commits also measures only its head.
+
 ## `base-lint` gets ESLint's worker threads, and only `base-lint` (#2437, 2026-09-19)
 
 **Problem.** After #2430, #2435 and #2436 the gate's floor 1 is `base-lint` at ~122 s, level with the sharded `base-test` chain, and `core#lint` is 94.4 s of it. ESLint 10.11 has `--concurrency` and this repository never passed it; the default is `off`.
