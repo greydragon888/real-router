@@ -2,6 +2,29 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## Sonar's JS/TS program is seeded with the analysed set, not the repository (#2440, 2026-09-20)
+
+**Problem.** `sonar.typescript.tsconfigPath` named the root `tsconfig.json`, which declares no `include` — so TypeScript took every `.ts`/`.tsx` under the root: the 139 runnable example applications, the benchmark harness, `scripts/` and every test file. Measured on run 35482231673, `Analyzing 481 file(s) from tsconfig (4602 total files in program)`: ten files carried for every one analysed.
+
+**Solution.** `tsconfig.sonar.json` extends the root config and adds an `include` of the analysed set. Measured cold against cold, run 35481866914 → 35483851783:
+
+|                                                     | before    | after              |
+| --------------------------------------------------- | --------- | ------------------ |
+| `JavaScript/TypeScript/CSS analysis`                | 16 750 ms | **11 378 ms**      |
+| files in the program                                | 4602      | **684**            |
+| analysed from the tsconfig                          | 481       | **506**            |
+| `Analyzing N file(s) using merged compiler options` | 25        | the line is absent |
+
+⚠ **The scanner's `Total time` moved 52.8 s → 40.1 s and that is NOT the saving.** Segment by segment the difference is the 5.4 s sensor plus 0.7 s of report generation; the remaining ~6 s is `Check Quality Gate` — SonarCloud's server-side wait, 7 s on one run and 1 s on the other, which varies without anything here changing.
+
+⚑ **It is also strictly better analysis, not only faster.** 481 + 25 = 506 exactly: the files that were on the `merged compiler options` fallback moved into the type-aware program.
+
+⚠ **The `exclude` of the three symlink aliases is load-bearing.** `shared/` reaches five adapters and three plugins through git-tracked symlinks, and **TypeScript keeps ONE path per real file — the alias wins.** Measured with the same `include`: with the aliases, 0 of 32 real `shared/` paths in the program; without them, 32 of 32. The root config manages 7, and `32 − 7 = 25` is exactly the fallback line above. The aliases stay in the program regardless, pulled in by the imports of the packages that use them.
+
+**Why a guard rather than a comment.** Nothing compiles this file, so nothing reds when it drifts: a new package or a new `shared/` dir joins the analysed set from the filesystem, and an alias that loses its `exclude` entry silently takes `shared/`'s place. `scripts/sonar-tsconfig.test.mjs` derives both sets from the filesystem and refuses either drift — nine mutations, each caught.
+
+⚠ **An analysis-config change is invisible to the analysis that would validate it.** It touches only root files, turbo's affected filter produces zero packages, no coverage artifact exists and the scan takes its _no coverage produced_ arm — observed on run 35483465957. The measurement above needed a throwaway commit touching one package test file, removed before merge. This is not new with #2442: the trusted gate counted the same artifacts.
+
 ## The Sonar analysis overlaps CI again, for a pull request from this repository (#2442, 2026-09-20)
 
 **Problem.** `sonar-trusted.yml` triggers on `workflow_run`, which fires only when the whole CI workflow completes, so the analysis was appended to the pipeline rather than overlapped. Measured on the commit statuses, the wait after `CI Result` goes green:
