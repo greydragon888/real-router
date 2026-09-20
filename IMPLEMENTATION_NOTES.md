@@ -17,6 +17,10 @@
 
 **Solution.** A `sonar` job in `ci.yml` analyses a pull request from THIS repository, where the secrets are and where the analysis overlaps the pipeline's tail; `sonar-trusted.yml` keeps the fork path behind the mirror condition.
 
+**Measured on run 35481866914**, the first pull request to carry it: the job started 3 s after `Base coverage` ended, which was 30 s BEFORE `CI Result` completed, and its verdict posted at `CI Result` **+43 s** against the ~97 s median above.
+
+⚠ **The same run's trusted verdict, at +148 s, is NOT the old path's number.** The new job belongs to the CI workflow, so it pushed that workflow's own completion out by 50 s, and the trusted path waits on exactly that. It ran at all only because a `workflow_run` workflow always executes the default branch's copy, which did not yet carry the fork condition — a one-pull-request overlap of the two producers, visible as the required context flipping `success` → `pending` → `success`.
+
 ⚠ **The job is not named `SonarCloud` and does not rely on its own check run.** `SonarCloud` is a required context in `protect-master`, and a job with that name would put a skipped check run under it on the fork path, beside the status the trusted workflow posts there. Both paths POST the status instead, so the context has exactly one producer whichever way a pull request comes.
 
 ⚠ **Its `if:` carries nothing but `always()` and the head-repository test.** Every other condition — Dependabot, no source (#2433), no coverage — is decided inside and ends in a posted success with a reason. A condition in the `if:` skips the job, and a skipped job posts nothing: the pull request would then wait on a context nobody produces.
