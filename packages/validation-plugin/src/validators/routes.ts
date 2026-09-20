@@ -549,6 +549,11 @@ export function validateRoutes<Dependencies extends DefaultDependencies>(
 /**
  * Validates that forwardTo target doesn't require params that source doesn't have.
  *
+ * ⚠ The `update` door is the only one that reaches this, so the message names
+ * it. The batch doors carry their own copy in `forwardTo.ts`, which also
+ * resolves a target the tree does not hold YET from the batch being registered
+ * — and names `addRoute`, as the batch copy of this check does.
+ *
  * @param sourceName - Source route name
  * @param targetName - Target route name
  * @param lookup - Path slots of routes that already exist
@@ -567,7 +572,7 @@ export function validateForwardToParamCompatibility(
 
   if (missingParams.length > 0) {
     throw new Error(
-      `[router.addRoute] forwardTo target "${targetName}" requires params ` +
+      `[router.updateRoute] forwardTo target "${targetName}" requires params ` +
         `[${missingParams.join(", ")}] that are not available in source route "${sourceName}"`,
     );
   }
