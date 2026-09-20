@@ -16,6 +16,8 @@
 
 ⚠ **It sits AFTER the cgroup sampler's second half, never between the two.** The pair brackets the measured step, and a step inserted between them would put its own allocations inside the measurement's window.
 
+**Keeping the base fresher was priced and declined.** Three options, measured rather than argued: always measuring on a `master` push costs **5.9 h a day** of the single self-hosted slot — 28.2 commits a day against a 12.5 min run, core 4m01 plus adapters 8m29 — and would need `paths-ignore` removed as well; seeding on a schedule is bounded at ~50 min a day for a 6 h base and ~25 for 12 h; refusing a corrupt sample has its detector now, but its threshold would come from the single case on record, and CodSpeed picks the base itself so refusing means not uploading — while the action measures and uploads in one step. Against **one anomalous sample, on 2026-09-16, not repeated since under a sampler that watches for it**, none of the three is worth its slot. A second occurrence is what turns that threshold into data.
+
 **Three mechanisms leave `master` unmeasured, not two.** The gate skip and a bare absence of work are the ones #2375 names; the third is `codspeed.yml`'s own `paths-ignore` (`.github/**`, `scripts/**`, `**/*.md`, `.claude/**`, `.husky/**`, `knip.json`), under which a push touching only those produces **no run at all** — not even a gate record. Measured on `a1fa45202`. A push of several commits also measures only its head.
 
 ## `base-lint` gets ESLint's worker threads, and only `base-lint` (#2437, 2026-09-19)
