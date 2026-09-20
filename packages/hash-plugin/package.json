@@ -47,7 +47,6 @@
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --max-warnings 0",
     "lint:fix": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
-    "lint:package": "publint",
     "bundle": "tsdown --config-loader unrun"
   },
   "sideEffects": false,

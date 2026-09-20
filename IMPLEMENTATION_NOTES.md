@@ -11099,31 +11099,40 @@ measures sizes, `changesets.yml` bundles and publishes with nothing in between, 
 
 ## The only check between master and npm (2026-09-20)
 
-**Problem.** Nothing on the publish path read the artifact. Measured across the three workflows:
-`post-merge.yml` runs install, `Build` and the bundle-size base measurement; `changesets.yml` ran
-`Bundle packages for publish` and then `Publish to npm` with nothing in between; the smoke test and
-the `publint` + `attw` step live in `ci.yml`, i.e. on pull requests only. Until the record above
-landed, the release PR's own CI covered the gap by accident — its tree is master plus version bumps
-— and that record removed two of those jobs deliberately. So the gap became explicit, and it sits in
-front of an npm publish, which cannot be taken back.
+**Problem.** `changesets.yml` ran `Bundle packages for publish` and then `Publish to npm` with nothing
+in between. For a tsdown-built package that gap is covered from inside the build — `tsdown.base.ts`
+carries `publint: true` and `attw: { profile: "strict" }`, see "tsdown-consolidated publint/attw" —
+but `angular`, `solid` and `svelte` are built by ng-packagr, rollup and svelte-package, so their own
+`lint:package` / `lint:types` scripts ran in `ci.yml`, i.e. on pull requests only. Until the record
+above landed, the release PR's own CI covered them by accident — its tree is master plus version
+bumps — and that record removed two of those jobs deliberately. So the gap became explicit for those
+three, and it sits in front of an npm publish, which cannot be taken back.
 
 **Solution (#2452).** A step between bundling and publishing, carrying the same guard its neighbours
 carry (`steps.unpublished.outputs.has_unpublished == 'true'`):
 `pnpm turbo run lint:package lint:types --filter='!./examples/**' --filter='!./benchmarks'`. Both
 tasks `dependsOn` bundle, which ran in the step above, so they are a cache hit and cost seconds.
+Measured on the command as written: publint and attw execute for `angular`, `solid` and `svelte` and
+for nobody else, because nobody else declares the scripts. `turbo … --dry=json` does NOT show that —
+it lists a task node per package in scope, including the packages where the script is absent and
+turbo runs nothing.
 
 **Why publint rather than the smoke test.** The smoke test installs the packed tarballs with npm, so
 a registry hiccup during a release would block a publish for a reason that has nothing to do with the
 artifact. `publint` and `attw` read what was built and need no network.
 
-**And why `publint` had to be extended in the same change.** It was declared by THREE of the 23
-public packages (angular, solid, svelte) — a guard over 3/23 is a token. Measured before extending:
-all 23 pass, so the extension is a one-line script per manifest and no defect to fix. `attw` stays
-where it is declared: raw, it also passes everywhere except three, and each of those three is the
-class the two gated packages already ignore by rule — for `@real-router/react` it is
-`@real-router/react/ink`, whose `require` condition was dropped on purpose because ink@7 is ESM-only
-(#1628), so `node16 (from CJS)` cannot resolve there by design. Extending `attw` therefore needs a
-per-package ignore rule and a decision about that subpath, which is its own issue.
+**⚠ The first version of this record read the script list as the coverage, and extended `publint` to
+20 manifests on that reading.** It said nothing on the publish path read the artifact, and that a
+guard declared by three of 23 packages "is a token". A `grep` for `lint:package` counts who is not
+built by tsdown, not who is unchecked: every tsdown package validates inside its own `bundle`. The 20
+scripts were reverted the same day (#2455) — `7764cb93b` had removed them on 2026-06-30 for the
+duplication they re-create, and the reasoning is the section this one now points at.
+
+**⚠ The two tools do not carry the same strictness inside tsdown.** A publint finding is an ERROR and
+fails the bundle whatever `CI` says; an attw finding is a WARNING that `failOnWarn: "ci-only"`
+promotes only under `CI`, so a local bundle prints it and exits 0. Measured on `packages/memory-plugin`
+against an `exports.require` target that does not exist (publint, exit 1 with `CI` unset) and against
+a dropped `types.require` (attw, exit 0 with `CI` unset, exit 1 with `CI=1`).
 
 **Discriminating power, measured rather than assumed.** With an export pointing at a file that is not
 built, `publint` fails with `pkg.module is ./dist/esm/nope.mjs but the file does not exist.`; with
