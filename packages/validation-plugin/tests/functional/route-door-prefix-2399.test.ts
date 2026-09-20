@@ -30,12 +30,17 @@ import type { RoutesApi } from "@real-router/core/api";
  * - **the retrospective pass reports `[validation-plugin]`** — no public method
  *   was called, and `README.md` documents that spelling.
  *
- * ⚠ `Circular forwardTo: …` carries NO prefix, and its cell registers that:
- * core raises it from `forwardChain.ts` on the map this plugin hands it with the
- * pending edge spliced in, so the wording and the missing prefix are core's.
- * Registering it says who owns the message — the same cross-package reading
- * `bare-core-message-parity.test.ts` already does here — and it keeps
- * `prefixOf`'s no-prefix answer load-bearing.
+ * ⚠ `Circular forwardTo: …` reports the bare `[router]`, and its cell registers
+ * that: core raises it from `forwardChain.ts` on the map this plugin hands it
+ * with the pending edge spliced in, so both the wording and the prefix are
+ * core's, and core has no door name to give — the raiser is a root export
+ * reached from four doors (#2456). Registering it says who owns the message, the
+ * same cross-package reading `bare-core-message-parity.test.ts` already does
+ * here.
+ *
+ * ⚠ No cell reaches `prefixOf`'s `<no prefix>` answer any more, and it stays:
+ * it is what makes a message that LOSES its prefix fail with a readable
+ * mismatch instead of a `TypeError` on `null[0]`.
  */
 
 const prefixOf = (error: unknown): string =>
@@ -111,6 +116,34 @@ const CELLS: readonly Cell[] = [
     },
   },
   {
+    // The batch doors reach core's raiser through `validateForwardToTargets`,
+    // which calls `resolveForwardChain` UNWRAPPED — so the prefix here is core's
+    // (#2456), not this plugin's, and it is a different code path from the
+    // `update` cell below.
+    door: "addRoute",
+    what: "the added batch closes a cycle — core's message, core's prefix",
+    says: /Circular forwardTo: p → q → p/,
+    registered: "[router]",
+    trigger: (routes) => {
+      routes.add([
+        { name: "p", path: "/p", forwardTo: "q" },
+        { name: "q", path: "/q", forwardTo: "p" },
+      ]);
+    },
+  },
+  {
+    door: "replaceRoutes",
+    what: "the replacing batch closes a cycle — core's message, core's prefix",
+    says: /Circular forwardTo: p → q → p/,
+    registered: "[router]",
+    trigger: (routes) => {
+      routes.replace([
+        { name: "p", path: "/p", forwardTo: "q" },
+        { name: "q", path: "/q", forwardTo: "p" },
+      ]);
+    },
+  },
+  {
     door: "updateRoute",
     what: "forwardTo target does not exist",
     says: /forwardTo target "ghost" does not exist/,
@@ -130,7 +163,7 @@ const CELLS: readonly Cell[] = [
     door: "updateRoute",
     what: "the forwardTo closes a cycle — core's message, core's prefix rule",
     says: /Circular forwardTo: home → plain → home/,
-    registered: "<no prefix>",
+    registered: "[router]",
     trigger: (routes) => {
       routes.update("plain", { forwardTo: "home" });
       routes.update("home", { forwardTo: "plain" });

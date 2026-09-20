@@ -1374,19 +1374,19 @@ export class RoutesNamespace<
 
     if (typeof current !== "string") {
       throw new TypeError(
-        `forwardTo callback must return a string, got ${typeof current}`,
+        `[router] forwardTo callback must return a string, got ${typeof current}`,
       );
     }
 
     while (depth < MAX_DEPTH) {
       if (this.#store.matcher.getSegmentsByName(current) === undefined) {
-        throw new Error(`Route "${current}" does not exist`);
+        throw new Error(`[router] Route "${current}" does not exist`);
       }
 
       if (visited.has(current)) {
         const cycle = [...visited, current].join(" → ");
 
-        throw new Error(`Circular forwardTo: ${cycle}`);
+        throw new Error(`[router] Circular forwardTo: ${cycle}`);
       }
 
       visited.add(current);
@@ -1416,6 +1416,6 @@ export class RoutesNamespace<
       return { target: current, chain, params };
     }
 
-    throw new Error(`forwardTo exceeds maximum depth of ${MAX_DEPTH}`);
+    throw new Error(`[router] forwardTo exceeds maximum depth of ${MAX_DEPTH}`);
   }
 }

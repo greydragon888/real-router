@@ -101,6 +101,36 @@ describe("validateForwardToConsistency — chain depth limit", () => {
       validateForwardToConsistency(forwardMap, lookupOf(table));
     }).toThrow(/exceeds maximum depth/);
   });
+
+  it("names ONE subsystem — core's [router] head is replaced, not stacked", () => {
+    // Core's refusal opens with `[router] ` (#2456) and this pass re-prefixes it.
+    // The cell above matches a substring, so it passes either way; this one is
+    // what fails when the two prefixes stack.
+    let raised: unknown;
+
+    try {
+      validateForwardToConsistency(
+        { a: "b", b: "a" },
+        lookupOf({ a: [], b: [] }),
+      );
+    } catch (error) {
+      raised = error;
+    }
+
+    expect(raised).toBeInstanceOf(Error);
+    // The head, not the chain: which route the walk starts from follows key
+    // order, and this cell's subject is the prefix.
+    expect((raised as Error).message).toMatch(
+      /^\[validation-plugin\] Circular forwardTo: /u,
+    );
+    expect((raised as Error).message).not.toMatch(/\[router\]/u);
+    // The cause keeps core's own wording, prefix included. Asserted as an Error
+    // first, so dropping `{ cause }` fails with a mismatch and not a TypeError.
+    expect((raised as Error).cause).toBeInstanceOf(Error);
+    expect(((raised as Error).cause as Error).message).toMatch(
+      /^\[router\] Circular forwardTo: /u,
+    );
+  });
 });
 
 describe("validateForwardToConsistency", () => {

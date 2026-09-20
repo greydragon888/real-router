@@ -618,7 +618,8 @@ wire it in `validationPlugin.ts`.
 **Message prefixes:** name the facade call the message comes from, not the class
 raising it — `[router.buildPath]`, or bare `[router]` where several doors reach
 one raiser. `tests/functional/message-prefix-authority-1845.test.ts` derives the
-rule and owns the one exception, which is a REGISTER rather than a carve-out.
+rule and owns two registers rather than carve-outs: the internal prefixes that
+stay (`CORE_INTERNAL`), and the refusals that carry no prefix at all (#2456).
 
 ### Modifying Existing Methods
 

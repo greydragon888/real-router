@@ -1,5 +1,6 @@
 import {
   globSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -240,5 +241,301 @@ describe("a message prefix names something the caller can look up (#1845)", () =
     }
 
     expect(messages).toBeGreaterThan(50);
+  });
+});
+
+/**
+ * Tier three: a refusal that names NOTHING (#2456).
+ *
+ * The rule above polices WHICH prefix a message uses and answers `undefined` for
+ * a message that has none — so `Circular forwardTo: a → b → a` passed it while
+ * its neighbour at the same door said `[router.addRoute] forwardTo target "x"
+ * does not exist`. The register below is what makes a new bare refusal loud: add
+ * one and this reds, and the author either prefixes it or records the row with a
+ * reason.
+ *
+ * ⚠ It is a BACKLOG, not an approval, on the same reading as
+ * `table-vacuity-authority`. #2456 prefixed the forward-chain family and left
+ * the rows below where the census found them, unadjudicated: a row states that
+ * the message has no prefix, NOT that it should not have one. Removing a row
+ * reds this too, deliberately — a `toBeLessThanOrEqual` would develop slack.
+ *
+ * ⚠ **The rule judges one spelling — `throw new X(<literal>)` — and the census
+ * below says so out loud.** Core also throws through a factory
+ * (`throw freezeThrownError(new …)`, `throw createRouterError(door, msg)`) and
+ * re-throws a caught error, and a bare message hidden inside either is invisible
+ * to the rule. Those shapes are COUNTED, in a partition that has to add up to
+ * every `throw` in the tree, so a new one cannot arrive unnoticed even where it
+ * cannot be judged.
+ */
+const BARE: readonly string[] = [
+  "guards.ts · Invalid logger level: ${}. Expected: all | warn-error | error-only | none",
+  "guards.ts · Logger callback must be a function, got ${}",
+  "guards.ts · Logger callbackIgnoresLevel must be a boolean, got ${}",
+  "guards.ts · Logger config must be an object",
+  "guards.ts · Unknown logger config property: ${}",
+  "guards.ts · dependencies cannot contain getters: ${}",
+  "guards.ts · dependencies must be a plain object",
+  "guards.ts · route must be a non-array object",
+  "namespaces/RoutesNamespace/routesStore.ts · forwardTo callback cannot be async for route ${}. Async functions break matchPath/buildPath.",
+  "namespaces/RoutesNamespace/routesStore.ts · forwardTo must be a string or function for route ${}, got ${}",
+  "utils/event-emitter/EventEmitter.ts · Duplicate listener for ${}",
+  "utils/event-emitter/EventEmitter.ts · Expected callback to be a function for event ${}",
+  "utils/event-emitter/EventEmitter.ts · Listener limit (${}) reached for ${}",
+];
+
+/**
+ * `Route "${current}" does not exist` → the shape, substitutions collapsed.
+ *
+ * ⚠ The WHOLE argument, not its leftmost operand: two of the rows below are `+`
+ * chains, and rendering only the head made the row hold half a message — so a
+ * `printWidth` change that re-split the chain moved the row while the message
+ * stayed byte-identical.
+ */
+const shapeOf = (node: ts.Expression, source: ts.SourceFile): string =>
+  node
+    .getText(source)
+    // Whitespace first, so a chain wrapped across lines and one written on a
+    // single line reduce to the same junction below.
+    .replaceAll(/\s+/gu, " ")
+    // The junction between two literals joins ONE message: drop the operator and
+    // the quotes either side, keeping the spacing the literals themselves carry.
+    .replaceAll(/[`"'] \+ [`"']/gu, "")
+    .replaceAll(/\$\{[^}]*\}/gu, "${}")
+    .replaceAll(/[`"']/gu, "")
+    .trim()
+    .slice(0, 120);
+
+interface Refusals {
+  readonly bare: string[];
+  /** Literal-message `throw new` sites seen at all — the anti-vacuum floor. */
+  readonly literals: number;
+  /** `throw new X(nonLiteral)` — the message is not in the tree. */
+  readonly opaque: number;
+  /** `throw factory(…)` — a message may hide inside, unjudged by the rule. */
+  readonly wrapped: number;
+  /** `throw error` — a caught error re-thrown, carrying someone else's message. */
+  readonly rethrown: number;
+  /** Any other `throw` shape. Zero today; a new one has to be classified. */
+  readonly otherShape: number;
+  /** Every `throw` in the tree — the partition's total. */
+  readonly throwStatements: number;
+  /** Files the glob reached — reach, asserted apart from recognition. */
+  readonly files: number;
+}
+
+/**
+ * The class a `throw` falls into — the partition's single decision point.
+ *
+ * ⚠ An EMPTY template head is a message opening with a substitution
+ * (`` `${PREFIX} …` ``), whose prefix is real but is not in the tree. Judging it
+ * would report a prefixed message as BARE and forbid a legal refactor, so it
+ * joins the unjudgeable rather than the offenders.
+ */
+type Seen =
+  | {
+      readonly kind: "literal";
+      readonly text: string;
+      readonly argument: ts.Expression;
+    }
+  | { readonly kind: "opaque" | "wrapped" | "rethrown" | "otherShape" };
+
+function classify(thrown: ts.Expression): Seen {
+  if (ts.isCallExpression(thrown)) {
+    return { kind: "wrapped" };
+  }
+
+  if (ts.isIdentifier(thrown)) {
+    return { kind: "rethrown" };
+  }
+
+  if (!ts.isNewExpression(thrown)) {
+    return { kind: "otherShape" };
+  }
+
+  const argument = thrown.arguments?.[0];
+  const text = argument === undefined ? undefined : textOf(argument);
+
+  return argument === undefined || text === undefined || text === ""
+    ? { kind: "opaque" }
+    : { kind: "literal", text, argument };
+}
+
+function refusals(root: string = SRC): Refusals {
+  const bare: string[] = [];
+  let literals = 0;
+  let opaque = 0;
+  let wrapped = 0;
+  let rethrown = 0;
+  let otherShape = 0;
+  let throwStatements = 0;
+  let files = 0;
+
+  for (const file of globSync(`${root}/**/*.ts`)) {
+    files++;
+
+    const source = ts.createSourceFile(
+      file,
+      readFileSync(file, "utf8"),
+      ts.ScriptTarget.Latest,
+      /* setParentNodes */ true,
+      ts.ScriptKind.TS,
+    );
+
+    const walk = (node: ts.Node): void => {
+      if (ts.isThrowStatement(node)) {
+        throwStatements++;
+
+        const seen = classify(node.expression);
+
+        switch (seen.kind) {
+          case "wrapped": {
+            wrapped++;
+
+            break;
+          }
+          case "rethrown": {
+            rethrown++;
+
+            break;
+          }
+          case "otherShape": {
+            otherShape++;
+
+            break;
+          }
+          case "opaque": {
+            opaque++;
+
+            break;
+          }
+          default: {
+            literals++;
+
+            if (!seen.text.startsWith("[")) {
+              bare.push(
+                `${path.relative(root, file)} · ${shapeOf(seen.argument, source)}`,
+              );
+            }
+          }
+        }
+      }
+
+      ts.forEachChild(node, walk);
+    };
+
+    walk(source);
+  }
+
+  return {
+    bare: bare.toSorted(byteOrder),
+    literals,
+    opaque,
+    wrapped,
+    rethrown,
+    otherShape,
+    throwStatements,
+    files,
+  };
+}
+
+/** Byte order, so the frozen register reads the same on any locale. */
+function byteOrder(left: string, right: string): number {
+  if (left === right) {
+    return 0;
+  }
+
+  return left < right ? -1 : 1;
+}
+
+describe("a refusal with no prefix at all is registered, not invisible (#2456)", () => {
+  it("the backlog is exactly this, and it only shrinks", () => {
+    expect(refusals().bare).toStrictEqual([...BARE].toSorted(byteOrder));
+  });
+
+  it("CONTROL — every throw in the tree lands in exactly one class", () => {
+    // ⚑ A PARTITION, not two lower bounds. The rule judges `throw new
+    // X(<literal>)`; the first draft asserted only that it had seen some of
+    // those, which left 58 throws — every factory call and every re-throw —
+    // counted by nothing, so a shape the rule cannot judge could arrive in
+    // silence. The sum is what makes an unjudgeable shape still VISIBLE.
+    const seen = refusals();
+
+    expect(
+      seen.literals +
+        seen.opaque +
+        seen.wrapped +
+        seen.rethrown +
+        seen.otherShape,
+    ).toBe(seen.throwStatements);
+    // No shape outside the four the partition names.
+    expect(seen.otherShape).toBe(0);
+  });
+
+  it("CONTROL — the glob reaches the tree, and the rule recognises most of it", () => {
+    // Two separate claims, deliberately not one. A narrowed glob moves `files`;
+    // a broken recogniser moves `literals`. The first draft conflated them in a
+    // single `literals > 60` against a measured 90, so a glob narrowed to a handful
+    // of files still passed. Both floors sit close under what is measured today.
+    const seen = refusals();
+
+    expect(seen.files).toBeGreaterThan(120);
+    expect(seen.throwStatements).toBeGreaterThan(130);
+    expect(seen.literals).toBeGreaterThan(80);
+  });
+
+  it("CONTROL — both polarities, on a tree written for the purpose", () => {
+    const directory = mkdtempSync(path.join(tmpdir(), "bare-prefix-"));
+
+    try {
+      writeFileSync(
+        path.join(directory, "bare.ts"),
+        "throw new Error(`no prefix here: ${x}`);\n",
+      );
+      writeFileSync(
+        path.join(directory, "prefixed.ts"),
+        "throw new TypeError(`[router.addRoute] fine`);\n",
+      );
+      writeFileSync(
+        path.join(directory, "opaque.ts"),
+        "throw new Error(buildMessage(x));\n",
+      );
+      // The three shapes the rule cannot judge. Each must land in its own class
+      // — the partition above is only as good as this cell's discrimination.
+      writeFileSync(
+        path.join(directory, "wrapped.ts"),
+        "throw freezeThrownError(new Error(`bare inside a factory`));\n",
+      );
+      writeFileSync(
+        path.join(directory, "rethrown.ts"),
+        "try { f(); } catch (error) { throw error; }\n",
+      );
+      writeFileSync(
+        path.join(directory, "hoisted-prefix.ts"),
+        "throw new Error(`${PREFIX} prefixed, but not in the tree`);\n",
+      );
+      // Recursion: a bare throw one directory down must still be found.
+      mkdirSync(path.join(directory, "nested"));
+      writeFileSync(
+        path.join(directory, "nested", "deep.ts"),
+        "throw new Error(`deeper and bare`);\n",
+      );
+
+      const seen = refusals(directory);
+
+      expect(seen.bare).toStrictEqual([
+        "bare.ts · no prefix here: ${}",
+        "nested/deep.ts · deeper and bare",
+      ]);
+      expect(seen.literals).toBe(3);
+      // `buildMessage(x)` and the hoisted-prefix template, which is prefixed at
+      // runtime and would be a FALSE offender if the empty head were judged.
+      expect(seen.opaque).toBe(2);
+      expect(seen.wrapped).toBe(1);
+      expect(seen.rethrown).toBe(1);
+      expect(seen.files).toBe(7);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });
