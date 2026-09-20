@@ -1,5 +1,24 @@
 # @real-router/validation-plugin
 
+## 0.28.0
+
+### Minor Changes
+
+- [#2467](https://github.com/greydragon888/real-router/pull/2467) [`00deef6`](https://github.com/greydragon888/real-router/commit/00deef6278cdeea8d0b71f6191f715623e264858) Thanks [@greydragon888](https://github.com/greydragon888)! - The first diagnostic is delivered by subscription, not by a validator method ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  The plugin subscribes to `PLUGIN_AFTER_START` at install and unsubscribes on
+  `teardown`. The warning itself is unchanged — same function, same wording, same
+  trigger — and `plugin-api.validation.test.ts` proves it: deleting the
+  subscription reddens a cell written long before this conversion.
+
+  `RouterValidator` loses `plugins.warnPluginAfterStart`; core has no consultation
+  left for it.
+
+### Patch Changes
+
+- Updated dependencies [[`00deef6`](https://github.com/greydragon888/real-router/commit/00deef6278cdeea8d0b71f6191f715623e264858)]:
+  - @real-router/core@0.146.0
+
 ## 0.27.2
 
 ### Patch Changes
