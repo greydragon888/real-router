@@ -103,6 +103,7 @@
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts,.tsx src/ src/dom-utils/ tests/ --max-warnings 0",
     "lint:fix": "eslint --cache --ext .ts,.tsx src/ src/dom-utils/ tests/ --fix --max-warnings 0",
+    "lint:package": "publint",
     "bundle": "tsdown --config-loader unrun"
   },
   "keywords": [

@@ -225,6 +225,29 @@ jobs:
         if: steps.unpublished.outputs.has_unpublished == 'true'
         run: pnpm turbo run bundle --filter='!./examples/**'
 
+      # Validate what is ABOUT TO BE PUBLISHED, not the tree that produced it.
+      # `lint:package` is publint on every public package and `lint:types` is attw
+      # where a package declares it; both `dependsOn` bundle, which ran above, so
+      # they are a cache hit and cost seconds.
+      #
+      # ⚑ This is the only check between master and npm, and the placement is the
+      # point (#2452). `post-merge.yml` builds and measures sizes; the smoke test
+      # and these two live in `ci.yml`, i.e. on pull requests — and #2450 took the
+      # first two off the release PR, whose diff cannot give them a subject. A red
+      # step HERE means "do not publish", which is the answer a bot PR could not
+      # give: the changesets action regenerates that PR from master.
+      #
+      # ⚠ Failing here leaves the versions committed and unpublished — the state
+      # `stranded-release.yml` watches (#2057). That watch is the backstop; this
+      # step failing the run is the alarm, and it is attributable because it is
+      # the release run.
+      - name: Validate published artifacts (publint + attw)
+        if: steps.unpublished.outputs.has_unpublished == 'true'
+        run: >-
+          pnpm turbo run lint:package lint:types
+          --filter='!./examples/**'
+          --filter='!./benchmarks'
+
       # Publish with OIDC Trusted Publishing
       # changeset publish automatically:
       # - Checks which versions are not on npm
