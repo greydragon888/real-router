@@ -753,6 +753,16 @@ jobs:
       # a bump does not change; the failure record behind this split is in
       # IMPLEMENTATION_NOTES "Dependabot PRs skip every metric".
       DEPENDABOT_PR: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
+      # A release PR has the SAME diff shape as a bump — manifests, CHANGELOGs,
+      # the consumed changesets and the lockfile (#2433's predicate) — so it takes
+      # the same split rather than its own. The four that stay are the four whose
+      # subject that shape holds: `lint:deps` judges the peer floors
+      # `changeset version` rewrites, `lint:dedupe` the lockfile the root
+      # `version` script regenerates (#2411), and four of the twelve
+      # repository-wide scans plus knip read manifests and Markdown.
+      # ⚠ Asked of the DIFF, not of the branch name: one source file in a
+      # `changeset-release/*` branch must still reach every check (#2450).
+      NO_SOURCE: ${{ needs.check.outputs.no_source }}
     steps:
       # Full history: three cells of `diff-carries-no-source.test.mjs` read real
       # commits — release commits, dependency bumps, commits that touch source —
@@ -795,7 +805,7 @@ jobs:
       # Guard: codecov.yml components + Sonar coverage-exclusions stay in sync
       # with the package set, so external quality gates can't silently drift (#732).
       - name: Check coverage scope
-        if: env.DEPENDABOT_PR != 'true'
+        if: env.DEPENDABOT_PR != 'true' && env.NO_SOURCE != 'true'
         run: pnpm lint:coverage-scope
 
       # Every example with a playwright.config.ts must ship at least one spec —
@@ -805,7 +815,7 @@ jobs:
       # that moved knip/publint/attw into CI. Cheap enough to sit ahead of knip.
       # (2026-08-01 CI/CD audit §4.3.)
       - name: Check e2e specs
-        if: env.DEPENDABOT_PR != 'true'
+        if: env.DEPENDABOT_PR != 'true' && env.NO_SOURCE != 'true'
         run: pnpm lint:e2e
 
       # A rule written in a docblock AND in the package's own docs goes stale in
@@ -815,7 +825,7 @@ jobs:
       # the exempt-door count. A ratchet over a baseline, so only NEW restatement
       # fails; ~0.5 s, no build needed.
       - name: Check docblock/doc duplication
-        if: env.DEPENDABOT_PR != 'true'
+        if: env.DEPENDABOT_PR != 'true' && env.NO_SOURCE != 'true'
         run: pnpm lint:doc-dup
 
       # One record, two questions about its own keys: a function that COUNTS with
@@ -827,7 +837,7 @@ jobs:
       # per package: a scan rooted in a package cannot see `shared/` (#1838), and
       # four copies of one predicate is the class it guards. ~0.6 s, no build.
       - name: Check membership predicates
-        if: env.DEPENDABOT_PR != 'true'
+        if: env.DEPENDABOT_PR != 'true' && env.NO_SOURCE != 'true'
         run: pnpm lint:membership
 
       # EVERY repository-wide scan, in one step (#2241). A scan whose SUBJECT is
@@ -868,7 +878,7 @@ jobs:
       # failure. Pin the version — a floor of zero is only meaningful against a
       # fixed rule engine.
       - name: Install Vale
-        if: env.DEPENDABOT_PR != 'true'
+        if: env.DEPENDABOT_PR != 'true' && env.NO_SOURCE != 'true'
         env:
           VALE_VERSION: "3.20.0"
           VALE_SHA256: "f59e7030c5d4ace6cf915497d0d076a1699d61e876142765963237e6867c9712"
@@ -881,7 +891,7 @@ jobs:
           vale --version
 
       - name: Check Markdown prose
-        if: env.DEPENDABOT_PR != 'true'
+        if: env.DEPENDABOT_PR != 'true' && env.NO_SOURCE != 'true'
         env:
           VALE_REQUIRED: "1"
         run: pnpm lint:prose
@@ -902,7 +912,7 @@ jobs:
       # every ci.yml job must feed the CI Result gate or be allowlisted with a
       # written reason (the #1127 class, debt-map axis A6).
       - name: Test CI meta (shard planner + gate completeness)
-        if: env.DEPENDABOT_PR != 'true'
+        if: env.DEPENDABOT_PR != 'true' && env.NO_SOURCE != 'true'
         run: node --test scripts/*.test.mjs
 
   # ============================================
@@ -1108,9 +1118,20 @@ jobs:
     needs: [check, pipeline-leaf, base-bundle, pipeline-sharded]
     # Active path succeeded: leaf → pipeline-leaf; sharded → base-bundle
     # + all shards (empty matrix.include → pipeline-sharded 'skipped', carried by base-bundle).
+    #
+    # Not on a diff that holds no source — a release PR, where the tarballs are
+    # packed from master's code and every assertion here (exports resolve, no
+    # private package in `dependencies` (#413), no source shipped (#418), no
+    # missing `dist`) is independent of the version being bumped (#2450). It is
+    # also the wrong address: a `changeset-release/*` PR is regenerated from
+    # master, so a failure there cannot be answered there.
+    # ⚠ That leaves the packaging guard off the master → npm path entirely —
+    # neither `post-merge.yml` nor `changesets.yml` runs it. Its home in front of
+    # the irreversible step is a separate issue.
     if: >-
       always() &&
       needs.check.outputs.should_run == 'true' &&
+      needs.check.outputs.no_source != 'true' &&
       (
         (needs.check.outputs.mode == 'leaf' &&
           needs.pipeline-leaf.result == 'success') ||
@@ -1337,11 +1358,14 @@ jobs:
     # Skipped on a Dependabot PR: no published package has a third-party
     # runtime dependency, so only a bundler bump could move a size, and that
     # case is accepted as rare (IMPLEMENTATION_NOTES "Dependabot PRs skip every
-    # metric").
+    # metric"). Skipped on a diff that holds no source for a stronger reason
+    # than rarity: nothing inlines a version into a bundle, so on a release PR
+    # the bytes are master's bytes and the delta is zero by construction (#2450).
     needs: [check, pipeline-leaf, base-bundle, pipeline-sharded]
     if: >-
       always() &&
       needs.check.outputs.should_run == 'true' &&
+      needs.check.outputs.no_source != 'true' &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.user.login != 'dependabot[bot]' &&
       (
