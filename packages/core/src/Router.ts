@@ -637,6 +637,8 @@ export class Router<
 
         return this.#eventBus.addEventListener(eventName, cb);
       },
+      subscribeDiagnostic: (key, handler) =>
+        this.#eventBus.subscribeDiagnostic(key, handler),
       treeChanged: {
         emit: (event) => {
           this.#eventBus.emitTreeChanged(event);

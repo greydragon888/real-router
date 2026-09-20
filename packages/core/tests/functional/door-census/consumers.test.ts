@@ -693,6 +693,7 @@ describe("consumer census (#2303)", () => {
         "makeState",
         "matchPath",
         "setRootPath",
+        "subscribeDiagnostic",
       ],
       getRoutesApi: ["get", "subscribeChanges"],
       // ⚠ An empty row here is NOT an unused surface — see the cell below.
@@ -881,6 +882,7 @@ describe("consumer census (#2303)", () => {
         "routerExtensions",
         "setRootPath",
         "start",
+        "subscribeDiagnostic",
         "systemCommit",
         "treeChanged",
       ],

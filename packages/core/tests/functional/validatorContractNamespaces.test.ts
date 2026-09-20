@@ -139,7 +139,20 @@ describe("core/validator call-site contract (facade + namespaces)", () => {
       expect(validator.plugins.warnBatchDuplicates).not.toHaveBeenCalled();
     });
 
-    it("usePlugin after start warns about onStart being missed ('onStart')", async () => {
+    it("usePlugin after start REPORTS the missed onStart, on the diagnostic channel (#2388)", async () => {
+      // ⚑ Not a validator consultation any more. Core STATES what happened and
+      // whether anyone is told is the listening plugin's business — which is
+      // what separates a diagnostic from a check: this one cannot refuse the
+      // registration it describes.
+      const seen: string[] = [];
+
+      getPluginApi(router).subscribeDiagnostic(
+        "PLUGIN_AFTER_START",
+        (methodName) => {
+          seen.push(methodName);
+        },
+      );
+
       await router.start("/home");
 
       router.usePlugin(() => ({
@@ -148,19 +161,26 @@ describe("core/validator call-site contract (facade + namespaces)", () => {
         },
       }));
 
-      expect(validator.plugins.warnPluginAfterStart).toHaveBeenCalledWith(
-        "onStart",
-      );
+      expect(seen).toStrictEqual(["onStart"]);
     });
 
-    it("usePlugin BEFORE start does NOT warn about onStart", () => {
+    it("usePlugin BEFORE start reports nothing", () => {
+      const seen: string[] = [];
+
+      getPluginApi(router).subscribeDiagnostic(
+        "PLUGIN_AFTER_START",
+        (methodName) => {
+          seen.push(methodName);
+        },
+      );
+
       router.usePlugin(() => ({
         onStart() {
           /* will be called on start */
         },
       }));
 
-      expect(validator.plugins.warnPluginAfterStart).not.toHaveBeenCalled();
+      expect(seen).toStrictEqual([]);
     });
 
     it("usePlugin: a non-function lifecycle method warns ('onStart')", () => {

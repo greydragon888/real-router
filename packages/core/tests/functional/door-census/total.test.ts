@@ -355,6 +355,7 @@ describe("door total (#2303)", () => {
     ContextNamespaceClaim: "surface",
     DependenciesApi: "surface",
     CheckPositionMap: "surface",
+    DiagnosticEventMap: "surface",
     InterceptableMethodMap: "surface",
     LifecycleApi: "surface",
     Navigator: "surface",
@@ -979,6 +980,7 @@ describe("door total (#2303)", () => {
     RouteTree: "round-trip — the tree core built",
     InterceptableMethodMap: "callback — `InterceptorFn`",
     CheckPositionMap: "callback — `CheckFn`",
+    DiagnosticEventMap: "callback — a diagnostic handler",
     ParamsSearch: "callback — a route's `encodeParams` / `decodeParams`",
     PreloadTarget: "callback — `PreloadFn`",
     RouterError: "callback — `onError`, `fallback`, `Plugin.onTransitionError`",
@@ -1133,13 +1135,13 @@ describe("door total (#2303)", () => {
       "plugin augmentations": 15,
       "plugin factory params": 14,
       "provider props": 6,
-      "surface members": 84,
+      "surface members": 86,
     });
   });
 
   it("the total", () => {
     // ⚠ The bucket table above is what a reader diffs; this line exists so the
     // headline is a test rather than a sentence somebody wrote down once.
-    expect(union.size).toBe(295);
+    expect(union.size).toBe(297);
   });
 });

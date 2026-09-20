@@ -73,6 +73,7 @@ describe("surface census (#2303)", () => {
     "routerExtensions",
     "setRootPath",
     "start",
+    "subscribeDiagnostic",
     "systemCommit",
     "treeChanged",
     "validator",
@@ -104,6 +105,7 @@ describe("surface census (#2303)", () => {
     "matchPath",
     "navigateToState",
     "setRootPath",
+    "subscribeDiagnostic",
   ];
 
   const FACADE = [

@@ -29,6 +29,7 @@ import type {
   EventMethodMap,
   InterceptableMethodMap,
   CheckPositionMap,
+  DiagnosticEventMap,
   PluginFactory,
 } from "./types";
 import type { Limits } from "./types/internal";
@@ -133,6 +134,15 @@ export interface RouterInternals<
    * `"TREE_CHANGED"` (it is not in the public `EventName` union), is strict on
    * duplicates, and exposes neither `emit` nor `listenerCount`.
    */
+  /**
+   * Subscribes to one internal DIAGNOSTIC kind (#2388). The wiring path for
+   * `PluginApi.subscribeDiagnostic`; core itself never listens.
+   */
+  readonly subscribeDiagnostic: <K extends keyof DiagnosticEventMap>(
+    key: K,
+    handler: (...args: DiagnosticEventMap[K]) => void,
+  ) => Unsubscribe;
+
   readonly treeChanged: {
     readonly emit: (event: TreeChangedEvent) => void;
     readonly subscribe: (
@@ -504,6 +514,18 @@ export const SEAM = {
  * The call sites below read a PROPERTY of this object rather than spelling a
  * literal, so the set that decides is the set that acts.
  */
+/**
+ * The runtime half of the diagnostic channel (#2388) — the same
+ * pair-with-the-type construction {@link SEAM} and {@link POSITION} use.
+ *
+ * ⚑ A key added to {@link DiagnosticEventMap} and not here fails this object to
+ * compile, and a value drifting from its key is an error rather than a silent
+ * alias.
+ */
+export const DIAGNOSTIC = {
+  PLUGIN_AFTER_START: "PLUGIN_AFTER_START",
+} as const satisfies { [K in keyof DiagnosticEventMap]: K };
+
 export const POSITION = {
   "buildPath:params": "buildPath:params",
   "buildPathResolved:params": "buildPathResolved:params",

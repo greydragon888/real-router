@@ -248,6 +248,7 @@ describe("reachability census (#2303)", () => {
       "DefaultRouteCallback",
       "DefaultSearchCallback",
       "DependenciesApi",
+      "DiagnosticEventMap",
       "ErrorCodeKeys",
       "ErrorCodeToValueMap",
       "ErrorCodeValues",

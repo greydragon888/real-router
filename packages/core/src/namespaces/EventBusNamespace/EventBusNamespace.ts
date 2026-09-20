@@ -32,6 +32,7 @@ import type {
   Params,
   SearchParams,
   TransitionMeta,
+  DiagnosticEventMap,
 } from "../../types";
 import type { RouterEventMap } from "../../types/internal";
 import type { RouterValidator } from "../../types/RouterValidator";
@@ -369,6 +370,41 @@ export class EventBusNamespace {
 
     return this.#emitter.on(TREE_CHANGED, (event: TreeChangedEvent) => {
       handler(event);
+    });
+  }
+
+  /**
+   * Emits an internal DIAGNOSTIC (#2388) — what core reports rather than
+   * refuses. Same emitter as `TREE_CHANGED`, so coalescing and per-listener
+   * error isolation apply, and with no listener the cost is one `Map.get`.
+   */
+  emitDiagnostic<K extends keyof DiagnosticEventMap>(
+    key: K,
+    ...args: DiagnosticEventMap[K]
+  ): void {
+    this.#emitter.emit(key, ...args);
+  }
+
+  /**
+   * Subscribes to one diagnostic KIND. Lenient duplicates, like
+   * {@link subscribeTreeChanged}.
+   *
+   * ⚠ Refuses on a disposed router, like its three subscription siblings
+   * (#946 / #982). Not because an inert diagnostic listener is harmful, but
+   * because `RouterInternals` promises the refusals its guarded sibling makes
+   * (#2259) — putting the check HERE is what keeps the two sides one function
+   * rather than a bypass.
+   */
+  subscribeDiagnostic<K extends keyof DiagnosticEventMap>(
+    key: K,
+    handler: (...args: DiagnosticEventMap[K]) => void,
+  ): Unsubscribe {
+    if (this.isDisposed()) {
+      throw freezeThrownError(new RouterError(errorCodes.ROUTER_DISPOSED));
+    }
+
+    return this.#emitter.on(key, (...args: DiagnosticEventMap[K]) => {
+      handler(...args);
     });
   }
 

@@ -337,6 +337,7 @@ export type {
   InterceptableMethodMap,
   InterceptorFn,
   CheckPositionMap,
+  DiagnosticEventMap,
   CheckFn,
   ContextNamespaceClaim,
 } from "./api";

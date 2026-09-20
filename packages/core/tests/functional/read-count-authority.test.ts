@@ -2093,6 +2093,7 @@ describe("the public door inventory (#1901)", () => {
     "getPluginApi.matchPath",
     "getPluginApi.navigateToState",
     "getPluginApi.setRootPath",
+    "getPluginApi.subscribeDiagnostic",
     "getRoutesApi.add",
     "getRoutesApi.clear",
     "getRoutesApi.get",

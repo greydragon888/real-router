@@ -346,6 +346,10 @@ export function getPluginApi<
         list.splice(list.indexOf(fn), 1);
       };
     },
+    // ⚑ The REFERENCE, not a wrapper: identity is what makes this a plain alias
+    // rather than a pair the #2259 ratchet must probe for divergence.
+    subscribeDiagnostic: ctx.subscribeDiagnostic,
+
     addCheck: (position, check) => {
       throwIfDisposed(ctx.isDisposed);
       assertCheckPosition(position, check);
