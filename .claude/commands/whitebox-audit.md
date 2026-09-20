@@ -4,6 +4,7 @@
 $ARGUMENTS
 
 Формат аргументов:
+
 - **Модуль (ОБЯЗАТЕЛЬНО)** — какой пакет аудировать. Любое из:
   - путь к пакету: `packages/path-matcher`, `packages/route-tree`
   - npm-имя: `@real-router/logger`, `search-params`
@@ -15,6 +16,7 @@ $ARGUMENTS
 > **Диспетчер.** Это НЕ `/mutation-score` (тот убивает выживших мутантов точечными тестами — ось «сила ассертов»). `/whitebox-audit` — про **границу** теста: unit-тесты обязаны ходить через public API, тогда недостижимый код всплывает как непокрытая ветка. Пересекается с `/mutation-score` (оба про качество тестов), но дополняет его: whitebox = ЧЕСТНОСТЬ границы, mutation = сила ассертов внутри границы.
 
 **Прецеденты (изучи перед прогоном — это готовая эталонная реализация):**
+
 - `packages/core/eslint.config.mjs` — первый white-box guardrail + аудит-доктрина в комментарии.
 - `packages/path-matcher/eslint.config.mjs` + `tests/unit/*` — ПОЛНАЯ миграция всеми тремя исходами (мигрирован / v8-ignore / KEEP-exception); `createSegmentNode.test.ts` и `percentEncoding.test.ts` — образцы KEEP-исключений с заголовком-обоснованием.
 - `.claude/whitebox-test-audit-2026-06-23.md` — исходный аудит core (если есть локально).
@@ -41,6 +43,7 @@ White-box-тест может убить мутанта, **не усилив П�
 ## Фаза 2 — Классификация каждого нарушения
 
 Для каждого импорта из `src/*` реши по `src/index.ts`:
+
 - **Class-1 — публичный символ через src-путь** (символ ЕСТЬ в индексе, импортится как `../../src/X`): тривиально репойнтнуть на имя пакета (`from "<package>"`). Смешанный импорт (часть public, часть internal) — расщепить на два. Чинить сразу. **Гоча:** self-import `from "<package-name>"` в тестах пакета резолвится (Node self-ref + `exports` + tsc `customConditions` + vitest alias) — но без прецедента в пакете **проверь vitest-прогоном И type-check'ом**, что резолвится, до массовой правки.
 - **Class-2 — истинно внутренний** (символа НЕТ в индексе: энкодеры, node-фабрики, токенайзер-примитивы, char-сканы): в Фазу 3.
 
@@ -55,6 +58,7 @@ pnpm -F <pkg> exec vitest run tests/ \
 ```
 
 Непокрытые строки = что ТОЛЬКО этот white-box-файл покрывает напрямую. Затем для каждой такой строки установи, покрыта ли она:
+
 - непрямыми public-тестами других файлов (тогда прямой тест избыточен для покрытия);
 - **exempt-property-тестом** (`*.properties.ts`) — **ГОЧА:** property-тесты НЕ гоняются в `vitest run tests/` (default config), их покрытие в unit-гейт НЕ входит; строка, покрытая ТОЛЬКО exempt-property, всплывёт «непокрытой» в unit-гейте — это НЕ мёртвый код, это кандидат в v8-ignore (Фаза 5). **⚠ Но сначала спроси: достижима ли строка ПУБЛИЧНЫМ UNIT-тестом (просто ненаписанным)?** Exempt-property часто гоняет ветку через тот же public API под форматом/опцией, которые unit не покрывает (напр. `noneBooleanStrategy` покрыт только property с `booleanFormat:"none"`, но тривиально достижим unit'ом `parse("x=true",{booleanFormat:"none"})`). Если достижим — это **МИГРАЦИЯ** (допиши public-unit с нужной опцией, Фаза 4), а НЕ v8-ignore. v8-ignore — ТОЛЬКО когда НИ ОДИН разумный public-unit до строки не дотягивается (реально dead-via-unit, живёт лишь в property/другом слое). Проверяй достижимость эмпирически (Фаза 3-замер от кандидатного unit), не глазом;
 - кросс-пакетно (напр. gate `route-tree` зовёт публичную функцию `path-matcher`) — проверь консьюмеров grep'ом.
@@ -62,6 +66,7 @@ pnpm -F <pkg> exec vitest run tests/ \
 ## Фаза 4 — Honest-переписывание через public API
 
 Перепиши Class-2-тесты на публичную поверхность:
+
 - ошибки/реджекты → публичная validation-функция (`findSegmentGrammarError`) ИЛИ throw на `registerTree`/фабрике — точно, лоссли;
 - извлечённые данные (имя/констрейнт/kind) → `buildParamMeta`/аналог;
 - **поведение** (`optional`, декод, матч) → через `match`/`buildPath` — обе формы, реальные входы.
@@ -70,13 +75,13 @@ pnpm -F <pkg> exec vitest run tests/ \
 
 ## Фаза 5 — Резолюция КАЖДОЙ всплывшей находки (дерево решений)
 
-| Ситуация | Исход | Как |
-|---|---|---|
-| **Truly dead** — ветка недостижима НИ через public, НИ через property, НИ через другой тест | **SIMPLIFY** (удалить из `src`) | Доказать недостижимость (трассировка + мутация); удалить; прогнать equivalence-property/parity — зелёные. changeset. |
-| **Dead-via-public, но покрыто** exempt-property/другим слоем | **v8-ignore + коммент** | `/* v8 ignore next -- unreachable via <public path>; covered by <exempt property/др.> */`. Паттерн core «validator-opt-in: dead in core, covered in plugin». |
-| **Reachable, но вердикт публично НЕРАЗЛИЧИМ** (fast-reject, backstopped downstream — напр. `validatePercentEncoding` ← decode try/catch) | **KEEP-narrow exception** | Оставить прямой тест; вынести (при необходимости) в отдельный файл; в `ignores` allowlist + заголовок-обоснование в файле. |
-| **Внутренний memory/perf/hidden-class инвариант**, консьюмером ненаблюдаемый (напр. `createSegmentNode` sentinel #1009/#1379) | **KEEP-narrow exception** | Так же; в заголовке — какой инвариант и почему только прямым тестом. |
-| Покрытие полностью **избыточно** (public + property уже дают 100%), mutation-ценности нет | **DELETE** | Удалить файл/блок. |
+| Ситуация                                                                                                                                 | Исход                           | Как                                                                                                                                                          |
+| ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Truly dead** — ветка недостижима НИ через public, НИ через property, НИ через другой тест                                              | **SIMPLIFY** (удалить из `src`) | Доказать недостижимость (трассировка + мутация); удалить; прогнать equivalence-property/parity — зелёные. changeset.                                         |
+| **Dead-via-public, но покрыто** exempt-property/другим слоем                                                                             | **v8-ignore + коммент**         | `/* v8 ignore next -- unreachable via <public path>; covered by <exempt property/др.> */`. Паттерн core «validator-opt-in: dead in core, covered in plugin». |
+| **Reachable, но вердикт публично НЕРАЗЛИЧИМ** (fast-reject, backstopped downstream — напр. `validatePercentEncoding` ← decode try/catch) | **KEEP-narrow exception**       | Оставить прямой тест; вынести (при необходимости) в отдельный файл; в `ignores` allowlist + заголовок-обоснование в файле.                                   |
+| **Внутренний memory/perf/hidden-class инвариант**, консьюмером ненаблюдаемый (напр. `createSegmentNode` sentinel #1009/#1379)            | **KEEP-narrow exception**       | Так же; в заголовке — какой инвариант и почему только прямым тестом.                                                                                         |
+| Покрытие полностью **избыточно** (public + property уже дают 100%), mutation-ценности нет                                                | **DELETE**                      | Удалить файл/блок.                                                                                                                                           |
 
 **Не путать критерии:** truly-dead-нигде → SIMPLIFY; dead-via-public-но-покрыто-property → v8-ignore; reachable-но-неразличимо ИЛИ внутренний-инвариант → KEEP-exception. Каждое SIMPLIFY/v8-ignore — доказать эмпирически (мутация + прогон), не рассуждением. KEEP-exception при необходимости выноси в ОТДЕЛЬНЫЙ exempted-файл (не exemptить весь большой mostly-public файл ради одного блока).
 

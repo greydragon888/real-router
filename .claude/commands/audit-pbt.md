@@ -4,11 +4,13 @@
 $ARGUMENTS
 
 Формат аргументов:
+
 - Путь к пакету (`packages/<name>`) — аудит всех `tests/property/*.properties.ts`
 - ИЛИ путь к конкретному `*.properties.ts` файлу
 - Опционально `--report-only` — только отчёт, без правок (по умолчанию: аудит + правки)
 
 Пример:
+
 ```
 /audit-pbt packages/path-matcher
 /audit-pbt packages/search-params/tests/property/parse.properties.ts --report-only

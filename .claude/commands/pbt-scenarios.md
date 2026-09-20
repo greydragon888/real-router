@@ -4,10 +4,12 @@
 $ARGUMENTS
 
 Формат аргументов:
+
 - Имя пакета (как в pnpm `-F`) — например `@real-router/core`, `path-matcher`, `@real-router/sources`. Резолвится в `packages/<dir>` (для scoped — отбрось `@real-router/`); анализируется весь invariant-surface + существующие `tests/property/*.properties.ts` + `INVARIANTS.md`.
 - Опционально `--invariants-only` — только полный список инвариантов + матрица пробелов, без написания и мутационной валидации тестов (по умолчанию: список → генерация PBT → мутационная валидация каждого → обновление `INVARIANTS.md` → отчёт).
 
 Пример:
+
 ```
 /pbt-scenarios @real-router/core
 /pbt-scenarios search-params --invariants-only
@@ -22,6 +24,7 @@ $ARGUMENTS
 PBT защищает не строку, а **логическое свойство** функции над всей областью входа. Цель скилла: перечислить ВСЕ инварианты, которым обязан удовлетворять модуль, и для каждого непокрытого — родить дискриминирующий тест с независимым оракулом и генератором, который реально достаёт класс-нарушитель.
 
 Тройная планка качества (иначе скилл генерирует PBT-театр):
+
 1. **ПОЛНОТА** — каждый применимый инвариант имеет дискриминирующий PBT (или явно помечен N/A с причиной). «Полнота/исчерпывающий» = «не осталось применимого непокрытого инварианта», НЕ объём генерации: на новом модуле (режим B, Шаг 0) выход = полный каталог + suite с нуля; на зрелом (режим A) выход = РАСШИРЕНИЕ существующего `INVARIANTS.md` на единицы («+1 к 139»), а не регенерация. Артефакт — обновлённый `INVARIANTS.md`.
 2. **ДИСКРИМИНАЦИЯ** — каждый рождённый PBT мутационно доказан ещё до приёмки (протокол — Шаг 4.4): оракул независим от кода-под-тестом, генератор покрывает нарушителя, мутация инварианта роняет тест. Тест, не падающий на мутации, — не покрытие, а шум.
 3. **СКЕПСИС (важнее обеих)** — PBT существует НЕ чтобы зафиксировать текущий вывод, а чтобы НАЙТИ нарушение инварианта (реальный баг). Сформулируй инвариант как ГИПОТЕЗУ и попытайся ОПРОВЕРГНУТЬ её на реальном коде (Шаг 1.5) ДО написания guard-теста. Падение на текущем коде — главный результат (REPORTED-BUG → фикс). Зелёный с первого прогона PBT, просто отражающий текущий вывод, — подозрителен: вернись и спроси «какой класс входа это нарушит, чего автор не предусмотрел?». Так аудит этого репо нашёл баг `optional-then-query` в `buildParamMeta`.
@@ -33,12 +36,14 @@ PBT защищает не строку, а **логическое свойств
 **Сначала прочитай `packages/<dir>/CLAUDE.md`, `INVARIANTS.md` (КРИТИЧНО — это существующий каталог инвариантов; скилл его РАСШИРЯЕТ, а не дублирует), `tests/property/` и helpers.** Задокументированные «gotchas» в CLAUDE.md — это инварианты (напр. «ignores query params by default», «empty array → empty string», «own-property only via hasOwn»). Пустой/короткий `INVARIANTS.md` ≠ «инвариантов нет» — значит «не выписаны».
 
 Природа модуля определяет, какие архетипы применимы и какие оракулы доступны:
+
 - **Чистые функции** (path-matcher, search-params, type-guards, route-tree): PBT-идеал. Применимы ВСЕ архетипы; сильнейшие оракулы — **model-based** (структурная модель → рендер во вход → проверка вывода против модели) и **cross-check** (build↔match, encode↔decode). Мутация src этого пакета — правильный зонд.
 - **Stateful / реактивные** (core, sources, плагины): инварианты требуют **command-sequence** генерации (start→nav→nav), model-based оракулов (пересчёт ожидаемого из имён, НЕ из кода), и **equivalence-relation laws** для предикатов сравнения (areStatesEqual). Часть свойств — **layered-contract** (инвариант обеспечивает ДРУГОЙ слой — core/инжектируемый парсер): src-мутация этого пакета здесь неправильный зонд → это documentation-тест, не «слабый» (см. `/audit-pbt` «Оговорки»).
 
 **Жёсткий фильтр применимости (применяй ДО объявления пробела).** Инвариант — пробел ТОЛЬКО если: (a) он реально держится (или его нарушение — реальный баг, Шаг 1.5), (b) он дискриминирующе тестируем В ЭТОМ пакете (не layered-contract, который обеспечивает зависимость), (c) ещё не покрыт дискриминирующим PBT. Иначе `N/A`/`documentation` с причиной. Не навязывай pure-архетипы тонкому stateful-обёртке и наоборот; чистая `not.toThrow`-тотальность на функции без нетривиального результата — низкий сигнал, не выдумывай свойство ради числа.
 
 **Зрелость задаёт РЕЖИМ работы (ветвление в Шаге 1), не строгость.** Определи режим:
+
 - **Режим A — зрелый модуль** (непустой `INVARIANTS.md` + существующие property-тесты, как core/path-matcher): каталог почти полон. Работа = подтвердить покрытие + найти ЕДИНИЦЫ пропущенного; НЕ перечисляй всё с нуля. Здесь скилл — **ратчет покрытия**: типичный запуск после добавления фичи (новая функция → новые непокрытые инварианты → скилл их закрывает; покрытие «упало» → восстановилось). Выход «+1 тест / +1 инвариант» — это УСПЕХ (покрытие уплотнилось), а НЕ малый/антиклимактичный результат.
 - **Режим B — новый/недокументированный** (пустой/отсутствующий `INVARIANTS.md`, мало/нет тестов): каталог нужно ПОСТРОИТЬ. Работа = полный проход чеклиста, каждый применимый инвариант — реальный пробел.
 
@@ -80,7 +85,11 @@ PBT защищает не строку, а **логическое свойств
 Для каждого кандидата сформулируй инвариант как ГИПОТЕЗУ и попытайся ОПРОВЕРГНУТЬ её на текущем src, прежде чем писать охранный PBT. Засемпли именно класс-нарушитель и прогони:
 
 ```ts
-fc.assert(fc.property(arbViolatorClass, (x) => { /* проверь свойство на реальном f(x) */ }))
+fc.assert(
+  fc.property(arbViolatorClass, (x) => {
+    /* проверь свойство на реальном f(x) */
+  }),
+);
 ```
 
 Типовые класс-нарушители, на которых ломаются инварианты (и которые дырявые генераторы исключают): граничные символы `/ ? % # &`, пустая строка, юникод/мультибайт; типы маршрутов splat/optional/constrained (не только param); перестановка ключей; вложенность/циклы; over-encoded значения (satisfies-after-decode-but-not-before); смешанные declared+undeclared query-ключи.
@@ -92,26 +101,26 @@ fc.assert(fc.property(arbViolatorClass, (x) => { /* проверь свойст�
 
 Выжимка из изучения всей PBT-базы. Для каждого: **форма свойства** · **триггер применимости** · **правильный оракул** · **класс-нарушитель для генератора** · **эталон**.
 
-| Архетип | Форма / триггер | Оракул · класс-нарушитель · эталон |
-| --- | --- | --- |
-| round-trip / bijection | `f(g(x))===x`; есть обратная (encode/decode, build/match, parse/build) | model-based или cross-check; нарушитель — encode-требующее значение; `path-matcher/matching`, `search-params` |
-| anti-identity | нетривиальная стратегия РЕАЛЬНО изменила значение (`encoded≠v`); парная к round-trip когда оракул слеп к under-encode | прямой; нарушитель — пробел/мультибайт (`%20`/`%`); `path-matcher/encoding` #5 |
-| idempotence / fixpoint | `f(f(x))===f(x)`; normalize/canonicalize/terminal-forward; idempotent dispose/unsub/set | self или model (terminal known); нарушитель — уже-нормализованный вход; `sources/normalizeActiveOptions`, `core/forwarding` |
-| equivalence-relation laws | reflexivity/symmetry/transitivity для `equals(a,b)` | model (если оба равны — третий обязан); нарушитель — **параметризованные** состояния (иначе param-loop мёртв); `core/areStatesEqual` |
-| commutativity / order-independence | порядок не важен: ключи canonicalJson, guard/plugin order | independent canonical encoder; нарушитель — перестановка ключей/целочисл. ключи/юникод; `sources/canonical-json` |
-| determinism / purity | одинаковый вход→выход; нет рандома; вход не мутируется | self (повтор) + pre/post snapshot; низкий сигнал — пометь; `core/nameToIDs`, `logger` |
-| totality / never-throws | не бросает на ЛЮБОМ входе под ЛЮБОЙ опцией; предикат→`false` не throw | boundary-enumeration; нарушитель — malformed `%`, raw unicode, `//`, опасный объект; `path-matcher/match-semantics` (never-throw matrix), `core/canNavigateTo` |
-| boundary-dichotomy | бросает/возвращает РОВНО когда выполнено условие | дихотомия (`throws ⟺ cond`); нарушитель — оба класса (вблизи границы); `core/transitionSegments` (SAME_STATES), `nav-plugin/canGoBack` |
-| monotonicity / subsumption | `strict⟹loose`; `ignoreQP:true⟹false`; version↑; count+1 | логическая импликация; нарушитель — пары, различающиеся только по оси; `core/isActiveRoute`, `sources/errorSource` |
-| metamorphic | f(x) влечёт g(x): navigate⟹segments; predicate⟹outcome | cross-check двух путей / model; нарушитель — глубокое дерево, все ancestor-комбинации; `core/transitionSegments`, `shouldUpdateNode` |
-| oracle-equivalence (model-based) | вывод парсера = независимо выведенная модель | **model** (модель — оракул, НЕ код); нарушитель — все типы сегментов (static/param/constrained/optional/splat); `path-matcher/buildParamMeta` |
-| structural-preservation | prefix-property, ancestor⊇descendant, subset, splat-slash-count, partition-coverage | структурный (slice/prefix/set-equality); нарушитель — глубокая вложенность, общий префикс-ловушка (`users` vs `usersAdmin`); `core/nameToIDs`, `sources/computeSnapshot` |
-| canonicalization | разные входы → один канонический выход | independent canonical; нарушитель — эквивалентные представления; `sources/canonical-json`, `nav-plugin/isSameHref` |
-| cache-identity / memoization | один вход → тот же инстанс (Object.is); per-router изоляция | identity + WeakMap; нарушитель — кросс-роутер ключи, переставленные params; `sources/createRouteNodeSource` |
-| subscription / notification | каждый подписчик видит каждое изменение; dedup; fire-once | event-count oracle; нарушитель — эквивалентная навигация (dedup), множество подписчиков; `sources/notification` |
-| default-fill / merge | пропущенное→дефолт; merge own-property only | defaults oracle; нарушитель — prototype-ключи (`__proto__`, `constructor`), partial-конфиг; `logger/configure`, `persistent-params` |
-| error-contract | исключительный вход → конкретный тип ошибки | error-type/regex oracle; нарушитель — circular, Map/Set/BigInt, невалидный уровень; `sources/canonical-json`, `type-guards` |
-| layered-contract (documentation) | свойство обеспечивает ДРУГОЙ слой (core/инжектируемый парсер) | documented-interface; **НЕ метить слабым** — src-мутация ЭТОГО пакета неправильный зонд; `path-matcher/undefined-strip`, `persistent-params/state.context` |
+| Архетип                            | Форма / триггер                                                                                                       | Оракул · класс-нарушитель · эталон                                                                                                                                       |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| round-trip / bijection             | `f(g(x))===x`; есть обратная (encode/decode, build/match, parse/build)                                                | model-based или cross-check; нарушитель — encode-требующее значение; `path-matcher/matching`, `search-params`                                                            |
+| anti-identity                      | нетривиальная стратегия РЕАЛЬНО изменила значение (`encoded≠v`); парная к round-trip когда оракул слеп к under-encode | прямой; нарушитель — пробел/мультибайт (`%20`/`%`); `path-matcher/encoding` #5                                                                                           |
+| idempotence / fixpoint             | `f(f(x))===f(x)`; normalize/canonicalize/terminal-forward; idempotent dispose/unsub/set                               | self или model (terminal known); нарушитель — уже-нормализованный вход; `sources/normalizeActiveOptions`, `core/forwarding`                                              |
+| equivalence-relation laws          | reflexivity/symmetry/transitivity для `equals(a,b)`                                                                   | model (если оба равны — третий обязан); нарушитель — **параметризованные** состояния (иначе param-loop мёртв); `core/areStatesEqual`                                     |
+| commutativity / order-independence | порядок не важен: ключи canonicalJson, guard/plugin order                                                             | independent canonical encoder; нарушитель — перестановка ключей/целочисл. ключи/юникод; `sources/canonical-json`                                                         |
+| determinism / purity               | одинаковый вход→выход; нет рандома; вход не мутируется                                                                | self (повтор) + pre/post snapshot; низкий сигнал — пометь; `core/nameToIDs`, `logger`                                                                                    |
+| totality / never-throws            | не бросает на ЛЮБОМ входе под ЛЮБОЙ опцией; предикат→`false` не throw                                                 | boundary-enumeration; нарушитель — malformed `%`, raw unicode, `//`, опасный объект; `path-matcher/match-semantics` (never-throw matrix), `core/canNavigateTo`           |
+| boundary-dichotomy                 | бросает/возвращает РОВНО когда выполнено условие                                                                      | дихотомия (`throws ⟺ cond`); нарушитель — оба класса (вблизи границы); `core/transitionSegments` (SAME_STATES), `nav-plugin/canGoBack`                                   |
+| monotonicity / subsumption         | `strict⟹loose`; `ignoreQP:true⟹false`; version↑; count+1                                                              | логическая импликация; нарушитель — пары, различающиеся только по оси; `core/isActiveRoute`, `sources/errorSource`                                                       |
+| metamorphic                        | f(x) влечёт g(x): navigate⟹segments; predicate⟹outcome                                                                | cross-check двух путей / model; нарушитель — глубокое дерево, все ancestor-комбинации; `core/transitionSegments`, `shouldUpdateNode`                                     |
+| oracle-equivalence (model-based)   | вывод парсера = независимо выведенная модель                                                                          | **model** (модель — оракул, НЕ код); нарушитель — все типы сегментов (static/param/constrained/optional/splat); `path-matcher/buildParamMeta`                            |
+| structural-preservation            | prefix-property, ancestor⊇descendant, subset, splat-slash-count, partition-coverage                                   | структурный (slice/prefix/set-equality); нарушитель — глубокая вложенность, общий префикс-ловушка (`users` vs `usersAdmin`); `core/nameToIDs`, `sources/computeSnapshot` |
+| canonicalization                   | разные входы → один канонический выход                                                                                | independent canonical; нарушитель — эквивалентные представления; `sources/canonical-json`, `nav-plugin/isSameHref`                                                       |
+| cache-identity / memoization       | один вход → тот же инстанс (Object.is); per-router изоляция                                                           | identity + WeakMap; нарушитель — кросс-роутер ключи, переставленные params; `sources/createRouteNodeSource`                                                              |
+| subscription / notification        | каждый подписчик видит каждое изменение; dedup; fire-once                                                             | event-count oracle; нарушитель — эквивалентная навигация (dedup), множество подписчиков; `sources/notification`                                                          |
+| default-fill / merge               | пропущенное→дефолт; merge own-property only                                                                           | defaults oracle; нарушитель — prototype-ключи (`__proto__`, `constructor`), partial-конфиг; `logger/configure`, `persistent-params`                                      |
+| error-contract                     | исключительный вход → конкретный тип ошибки                                                                           | error-type/regex oracle; нарушитель — circular, Map/Set/BigInt, невалидный уровень; `sources/canonical-json`, `type-guards`                                              |
+| layered-contract (documentation)   | свойство обеспечивает ДРУГОЙ слой (core/инжектируемый парсер)                                                         | documented-interface; **НЕ метить слабым** — src-мутация ЭТОГО пакета неправильный зонд; `path-matcher/undefined-strip`, `persistent-params/state.context`               |
 
 ### Алгоритм подбора генератора (диапазон значений для теста инварианта)
 
@@ -143,21 +152,26 @@ fc.assert(fc.property(arbViolatorClass, (x) => { /* проверь свойст�
 Для каждого GAP/WEAK:
 
 ### 4.1 Выбери НЕЗАВИСИМЫЙ оракул (анти-циркулярность)
+
 Сила убывает: **model-based** (структурная модель — оракул) > **reference/ground-truth** (`decodeURIComponent`, regex-оракул) > **cross-check** (два пути обязаны согласоваться: build↔match) > **metamorphic** (идемпотентность/roundtrip/порядок) > self/tautology (слабо). НИКОГДА не вычисляй ожидаемое тем же кодом, что тестируешь.
 
 ### 4.2 Спроектируй генератор под класс-нарушитель
+
 По алгоритму выше (A–D + anti-identity + numRuns + command-sequence). Засемпли `fc.sample` — нарушитель ДОЛЖЕН встречаться. Сохрани предусловия, держащие вход ВАЛИДНЫМ, но не те, что прячут баг. Если общий арбитрари нельзя расширить, не сломав другие тесты, — заведи отдельный узкий генератор (это инструкция его создать, не повод оставить слабым).
 
 ### 4.3 Напиши PBT
+
 `test.prop([arb], { numRuns })(...)`. Заголовок правдив: какой инвариант, какой оракул, какой класс входа. Используй helper-арбитрари пакета.
 
 ### 4.4 Мутационно провалидируй (полный протокол `/audit-pbt`)
+
 1. Сформулируй режим бага, нарушающий инвариант (какая правка src его ломает).
 2. Инъецируй ИМЕННО его в src: ослабь regex/charset, сделай преобразование тождественным, отключи guard/валидацию, поменяй классификацию, убери try/catch, останови equals-chain рано. Прогони ТОЛЬКО этот property-файл через property-конфиг → тест **ДОЛЖЕН упасть**. Откати src. `grep`-ом проверь, что мутация не осталась.
    - НЕ упал → недискриминирующий (почти всегда дырявый генератор или тавтология) → вернись к 4.1/4.2. **Не принимай.**
    - Падает на ТЕКУЩЕМ (корректном) коде → **реальный баг** → СТОП, сообщи, НЕ ослабляй тест и НЕ сужай генератор, чтобы спрятать.
 
 ### 4.5 Документируй и не плоди дублей
+
 Добавь инвариант в `INVARIANTS.md` (нумерованный, с формулой). Если новый сильный тест строго перекрывает старый слабый — удали слабый.
 
 ## Жёсткие правила

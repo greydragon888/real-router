@@ -1,6 +1,7 @@
 Сгенерируй commit message на основе текущих изменений в git.
 
 Шаги:
+
 1. Выполни `git diff --stat` для обзора изменённых файлов
 2. Выполни `git diff` для анализа содержимого изменений
 3. Определи тип изменений (feat, fix, refactor, docs, chore, ci, test, perf)
@@ -8,6 +9,7 @@
 5. При необходимости добавь детали в body
 
 Формат Conventional Commits:
+
 ```
 <type>(<scope>): <description>
 
@@ -15,6 +17,7 @@
 ```
 
 Типы:
+
 - feat: новая функциональность
 - fix: исправление бага
 - refactor: рефакторинг без изменения поведения
@@ -25,12 +28,14 @@
 - perf: оптимизация производительности
 
 Scopes (из cz.config.js — используй приоритетно):
+
 - Пакеты: core, core-types, route-tree, search-params, type-guards, helpers, logger
 - Плагины: browser-plugin, logger-plugin, persistent-params-plugin
 - Фреймворки: react
 - Инфраструктура: deps, config, ci, benchmarks
 
 Правила:
+
 - Описание в imperative mood ("add", не "added")
 - Scope — приоритетно из списка выше, можно кастомный если нужно
 - Не начинай с заглавной буквы после двоеточия
@@ -38,6 +43,7 @@ Scopes (из cz.config.js — используй приоритетно):
 - Body через пустую строку, каждый пункт с "- "
 
 Примеры:
+
 ```
 feat(core): add route guards support
 ```

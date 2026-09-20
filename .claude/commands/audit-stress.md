@@ -4,11 +4,13 @@
 $ARGUMENTS
 
 Формат аргументов:
+
 - Путь к пакету (`packages/<name>`) — аудит всех `tests/stress/*.stress.ts`
 - ИЛИ путь к конкретному `*.stress.ts` файлу
 - Опционально `--report-only` — только отчёт, без правок (по умолчанию: аудит + правки)
 
 Пример:
+
 ```
 /audit-stress packages/sources
 /audit-stress packages/core/tests/stress/dependencies-store.stress.ts --report-only

@@ -4,11 +4,13 @@
 $ARGUMENTS
 
 Формат аргументов:
+
 - Путь к файлу (`packages/core/src/namespaces/EventBusNamespace/EventBusNamespace.ts`). Один файл за прогон — рой масштабируется по числу блоков внутри него, а не по числу файлов.
 - Опционально `--dry` — остановиться на блоке рекомендаций, без правок и коммита.
 - Опционально `--no-mutate` — запретить мутационные замеры (быстрый прогон: только адреса, дубли, соответствие коду). Вердикт «избыточно» тогда ЗАПРЕЩЁН — см. §Гейт.
 
 Пример:
+
 ```
 /comment-audit packages/core/src/namespaces/NavigationNamespace/transition/executeNavigation.ts
 /comment-audit packages/core/src/routerFSM.ts --dry
@@ -24,12 +26,12 @@ $ARGUMENTS
 
 ## Классификация (единственная ось, по которой судят блок)
 
-| категория | признак | что с ней делают |
-| --- | --- | --- |
-| **ДЕРЖИТ** | называет инвариант с режимом отказа: «сломается так-то, если…» | оставить; проверить, что он и правда держится (замер), и что число в нём сегодняшнее |
-| **ОБЪЯСНЯЕТ** | называет механизм или отвергнутую альтернативу, которых из кода не видно | оставить, если стоит у своего кода и не повторён у владельца |
-| **АРХИВ** | рассказывает, что было ДО (переезды, удалённые предикаты, история счёта) | снять или свернуть до ссылки на issue; история живёт в git и IMPLEMENTATION_NOTES |
-| **ОПИСЫВАЕТ** | пересказывает соседние строки кода | снять |
+| категория     | признак                                                                  | что с ней делают                                                                     |
+| ------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| **ДЕРЖИТ**    | называет инвариант с режимом отказа: «сломается так-то, если…»           | оставить; проверить, что он и правда держится (замер), и что число в нём сегодняшнее |
+| **ОБЪЯСНЯЕТ** | называет механизм или отвергнутую альтернативу, которых из кода не видно | оставить, если стоит у своего кода и не повторён у владельца                         |
+| **АРХИВ**     | рассказывает, что было ДО (переезды, удалённые предикаты, история счёта) | снять или свернуть до ссылки на issue; история живёт в git и IMPLEMENTATION_NOTES    |
+| **ОПИСЫВАЕТ** | пересказывает соседние строки кода                                       | снять                                                                                |
 
 Операционально: если из абзаца нельзя извлечь **проверяемое утверждение** и он не называет **режим отказа** — это не «держит».
 
@@ -59,6 +61,7 @@ $ARGUMENTS
 **Фаза 1 — разбор (рой, ОДИН агент на ОДИН блок).** Гранулярность — это и надёжность, и скорость: агент с одним предметом не размывает контекст (в первом прогоне ошибся ровно тот агент, которому досталось семь блоков и 256 строк прозы), а внутри агента работа последовательная, поэтому тридцать мелких при параллелизме ~10–16 идут вдвое-втрое быстрее трёх крупных. Батчить по 2–3 блока — только когда блоков больше сорока; группировать «по смыслу» НЕ надо, блок самодостаточен.
 
 Каждый агент по СВОЕМУ блоку:
+
 1. разложить на атомарные утверждения;
 2. классифицировать каждое (таблица выше);
 3. для проверяемых — сформулировать конкретную проверку: точную мутацию и ожидаемый результат, либо скан;
@@ -70,10 +73,11 @@ $ARGUMENTS
 Возвращает `verdict: TRUE | FALSE | STALE | UNMEASURED` с фактическими числами. `UNMEASURED` НЕ может служить основанием для удаления.
 
 **Фаза 3 — критика (адверсариальный рой, 3 линзы на ПАКЕТ рекомендаций).** Не по три критика на каждый блок — это множит рой вчетверо без прироста качества. Собери выжившие рекомендации в пакеты по 6–10 (по смежным блокам) и дай каждому пакету три линзы. Задача — опровергнуть:
+
 - **линза «утрата»**: что перестанет быть известно, если это убрать? Восстановимо ли из кода, типов, тестов? Если знание живёт только здесь — рекомендация отклоняется;
 - **линза «метод»**: воспроизводится ли замер? не спутано ли «0 красных» с «избыточно» (проверено ли покрытие)? не мерил ли агент не то, что утверждает?
 - **линза «самостухание»**: не содержит ли предложенный текст нового счётчика/адреса, который протухнет так же? не переносит ли он ложь в другую формулировку?
-Рекомендация проходит при большинстве «не опровергнуто». Отклонённые попадают в отчёт с причиной — они тоже результат.
+  Рекомендация проходит при большинстве «не опровергнуто». Отклонённые попадают в отчёт с причиной — они тоже результат.
 
 **Фаза 4 — синтез (один агент), и он получает ВЫЖИМКУ, а не сырой JSON.** Это узкое место: сырые результаты роя не влезают в один промпт, и обрезка режет молча. В первом прогоне `slice(0, 40000)` съел две трети — синтезатор увидел одну группу из трёх, сообщил об этом сам и перевыводил остальное вручную. Поэтому **скрипт сжимает перед синтезом**: из каждого блока — только `{at, defectClass, whatIsWrong, evidence, anchorText, replacement, linesSaved, refutedBy[]}`, без исходных текстов комментариев и без промежуточных рассуждений. Если выжимка всё равно велика — синтезируй в два уровня (по 10 блоков → частичные отчёты → финальный), а не режь строкой.
 
@@ -92,46 +96,65 @@ $ARGUMENTS
 
 ```js
 export const meta = {
-  name: 'comment-audit',
-  description: 'Per-comment audit of one file: analyse → verify → criticise → recommend',
+  name: "comment-audit",
+  description:
+    "Per-comment audit of one file: analyse → verify → criticise → recommend",
   phases: [
-    { title: 'Analyse', detail: 'one agent per comment block' },
-    { title: 'Verify', detail: 'settle the checkable claims' },
-    { title: 'Criticise', detail: 'three lenses per package of recommendations' },
-    { title: 'Synthesise', detail: 'one ranked recommendation block' },
+    { title: "Analyse", detail: "one agent per comment block" },
+    { title: "Verify", detail: "settle the checkable claims" },
+    {
+      title: "Criticise",
+      detail: "three lenses per package of recommendations",
+    },
+    { title: "Synthesise", detail: "one ranked recommendation block" },
   ],
-}
+};
 
-const BLOCKS = [/* впечатано фазой 0: {at, len, attachedTo, markers} */]
-const FILE = '/абсолютный/путь'          // тоже литерал, не args
+const BLOCKS = [/* впечатано фазой 0: {at, len, attachedTo, markers} */];
+const FILE = "/абсолютный/путь"; // тоже литерал, не args
 
 // 1+2: разбор и проверка идут ПО БЛОКУ, без барьера между ними
 const perBlock = await pipeline(
   BLOCKS,
-  b => agent(ANALYSE(FILE, b), { label: `analyse:${b.at}`, phase: 'Analyse', schema: BLOCK_SCHEMA }),
-  (r, b) => (r?.claims ?? []).some(c => c.checkable)
-      ? agent(VERIFY(FILE, b, r), { label: `verify:${b.at}`, phase: 'Verify', schema: VERDICT_SCHEMA })
-          .then(v => ({ block: b, analysis: r, verification: v }))
+  (b) =>
+    agent(ANALYSE(FILE, b), {
+      label: `analyse:${b.at}`,
+      phase: "Analyse",
+      schema: BLOCK_SCHEMA,
+    }),
+  (r, b) =>
+    (r?.claims ?? []).some((c) => c.checkable)
+      ? agent(VERIFY(FILE, b, r), {
+          label: `verify:${b.at}`,
+          phase: "Verify",
+          schema: VERDICT_SCHEMA,
+        }).then((v) => ({ block: b, analysis: r, verification: v }))
       : { block: b, analysis: r, verification: null },
-)
+);
 
 // 3: критика по ПАКЕТАМ, а не по блокам — иначе рой множится вчетверо
-const alive = perBlock.filter(Boolean)
-const packs = []
-for (let i = 0; i < alive.length; i += 8) packs.push(alive.slice(i, i + 8))
+const alive = perBlock.filter(Boolean);
+const packs = [];
+for (let i = 0; i < alive.length; i += 8) packs.push(alive.slice(i, i + 8));
 
 const judged = await parallel(
   packs.flatMap((pack, i) =>
-    ['loss', 'method', 'rot'].map(lens => () =>
-      agent(CRITIQUE(FILE, digest(pack), lens), {
-        label: `critique:${i}:${lens}`, phase: 'Criticise', schema: CRITIQUE_SCHEMA,
-      }))),
-)
+    ["loss", "method", "rot"].map(
+      (lens) => () =>
+        agent(CRITIQUE(FILE, digest(pack), lens), {
+          label: `critique:${i}:${lens}`,
+          phase: "Criticise",
+          schema: CRITIQUE_SCHEMA,
+        }),
+    ),
+  ),
+);
 
 // 4: синтез получает ВЫЖИМКУ (digest), не сырые результаты
 return await agent(SYNTHESISE(digest(alive), judged.filter(Boolean)), {
-  phase: 'Synthesise', schema: REPORT_SCHEMA,
-})
+  phase: "Synthesise",
+  schema: REPORT_SCHEMA,
+});
 ```
 
 `digest()` — обычная JS-функция в скрипте: оставляет `{at, defectClass, whatIsWrong, evidence, anchorText, replacement, linesSaved}` и выбрасывает исходные тексты и рассуждения. Именно она держит синтез в пределах одного промпта; `slice()` по строке — не замена, он режет молча и посреди объекта.
