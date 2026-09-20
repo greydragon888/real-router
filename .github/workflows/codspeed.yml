@@ -231,6 +231,12 @@ jobs:
 
   core:
     name: Core hot-path benchmarks
+    # `checks: read` for the base-provenance step below: it asks the Checks API
+    # which `master` commit carries CodSpeed's own analysis. The workflow-level
+    # default is `contents: read` alone, under which that read 403s.
+    permissions:
+      contents: read
+      checks: read
     needs: gate
     # SECURITY (self-hosted + public repo): never run untrusted fork-PR code on
     # the VPS. The pull_request guard (the second clause) lets push +
@@ -437,6 +443,26 @@ jobs:
           bash "$GITHUB_WORKSPACE/scripts/cgroup-sample.sh" capture "$RUNNER_TEMP/cgroup-after.txt"
           bash "$GITHUB_WORKSPACE/scripts/cgroup-sample.sh" report \
             "$RUNNER_TEMP/cgroup-before.txt" "$RUNNER_TEMP/cgroup-after.txt" "core hot-path benchmarks"
+
+      # Which sample is this comparison read against, and how old is it (#2375)?
+      # CodSpeed takes the most recent run that HAS data, and the gate skips the
+      # benchmark jobs while the measured program is unchanged — so one sample
+      # can answer for every pull request opened since. That is the gate working
+      # rather than a defect, but the report does not say it: CodSpeed prints a
+      # footnote only when it calls the base *unexpected*, and on #2371 the
+      # second run dropped that footnote while keeping the same 13-commit base.
+      #
+      # ⚠ AFTER the cgroup sampler, never between its two halves — the pair
+      # brackets the measured step and a step inserted between them would put
+      # this script's own allocations inside the measurement's window.
+      #
+      # `if: always()`, because a base that is a day old is worth naming most on
+      # the run that just failed against it.
+      - name: Report the base this comparison reads against
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node "$GITHUB_WORKSPACE/scripts/codspeed-base-age.mjs"
 
   adapters:
     name: Adapter hot-path benchmarks (6 frameworks)
