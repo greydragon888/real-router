@@ -11059,6 +11059,44 @@ required checks must report: `Require Changeset`, `Validate Changesets`, `CI Res
 `Dependency Review` (still skipped-as-passed) and `SonarCloud`, which now runs for real on the
 release tree.
 
+## Three jobs a release PR cannot give a subject (2026-09-20)
+
+**Problem.** "Release PRs run the pipeline" above is about the pipeline: the release commit's TREE is
+checked where a flake costs a re-run rather than the release chain, and the run fills the remote cache
+post-merge then reads. Three jobs rode along that decision without sharing its subject. Measured on
+release PR #2449, whose diff is four files — the consumed changeset, two CHANGELOGs and one `version`
+field: `Bundle Size` compared bytes that cannot move (nothing inlines a version into a bundle),
+`Package Smoke Test` re-installed tarballs whose every assertion is independent of the version being
+bumped, and seven of `Repo Lints`' steps read source, docs and tests the diff does not hold. 1 m 23 s
+
+- 25 s + 39 s of runners — and a red check in the last two lands on a PR the changesets action
+  regenerates from master, where it cannot be answered.
+
+**Solution (#2450).** `check.outputs.no_source` — the #2433 predicate, asked of the DIFF rather than
+of the branch name — now gates them:
+
+- `Bundle Size` and `Package Smoke Test` skip the job. Neither sits in `CI Result`'s strict set: the
+  first is not among its `needs` at all, the second is read through `ok()`, which counts a skip as a
+  pass.
+- `Repo Lints` keeps the job and gates seven STEPS, because a release PR DOES hold a subject for four
+  of its checks — `lint:deps` judges the peer floors `changeset version` rewrites, `lint:dedupe` the
+  lockfile the root `version` script regenerates, and four of the twelve repository-wide scans plus
+  knip read manifests and Markdown. A job-level skip would also redden `CI Result`, which demands
+  `LINTS == "success"` strictly rather than through `ok()`.
+
+A release PR has the same diff shape as a Dependabot bump, so those steps take the condition the
+Dependabot split already gives them instead of a second mechanism.
+
+**Why the decision above is untouched.** Its value sits in `pipeline-leaf` / `base-*` /
+`pipeline-sharded`, which still run: a version bump moves the bumped package's turbo hash, so the
+pipeline bundles it and fills the cache. `Bundle Size`'s own `turbo run bundle --filter='./packages/*'`
+is a remote-cache READ for everything the pipeline did not build, so skipping it fills nothing less.
+
+**Cost.** The packaging guard now runs nowhere on the master → npm path: `post-merge.yml` builds and
+measures sizes, `changesets.yml` bundles and publishes with nothing in between, and the smoke test plus
+`publint`/`attw` live in `ci.yml` only. Tracked in #2452, whose answer belongs in front of
+`Publish to npm` rather than on a bot PR.
+
 ## Two example suites asserted on a contract that had moved (2026-09-16)
 
 ### Problem
