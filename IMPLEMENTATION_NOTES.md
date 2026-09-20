@@ -11097,6 +11097,43 @@ measures sizes, `changesets.yml` bundles and publishes with nothing in between, 
 `publint`/`attw` live in `ci.yml` only. Tracked in #2452, whose answer belongs in front of
 `Publish to npm` rather than on a bot PR.
 
+## The only check between master and npm (2026-09-20)
+
+**Problem.** Nothing on the publish path read the artifact. Measured across the three workflows:
+`post-merge.yml` runs install, `Build` and the bundle-size base measurement; `changesets.yml` ran
+`Bundle packages for publish` and then `Publish to npm` with nothing in between; the smoke test and
+the `publint` + `attw` step live in `ci.yml`, i.e. on pull requests only. Until the record above
+landed, the release PR's own CI covered the gap by accident — its tree is master plus version bumps
+— and that record removed two of those jobs deliberately. So the gap became explicit, and it sits in
+front of an npm publish, which cannot be taken back.
+
+**Solution (#2452).** A step between bundling and publishing, carrying the same guard its neighbours
+carry (`steps.unpublished.outputs.has_unpublished == 'true'`):
+`pnpm turbo run lint:package lint:types --filter='!./examples/**' --filter='!./benchmarks'`. Both
+tasks `dependsOn` bundle, which ran in the step above, so they are a cache hit and cost seconds.
+
+**Why publint rather than the smoke test.** The smoke test installs the packed tarballs with npm, so
+a registry hiccup during a release would block a publish for a reason that has nothing to do with the
+artifact. `publint` and `attw` read what was built and need no network.
+
+**And why `publint` had to be extended in the same change.** It was declared by THREE of the 23
+public packages (angular, solid, svelte) — a guard over 3/23 is a token. Measured before extending:
+all 23 pass, so the extension is a one-line script per manifest and no defect to fix. `attw` stays
+where it is declared: raw, it also passes everywhere except three, and each of those three is the
+class the two gated packages already ignore by rule — for `@real-router/react` it is
+`@real-router/react/ink`, whose `require` condition was dropped on purpose because ink@7 is ESM-only
+(#1628), so `node16 (from CJS)` cannot resolve there by design. Extending `attw` therefore needs a
+per-package ignore rule and a decision about that subpath, which is its own issue.
+
+**Discriminating power, measured rather than assumed.** With an export pointing at a file that is not
+built, `publint` fails with `pkg.module is ./dist/esm/nope.mjs but the file does not exist.`; with
+`files` no longer shipping `dist`, it fails too. Both mutants were applied to `packages/core` and
+restored, with the baseline and the final control green.
+
+**Cost.** Seconds per release, and a failure leaves the versions committed and unpublished — the
+state `stranded-release.yml` watches (#2057). That watch is the backstop; this step failing the run is
+the alarm, and it is attributable because it is the release run.
+
 ## Two example suites asserted on a contract that had moved (2026-09-16)
 
 ### Problem

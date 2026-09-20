@@ -42,6 +42,7 @@
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --max-warnings 0 --no-error-on-unmatched-pattern",
     "lint:fix": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0 --no-error-on-unmatched-pattern",
+    "lint:package": "publint",
     "test": "vitest run",
     "test:properties": "vitest --config vitest.config.properties.mts --run",
     "bundle": "tsdown --config-loader unrun"
