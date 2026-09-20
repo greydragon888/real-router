@@ -364,6 +364,16 @@ describe("routes API validation — with validationPlugin", () => {
       }).toThrow(/cannot be an async function/);
     });
 
+    it("names the update door when the forwardTo target needs a param the source lacks (#2399)", () => {
+      routes.add([{ name: "u", path: "/u/:id" }]);
+
+      expect(() => {
+        routes.update("users", { forwardTo: "u" });
+      }).toThrow(
+        '[router.updateRoute] forwardTo target "u" requires params [id] that are not available in source route "users"',
+      );
+    });
+
     it("should not reject custom (plugin-defined) fields in the patch (#797)", () => {
       const raw = routes as unknown as {
         update: (n: string, u: unknown) => void;
