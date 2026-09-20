@@ -6,8 +6,8 @@ Logger channels name the call you made, not the class that logged it (#2461)
 
 The issue read the `clear` door as naming itself two ways and expected the longer
 name to be the outlier. The census answered the other way: core names that door
-`clearRoutes` everywhere it names it — the in-flight log channel at
-`routeGuards.ts:247`, the wiki page — the way `add` is `addRoute` and `update` is
+`clearRoutes` everywhere it names it — the in-flight log channel in
+`routeGuards.ts`, the wiki page — the way `add` is `addRoute` and `update` is
 `updateRoute`. The refusal raised by `getRoutesApi` was the only site saying
 `[router.clear]`, so the throw is what changed.
 
