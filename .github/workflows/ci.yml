@@ -1579,6 +1579,192 @@ jobs:
           SHELLCHECK_OPTS: --severity=warning
 
   # ============================================
+  # SONAR, for a pull request from THIS repository (#2442). The analysis needs
+  # only the coverage artifacts, which are ready when the pipeline's test jobs
+  # are — about 122 s in — so running it here overlaps it with the tail of CI
+  # instead of appending it. Measured: the verdict lands at ~122 + 97 s through
+  # `sonar-trusted.yml`, against ~180 s from here.
+  #
+  # ⚠ A fork's run has no secrets, so `SONAR_TOKEN` is absent there and the scan
+  # dies at "Secret source: None" (#1868, measured on #1857). That path stays on
+  # `sonar-trusted.yml`, whose gate carries the mirror condition. The two are
+  # mutually exclusive by the head repository, and `sonar-producer.test.mjs`
+  # refuses a state where both or neither would produce.
+  #
+  # ⚠ The job is NOT named `SonarCloud` and does not rely on its own check run.
+  # `SonarCloud` is a required context in `protect-master`, and a skipped job on
+  # the fork path would put a second entry under that name beside the status the
+  # trusted workflow posts. This job POSTS the status, exactly as the gate does,
+  # so the context has one producer whichever path a pull request takes.
+  #
+  # ⚠ `if: always()` and only the head-repository test: every other condition is
+  # decided INSIDE, because a context nobody produces blocks the pull request
+  # forever. A skip here is a posted success with a reason, never an absence.
+  # ============================================
+  sonar:
+    name: Sonar (same-repository PR)
+    needs:
+      [
+        check,
+        pipeline-leaf,
+        base-bundle,
+        base-test,
+        base-coverage,
+        pipeline-sharded,
+      ]
+    if: always() && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      # The three arms `sonar-trusted.yml`'s gate decides from artifacts, decided
+      # here from what `check` already published — same verdicts, no API calls.
+      - name: Decide whether there is anything to analyse
+        id: decide
+        env:
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          NO_SOURCE: ${{ needs.check.outputs.no_source }}
+          SHOULD_RUN: ${{ needs.check.outputs.should_run }}
+          MODE: ${{ needs.check.outputs.mode }}
+          LEAF: ${{ needs.pipeline-leaf.result }}
+          LEAF_BUILT: ${{ needs.pipeline-leaf.outputs.built }}
+          BASE_BUNDLE: ${{ needs.base-bundle.result }}
+          BASE_TEST: ${{ needs.base-test.result }}
+          BASE_COV: ${{ needs.base-coverage.result }}
+          SHARDED: ${{ needs.pipeline-sharded.result }}
+        run: |
+          set -euo pipefail
+
+          verdict() {
+            echo "analyse=false" >> "$GITHUB_OUTPUT"
+            echo "why=$1" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+
+          # A bump changes manifests and the lockfile, never a line this reads
+          # (IMPLEMENTATION_NOTES "Dependabot PRs skip every metric").
+          [[ "$AUTHOR" == "dependabot[bot]" ]] && verdict "Not analysed: dependabot"
+
+          # The same predicate `coverage` and `duplication` consult (#2433).
+          [[ "$NO_SOURCE" == "true" ]] && verdict "Not analysed: no source changed"
+
+          [[ "$SHOULD_RUN" != "true" ]] && verdict "Not analysed: docs or CI only"
+
+          # No coverage means the pipeline built nothing to analyse — the arm the
+          # gate reaches by counting `coverage-reports-*` artifacts.
+          case "$MODE" in
+            leaf)
+              [[ "$LEAF" == "success" && "$LEAF_BUILT" == "true" ]] \
+                || verdict "Not analysed: no coverage produced" ;;
+            sharded)
+              { [[ "$BASE_BUNDLE" == "success" ]] \
+                && [[ "$BASE_TEST" == "success" ]] \
+                && [[ "$BASE_COV" == "success" ]] \
+                && { [[ "$SHARDED" == "success" ]] || [[ "$SHARDED" == "skipped" ]]; }; } \
+                || verdict "Not analysed: no coverage produced" ;;
+            *)
+              verdict "Not analysed: no shard plan" ;;
+          esac
+
+          echo "analyse=true" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        if: steps.decide.outputs.analyse == 'true'
+        uses: actions/checkout@v7
+        with:
+          # Sonar blames the changed lines; a shallow tree has nothing to blame.
+          fetch-depth: 0
+
+      # Pin Node for the `node -p` version read and the --emit scope script
+      # (fs-only, no pnpm install) instead of relying on the runner's system node.
+      - name: Setup Node.js
+        if: steps.decide.outputs.analyse == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      # Same per-path coverage merge as the Codecov job (leaf single artifact OR
+      # base + per-shard). check-coverage-scope --emit rescans after the merge.
+      - name: Download coverage artifacts
+        if: steps.decide.outputs.analyse == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          pattern: coverage-reports-*
+          merge-multiple: true
+          path: packages
+
+      - name: Cache SonarCloud packages
+        if: steps.decide.outputs.analyse == 'true'
+        uses: actions/cache@v6
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+
+      - name: Get version from core package
+        id: version
+        if: steps.decide.outputs.analyse == 'true'
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p 'require("./packages/core/package.json").version')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # Generate analysis scope from the filesystem (#732) — the same
+      # `check-coverage-scope.mjs --emit` that guards codecov.yml and
+      # sonar-project.properties, so the CI scope and the drift guard cannot
+      # disagree. Scanner CLI args override the properties file.
+      - name: Compute Sonar scope
+        id: scope
+        if: steps.decide.outputs.analyse == 'true'
+        run: node scripts/check-coverage-scope.mjs --emit >> "$GITHUB_OUTPUT"
+
+      - name: SonarCloud Scan
+        id: scan
+        if: steps.decide.outputs.analyse == 'true'
+        uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
+        with:
+          args: >
+            -Dsonar.projectVersion=${{ steps.version.outputs.version }}
+            -Dsonar.sources=${{ steps.scope.outputs.sources }}
+            -Dsonar.tests=${{ steps.scope.outputs.tests }}
+            -Dsonar.javascript.lcov.reportPaths=${{ steps.scope.outputs.reports }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+
+      # ⚠ `always()`: this step IS the required context. A scan that fails, a
+      # step that dies and a verdict of "nothing to analyse" all have to end in a
+      # posted status — the rule `sonar-trusted.yml` states for its own paths.
+      - name: Report the verdict
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          ANALYSE: ${{ steps.decide.outputs.analyse }}
+          WHY: ${{ steps.decide.outputs.why }}
+          SCAN: ${{ steps.scan.outcome }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$ANALYSE" != "true" ]]; then
+            STATE=success
+            DESC="${WHY:-Not analysed}"
+          elif [[ "$SCAN" == "success" ]]; then
+            STATE=success
+            DESC='Quality gate passed'
+          else
+            STATE=failure
+            DESC="Quality gate failed or the scan could not run (${SCAN:-unknown})"
+          fi
+
+          gh api "repos/${{ github.repository }}/statuses/$SHA" \
+            -f state="$STATE" \
+            -f context=SonarCloud \
+            -f description="$DESC" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+  # ============================================
   # GATE: Single required status check
   # Configure "CI Result" in branch protection
   # ============================================

@@ -62,9 +62,15 @@ jobs:
     # `ci.yml` triggers on `pull_request` only; the event test keeps this true if
     # a trigger is ever added there. A CI run that did not succeed produced no
     # artifacts to read, and its PR is already blocked by `CI Result`.
+    # ⚠ FORKS ONLY since #2442. A pull request from this repository is analysed
+    # inside `ci.yml`, where the secrets are and where the analysis overlaps the
+    # tail of the pipeline instead of following it. The two conditions are
+    # mirror images on the head repository and `sonar-producer.test.mjs` refuses
+    # a state where both, or neither, would produce the `SonarCloud` context.
     if: >-
       github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.conclusion == 'success'
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name != github.repository
     outputs:
       analyse: ${{ steps.decide.outputs.analyse }}
       sha: ${{ steps.meta.outputs.sha }}

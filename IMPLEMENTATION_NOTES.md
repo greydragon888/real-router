@@ -2,6 +2,29 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## The Sonar analysis overlaps CI again, for a pull request from this repository (#2442, 2026-09-20)
+
+**Problem.** `sonar-trusted.yml` triggers on `workflow_run`, which fires only when the whole CI workflow completes, so the analysis was appended to the pipeline rather than overlapped. Measured on the commit statuses, the wait after `CI Result` goes green:
+
+|                                              |                                                            |
+| -------------------------------------------- | ---------------------------------------------------------- |
+| before 2026-09-10, the job lived in `ci.yml` | 13 · 16 · 41 · 61 · 64 · 67 · 71 · 78 s — median **~62 s** |
+| after, on `workflow_run`                     | 92 · 96 · 98 · 118 s — median **~97 s**                    |
+
+⚑ **The share grew far more than the number.** The gate's floor went 278 s → 122 s across #2430, #2435, #2436 and #2438, so the same analysis went from about a fifth of the wait to nearly half.
+
+**Who the move was for.** A fork's run gets no repository secrets, so `SONAR_TOKEN` is absent and the scan dies at `Secret source: None` — #1868 measured that on #1857, where every other required check passed and this one did not. ⚠ **Measured over the last 1000 pull requests, 2 came from another repository**, so 998 carried the append for 2.
+
+**Solution.** A `sonar` job in `ci.yml` analyses a pull request from THIS repository, where the secrets are and where the analysis overlaps the pipeline's tail; `sonar-trusted.yml` keeps the fork path behind the mirror condition.
+
+⚠ **The job is not named `SonarCloud` and does not rely on its own check run.** `SonarCloud` is a required context in `protect-master`, and a job with that name would put a skipped check run under it on the fork path, beside the status the trusted workflow posts there. Both paths POST the status instead, so the context has exactly one producer whichever way a pull request comes.
+
+⚠ **Its `if:` carries nothing but `always()` and the head-repository test.** Every other condition — Dependabot, no source (#2433), no coverage — is decided inside and ends in a posted success with a reason. A condition in the `if:` skips the job, and a skipped job posts nothing: the pull request would then wait on a context nobody produces.
+
+**Why the arms are re-decided rather than shared.** The gate reaches them by counting `coverage-reports-*` artifacts and diffing through the API; in `ci.yml` the same three verdicts follow from what `check` already published, with no API call. `scripts/sonar-producer.test.mjs` is what keeps the two from drifting: it refuses a state where both or neither would produce, and counts the coverage verdict on **both** shard plans — losing one of the two leaves the other matching.
+
+**Off the gate's `needs`, deliberately.** `sonar` is allowlisted in `ci-gate-completeness.test.mjs`: it gates through its own required context, and routing it through `CI Result` would put the analysis back on the critical path, which is the thing this change removes.
+
 ## A CodSpeed comparison names the sample it is read against (#2375, 2026-09-20)
 
 **Problem.** CodSpeed takes as base the most recent run that HAS data, and `scripts/codspeed-gate.mjs` skips both benchmark jobs on a push whose range does not reach the measured program. While the program is unchanged one sample answers for every pull request opened since — and the report does not say which sample or how old. CodSpeed prints a footnote only when it calls the base _unexpected_; on #2371 the second run dropped that footnote while keeping the same 13-commit-old base, and the PR carried a red −13 % that was a property of the base rather than of its diff.

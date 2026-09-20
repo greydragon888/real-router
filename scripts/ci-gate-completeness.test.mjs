@@ -49,6 +49,14 @@ export const OUTSIDE_GATE = new Map([
     "informational size-limit PR comment — 'not a gate' by design " +
       "(infra-review W4 §3.4); its latency/failure must not move the merge point",
   ],
+  [
+    "sonar",
+    "gates through its OWN required context: the job posts the `SonarCloud` " +
+      "status that the `protect-master` ruleset requires beside `CI Result`, " +
+      "so a red analysis blocks the merge directly rather than through the " +
+      "aggregator — and routing it through `CI Result` would put the ~60 s " +
+      "analysis back on the gate's critical path, which is what #2442 removed",
+  ],
 ]);
 
 /**
@@ -230,7 +238,10 @@ test("fixture: reading a job's OUTPUTS counts as gating it, not only .result", (
     '          if [[ "${{ needs.check.result }}" != "success" ]]; then exit 1; fi\n',
     '          MODE="${{ needs.check.outputs.mode }}"\n',
   );
-  const v = findViolations(outputsOnly, new Map([["bundle-size", "info-only"]]));
+  const v = findViolations(
+    outputsOnly,
+    new Map([["bundle-size", "info-only"]]),
+  );
   assert.deepEqual(v.neededButUnread, []);
 });
 
