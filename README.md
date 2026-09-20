@@ -494,7 +494,12 @@ Real-Router is an **independent project** — not a fork. Built from scratch wit
 
 ## Quality & Testing
 
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=greydragon888_real-router&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=greydragon888_real-router)
+<!-- No SonarCloud Quality Gate badge here, deliberately. The badge renders the
+     MAIN BRANCH's `alert_status`, and nothing analyses `master`: its last
+     analysis is dated 2026-06-25. A green verdict about a tree that old is a
+     claim this page will not make. #2445 owns whether `master` gets a current
+     analysis; the badge can come back when it does. -->
+
 [![Vitest](https://img.shields.io/badge/tested%20with-vitest-6E9F18?style=flat-square&logo=vitest)](https://vitest.dev/)
 [![Playwright](https://img.shields.io/badge/e2e-playwright-2EAD33?style=flat-square&logo=playwright)](https://playwright.dev/)
 [![Property-Based Testing](https://img.shields.io/badge/PBT-fast--check-FF4785?style=flat-square)](https://fast-check.dev/)
@@ -502,7 +507,7 @@ Real-Router is an **independent project** — not a fork. Built from scratch wit
 Real-Router treats testing as a first-class engineering concern, not an afterthought.
 
 - **100% code coverage** — enforced in CI across all packages, no exceptions
-- **Static analysis** — SonarCloud quality gate on every PR: zero bugs, zero vulnerabilities, zero code smells
+- **Static analysis** — SonarCloud quality gate on every PR: an A rating for reliability, security and maintainability on the code the PR changes, plus its coverage, duplication and security-hotspot conditions
 - **Property-based testing** — 1000+ property tests via [fast-check](https://fast-check.dev/) across 31 packages, each running hundreds of generated inputs to verify invariants that hand-written tests miss (URL encoding, parameter serialization, route tree operations, reactive subscription ordering)
 - **Stress testing** — 500+ dedicated stress tests across core, plugins, and all 6 framework adapters: thousands of concurrent navigations, guard removal mid-execution, route CRUD under load, heap snapshots confirming zero memory leaks, mount/unmount lifecycle validation, subscription fanout granularity, and full SPA simulations
 - **Playwright e2e testing** — 1000+ end-to-end test cases across 100+ Playwright suites covering all 6 framework adapters (React, Preact, Solid, Vue, Svelte, Angular). Tests verify real browser behavior: navigation, guards, data loading, error handling, hash routing, nested routes, dynamic routes, and async guards
