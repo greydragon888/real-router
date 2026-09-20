@@ -1624,6 +1624,7 @@ jobs:
         id: decide
         env:
           AUTHOR: ${{ github.event.pull_request.user.login }}
+          CHECK: ${{ needs.check.result }}
           NO_SOURCE: ${{ needs.check.outputs.no_source }}
           SHOULD_RUN: ${{ needs.check.outputs.should_run }}
           MODE: ${{ needs.check.outputs.mode }}
@@ -1645,6 +1646,27 @@ jobs:
           # A bump changes manifests and the lockfile, never a line this reads
           # (IMPLEMENTATION_NOTES "Dependabot PRs skip every metric").
           [[ "$AUTHOR" == "dependabot[bot]" ]] && verdict "Not analysed: dependabot"
+
+          # ⚠ Every arm below reads an OUTPUT of `check`, and a job that did not
+          # succeed publishes the empty string rather than `false` — so the state
+          # of the pipeline is settled first, from job RESULTS, which are
+          # readable whatever happened. Measured before this arm existed: with
+          # `check` failed, `should_run` was empty and a pull request of nothing
+          # but source was told "docs or CI only" (#2441).
+          for result in "$CHECK" "$LEAF" "$BASE_BUNDLE" "$BASE_TEST" "$BASE_COV" "$SHARDED"; do
+            if [[ "$result" == "failure" ]]; then
+              verdict "Not analysed: CI failed"
+            fi
+          done
+
+          # Separate from a failure, and separate from "no coverage produced":
+          # a cancelled run is usually the concurrency group retiring a commit
+          # that a newer push replaced.
+          for result in "$CHECK" "$LEAF" "$BASE_BUNDLE" "$BASE_TEST" "$BASE_COV" "$SHARDED"; do
+            if [[ "$result" == "cancelled" ]]; then
+              verdict "Not analysed: CI cancelled"
+            fi
+          done
 
           # The same predicate `coverage` and `duplication` consult (#2433).
           [[ "$NO_SOURCE" == "true" ]] && verdict "Not analysed: no source changed"

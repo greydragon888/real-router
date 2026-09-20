@@ -54,6 +54,49 @@ env:
   STATUS_CONTEXT: SonarCloud
 
 jobs:
+  # A CI run that did not succeed produced no artifacts to read, so `gate` below
+  # refuses it — and a refusal that posts nothing leaves the required context on
+  # `Expected` for good, because nothing else will ever report on that commit.
+  # This job is that report, and it is a SEPARATE job for the same reason `gate`
+  # is separate from `sonar`: a skip cannot report.
+  #
+  # ⚠ It reads no artifact. `pr-meta` is written by the LAST two steps of
+  # `check`, so a run that died earlier never uploaded one — the arm would be
+  # unreachable in exactly the case it exists for. The head SHA comes from the
+  # payload instead, the same address the gate's own `failure()` arm uses.
+  ci-failed:
+    name: Sonar gate (CI did not succeed)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      statuses: write
+    # The exact complement of `gate`'s condition on `conclusion`, so the two
+    # cannot both fire or both stay silent; `sonar-producer.test.mjs` refuses a
+    # state where they stop being complements.
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion != 'success' &&
+      github.event.workflow_run.head_repository.full_name != github.repository
+    steps:
+      - name: Report that there will be no analysis
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        run: |
+          set -euo pipefail
+          # `cancelled` is usually the concurrency group retiring a commit a
+          # newer push replaced, which is not a failure and does not read as one.
+          if [[ "$CONCLUSION" == "cancelled" ]]; then
+            WHY="Not analysed: CI cancelled"
+          else
+            WHY="Not analysed: CI failed"
+          fi
+          gh api "repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_sha }}" \
+            -f state=success \
+            -f context="$STATUS_CONTEXT" \
+            -f description="$WHY" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
   # Owns the two verdicts that need no scanner. Split from `sonar` because a job
   # cannot end early and still report: a skip has to be a different job's success.
   gate:
