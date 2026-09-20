@@ -287,7 +287,7 @@ export class Router<
       // throws here, and EventBusNamespace.subscribe routes an async listener's
       // rejected Promise through the SAME sink (#944) — both land in one place.
       onListenerError: (eventName, error) => {
-        logger.error("Router", `Error in listener for ${eventName}:`, error);
+        logger.error("router", `Error in listener for ${eventName}:`, error);
       },
       onListenerWarn: (eventName, count) => {
         logger.warn(
@@ -893,7 +893,7 @@ export class Router<
     // Empty string is special case - warn and return false (root node is not a parent)
     if (name === "") {
       ctx.logger.warn(
-        "real-router",
+        "router.isActiveRoute",
         'isActiveRoute("") called with empty string. Root node is not considered a parent of any route.',
       );
 

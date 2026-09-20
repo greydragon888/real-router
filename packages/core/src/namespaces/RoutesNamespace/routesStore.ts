@@ -376,7 +376,7 @@ function registerForwardTo<Dependencies extends DefaultDependencies>(
       typeof route.forwardTo === "string" ? route.forwardTo : "[dynamic]";
 
     logger.warn(
-      "real-router",
+      "router",
       `Route "${fullName}" has both forwardTo and canActivate. ` +
         `canActivate will be ignored because forwardTo creates a redirect (industry standard). ` +
         `Move canActivate to the target route "${forwardTarget}".`,
@@ -389,7 +389,7 @@ function registerForwardTo<Dependencies extends DefaultDependencies>(
       typeof route.forwardTo === "string" ? route.forwardTo : "[dynamic]";
 
     logger.warn(
-      "real-router",
+      "router",
       `Route "${fullName}" has both forwardTo and canDeactivate. ` +
         `canDeactivate will be ignored because forwardTo creates a redirect (industry standard). ` +
         `Move canDeactivate to the target route "${forwardTarget}".`,

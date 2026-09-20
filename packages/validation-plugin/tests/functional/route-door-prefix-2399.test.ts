@@ -208,6 +208,10 @@ const CELLS: readonly Cell[] = [
     door: "clear",
     what: "a state is committed — core's own guard, and the only door whose refusal is about the router rather than the call",
     says: /Cannot clear routes while a state is committed/,
+    // ⚠ The prefix is the DOOR name, not the method name. Core calls this door
+    // `clearRoutes` wherever it names it — the in-flight log channel, the wiki
+    // page — the way `add` is `addRoute` and `update` is `updateRoute` (#2461).
+    registered: "[router.clearRoutes]",
     trigger: async (routes, router) => {
       await router.start("/home");
       routes.clear();
