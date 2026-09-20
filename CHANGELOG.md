@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-09-20]
+
+### @real-router/validation-plugin@0.27.1
+
+### Patch Changes
+
+- [#2448](https://github.com/greydragon888/real-router/pull/2448) [`fb9164b`](https://github.com/greydragon888/real-router/commit/fb9164b1aa5340b276704427d84a2ecda85f69fa) Thanks [@greydragon888](https://github.com/greydragon888)! - `update()` refuses an unavailable-params `forwardTo` under its own door name ([#2399](https://github.com/greydragon888/real-router/issues/2399))
+
+  `getRoutesApi(router).update("r", { forwardTo: "u" })`, where `u` needs a path
+  param `r` does not carry, threw
+  `[router.addRoute] forwardTo target "u" requires params [id] …`. The prefix names
+  the call a reader can grep in their own code, and this one named a door the
+  caller never used — the neighbouring refusal from the same door,
+  `forwardTo target "…" does not exist`, already said `[router.updateRoute]`.
+
+  The message now reads `[router.updateRoute]`; nothing else about it changes, and
+  the error stays an `Error`.
+
+  The batch doors are untouched: `add` and `replace` still print
+  `[router.addRoute]` for the same defect, which is core's recorded decision that
+  every batch door reports that one name. A cell per door of the `RoutesApi`
+  surface now pins which door a refusal names, and what it says.
+
 ## [2026-09-19]
 
 ### @real-router/core@0.145.0
