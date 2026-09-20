@@ -986,3 +986,5 @@ if (isMain(__filename)) {
     process.exitCode = 1;
   });
 }
+
+// measurement marker — removed before merge (#2375)
