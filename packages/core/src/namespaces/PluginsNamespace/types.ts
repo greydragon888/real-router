@@ -8,6 +8,7 @@ import type {
   Unsubscribe,
   EventMethodMap,
   PluginFactory,
+  DiagnosticEventMap,
 } from "../../types";
 import type { RouterValidator } from "../../types/RouterValidator";
 
@@ -32,4 +33,14 @@ export interface PluginsDependencies<
    * wiring, so `getInternals(router)` never throws and no try/catch is needed.
    */
   getValidator: () => RouterValidator | null;
+
+  /**
+   * Reports an internal DIAGNOSTIC (#2388). Core states what happened; whether
+   * anyone is told is the listening plugin's business, and with no listener
+   * this costs one `Map.get`.
+   */
+  emitDiagnostic: <K extends keyof DiagnosticEventMap>(
+    key: K,
+    ...args: DiagnosticEventMap[K]
+  ) => void;
 }

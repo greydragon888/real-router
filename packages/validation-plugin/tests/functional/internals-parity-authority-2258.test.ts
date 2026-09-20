@@ -340,6 +340,7 @@ describe("an internal door answers what its guarded sibling answers (#2258 / #22
       "getOptions",
       "getRootPath",
       "getTree",
+      "subscribeDiagnostic",
     ]);
 
     router.stop();

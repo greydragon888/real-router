@@ -105,7 +105,6 @@ export interface RouterValidator {
     validateCountThresholds: (count: number) => void;
     warnBatchDuplicates: (plugins: unknown[]) => void;
     warnPluginMethodType: (methodName: string) => void;
-    warnPluginAfterStart: (methodName: string) => void;
   };
 
   /**

@@ -77,6 +77,26 @@ export interface InterceptableMethodMap {
  * ⚠ The map's VALUE is the argument tuple, so a check registered at a position
  * is typed by what that position judges rather than by the door's signature.
  */
+/**
+ * The DIAGNOSTIC half of #2388 — what core reports rather than refuses.
+ *
+ * ⚑ **Internal keys, the shape `TREE_CHANGED` established.** They ride the same
+ * `EventEmitter` — so this is the mechanism core already has, not a third one —
+ * and are deliberately absent from the public `EventName` union, the `events.*`
+ * registry and the `Plugin` interface. `PluginApi.subscribeDiagnostic` is the
+ * only door.
+ *
+ * ⚠ **One key per diagnostic KIND, never one shared key.** `EventEmitter.emit`
+ * coalesces a re-entrant emit of an in-flight event NAME and drops it silently
+ * (#1033), and a listener here reaches the application's own
+ * `LoggerConfig.callback`, from which another diagnostic is raisable. Under one
+ * shared key that second diagnostic is lost.
+ */
+// eslint-disable-next-line @typescript-eslint/consistent-type-definitions -- must be `type`: `RouterEventMap` intersects it against a `Record<string, unknown[]>` constraint, which an interface does not satisfy
+export type DiagnosticEventMap = {
+  PLUGIN_AFTER_START: [methodName: string];
+};
+
 export interface CheckPositionMap {
   /**
    * The bag core adopted from the caller's, and prints the path from (#2134).
@@ -503,6 +523,23 @@ export interface PluginApi {
    * wins: core does not collect refusals, because the caller gets one error and
    * a second check's opinion about a value already refused is not actionable.
    */
+  /**
+   * Subscribes to one internal DIAGNOSTIC kind (#2388) — what core REPORTS
+   * rather than refuses.
+   *
+   * ⚑ The twin of {@link addCheck}, and the split is the same one: a check may
+   * refuse and a diagnostic may not. These ride the router's own emitter, on
+   * keys deliberately absent from the public `EventName` union — the shape
+   * `TREE_CHANGED` established.
+   *
+   * ⚠ A handler here reaches application code if it logs, so core isolates the
+   * call: a throwing handler cannot break the operation that reported.
+   */
+  subscribeDiagnostic: <K extends keyof DiagnosticEventMap>(
+    key: K,
+    handler: (...args: DiagnosticEventMap[K]) => void,
+  ) => Unsubscribe;
+
   addCheck: <P extends keyof CheckPositionMap>(
     position: P,
     check: CheckFn<P>,

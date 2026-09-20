@@ -179,6 +179,9 @@ function wirePlugins<Dependencies extends DefaultDependencies>(
     canNavigate: () => ns.eventBus.canBeginTransition(),
     compileFactory,
     getValidator,
+    emitDiagnostic: (key, ...args) => {
+      ns.eventBus.emitDiagnostic(key, ...args);
+    },
   };
 
   ns.plugins.setDependencies(deps);

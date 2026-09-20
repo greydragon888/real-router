@@ -14,6 +14,7 @@
  * `internal.ts`.
  */
 
+import type { DiagnosticEventMap } from "./api";
 import type { RouterError as RouterErrorType, State } from "./base";
 import type { NavigationOptions } from "./index";
 import type { LimitsConfig } from "./limits";
@@ -31,7 +32,7 @@ import type { TreeChangedEvent } from "./tree-changed";
  * reuses the same `EventEmitter` (depth tracking, error isolation) but is only
  * reachable via `getRoutesApi(router).subscribeChanges()`.
  */
-// eslint-disable-next-line @typescript-eslint/consistent-type-definitions -- must be `type` for Record<string, unknown[]> constraint
+
 export type RouterEventMap = {
   $start: [];
   $stop: [];
@@ -49,7 +50,7 @@ export type RouterEventMap = {
   ];
   $$cancel: [toState: State, fromState: State | undefined];
   TREE_CHANGED: [event: TreeChangedEvent];
-};
+} & DiagnosticEventMap;
 
 /**
  * Immutable limits configuration type.

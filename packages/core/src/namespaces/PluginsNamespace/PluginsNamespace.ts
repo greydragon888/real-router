@@ -2,6 +2,7 @@
 
 import { EVENTS_MAP, EVENT_METHOD_NAMES, LOGGER_CONTEXT } from "./constants";
 import { validatePlugin } from "./validators";
+import { DIAGNOSTIC } from "../../internals";
 
 import type { PluginsDependencies } from "./types";
 import type {
@@ -245,7 +246,10 @@ export class PluginsNamespace<
           );
 
           if (methodName === "onStart" && this.#deps.canNavigate()) {
-            this.#deps.getValidator()?.plugins.warnPluginAfterStart(methodName);
+            this.#deps.emitDiagnostic(
+              DIAGNOSTIC.PLUGIN_AFTER_START,
+              methodName,
+            );
           }
         } else {
           this.#deps.getValidator()?.plugins.warnPluginMethodType(methodName);

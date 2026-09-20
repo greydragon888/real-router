@@ -237,6 +237,7 @@ describe("the stub seam below getPluginApi (#1805)", () => {
       "getOptions",
       "getRootPath",
       "getTree",
+      "subscribeDiagnostic",
     ]);
 
     // Composes its answer locally — no seam one layer down at all.

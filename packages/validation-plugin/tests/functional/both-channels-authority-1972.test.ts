@@ -71,6 +71,7 @@ describe("every door taking both channels validates both (#1972)", () => {
     matchPath: "not-a-channel-door",
     navigateToState: "not-a-channel-door",
     setRootPath: "not-a-channel-door",
+    subscribeDiagnostic: "not-a-channel-door",
   };
 
   const routes = () => [{ name: "h", path: "/h/:id?page" }];

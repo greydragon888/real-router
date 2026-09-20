@@ -262,9 +262,6 @@ function buildValidatorObject(
       warnPluginMethodType(methodName) {
         warnPluginMethodType(methodName, api.logger);
       },
-      warnPluginAfterStart(methodName) {
-        warnPluginAfterStart(methodName, api.logger);
-      },
     },
     lifecycle: {
       validateHandlerLimit(count, methodName) {
@@ -706,6 +703,16 @@ export function validationPlugin<
       },
     );
 
+    // ⚠ A DIAGNOSTIC, not a check, and the channel is the difference rather
+    // than the style: this one cannot refuse the registration it describes —
+    // the plugin is already installed by the time core reports.
+    const removePluginAfterStartDiagnostic = api.subscribeDiagnostic(
+      "PLUGIN_AFTER_START",
+      (methodName) => {
+        warnPluginAfterStart(methodName, api.logger);
+      },
+    );
+
     return {
       teardown() {
         removeParamsCheck();
@@ -743,6 +750,8 @@ export function validationPlugin<
         removeRemoveActivateGuardCheck();
 
         removeRemoveDeactivateGuardCheck();
+
+        removePluginAfterStartDiagnostic();
 
         removeInterceptor();
 
