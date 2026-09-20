@@ -87,8 +87,27 @@ interface Anchor {
   anchor: string;
 }
 
+/**
+ * ⚠ **`**` does not descend into a directory whose name starts with a dot**, so
+ * the dot-directories are named explicitly. Measured in this tree: `**` finds 232
+ * `.md` files and none of the ones under `.changeset` — which is how a `.ts:247`
+ * anchor written in a changeset passed every check on its own pull request and
+ * then reddened the RELEASE one, where `changeset version` had copied the body
+ * verbatim into `packages/core/CHANGELOG.md`.
+ *
+ * `.claude` and `.github` are named for the same reason, not for symmetry: the
+ * skill files are where this class was measured at its worst, and nothing was
+ * holding them at zero afterwards.
+ */
+const DOT_DIRECTORIES = [".changeset", ".claude", ".github"] as const;
+
+const PATTERNS = [
+  "**/*.{ts,tsx,mts,md}",
+  ...DOT_DIRECTORIES.map((directory) => `${directory}/**/*.{ts,tsx,mts,md}`),
+];
+
 function scannedFiles(): string[] {
-  return globSync("**/*.{ts,tsx,mts,md}", {
+  return globSync(PATTERNS, {
     cwd: REPO_ROOT,
     exclude: (entry) => NOT_SOURCE.test(entry),
   })
@@ -133,6 +152,26 @@ const BASELINE: readonly Anchor[] = [];
 describe("nothing points at our code by line number", () => {
   it("carries exactly the known line anchors, no more and no fewer", () => {
     expect(lineAnchors(scannedFiles())).toStrictEqual(BASELINE);
+  });
+
+  it("CONTROL — the scan REACHES each dot-directory it names", () => {
+    // Dropping a pattern reddens nothing until someone writes an anchor there, and
+    // in a changeset that is one release cycle later, in the release pull request.
+    // Reached-or-not rather than a count: a count here would be a second promise
+    // to re-measure every time one of these directories gains a file.
+    const files = scannedFiles();
+    const reached = Object.fromEntries(
+      DOT_DIRECTORIES.map((directory) => [
+        directory,
+        files.some((file) => file.startsWith(`${directory}/`)),
+      ]),
+    );
+
+    expect(reached).toStrictEqual({
+      ".changeset": true,
+      ".claude": true,
+      ".github": true,
+    });
   });
 
   it("CONTROL — the scan FINDS a planted anchor, in prose and in code", () => {

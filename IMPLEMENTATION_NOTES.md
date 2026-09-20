@@ -94,6 +94,37 @@
 
 **Three mechanisms leave `master` unmeasured, not two.** The gate skip and a bare absence of work are the ones #2375 names; the third is `codspeed.yml`'s own `paths-ignore` (`.github/**`, `scripts/**`, `**/*.md`, `.claude/**`, `.husky/**`, `knip.json`), under which a push touching only those produces **no run at all** — not even a gate record. Measured on `a1fa45202`. A push of several commits also measures only its head.
 
+## The line-anchor gate did not read the dot-directories, so a changeset carried an anchor into a release PR (2026-09-21)
+
+**Problem.** `line-anchor-authority` holds the whole tree at zero `file:line`
+anchors, and it reported zero while one was live. The changeset for #2461 cited
+`routeGuards.ts` **by line** in its body; every check on that pull request passed.
+`changeset version` then copied the body verbatim into `packages/core/CHANGELOG.md`
+— a path the gate DOES read — and the failure landed on the release pull request,
+in two jobs, on work that had already merged.
+
+**Cause.** The scan globbed `**/*.{ts,tsx,mts,md}`, and `**` does not descend into
+a directory whose name begins with a dot. Measured in this tree: that pattern
+finds 232 `.md` files and none of the ones under `.changeset`. So a changeset was
+outside the ratchet by construction, and so were the 38 tracked files under
+`.claude` — the very files whose six anchors the gate's own docblock records as
+six-of-six stale, fixed by hand with nothing holding them there afterwards.
+
+**Solution.** `.changeset`, `.claude` and `.github` are named explicitly beside the
+`**` pattern, from one `DOT_DIRECTORIES` list that also feeds a new control cell:
+the scan must REACH each of them. Without that cell, dropping a pattern reddens
+nothing until someone writes an anchor there — which in a changeset is one release
+cycle later.
+
+**Why a control rather than a count.** The cell asserts reached-or-not per
+directory, not how many files each holds. A count would be a second promise to
+re-measure every time one of these directories gains a file.
+
+**What the mutants establish.** Putting the anchor back into the changeset reds
+the gate; planting one in a tracked `.claude/commands/*.md` reds it; dropping the
+patterns reds the new control. And the escape itself reproduces: old scope, new
+control removed, anchor restored — **6 of 6 green**, which is what #2469 saw.
+
 ## `base-lint` gets ESLint's worker threads, and only `base-lint` (#2437, 2026-09-19)
 
 **Problem.** After #2430, #2435 and #2436 the gate's floor 1 is `base-lint` at ~122 s, level with the sharded `base-test` chain, and `core#lint` is 94.4 s of it. ESLint 10.11 has `--concurrency` and this repository never passed it; the default is `off`.
