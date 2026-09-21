@@ -65,6 +65,11 @@ export interface InterceptableMethodMap {
  * one of the validator's refusals replaces; the two rights are disjoint in
  * practice, so they are disjoint in the API.
  *
+ * ⚠ **A throw is not a refusal when it stands AFTER `next(…)`** and judges what
+ * that call returned — the operation it rejects has already happened, while
+ * refusing means throwing INSTEAD of the call. Every throw reachable from those
+ * sites is of that shape, which a grep for `throw` does not show.
+ *
  * ⚑ **What refuses a position: a consultation standing at it.** A name lands
  * here when shipped code asks the question there, never because a door looks
  * like it might want one — an eligible-looking position with no consultation is
