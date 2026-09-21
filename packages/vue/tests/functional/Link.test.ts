@@ -79,8 +79,8 @@ describe("Link component", () => {
       // of distinct-name links), NOT a per-link `createActiveRouteSource` (a
       // `BaseSource` + its own router subscription EACH). Pre-#1416 vue's `<Link>`
       // built the per-link source unconditionally — the only adapter that never
-      // wired up the #1250 fast path (which landed only in the never-called
-      // `useIsActiveRoute` composable).
+      // wired up the #1250 fast path, which had landed in a composable nothing
+      // called (removed in #2425).
       //
       // Discriminator (mirror of svelte #1099 / react #1248): the canonical
       // undefined-params slow-path source is UNBUILT after a fast-path Link
@@ -103,9 +103,9 @@ describe("Link component", () => {
     it("a slow-path no-params <Link> (activeStrict) still shares the canonical undefined-params source (#776)", () => {
       // When a no-params Link falls to the slow path (here via `activeStrict`,
       // which the fast path excludes), it must still pass `routeParams` straight
-      // through as `undefined` — keying the source "" (not "{}") — so a matching
-      // Link / `useIsActiveRoute` shares the SAME cached source (one router
-      // subscription, not two). Discriminator: after the Link mounts + builds the
+      // through as `undefined` — keying the source "" (not "{}") — so any two
+      // consumers asking that same question share the SAME cached source (one
+      // router subscription, not two). Discriminator: after the Link mounts + builds the
       // source (calling `isActiveRoute` before the spy), asking for the identical
       // source is a cache HIT → `isActiveRoute` is NOT re-run.
       mountLink(router, { routeName: "one-more-test", activeStrict: true });
@@ -290,9 +290,8 @@ describe("Link component", () => {
     // consequence: `<Link routeName="users" />` remains active even when the
     // current URL has different query params than the Link target.
     //
-    // No prior direct regression at the Link layer (only `useIsActiveRoute`
-    // covers the default via its own test); this locks the Link → composable
-    // chain so the prop's omission yields the documented behaviour.
+    // This is the only cell covering the default at the Link layer, so it
+    // locks the prop's omission to the documented behaviour on its own.
     it("CLAUDE.md gotcha #17: active state ignores query params by default", async () => {
       // Re-start the router with a URL that carries a query param.
       router.stop();
@@ -801,8 +800,9 @@ describe("Link component", () => {
 
   describe("no-params active-route source dedup (#776)", () => {
     it("a no-params <Link> shares the canonical undefined-params source (cache key '', not '{}')", () => {
-      // A no-params `<Link routeName="users">` and a manual `useIsActiveRoute("users")`
-      // (params === undefined) ask ONE logical question and must resolve the SAME
+      // A no-params `<Link routeName="users">` and a direct
+      // `createActiveSource(router, "users")` (params === undefined) ask ONE
+      // logical question and must resolve the SAME
       // cached active-route source — one router subscription, not two (#766).
       // `createActiveRouteSource` keys params as
       // `params === undefined ? "" : canonicalJson(params)`, so a `routeParams` prop
