@@ -50,7 +50,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
   ): asserts cb is Function {
     if (typeof cb !== "function") {
       throw new TypeError(
-        `Expected callback to be a function for event ${eventName}`,
+        `[EventEmitter] Expected callback to be a function for event ${eventName}`,
       );
     }
   }
@@ -81,7 +81,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
     const size = existing?.size ?? 0;
 
     if (existing?.has(cb)) {
-      throw new Error(`Duplicate listener for "${eventName}"`);
+      throw new Error(`[router] Duplicate listener for "${eventName}"`);
     }
 
     const { maxListeners, warnListeners } = this.#limits;
@@ -90,7 +90,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
     // a registration that then throws (the warnListeners === maxListeners case).
     if (maxListeners !== 0 && size >= maxListeners) {
       throw new Error(
-        `Listener limit (${maxListeners}) reached for "${eventName}"`,
+        `[router] Listener limit (${maxListeners}) reached for "${eventName}"`,
       );
     }
 

@@ -33,7 +33,7 @@ const NOT_A_FORWARD: [label: string, value: unknown, type: string][] = [
 const DROPPED: unknown[] = [0, false, Number.NaN, ""];
 
 const messageFor = (route: string, type: string): string =>
-  `forwardTo must be a string or function for route "${route}", got ${type}`;
+  `[router] forwardTo must be a string or function for route "${route}", got ${type}`;
 
 function thrown(run: () => unknown): unknown {
   try {

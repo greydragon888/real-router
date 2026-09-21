@@ -632,6 +632,9 @@ raising it — `[router.buildPath]`, or bare `[router]` where several doors reac
 one raiser. `tests/functional/message-prefix-authority-1845.test.ts` derives the
 rule and owns two registers rather than carve-outs: the internal prefixes that
 stay (`CORE_INTERNAL`), and the refusals that carry no prefix at all (#2456).
+The second is EMPTY since #2459 adjudicated it — twelve of its thirteen rows
+were reachable from a door and took the bare `[router]`, and the thirteenth is
+`EventEmitter`'s callback check, which no caller input reaches.
 
 **Logger channels take the same rule, and the vocabulary is the DOOR** — `clear`
 logs and raises under `router.clearRoutes`, `add` under `router.addRoute` (#2461).

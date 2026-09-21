@@ -87,8 +87,23 @@ const PUBLISHED = /^\[(router(\.[A-Za-z$.{}]+)?|RouterError(\.[A-Za-z]+)?)\]$/u;
  * Tier two: unreachable from caller input, so the internal name is the useful
  * one. Each entry carries its reason in the docblock above; adding one without
  * measuring that reachability is what this list exists to make deliberate.
+ *
+ * ⚑ **`[EventEmitter]` carries ONE message, and the reachability was traced
+ * door by door (#2459).** `EventEmitter` is on no exports map and not in
+ * `src/index.ts`, and `on()` has four call sites in `EventBusNamespace`:
+ * `subscribeChanges`, `subscribeDiagnostic` and `subscribe` each hand it a
+ * closure core wrote, so the callback is a function by construction, and
+ * `addEventListener` — the one door that forwards the caller's own value —
+ * passes `assertListenerIsFunction` first, which refuses with
+ * `[router.addEventListener]`. So `Expected callback to be a function` answers
+ * only a caller inside this package. ⚠ Its two neighbours in the same file are
+ * NOT here: `Duplicate listener` and `Listener limit` are both reachable
+ * — measured through `PluginApi.addEventListener`, and the limit through
+ * `router.subscribe` as well — so they carry `[router]`. The register is about
+ * reachability, not about the file a raiser lives in.
  */
 const CORE_INTERNAL: ReadonlySet<string> = new Set([
+  "[EventEmitter]",
   "[FSM.constructor]",
   "[FSM.on]",
 ]);
@@ -254,11 +269,20 @@ describe("a message prefix names something the caller can look up (#1845)", () =
  * one and this reds, and the author either prefixes it or records the row with a
  * reason.
  *
- * ⚠ It is a BACKLOG, not an approval, on the same reading as
- * `table-vacuity-authority`. #2456 prefixed the forward-chain family and left
- * the rows below where the census found them, unadjudicated: a row states that
- * the message has no prefix, NOT that it should not have one. Removing a row
- * reds this too, deliberately — a `toBeLessThanOrEqual` would develop slack.
+ * ⚑ **The backlog is EMPTY, and that is the adjudication rather than the
+ * absence of one (#2459).** #2456 prefixed the forward-chain family and
+ * registered thirteen more without judging them. Each was then driven through
+ * the doors that print it: twelve are reachable by caller input and took
+ * `[router]`, the bare facade form #1845 settles multi-door raisers with, and
+ * the thirteenth — `EventEmitter`'s callback check — is reachable from inside
+ * this package only and moved to `CORE_INTERNAL` above.
+ *
+ * ⚠ **An empty register still reds on a NEW bare refusal, and that is what it
+ * is for.** What an empty one cannot do is double as a positive control on the
+ * recogniser, the way a populated list did. Two cells carry that instead, and
+ * neither may be removed with this one: the floors below (`literals` against a
+ * measured count) and `CONTROL — both polarities`, which writes a bare throw on
+ * a purpose-built tree and asserts it is found.
  *
  * ⚠ **The rule judges one spelling — `throw new X(<literal>)` — and the census
  * below says so out loud.** Core also throws through a factory
@@ -268,21 +292,7 @@ describe("a message prefix names something the caller can look up (#1845)", () =
  * every `throw` in the tree, so a new one cannot arrive unnoticed even where it
  * cannot be judged.
  */
-const BARE: readonly string[] = [
-  "guards.ts · Invalid logger level: ${}. Expected: all | warn-error | error-only | none",
-  "guards.ts · Logger callback must be a function, got ${}",
-  "guards.ts · Logger callbackIgnoresLevel must be a boolean, got ${}",
-  "guards.ts · Logger config must be an object",
-  "guards.ts · Unknown logger config property: ${}",
-  "guards.ts · dependencies cannot contain getters: ${}",
-  "guards.ts · dependencies must be a plain object",
-  "guards.ts · route must be a non-array object",
-  "namespaces/RoutesNamespace/routesStore.ts · forwardTo callback cannot be async for route ${}. Async functions break matchPath/buildPath.",
-  "namespaces/RoutesNamespace/routesStore.ts · forwardTo must be a string or function for route ${}, got ${}",
-  "utils/event-emitter/EventEmitter.ts · Duplicate listener for ${}",
-  "utils/event-emitter/EventEmitter.ts · Expected callback to be a function for event ${}",
-  "utils/event-emitter/EventEmitter.ts · Listener limit (${}) reached for ${}",
-];
+const BARE: readonly string[] = [];
 
 /**
  * `Route "${current}" does not exist` → the shape, substitutions collapsed.
@@ -449,7 +459,12 @@ function byteOrder(left: string, right: string): number {
 }
 
 describe("a refusal with no prefix at all is registered, not invisible (#2456)", () => {
-  it("the backlog is exactly this, and it only shrinks", () => {
+  it("no literal refusal in core is left without a prefix", () => {
+    // Was "the backlog is exactly this, and it only shrinks" while rows
+    // remained (#2456). Adjudicated to empty in #2459, so the claim is now the
+    // statement itself rather than a list — the same assertion, one register
+    // later. It reds on a new bare refusal; the two controls named in the
+    // docblock are what keep it from passing on a broken recogniser.
     expect(refusals().bare).toStrictEqual([...BARE].toSorted(byteOrder));
   });
 

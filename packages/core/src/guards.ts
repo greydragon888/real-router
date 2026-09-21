@@ -302,7 +302,7 @@ function isPlainBag(bag: unknown): boolean {
 
 export function guardDependencyShape(deps: unknown): void {
   if (!isPlainBag(deps)) {
-    throw new TypeError("dependencies must be a plain object");
+    throw new TypeError("[router] dependencies must be a plain object");
   }
   // ⚑ The walk and the check must answer about the SAME property set (#1799).
   // `for…in` enumerates inherited names; `getOwnPropertyDescriptor` answers
@@ -419,7 +419,9 @@ export function ingestDependencies(
   // caller nothing.
   for (const key of objectKeys(bag)) {
     if (getOwnPropertyDescriptor(bag, key)?.get) {
-      throw new TypeError(`dependencies cannot contain getters: "${key}"`);
+      throw new TypeError(
+        `[router] dependencies cannot contain getters: "${key}"`,
+      );
     }
 
     const value = bag[key];
@@ -474,7 +476,7 @@ export function guardRouteStructure<T extends Route<any>>(routes: T[]): T[] {
       typeof routeValue !== "object" ||
       Array.isArray(routeValue)
     ) {
-      throw new TypeError("route must be a non-array object");
+      throw new TypeError("[router] route must be a non-array object");
     }
 
     // ⚑ The OBJECT-shape questions run HERE, on the caller's value, because a
@@ -588,7 +590,7 @@ function assertNoUnknownKeys(obj: Record<string, unknown>): void {
       key !== "callback" &&
       key !== "callbackIgnoresLevel"
     ) {
-      throw new TypeError(`Unknown logger config property: "${key}"`);
+      throw new TypeError(`[router] Unknown logger config property: "${key}"`);
     }
   }
 }
@@ -609,7 +611,7 @@ function readLoggerLevel(
 
   if (!isValidLevel(level)) {
     throw new TypeError(
-      `Invalid logger level: ${formatValue(level)}. Expected: "all" | "warn-error" | "error-only" | "none"`,
+      `[router] Invalid logger level: ${formatValue(level)}. Expected: "all" | "warn-error" | "error-only" | "none"`,
     );
   }
 
@@ -632,7 +634,7 @@ function readCallbackIgnoresLevel(
 
   if (typeof flag !== "boolean") {
     throw new TypeError(
-      `Logger callbackIgnoresLevel must be a boolean, got ${typeof flag}`,
+      `[router] Logger callbackIgnoresLevel must be a boolean, got ${typeof flag}`,
     );
   }
 
@@ -641,7 +643,7 @@ function readCallbackIgnoresLevel(
 
 export function assertLoggerConfig(config: unknown): Partial<LoggerConfig> {
   if (typeof config !== "object" || config === null) {
-    throw new TypeError("Logger config must be an object");
+    throw new TypeError("[router] Logger config must be an object");
   }
 
   const obj = config as Record<string, unknown>;
@@ -673,7 +675,7 @@ export function assertLoggerConfig(config: unknown): Partial<LoggerConfig> {
 
     if (callback !== undefined && typeof callback !== "function") {
       throw new TypeError(
-        `Logger callback must be a function, got ${typeof callback}`,
+        `[router] Logger callback must be a function, got ${typeof callback}`,
       );
     }
 

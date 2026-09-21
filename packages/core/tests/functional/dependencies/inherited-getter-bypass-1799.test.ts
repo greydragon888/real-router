@@ -54,7 +54,7 @@ describe("dependencies: an inherited getter must not walk past the guard (#1799)
 
     expect(() =>
       createRouter([{ name: "a", path: "/a" }], {}, own as never),
-    ).toThrow('dependencies cannot contain getters: "svc"');
+    ).toThrow('[router] dependencies cannot contain getters: "svc"');
     expect(reads).toBe(0);
   });
 
@@ -116,7 +116,9 @@ describe("dependencies: an inherited getter must not walk past the guard (#1799)
       }
     };
 
-    expect(attempt()).toBe('dependencies cannot contain getters: "svc"');
+    expect(attempt()).toBe(
+      '[router] dependencies cannot contain getters: "svc"',
+    );
   });
 
   it("keeps an ordinary own value working — the anti-collapse control", () => {

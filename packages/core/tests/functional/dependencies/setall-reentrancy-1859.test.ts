@@ -74,7 +74,7 @@ describe("a teardown from inside the call cannot land a write (#1859)", () => {
         } as never);
       }),
       "the refusal comes from the DOOR, not from a disposal mid-copy",
-    ).toBe('dependencies cannot contain getters: "b"');
+    ).toBe('[router] dependencies cannot contain getters: "b"');
 
     expect(invoked, "the whole point: the caller's code does not run").toBe(0);
     expect(
@@ -106,7 +106,7 @@ describe("a teardown from inside the call cannot land a write (#1859)", () => {
           c: 3,
         } as never);
       }),
-    ).toBe('dependencies cannot contain getters: "b"');
+    ).toBe('[router] dependencies cannot contain getters: "b"');
 
     expect(invoked).toBe(0);
     expect(Object.keys(api.getAll())).toStrictEqual(["boot"]);
@@ -129,7 +129,7 @@ describe("a teardown from inside the call cannot land a write (#1859)", () => {
         },
         c: 3,
       });
-    }).toThrow('dependencies cannot contain getters: "b"');
+    }).toThrow('[router] dependencies cannot contain getters: "b"');
 
     expect(
       Object.keys(api.getAll()),

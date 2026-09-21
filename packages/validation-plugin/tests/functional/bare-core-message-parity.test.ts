@@ -213,7 +213,7 @@ describe("bare core matches the validated build, message for message (#1896)", (
     ).toBe(bareMessage);
   });
 
-  it("add: both layers refuse `forwardTo: 42` with one wording, minus the door prefix (#2394)", () => {
+  it("add: both layers refuse `forwardTo: 42` with one sentence under two prefixes (#2394, #2459)", () => {
     // ⚑ Two code paths, not one: with the plugin installed its own check
     // refuses first, so the validated message never reaches core's copy.
     const refuse = (api: RoutesApi): string =>
@@ -221,11 +221,34 @@ describe("bare core matches the validated build, message for message (#1896)", (
         api.add([{ name: "kid", path: "/kid", forwardTo: 42 }] as never);
       });
 
-    const bareMessage = refuse(bare());
+    // ⚑ **The relation is the SENTENCE, not a concatenation (#2459).** This
+    // cell could read `[router.addRoute] ${bare}` and mean it only while core's
+    // copy carried nothing in front of it. Both are prefixed now, and they
+    // differ by the rule rather than by drift: core's raiser serves three
+    // registration doors so it names the facade, this plugin's validator is
+    // reached from one so it names that door. Comparing the sentences is what
+    // the cell was always about.
+    const sentenceOf = (message: string): string =>
+      message.replace(/^\[[^\]]+\] /u, "");
 
-    expect(bareMessage).toBe(
+    const bareMessage = refuse(bare());
+    const validatedMessage = refuse(withPlugin());
+
+    // CONTROL — a prefix really was stripped on each side. Without this, two
+    // unprefixed strings would satisfy the equality below and the cell would
+    // pass while asserting nothing about the relation.
+    expect(sentenceOf(bareMessage)).not.toBe(bareMessage);
+    expect(sentenceOf(validatedMessage)).not.toBe(validatedMessage);
+
+    expect(sentenceOf(bareMessage)).toBe(
       'forwardTo must be a string or function for route "kid", got number',
     );
-    expect(refuse(withPlugin())).toBe(`[router.addRoute] ${bareMessage}`);
+    expect(sentenceOf(validatedMessage)).toBe(sentenceOf(bareMessage));
+
+    // And the prefixes themselves, each named rather than inferred.
+    expect(bareMessage).toBe(`[router] ${sentenceOf(bareMessage)}`);
+    expect(validatedMessage).toBe(
+      `[router.addRoute] ${sentenceOf(bareMessage)}`,
+    );
   });
 });
