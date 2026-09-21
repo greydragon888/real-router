@@ -165,13 +165,32 @@ const DOORS: readonly (readonly [string, () => unknown])[] = [
       router.subscribe(() => {});
     },
   ],
+  // ── two doors whose message lives in a RouterError options bag, the shape
+  //    the source walk reads since #2493 ─────────────────────────────────────
+  [
+    "getPluginApi().extendRouter (conflict)",
+    () => {
+      getPluginApi(createRouter(ROUTES)).extendRouter({
+        navigate: () => {},
+      });
+    },
+  ],
+  [
+    "getPluginApi().claimContextNamespace (twice)",
+    () => {
+      const api = getPluginApi(createRouter(ROUTES));
+
+      api.claimContextNamespace("taken");
+      api.claimContextNamespace("taken");
+    },
+  ],
 ];
 
 describe("every refusal a caller can reach names a door (#2459)", () => {
   // The floor is what keeps a narrowed table from passing vacuously: drop a row
   // and the count moves, drop them all and this is the only assertion left.
   it("the table still drives every door the register named", () => {
-    expect(DOORS).toHaveLength(20);
+    expect(DOORS).toHaveLength(22);
   });
 
   it.each(DOORS)("%s refuses with a prefix", (_door, open) => {

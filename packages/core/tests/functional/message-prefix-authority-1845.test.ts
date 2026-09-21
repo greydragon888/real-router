@@ -129,6 +129,22 @@ function offenders(root: string = SRC): Offender[] {
     );
 
     const inspect = (node: ts.Expression): void => {
+      // `new RouterError(code, { message })` keeps the message in the BAG, so the
+      // argument walk below hands this an object literal with no text of its own
+      // (#2493). The floors on `judged` are what hold this branch reachable.
+      if (ts.isObjectLiteralExpression(node)) {
+        for (const property of node.properties) {
+          if (
+            ts.isPropertyAssignment(property) &&
+            property.name.getText() === "message"
+          ) {
+            inspect(property.initializer);
+          }
+        }
+
+        return;
+      }
+
       const text = textOf(node);
 
       if (text === undefined) {
@@ -318,7 +334,7 @@ const shapeOf = (node: ts.Expression, source: ts.SourceFile): string =>
 
 interface Refusals {
   readonly bare: string[];
-  /** Literal-message `throw new` sites seen at all — the anti-vacuum floor. */
+  /** Literal-message `throw new` sites — the throw partition's own floor. */
   readonly literals: number;
   /** `throw new X(nonLiteral)` — the message is not in the tree. */
   readonly opaque: number;
@@ -328,8 +344,16 @@ interface Refusals {
   readonly rethrown: number;
   /** Any other `throw` shape. Zero today; a new one has to be classified. */
   readonly otherShape: number;
-  /** Every `throw` in the tree — the partition's total. */
+  /** Every `throw` in the tree — the throw partition's total. */
   readonly throwStatements: number;
+  /**
+   * Every error CONSTRUCTION — the bare-message tier's own total (#2493). A
+   * separate subject from `throwStatements`, deliberately: that partition guards
+   * against a new THROW shape, this one against a refusal that never throws here.
+   */
+  readonly constructions: number;
+  /** Of those, the ones whose message text is in the tree. */
+  readonly judged: number;
   /** Files the glob reached — reach, asserted apart from recognition. */
   readonly files: number;
 }
@@ -371,6 +395,62 @@ function classify(thrown: ts.Expression): Seen {
     : { kind: "literal", text, argument };
 }
 
+/**
+ * The five constructors a refusal is built from. The bare-message tier judges a
+ * CONSTRUCTION (#2493), because a refusal reaches a caller by three channels —
+ * thrown where it is built, returned into `Promise.reject`, or built here and
+ * thrown by someone else — and only the first is a `throw`.
+ */
+const ERROR_CONSTRUCTORS: ReadonlySet<string> = new Set([
+  "TypeError",
+  "Error",
+  "RangeError",
+  "ReferenceError",
+  "RouterError",
+]);
+
+/**
+ * Where a construction keeps its message. `new RouterError(code, { message })`
+ * puts it in the bag and its FIRST argument is the code, so reading argument 0
+ * for every constructor counts a code-only refusal as a message.
+ */
+function messageOfConstruction(
+  node: ts.NewExpression,
+): ts.Expression | undefined {
+  const args = node.arguments ?? [];
+
+  const fromBag = (): ts.Expression | undefined => {
+    for (const argument of args) {
+      if (!ts.isObjectLiteralExpression(argument)) {
+        continue;
+      }
+
+      for (const property of argument.properties) {
+        if (
+          ts.isPropertyAssignment(property) &&
+          property.name.getText() === "message"
+        ) {
+          return property.initializer;
+        }
+      }
+    }
+
+    return undefined;
+  };
+
+  if (node.expression.getText() === "RouterError") {
+    return fromBag();
+  }
+
+  const [first] = args;
+
+  if (first === undefined) {
+    return undefined;
+  }
+
+  return ts.isObjectLiteralExpression(first) ? fromBag() : first;
+}
+
 function refusals(root: string = SRC): Refusals {
   const bare: string[] = [];
   let literals = 0;
@@ -379,6 +459,8 @@ function refusals(root: string = SRC): Refusals {
   let rethrown = 0;
   let otherShape = 0;
   let throwStatements = 0;
+  let constructions = 0;
+  let judged = 0;
   let files = 0;
 
   for (const file of globSync(`${root}/**/*.ts`)) {
@@ -421,12 +503,28 @@ function refusals(root: string = SRC): Refusals {
           }
           default: {
             literals++;
+          }
+        }
+      }
 
-            if (!seen.text.startsWith("[")) {
-              bare.push(
-                `${path.relative(root, file)} · ${shapeOf(seen.argument, source)}`,
-              );
-            }
+      // The bare-message tier's own subject: every error CONSTRUCTION, whatever
+      // carries it to the caller afterwards.
+      if (
+        ts.isNewExpression(node) &&
+        ERROR_CONSTRUCTORS.has(node.expression.getText())
+      ) {
+        constructions++;
+
+        const message = messageOfConstruction(node);
+        const text = message === undefined ? undefined : textOf(message);
+
+        if (message !== undefined && text !== undefined && text !== "") {
+          judged++;
+
+          if (!text.startsWith("[")) {
+            bare.push(
+              `${path.relative(root, file)} · ${shapeOf(message, source)}`,
+            );
           }
         }
       }
@@ -445,6 +543,8 @@ function refusals(root: string = SRC): Refusals {
     rethrown,
     otherShape,
     throwStatements,
+    constructions,
+    judged,
     files,
   };
 }
@@ -497,6 +597,11 @@ describe("a refusal with no prefix at all is registered, not invisible (#2456)",
     expect(seen.files).toBeGreaterThan(120);
     expect(seen.throwStatements).toBeGreaterThan(130);
     expect(seen.literals).toBeGreaterThan(80);
+    // The construction subject carries its own floors (#2493), because a broken
+    // construction walk empties `bare` exactly the way a broken throw walk does,
+    // and the floors above cannot see it: they count throws.
+    expect(seen.constructions).toBeGreaterThan(130);
+    expect(seen.judged).toBeGreaterThan(95);
   });
 
   it("CONTROL — both polarities, on a tree written for the purpose", () => {
@@ -515,11 +620,22 @@ describe("a refusal with no prefix at all is registered, not invisible (#2456)",
         path.join(directory, "opaque.ts"),
         "throw new Error(buildMessage(x));\n",
       );
-      // The three shapes the rule cannot judge. Each must land in its own class
-      // — the partition above is only as good as this cell's discrimination.
+      // ⚠ A factory-wrapped throw is judged by its CONSTRUCTION (#2493): the
+      // message is in the tree, so this fixture belongs in `bare` — while the
+      // THROW partition still counts it `wrapped`, because that is its throw.
       writeFileSync(
         path.join(directory, "wrapped.ts"),
         "throw freezeThrownError(new Error(`bare inside a factory`));\n",
+      );
+      // The bag, and a construction that never reaches a `throw` at all — the two
+      // channels #2493 added. Both must be judged like any other refusal.
+      writeFileSync(
+        path.join(directory, "bag.ts"),
+        "throw freezeThrownError(new RouterError(CODE, { message: `no prefix in a bag` }));\n",
+      );
+      writeFileSync(
+        path.join(directory, "rejected.ts"),
+        "const p = Promise.reject(new Error(`bare and never thrown`));\n",
       );
       writeFileSync(
         path.join(directory, "rethrown.ts"),
@@ -539,16 +655,25 @@ describe("a refusal with no prefix at all is registered, not invisible (#2456)",
       const seen = refusals(directory);
 
       expect(seen.bare).toStrictEqual([
+        "bag.ts · no prefix in a bag",
         "bare.ts · no prefix here: ${}",
         "nested/deep.ts · deeper and bare",
+        "rejected.ts · bare and never thrown",
+        "wrapped.ts · bare inside a factory",
       ]);
+      // The two subjects, side by side: `literals` counts THROWS whose message is
+      // a literal (bare, prefixed, deep); `constructions` counts every error
+      // built, whatever carries it afterwards.
       expect(seen.literals).toBe(3);
+      expect(seen.constructions).toBe(8);
+      expect(seen.judged).toBe(6);
       // `buildMessage(x)` and the hoisted-prefix template, which is prefixed at
       // runtime and would be a FALSE offender if the empty head were judged.
       expect(seen.opaque).toBe(2);
-      expect(seen.wrapped).toBe(1);
+      // Two, because `bag.ts` is a second factory-wrapped throw.
+      expect(seen.wrapped).toBe(2);
       expect(seen.rethrown).toBe(1);
-      expect(seen.files).toBe(7);
+      expect(seen.files).toBe(9);
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
