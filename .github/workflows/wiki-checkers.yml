@@ -119,7 +119,12 @@ jobs:
               printf '%s\n' "$out"
               echo "$fence"
             )
-            printf '%s\n' "$block" >> "$GITHUB_STEP_SUMMARY"
+            # ⚠ Also to STDOUT, because the tracking issue links the RUN and the
+            # run's LOG is where a reader lands. Capturing the checkers put their
+            # output in the summary alone, so a failed run's log read `rc=1` and
+            # nothing else. `printf` is the source here rather than the checker, so
+            # teeing costs no exit status — `rc` comes from the captured `$status`.
+            printf '%s\n' "$block" | tee -a "$GITHUB_STEP_SUMMARY"
             if [ "$status" -ne 0 ]; then
               printf '%s\n' "$block" >> "$RUNNER_TEMP/findings.md"
               rc="$status"
