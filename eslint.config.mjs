@@ -690,11 +690,18 @@ export default tsEslint.config(
       // ============================================
       // NEW RULES (v56-v64)
       // ============================================
-      // v62: Disallow mutating variables immediately after declaration. Off: the
-      // rule also reports a mutation under `if` and wants it folded into the
-      // initializer as `...(cond && { key })`, a form its own docs leave without
-      // a fix in TypeScript because the spread can lose contextual typing.
-      "unicorn/no-immediate-mutation": "off",
+      // v62: Disallow mutating variables immediately after declaration. Runs at
+      // the v76 default `checkConditionals: false`, and that default is what
+      // makes it affordable: the conditional form folds into
+      // `...(cond && { key })`, which its own docs leave without a fix in
+      // TypeScript because the spread can lose contextual typing, and this
+      // repository writes that form throughout.
+      //
+      // ⚠ Its fix rewrites `Object.assign(target, source)` into a spread, which
+      // is a DIFFERENT write primitive — assign runs [[Set]], a spread DEFINES.
+      // Three sites say so at the site and carry a directive; one of them
+      // records the fix having silently removed the point of its own cell.
+      "unicorn/no-immediate-mutation": "error",
       // v62: Disallow unnecessary arguments for collection methods
       "unicorn/no-useless-collection-argument": "error",
       // v61: Prefer class field declarations over constructor assignments
