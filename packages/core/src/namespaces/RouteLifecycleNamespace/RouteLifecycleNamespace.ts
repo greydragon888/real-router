@@ -722,10 +722,8 @@ export class RouteLifecycleNamespace<
   ): void {
     const { definition, external } = this.#getFactoryMaps(type);
     const compiled = this.#getCompiledMaps(type);
-    const clearedDefinition =
-      scope === "external" ? false : definition.delete(name);
-    const clearedExternal =
-      scope === "definition" ? false : external.delete(name);
+    const clearedDefinition = scope !== "external" && definition.delete(name);
+    const clearedExternal = scope !== "definition" && external.delete(name);
 
     // The compiled form is part of the slot, so it is cleared with it (#1649).
     if (clearedDefinition) {

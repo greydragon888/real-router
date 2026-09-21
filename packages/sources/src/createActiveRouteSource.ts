@@ -278,17 +278,17 @@ function buildActiveRouteSource(
         // avoid calling isActiveRoute for the optimization. (Hash check would
         // also fail without route-match, so this short-circuit holds for
         // hash-aware sources too.)
-        const newValue = isNewRelated
-          ? computeActive(
-              router,
-              routeName,
-              params,
-              search,
-              strict,
-              ignoreQueryParams,
-              hash,
-            )
-          : false;
+        const newValue =
+          isNewRelated &&
+          computeActive(
+            router,
+            routeName,
+            params,
+            search,
+            strict,
+            ignoreQueryParams,
+            hash,
+          );
 
         if (!Object.is(source.getSnapshot(), newValue)) {
           source.updateSnapshot(newValue);

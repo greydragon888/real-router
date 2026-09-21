@@ -259,8 +259,8 @@ describe("injectDeferredScripts stress", () => {
       // Each outcome is one of three sentinel shapes; none must be
       // `unexpected:...` (which would indicate a non-mode-0 stream
       // crashed with an error other than the upstream-boom).
-      const unexpected = outcomes.filter((o) =>
-        typeof o === "string" ? o.startsWith("unexpected:") : false,
+      const unexpected = outcomes.filter(
+        (o) => typeof o === "string" && o.startsWith("unexpected:"),
       );
 
       expect(unexpected).toStrictEqual([]);

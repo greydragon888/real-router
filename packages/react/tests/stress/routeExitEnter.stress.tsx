@@ -292,10 +292,10 @@ describe("R11 — useRouteEnter/useRouteExit stress", () => {
 
     // React 19 silently no-ops setState on unmounted; if it ever regresses
     // to warning again, the assertion catches it.
-    const reactWarnings = consoleSpy.mock.calls.filter(([msg]) =>
-      typeof msg === "string"
-        ? /Can't perform a React state update|memory leak/i.test(msg)
-        : false,
+    const reactWarnings = consoleSpy.mock.calls.filter(
+      ([msg]) =>
+        typeof msg === "string" &&
+        /Can't perform a React state update|memory leak/i.test(msg),
     );
 
     expect(reactWarnings).toHaveLength(0);

@@ -161,8 +161,7 @@ export function validateNavigateParamsShape(
   // `isParamsUnsafe` applies its own array term, the value it is handed is no
   // longer an array. This door is where the shape is still visible, and
   // `IsArray` is the one question a proxy cannot answer for.
-  const proto =
-    params === null ? false : (getPrototypeOf(params) as object | null);
+  const proto = params !== null && (getPrototypeOf(params) as object | null);
 
   if (Array.isArray(params) || (proto !== null && proto !== Object.prototype)) {
     throw new TypeError(

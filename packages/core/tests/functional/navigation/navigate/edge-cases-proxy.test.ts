@@ -118,7 +118,7 @@ describe("router.navigate() - edge cases proxy", () => {
           {},
           {
             get(_target, prop) {
-              return prop === "replace" ? true : undefined;
+              return prop === "replace" || undefined;
             },
           },
         );

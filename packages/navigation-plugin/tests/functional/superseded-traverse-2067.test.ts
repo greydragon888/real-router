@@ -98,7 +98,7 @@ describe("a superseded traverse leaves its successor's record alone (#2067)", ()
       };
     });
 
-    const env = createEnv(routes(() => (armed ? held : true)));
+    const env = createEnv(routes(() => !armed || held));
 
     // Two entries in history, then park somewhere else so both are behind us.
     await env.router.start("/users/list");
