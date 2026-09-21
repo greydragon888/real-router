@@ -315,8 +315,8 @@ importers:
         specifier: ~3.11.0
         version: 3.11.0(react@19.3.0)
       zod:
-        specifier: 4.6.2
-        version: 4.6.2
+        specifier: 4.6.5
+        version: 4.6.5
     devDependencies:
       '@analogjs/vite-plugin-angular':
         specifier: 2.7.2
@@ -966,8 +966,8 @@ importers:
         specifier: 2.8.1
         version: 2.8.1
       zod:
-        specifier: 4.6.2
-        version: 4.6.2
+        specifier: 4.6.5
+        version: 4.6.5
     devDependencies:
       '@analogjs/vite-plugin-angular':
         specifier: 2.7.2
@@ -1841,8 +1841,8 @@ importers:
         specifier: ~10.29.7
         version: 10.29.7(preact-render-to-string@6.7.0)
       zod:
-        specifier: 4.6.2
-        version: 4.6.2
+        specifier: 4.6.5
+        version: 4.6.5
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -2134,8 +2134,8 @@ importers:
         specifier: ~10.29.7
         version: 10.29.7(preact-render-to-string@6.7.0)
       zod:
-        specifier: 4.6.2
-        version: 4.6.2
+        specifier: 4.6.5
+        version: 4.6.5
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -2681,8 +2681,8 @@ importers:
         specifier: ~19.3.0
         version: 19.3.0(react@19.3.0)
       zod:
-        specifier: 4.6.2
-        version: 4.6.2
+        specifier: 4.6.5
+        version: 4.6.5
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -3305,8 +3305,8 @@ importers:
         specifier: ~19.3.0
         version: 19.3.0(react@19.3.0)
       zod:
-        specifier: 4.6.2
-        version: 4.6.2
+        specifier: 4.6.5
+        version: 4.6.5
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -3864,8 +3864,8 @@ importers:
         specifier: ~1.9.14
         version: 1.9.14
       zod:
-        specifier: 4.6.2
-        version: 4.6.2
+        specifier: 4.6.5
+        version: 4.6.5
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -4157,8 +4157,8 @@ importers:
         specifier: ~1.9.14
         version: 1.9.14
       zod:
-        specifier: 4.6.2
-        version: 4.6.2
+        specifier: 4.6.5
+        version: 4.6.5
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -4691,8 +4691,8 @@ importers:
         specifier: ~5.57.0
         version: 5.57.0(@typescript-eslint/types@8.70.0)
       zod:
-        specifier: 4.6.2
-        version: 4.6.2
+        specifier: 4.6.5
+        version: 4.6.5
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -5062,8 +5062,8 @@ importers:
         specifier: ~5.57.0
         version: 5.57.0(@typescript-eslint/types@8.70.0)
       zod:
-        specifier: 4.6.2
-        version: 4.6.2
+        specifier: 4.6.5
+        version: 4.6.5
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -5573,8 +5573,8 @@ importers:
         specifier: ~3.5.39
         version: 3.5.39(typescript@6.0.3)
       zod:
-        specifier: 4.6.2
-        version: 4.6.2
+        specifier: 4.6.5
+        version: 4.6.5
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -5949,8 +5949,8 @@ importers:
         specifier: ~3.5.39
         version: 3.5.39(typescript@6.0.3)
       zod:
-        specifier: 4.6.2
-        version: 4.6.2
+        specifier: 4.6.5
+        version: 4.6.5
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -15040,8 +15040,8 @@ packages:
   zod@4.4.3:
     resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
-  zod@4.6.2:
-    resolution: {integrity: sha512-lh5RCAGFa1Cm2hjtNwLQhSs/AsqdWnTQaBER9fEwN/88pSh7KOtJavtBx/0VlkN/uFd61SwYmljLMDAsHlvzBQ==}
+  zod@4.6.5:
+    resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
 
 snapshots:
 
@@ -15226,7 +15226,7 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       rxjs: 7.8.2
       tslib: 2.8.1
-      zod: 4.6.2
+      zod: 4.6.5
 
   '@angular/platform-browser@22.1.6(@angular/common@22.1.6(@angular/core@22.1.6(@angular/compiler@22.1.6)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.1.6(@angular/compiler@22.1.6)(rxjs@7.8.2))':
     dependencies:
@@ -16335,7 +16335,7 @@ snapshots:
       eslint: 10.11.0(jiti@2.7.0)(supports-color@10.2.2)
       ts-pattern: 5.9.0
       typescript: 6.0.3
-      zod: 4.6.2
+      zod: 4.6.5
     transitivePeerDependencies:
       - supports-color
 
@@ -21175,7 +21175,7 @@ snapshots:
       tinyglobby: 0.2.17
       unbash: 4.0.11
       yaml: 2.9.0
-      zod: 4.6.2
+      zod: 4.6.5
 
   known-css-properties@0.37.0: {}
 
@@ -21525,7 +21525,7 @@ snapshots:
 
   mutation-server-protocol@0.4.1:
     dependencies:
-      zod: 4.6.2
+      zod: 4.6.5
 
   mutation-testing-elements@3.8.4: {}
 
@@ -23642,4 +23642,4 @@ snapshots:
 
   zod@4.4.3: {}
 
-  zod@4.6.2: {}
+  zod@4.6.5: {}
