@@ -1,0 +1,259 @@
+# The wiki's two checkers — on the pull request that can cause the drift, and on a
+# schedule and a wiki edit as the net underneath (#2466).
+#
+# They read BOTH repositories: `check-links.mjs` resolves wiki links against
+# monorepo paths, and `check-messages.mjs` compares every message a page quotes
+# against the literals in `packages/*/src`. So drift arrives from either side, and
+# a rename in the monorepo makes a page wrong with nobody touching the wiki —
+# which is how #2399, #2458 and #2460 happened.
+#
+# **The pull request is where the drift is CAUSED, so that is where the report
+# goes.** The author of a rename has the context and can update the page in a
+# minute; a tracking issue the next morning reaches them cold, after the merge.
+# The report is a PR comment rather than a check result, and the job stays green on
+# a finding — deliberately, because a wiki finding cannot be ANSWERED in a monorepo
+# pull request: the wiki is a separate repository with no pull requests, and the
+# page documents `master`, so it is usually correct to fix it once this merges
+# rather than before. #2450 is the precedent for not putting a check at an address
+# where it cannot be answered; a comment at that address is not a check.
+#
+# On `schedule` and `gollum` the same finding DOES fail the job, because there the
+# report has no author to reach and the tracking issue is the only signal.
+#
+# `gollum` fires in THIS repository when someone edits a wiki page, which covers
+# the wiki-side direction immediately and costs nothing. It reports rather than
+# blocks, because the push has already happened by the time the event arrives.
+#
+# ⚠ **The two checkers are named here by hand, and nothing holds that list to the
+# wiki's.** A third checker added there runs nowhere until someone adds it to the
+# loop below. No gate can close that from this side: the monorepo's own tests never
+# see the wiki, so the only thing that could compare the lists is a job that has
+# already cloned it — this one. A renamed checker at least fails loudly rather than
+# silently passing, because `node` cannot find the file.
+name: Wiki checkers
+
+on:
+  schedule:
+    # Daily, ahead of `stranded-release.yml`'s 06:17 so the two do not start
+    # together. 12:41 ICT (UTC+7) — the drift this reports is a day old at worst.
+    - cron: "41 5 * * *"
+  gollum:
+  workflow_dispatch:
+  pull_request:
+    # ⚠ These are ACTIONS path globs, where `**` crosses `/` — not git pathspecs,
+    # where `packages/*/src` matches the full path and therefore nothing. The two
+    # languages look identical and disagree; measured, the git form returns 0 for a
+    # tree with 163 matching commits in thirty days.
+    paths:
+      - "packages/*/src/**"
+      # So a change to this workflow is exercised by its own pull request.
+      - ".github/workflows/wiki-checkers.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  # ⚠ `cancel-in-progress` only on a pull request. Elsewhere a cancelled job ends
+  # as CANCELLED, which the `!success()` gate below would file an issue for — the
+  # trap `examples.yml` records and `post-merge.yml` deliberately avoids. On a pull
+  # request nothing files an issue, so superseding a run is free.
+  group: wiki-checkers-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: Wiki checkers
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      # Only for the advisory comment below; the checkers write nothing.
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+
+      # `--ignore-scripts`: `check-messages.mjs` needs exactly one thing from the
+      # install — `node_modules/typescript/lib/typescript.js`, which it imports by
+      # path — and it reads `packages/*/src`, never `dist`, so nothing has to be
+      # built. `check-links.mjs` needs no dependency at all.
+      - uses: ./.github/actions/setup
+        with:
+          install-args: "--frozen-lockfile --ignore-scripts"
+
+      # A public repository's wiki clones without credentials; embedding a token
+      # in the URL would put it in the log for nothing.
+      - name: Clone the wiki
+        run: git clone --depth 1 "$WIKI_REMOTE" "$RUNNER_TEMP/wiki"
+        env:
+          WIKI_REMOTE: https://github.com/greydragon888/real-router.wiki.git
+
+      # ⚠ Both checkers resolve the wiki from their OWN location and the monorepo
+      # from `$REAL_ROUTER_ROOT`, so they run from the clone with the root passed
+      # in. Without the root, `check-messages.mjs` prints "no checks run" and
+      # which of its three reasons applies — it does not pass silently, which is
+      # what makes a summary of a broken run readable rather than green.
+      # ⚠ The output is CAPTURED rather than piped into the summary. `node … | tee`
+      # exits with tee's status, and the default shell for `run:` is `bash -e`
+      # WITHOUT pipefail — measured, that pipeline exits 0 while the checker exits
+      # 1, so a finding would have been written to the summary and the job would
+      # have stayed green. Capturing also closes the fenced block on the failing
+      # path, which a `set -e` abort mid-step does not.
+      # ⚠ Both checkers run in ONE step so that a link finding cannot hide a
+      # message finding, and so that the verdict reaches the two steps below as a
+      # single answer. This step itself never fails; what to DO about a finding is
+      # the event's business, not the checker's.
+      - name: Run the checkers
+        id: run
+        run: |
+          set -euo pipefail
+          rc=0
+          fence='```'
+          for checker in check-links check-messages; do
+            out=$(node "$RUNNER_TEMP/wiki/$checker.mjs" 2>&1) && status=0 || status=$?
+            # ⚠ The fence is a variable: a backtick inside a `printf` FORMAT string
+            # reads as legacy command substitution to shellcheck, which reports
+            # SC2016 on a line that has no expansion in it at all.
+            block=$(
+              echo "### $checker"
+              echo "$fence"
+              printf '%s\n' "$out"
+              echo "$fence"
+            )
+            # ⚠ Also to STDOUT, because the tracking issue links the RUN and the
+            # run's LOG is where a reader lands. Capturing the checkers put their
+            # output in the summary alone, so a failed run's log read `rc=1` and
+            # nothing else. `printf` is the source here rather than the checker, so
+            # teeing costs no exit status — `rc` comes from the captured `$status`.
+            printf '%s\n' "$block" | tee -a "$GITHUB_STEP_SUMMARY"
+            if [ "$status" -ne 0 ]; then
+              printf '%s\n' "$block" >> "$RUNNER_TEMP/findings.md"
+              rc="$status"
+            fi
+          done
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+        env:
+          REAL_ROUTER_ROOT: ${{ github.workspace }}
+
+      # The report goes to the author who caused it, while the change is in hand.
+      # ⚠ Same-repo pull requests only: a fork's token cannot write a comment, and
+      # the step would fail on something the author cannot fix. The guard is the
+      # one `codspeed.yml` states for the self-hosted runner.
+      - name: Tell the pull request
+        if: >-
+          github.event_name == 'pull_request' &&
+          steps.run.outputs.rc != '0' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { readFileSync } = require('node:fs');
+            const marker = '<!-- wiki-checkers-advisory -->';
+            const findings = readFileSync(`${process.env.RUNNER_TEMP}/findings.md`, 'utf8');
+            const body = [
+              marker,
+              '**The wiki no longer matches this branch.** Advisory — nothing here blocks the merge.',
+              '',
+              findings.trim(),
+              '',
+              'The page documents `master`, so the usual order is: merge this, then fix the page.',
+              'Run `node check-links.mjs` / `node check-messages.mjs` in the wiki checkout with',
+              '`REAL_ROUTER_ROOT` pointing at the monorepo to confirm.',
+              '',
+              '_Updated in place on each push by `wiki-checkers.yml`._',
+            ].join('\n');
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find(c => (c.body || '').includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      # Off a pull request there is no author to reach, so the finding fails the
+      # job and `notify-failure` files the issue.
+      - name: Fail on a finding
+        if: github.event_name != 'pull_request' && steps.run.outputs.rc != '0'
+        run: exit 1
+
+  # The same tracker shape `examples.yml` uses: one issue, a comment per
+  # subsequent failure, closed once green. A job summary would be cheaper and
+  # invisible — nobody opens a green workflow's summary, and this signal exists
+  # precisely for the days nobody looks.
+  notify-failure:
+    name: Open issue on failure
+    runs-on: ubuntu-latest
+    needs: [check]
+    # `!success()`, not `failure()`: a job killed by `timeout-minutes` ends as
+    # CANCELLED, which `failure()` does not match.
+    #
+    # ⚠ The two events are named rather than `!= 'workflow_dispatch'`. A pull
+    # request reports through a comment and must never open an issue — not even
+    # when the job fails for an infrastructural reason — and a manual dispatch
+    # files nothing so that verifying this workflow by hand is free.
+    if: >-
+      !success() &&
+      (github.event_name == 'schedule' || github.event_name == 'gollum')
+    permissions:
+      issues: write
+    steps:
+      - name: Create or update tracking issue
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const marker = '<!-- wiki-checkers-failure-tracker -->';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const title = '🔴 Wiki checkers failing';
+            const body = [
+              marker,
+              'A **Wiki checkers** run failed — a page quotes something the code no longer prints, or a link no longer resolves.',
+              '',
+              `- Run: ${runUrl}`,
+              `- Commit: ${context.sha}`,
+              `- Trigger: ${context.eventName}`,
+              '',
+              'The fix belongs in whichever repository the drift came from: a renamed message is fixed in the wiki page, a wrong link in whichever side moved.',
+              '',
+              '_Auto-filed by `wiki-checkers.yml`. This comment updates on each subsequent failure; close the issue once green._',
+            ].join('\n');
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'area: ci/cd',
+              per_page: 100,
+            });
+            const existing = issues.find(i => (i.body || '').includes(marker));
+
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body: `Still failing — ${runUrl} (${context.eventName})`,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['documentation', 'area: ci/cd'],
+              });
+            }

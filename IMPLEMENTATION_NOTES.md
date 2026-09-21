@@ -94,6 +94,63 @@
 
 **Three mechanisms leave `master` unmeasured, not two.** The gate skip and a bare absence of work are the ones #2375 names; the third is `codspeed.yml`'s own `paths-ignore` (`.github/**`, `scripts/**`, `**/*.md`, `.claude/**`, `.husky/**`, `knip.json`), under which a push touching only those produces **no run at all** — not even a gate record. Measured on `a1fa45202`. A push of several commits also measures only its head.
 
+## The wiki's checkers run on a schedule and on a wiki edit, and block nothing (#2466, 2026-09-21)
+
+**Problem.** `check-links.mjs` and `check-messages.mjs` ran "on whoever
+remembered". Both read BOTH repositories — links resolve against monorepo paths,
+and every message a page quotes is compared to the literals in `packages/*/src` —
+so drift arrives from either side, and a rename in the monorepo makes a page wrong
+with nobody touching the wiki. That is how #2399, #2458 and #2460 happened.
+
+**Solution.** `wiki-checkers.yml`: daily at 05:41 UTC, on `gollum`, and on
+dispatch. It checks out the monorepo, installs with `--ignore-scripts`, clones the
+wiki shallowly, and runs both checkers with `REAL_ROUTER_ROOT` pointed at the
+checkout. A failure opens or comments on one tracking issue, the shape
+`examples.yml` already uses.
+
+**The report goes to the pull request that CAUSES the drift, and a comment is not a
+check.** The author of a rename has the context and can update the page in a
+minute; a tracking issue the next morning reaches them cold, after the merge. So a
+`pull_request` run on `packages/*/src/**` posts an advisory comment and **stays
+green** — a wiki finding cannot be ANSWERED there (the wiki is a separate
+repository with no pull requests, and the page documents `master`, so the usual
+order is merge-then-fix), which is why #2450's precedent rules out a required check
+at that address but not a comment at it.
+
+⚠ **The same finding fails the job on every event except a pull request**, because
+only there does it have an author to reach; the issue is filed on `schedule` and
+`gollum` alone, so a manual dispatch fails visibly and files nothing.
+
+**What the measurement said about the rate, and what it did not.** Messages change
+often — 163 commits touched `packages/*/src` in thirty days, 90 of the changed
+lines carrying a `[router…]` prefix. But the four recorded drift incidents (#2458,
+#2460, #2465, #2399) were all filed on one day, by the audit that wrote the
+checker, so they are an accumulated backlog rather than a rate. The case for this
+workflow is that the wiki went stale silently until someone looked on purpose, not
+that drift has been observed four times.
+
+**Why the install can skip scripts.** `check-messages.mjs` needs exactly one thing
+from it, `node_modules/typescript/lib/typescript.js`, which it imports by path, and
+it reads `packages/*/src` rather than `dist`. `check-links.mjs` needs no dependency
+at all.
+
+**The output is captured, not piped into the summary.** `node … | tee` exits with
+tee's status, and the default shell for `run:` is `bash -e` WITHOUT pipefail.
+
+⚠ **Measured: that pipeline exits 0 while the checker exits 1**, so the first draft
+would have written a finding into the job summary and kept the job green.
+
+Capturing also closes the fenced block on the failing path, which a `set -e` abort
+mid-step does not. Validated by extracting both `run:` bodies verbatim from the
+workflow and executing them: clean tree exits 0, a planted wrong-door quote exits
+1 with the finding in a closed block.
+
+**What this does not close.** The two checkers are named in the workflow by hand
+and nothing holds that list to the wiki's, so a third one added there would run
+nowhere. No gate can close it from the monorepo side: the repo's own tests never
+see the wiki, and the only thing that could compare the lists is a job that has
+already cloned it.
+
 ## A step inserted above a trailing `env:` block re-parents it, and nothing saw that (#2472, 2026-09-21)
 
 **Problem.** The scheduled cross-router matrix ran `run-all.mjs "$RUNS"` with
