@@ -2,7 +2,7 @@ import { readFileSync, globSync } from "node:fs";
 import path from "node:path";
 
 import { createRouter } from "@real-router/core";
-import { getInternals } from "@real-router/core/validation";
+import { getPluginApi } from "@real-router/core/api";
 import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 
@@ -86,7 +86,7 @@ function collectNumericDefaults(sourceText: string, fileName: string): Hit[] {
 function coreEnforcedLimits(): Readonly<Record<string, number>> {
   const router = createRouter([{ name: "home", path: "/" }]);
 
-  return getInternals(router).getCloneState().limits;
+  return getPluginApi(router).getResolvedLimits();
 }
 
 describe("limit defaults — the plugin mirrors core (#1879)", () => {

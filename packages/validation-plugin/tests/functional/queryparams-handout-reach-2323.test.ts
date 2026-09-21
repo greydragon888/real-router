@@ -1,5 +1,5 @@
 import { createRouter } from "@real-router/core";
-import { cloneRouter } from "@real-router/core/api";
+import { cloneRouter, getPluginApi } from "@real-router/core/api";
 import { getInternals } from "@real-router/core/validation";
 import { describe, expect, it } from "vitest";
 
@@ -46,7 +46,7 @@ function install(router: Router): void {
 /** What the plugin's retrospective pass reads. */
 function handoutNames(router: Router): string[] {
   return Object.keys(
-    getInternals(router).getOptions().queryParams as object,
+    getPluginApi(router).getOptions().queryParams as object,
   ).toSorted((left, right) => left.localeCompare(right));
 }
 

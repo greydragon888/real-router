@@ -762,8 +762,6 @@ describe("consumer census (#2303)", () => {
         src: ["dependencies"],
         tests: [],
       },
-      "getInternals.getCloneState()": { src: [], tests: ["limits"] },
-      "getInternals.getOptions()": { src: [], tests: ["queryParams"] },
       "getInternals.routeGetStore()": {
         src: [],
         tests: ["matcherOptions"],
@@ -785,7 +783,7 @@ describe("consumer census (#2303)", () => {
       "getPluginApi.getDependencyKeys()": { src: ["length"], tests: [] },
       "getPluginApi.getOptions()": {
         src: ["allowNotFound", "defaultRoute", "limits"],
-        tests: [],
+        tests: ["queryParams"],
       },
       "getPluginApi.getResolvedLimits()": {
         src: ["maxDependencies"],
@@ -862,11 +860,14 @@ describe("consumer census (#2303)", () => {
         "forwardState",
         // ⚑ Untouched: their only consumer outside core moved to the `PluginApi`
         // twin — `getAdoptedOrigins` in #2339 slice 1, `getDeclaredQueryNames` and
-        // `logger` in slice 2. The internals members are now dead weight, which
-        // is the state the door's removal clears.
+        // `logger` in slice 2, `getCloneState` and `getOptions` in #2486. The
+        // internals members are now dead weight, which is the state the door's
+        // removal clears.
         "getAdoptedOrigins",
+        "getCloneState",
         "getDeclaredQueryNames",
         "getMetaForState",
+        "getOptions",
         "getRootPath",
         "getStateName",
         "getTree",

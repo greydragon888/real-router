@@ -205,7 +205,7 @@ describe("the analyser's reach decides which side refuses (#2322)", () => {
     logger: { level: "warn-error" },
     queryParams: { arrayFormat: "none" },
   });
-  const stored: object = getInternals(router).getOptions();
+  const stored: object = getPluginApi(router).getOptions();
 
   it("what the retrospective pass reads is what the plugin can judge", () => {
     // Anti-vacuum: an empty bag would make the absence below meaningless.
