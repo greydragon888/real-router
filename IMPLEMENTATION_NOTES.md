@@ -94,6 +94,53 @@
 
 **Three mechanisms leave `master` unmeasured, not two.** The gate skip and a bare absence of work are the ones #2375 names; the third is `codspeed.yml`'s own `paths-ignore` (`.github/**`, `scripts/**`, `**/*.md`, `.claude/**`, `.husky/**`, `knip.json`), under which a push touching only those produces **no run at all** — not even a gate record. Measured on `a1fa45202`. A push of several commits also measures only its head.
 
+## A step inserted above a trailing `env:` block re-parents it, and nothing saw that (#2472, 2026-09-21)
+
+**Problem.** The scheduled cross-router matrix ran `run-all.mjs "$RUNS"` with
+`RUNS` unset. `Number("")` is 0, so the sub-`N_MIN` guard (#1455) refused to
+persist anything and exited 1 — correctly — after the job had already built the
+packages and installed Chromium. The run published nothing, auto-filed a tracking
+issue, and the defect had been live for four days.
+
+**Cause.** `8777575a8` inserted a `Sample cgroup — after` step between the matrix
+step's `run:` / `working-directory:` and its trailing `timeout-minutes:` / `env:`
+block. YAML does not care which step a key was written for: all three silently
+became the sampler's. So the matrix lost `RUNS` and `BENCH_RUNNER` — its
+provenance stamp — and its 300-minute cap, while a sub-second `cat` of a cgroup
+file acquired them. The diff shows it plainly in hindsight: the added lines stop
+at the sampler's `report` call and the three settings are CONTEXT lines below it.
+
+**Why no gate caught it.** An unset variable is valid YAML and valid shell, so the
+defect is a hole in what one step can reach rather than a syntax error — and the
+scopes a step can reach are what has to be scanned to see it.
+
+⚠ **actionlint is clean on the broken file and on the fixed one**, measured rather
+than assumed.
+
+`codspeed.yml` took the same pair of steps in the same commit and is unaffected:
+both insertions there land before a blank line.
+
+**Solution.** The three settings move back onto the matrix step, and
+`scripts/workflow-env-reachability.test.mjs` makes the class fail loudly: every
+`$VAR` a step's `run:` reads must be declared in that step's `env:`, its job's,
+the workflow's, an earlier step's `$GITHUB_ENV` export, or the ambient runner set.
+It is stdlib-only and lands in the existing `node --test scripts/*.test.mjs` glob,
+so it needed no wiring — the same arrangement `ci-gate-completeness.test.mjs` uses.
+
+**Why two of its pieces are not decoration.** Both were added because the first
+draft produced FALSE findings, and a scan a reader learns to ignore is worse than
+no scan: modelling `$GITHUB_ENV` exports across steps (without it `LEAF_FILTER`
+and `RELEASES_CREATED` read as defects), and matching a shell assignment anywhere
+on its line rather than at the start (without it roughly fifty names do, among
+them `… && PATH_OK=1` inside a `case` arm and `declare -A HAS_RELEASE=()`).
+Mutating either one back reddens the scan on the current tree, which is what keeps
+them honest.
+
+**What the battery establishes.** Restoring `master`'s version of the workflow
+verbatim reddens the gate and names `RUNS` — so it would have caught the real
+escape, not a synthetic likeness of it. Breaking the step detector reddens the
+floors instead of reporting a clean scan.
+
 ## The line-anchor gate did not read the dot-directories, so a changeset carried an anchor into a release PR (2026-09-21)
 
 **Problem.** `line-anchor-authority` holds the whole tree at zero `file:line`

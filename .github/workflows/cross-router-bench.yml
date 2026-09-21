@@ -140,15 +140,6 @@ jobs:
           done
           exit $rc
         working-directory: benchmarks
-
-      # always(): a reclaim may be WHY the matrix above failed — exit 137 is its
-      # "a worker was killed" code, and reclaim is the quieter neighbour of that.
-      - name: Sample cgroup — after
-        if: always()
-        run: |
-          bash "$GITHUB_WORKSPACE/scripts/cgroup-sample.sh" capture "$RUNNER_TEMP/cgroup-after.txt"
-          bash "$GITHUB_WORKSPACE/scripts/cgroup-sample.sh" report \
-            "$RUNNER_TEMP/cgroup-before.txt" "$RUNNER_TEMP/cgroup-after.txt" "cross-router matrix"
         # 300 min covers all five cohorts (~2.8 h measured) with ~1.8× headroom,
         # and — unlike the previous 600 — it is REACHABLE: `timeout-minutes`
         # defaults to 360 at the JOB level, so a 600-minute step cap could never
@@ -159,6 +150,15 @@ jobs:
         env:
           BENCH_RUNNER: "self-hosted" # machine stamp (env.cpu carries the real CPU model)
           RUNS: ${{ inputs.runs || '100' }} # via env, not inline in `run:` — a workflow_dispatch input spliced into a run-script is a shell-injection sink (matches the rme-gate step below)
+
+      # always(): a reclaim may be WHY the matrix above failed — exit 137 is its
+      # "a worker was killed" code, and reclaim is the quieter neighbour of that.
+      - name: Sample cgroup — after
+        if: always()
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/cgroup-sample.sh" capture "$RUNNER_TEMP/cgroup-after.txt"
+          bash "$GITHUB_WORKSPACE/scripts/cgroup-sample.sh" report \
+            "$RUNNER_TEMP/cgroup-before.txt" "$RUNNER_TEMP/cgroup-after.txt" "cross-router matrix"
 
       # ── TRANSACTIONAL publish: deck / PDF / upload run ONLY after a fully-green matrix. They use
       #    default step gating (no `if:`) — any prior failure skips them and the job goes red, so a
