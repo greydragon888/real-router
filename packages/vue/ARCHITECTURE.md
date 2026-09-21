@@ -49,7 +49,6 @@ src/
 │   ├── useNavigator.ts         # Navigator from inject (never reactive)
 │   ├── useRoute.ts             # Full route context from inject (every navigation) — Readonly<Ref<State>>
 │   ├── useRouteNode.ts         # Node-scoped subscription via useRefFromSource (computed over shallowRef snapshot)
-│   ├── useIsActiveRoute.ts     # Active state subscription (internal — used by Link)
 │   ├── useRouteUtils.ts        # RouteUtils from route tree (never reactive)
 │   ├── useRouterTransition.ts  # Transition lifecycle ShallowRef (isTransitioning, toRoute, fromRoute)
 │   ├── useRouteExit.ts         # Wrap subscribeLeave with abort + same-route guards (handler captured in setup())
@@ -150,7 +149,6 @@ useNavigator()  — reads NavigatorKey → returns Navigator, never reactive
 ```
 useRouteNode(name)      — cached createRouteNodeSource(router, name)     → { navigator, route: ShallowRef, previousRoute: ShallowRef }
 useRouterTransition()   — cached getTransitionSource(router)             → ShallowRef<RouterTransitionSnapshot>
-useIsActiveRoute(...)   — cached createActiveRouteSource(router, ...)    → ShallowRef<boolean>
 RouterErrorBoundary     — cached createDismissableError(router)          → ShallowRef<DismissableErrorSnapshot>
 RouterProvider          — createRouteSource(router)                      → updates route/previousRoute ShallowRefs
 ```
@@ -162,7 +160,7 @@ All source caches live in `@real-router/sources` — no local WeakMaps in this a
 ```
 Link (defineComponent + h('a'))
 ├── useRouter() — router instance from inject (never reactive)
-├── useIsActiveRoute(...) — ShallowRef<boolean> for active CSS
+├── watch([7 active-state props]) → createActiveSource(...) — ShallowRef<boolean> for active CSS
 ├── computed(() => router.buildUrl() || router.buildPath()) — reactive href
 ├── computed(() => ...) — reactive class string concat
 └── onClick → router.navigate(...).catch(() => {})

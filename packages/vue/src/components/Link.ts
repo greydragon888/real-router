@@ -101,8 +101,9 @@ export const Link = defineComponent({
     },
     // Default `undefined` (NOT EMPTY_PARAMS): an omitted `routeParams` must reach
     // `createActiveRouteSource` as `undefined` so it keys the active source as ""
-    // and shares ONE cached source (one router subscription) with a manual
-    // `useIsActiveRoute(routeName)`. Defaulting to EMPTY_PARAMS ({}) here would key
+    // and shares ONE cached source (one router subscription) with every other
+    // consumer asking that same question — another `<Link routeName>`, or a
+    // direct `createActiveSource(router, routeName)`. Defaulting to EMPTY_PARAMS ({}) here would key
     // "{}" and split the same logical question into a second eager subscription
     // (#776). Navigation/href default to EMPTY_PARAMS locally where a concrete
     // object is required.
