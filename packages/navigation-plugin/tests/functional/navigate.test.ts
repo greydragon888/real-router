@@ -707,9 +707,12 @@ describe("Error Recovery", () => {
     unsub = router.usePlugin(navigationPluginFactory({}, browser));
     await router.start();
 
-    vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
-      new TypeError("unexpected crash"),
-    );
+    // ⚑ A REAL failure, not a stubbed door: a leave listener that throws makes
+    // the navigation reject with what it threw, and a non-`RouterError` is what
+    // sends the handler down its critical-error arm.
+    router.subscribeLeave(() => {
+      throw new TypeError("unexpected crash");
+    });
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const browserNavigateSpy = vi.spyOn(browser, "navigate");
@@ -817,9 +820,9 @@ describe("Error Recovery", () => {
     unsub = router.usePlugin(navigationPluginFactory({}, browser));
     await router.start();
 
-    vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
-      new TypeError("crash"),
-    );
+    router.subscribeLeave(() => {
+      throw new TypeError("crash");
+    });
     vi.spyOn(router, "getState").mockReturnValue(undefined);
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -843,9 +846,9 @@ describe("Error Recovery", () => {
     unsub = router.usePlugin(navigationPluginFactory({}, browser));
     await router.start();
 
-    vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
-      new TypeError("crash"),
-    );
+    router.subscribeLeave(() => {
+      throw new TypeError("crash");
+    });
     vi.spyOn(router, "buildUrl").mockImplementation(() => {
       throw new Error("buildUrl failed");
     });

@@ -1,5 +1,4 @@
 import { getLifecycleApi } from "@real-router/core/api";
-import { getInternals } from "@real-router/core/validation";
 import {
   describe,
   it,
@@ -89,9 +88,12 @@ describe("B4 — Cannot Deactivate Storm", () => {
   it("4.3 — async guard (TypeError) × 50 popstate: recoverFromCriticalError calls replaceState", async () => {
     const replaceStateSpy = vi.spyOn(browser, "replaceState");
 
-    vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
-      new TypeError("Guard throws"),
-    );
+    // ⚑ A REAL failure, not a stubbed door: a leave listener that throws makes
+    // every navigation of the storm reject with what it threw, and a
+    // non-`RouterError` is what sends the handler down its critical arm.
+    router.subscribeLeave(() => {
+      throw new TypeError("Guard throws");
+    });
 
     for (let i = 0; i < 50; i++) {
       dispatchPopstate(makePopstateState("home", {}, "/home"));
@@ -105,9 +107,12 @@ describe("B4 — Cannot Deactivate Storm", () => {
   it("4.4 — critical error in recovery × 20: console.error logged, no unhandled exceptions", async () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
-    vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
-      new TypeError("Navigate throws"),
-    );
+    // ⚑ A REAL failure, not a stubbed door: a leave listener that throws makes
+    // every navigation of the storm reject with what it threw, and a
+    // non-`RouterError` is what sends the handler down its critical arm.
+    router.subscribeLeave(() => {
+      throw new TypeError("Navigate throws");
+    });
     // ⚑ `router.buildPath` is no longer on the recovery path (#2250): the
     // rollback prefixes the committed state's own `path` instead of rebuilding
     // it from the name, so the route table is out of the recovery entirely.
