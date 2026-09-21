@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createRouter } from "@real-router/core";
+import { createRouter, RouterError } from "@real-router/core";
 import {
   cloneRouter,
   getDependenciesApi,
@@ -40,6 +40,31 @@ const refusalFrom = (door: () => unknown): string => {
     return "NO THROW";
   } catch (error) {
     return error instanceof Error ? error.message : String(error);
+  }
+};
+
+/**
+ * What a door's refusal says about the freeze, as a fact rather than a branch.
+ *
+ * `routerErrorUnfrozen` is scoped to `RouterError` on purpose: #1960 is about the
+ * asymmetry between frozen and unfrozen ROUTER errors, and a plain `TypeError` is
+ * not frozen by convention — asserting "everything is frozen" would red the
+ * honest rows. `refused` is the control: a row that stops refusing measures
+ * nothing, and would otherwise pass this cell for ever.
+ */
+const freezeFactOf = (
+  door: () => unknown,
+): { readonly refused: boolean; readonly routerErrorUnfrozen: boolean } => {
+  try {
+    door();
+
+    return { refused: false, routerErrorUnfrozen: false };
+  } catch (error) {
+    return {
+      refused: true,
+      routerErrorUnfrozen:
+        error instanceof RouterError && !Object.isFrozen(error),
+    };
   }
 };
 
@@ -191,6 +216,36 @@ describe("every refusal a caller can reach names a door (#2459)", () => {
   // and the count moves, drop them all and this is the only assertion left.
   it("the table still drives every door the register named", () => {
     expect(DOORS).toHaveLength(22);
+  });
+
+  it.each(DOORS)("%s hands back a FROZEN RouterError", (_door, open) => {
+    expect(freezeFactOf(open)).toStrictEqual({
+      refused: true,
+      routerErrorUnfrozen: false,
+    });
+  });
+
+  it("a refusal built by a helper and thrown by its caller is frozen too", async () => {
+    // The seam #1960 and #1964 both missed: construction moved into a private
+    // helper, and the throw site adds nothing. Its channel is asynchronous — the
+    // refusal arrives inside `start()` — so it cannot join the table above.
+    const router = createRouter(ROUTES);
+    let caught: unknown = "NO THROW";
+
+    getPluginApi(router).addInterceptor("start", async (next, path) => {
+      try {
+        router.navigateToNotFound("/zzz");
+      } catch (error) {
+        caught = error;
+      }
+
+      return next(path);
+    });
+
+    await router.start("/");
+
+    expect(caught).toBeInstanceOf(RouterError);
+    expect(Object.isFrozen(caught)).toBe(true);
   });
 
   it.each(DOORS)("%s refuses with a prefix", (_door, open) => {
