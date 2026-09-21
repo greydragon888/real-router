@@ -338,7 +338,7 @@ export function assertForwardToShape(
   if (typeof forwardTo !== "function") {
     if (typeof forwardTo !== "string" && forwardTo !== null) {
       throw new TypeError(
-        `forwardTo must be a string or function for route "${fullName}", ` +
+        `[router] forwardTo must be a string or function for route "${fullName}", ` +
           `got ${typeof forwardTo}`,
       );
     }
@@ -355,7 +355,7 @@ export function assertForwardToShape(
 
   if (isNativeAsync || isTranspiledAsync) {
     throw new TypeError(
-      `forwardTo callback cannot be async for route "${fullName}". ` +
+      `[router] forwardTo callback cannot be async for route "${fullName}". ` +
         `Async functions break matchPath/buildPath.`,
     );
   }

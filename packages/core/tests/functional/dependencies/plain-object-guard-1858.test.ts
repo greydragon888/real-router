@@ -29,7 +29,7 @@ const attempt = (fn: () => unknown): string => {
   }
 };
 
-const REFUSED = "TypeError: dependencies must be a plain object";
+const REFUSED = "TypeError: [router] dependencies must be a plain object";
 
 describe("the plain-object guard judges the prototype (#1858)", () => {
   it("a dependency named `constructor` SURVIVES every rebuild door", () => {
