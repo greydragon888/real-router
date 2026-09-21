@@ -236,7 +236,7 @@ export const arbFrozenRecord: fc.Arbitrary<Readonly<Record<string, unknown>>> =
 /**
  * Vue reactive-proxy record — `arbExtendedRecord` wrapped with `reactive(...)`.
  *
- * `useIsActiveRoute` accepts a Vue reactive ref/proxy as `routeParams` (e.g.
+ * `<Link>` accepts a Vue reactive ref/proxy as its `routeParams` prop (e.g.
  * `reactive({ id: 1 })` from a setup-scope state object). `shallowEqual` ends
  * up comparing the proxy against either another proxy or the raw target —
  * Object.is treats the proxy as its own identity, so cross-proxy reflexivity

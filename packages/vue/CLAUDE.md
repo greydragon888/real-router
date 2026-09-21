@@ -38,7 +38,6 @@ src/
 │   ├── useNavigator.ts
 │   ├── useRoute.ts
 │   ├── useRouteNode.ts           # Uses cached createRouteNodeSource from @real-router/sources
-│   ├── useIsActiveRoute.ts       # Internal ref form of the shared internal/createActiveSource fast/slow builder. NOT called by Link — Link calls createActiveSource directly in its watch (#1416)
 │   ├── useRouteUtils.ts
 │   ├── useRouterTransition.ts    # Uses cached getTransitionSource
 │   ├── useRouteExit.ts           # Wraps subscribeLeave with abort + same-route guards
@@ -117,7 +116,6 @@ A fourth `@internal` key — `HTTP_STATUS_KEY` (provider/inject pair behind `<Ht
 | `useRouteNode(name)`               | `{ navigator, route: Readonly<Ref<State \| undefined>>, previousRoute: Readonly<Ref<State \| undefined>> }` — backed by `computed` over a shared `shallowRef` snapshot | Only when node active/inactive          |
 | `useRouteUtils()`                  | `RouteUtils`                                                                                                                                                           | Never                                   |
 | `useRouterTransition()`            | `ShallowRef<RouterTransitionSnapshot>` — includes `isLeaveApproved` field                                                                                              | On transition start/end                 |
-| `useIsActiveRoute()`               | `ShallowRef<boolean>`                                                                                                                                                  | **INTERNAL ONLY**                       |
 | `useRouteExit(handler, options?)`  | `void` — wraps `router.subscribeLeave` with abort + same-route guards (handler captured in `setup()`)                                                                  | Never (subscription is stable)          |
 | `useRouteEnter(handler, options?)` | `void` — fires once on nav-driven mount via `useRoute()` + `watch(route)` (handler captured in `setup()`)                                                              | Never (watcher is owned by setup scope) |
 
@@ -711,9 +709,9 @@ See also: [Vue Integration — Server-Side Rendering](https://github.com/greydra
 - `useRouteNode` uses cached `createRouteNodeSource` from `@real-router/sources` — N consumers of the same `nodeName` share one router subscription
 - `useRouterTransition` uses `getTransitionSource` — shared eager source per router
 - `RouterErrorBoundary` uses `createDismissableError` — shared error source with integrated dismissal state (no local `useRouterError` composable)
-- `<Link>` resolves default-options active state through the shared per-router `createActiveNameSelector` — one `router.subscribe` for any number of distinct-`routeName` Links — via the `internal/createActiveSource` fast/slow builder called from its reactive `watch` (#1416; #1250 landed the fast path only in `useIsActiveRoute`, which `<Link>` never called — the drift #1416 fixed). Custom params / strict / `ignoreQueryParams: false` / hash fall to cached `createActiveRouteSource` (params hashed via `canonicalJson`, key-order-insensitive). `useIsActiveRoute` shares the same `createActiveSource` builder (its ref form), so the two cannot drift. `useRefFromSource` consumes only `subscribe` + `getSnapshot`
+- `<Link>` resolves default-options active state through the shared per-router `createActiveNameSelector` — one `router.subscribe` for any number of distinct-`routeName` Links — via the `internal/createActiveSource` fast/slow builder called from its reactive `watch` (#1416, #1250). Custom params / strict / `ignoreQueryParams: false` / hash fall to cached `createActiveRouteSource` (params hashed via `canonicalJson`, key-order-insensitive). `useRefFromSource` consumes only `subscribe` + `getSnapshot`
 - No `memo()` needed — Vue tracks ref dependencies automatically
-- `Link` content-stabilizes `routeParams` with `shallowEqual` (Object.is per key, order-insensitive — the same contract as the React adapter's `Link` `memo`), so an inline `:routeParams="{ id }"` literal from a re-rendering parent does **not** re-run `buildHref` or `canonicalJson` every navigation; `href` and active-class are `computed()` off the stabilized params + `useIsActiveRoute`. Same-shape navigations skip both derivations entirely (~18% faster on the Link-heavy `vs-tanstack` Vue bench)
+- `Link` content-stabilizes `routeParams` with `shallowEqual` (Object.is per key, order-insensitive — the same contract as the React adapter's `Link` `memo`), so an inline `:routeParams="{ id }"` literal from a re-rendering parent does **not** re-run `buildHref` or `canonicalJson` every navigation; `href` is `computed()` off the stabilized params, and the active class is `computed()` off the `isActive` ref that `watch` maintains. Same-shape navigations skip both derivations entirely (~18% faster on the Link-heavy `vs-tanstack` Vue bench)
 - All WeakMap caches live in `@real-router/sources` — auto-evicted on router GC, no local caches in this adapter
 - `EMPTY_PARAMS` and `EMPTY_OPTIONS` frozen singletons avoid allocation for default props
 - keepAlive wrapper components cached with `markRaw` to prevent Vue from proxying them

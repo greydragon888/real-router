@@ -3,7 +3,7 @@
 /**
  * Property-based tests for `shallowEqual` from `shared/dom-utils/link-utils.ts`.
  *
- * The function is used by Vue's `<Link>` (via `useIsActiveRoute`) and by
+ * The function is used by Vue's `<Link>` and by
  * `navigateWithHash` to determine "same params" within the same-route hash
  * detection branch. It must hold:
  *
@@ -313,8 +313,8 @@ describe("shallowEqual — Property Tests", () => {
 
   describe("Invariant 12: Vue reactive proxies — identity-based reflexivity, no deep compare across proxies", () => {
     // Vue's `reactive(...)` returns a Proxy that wraps the target object.
-    // `useIsActiveRoute` can be invoked with `routeParams` coming from a
-    // reactive setup-scope state. `shallowEqual` must:
+    // `<Link>`'s `routeParams` prop can carry a value coming from a reactive
+    // setup-scope state. `shallowEqual` must:
     //   1. Treat a proxy as its own identity (Object.is(p, p) === true).
     //   2. NOT deep-compare two proxies that wrap structurally-identical
     //      targets — proxies are reference-distinct.
