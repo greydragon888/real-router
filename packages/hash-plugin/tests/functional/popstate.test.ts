@@ -1,6 +1,5 @@
 import { createRouter } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
-import { getInternals } from "@real-router/core/validation";
 import {
   describe,
   beforeAll,
@@ -27,6 +26,26 @@ const STUB_TRANSITION = Object.freeze({
     intersection: "",
   }),
 }) as unknown as State["transition"];
+
+/**
+ * The public signature of one navigation: a single `start` and no error.
+ *
+ * ⚑ What these cells are about is the DEDUP, and its failure is observable
+ * without the door: the paired event that slips through raises a phantom
+ * `SAME_STATES`. Measured — healthy gives `["start"]`, a disabled dedup gives
+ * `["start", "error:SAME_STATES"]`.
+ */
+const watchTransitions = (target: Router): string[] => {
+  const seen: string[] = [];
+
+  target.usePlugin(() => ({
+    onTransitionStart: () => seen.push("start"),
+    onTransitionError: (_toState, _fromState, error) =>
+      seen.push(`error:${(error as { code?: string }).code}`),
+  }));
+
+  return seen;
+};
 
 let router: Router;
 let mockedBrowser: Browser;
@@ -653,7 +672,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
       // Back/forward over a hash entry fires BOTH events synchronously. The
       // dedup drops the second of the pair, so exactly one navigation runs.
       globalThis.history.replaceState({}, "", "/#/users/list");
-      const navSpy = vi.spyOn(getInternals(router), "navigateToState");
+      const seen = watchTransitions(router);
 
       globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
       globalThis.dispatchEvent(new HashChangeEvent("hashchange"));
@@ -661,14 +680,14 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(router.getState()?.name).toBe("users.list");
-      expect(navSpy).toHaveBeenCalledTimes(1);
+      expect(seen).toStrictEqual(["start"]);
     });
 
     it("does not double-navigate when a hash traversal fires hashchange then popstate (reverse order)", async () => {
       // Same traversal, opposite arrival order — the dedup is order-independent,
       // so the popstate is the one dropped here. Still exactly one navigation.
       globalThis.history.replaceState({}, "", "/#/users/list");
-      const navSpy = vi.spyOn(getInternals(router), "navigateToState");
+      const seen = watchTransitions(router);
 
       globalThis.dispatchEvent(new HashChangeEvent("hashchange"));
       globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
@@ -676,7 +695,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(router.getState()?.name).toBe("users.list");
-      expect(navSpy).toHaveBeenCalledTimes(1);
+      expect(seen).toStrictEqual(["start"]);
     });
 
     it("dedups the pair even when a microtask checkpoint runs between the two events (#1228)", async () => {
@@ -687,7 +706,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
       // clears the flags, and the second event double-navigates → phantom
       // SAME_STATES. Model that checkpoint with an awaited microtask.
       globalThis.history.replaceState({}, "", "/#/users/list");
-      const navSpy = vi.spyOn(getInternals(router), "navigateToState");
+      const seen = watchTransitions(router);
 
       globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
       await Promise.resolve(); // microtask checkpoint — the queued reset runs here
@@ -696,7 +715,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(router.getState()?.name).toBe("users.list");
-      expect(navSpy).toHaveBeenCalledTimes(1); // one navigation, not a double
+      expect(seen).toStrictEqual(["start"]);
     });
 
     it("handles hashchanges from separate tasks independently (dedup guard resets per task)", async () => {
