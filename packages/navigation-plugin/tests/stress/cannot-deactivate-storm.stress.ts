@@ -1,5 +1,4 @@
 import { getLifecycleApi } from "@real-router/core/api";
-import { getInternals } from "@real-router/core/validation";
 import {
   describe,
   it,
@@ -85,9 +84,12 @@ describe("N4 — Cannot Deactivate Storm", () => {
   it("4.3 — 50 navigate events with TypeError: error recovery calls browser.navigate", async () => {
     const browserNavigateSpy = vi.spyOn(browser, "navigate");
 
-    vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
-      new TypeError("Guard throws"),
-    );
+    // ⚑ A REAL failure, not a stubbed door: a leave listener that throws makes
+    // every navigation of the storm reject with what it threw, and a
+    // non-`RouterError` is what sends the handler down its critical arm.
+    router.subscribeLeave(() => {
+      throw new TypeError("Guard throws");
+    });
 
     for (let i = 0; i < 50; i++) {
       mockNav.navigate("http://localhost/home");
@@ -110,9 +112,12 @@ describe("N4 — Cannot Deactivate Storm", () => {
   it("4.4 — double error recovery × 20: no unhandled exceptions", async () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
-    vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
-      new TypeError("Navigate throws"),
-    );
+    // ⚑ A REAL failure, not a stubbed door: a leave listener that throws makes
+    // every navigation of the storm reject with what it threw, and a
+    // non-`RouterError` is what sends the handler down its critical arm.
+    router.subscribeLeave(() => {
+      throw new TypeError("Navigate throws");
+    });
     vi.spyOn(router, "buildUrl").mockImplementation(() => {
       throw new Error("BuildUrl throws");
     });

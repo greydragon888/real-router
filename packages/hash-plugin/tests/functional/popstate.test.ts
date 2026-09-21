@@ -471,13 +471,30 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
     it("logs critical error when navigate throws non-RouterError", async () => {
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
-      // popstate-handler now uses router.navigateToState (#525);
-      // mock that path to surface a non-RouterError into the recovery branch.
-      vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
-        new TypeError("Critical error"),
-      );
+      // ⚑ A REAL failure, not a stubbed door: a leave listener that throws
+      // makes the navigation reject with what it threw, and a non-`RouterError`
+      // is what sends the handler down its critical-error arm.
+      //
+      // ⚠ The popstate must target a DIFFERENT state. A same-state one
+      // short-circuits on `SAME_STATES` before any transition runs, so nothing
+      // would throw — the stub this replaces could not show that, because it
+      // intercepted the door above the check.
+      router.subscribeLeave(() => {
+        throw new TypeError("Critical error");
+      });
 
-      globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+      globalThis.dispatchEvent(
+        new PopStateEvent("popstate", {
+          state: {
+            name: "home",
+            params: {},
+            search: {},
+            path: "/home",
+            transition: STUB_TRANSITION,
+            context: {},
+          } satisfies State,
+        }),
+      );
 
       await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -495,9 +512,9 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
 
       await router.navigate("users.list");
 
-      vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
-        new TypeError("Critical navigate error"),
-      );
+      router.subscribeLeave(() => {
+        throw new TypeError("Critical navigate error");
+      });
 
       const validState: State = {
         name: "home",
@@ -531,9 +548,9 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
 
       await router.navigate("users.list");
 
-      vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
-        new TypeError("Critical navigate error"),
-      );
+      router.subscribeLeave(() => {
+        throw new TypeError("Critical navigate error");
+      });
 
       // ⚑ `router.buildPath` is no longer on this path (#2250): the rollback
       // prefixes the committed state's own `path` instead of rebuilding it from
