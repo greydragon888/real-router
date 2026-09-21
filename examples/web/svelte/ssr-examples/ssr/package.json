@@ -24,7 +24,7 @@
     "@playwright/test": "1.63.0",
     "@sveltejs/vite-plugin-svelte": "7.3.0",
     "@types/express": "5.0.6",
-    "@types/node": "24.13.4",
+    "@types/node": "24.13.5",
     "svelte-check": "4.7.6",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
