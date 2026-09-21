@@ -244,6 +244,44 @@ Callbacks are intentionally **not** probed at registration time — their return
 
 The plugin does **not** import the foundation `route-tree` package. `validateRoute` (the batch route/path validator — no matcher equivalent) comes from the `@real-router/core/validation` subpath; the route validators ask existence by walking `PluginApi.getTree()` and read path slots from `PluginApi.getUrlParams` (a `RouteLookup`, threaded into `validateRoutes` → `validateForwardToTargets`), and the retrospective pass reads the same two answers from that lookup; the `RouteTree` type comes from core. This keeps core the sole consumer of the routing engine. `tests/functional/no-route-tree.test.ts` scans `src/` for any `route-tree` import and fails on a regression — keep it green (and `route-tree` out of `devDependencies`).
 
+### A message names a door that can reach it, and a walk says so (#2457)
+
+Every `[router.<door>]` head in `src/` is checked against the doors that can
+actually reach it, by `tests/functional/prefix-reachability-authority-2457.test.ts`.
+The door comes from three places, none of them a list: an `addCheck("<door>:<slot>")`
+position, the implementation in core that consults a `RouterValidator` member, or
+a `methodName` the caller hands down for a helper serving several doors.
+
+⚠ **The resolution of an implementation name STOPS at a published door.** It exists
+only to translate `#runStart` into `start` and `#startPlugin` → `use` into
+`usePlugin`. Left to run past a published name it becomes an unbounded closure —
+measured, that gave one validator eleven doors, because `navigate`, `start` and
+`matchPath` all reach a path build eventually, and a wrong door then passed.
+
+⚑ The register holds ONE entry (`[internal]`, whose own `v8 ignore … unreachable`
+is the reason) plus two published names (`[cloneRouter]`, `[validation-plugin]`).
+"Both batch doors report `addRoute`" needs no entry: the shared helper is reached
+from both batch positions, so the rule admits it unaided. A cell asserts that
+entry's REASON is present at its site, not merely written here.
+
+⚠ **That cell catches the marker being deleted and cannot catch it outliving its
+truth**, because nothing in this repository flags an unnecessary `v8 ignore` —
+proving one unnecessary costs a coverage run per ignore.
+
+⚑ **Functions are keyed by file, not by name.** Names ARE declared in two files
+each here — `assertNotAsync` carries a `[validation-plugin]` head in one and a
+`[router.updateRoute]` head in the other — and keyed by name they merge, so each
+one's reachers admit the other's door. Measured, the merge is inert on this tree
+today, which is why a synthetic two-file cell is what keeps the key load-bearing
+rather than the real collisions. Object-literal METHODS stay out of the scope that
+resolves a call: the wiring table names an inline method exactly as the function it
+delegates to, and letting the method win dropped doors that the wiring had wired.
+
+`route-door-prefix-2399.test.ts` stays beside it and answers a different question —
+what a caller SEES, driven end to end. Its reach is the sixteen refusals it drives:
+measured, flipping the door on a route-CRUD message it does not drive left the
+whole suite green.
+
 ### Core's limit defaults live in ONE place here (#1879)
 
 `helpers.ts` exports `CORE_LIMIT_DEFAULTS`, and every reader takes its fallback from it, in one of two shapes: a `?? …` (four in `validationPlugin.ts`) or a defaulted parameter (`eventBus.ts`, `lifecycle.ts`, `plugins.ts`). Core keeps `DEFAULT_LIMITS` internal, so this is a copy by decision, not by accident.
