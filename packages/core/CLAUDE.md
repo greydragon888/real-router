@@ -390,11 +390,23 @@ syntactic walk beside the typed one still undercounts — what it cannot see is
 asserted as a difference rather than described, so a new invisible idiom is an
 event rather than a silence.
 
-⚠ **No refusal has ever been recorded, and that is the gap.** The rule describes
-the surface that exists; it has never turned a member away. A criterion with no
-negative example is indistinguishable from a description of the current set, so
-the first member that satisfies both clauses and is still refused is the one that
-makes this a rule — write that refusal down when it happens.
+⚑ **The rule is not merely descriptive, and that half is settled (#2388).** It
+has reddened a cell and changed the work twice, both times on an ADDITION:
+`addCheck` failed clause (a) until the slice grew a shipped consumer for it, and
+`subscribeDiagnostic` failed clause (b) until `DiagnosticEventMap` moved to a
+published subpath. A description cannot fail a test, so "indistinguishable from
+a description of the current set" no longer holds.
+
+⚠ **What is still open is narrower: no QUALIFIED member has ever been turned
+away.** Both cases above were admitted once fixed. The rule enforcing itself and
+the rule exercising judgement beyond its own conjunction are different
+properties, and only the first is demonstrated. The first member that satisfies
+both clauses and is STILL kept off `PluginApi` is the one that shows the second
+— write that refusal down when it happens.
+
+⚑ **Expect it on an addition, not on an inventory.** The conjunction judges a
+candidate when it appears, which is why a census of the existing surface found
+nothing to refuse.
 
 ### Before adding an aggregating entity, ask what could REFUSE a member
 
