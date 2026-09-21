@@ -97,6 +97,7 @@ describe("dependencies: the copy loop and getAll (#1823)", () => {
     // silently removed the whole point of the cell.
     const merged: Record<string, unknown> = {};
 
+    // eslint-disable-next-line unicorn/no-immediate-mutation -- its fix is that spread, see the four lines above
     Object.assign(merged, all);
 
     expect(Object.getPrototypeOf(merged)).toBe(Object.prototype);

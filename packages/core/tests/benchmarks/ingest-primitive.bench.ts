@@ -134,6 +134,7 @@ export async function run(): Promise<void> {
 
       // The point of this arm IS the `Object.assign` call: `{ ...source }` is a
       // different operation, and the arm name would then say otherwise.
+      // eslint-disable-next-line unicorn/no-immediate-mutation -- its fix is that spread, see the two lines above
       Object.assign(target, source);
       keep(target);
     }),
@@ -172,6 +173,7 @@ export async function run(): Promise<void> {
         const target: Record<string, unknown> = {};
 
         // `Object.assign` on purpose — see the five-key arm above.
+        // eslint-disable-next-line unicorn/no-immediate-mutation -- its fix is that spread, see the line above
         Object.assign(target, bag);
         keep(target);
       }),
