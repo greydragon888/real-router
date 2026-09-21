@@ -103,6 +103,10 @@
       "reads": "core's INVARIANTS.md, to derive which predicates claim totality"
     },
     {
+      "file": "packages/validation-plugin/tests/functional/prefix-reachability-authority-2457.test.ts",
+      "reads": "packages/core/src — the door names core publishes, and which of them consults each validator member"
+    },
+    {
       "file": "packages/validation-plugin/tests/functional/validator-boundary-authority-2322.test.ts",
       "reads": "core's src, for every place core consults this plugin"
     }
