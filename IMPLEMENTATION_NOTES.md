@@ -108,13 +108,26 @@ wiki shallowly, and runs both checkers with `REAL_ROUTER_ROOT` pointed at the
 checkout. A failure opens or comments on one tracking issue, the shape
 `examples.yml` already uses.
 
-**Why nothing here is a required check.** Neither direction can be BLOCKED where
-its fix lives: a wiki finding cannot be answered in a monorepo pull request, since
-the wiki has no pull requests, and a monorepo rename cannot be answered in the
-wiki. #2450 took the smoke test off the release pull request on the same
-reasoning. An advisory job on every `packages/*/src` pull request was considered
-and declined — an advisory check is one nobody must act on, and the schedule finds
-the same drift within a day. This is documentation drift, not a release blocker.
+**The report goes to the pull request that CAUSES the drift, and a comment is not a
+check.** The author of a rename has the context and can update the page in a
+minute; a tracking issue the next morning reaches them cold, after the merge. So a
+`pull_request` run on `packages/*/src/**` posts an advisory comment and **stays
+green** — a wiki finding cannot be ANSWERED there (the wiki is a separate
+repository with no pull requests, and the page documents `master`, so the usual
+order is merge-then-fix), which is why #2450's precedent rules out a required check
+at that address but not a comment at it.
+
+⚠ **The same finding fails the job on every event except a pull request**, because
+only there does it have an author to reach; the issue is filed on `schedule` and
+`gollum` alone, so a manual dispatch fails visibly and files nothing.
+
+**What the measurement said about the rate, and what it did not.** Messages change
+often — 163 commits touched `packages/*/src` in thirty days, 90 of the changed
+lines carrying a `[router…]` prefix. But the four recorded drift incidents (#2458,
+#2460, #2465, #2399) were all filed on one day, by the audit that wrote the
+checker, so they are an accumulated backlog rather than a rate. The case for this
+workflow is that the wiki went stale silently until someone looked on purpose, not
+that drift has been observed four times.
 
 **Why the install can skip scripts.** `check-messages.mjs` needs exactly one thing
 from it, `node_modules/typescript/lib/typescript.js`, which it imports by path, and

@@ -1,4 +1,5 @@
-# The wiki's two checkers, on a schedule and on a wiki edit (#2466).
+# The wiki's two checkers — on the pull request that can cause the drift, and on a
+# schedule and a wiki edit as the net underneath (#2466).
 #
 # They read BOTH repositories: `check-links.mjs` resolves wiki links against
 # monorepo paths, and `check-messages.mjs` compares every message a page quotes
@@ -6,25 +7,29 @@
 # a rename in the monorepo makes a page wrong with nobody touching the wiki —
 # which is how #2399, #2458 and #2460 happened.
 #
-# ⚠ **Neither direction can be BLOCKED where its fix lives, so nothing here is a
-# required check.** A wiki finding cannot be answered in a monorepo pull request
-# (the wiki is a separate repository with no pull requests), and a monorepo rename
-# cannot be answered in the wiki. #2450 took the smoke test off the release pull
-# request on exactly that reasoning. An advisory job on every `packages/*/src`
-# pull request was considered and declined: an advisory check is one nobody must
-# act on, and the schedule below finds the same drift within a day — this is
-# documentation drift, not a release blocker.
+# **The pull request is where the drift is CAUSED, so that is where the report
+# goes.** The author of a rename has the context and can update the page in a
+# minute; a tracking issue the next morning reaches them cold, after the merge.
+# The report is a PR comment rather than a check result, and the job stays green on
+# a finding — deliberately, because a wiki finding cannot be ANSWERED in a monorepo
+# pull request: the wiki is a separate repository with no pull requests, and the
+# page documents `master`, so it is usually correct to fix it once this merges
+# rather than before. #2450 is the precedent for not putting a check at an address
+# where it cannot be answered; a comment at that address is not a check.
+#
+# On `schedule` and `gollum` the same finding DOES fail the job, because there the
+# report has no author to reach and the tracking issue is the only signal.
 #
 # `gollum` fires in THIS repository when someone edits a wiki page, which covers
 # the wiki-side direction immediately and costs nothing. It reports rather than
 # blocks, because the push has already happened by the time the event arrives.
 #
 # ⚠ **The two checkers are named here by hand, and nothing holds that list to the
-# wiki's.** A third checker added there runs nowhere until someone adds a step. No
-# gate can close that from this side: the monorepo's own tests never see the wiki,
-# so the only thing that could compare the lists is a job that has already cloned
-# it — this one. A renamed checker at least fails loudly rather than silently
-# passing, because `node` cannot find the file.
+# wiki's.** A third checker added there runs nowhere until someone adds it to the
+# loop below. No gate can close that from this side: the monorepo's own tests never
+# see the wiki, so the only thing that could compare the lists is a job that has
+# already cloned it — this one. A renamed checker at least fails loudly rather than
+# silently passing, because `node` cannot find the file.
 name: Wiki checkers
 
 on:
@@ -34,23 +39,36 @@ on:
     - cron: "41 5 * * *"
   gollum:
   workflow_dispatch:
+  pull_request:
+    # ⚠ These are ACTIONS path globs, where `**` crosses `/` — not git pathspecs,
+    # where `packages/*/src` matches the full path and therefore nothing. The two
+    # languages look identical and disagree; measured, the git form returns 0 for a
+    # tree with 163 matching commits in thirty days.
+    paths:
+      - "packages/*/src/**"
+      # So a change to this workflow is exercised by its own pull request.
+      - ".github/workflows/wiki-checkers.yml"
 
 permissions:
   contents: read
 
 concurrency:
-  # ⚠ `cancel-in-progress: false` on purpose. A burst of wiki edits queues runs
-  # instead of cancelling them, because a cancelled job ends as CANCELLED and the
-  # `!success()` gate below would file an issue for it — the trap `examples.yml`
-  # records and `post-merge.yml` deliberately avoids.
-  group: wiki-checkers
-  cancel-in-progress: false
+  # ⚠ `cancel-in-progress` only on a pull request. Elsewhere a cancelled job ends
+  # as CANCELLED, which the `!success()` gate below would file an issue for — the
+  # trap `examples.yml` records and `post-merge.yml` deliberately avoids. On a pull
+  # request nothing files an issue, so superseding a run is free.
+  group: wiki-checkers-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
     name: Wiki checkers
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      # Only for the advisory comment below; the checkers write nothing.
+      pull-requests: write
     steps:
       - uses: actions/checkout@v7
 
@@ -80,36 +98,93 @@ jobs:
       # 1, so a finding would have been written to the summary and the job would
       # have stayed green. Capturing also closes the fenced block on the failing
       # path, which a `set -e` abort mid-step does not.
-      - name: check-links
+      # ⚠ Both checkers run in ONE step so that a link finding cannot hide a
+      # message finding, and so that the verdict reaches the two steps below as a
+      # single answer. This step itself never fails; what to DO about a finding is
+      # the event's business, not the checker's.
+      - name: Run the checkers
+        id: run
         run: |
           set -euo pipefail
-          out=$(node "$RUNNER_TEMP/wiki/check-links.mjs" 2>&1) && rc=0 || rc=$?
-          {
-            echo '### check-links'
-            echo '```'
-            printf '%s\n' "$out"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          exit "$rc"
+          rc=0
+          fence='```'
+          for checker in check-links check-messages; do
+            out=$(node "$RUNNER_TEMP/wiki/$checker.mjs" 2>&1) && status=0 || status=$?
+            # ⚠ The fence is a variable: a backtick inside a `printf` FORMAT string
+            # reads as legacy command substitution to shellcheck, which reports
+            # SC2016 on a line that has no expansion in it at all.
+            block=$(
+              echo "### $checker"
+              echo "$fence"
+              printf '%s\n' "$out"
+              echo "$fence"
+            )
+            printf '%s\n' "$block" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$status" -ne 0 ]; then
+              printf '%s\n' "$block" >> "$RUNNER_TEMP/findings.md"
+              rc="$status"
+            fi
+          done
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
         env:
           REAL_ROUTER_ROOT: ${{ github.workspace }}
 
-      - name: check-messages
-        # always(): the two checks are independent, and a link finding must not
-        # hide a message finding from the same run.
-        if: always()
-        run: |
-          set -euo pipefail
-          out=$(node "$RUNNER_TEMP/wiki/check-messages.mjs" 2>&1) && rc=0 || rc=$?
-          {
-            echo '### check-messages'
-            echo '```'
-            printf '%s\n' "$out"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          exit "$rc"
-        env:
-          REAL_ROUTER_ROOT: ${{ github.workspace }}
+      # The report goes to the author who caused it, while the change is in hand.
+      # ⚠ Same-repo pull requests only: a fork's token cannot write a comment, and
+      # the step would fail on something the author cannot fix. The guard is the
+      # one `codspeed.yml` states for the self-hosted runner.
+      - name: Tell the pull request
+        if: >-
+          github.event_name == 'pull_request' &&
+          steps.run.outputs.rc != '0' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { readFileSync } = require('node:fs');
+            const marker = '<!-- wiki-checkers-advisory -->';
+            const findings = readFileSync(`${process.env.RUNNER_TEMP}/findings.md`, 'utf8');
+            const body = [
+              marker,
+              '**The wiki no longer matches this branch.** Advisory — nothing here blocks the merge.',
+              '',
+              findings.trim(),
+              '',
+              'The page documents `master`, so the usual order is: merge this, then fix the page.',
+              'Run `node check-links.mjs` / `node check-messages.mjs` in the wiki checkout with',
+              '`REAL_ROUTER_ROOT` pointing at the monorepo to confirm.',
+              '',
+              '_Updated in place on each push by `wiki-checkers.yml`._',
+            ].join('\n');
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find(c => (c.body || '').includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      # Off a pull request there is no author to reach, so the finding fails the
+      # job and `notify-failure` files the issue.
+      - name: Fail on a finding
+        if: github.event_name != 'pull_request' && steps.run.outputs.rc != '0'
+        run: exit 1
 
   # The same tracker shape `examples.yml` uses: one issue, a comment per
   # subsequent failure, closed once green. A job summary would be cheaper and
@@ -120,9 +195,15 @@ jobs:
     runs-on: ubuntu-latest
     needs: [check]
     # `!success()`, not `failure()`: a job killed by `timeout-minutes` ends as
-    # CANCELLED, which `failure()` does not match. A manual dispatch files
-    # nothing, so verifying this workflow by hand cannot open issues.
-    if: "!success() && github.event_name != 'workflow_dispatch'"
+    # CANCELLED, which `failure()` does not match.
+    #
+    # ⚠ The two events are named rather than `!= 'workflow_dispatch'`. A pull
+    # request reports through a comment and must never open an issue — not even
+    # when the job fails for an infrastructural reason — and a manual dispatch
+    # files nothing so that verifying this workflow by hand is free.
+    if: >-
+      !success() &&
+      (github.event_name == 'schedule' || github.event_name == 'gollum')
     permissions:
       issues: write
     steps:
