@@ -7,6 +7,7 @@ import {
   getPluginApi,
   getRoutesApi,
 } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 
 /**
  * Every refusal a caller can reach names something they can look up (#1845).
@@ -225,10 +226,14 @@ describe("every refusal a caller can reach names a door (#2459)", () => {
     });
   });
 
-  it("a refusal built by a helper and thrown by its caller is frozen too", async () => {
+  it("a helper-built refusal carrying a MESSAGE is frozen (the phase branch)", async () => {
     // The seam #1960 and #1964 both missed: construction moved into a private
     // helper, and the throw site adds nothing. Its channel is asynchronous — the
     // refusal arrives inside `start()` — so it cannot join the table above.
+    //
+    // ⚠ `#refuseSystemCommit` has TWO returns and this cell drives one. The
+    // code-only branch is the cell below; naming the branch here is what keeps
+    // the pair from reading as one guard over the whole helper (#2506).
     const router = createRouter(ROUTES);
     let caught: unknown = "NO THROW";
 
@@ -245,6 +250,42 @@ describe("every refusal a caller can reach names a door (#2459)", () => {
     await router.start("/");
 
     expect(caught).toBeInstanceOf(RouterError);
+    expect(Object.isFrozen(caught)).toBe(true);
+  });
+
+  it("a helper-built refusal carrying only a CODE is frozen (the disposed branch)", () => {
+    // The same helper's other return: `new RouterError(errorCodes.ROUTER_DISPOSED)`
+    // with no message, so its text IS the code (`super(message ?? code)`). A raiser
+    // that owns MESSAGE construction never touches it, which is why the wrapper at
+    // the throw is the only thing freezing it (#2506).
+    //
+    // Reached through published API: `systemCommit` COPIES `toState` before the FSM
+    // check (#1792), so a getter that disposes the router runs first and the helper
+    // takes its `isDisposed()` branch. ⚠ `getInternals` is retired by #2339 — when
+    // that lands this cell moves to whichever door carries `systemCommit` after it.
+    const router = createRouter(ROUTES);
+    const disposingState = {
+      name: "home",
+      path: "/",
+      meta: undefined,
+      get params(): Record<string, never> {
+        router.dispose();
+
+        return {};
+      },
+    };
+
+    let caught: unknown = "NO THROW";
+
+    try {
+      getInternals(router).systemCommit(disposingState as never, undefined, {});
+    } catch (error) {
+      caught = error;
+    }
+
+    // CONTROL: the branch is only reached when the message IS the code — anything
+    // else means the probe landed on a different refusal, as two drafts of it did.
+    expect((caught as RouterError).message).toBe((caught as RouterError).code);
     expect(Object.isFrozen(caught)).toBe(true);
   });
 
