@@ -36,7 +36,7 @@
     "@types/express": "5.0.6",
     "@types/node": "24.13.4",
     "sirv-cli": "3.0.1",
-    "tsx": "4.23.13",
+    "tsx": "4.23.15",
     "typescript": "6.0.3"
   }
 }
