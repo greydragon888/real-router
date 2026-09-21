@@ -1,10 +1,5 @@
-import {
-  globSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -88,30 +83,57 @@ interface Anchor {
 }
 
 /**
- * ⚠ **`**` does not descend into a directory whose name starts with a dot**, so
- * the dot-directories are named explicitly. Measured in this tree: `**` finds 232
- * `.md` files and none of the ones under `.changeset` — which is how a `.ts:247`
- * anchor written in a changeset passed every check on its own pull request and
- * then reddened the RELEASE one, where `changeset version` had copied the body
- * verbatim into `packages/core/CHANGELOG.md`.
- *
- * `.claude` and `.github` are named for the same reason, not for symmetry: the
- * skill files are where this class was measured at its worst, and nothing was
- * holding them at zero afterwards.
+ * The dot-directories the CONTROL below requires the scan to reach. A changeset
+ * is why the first one is here: `changeset version` copies a body verbatim into
+ * `packages/core/CHANGELOG.md`, so an anchor written there passes every check on
+ * its own pull request and reddens the RELEASE one. The skill files are where
+ * this class was measured at its worst, and `.github` keeps the workflows in.
  */
 const DOT_DIRECTORIES = [".changeset", ".claude", ".github"] as const;
 
-const PATTERNS = [
-  "**/*.{ts,tsx,mts,md}",
-  ...DOT_DIRECTORIES.map((directory) => `${directory}/**/*.{ts,tsx,mts,md}`),
-];
+/** Our prose and our source. Everything else is out of scope by extension. */
+const SCANNED = /\.(?:ts|tsx|mts|md)$/;
+
+/**
+ * Every file git TRACKS, so the question this suite answers is about the
+ * REPOSITORY rather than about the disk it happens to be checked out on.
+ *
+ * ⚠ **A filesystem walk reads local-only material and reddens where CI is
+ * green.** The ignored half of `.claude` — scratch material, worktrees, editor
+ * state — carries such anchors by the thousand, and none of them is ours to hold
+ * at zero. Tracking decides it by construction rather than by an ignore list
+ * somebody maintains, and it is also what reaches the dot-directories above:
+ * `**` does not descend into a name that starts with a dot.
+ *
+ * ⚠ `GIT_DIR` and its siblings are stripped. A hook runs this suite with the
+ * environment of whichever worktree fired it, and git would answer for that
+ * repository instead of this one.
+ */
+function trackedFiles(): string[] {
+  const env = { ...process.env };
+
+  delete env.GIT_DIR;
+  delete env.GIT_WORK_TREE;
+  delete env.GIT_INDEX_FILE;
+
+  // `git` is the tool this repository is checked out with, the argument list is
+  // fixed and carries no caller input, and asking git is the only way to learn
+  // what is TRACKED — the same reasoning its sibling in
+  // `repo-scan-authority-2241.test.ts` records for the same call.
+  // eslint-disable-next-line sonarjs/no-os-command-from-path -- see the four lines above
+  return execFileSync("git", ["ls-files", "-z"], {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+    env,
+    maxBuffer: 64 * 1024 * 1024,
+  })
+    .split("\0")
+    .filter(Boolean);
+}
 
 function scannedFiles(): string[] {
-  return globSync(PATTERNS, {
-    cwd: REPO_ROOT,
-    exclude: (entry) => NOT_SOURCE.test(entry),
-  })
-    .map((file) => file.split(path.sep).join("/"))
+  return trackedFiles()
+    .filter((file) => SCANNED.test(file) && !NOT_SOURCE.test(file))
     .filter((file) => EXEMPT.every((rule) => !rule.test(file)))
     .toSorted((a, b) => a.localeCompare(b));
 }
@@ -216,10 +238,9 @@ describe("nothing points at our code by line number", () => {
     // is the historical form of the blind spot and it has to be written out to
     // be pinned.
     const real = new Set(
-      globSync("**/*.{ts,tsx,mts}", {
-        cwd: REPO_ROOT,
-        exclude: (entry) => NOT_SOURCE.test(entry),
-      }).map((file) => file.split(path.sep).join("/")),
+      trackedFiles().filter(
+        (file) => /\.(?:ts|tsx|mts)$/.test(file) && !NOT_SOURCE.test(file),
+      ),
     );
     const namesARealFile = (anchor: string): boolean => {
       // ⚠ The leading backtick is OPTIONAL since the pattern took the bare form
