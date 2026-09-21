@@ -1339,7 +1339,7 @@ jobs:
       # (2026-08-01 CI/CD audit §1.7.)
       - name: Upload coverage to Codecov
         continue-on-error: true
-        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v5
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ${{ steps.lcov.outputs.reports }}
