@@ -12,10 +12,16 @@ import type { RoutesApi } from "@real-router/core/api";
  *
  * `packages/validation-plugin/README.md` promises `[router.METHOD]` on every
  * message from this plugin, and core derives the same rule for its own package
- * in `message-prefix-authority-1845.test.ts`. This package has no counterpart,
- * which is how a check whose message names `addRoute` came to run at the
- * `update` door only: the message was right about the defect and wrong about the
- * door, so a reader grepping their own code for `addRoute` found nothing.
+ * in `message-prefix-authority-1845.test.ts`. A check whose message named
+ * `addRoute` came to run at the `update` door only: the message was right about
+ * the defect and wrong about the door, so a reader grepping their own code for
+ * `addRoute` found nothing.
+ *
+ * ⚠ **This table covers the refusals its own cells drive, not a door family.**
+ * `prefix-reachability-authority-2457` is the derived counterpart that judges
+ * every message; this one stays because it answers what a caller SEES, end to
+ * end, which a literal scan cannot. What each of the two reaches, and the
+ * measurement that separates them, is in this package's `CLAUDE.md`.
  *
  * ⚑ **A cell pins the prefix AND what the message says**, because the prefix
  * alone does not discriminate: every refusal of one door carries it, so a cell
