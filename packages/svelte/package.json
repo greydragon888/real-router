@@ -76,7 +76,7 @@
     "rimraf": "6.1.3",
     "svelte": "~5.57.0",
     "svelte-check": "4.7.6",
-    "svelte-eslint-parser": "1.8.0"
+    "svelte-eslint-parser": "1.8.1"
   },
   "peerDependencies": {
     "@real-router/core": "workspace:>=0.146.0",
