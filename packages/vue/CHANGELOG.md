@@ -1,5 +1,13 @@
 # @real-router/vue
 
+## 0.24.1
+
+### Patch Changes
+
+- [#2475](https://github.com/greydragon888/real-router/pull/2475) [`e01b1b2`](https://github.com/greydragon888/real-router/commit/e01b1b2ecc73bc9626b8805b78d620c78dbf6e49) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove the `useIsActiveRoute` composable, which nothing called ([#2425](https://github.com/greydragon888/real-router/issues/2425))
+
+  It was never exported from `@real-router/vue` and no module imported it — its only importer was its own test — so no published surface changes. `<Link>` resolves active state through `createActiveSource` in its reactive `watch`, which is what it already did.
+
 ## 0.24.0
 
 ### Minor Changes
