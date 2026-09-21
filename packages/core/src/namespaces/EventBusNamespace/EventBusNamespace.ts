@@ -625,7 +625,7 @@ export class EventBusNamespace {
     // prevent (#1186): "a refusal there is silent … the contract these callers
     // already had promises an error, not a quietly skipped commit."
     if (!this.#fsm.canSend(routerEvents.SYSTEM_COMMIT)) {
-      throw this.#refuseSystemCommit();
+      throw freezeThrownError(this.#refuseSystemCommit());
     }
 
     this.#fsm.send(routerEvents.SYSTEM_COMMIT, {
