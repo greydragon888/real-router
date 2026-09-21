@@ -216,8 +216,17 @@ function main() {
     }
 
     if (choice === null) {
+      // The count alone cannot separate a base nothing built from a list that
+      // arrived without the recent runs, so name the newest row it served.
+      const newest = [...runs]
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .at(0);
+      const listed = newest
+        ? ` (newest listed: ${newest.headSha} at ${newest.createdAt})`
+        : "";
+
       console.log(
-        `ℹ️ No successful post-merge build of ${baseSha} or of an ancestor within ${String(MAX_DISTANCE)} commits among ${String(runs.length)} runs`,
+        `ℹ️ No successful post-merge build of ${baseSha} or of an ancestor within ${String(MAX_DISTANCE)} commits among ${String(runs.length)} runs${listed}`,
       );
 
       return { sizes: "[]", note: baseNote({ baseSha, choice: null }) };
