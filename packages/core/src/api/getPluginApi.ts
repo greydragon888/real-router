@@ -397,7 +397,7 @@ export function getPluginApi<
         if (key in router) {
           throw freezeThrownError(
             new RouterError(errorCodes.PLUGIN_CONFLICT, {
-              message: `Cannot extend router: property "${key}" already exists`,
+              message: `[router.extendRouter] Cannot extend router: property "${key}" already exists`,
             }),
           );
         }
@@ -465,7 +465,7 @@ export function getPluginApi<
       if (ctx.contextClaimRecords.has(namespace)) {
         throw freezeThrownError(
           new RouterError(errorCodes.CONTEXT_NAMESPACE_ALREADY_CLAIMED, {
-            message: `Cannot claim context namespace: "${namespace}" is already claimed by another plugin`,
+            message: `[router.claimContextNamespace] Cannot claim context namespace: "${namespace}" is already claimed by another plugin`,
           }),
         );
       }
