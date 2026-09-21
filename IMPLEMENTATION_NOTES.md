@@ -94,6 +94,50 @@
 
 **Three mechanisms leave `master` unmeasured, not two.** The gate skip and a bare absence of work are the ones #2375 names; the third is `codspeed.yml`'s own `paths-ignore` (`.github/**`, `scripts/**`, `**/*.md`, `.claude/**`, `.husky/**`, `knip.json`), under which a push touching only those produces **no run at all** — not even a gate record. Measured on `a1fa45202`. A push of several commits also measures only its head.
 
+## The wiki's checkers run on a schedule and on a wiki edit, and block nothing (#2466, 2026-09-21)
+
+**Problem.** `check-links.mjs` and `check-messages.mjs` ran "on whoever
+remembered". Both read BOTH repositories — links resolve against monorepo paths,
+and every message a page quotes is compared to the literals in `packages/*/src` —
+so drift arrives from either side, and a rename in the monorepo makes a page wrong
+with nobody touching the wiki. That is how #2399, #2458 and #2460 happened.
+
+**Solution.** `wiki-checkers.yml`: daily at 05:41 UTC, on `gollum`, and on
+dispatch. It checks out the monorepo, installs with `--ignore-scripts`, clones the
+wiki shallowly, and runs both checkers with `REAL_ROUTER_ROOT` pointed at the
+checkout. A failure opens or comments on one tracking issue, the shape
+`examples.yml` already uses.
+
+**Why nothing here is a required check.** Neither direction can be BLOCKED where
+its fix lives: a wiki finding cannot be answered in a monorepo pull request, since
+the wiki has no pull requests, and a monorepo rename cannot be answered in the
+wiki. #2450 took the smoke test off the release pull request on the same
+reasoning. An advisory job on every `packages/*/src` pull request was considered
+and declined — an advisory check is one nobody must act on, and the schedule finds
+the same drift within a day. This is documentation drift, not a release blocker.
+
+**Why the install can skip scripts.** `check-messages.mjs` needs exactly one thing
+from it, `node_modules/typescript/lib/typescript.js`, which it imports by path, and
+it reads `packages/*/src` rather than `dist`. `check-links.mjs` needs no dependency
+at all.
+
+**The output is captured, not piped into the summary.** `node … | tee` exits with
+tee's status, and the default shell for `run:` is `bash -e` WITHOUT pipefail.
+
+⚠ **Measured: that pipeline exits 0 while the checker exits 1**, so the first draft
+would have written a finding into the job summary and kept the job green.
+
+Capturing also closes the fenced block on the failing path, which a `set -e` abort
+mid-step does not. Validated by extracting both `run:` bodies verbatim from the
+workflow and executing them: clean tree exits 0, a planted wrong-door quote exits
+1 with the finding in a closed block.
+
+**What this does not close.** The two checkers are named in the workflow by hand
+and nothing holds that list to the wiki's, so a third one added there would run
+nowhere. No gate can close it from the monorepo side: the repo's own tests never
+see the wiki, and the only thing that could compare the lists is a job that has
+already cloned it.
+
 ## A step inserted above a trailing `env:` block re-parents it, and nothing saw that (#2472, 2026-09-21)
 
 **Problem.** The scheduled cross-router matrix ran `run-all.mjs "$RUNS"` with
