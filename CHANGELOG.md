@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-22]
 
+### @real-router/core@0.147.1
+
+### Patch Changes
+
+- [#2514](https://github.com/greydragon888/real-router/pull/2514) [`086cee7`](https://github.com/greydragon888/real-router/commit/086cee7ea760304746bc4db238c21679302837d9) Thanks [@greydragon888](https://github.com/greydragon888)! - An empty door reads as the bare form rather than `[router.]` ([#2487](https://github.com/greydragon888/real-router/issues/2487))
+
+  `raiser("router", "")` printed `[router.] …` — a head that looks like a door
+  without naming one, which is the class the raiser exists to remove. An empty door
+  now behaves as an absent one.
+
+
 ### @real-router/core@0.147.0
 
 ### Minor Changes
