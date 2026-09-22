@@ -100,7 +100,7 @@
     "vitest": "4.1.11"
   },
   "peerDependencies": {
-    "@real-router/core": "workspace:>=0.146.0",
+    "@real-router/core": "workspace:>=0.147.0",
     "solid-js": ">=1.7.0"
   }
 }
