@@ -90,23 +90,8 @@ const PUBLISHED =
  * Tier two: unreachable from caller input, so the internal name is the useful
  * one. Each entry carries its reason in the docblock above; adding one without
  * measuring that reachability is what this list exists to make deliberate.
- *
- * ⚑ **`[EventEmitter]` carries ONE message, and the reachability was traced
- * door by door (#2459).** `EventEmitter` is on no exports map and not in
- * `src/index.ts`, and `on()` has four call sites in `EventBusNamespace`:
- * `subscribeChanges`, `subscribeDiagnostic` and `subscribe` each hand it a
- * closure core wrote, so the callback is a function by construction, and
- * `addEventListener` — the one door that forwards the caller's own value —
- * passes `assertListenerIsFunction` first, which refuses with
- * `[router.addEventListener]`. So `Expected callback to be a function` answers
- * only a caller inside this package. ⚠ Its two neighbours in the same file are
- * NOT here: `Duplicate listener` and `Listener limit` are both reachable
- * — measured through `PluginApi.addEventListener`, and the limit through
- * `router.subscribe` as well — so they carry `[router]`. The register is about
- * reachability, not about the file a raiser lives in.
  */
 const CORE_INTERNAL: ReadonlySet<string> = new Set([
-  "[EventEmitter]",
   "[FSM.constructor]",
   "[FSM.on]",
 ]);
@@ -292,9 +277,9 @@ describe("a message prefix names something the caller can look up (#1845)", () =
  * absence of one (#2459).** #2456 prefixed the forward-chain family and
  * registered thirteen more without judging them. Each was then driven through
  * the doors that print it: twelve are reachable by caller input and took
- * `[router]`, the bare facade form #1845 settles multi-door raisers with, and
- * the thirteenth — `EventEmitter`'s callback check — is reachable from inside
- * this package only and moved to `CORE_INTERNAL` above.
+ * `[router]`, the bare facade form #1845 settles multi-door raisers with. A
+ * thirteenth was registered here for a static check nothing called; the check is
+ * gone and the register is back to the FSM pair.
  *
  * ⚠ **An empty register still reds on a NEW bare refusal, and that is what it
  * is for.** What an empty one cannot do is double as a positive control on the

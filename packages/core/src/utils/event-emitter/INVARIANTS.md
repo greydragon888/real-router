@@ -79,7 +79,6 @@
 
 | #   | Invariant                     | Description                                                                                                                                        |
 | --- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Non-function throws TypeError | `EventEmitter.validateCallback()` throws `TypeError` for any non-function value (null, undefined, number, string, boolean, object, array, symbol). |
 
 ## Stateful Consistency
 

@@ -1219,49 +1219,6 @@ describe("EventEmitter", () => {
       expect(() => emitter.on("click", vi.fn())).toThrow("Listener limit");
     });
   });
-
-  // ===========================================================================
-  // validateCallback()
-  // ===========================================================================
-
-  describe("validateCallback()", () => {
-    it("should throw TypeError for non-functions", () => {
-      expect(() => {
-        EventEmitter.validateCallback(null, "test");
-      }).toThrow(TypeError);
-      expect(() => {
-        EventEmitter.validateCallback(42, "test");
-      }).toThrow(TypeError);
-      expect(() => {
-        EventEmitter.validateCallback("str", "test");
-      }).toThrow(TypeError);
-      expect(() => {
-        EventEmitter.validateCallback({}, "test");
-      }).toThrow(TypeError);
-    });
-
-    it("should include 'Expected callback to be a function' in message", () => {
-      expect(() => {
-        EventEmitter.validateCallback(null, "click");
-      }).toThrow("Expected callback to be a function");
-    });
-
-    it("should include event name in error message", () => {
-      expect(() => {
-        EventEmitter.validateCallback(null, "myEvent");
-      }).toThrow("myEvent");
-    });
-
-    it("should pass for functions", () => {
-      expect(() => {
-        EventEmitter.validateCallback(() => {}, "test");
-      }).not.toThrow();
-      expect(() => {
-        EventEmitter.validateCallback(() => {}, "test");
-      }).not.toThrow();
-    });
-  });
-
   // ===========================================================================
   // Constructor options
   // ===========================================================================

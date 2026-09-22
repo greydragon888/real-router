@@ -41,17 +41,6 @@ export const arbMaxListeners = fc.integer({ min: 1, max: 10 });
 
 export const arbWarnThreshold = fc.integer({ min: 1, max: 5 });
 
-export const arbNonFunction: fc.Arbitrary<unknown> = fc.oneof(
-  fc.constant(null),
-  fc.constant(undefined),
-  fc.integer(),
-  fc.string(),
-  fc.boolean(),
-  fc.constant({}),
-  fc.constant([]),
-  fc.constant(Symbol("test")),
-);
-
 export function createTestEmitter(): EventEmitter<TestEventMap> {
   return new EventEmitter<TestEventMap>();
 }

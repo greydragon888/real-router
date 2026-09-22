@@ -29,7 +29,6 @@ Generic typed event emitter for Real-Router, used by core for all internal event
 | `listenerCount(event)` | Number of listeners for an event |
 | `isDispatching(event)` | Whether the event is currently in-flight (its `emit` is on the stack) — the re-entrancy coalesce guard (#1033) |
 | `setLimits(limits)` | Replace current limits at runtime |
-| `EventEmitter.validateCallback(cb, event)` | Static assertion that cb is a function |
 
 ## All Features Are Opt-In
 

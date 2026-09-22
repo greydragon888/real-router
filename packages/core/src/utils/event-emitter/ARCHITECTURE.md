@@ -66,10 +66,6 @@ class EventEmitter<TEventMap extends Record<string, unknown[]>> {
   isDispatching(eventName: keyof TEventMap & string): boolean;
   setLimits(limits: EventEmitterLimits): void;
 
-  static validateCallback(
-    cb: unknown,
-    eventName: string,
-  ): asserts cb is Function;
 }
 ```
 

@@ -10,7 +10,6 @@ import {
   arbListenerCount,
   arbMaxListeners,
   arbWarnThreshold,
-  arbNonFunction,
   createOrderedListeners,
   createTestEmitter,
   createUniqueListeners,
@@ -485,19 +484,6 @@ describe("EventEmitter Property-Based Tests", () => {
         expect(() => {
           emitter.on(eventName, listeners[maxListeners].fn);
         }).toThrow("Listener limit");
-      },
-    );
-  });
-
-  describe("validateCallback — non-function throws TypeError", () => {
-    test.prop([arbNonFunction, arbEventName], {
-      numRuns: NUM_RUNS.standard,
-    })(
-      "non-function values cause validateCallback to throw TypeError",
-      (value, eventName) => {
-        expect(() => {
-          EventEmitter.validateCallback(value, eventName);
-        }).toThrow(TypeError);
       },
     );
   });

@@ -41,21 +41,6 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
   }
 
   /**
-   * Validates that a callback is a function.
-   */
-  static validateCallback(
-    cb: unknown,
-    eventName: string,
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  ): asserts cb is Function {
-    if (typeof cb !== "function") {
-      throw new TypeError(
-        `[EventEmitter] Expected callback to be a function for event ${eventName}`,
-      );
-    }
-  }
-
-  /**
    * Replaces current limits with the provided limits.
    */
   setLimits(limits: EventEmitterLimits): void {
