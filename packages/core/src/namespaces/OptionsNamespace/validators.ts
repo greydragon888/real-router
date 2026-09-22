@@ -8,6 +8,6 @@ export function validateOptionsIsObject(
   options: unknown,
 ): asserts options is Record<string, unknown> {
   if (!options || typeof options !== "object" || Array.isArray(options)) {
-    throw new TypeError("[router.constructor] options must be a plain object");
+    throw new TypeError("[router] options must be a plain object");
   }
 }

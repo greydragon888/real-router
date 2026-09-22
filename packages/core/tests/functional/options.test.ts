@@ -548,9 +548,7 @@ describe("core/options", () => {
 
         expect(() =>
           createRouter([], { queryParams: withGetter as any }),
-        ).toThrow(
-          '[router.constructor] Invalid "queryParams.arrayFormat": "bracket"',
-        );
+        ).toThrow('[router] Invalid "queryParams.arrayFormat": "bracket"');
       });
 
       it("without validation plugin, mixed getter objects do NOT throw", () => {
@@ -601,33 +599,25 @@ describe("core/options", () => {
       it("without validation plugin, an invalid arrayFormat is refused BY NAME at construction", () => {
         expect(() =>
           createRouter([], { queryParams: { arrayFormat: "invalid" } as any }),
-        ).toThrow(
-          '[router.constructor] Invalid "queryParams.arrayFormat": "invalid"',
-        );
+        ).toThrow('[router] Invalid "queryParams.arrayFormat": "invalid"');
       });
 
       it("without validation plugin, an invalid booleanFormat is refused BY NAME at construction", () => {
         expect(() =>
           createRouter([], { queryParams: { booleanFormat: "wrong" } as any }),
-        ).toThrow(
-          '[router.constructor] Invalid "queryParams.booleanFormat": "wrong"',
-        );
+        ).toThrow('[router] Invalid "queryParams.booleanFormat": "wrong"');
       });
 
       it("without validation plugin, an invalid nullFormat is refused BY NAME at construction", () => {
         expect(() =>
           createRouter([], { queryParams: { nullFormat: "bad" } as any }),
-        ).toThrow(
-          '[router.constructor] Invalid "queryParams.nullFormat": "bad"',
-        );
+        ).toThrow('[router] Invalid "queryParams.nullFormat": "bad"');
       });
 
       it("without validation plugin, an invalid numberFormat is refused BY NAME at construction", () => {
         expect(() =>
           createRouter([], { queryParams: { numberFormat: "bad" } as any }),
-        ).toThrow(
-          '[router.constructor] Invalid "queryParams.numberFormat": "bad"',
-        );
+        ).toThrow('[router] Invalid "queryParams.numberFormat": "bad"');
       });
 
       it("should accept all valid queryParams combinations", () => {

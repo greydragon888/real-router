@@ -1144,10 +1144,9 @@ export function copyOwnData<T>(field: string, bag: T): T {
 
     return freeze(dropUnsafeKey(copy)) as T;
   } catch (error) {
-    throw new TypeError(
-      `[router.constructor] Invalid "${field}": reading it threw.`,
-      { cause: error },
-    );
+    throw new TypeError(`[router] Invalid "${field}": reading it threw.`, {
+      cause: error,
+    });
   }
 }
 

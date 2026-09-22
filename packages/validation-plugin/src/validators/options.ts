@@ -51,7 +51,7 @@ const VALID_OPTION_VALUES = {
 // ⚑ The VALUES are absent on purpose, and this is the whole of #2307. Core
 // refuses an unknown format BY NAME at construction (`requireStrategy`, #1318,
 // hoisted to matcher construction by #1819) and prints
-// `[router.constructor] Invalid "queryParams.<key>"` — the prefix and the field
+// `[router] Invalid "queryParams.<key>"` — the prefix and the field
 // path deliberately copied from this module, so a reader lands on the same
 // option. ⚠ The TAIL is core's own (`— expected "a" | "b"` against this
 // module's `. Must be one of: "a", "b"`), which is as far as the agreement

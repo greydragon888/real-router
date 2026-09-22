@@ -733,7 +733,10 @@ export function assertNoInternalNamesInBatch<
  */
 export function assertNonEmptyNamesInBatch<
   Dependencies extends DefaultDependencies,
->(routes: readonly Route<Dependencies>[], methodName: string): void {
+>(
+  routes: readonly Route<Dependencies>[],
+  methodName: string | undefined,
+): void {
   for (const route of routes) {
     assertRouteNameNotEmpty(route.name, methodName);
 
@@ -764,7 +767,10 @@ export function assertNonEmptyNamesInBatch<
  */
 export function assertNoDottedNamesInBatch<
   Dependencies extends DefaultDependencies,
->(routes: readonly Route<Dependencies>[], methodName: string): void {
+>(
+  routes: readonly Route<Dependencies>[],
+  methodName: string | undefined,
+): void {
   for (const route of routes) {
     assertNoDottedRouteName(route.name, methodName);
 
@@ -1546,8 +1552,10 @@ export function createRoutesStore<
   const batch = routes;
 
   assertNoInternalNamesInBatch(batch, "addRoute");
-  assertNonEmptyNamesInBatch(batch, "constructor");
-  assertNoDottedNamesInBatch(batch, "constructor");
+  // Both doors that reach here ARE the constructor — `createRouter` and
+  // `cloneRouter` — so the refusal names neither.
+  assertNonEmptyNamesInBatch(batch, undefined);
+  assertNoDottedNamesInBatch(batch, undefined);
   assertNoDuplicateNamesInBatch(batch, "", "addRoute");
 
   const artifacts = buildReplaceArtifacts(batch, "", matcherOptions, logger);

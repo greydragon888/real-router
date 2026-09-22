@@ -31,7 +31,7 @@ describe('a route named "" is refused at registration (#1804)', () => {
     // claim here is about the two always-on name rules agreeing, not about
     // matching the plugin at this door.
     expect(() => createRouter([{ name: "", path: "/a" }])).toThrow(
-      "[router.constructor] Route name cannot be empty",
+      "[router] Route name cannot be empty",
     );
   });
 
