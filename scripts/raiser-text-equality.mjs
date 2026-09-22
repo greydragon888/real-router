@@ -1,23 +1,47 @@
-// raiser-text-equality.mjs — a converted refusal must render the same message.
+// raiser-text-equality.mjs — a converted refusal must render the same message SHAPE.
 //
 // Snapshots every message head+body from `origin/master`, synthesises the same from
 // the bindings in the working tree, and compares the two sets. Run it on every family
 // a conversion touches: `node scripts/raiser-text-equality.mjs`.
+//
+// ⚠ A shape collapses every `${expr}` to `${}`, so swapping WHICH variable lands in
+// which slot passes green. Measured on `EventEmitter.ts`: the swap is caught by the
+// pins that spell the interpolated value, not by this guard.
 //
 // ⚠ It is not optional where the suite looks sufficient. Measured on the first
 // multi-file family: 19 of 30 converted sites were pinned verbatim by a test and 11
 // were not, and this guard caught a real defect in one of the eleven — a `" + "`
 // junction left inside the message, invisible to a green suite.
 //
-// It reads the working tree against `origin/master`, so it measures a conversion in
-// progress, not a committed one.
+// It reads both the working tree and the commits on the branch, so it measures a
+// conversion in progress and one already landed.
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import ts from "typescript";
 
-const files = execFileSync("git", ["diff", "--name-only"], { encoding: "utf8" })
-  .split("\n")
-  .filter((f) => f.endsWith(".ts"));
+// Committed AND uncommitted, because a conversion is measured both before it lands
+// and after. ⚠ An empty set is a REFUSAL, not a pass: reading only `git diff
+// --name-only` printed `lost: 0  new: 0` once the work was committed, which reads
+// exactly like success while comparing nothing.
+const files = [
+  ...new Set(
+    [
+      ...execFileSync("git", ["diff", "--name-only"], {
+        encoding: "utf8",
+      }).split("\n"),
+      ...execFileSync("git", ["diff", "--name-only", "origin/master...HEAD"], {
+        encoding: "utf8",
+      }).split("\n"),
+    ].filter((f) => f.endsWith(".ts") && f.startsWith("packages/")),
+  ),
+];
+
+if (files.length === 0) {
+  console.error(
+    "no changed .ts files against origin/master \u2014 nothing to compare, which is not a pass",
+  );
+  process.exit(1);
+}
 const PLAIN = new Set(["TypeError", "Error", "ReferenceError", "RangeError"]);
 
 const shape = (n, s) => {
