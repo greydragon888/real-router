@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-22]
 
+### @real-router/core@0.147.2
+
+### Patch Changes
+
+- [#2518](https://github.com/greydragon888/real-router/pull/2518) [`4be5edc`](https://github.com/greydragon888/real-router/commit/4be5edc5d8a3df9e4990dee95c0a61759bffed6c) Thanks [@greydragon888](https://github.com/greydragon888)! - The constructor refusals name no door, because two doors reach them ([#2487](https://github.com/greydragon888/real-router/issues/2487))
+
+  Six messages opened with `[router.constructor]`, a head no caller can look up:
+  `createRouter(...)` and `cloneRouter(...)` both reach these checks through
+  `new RouterClass(...)`, so naming one of them would name a call half the callers
+  did not make, and `constructor` names one nobody types.
+
+  They take the bare `[router]` form instead — the form the repository already uses
+  where several doors reach one refusal. Observable message change, no behaviour
+  change; the field path each message carries is untouched, which is what a reader
+  follows.
+
+
 ### @real-router/core@0.147.1
 
 ### Patch Changes
