@@ -39,7 +39,7 @@ export default [
   {
     name: "@real-router/core/utils (ESM)",
     path: "packages/core/dist/esm/utils.mjs",
-    limit: "900 B",
+    limit: "1.5 kB",
   },
   {
     name: "@real-router/core/validation (ESM)",

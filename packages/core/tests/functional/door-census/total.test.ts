@@ -465,6 +465,8 @@ describe("door total (#2303)", () => {
     RequestLike: "external platform shape",
     // Factories the census does not seed, each for its own reason.
     createRouterPlugin: "takes core's own router, not an application value",
+    internalDefect:
+      "its members are CONSTRUCTORS, not doors — the unbracketed form names no door by design (#1845)",
   };
 
   function barrelNames(file: string, seen: Set<string>): string[] {

@@ -296,7 +296,12 @@ describe("a message prefix names something the caller can look up (#1845)", () =
  * every `throw` in the tree, so a new one cannot arrive unnoticed even where it
  * cannot be judged.
  */
-const BARE: readonly string[] = [];
+const BARE: readonly string[] = [
+  // The unbracketed form O-1 prescribes: a defect no caller input can reach, so
+  // there is no door to name. Registered rather than prefixed, and step 2 of
+  // #2487 replaces this row with a tier that judges the MARKER.
+  "RouterError.ts · Internal error (please report): ${}",
+];
 
 /**
  * `Route "${current}" does not exist` → the shape, substitutions collapsed.

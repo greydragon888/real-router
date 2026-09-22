@@ -207,6 +207,36 @@ rather than a toolkit. Reaching for `Object.create(null)` instead is the
 expensive horn — V8 keeps such an object in dictionary mode, so the price lands
 on every later READ.
 
+### Refusal raiser (`@real-router/core/utils`)
+
+For **plugin authors**. A refusal opens with a bracketed pointer naming the call
+the caller made — `[router.buildPath] Missing required param 'id'` — and that
+pointer is an address a reader follows into their own code. Written once per
+throw it drifts: measured before this shipped, 19 messages carried no pointer and
+ten named a door that cannot reach them.
+
+`raiser(receiver, door?)` binds the head once per door and hands back one builder
+per constructor:
+
+```typescript
+import { raiser } from "@real-router/core/utils";
+
+const at = raiser("validation-plugin");
+
+throw at.plain`defaultRoute "${name}" does not exist`;
+```
+
+`type`, `plain`, `ref` and `range` build the matching constructor;
+`code(code, fields?)` builds a `RouterError` frozen for the throw, so such a site
+needs no freeze of its own. `type` and `plain` also accept `ErrorOptions` —
+``at.type({ cause })`reading it threw` `` — because a `cause` the constructor
+takes is non-enumerable while one assigned afterwards is not.
+
+It RETURNS the error rather than throwing it, so `throw` stays at the site. For a
+defect no caller can provoke, `internalDefect.plain` writes
+`Internal error (please report): …` with no bracket, because there is no door to
+name.
+
 ### `getNavigator(router)` (main entry)
 
 Frozen read-only subset of router methods for view layers. Pre-bound, safe to destructure. Imported from `@real-router/core`, not `/api`.

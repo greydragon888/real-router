@@ -1,5 +1,5 @@
 /**
- * Subpath export: the INGESTION primitives (#1852).
+ * Subpath export: core's own DISCIPLINE primitives.
  *
  * ⚑ This is not "core's utils" and deliberately does not grow into one. It
  * carries core's own DISCIPLINE primitives — the rules a plugin has to obey for
@@ -82,3 +82,16 @@ export { adoptChannel } from "./helpers";
  * it observes.
  */
 export { freezeThrownError } from "./RouterError";
+
+/**
+ * **REFUSAL (#2487)** — a refusal opens with a bracketed pointer naming the call
+ * the caller made, and that pointer is an address a reader follows into their own
+ * code and into the wiki. A head written once per THROW drifts — #2456, #2459,
+ * #2399, #2461, #2477.
+ *
+ * Published because the plugin raises refusals a consumer reads the same way core
+ * does, and a head written per throw is what drifted. Why the head is bound once
+ * per door, and why the raiser returns rather than throws, is stated at the
+ * declaration — the copy that ships.
+ */
+export { internalDefect, raiser } from "./RouterError";
