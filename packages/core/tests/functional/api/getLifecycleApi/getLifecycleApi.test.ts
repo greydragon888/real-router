@@ -63,7 +63,7 @@ describe("getLifecycleApi", () => {
 
       expect(() => {
         freshLifecycle.addActivateGuard("home", true);
-      }).toThrow(errorCodes.ROUTER_DISPOSED);
+      }).toThrow(expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }));
     });
 
     it("should work without validation plugin (any route name)", () => {
@@ -111,7 +111,7 @@ describe("getLifecycleApi", () => {
 
       expect(() => {
         freshLifecycle.addDeactivateGuard("home", true);
-      }).toThrow(errorCodes.ROUTER_DISPOSED);
+      }).toThrow(expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }));
     });
 
     it("should work without validation plugin (any route name)", () => {
@@ -150,7 +150,7 @@ describe("getLifecycleApi", () => {
 
       expect(() => {
         freshLifecycle.removeActivateGuard("home");
-      }).toThrow(errorCodes.ROUTER_DISPOSED);
+      }).toThrow(expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }));
     });
 
     it("should work without validation plugin (any route name)", () => {
@@ -189,7 +189,7 @@ describe("getLifecycleApi", () => {
 
       expect(() => {
         freshLifecycle.removeDeactivateGuard("home");
-      }).toThrow(errorCodes.ROUTER_DISPOSED);
+      }).toThrow(expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }));
     });
 
     it("should skip validation in noValidate mode", () => {

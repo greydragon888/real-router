@@ -33,7 +33,9 @@ const attempt = (fn: () => unknown): string => {
 
     return "ok";
   } catch (error) {
-    return (error as Error).message;
+    // The CODE when there is one: these rows are about `ROUTER_DISPOSED`, and a
+    // code does not move when the prose beside it does.
+    return (error as { code?: string }).code ?? (error as Error).message;
   }
 };
 

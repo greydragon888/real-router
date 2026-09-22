@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { createRouter, events } from "@real-router/core";
+import { createRouter, errorCodes, events } from "@real-router/core";
 import { getInternals } from "@real-router/core/validation";
 
 import { installSpyValidator } from "../helpers/spyValidator";
@@ -126,7 +126,9 @@ describe("the internals adapters run the guards (#2259)", () => {
 
       // ⚠ THROWS rather than rejecting: the guard stands above the promise, so
       // this door's disposed failure has a different shape from its others.
-      expect(() => ctx.navigateToState(state)).toThrow(/DISPOSED/);
+      expect(() => ctx.navigateToState(state)).toThrow(
+        expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }),
+      );
     });
 
     it("navigateToState consults the validator, options included", async () => {

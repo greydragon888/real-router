@@ -434,7 +434,11 @@ export function throwOnMisChanneledKey<D extends DefaultDependencies>(
  */
 export function throwIfDisposed(isDisposed: () => boolean): void {
   if (isDisposed()) {
-    throw freezeThrownError(new RouterError(errorCodes.ROUTER_DISPOSED));
+    throw freezeThrownError(
+      new RouterError(errorCodes.ROUTER_DISPOSED, {
+        message: "[router] this router is disposed — dispose() is terminal",
+      }),
+    );
   }
 }
 

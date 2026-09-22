@@ -22,7 +22,9 @@ import { describe, expect, it } from "vitest";
  * reasoning and this is the remainder of the same class.
  *
  * ⚑ **Two prefixes are admissible, and both name something published.**
- * `[router…]` is the facade a caller typed. `[RouterError…]` is a root export, so
+ * `[router…]` is the facade a caller typed. `[cloneRouter]` is exported from
+ * `@real-router/core/api` and takes no router receiver, so naming it is naming a
+ * call the reader made. `[RouterError…]` is a root export, so
  * naming it is naming something they can look up — which is why those were
  * excluded from the inventory rather than renamed.
  *
@@ -81,7 +83,8 @@ const textOf = (node: ts.Expression): string | undefined => {
 };
 
 /** Tier one: the prefix names something published, so the caller can look it up. */
-const PUBLISHED = /^\[(router(\.[A-Za-z$.{}]+)?|RouterError(\.[A-Za-z]+)?)\]$/u;
+const PUBLISHED =
+  /^\[(router(\.[A-Za-z$.{}]+)?|RouterError(\.[A-Za-z]+)?|cloneRouter)\]$/u;
 
 /**
  * Tier two: unreachable from caller input, so the internal name is the useful

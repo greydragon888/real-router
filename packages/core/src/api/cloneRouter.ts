@@ -122,7 +122,12 @@ export function cloneRouter<
   const ctx = getInternals(router);
 
   if (ctx.isDisposed()) {
-    throw freezeThrownError(new RouterError(errorCodes.ROUTER_DISPOSED));
+    throw freezeThrownError(
+      new RouterError(errorCodes.ROUTER_DISPOSED, {
+        message:
+          "[cloneRouter] cannot clone a disposed router — dispose() is terminal",
+      }),
+    );
   }
 
   ctx.validator?.dependencies.validateCloneArgs(dependencies);

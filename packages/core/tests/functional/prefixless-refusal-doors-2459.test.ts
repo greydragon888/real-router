@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createRouter, RouterError } from "@real-router/core";
+import { createRouter, errorCodes, RouterError } from "@real-router/core";
 import {
   cloneRouter,
   getDependenciesApi,
@@ -283,9 +283,9 @@ describe("every refusal a caller can reach names a door (#2459)", () => {
       caught = error;
     }
 
-    // CONTROL: the branch is only reached when the message IS the code — anything
-    // else means the probe landed on a different refusal, as two drafts of it did.
-    expect((caught as RouterError).message).toBe((caught as RouterError).code);
+    // CONTROL: only this branch carries ROUTER_DISPOSED here — anything else means
+    // the probe landed on a different refusal, as two drafts of it did.
+    expect((caught as RouterError).code).toBe(errorCodes.ROUTER_DISPOSED);
     expect(Object.isFrozen(caught)).toBe(true);
   });
 

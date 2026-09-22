@@ -116,16 +116,16 @@ describe("getDependenciesApi", () => {
 
       expect(() => {
         depsAfterDispose.set("bar", "x");
-      }).toThrow(errorCodes.ROUTER_DISPOSED);
+      }).toThrow(expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }));
       expect(() => {
         depsAfterDispose.setAll({ foo: 2 });
-      }).toThrow(errorCodes.ROUTER_DISPOSED);
+      }).toThrow(expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }));
       expect(() => {
         depsAfterDispose.remove("foo");
-      }).toThrow(errorCodes.ROUTER_DISPOSED);
+      }).toThrow(expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }));
       expect(() => {
         depsAfterDispose.reset();
-      }).toThrow(errorCodes.ROUTER_DISPOSED);
+      }).toThrow(expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }));
     });
 
     it("should still allow read-only methods after dispose", () => {

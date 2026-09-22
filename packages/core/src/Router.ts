@@ -1276,7 +1276,12 @@ export class Router<
     // effects), listeners would land in the cleared emitter, and teardown would
     // never fire — a silent zombie plugin (#1196).
     if (this.#eventBus.isDisposed()) {
-      throw freezeThrownError(new RouterError(errorCodes.ROUTER_DISPOSED));
+      throw freezeThrownError(
+        new RouterError(errorCodes.ROUTER_DISPOSED, {
+          message:
+            "[router.usePlugin] cannot install a plugin on a disposed router — dispose() is terminal",
+        }),
+      );
     }
 
     const filtered = plugins.filter(Boolean) as PluginFactory<Dependencies>[];
@@ -1665,7 +1670,12 @@ export class Router<
 }
 
 function throwDisposed(): never {
-  throw freezeThrownError(new RouterError(errorCodes.ROUTER_DISPOSED));
+  throw freezeThrownError(
+    new RouterError(errorCodes.ROUTER_DISPOSED, {
+      message:
+        "[router] this router is disposed — dispose() is terminal and swapped every method to refuse",
+    }),
+  );
 }
 
 /**
