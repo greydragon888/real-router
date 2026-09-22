@@ -10,12 +10,18 @@
  *
  * ⚑ One owner per rule is the point of this file: putting a rule on the live
  * path is a CALL, never a second copy of its message (#2035).
+ *
+ * A `methodName` of `undefined` is why two predicates take `string | undefined`:
+ * `createRouter` and `cloneRouter` reach them through the constructor, so neither
+ * names a door the caller typed, and the raiser renders the bare head (#2487).
  */
 
 /**
  * Route names are ASCII — a letter or underscore, then letters, digits,
  * underscores or hyphens.
  */
+import { raiser } from "../../RouterError";
+
 const ROUTE_NAME_PATTERN = /^[A-Z_a-z][\w-]*$/;
 
 /**
@@ -31,20 +37,14 @@ const MAX_ROUTE_NAME_LENGTH = 10_000;
 /**
  * Refuses `{ name: "" }`.
  */
-/**
- * The head a route-name refusal opens with. `createRouter` and `cloneRouter` both
- * reach these checks through the constructor, so neither names a door the caller
- * typed — they take the bare form rather than inventing one (#2487).
- */
-const head = (methodName: string | undefined): string =>
-  methodName === undefined ? "[router]" : `[router.${methodName}]`;
-
 export function assertRouteNameNotEmpty(
   name: string,
   methodName: string | undefined,
 ): void {
   if (name === "") {
-    throw new TypeError(`${head(methodName)} Route name cannot be empty`);
+    const at = raiser("router", methodName);
+
+    throw at.type`Route name cannot be empty`;
   }
 }
 
@@ -56,9 +56,9 @@ export function assertRouteNameNotWhitespaceOnly(
   methodName: string,
 ): void {
   if (!HAS_NON_WHITESPACE.test(name)) {
-    throw new TypeError(
-      `[router.${methodName}] Route name cannot contain only whitespace`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Route name cannot contain only whitespace`;
   }
 }
 
@@ -70,9 +70,9 @@ export function assertRouteNameWithinLength(
   methodName: string,
 ): void {
   if (name.length > MAX_ROUTE_NAME_LENGTH) {
-    throw new TypeError(
-      `[router.${methodName}] Route name exceeds maximum length of ${MAX_ROUTE_NAME_LENGTH} characters`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Route name exceeds maximum length of ${MAX_ROUTE_NAME_LENGTH} characters`;
   }
 }
 
@@ -89,10 +89,9 @@ export function assertNoDottedRouteName(
   methodName: string | undefined,
 ): void {
   if (name.includes(".")) {
-    throw new TypeError(
-      `${head(methodName)} Route name "${name}" cannot contain dots. ` +
-        `Use children array or { parent } option in addRoute() instead.`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Route name "${name}" cannot contain dots. Use children array or { parent } option in addRoute() instead.`;
   }
 }
 
@@ -104,10 +103,8 @@ export function assertRouteNameMatchesPattern(
   methodName: string,
 ): void {
   if (!ROUTE_NAME_PATTERN.test(name)) {
-    throw new TypeError(
-      `[router.${methodName}] Invalid route name "${name}". ` +
-        `Name must start with a letter or underscore, ` +
-        `followed by letters, numbers, underscores, or hyphens.`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Invalid route name "${name}". Name must start with a letter or underscore, followed by letters, numbers, underscores, or hyphens.`;
   }
 }

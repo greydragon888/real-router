@@ -646,9 +646,9 @@ export function assertNoDuplicateNamesInBatch<
 
   walkRouteNames(routes, parentName, (fullName) => {
     if (seen.has(fullName)) {
-      throw new Error(
-        `[router.${methodName}] Duplicate route "${fullName}" in batch`,
-      );
+      const at = raiser("router", methodName);
+
+      throw at.plain`Duplicate route "${fullName}" in batch`;
     }
 
     seen.add(fullName);
@@ -698,9 +698,9 @@ export function assertNoInternalRouteName(
   assertRouteNameIsString(name, methodName);
 
   if (name.startsWith(INTERNAL_ROUTE_PREFIX)) {
-    throw new Error(
-      `[router.${methodName}] Route name "${name}" uses the reserved "${INTERNAL_ROUTE_PREFIX}" prefix. Routes with this prefix are internal and cannot be modified through the public API.`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.plain`Route name "${name}" uses the reserved "${INTERNAL_ROUTE_PREFIX}" prefix. Routes with this prefix are internal and cannot be modified through the public API.`;
   }
 }
 
@@ -807,9 +807,9 @@ export function assertNoDuplicatePathsInBatch<
       const paths = seenByParent.get(parent);
 
       if (paths?.has(route.path)) {
-        throw new Error(
-          `[router.${methodName}] Path "${route.path}" is already defined`,
-        );
+        const at = raiser("router", methodName);
+
+        throw at.plain`Path "${route.path}" is already defined`;
       }
 
       if (paths) {

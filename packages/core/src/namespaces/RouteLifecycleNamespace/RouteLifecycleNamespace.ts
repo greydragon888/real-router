@@ -1,5 +1,7 @@
 // packages/core/src/namespaces/RouteLifecycleNamespace/RouteLifecycleNamespace.ts
 
+import { raiser } from "../../RouterError";
+
 import type { RouteLifecycleDependencies } from "./types";
 import type {
   DefaultDependencies,
@@ -576,9 +578,9 @@ export class RouteLifecycleNamespace<
     const fn = this.#deps.compileFactory(factory);
 
     if (typeof fn !== "function") {
-      throw new TypeError(
-        `[router.${methodName}] Factory must return a function, got ${typeof fn}`,
-      );
+      const at = raiser("router", methodName);
+
+      throw at.type`Factory must return a function, got ${typeof fn}`;
     }
 
     return fn;

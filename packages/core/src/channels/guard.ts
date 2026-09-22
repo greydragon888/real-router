@@ -1,5 +1,7 @@
 // packages/core/src/channels/guard.ts
 
+import { raiser } from "../RouterError";
+
 import type { Params } from "../types";
 
 /**
@@ -114,14 +116,14 @@ export function assertChannelCorrect(
   const key = findMisChanneledKey(params, queryNames);
 
   if (key !== undefined) {
-    throw new TypeError(
-      `[router.${method}] ${misChanneledKeyMessage(
-        routeName,
-        key,
-        typeof source === "function" ? source() : source,
-        remedy,
-      )}`,
-    );
+    const at = raiser("router", method);
+
+    throw at.type`${misChanneledKeyMessage(
+      routeName,
+      key,
+      typeof source === "function" ? source() : source,
+      remedy,
+    )}`;
   }
 }
 

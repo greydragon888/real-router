@@ -1,3 +1,4 @@
+import { raiser } from "../../RouterError";
 import {
   buildParamMeta,
   describeRemovedForm,
@@ -17,7 +18,9 @@ import type { RouteTree } from "../types";
  * @internal
  */
 function createRouterError(methodName: string, message: string): TypeError {
-  return new TypeError(`[router.${methodName}] ${message}`);
+  const at = raiser("router", methodName);
+
+  return at.type`${message}`;
 }
 
 /**

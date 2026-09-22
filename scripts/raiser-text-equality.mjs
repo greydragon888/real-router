@@ -1,8 +1,9 @@
 // raiser-text-equality.mjs — a converted refusal must render the same message SHAPE.
 //
-// Snapshots every message head+body from `origin/master`, synthesises the same from
-// the bindings in the working tree, and compares the two sets. Run it on every family
-// a conversion touches: `node scripts/raiser-text-equality.mjs`.
+// Renders every message head+body TWICE — once from `origin/master`, once from the
+// working tree — and compares the two sets. Each side reads both forms, the literal
+// head and the head a `raiser` binding builds. Run it on every family a conversion
+// touches: `node scripts/raiser-text-equality.mjs`.
 //
 // ⚠ A shape collapses every `${expr}` to `${}`, so swapping WHICH variable lands in
 // which slot passes green. Measured on `EventEmitter.ts`: the swap is caught by the
@@ -20,13 +21,14 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 
 // Committed AND uncommitted, because a conversion is measured both before it lands
-// and after. ⚠ An empty set is a REFUSAL, not a pass: reading only `git diff
-// --name-only` printed `lost: 0  new: 0` once the work was committed, which reads
-// exactly like success while comparing nothing.
+// and after. ⚠ Two spellings of the file set each printed `lost: 0  new: 0` on work
+// that WAS converted — `git diff --name-only` alone went quiet once the work was
+// committed, and without `HEAD` it goes quiet again once the work is staged. An empty
+// set is a REFUSAL, not a pass.
 const files = [
   ...new Set(
     [
-      ...execFileSync("git", ["diff", "--name-only"], {
+      ...execFileSync("git", ["diff", "--name-only", "HEAD"], {
         encoding: "utf8",
       }).split("\n"),
       ...execFileSync("git", ["diff", "--name-only", "origin/master...HEAD"], {
@@ -61,69 +63,88 @@ const shape = (n, s) => {
 const parse = (name, text) =>
   ts.createSourceFile(name, text, ts.ScriptTarget.Latest, true);
 
-const before = new Set(),
-  after = new Set();
+// ONE renderer, run against both revisions. ⚠ It must read the literal form AND
+// the binding form on EACH side: reading literals on the left only reported a file's
+// EARLIER conversions as `new` the next time a step touched it, which is a false
+// positive that grows with every step.
+const render = (name, text) => {
+  const src = parse(name, text);
+  const out = new Set();
 
-for (const f of files) {
-  // BEFORE: master's literal heads
-  const old = execFileSync("git", ["show", `origin/master:${f}`], {
-    encoding: "utf8",
-  });
-  const so = parse(f, old);
-  const walkOld = (n) => {
-    if (
-      ts.isThrowStatement(n) &&
-      ts.isNewExpression(n.expression) &&
-      PLAIN.has(n.expression.expression.getText(so))
-    ) {
-      const a = n.expression.arguments?.[0];
-      const t = a ? shape(a, so) : undefined;
-      if (t && /^\[router(\.[A-Za-z]+)?\]\s/.test(t)) before.add(t);
-    }
-    ts.forEachChild(n, walkOld);
-  };
-  walkOld(so);
+  const walk = (n, outer) => {
+    const scope =
+      ts.isBlock(n) || ts.isSourceFile(n) || ts.isModuleBlock(n)
+        ? new Map(outer)
+        : outer;
 
-  // AFTER: head from the binding + body from the tag
-  const now = readFileSync(f, "utf8");
-  const sn = parse(f, now);
-  const heads = new Map();
-  const collect = (n) => {
     if (
       ts.isVariableDeclaration(n) &&
       ts.isIdentifier(n.name) &&
       n.initializer &&
       ts.isCallExpression(n.initializer) &&
-      n.initializer.expression.getText(sn) === "raiser"
+      n.initializer.expression.getText(src) === "raiser"
     ) {
       const [r, d] = n.initializer.arguments;
+
       if (r && ts.isStringLiteral(r))
-        heads.set(
+        scope.set(
           n.name.text,
-          d && ts.isStringLiteral(d)
-            ? `[${r.text}.${d.text}] `
-            : `[${r.text}] `,
+          d === undefined
+            ? `[${r.text}] `
+            : ts.isStringLiteral(d)
+              ? `[${r.text}.${d.text}] `
+              : `[${r.text}.\${}] `,
         );
     }
-    ts.forEachChild(n, collect);
-  };
-  collect(sn);
-  const walkNew = (n) => {
-    if (ts.isThrowStatement(n) && ts.isTaggedTemplateExpression(n.expression)) {
-      const tag = n.expression.tag;
-      const member = ts.isCallExpression(tag) ? tag.expression : tag;
+
+    if (ts.isThrowStatement(n)) {
+      // the literal form
       if (
-        ts.isPropertyAccessExpression(member) &&
-        ts.isIdentifier(member.expression)
+        ts.isNewExpression(n.expression) &&
+        PLAIN.has(n.expression.expression.getText(src))
       ) {
-        const head = heads.get(member.expression.text);
-        if (head !== undefined)
-          after.add(head + shape(n.expression.template, sn));
+        const head = shape(n.expression.arguments?.[0], src);
+
+        if (head && /^\[router(\.([A-Za-z]+|\$\{\}))?\]\s/u.test(head))
+          out.add(head);
+      }
+
+      // the binding form
+      if (ts.isTaggedTemplateExpression(n.expression)) {
+        const tag = n.expression.tag;
+        const member = ts.isCallExpression(tag) ? tag.expression : tag;
+
+        if (
+          ts.isPropertyAccessExpression(member) &&
+          ts.isIdentifier(member.expression)
+        ) {
+          const head = scope.get(member.expression.text);
+
+          if (head !== undefined)
+            out.add(head + shape(n.expression.template, src));
+        }
       }
     }
-    ts.forEachChild(n, walkNew);
+
+    ts.forEachChild(n, (c) => walk(c, scope));
   };
-  walkNew(sn);
+
+  walk(src, new Map());
+
+  return out;
+};
+
+const before = new Set(),
+  after = new Set();
+
+for (const f of files) {
+  for (const head of render(
+    f,
+    execFileSync("git", ["show", `origin/master:${f}`], { encoding: "utf8" }),
+  ))
+    before.add(head);
+
+  for (const head of render(f, readFileSync(f, "utf8"))) after.add(head);
 }
 
 const missing = [...before].filter((x) => !after.has(x));
