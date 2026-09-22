@@ -3,9 +3,25 @@
 import { events } from "./constants";
 import { validateRouteType } from "./engine";
 import { POSITION, SEAM } from "./internals";
+import { raiser } from "./RouterError";
 import { emptyRecord, putField } from "./utils/ingest";
 
 import type { LoggerConfig, LogLevelConfig, Route } from "./types";
+
+/**
+ * One binding per door this module refuses behind (#2487). The head is written
+ * here and nowhere else, so a wrong door becomes a wrong ARGUMENT rather than a
+ * typo inside a template — which is what `message-prefix-authority-1845` judges
+ * and `door-reachability-authority-2479` measures against the public call surface.
+ */
+const atAddEventListener = raiser("router", "addEventListener");
+const atSubscribeChanges = raiser("router", "subscribeChanges");
+const atAddInterceptor = raiser("router", "addInterceptor");
+const atAddCheck = raiser("router", "addCheck");
+const atExtendRouter = raiser("router", "extendRouter");
+
+/** The bare form: several doors reach these, so none of them is named. */
+const atRouter = raiser("router");
 
 /**
  * Intrinsics captured at module load (#1971).
@@ -92,9 +108,7 @@ const VALID_EVENT_NAMES: ReadonlySet<string> = new Set(objectValues(events));
  */
 export function assertEventNameIsValid(eventName: unknown): void {
   if (!VALID_EVENT_NAMES.has(eventName as string)) {
-    throw new TypeError(
-      `[router.addEventListener] Invalid event name: ${String(eventName)}. Must be one of: ${[...VALID_EVENT_NAMES].join(", ")}`,
-    );
+    throw atAddEventListener.type`Invalid event name: ${String(eventName)}. Must be one of: ${[...VALID_EVENT_NAMES].join(", ")}`;
   }
 }
 
@@ -141,9 +155,7 @@ export function assertEventNameIsValid(eventName: unknown): void {
  */
 export function assertListenerIsFunction(cb: unknown): void {
   if (typeof cb !== "function") {
-    throw new TypeError(
-      `[router.addEventListener] callback must be a function, got ${typeof cb}`,
-    );
+    throw atAddEventListener.type`callback must be a function, got ${typeof cb}`;
   }
 }
 
@@ -160,23 +172,19 @@ export function assertListenerIsFunction(cb: unknown): void {
  */
 export function assertTreeChangeListener(handler: unknown): void {
   if (typeof handler !== "function") {
-    throw new TypeError("[router.subscribeChanges] Expected a function");
+    throw atSubscribeChanges.type`Expected a function`;
   }
 }
 
 export function assertInterceptableSeam(method: unknown, fn: unknown): void {
   if (typeof method !== "string" || !hasOwn(SEAM, method)) {
-    throw new TypeError(
-      `[router.addInterceptor] Invalid method: ${
-        typeof method === "string" ? `"${method}"` : typeof method
-      }. Must be one of: ${objectKeys(SEAM).join(", ")}`,
-    );
+    throw atAddInterceptor.type`Invalid method: ${
+      typeof method === "string" ? `"${method}"` : typeof method
+    }. Must be one of: ${objectKeys(SEAM).join(", ")}`;
   }
 
   if (typeof fn !== "function") {
-    throw new TypeError(
-      `[router.addInterceptor] interceptor must be a function, got ${typeof fn}`,
-    );
+    throw atAddInterceptor.type`interceptor must be a function, got ${typeof fn}`;
   }
 }
 
@@ -193,17 +201,13 @@ export function assertInterceptableSeam(method: unknown, fn: unknown): void {
  */
 export function assertCheckPosition(position: unknown, check: unknown): void {
   if (typeof position !== "string" || !hasOwn(POSITION, position)) {
-    throw new TypeError(
-      `[router.addCheck] Invalid position: ${
-        typeof position === "string" ? `"${position}"` : typeof position
-      }. Must be one of: ${objectKeys(POSITION).join(", ")}`,
-    );
+    throw atAddCheck.type`Invalid position: ${
+      typeof position === "string" ? `"${position}"` : typeof position
+    }. Must be one of: ${objectKeys(POSITION).join(", ")}`;
   }
 
   if (typeof check !== "function") {
-    throw new TypeError(
-      `[router.addCheck] check must be a function, got ${typeof check}`,
-    );
+    throw atAddCheck.type`check must be a function, got ${typeof check}`;
   }
 }
 
@@ -212,9 +216,12 @@ export function assertRouteNameIsString(
   methodName: string,
 ): asserts name is string {
   if (typeof name !== "string") {
-    throw new TypeError(
-      `[router.${methodName}] Route name must be a string, got ${typeof name}`,
-    );
+    // The door arrives as a VALUE here, so the binding is per call.
+    // The design counts this shape rather than judging it: no static
+    // check can read a runtime door.
+    const at = raiser("router", methodName);
+
+    throw at.type`Route name must be a string, got ${typeof name}`;
   }
 }
 
@@ -302,7 +309,7 @@ function isPlainBag(bag: unknown): boolean {
 
 export function guardDependencyShape(deps: unknown): void {
   if (!isPlainBag(deps)) {
-    throw new TypeError("[router] dependencies must be a plain object");
+    throw atRouter.type`dependencies must be a plain object`;
   }
   // ⚑ The walk and the check must answer about the SAME property set (#1799).
   // `for…in` enumerates inherited names; `getOwnPropertyDescriptor` answers
@@ -340,11 +347,9 @@ function shapeOf(value: unknown): string {
  */
 export function assertExtensionsShape(extensions: unknown): void {
   if (!isPlainBag(extensions)) {
-    throw new TypeError(
-      `[router.extendRouter] extensions must be a plain object, got ${shapeOf(
-        extensions,
-      )}`,
-    );
+    throw atExtendRouter.type`extensions must be a plain object, got ${shapeOf(
+      extensions,
+    )}`;
   }
 }
 
@@ -419,9 +424,7 @@ export function ingestDependencies(
   // caller nothing.
   for (const key of objectKeys(bag)) {
     if (getOwnPropertyDescriptor(bag, key)?.get) {
-      throw new TypeError(
-        `[router] dependencies cannot contain getters: "${key}"`,
-      );
+      throw atRouter.type`dependencies cannot contain getters: "${key}"`;
     }
 
     const value = bag[key];
@@ -476,7 +479,7 @@ export function guardRouteStructure<T extends Route<any>>(routes: T[]): T[] {
       typeof routeValue !== "object" ||
       Array.isArray(routeValue)
     ) {
-      throw new TypeError("[router] route must be a non-array object");
+      throw atRouter.type`route must be a non-array object`;
     }
 
     // ⚑ The OBJECT-shape questions run HERE, on the caller's value, because a
@@ -590,7 +593,7 @@ function assertNoUnknownKeys(obj: Record<string, unknown>): void {
       key !== "callback" &&
       key !== "callbackIgnoresLevel"
     ) {
-      throw new TypeError(`[router] Unknown logger config property: "${key}"`);
+      throw atRouter.type`Unknown logger config property: "${key}"`;
     }
   }
 }
@@ -610,9 +613,7 @@ function readLoggerLevel(
   }
 
   if (!isValidLevel(level)) {
-    throw new TypeError(
-      `[router] Invalid logger level: ${formatValue(level)}. Expected: "all" | "warn-error" | "error-only" | "none"`,
-    );
+    throw atRouter.type`Invalid logger level: ${formatValue(level)}. Expected: "all" | "warn-error" | "error-only" | "none"`;
   }
 
   return level;
@@ -633,9 +634,7 @@ function readCallbackIgnoresLevel(
   }
 
   if (typeof flag !== "boolean") {
-    throw new TypeError(
-      `[router] Logger callbackIgnoresLevel must be a boolean, got ${typeof flag}`,
-    );
+    throw atRouter.type`Logger callbackIgnoresLevel must be a boolean, got ${typeof flag}`;
   }
 
   return flag;
@@ -643,7 +642,7 @@ function readCallbackIgnoresLevel(
 
 export function assertLoggerConfig(config: unknown): Partial<LoggerConfig> {
   if (typeof config !== "object" || config === null) {
-    throw new TypeError("[router] Logger config must be an object");
+    throw atRouter.type`Logger config must be an object`;
   }
 
   const obj = config as Record<string, unknown>;
@@ -674,9 +673,7 @@ export function assertLoggerConfig(config: unknown): Partial<LoggerConfig> {
     const callback = obj.callback;
 
     if (callback !== undefined && typeof callback !== "function") {
-      throw new TypeError(
-        `[router] Logger callback must be a function, got ${typeof callback}`,
-      );
+      throw atRouter.type`Logger callback must be a function, got ${typeof callback}`;
     }
 
     normalized.callback = callback as LoggerConfig["callback"];

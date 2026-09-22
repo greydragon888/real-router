@@ -592,6 +592,8 @@ interface Refusals {
   readonly wrapped: number;
   /** `throw error` — a caught error re-thrown, carrying someone else's message. */
   readonly rethrown: number;
+  /** `throw at.type`…`` — a refusal whose head came from a binding (#2487). */
+  readonly raised: number;
   /** Any other `throw` shape. Zero today; a new one has to be classified. */
   readonly otherShape: number;
   /** Every `throw` in the tree — the throw partition's total. */
@@ -628,9 +630,19 @@ type Seen =
       readonly text: string;
       readonly argument: ts.Expression;
     }
-  | { readonly kind: "opaque" | "wrapped" | "rethrown" | "otherShape" };
+  | {
+      readonly kind:
+        "opaque" | "wrapped" | "rethrown" | "raised" | "otherShape";
+    };
 
 function classify(thrown: ts.Expression): Seen {
+  // A raiser or `internalDefect` throw: the head is the BINDING, so there is no
+  // literal here to read. Its head is judged where it is written — by tier one on
+  // the binding, and by #2479 against the public call surface.
+  if (ts.isTaggedTemplateExpression(thrown)) {
+    return { kind: "raised" };
+  }
+
   if (ts.isCallExpression(thrown)) {
     return { kind: "wrapped" };
   }
@@ -839,6 +851,7 @@ function refusals(root: string = SRC): Refusals {
   let opaque = 0;
   let wrapped = 0;
   let rethrown = 0;
+  let raised = 0;
   let otherShape = 0;
   let throwStatements = 0;
   let constructions = 0;
@@ -875,6 +888,11 @@ function refusals(root: string = SRC): Refusals {
           }
           case "rethrown": {
             rethrown++;
+
+            break;
+          }
+          case "raised": {
+            raised++;
 
             break;
           }
@@ -963,6 +981,7 @@ function refusals(root: string = SRC): Refusals {
     opaque,
     wrapped,
     rethrown,
+    raised,
     otherShape,
     throwStatements,
     constructions,
@@ -1006,9 +1025,10 @@ describe("a refusal with no prefix at all is registered, not invisible (#2456)",
         seen.opaque +
         seen.wrapped +
         seen.rethrown +
+        seen.raised +
         seen.otherShape,
     ).toBe(seen.throwStatements);
-    // No shape outside the four the partition names.
+    // No shape outside the five the partition names.
     expect(seen.otherShape).toBe(0);
   });
 
@@ -1021,7 +1041,12 @@ describe("a refusal with no prefix at all is registered, not invisible (#2456)",
 
     expect(seen.files).toBeGreaterThan(120);
     expect(seen.throwStatements).toBeGreaterThan(130);
-    expect(seen.literals).toBeGreaterThan(80);
+    // ⚠ Re-based by step 3 of #2487. `guards.ts` held 17 literal heads and now
+    // binds them, so the literal count falls by exactly that; the raiser's own
+    // floor below is what keeps the converted half visible. Both numbers move
+    // together at every family, and neither may be raised without the other.
+    expect(seen.literals).toBeGreaterThan(60);
+    expect(seen.raised).toBeGreaterThan(10);
     // The construction subject carries its own floors (#2493), because a broken
     // construction walk empties `bare` exactly the way a broken throw walk does,
     // and the floors above cannot see it: they count throws.
