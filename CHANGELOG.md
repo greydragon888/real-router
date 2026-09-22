@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-22]
 
+### @real-router/core@0.147.4
+
+### Patch Changes
+
+- [#2522](https://github.com/greydragon888/real-router/pull/2522) [`e68d134`](https://github.com/greydragon888/real-router/commit/e68d1342b268a0892e5ee4bf4e75846e0e709d06) Thanks [@greydragon888](https://github.com/greydragon888)! - Registration errors build through the raiser ([#2487](https://github.com/greydragon888/real-router/issues/2487))
+
+  Internal refactor: the twelve refusals in
+  `engine/path-matcher/registration/errors.ts` are written once as a binding instead
+  of once per throw inside a template. No message text moves — the existing suite
+  asserts every one of them verbatim.
+
+
 ### @real-router/core@0.147.3
 
 ### Patch Changes
