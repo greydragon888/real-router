@@ -6,9 +6,13 @@ import {
   EMPTY_SEARCH,
   UNSAFE_KEY,
 } from "./constants";
+import { raiser } from "./RouterError";
 import { putField } from "./utils/ingest";
 
 import type { NavigationOptions, State, TransitionMeta } from "./types";
+
+/** One binding per door this module refuses behind (#2487). */
+const atRouter = raiser("router");
 
 /**
  * Intrinsics captured at module load: `freeze`, `hasOwn`, `objectKeys`.
@@ -1144,9 +1148,9 @@ export function copyOwnData<T>(field: string, bag: T): T {
 
     return freeze(dropUnsafeKey(copy)) as T;
   } catch (error) {
-    throw new TypeError(`[router] Invalid "${field}": reading it threw.`, {
+    throw atRouter.type({
       cause: error,
-    });
+    })`Invalid "${field}": reading it threw.`;
   }
 }
 

@@ -17,7 +17,7 @@ import {
 } from "../internals";
 import { urlParamsOf } from "../namespaces/RoutesNamespace/helpers";
 import { validateSetRootPath } from "../namespaces/RoutesNamespace/routeGuards";
-import { RouterError, freezeThrownError } from "../RouterError";
+import { raiser, RouterError, freezeThrownError } from "../RouterError";
 import { copyFields, emptyRecord, putField } from "../utils/ingest";
 
 import type { PluginApi } from "./types";
@@ -30,6 +30,9 @@ import type {
   SearchParams,
   State,
 } from "../types";
+
+/** One binding per door this module refuses behind (#2487). */
+const atClaimContextNamespace = raiser("router", "claimContextNamespace");
 
 /** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
 const freeze = Object.freeze;
@@ -455,11 +458,9 @@ export function getPluginApi<
       // A non-string namespace coerces to an inconsistent key ("42"); an empty
       // string is a meaningless namespace (#1191 N4).
       if (typeof namespace !== "string" || namespace === "") {
-        throw new TypeError(
-          `[router.claimContextNamespace] namespace must be a non-empty string, got ${
-            typeof namespace === "string" ? "an empty string" : typeof namespace
-          }`,
-        );
+        throw atClaimContextNamespace.type`namespace must be a non-empty string, got ${
+          typeof namespace === "string" ? "an empty string" : typeof namespace
+        }`;
       }
 
       if (ctx.contextClaimRecords.has(namespace)) {

@@ -1,8 +1,13 @@
+import { raiser } from "../../RouterError";
+
 import type {
   EventEmitterLimits,
   EventEmitterOptions,
   Unsubscribe,
 } from "./types";
+
+/** One binding per door this module refuses behind (#2487). */
+const atRouter = raiser("router");
 
 const DEFAULT_LIMITS: EventEmitterLimits = {
   maxListeners: 0,
@@ -66,7 +71,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
     const size = existing?.size ?? 0;
 
     if (existing?.has(cb)) {
-      throw new Error(`[router] Duplicate listener for "${eventName}"`);
+      throw atRouter.plain`Duplicate listener for "${eventName}"`;
     }
 
     const { maxListeners, warnListeners } = this.#limits;
@@ -74,9 +79,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
     // Enforce the hard limit before warning, so onListenerWarn never fires for
     // a registration that then throws (the warnListeners === maxListeners case).
     if (maxListeners !== 0 && size >= maxListeners) {
-      throw new Error(
-        `[router] Listener limit (${maxListeners}) reached for "${eventName}"`,
-      );
+      throw atRouter.plain`Listener limit (${maxListeners}) reached for "${eventName}"`;
     }
 
     // Warn at most once per emitter+event, using the PRE-add size. The hook is

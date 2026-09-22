@@ -59,7 +59,7 @@ import {
 import { deriveMatcherOptions } from "./namespaces/OptionsNamespace/matcherOptions";
 import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamespace/constants";
 import { buildURL, canonicalize, materialize } from "./pipeline";
-import { RouterError, freezeThrownError } from "./RouterError";
+import { raiser, RouterError, freezeThrownError } from "./RouterError";
 import { createRouterFSM } from "./routerFSM";
 import { getTransitionPath } from "./transitionPath";
 import { EventEmitter } from "./utils/event-emitter";
@@ -85,6 +85,9 @@ import type {
   Route,
 } from "./types";
 import type { Limits, RouterEventMap } from "./types/internal";
+
+/** One binding per door this module refuses behind (#2487). */
+const atNavigateToNotFound = raiser("router", "navigateToNotFound");
 
 /**
  * Router class with integrated namespace architecture.
@@ -665,9 +668,7 @@ export class Router<
         // in the other direction rather than parity.
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the rule reads the declared type, which is exactly what this line distrusts: `getInternals` is published and a JS caller is not bound by it
         if (path !== undefined && typeof path !== "string") {
-          throw new TypeError(
-            `[router.navigateToNotFound] path must be a string, got ${typeof path}`,
-          );
+          throw atNavigateToNotFound.type`path must be a string, got ${typeof path}`;
         }
 
         return this.#navigation.navigateToNotFound(path);
@@ -1447,9 +1448,7 @@ export class Router<
     }
 
     if (path !== undefined && typeof path !== "string") {
-      throw new TypeError(
-        `[router.navigateToNotFound] path must be a string, got ${typeof path}`,
-      );
+      throw atNavigateToNotFound.type`path must be a string, got ${typeof path}`;
     }
 
     if (path !== undefined) {

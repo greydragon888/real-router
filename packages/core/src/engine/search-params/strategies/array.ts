@@ -4,10 +4,14 @@
  * @module search-params/strategies/array
  */
 
+import { raiser } from "../../../RouterError";
 import { safeEncode } from "../utils";
 
 import type { NullStrategy } from "./null";
 import type { ArrayFormat } from "../types";
+
+/** One binding per door this module refuses behind (#2487). */
+const atRouter = raiser("router");
 
 // =============================================================================
 // Strategy Interface
@@ -73,9 +77,7 @@ const encodeValue = (value: unknown): string => {
     // [router.buildPath] …`, two contradictory attributions on one line. The
     // sibling refusals name a call because they HAVE one; this one does not, so
     // it names none rather than naming the wrong one.
-    throw new TypeError(
-      `[router] Invalid query value: an array element must be a string, number, or boolean — received ${type}`,
-    );
+    throw atRouter.type`Invalid query value: an array element must be a string, number, or boolean — received ${type}`;
   }
 
   return safeEncode(value as string | number | boolean);

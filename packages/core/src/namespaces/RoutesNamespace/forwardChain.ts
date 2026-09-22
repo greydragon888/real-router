@@ -26,6 +26,12 @@
  * ⚑ It also makes the declared `: string` return true. Uncoerced, a walk with no
  * entry in the map hands the caller's own OBJECT straight back.
  */
+
+import { raiser } from "../../RouterError";
+
+/** One binding per door this module refuses behind (#2487). */
+const atRouter = raiser("router");
+
 export function resolveForwardChain(
   startRoute: string,
   forwardMap: Record<string, string>,
@@ -90,7 +96,7 @@ export function resolveForwardChain(
       const cycleStart = chain.indexOf(next);
       const cycle = [...chain.slice(cycleStart), next];
 
-      throw new Error(`[router] Circular forwardTo: ${cycle.join(" → ")}`);
+      throw atRouter.plain`Circular forwardTo: ${cycle.join(" → ")}`;
     }
 
     visited.add(current);
@@ -98,9 +104,7 @@ export function resolveForwardChain(
     current = next;
 
     if (chain.length > maxDepth) {
-      throw new Error(
-        `[router] forwardTo chain exceeds maximum depth (${maxDepth}): ${chain.join(" → ")}`,
-      );
+      throw atRouter.plain`forwardTo chain exceeds maximum depth (${maxDepth}): ${chain.join(" → ")}`;
     }
   }
 

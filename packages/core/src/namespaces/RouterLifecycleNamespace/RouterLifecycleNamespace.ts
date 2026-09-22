@@ -1,10 +1,13 @@
 // packages/core/src/namespaces/RouterLifecycleNamespace/RouterLifecycleNamespace.ts
 
 import { errorCodes } from "../../constants";
-import { RouterError, freezeThrownError } from "../../RouterError";
+import { raiser, RouterError, freezeThrownError } from "../../RouterError";
 
 import type { RouterLifecycleDependencies } from "./types";
 import type { NavigationOptions, State } from "../../types";
+
+/** One binding per door this module refuses behind (#2487). */
+const atStart = raiser("router", "start");
 
 const REPLACE_OPTS: NavigationOptions = Object.freeze({ replace: true });
 
@@ -106,9 +109,7 @@ export class RouterLifecycleNamespace {
     // type guards; the validator deliberately permits `undefined` at the facade
     // for exactly the browser-plugin-override case.
     if (typeof startPath !== "string") {
-      throw new TypeError(
-        `[router.start] path must be a string, got ${typeof startPath}`,
-      );
+      throw atStart.type`path must be a string, got ${typeof startPath}`;
     }
 
     // Read BEFORE the window opens — the comparison below is the whole trigger,

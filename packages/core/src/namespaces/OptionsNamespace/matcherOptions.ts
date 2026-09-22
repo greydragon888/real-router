@@ -1,7 +1,12 @@
 // packages/core/src/namespaces/OptionsNamespace/matcherOptions.ts
 
+import { raiser } from "../../RouterError";
+
 import type { CreateMatcherOptions, QueryParamsConfig } from "../../engine";
 import type { DefaultDependencies, Options } from "../../types";
+
+/** One binding per door this module refuses behind (#2487). */
+const atRouter = raiser("router");
 
 /**
  * Captured at module load (#2073); `captured-intrinsics-authority-1971.test.ts`
@@ -85,10 +90,9 @@ function asKey<K extends keyof QueryParamsConfig>(
   try {
     value = bag[field];
   } catch (error) {
-    throw new TypeError(
-      `[router] Invalid "queryParams.${field}": reading it threw.`,
-      { cause: error },
-    );
+    throw atRouter.type({
+      cause: error,
+    })`Invalid "queryParams.${field}": reading it threw.`;
   }
 
   // `== null` is the intent: BOTH nullish values mean "the caller said nothing",
@@ -122,10 +126,9 @@ function asKey<K extends keyof QueryParamsConfig>(
     // have computed itself.
     return String(value) as QueryParamsConfig[K];
   } catch (error) {
-    throw new TypeError(
-      `[router] Invalid "queryParams.${field}": its value cannot be converted to a string.`,
-      { cause: error },
-    );
+    throw atRouter.type({
+      cause: error,
+    })`Invalid "queryParams.${field}": its value cannot be converted to a string.`;
   }
 }
 
@@ -185,10 +188,9 @@ function snapshotEncodingKey(
       CreateMatcherOptions["urlParamsEncoding"]
     >;
   } catch (error) {
-    throw new TypeError(
-      `[router] Invalid "urlParamsEncoding": coercing it threw.`,
-      { cause: error },
-    );
+    throw atRouter.type({
+      cause: error,
+    })`Invalid "urlParamsEncoding": coercing it threw.`;
   }
 }
 
