@@ -624,6 +624,17 @@ interface Refusals {
  * would report a prefixed message as BARE and forbid a legal refactor, so it
  * joins the unjudgeable rather than the offenders.
  */
+/** `at.type`, `atRouter.plain`, `internalDefect.plain`, `at.code(code)` — and nothing else. */
+function isRaiserTag(tag: ts.Expression): boolean {
+  const member = ts.isCallExpression(tag) ? tag.expression : tag;
+
+  return (
+    ts.isPropertyAccessExpression(member) &&
+    ts.isIdentifier(member.expression) &&
+    ["type", "plain", "ref", "range", "code"].includes(member.name.text)
+  );
+}
+
 type Seen =
   | {
       readonly kind: "literal";
@@ -639,7 +650,11 @@ function classify(thrown: ts.Expression): Seen {
   // A raiser or `internalDefect` throw: the head is the BINDING, so there is no
   // literal here to read. Its head is judged where it is written — by tier one on
   // the binding, and by #2479 against the public call surface.
-  if (ts.isTaggedTemplateExpression(thrown)) {
+  //
+  // ⚠ The FLAVOUR is part of the test. `isTaggedTemplateExpression` alone would
+  // count any tagged template thrown anywhere as a converted refusal, and the floor
+  // below would then be satisfied by something that is not one.
+  if (ts.isTaggedTemplateExpression(thrown) && isRaiserTag(thrown.tag)) {
     return { kind: "raised" };
   }
 
@@ -1041,12 +1056,13 @@ describe("a refusal with no prefix at all is registered, not invisible (#2456)",
 
     expect(seen.files).toBeGreaterThan(120);
     expect(seen.throwStatements).toBeGreaterThan(130);
-    // ⚠ Re-based by step 3 of #2487. `guards.ts` held 17 literal heads and now
-    // binds them, so the literal count falls by exactly that; the raiser's own
-    // floor below is what keeps the converted half visible. Both numbers move
-    // together at every family, and neither may be raised without the other.
-    expect(seen.literals).toBeGreaterThan(60);
-    expect(seen.raised).toBeGreaterThan(10);
+    // ⚠ The SUM, not the two halves. A conversion moves a site from `literals` to
+    // `raised` and leaves the total alone — measured, 87 on both sides of step 3 —
+    // so ONE floor holds from the first family to the last. Two would need re-basing
+    // at every family, and a floor lowered by reflex is a floor that stopped
+    // guarding: the recogniser it watches can break by exactly the amount the last
+    // conversion moved.
+    expect(seen.literals + seen.raised).toBeGreaterThan(80);
     // The construction subject carries its own floors (#2493), because a broken
     // construction walk empties `bare` exactly the way a broken throw walk does,
     // and the floors above cannot see it: they count throws.
@@ -1068,6 +1084,31 @@ describe("a refusal with no prefix at all is registered, not invisible (#2456)",
     expect(seen.variableFed).toBeLessThanOrEqual(3);
     // Anti-vacuum: a detector that stopped matching would satisfy the bound.
     expect(seen.variableFed).toBeGreaterThan(0);
+  });
+
+  it("CONTROL — only a raiser flavour counts as converted", () => {
+    // Without this the shape test has no oracle: core throws no other tagged
+    // template today, so dropping it leaves the suite green while the sum floor
+    // above becomes satisfiable by something that is not a refusal at all.
+    const directory = mkdtempSync(path.join(tmpdir(), "raised-shape-"));
+
+    try {
+      writeFileSync(
+        path.join(directory, "converted.ts"),
+        'const at = raiser("router", "buildPath");\nthrow at.type`Missing ${name}`;\n',
+      );
+      writeFileSync(
+        path.join(directory, "unrelated.ts"),
+        "throw sql`select ${id}`;\n",
+      );
+
+      const seen = refusals(directory);
+
+      expect(seen.raised).toBe(1);
+      expect(seen.otherShape).toBe(1);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it("CONTROL — the marker is admissible, a bare message is not, and raise sites are counted", () => {
