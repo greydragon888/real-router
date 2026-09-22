@@ -84,6 +84,27 @@ export function chooseBaseRun(baseSha, runs, distance) {
 }
 
 /**
+ * The run list `chooseBaseRun` judges: the page, with the base's own run added
+ * when a point query found one the page did not carry.
+ *
+ * ⚠ A page can arrive without its newest rows. Measured on #2514: the base's
+ * post-merge run had existed for half an hour, `gh run list --limit=50` returned
+ * 50 rows without it, and the report said no build existed. A query BY COMMIT
+ * does not depend on paging or on the order rows arrive in.
+ *
+ * @param {Run[]} runs the listed page
+ * @param {Run | null} exact the run for the base commit, or null
+ * @returns {Run[]}
+ */
+export function withExactRun(runs, exact) {
+  if (exact === null || runs.some((run) => run.headSha === exact.headSha)) {
+    return runs;
+  }
+
+  return [exact, ...runs];
+}
+
+/**
  * The line the report opens with, saying what the sizes were diffed against.
  *
  * @param {{ baseSha: string | null, choice: Choice | null, runUrl?: string, reason?: string }} input
@@ -190,6 +211,27 @@ function main() {
       );
     }
 
+    // The page is not trusted to carry its newest rows; ask for the base's own
+    // run by commit. A failure here costs the point query, not the page.
+    let exact = null;
+
+    try {
+      [exact = null] = JSON.parse(
+        run("gh", [
+          "api",
+          `repos/${repository}/actions/workflows/post-merge.yml/runs?head_sha=${baseSha}&status=success`,
+          "--jq",
+          "[.workflow_runs[] | {id, headSha: .head_sha, createdAt: .created_at}]",
+        ]),
+      );
+    } catch {
+      console.log(
+        "::warning title=Base bundle sizes::the run for the base commit could not be queried; falling back to the listed page",
+      );
+    }
+
+    runs = withExactRun(runs, exact);
+
     let choice;
 
     try {
@@ -216,8 +258,17 @@ function main() {
     }
 
     if (choice === null) {
+      // The count alone cannot separate a base nothing built from a list that
+      // arrived without the recent runs, so name the newest row it served.
+      const newest = [...runs]
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .at(0);
+      const listed = newest
+        ? ` (newest listed: ${newest.headSha} at ${newest.createdAt})`
+        : "";
+
       console.log(
-        `ℹ️ No successful post-merge build of ${baseSha} or of an ancestor within ${String(MAX_DISTANCE)} commits among ${String(runs.length)} runs`,
+        `ℹ️ No successful post-merge build of ${baseSha} or of an ancestor within ${String(MAX_DISTANCE)} commits among ${String(runs.length)} runs${listed}`,
       );
 
       return { sizes: "[]", note: baseNote({ baseSha, choice: null }) };

@@ -701,6 +701,21 @@ and the longest streak without a success in the last 100 was 5.
   the closest. Otherwise there is no base.
 - The report opens with a line naming the base commit and its run, how many
   commits it trails the PR's base, or why there is no base.
+- When there is no base, the log also names the newest run the list served. The
+  count alone cannot separate a base nothing built from a list that arrived
+  without the recent runs: on 2026-09-21 PR #2492 got "no base" while the base
+  commit's own post-merge run had finished five minutes earlier and still held
+  its artifact, and re-running that one job resolved the base at distance 0.
+  Which rows the job saw is not recoverable after the fact, which is what the
+  line is for.
+- The lookup does not depend on that list carrying its newest rows. Before the
+  page is judged, the base's own run is asked for BY COMMIT
+  (`.../workflows/post-merge.yml/runs?head_sha=<base>&status=success`), a query
+  that has no paging and no ordering to go wrong, and `withExactRun` merges the
+  answer in. Measured on #2514: the page carried neither the base nor any
+  ancestor within 20 commits, while the base's run had been successful for 32
+  minutes and held its artifact — and unlike #2492, re-running the job
+  REPRODUCED the empty answer, so waiting is not the remedy.
 
 **Why 20 commits.** It covers the longest measured streak of unbuilt commits
 (5) four times over, and refuses the base #2395 got (685 behind) by a wide

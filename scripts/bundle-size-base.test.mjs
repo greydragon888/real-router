@@ -15,6 +15,7 @@ import {
   baseNote,
   chooseBaseRun,
   firstParentOfMerge,
+  withExactRun,
 } from "./bundle-size-base.mjs";
 
 const sha = (c) => c.repeat(40);
@@ -171,4 +172,39 @@ test("the note names the base, and says so when it trails or is missing", () => 
     baseNote({ baseSha: BASE, choice: null, reason: "gh failed" }),
     /Base unavailable\*\* — gh failed\./,
   );
+});
+
+test("#2514: a page missing its newest rows still yields the base, via the point query", () => {
+  // The shape measured on #2514: the base's run existed for half an hour and
+  // the 50-row page did not carry it. Without the point query the lookup
+  // reports no base; with it the exact run wins.
+  const stale = [
+    run(30979695163, sha("a"), "2026-08-05T05:56:50Z"),
+    run(30979695164, sha("c"), "2026-08-05T06:56:50Z"),
+  ];
+  const exact = run(35696064610, BASE, "2026-09-22T06:42:34Z");
+  // Every row the page carried trails the base by more than MAX_DISTANCE —
+  // otherwise the ancestor fallback would have answered and the base would not
+  // have read as missing.
+  const farBehind = () => MAX_DISTANCE + 5;
+
+  assert.equal(chooseBaseRun(BASE, stale, farBehind), null);
+
+  assert.deepEqual(chooseBaseRun(BASE, withExactRun(stale, exact), noCompare), {
+    run: exact,
+    distance: 0,
+  });
+});
+
+test("the point query adds nothing when the page already carried the run", () => {
+  const listed = run(35696064610, BASE, "2026-09-22T06:42:34Z");
+  const page = [run(30979695163, sha("a"), "2026-08-05T05:56:50Z"), listed];
+
+  assert.deepEqual(withExactRun(page, listed), page);
+});
+
+test("a point query that found nothing leaves the page alone", () => {
+  const page = [run(30979695163, sha("a"), "2026-08-05T05:56:50Z")];
+
+  assert.deepEqual(withExactRun(page, null), page);
 });
