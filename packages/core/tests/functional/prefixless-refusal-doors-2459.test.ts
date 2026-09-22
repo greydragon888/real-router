@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { createRouter, errorCodes, RouterError } from "@real-router/core";
+import {
+  createRouter,
+  errorCodes,
+  events,
+  RouterError,
+} from "@real-router/core";
 import {
   cloneRouter,
   getDependenciesApi,
+  getLifecycleApi,
   getPluginApi,
   getRoutesApi,
 } from "@real-router/core/api";
@@ -250,6 +256,46 @@ describe("every refusal a caller can reach names a door (#2459)", () => {
     await router.start("/");
 
     expect(caught).toBeInstanceOf(RouterError);
+    expect(Object.isFrozen(caught)).toBe(true);
+  });
+
+  it("a $$error listener receives a frozen refusal, not a writable one", async () => {
+    // The other observation point on the same property (#2509). The cells above
+    // ask what the CALLER catches; a refusal reported to listeners first is
+    // writable in that window, and the write survives into what the caller then
+    // catches — so watching only the caller cannot see it.
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "other", path: "/other" },
+    ]);
+
+    getLifecycleApi(router).addDeactivateGuard("home", () => () => false);
+
+    let atListener: { frozen: boolean; code: unknown } | undefined;
+
+    getPluginApi(router).addEventListener(
+      events.TRANSITION_ERROR,
+      // ⚠ Positional, not a payload object: `emitTransitionError` sends
+      // `(toState, fromState, error)`.
+      (_to: unknown, _from: unknown, error: RouterError) => {
+        atListener = { frozen: Object.isFrozen(error), code: error.code };
+      },
+    );
+
+    await router.start("/");
+
+    let caught: unknown = "NO THROW";
+
+    try {
+      router.navigateToNotFound("/zzz");
+    } catch (error) {
+      caught = error;
+    }
+
+    // CONTROL: the listener has to have fired on THIS refusal, or the cell
+    // measures nothing.
+    expect(atListener?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+    expect(atListener?.frozen).toBe(true);
     expect(Object.isFrozen(caught)).toBe(true);
   });
 

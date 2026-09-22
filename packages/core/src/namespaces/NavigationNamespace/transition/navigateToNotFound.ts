@@ -111,17 +111,23 @@ function commitNotFound(
     fromState !== undefined &&
     !deps.canDeactivateCurrent(deactivated, state, fromState)
   ) {
-    const error = new RouterError(errorCodes.CANNOT_DEACTIVATE, {
-      path,
-      message: `[router.navigateToNotFound] a canDeactivate guard on "${fromState.name}" refused to leave for ${path}`,
-    });
+    // ⚠ Frozen BEFORE the report, not at the throw (#2509). Listeners and the
+    // caller receive the same object, so freezing afterwards hands every
+    // `$$error` listener a window in which a write lands in what the caller
+    // then catches. The three siblings in `NavigationNamespace` freeze here too.
+    const error = freezeThrownError(
+      new RouterError(errorCodes.CANNOT_DEACTIVATE, {
+        path,
+        message: `[router.navigateToNotFound] a canDeactivate guard on "${fromState.name}" refused to leave for ${path}`,
+      }),
+    );
 
     // Report before throwing, so an observer sees the refusal on the same
     // channel a blocked `navigate` uses — the popstate handler's own `catch`
     // is written against "navigate() already emitted $$error".
     deps.emitTransitionError(undefined, fromState, error);
 
-    throw freezeThrownError(error);
+    throw error;
   }
 
   // Write AND announce as one table fact — this is the second of the two
