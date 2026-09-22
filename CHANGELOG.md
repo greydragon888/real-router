@@ -5,6 +5,110 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-09-22]
+
+### @real-router/core@0.146.5
+
+### Patch Changes
+
+- [`51e13c0`](https://github.com/greydragon888/real-router/commit/51e13c00aa432a006fccd502242a462f36ff0263) Thanks [@greydragon888](https://github.com/greydragon888)! - Every `ROUTER_DISPOSED` refusal names the door it came from ([#1845](https://github.com/greydragon888/real-router/issues/1845))
+
+  These nine were the remainder of [#1845](https://github.com/greydragon888/real-router/issues/1845)'s class: all of them carried no message at all, so `RouterError`'s `super(message ?? code)`
+  handed the caller the bare string `"DISPOSED"` — no door to look up, no reason.
+  Each now opens with the call the caller made:
+
+  ```diff
+  - DISPOSED
+  + [router.usePlugin] cannot install a plugin on a disposed router — dispose() is terminal
+  + [router.subscribe] cannot subscribe on a disposed router — dispose() is terminal
+  + [cloneRouter] cannot clone a disposed router — dispose() is terminal
+  ```
+
+  Two doors keep the bare `[router]` form because several calls reach one raiser:
+  the post-dispose method swap, which stands in for six facade methods, and
+  `throwIfDisposed`, the shared guard that takes a predicate and no door name.
+
+  ⚠ **An assertion that matched the CODE inside the message stops working.** Nine
+  cells across four test files did `toThrow(errorCodes.ROUTER_DISPOSED)` or
+  `toThrow(/DISPOSED/)` — a substring match that only passed because the message WAS
+  the code. They now assert the code itself, in the idiom the property tests already
+  use: `toThrow(expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }))`.
+  Consumers doing the same will need the same change; the code is unchanged.
+
+- [`d46eaa9`](https://github.com/greydragon888/real-router/commit/d46eaa99615c989159471a39bcd9b0e4115dc267) Thanks [@greydragon888](https://github.com/greydragon888)! - A `$$error` listener can no longer write into the refusal the caller catches ([#2509](https://github.com/greydragon888/real-router/issues/2509))
+
+  `navigateToNotFound` reported its `canDeactivate` refusal to listeners and froze
+  the same object afterwards, so every `$$error` listener held a window in which a
+  write landed in what the application then caught. Measured: at the listener
+  `Object.isFrozen` was `false` and a write was accepted; the caller then received
+  the frozen error **carrying that write**. The refusal is now frozen before the
+  report, matching its three siblings in `NavigationNamespace`.
+
+  ⚠ **A listener that wrote to this error will stop having an effect** — silently in
+  sloppy mode, with a `TypeError` in strict mode. The report still precedes the
+  throw, which is the ordering that site's own comment defends; only the freeze
+  moved ahead of it.
+
+  ⚑ Fourth of a family: [#1960](https://github.com/greydragon888/real-router/issues/1960) removed the frozen/unfrozen asymmetry in core, [#1964](https://github.com/greydragon888/real-router/issues/1964)
+  in three plugin sites, [#2503](https://github.com/greydragon888/real-router/issues/2503) where construction moved into a helper. This one is
+  the sharpest, because the window was handed to a third party rather than kept
+  inside the router. The guard is a second observation point on the property
+  `prefixless-refusal-doors-2459` already watches at the caller — what a listener
+  receives — and it reds on this defect alone.
+
+- [`b18c192`](https://github.com/greydragon888/real-router/commit/b18c192e26d7f36fa30b61832cbb0f2380495b7a) Thanks [@greydragon888](https://github.com/greydragon888)! - `EventEmitter.validateCallback` is removed — nothing called it ([#1845](https://github.com/greydragon888/real-router/issues/1845))
+
+  The static assertion had **zero call sites** in `packages/*/src` and `shared/`;
+  only its own tests reached it. Its message was the one entry `[EventEmitter]` held
+  in `message-prefix-authority-1845`'s internal register, so the register is back to
+  the FSM pair.
+
+  ⚠ **The register entry's stated reason traced the wrong method.** It argued from
+  `on()`'s four call sites and from `assertListenerIsFunction` refusing first — but
+  `on()` neither calls `validateCallback` nor raises its message; `on()` raises
+  `[router] Duplicate listener` and `[router] Listener limit`, both of which that
+  same docblock correctly keeps OUT of the register. So the prefix was unreachable
+  for a stronger reason than the one recorded: the code was dead.
+
+  What goes with it: the `TypeError` invariant in `event-emitter/INVARIANTS.md`, its
+  row in that package's `CLAUDE.md` and `ARCHITECTURE.md` sketch, four functional
+  cells, one property, and the `arbNonFunction` arbitrary those cells were the only
+  consumer of. Coverage stays at 100 % on all four metrics.
+
+### @real-router/validation-plugin@0.28.1
+
+### Patch Changes
+
+- [`cbb6387`](https://github.com/greydragon888/real-router/commit/cbb6387ea155609acf0baa51793124cc7fe42bd0) Thanks [@greydragon888](https://github.com/greydragon888)! - The resolved-`defaultRoute` refusal names the door when a call reached it ([#1845](https://github.com/greydragon888/real-router/issues/1845))
+
+  One validator served two arrival paths, and a single prefix could only be right for
+  one of them. Its own docblock named both: the retrospective sweep, with
+  `options.defaultRoute` configured as a **string**, and the runtime pass on every
+  `navigateToDefault()`, with a **callback**'s return value. The two are mutually
+  exclusive on the option's type.
+
+  So it is two functions now, each owning a literal head — no prefix travels as data:
+
+  ```diff
+    // the retrospective sweep: no call reaches it, the package name is the address
+    [validation-plugin] defaultRoute resolved to non-existent route: "ghost"
+
+    // reached from navigateToDefault() alone, and it arrives as a REJECTION
+  - [validation-plugin] defaultRoute resolved to non-existent route: "ghost"
+  + [router.navigateToDefault] defaultRoute callback resolved to non-existent route: "ghost"
+  ```
+
+  ⚑ The runtime path's reachability was already pinned — an integration cell drives
+  `navigateToDefault()` and awaits a rejection — so the door was demonstrable before
+  it was named. That cell now asserts the door as well as the body, and the unit
+  tests cover both functions rather than one.
+
+  ⚠ An assertion matching the old message on the callback path needs the new text;
+  the string path is unchanged.
+
+- Updated dependencies [[`51e13c0`](https://github.com/greydragon888/real-router/commit/51e13c00aa432a006fccd502242a462f36ff0263), [`d46eaa9`](https://github.com/greydragon888/real-router/commit/d46eaa99615c989159471a39bcd9b0e4115dc267), [`b18c192`](https://github.com/greydragon888/real-router/commit/b18c192e26d7f36fa30b61832cbb0f2380495b7a)]:
+  - @real-router/core@0.146.5
+
 ## [2026-09-21]
 
 ### @real-router/core@0.146.4

@@ -1,5 +1,39 @@
 # @real-router/validation-plugin
 
+## 0.28.1
+
+### Patch Changes
+
+- [`cbb6387`](https://github.com/greydragon888/real-router/commit/cbb6387ea155609acf0baa51793124cc7fe42bd0) Thanks [@greydragon888](https://github.com/greydragon888)! - The resolved-`defaultRoute` refusal names the door when a call reached it ([#1845](https://github.com/greydragon888/real-router/issues/1845))
+
+  One validator served two arrival paths, and a single prefix could only be right for
+  one of them. Its own docblock named both: the retrospective sweep, with
+  `options.defaultRoute` configured as a **string**, and the runtime pass on every
+  `navigateToDefault()`, with a **callback**'s return value. The two are mutually
+  exclusive on the option's type.
+
+  So it is two functions now, each owning a literal head — no prefix travels as data:
+
+  ```diff
+    // the retrospective sweep: no call reaches it, the package name is the address
+    [validation-plugin] defaultRoute resolved to non-existent route: "ghost"
+
+    // reached from navigateToDefault() alone, and it arrives as a REJECTION
+  - [validation-plugin] defaultRoute resolved to non-existent route: "ghost"
+  + [router.navigateToDefault] defaultRoute callback resolved to non-existent route: "ghost"
+  ```
+
+  ⚑ The runtime path's reachability was already pinned — an integration cell drives
+  `navigateToDefault()` and awaits a rejection — so the door was demonstrable before
+  it was named. That cell now asserts the door as well as the body, and the unit
+  tests cover both functions rather than one.
+
+  ⚠ An assertion matching the old message on the callback path needs the new text;
+  the string path is unchanged.
+
+- Updated dependencies [[`51e13c0`](https://github.com/greydragon888/real-router/commit/51e13c00aa432a006fccd502242a462f36ff0263), [`d46eaa9`](https://github.com/greydragon888/real-router/commit/d46eaa99615c989159471a39bcd9b0e4115dc267), [`b18c192`](https://github.com/greydragon888/real-router/commit/b18c192e26d7f36fa30b61832cbb0f2380495b7a)]:
+  - @real-router/core@0.146.5
+
 ## 0.28.0
 
 ### Minor Changes
