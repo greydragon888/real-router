@@ -76,7 +76,7 @@
     "@real-router/ssr-utils": "workspace:^"
   },
   "peerDependencies": {
-    "@real-router/core": "workspace:>=0.146.0"
+    "@real-router/core": "workspace:>=0.147.0"
   },
   "devDependencies": {
     "@real-router/core": "workspace:^"
