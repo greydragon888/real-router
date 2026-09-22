@@ -31,12 +31,20 @@ const MAX_ROUTE_NAME_LENGTH = 10_000;
 /**
  * Refuses `{ name: "" }`.
  */
+/**
+ * The head a route-name refusal opens with. `createRouter` and `cloneRouter` both
+ * reach these checks through the constructor, so neither names a door the caller
+ * typed — they take the bare form rather than inventing one (#2487).
+ */
+const head = (methodName: string | undefined): string =>
+  methodName === undefined ? "[router]" : `[router.${methodName}]`;
+
 export function assertRouteNameNotEmpty(
   name: string,
-  methodName: string,
+  methodName: string | undefined,
 ): void {
   if (name === "") {
-    throw new TypeError(`[router.${methodName}] Route name cannot be empty`);
+    throw new TypeError(`${head(methodName)} Route name cannot be empty`);
   }
 }
 
@@ -78,11 +86,11 @@ export function assertRouteNameWithinLength(
  */
 export function assertNoDottedRouteName(
   name: string,
-  methodName: string,
+  methodName: string | undefined,
 ): void {
   if (name.includes(".")) {
     throw new TypeError(
-      `[router.${methodName}] Route name "${name}" cannot contain dots. ` +
+      `${head(methodName)} Route name "${name}" cannot contain dots. ` +
         `Use children array or { parent } option in addRoute() instead.`,
     );
   }

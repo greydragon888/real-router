@@ -834,32 +834,24 @@ describe("unknown format fails fast (#1318)", () => {
   it("throws a named TypeError on an unknown arrayFormat", () => {
     expect(() =>
       parseQuery("a=1", { arrayFormat: "bogus" } as unknown as Options),
-    ).toThrow(
-      /\[router\.constructor\] Invalid "queryParams\.arrayFormat": "bogus"/u,
-    );
+    ).toThrow(/\[router\] Invalid "queryParams\.arrayFormat": "bogus"/u);
   });
 
   it("throws a named TypeError on an unknown booleanFormat", () => {
     expect(() =>
       build({ a: 1 }, { booleanFormat: "bad" } as unknown as Options),
-    ).toThrow(
-      /\[router\.constructor\] Invalid "queryParams\.booleanFormat": "bad"/u,
-    );
+    ).toThrow(/\[router\] Invalid "queryParams\.booleanFormat": "bad"/u);
   });
 
   it("throws a named TypeError on an unknown nullFormat", () => {
     expect(() =>
       parseQuery("a=1", { nullFormat: "x" } as unknown as Options),
-    ).toThrow(
-      /\[router\.constructor\] Invalid "queryParams\.nullFormat": "x"/u,
-    );
+    ).toThrow(/\[router\] Invalid "queryParams\.nullFormat": "x"/u);
   });
 
   it("throws a named TypeError on an unknown numberFormat", () => {
     expect(() =>
       parseQuery("a=1", { numberFormat: "y" } as unknown as Options),
-    ).toThrow(
-      /\[router\.constructor\] Invalid "queryParams\.numberFormat": "y"/u,
-    );
+    ).toThrow(/\[router\] Invalid "queryParams\.numberFormat": "y"/u);
   });
 });

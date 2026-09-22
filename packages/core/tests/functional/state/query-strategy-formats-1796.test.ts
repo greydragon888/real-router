@@ -162,7 +162,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
       return `accepted: ${await attempt()}`;
     } catch (error) {
       return (error as Error).message.includes(
-        `[router.constructor] Invalid "queryParams.${field}"`,
+        `[router] Invalid "queryParams.${field}"`,
       )
         ? "named"
         : `wrong error: ${(error as Error).message}`;
@@ -187,7 +187,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
         // refusal is UNCONDITIONAL — it no longer waits for a URL that happens
         // to carry a query key.
         expect(() => routerWith(format.field, value)).toThrow(
-          `[router.constructor] Invalid "queryParams.${format.field}": "${value}"`,
+          `[router] Invalid "queryParams.${format.field}": "${value}"`,
         );
       },
     );
@@ -219,9 +219,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
         createRouter(queryless, {
           queryParams: { [format.field]: "bogusTypo" },
         }),
-      ).toThrow(
-        `[router.constructor] Invalid "queryParams.${format.field}": "bogusTypo"`,
-      );
+      ).toThrow(`[router] Invalid "queryParams.${format.field}": "bogusTypo"`);
 
       // CONTROL — the query-less channel is REACHED, so the cell pins "refused
       // with no query key anywhere" and not "this route table never works". With
@@ -818,7 +816,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     }).toStrictEqual({
       type: "TypeError",
       message:
-        '[router.constructor] Invalid "queryParams.booleanFormat": its value cannot be converted to a string.',
+        '[router] Invalid "queryParams.booleanFormat": its value cannot be converted to a string.',
       cause: "app toString bomb",
     });
 
@@ -847,8 +845,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
       cause: ((getterCaught as Error | undefined)?.cause as Error | undefined)
         ?.message,
     }).toStrictEqual({
-      message:
-        '[router.constructor] Invalid "queryParams.nullFormat": reading it threw.',
+      message: '[router] Invalid "queryParams.nullFormat": reading it threw.',
       cause: "lazy config boom",
     });
 
@@ -872,7 +869,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
         ?.message,
     }).toStrictEqual({
       message:
-        '[router.constructor] Invalid "queryParams.arrayFormat": its value cannot be converted to a string.',
+        '[router] Invalid "queryParams.arrayFormat": its value cannot be converted to a string.',
       cause: "Cannot convert a Symbol value to a string",
     });
 
@@ -1636,10 +1633,10 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     });
 
     expect(caught).toStrictEqual([
-      '[router.constructor] Invalid "queryParams.arrayFormat": reading it threw. <- lazy boom arrayFormat',
-      '[router.constructor] Invalid "queryParams.booleanFormat": reading it threw. <- lazy boom booleanFormat',
-      '[router.constructor] Invalid "queryParams.nullFormat": reading it threw. <- lazy boom nullFormat',
-      '[router.constructor] Invalid "queryParams.numberFormat": reading it threw. <- lazy boom numberFormat',
+      '[router] Invalid "queryParams.arrayFormat": reading it threw. <- lazy boom arrayFormat',
+      '[router] Invalid "queryParams.booleanFormat": reading it threw. <- lazy boom booleanFormat',
+      '[router] Invalid "queryParams.nullFormat": reading it threw. <- lazy boom nullFormat',
+      '[router] Invalid "queryParams.numberFormat": reading it threw. <- lazy boom numberFormat',
     ]);
   });
 
@@ -1846,7 +1843,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
         // The remedy tail has its own CONTROL cell; what this one is about is
         // WHICH value was refused and that it was refused at all.
         return (error as Error).message
-          .replace("[router.constructor] ", "")
+          .replace("[router] ", "")
           .split(" — expected ", 1)[0];
       }
     };
@@ -2008,7 +2005,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     })();
 
     expect(message).toContain(
-      '[router.constructor] Invalid "queryParams.arrayFormat": "Symbol(s)"',
+      '[router] Invalid "queryParams.arrayFormat": "Symbol(s)"',
     );
 
     // ⚑ And the REMEDY half, which nothing pinned: the sibling cells match the

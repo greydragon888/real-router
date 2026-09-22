@@ -123,18 +123,15 @@ const requireStrategy = <T>(
   // — `Object.hasOwn` answered `false` — but building the message threw from the
   // template, so the named error never reached the caller for that one class.
 
-  // ⚑ `[router.constructor]`, and the option's FULL PATH. A `[search-params]`
-  // prefix names a layer that is not a package (#1510) and that the caller never
-  // wrote; pairing it with the bare field points at neither a thing the user
-  // typed nor a thing they could look up.
+  // ⚑ The BARE head, and the option's FULL PATH. Two doors reach this refusal —
+  // `createRouter` and `cloneRouter`, both through `new RouterClass(...)` — so a
+  // head naming one of them would name a call half the callers did not make, and
+  // `constructor` names one nobody types (#2487).
   //
-  // ⚑ The prefix is `[router.constructor]` and not an invented
-  // `[router.options]`, on two counts. Core has ELEVEN `[router.*]` prefixes and
-  // every one of them names the CALL the user made, so a namespace there would
-  // be the only exception. And `@real-router/validation-plugin` prints
-  // `[router.constructor] Invalid "queryParams.<key>"` for this exact option —
-  // agreeing with it is the whole point, since the hoist makes the plugin's
-  // message unreachable for these four fields.
+  // ⚑ A `[search-params]` prefix is refused for a different reason: it names a
+  // layer that is not a package (#1510) and that the caller never wrote; paired
+  // with the bare field it points at neither a thing the user typed nor a thing
+  // they could look up. The full path is what carries that instead.
   //
   // ⚠ The objection this survives — that the hoist also runs from `cloneRouter`
   // and every matcher rebuild, so the prefix would be false on most doors — is
@@ -143,7 +140,7 @@ const requireStrategy = <T>(
   // `new RouterClass(...)`. Both doors that can raise ARE the constructor.
   if (!hasOwn(table, key)) {
     const error = new TypeError(
-      `[router.constructor] Invalid "queryParams.${field}": "${key}" — expected ${objectKeys(
+      `[router] Invalid "queryParams.${field}": "${key}" — expected ${objectKeys(
         table,
       )
         .map((name) => `"${name}"`)

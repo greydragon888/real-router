@@ -4170,7 +4170,7 @@ describe("SegmentMatcher", () => {
       // So: an UNTAGGED error, of any class, is swallowed like the `URIError`.
       const onUntaggedConfigLookalike = build(() => {
         throw new TypeError(
-          '[router.constructor] Invalid "queryParams.numberFormat": "toString"',
+          '[router] Invalid "queryParams.numberFormat": "toString"',
         );
       });
 
@@ -4190,7 +4190,7 @@ describe("SegmentMatcher", () => {
       // rethrow determine the predicate; two swallows alone do not — that was
       // the shape of the earlier version's own blind spot, one direction over.
       const tagged = new TypeError(
-        '[router.constructor] Invalid "queryParams.numberFormat": "toString"',
+        '[router] Invalid "queryParams.numberFormat": "toString"',
       );
 
       Object.defineProperty(

@@ -86,7 +86,7 @@ function asKey<K extends keyof QueryParamsConfig>(
     value = bag[field];
   } catch (error) {
     throw new TypeError(
-      `[router.constructor] Invalid "queryParams.${field}": reading it threw.`,
+      `[router] Invalid "queryParams.${field}": reading it threw.`,
       { cause: error },
     );
   }
@@ -123,7 +123,7 @@ function asKey<K extends keyof QueryParamsConfig>(
     return String(value) as QueryParamsConfig[K];
   } catch (error) {
     throw new TypeError(
-      `[router.constructor] Invalid "queryParams.${field}": its value cannot be converted to a string.`,
+      `[router] Invalid "queryParams.${field}": its value cannot be converted to a string.`,
       { cause: error },
     );
   }
@@ -186,7 +186,7 @@ function snapshotEncodingKey(
     >;
   } catch (error) {
     throw new TypeError(
-      `[router.constructor] Invalid "urlParamsEncoding": coercing it threw.`,
+      `[router] Invalid "urlParamsEncoding": coercing it threw.`,
       { cause: error },
     );
   }

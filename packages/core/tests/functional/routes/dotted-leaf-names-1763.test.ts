@@ -37,7 +37,7 @@ describe("a dotted route name is refused at registration (#1763)", () => {
 
   it("names the constructor, matching what the validation plugin reports", () => {
     expect(() => createRouter([{ name: "users.view", path: "/view" }])).toThrow(
-      '[router.constructor] Route name "users.view" cannot contain dots. Use children array or { parent } option in addRoute() instead.',
+      '[router] Route name "users.view" cannot contain dots. Use children array or { parent } option in addRoute() instead.',
     );
   });
 

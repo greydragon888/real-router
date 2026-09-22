@@ -394,7 +394,7 @@ describe("route-config aliasing authority (#1958)", () => {
         }
 
         expect((caught as Error).message).toBe(
-          '[router.constructor] Invalid "defaultParams": reading it threw.',
+          '[router] Invalid "defaultParams": reading it threw.',
         );
         // ⚠ The cause is the assertion that matters most: the message says WHICH
         // option, and only the cause says what actually went wrong inside it.
