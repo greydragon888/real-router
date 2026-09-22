@@ -101,9 +101,7 @@ describe("raiser", () => {
   it("CONTROL — both polarities of the head", () => {
     // A wrong door is writable, which is why step 2 judges the ARGUMENT: the
     // type cannot. The pair pins that the door reaches the message it prints.
-    expect(raiser("router", "clearRoutes").type`x`.message).toBe(
-      "[router.clearRoutes] x",
-    );
+    expect(raiser("router", "clear").type`x`.message).toBe("[router.clear] x");
     expect(raiser("validation-plugin").plain`x`.message).toBe(
       "[validation-plugin] x",
     );

@@ -217,7 +217,7 @@ const CELLS: readonly Cell[] = [
     // ⚠ The prefix is the DOOR name, not the method name. Core calls this door
     // `clearRoutes` wherever it names it — the in-flight log channel, the wiki
     // page — the way `add` is `addRoute` and `update` is `updateRoute` (#2461).
-    registered: "[router.clearRoutes]",
+    registered: "[router.clear]",
     trigger: async (routes, router) => {
       await router.start("/home");
       routes.clear();

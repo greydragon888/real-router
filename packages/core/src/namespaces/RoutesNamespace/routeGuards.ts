@@ -244,7 +244,7 @@ export function validateClearRoutes(
 ): boolean {
   if (isNavigating) {
     logger.error(
-      "router.clearRoutes",
+      "router.clear",
       "Cannot clear routes while navigation is in progress. Wait for navigation to complete.",
     );
 
