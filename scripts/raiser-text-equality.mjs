@@ -45,6 +45,23 @@ if (files.length === 0) {
   process.exit(1);
 }
 const PLAIN = new Set(["TypeError", "Error", "ReferenceError", "RangeError"]);
+const CONSTRUCTORS = new Set([...PLAIN, "RouterError"]);
+
+// `new RouterError(code, { message })` carries its message in the bag, so a reader
+// that only looks at `arguments[0]` sees no head at all.
+const bagMessage = (args) => {
+  const bag = args.find((a) => ts.isObjectLiteralExpression(a));
+
+  if (!bag) return undefined;
+
+  const entry = bag.properties.find(
+    (x) => x.name !== undefined && x.name.getText() === "message",
+  );
+
+  return entry && ts.isPropertyAssignment(entry)
+    ? entry.initializer
+    : undefined;
+};
 
 const shape = (n, s) => {
   if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n))
@@ -71,58 +88,68 @@ const render = (name, text) => {
   const src = parse(name, text);
   const out = new Set();
 
+  const headOfBinding = (declaration) => {
+    const [r, d] = declaration.initializer.arguments;
+
+    if (!r || !ts.isStringLiteral(r)) return undefined;
+
+    return d === undefined
+      ? `[${r.text}] `
+      : ts.isStringLiteral(d)
+        ? `[${r.text}.${d.text}] `
+        : `[${r.text}.\${}] `;
+  };
+
+  const isBinding = (n) =>
+    ts.isVariableDeclaration(n) &&
+    ts.isIdentifier(n.name) &&
+    n.initializer !== undefined &&
+    ts.isCallExpression(n.initializer) &&
+    n.initializer.expression.getText(src) === "raiser";
+
   const walk = (n, outer) => {
-    const scope =
-      ts.isBlock(n) || ts.isSourceFile(n) || ts.isModuleBlock(n)
-        ? new Map(outer)
-        : outer;
+    let scope = outer;
 
-    if (
-      ts.isVariableDeclaration(n) &&
-      ts.isIdentifier(n.name) &&
-      n.initializer &&
-      ts.isCallExpression(n.initializer) &&
-      n.initializer.expression.getText(src) === "raiser"
-    ) {
-      const [r, d] = n.initializer.arguments;
+    // ⚠ A scope's bindings are hoisted before its children are walked. Resolving
+    // them in TEXTUAL order lost three heads when `RouterError.ts` moved its
+    // bindings below the class that uses them — legal, since a method resolves the
+    // binding when it runs, not where it is written.
+    if (ts.isBlock(n) || ts.isSourceFile(n) || ts.isModuleBlock(n)) {
+      scope = new Map(outer);
 
-      if (r && ts.isStringLiteral(r))
-        scope.set(
-          n.name.text,
-          d === undefined
-            ? `[${r.text}] `
-            : ts.isStringLiteral(d)
-              ? `[${r.text}.${d.text}] `
-              : `[${r.text}.\${}] `,
-        );
+      for (const statement of n.statements)
+        if (ts.isVariableStatement(statement))
+          for (const declaration of statement.declarationList.declarations)
+            if (isBinding(declaration)) {
+              const head = headOfBinding(declaration);
+
+              if (head !== undefined) scope.set(declaration.name.text, head);
+            }
     }
 
-    if (ts.isThrowStatement(n)) {
-      // the literal form
+    // ⚠ Wherever the refusal is BUILT, not only where it is thrown. A third of
+    // this family is delivered by `Promise.reject`, by a `const` the caller reports
+    // before throwing, or by a module-cached instance — a throw-only reader reports
+    // each of those as `new` with nothing to compare against.
+    if (ts.isNewExpression(n) && CONSTRUCTORS.has(n.expression.getText(src))) {
+      const args = [...(n.arguments ?? [])];
+      const head = shape(bagMessage(args) ?? args[0], src);
+
+      if (head && /^\[[A-Za-z]+(\.([\w.]+|\$\{\}))?\]\s/u.test(head))
+        out.add(head);
+    }
+
+    if (ts.isTaggedTemplateExpression(n)) {
+      const tag = n.tag;
+      const member = ts.isCallExpression(tag) ? tag.expression : tag;
+
       if (
-        ts.isNewExpression(n.expression) &&
-        PLAIN.has(n.expression.expression.getText(src))
+        ts.isPropertyAccessExpression(member) &&
+        ts.isIdentifier(member.expression)
       ) {
-        const head = shape(n.expression.arguments?.[0], src);
+        const head = scope.get(member.expression.text);
 
-        if (head && /^\[router(\.([A-Za-z]+|\$\{\}))?\]\s/u.test(head))
-          out.add(head);
-      }
-
-      // the binding form
-      if (ts.isTaggedTemplateExpression(n.expression)) {
-        const tag = n.expression.tag;
-        const member = ts.isCallExpression(tag) ? tag.expression : tag;
-
-        if (
-          ts.isPropertyAccessExpression(member) &&
-          ts.isIdentifier(member.expression)
-        ) {
-          const head = scope.get(member.expression.text);
-
-          if (head !== undefined)
-            out.add(head + shape(n.expression.template, src));
-        }
+        if (head !== undefined) out.add(head + shape(n.template, src));
       }
     }
 

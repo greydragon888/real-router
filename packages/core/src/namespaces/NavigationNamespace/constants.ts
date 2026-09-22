@@ -1,9 +1,11 @@
 // packages/core/src/namespaces/NavigationNamespace/constants.ts
 
 import { errorCodes } from "../../constants";
-import { RouterError } from "../../RouterError";
+import { RouterError, raiser } from "../../RouterError";
 
 import type { State } from "../../types";
+
+const atRouter = raiser("router");
 
 // =============================================================================
 // Cached Errors & Rejected Promises (Performance Optimization)
@@ -33,13 +35,9 @@ export const CACHED_SAME_STATES_ERROR = new RouterError(errorCodes.SAME_STATES);
  * refusal site, by `deps.isStarting()` — an ordinary never-started router keeps
  * the plain error (#1647).
  */
-export const CACHED_PRE_BOOT_COMMIT_ERROR = new RouterError(
+export const CACHED_PRE_BOOT_COMMIT_ERROR = atRouter.code(
   errorCodes.ROUTER_NOT_STARTED,
-  {
-    message:
-      "[router] cannot commit before the start navigation does — the boot would overwrite it; defer with queueMicrotask/await, or navigate after start() resolves",
-  },
-);
+)`cannot commit before the start navigation does — the boot would overwrite it; defer with queueMicrotask/await, or navigate after start() resolves`;
 
 // #1606 backstop: these instances are handed to arbitrary consumer code (every
 // `.catch()`, `onTransitionError`, leave-signal `reason`) process-wide, so an

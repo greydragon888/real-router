@@ -89,6 +89,10 @@ import type { Limits, RouterEventMap } from "./types/internal";
 /** One binding per door this module refuses behind (#2487). */
 const atNavigateToNotFound = raiser("router", "navigateToNotFound");
 
+const atUsePlugin = raiser("router", "usePlugin");
+const atStart = raiser("router", "start");
+const atRouter = raiser("router");
+
 /**
  * Router class with integrated namespace architecture.
  *
@@ -1277,12 +1281,9 @@ export class Router<
     // effects), listeners would land in the cleared emitter, and teardown would
     // never fire — a silent zombie plugin (#1196).
     if (this.#eventBus.isDisposed()) {
-      throw freezeThrownError(
-        new RouterError(errorCodes.ROUTER_DISPOSED, {
-          message:
-            "[router.usePlugin] cannot install a plugin on a disposed router — dispose() is terminal",
-        }),
-      );
+      throw atUsePlugin.code(
+        errorCodes.ROUTER_DISPOSED,
+      )`cannot install a plugin on a disposed router — dispose() is terminal`;
     }
 
     const filtered = plugins.filter(Boolean) as PluginFactory<Dependencies>[];
@@ -1472,12 +1473,9 @@ export class Router<
     // same class as the #939 always-on invariant guards. Unconditional on the
     // in-flight question above: there is no path to derive either way.
     if (current === undefined) {
-      throw freezeThrownError(
-        new RouterError(errorCodes.ROUTER_NOT_STARTED, {
-          message:
-            "[router.navigateToNotFound] cannot derive the path before the start navigation commits — pass an explicit path",
-        }),
-      );
+      throw atNavigateToNotFound.code(
+        errorCodes.ROUTER_NOT_STARTED,
+      )`cannot derive the path before the start navigation commits — pass an explicit path`;
     }
 
     return this.#navigation.navigateToNotFound(current.path);
@@ -1539,9 +1537,7 @@ export class Router<
         "function"
           ? (chainResult as Promise<State>)
           : Promise.reject(
-              new TypeError(
-                "[router.start] a `start` interceptor returned without calling next(). Every start interceptor must return `next(path)`.",
-              ),
+              atStart.type`a \`start\` interceptor returned without calling next(). Every start interceptor must return \`next(path)\`.`,
             );
     } catch (syncError: unknown) {
       // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from user-provided start interceptor
@@ -1593,21 +1589,15 @@ export class Router<
    */
   #assertNotReentrant(): void {
     if (this.#eventBus.isProcessing()) {
-      throw freezeThrownError(
-        new RouterError(errorCodes.REENTRANT_NAVIGATION, {
-          message:
-            "[router] cannot start a navigation from inside a router event listener — the nested navigation would commit a state the outer one overwrites. Defer it: queueMicrotask(() => router.navigate(...)), await the current transition, or use an async listener.",
-        }),
-      );
+      throw atRouter.code(
+        errorCodes.REENTRANT_NAVIGATION,
+      )`cannot start a navigation from inside a router event listener — the nested navigation would commit a state the outer one overwrites. Defer it: queueMicrotask(() => router.navigate(...)), await the current transition, or use an async listener.`;
     }
 
     if (this.#navigation.isPreparing()) {
-      throw freezeThrownError(
-        new RouterError(errorCodes.REENTRANT_NAVIGATION, {
-          message:
-            "[router] cannot start a navigation from inside a forwardState interceptor, a route's encodeParams or dynamic forwardTo callback, or a defaultRoute/defaultParams/defaultSearch option callback — they run while a navigation is being prepared, before it is announced. Defer it: queueMicrotask(() => router.navigate(...)).",
-        }),
-      );
+      throw atRouter.code(
+        errorCodes.REENTRANT_NAVIGATION,
+      )`cannot start a navigation from inside a forwardState interceptor, a route's encodeParams or dynamic forwardTo callback, or a defaultRoute/defaultParams/defaultSearch option callback — they run while a navigation is being prepared, before it is announced. Defer it: queueMicrotask(() => router.navigate(...)).`;
     }
 
     // ⚠ The THIRD window, with its own sentence for the reason the two above
@@ -1616,12 +1606,9 @@ export class Router<
     // refusal the revalidation defers to a navigation that may never commit, and
     // a state on a dropped route then has nothing left to revalidate it (#1759).
     if (this.#routes.isRevalidating()) {
-      throw freezeThrownError(
-        new RouterError(errorCodes.REENTRANT_NAVIGATION, {
-          message:
-            "[router] cannot start a navigation from inside replace()'s revalidation — the revalidation would then defer to a commit that may never happen. Defer it: queueMicrotask(() => router.navigate(...)).",
-        }),
-      );
+      throw atRouter.code(
+        errorCodes.REENTRANT_NAVIGATION,
+      )`cannot start a navigation from inside replace()'s revalidation — the revalidation would then defer to a commit that may never happen. Defer it: queueMicrotask(() => router.navigate(...)).`;
     }
   }
 
@@ -1669,12 +1656,9 @@ export class Router<
 }
 
 function throwDisposed(): never {
-  throw freezeThrownError(
-    new RouterError(errorCodes.ROUTER_DISPOSED, {
-      message:
-        "[router] this router is disposed — dispose() is terminal and swapped every method to refuse",
-    }),
-  );
+  throw atRouter.code(
+    errorCodes.ROUTER_DISPOSED,
+  )`this router is disposed — dispose() is terminal and swapped every method to refuse`;
 }
 
 /**

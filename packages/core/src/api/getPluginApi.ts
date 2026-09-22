@@ -17,7 +17,7 @@ import {
 } from "../internals";
 import { urlParamsOf } from "../namespaces/RoutesNamespace/helpers";
 import { validateSetRootPath } from "../namespaces/RoutesNamespace/routeGuards";
-import { raiser, RouterError, freezeThrownError } from "../RouterError";
+import { raiser } from "../RouterError";
 import { copyFields, emptyRecord, putField } from "../utils/ingest";
 
 import type { PluginApi } from "./types";
@@ -33,6 +33,8 @@ import type {
 
 /** One binding per door this module refuses behind (#2487). */
 const atClaimContextNamespace = raiser("router", "claimContextNamespace");
+
+const atExtendRouter = raiser("router", "extendRouter");
 
 /** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
 const freeze = Object.freeze;
@@ -398,11 +400,9 @@ export function getPluginApi<
 
       for (const key of keys) {
         if (key in router) {
-          throw freezeThrownError(
-            new RouterError(errorCodes.PLUGIN_CONFLICT, {
-              message: `[router.extendRouter] Cannot extend router: property "${key}" already exists`,
-            }),
-          );
+          throw atExtendRouter.code(
+            errorCodes.PLUGIN_CONFLICT,
+          )`Cannot extend router: property "${key}" already exists`;
         }
       }
 
@@ -464,11 +464,9 @@ export function getPluginApi<
       }
 
       if (ctx.contextClaimRecords.has(namespace)) {
-        throw freezeThrownError(
-          new RouterError(errorCodes.CONTEXT_NAMESPACE_ALREADY_CLAIMED, {
-            message: `[router.claimContextNamespace] Cannot claim context namespace: "${namespace}" is already claimed by another plugin`,
-          }),
-        );
+        throw atClaimContextNamespace.code(
+          errorCodes.CONTEXT_NAMESPACE_ALREADY_CLAIMED,
+        )`Cannot claim context namespace: "${namespace}" is already claimed by another plugin`;
       }
 
       // ⚑ The record stores the CLAIM, not just its name, so both methods below

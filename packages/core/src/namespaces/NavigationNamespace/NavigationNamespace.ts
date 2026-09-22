@@ -18,7 +18,7 @@ import {
   errorCodes,
 } from "../../constants";
 import { adoptForeignBag, freezeStateShell } from "../../helpers";
-import { RouterError, freezeThrownError } from "../../RouterError";
+import { RouterError, freezeThrownError, raiser } from "../../RouterError";
 
 import type { NavigationDependencies } from "./types";
 import type {
@@ -27,6 +27,9 @@ import type {
   SearchParams,
   State,
 } from "../../types";
+
+const atNavigateToState = raiser("router", "navigateToState");
+const atNavigateToDefault = raiser("router", "navigateToDefault");
 
 /**
  * The navigation entry points, their fire-and-forget checkpoint and the DI bag —
@@ -323,16 +326,9 @@ export class NavigationNamespace {
     );
 
     if (misChanneled !== undefined) {
-      const err = freezeThrownError(
-        new RouterError(errorCodes.WRONG_CHANNEL, {
-          routeName: name,
-          message: `[router.navigateToState] ${misChanneledKeyMessage(
-            name,
-            misChanneled,
-            "`state.params`",
-          )}`,
-        }),
-      );
+      const err = atNavigateToState.code(errorCodes.WRONG_CHANNEL, {
+        routeName: name,
+      })`${misChanneledKeyMessage(name, misChanneled, "`state.params`")}`;
 
       deps.emitTransitionError(undefined, deps.getState(), err);
 
@@ -426,12 +422,9 @@ export class NavigationNamespace {
         // no route was named, so there is nothing to put in a field a consumer
         // reads in order to navigate. `message` defaulted to the code here, so
         // the sentence loses no information by moving into it.
-        freezeThrownError(
-          new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-            message:
-              "[router.navigateToDefault] no defaultRoute is configured — pass one to createRouter, or navigate to a route by name",
-          }),
-        ),
+        atNavigateToDefault.code(
+          errorCodes.ROUTE_NOT_FOUND,
+        )`no defaultRoute is configured — pass one to createRouter, or navigate to a route by name`,
       );
     }
 
@@ -456,12 +449,9 @@ export class NavigationNamespace {
 
     if (!route) {
       return Promise.reject(
-        freezeThrownError(
-          new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-            message:
-              "[router.navigateToDefault] defaultRoute resolved to an empty name",
-          }),
-        ),
+        atNavigateToDefault.code(
+          errorCodes.ROUTE_NOT_FOUND,
+        )`defaultRoute resolved to an empty name`,
       );
     }
 
@@ -479,11 +469,9 @@ export class NavigationNamespace {
     // without this gate.
     if (typeof route !== "string") {
       return Promise.reject(
-        freezeThrownError(
-          new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-            message: `[router.navigateToDefault] defaultRoute resolved to ${typeof route}, which cannot name a route`,
-          }),
-        ),
+        atNavigateToDefault.code(
+          errorCodes.ROUTE_NOT_FOUND,
+        )`defaultRoute resolved to ${typeof route}, which cannot name a route`,
       );
     }
 

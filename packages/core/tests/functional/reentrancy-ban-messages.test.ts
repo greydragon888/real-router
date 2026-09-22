@@ -58,7 +58,43 @@ interface Construction {
   readonly hasMessage: boolean;
 }
 
-/** Every `new RouterError(errorCodes.<CODE>, …)` in one file. */
+/** The literal parts of a template, interpolations excluded. */
+function templateParts(template: ts.TemplateLiteral): string[] {
+  if (ts.isNoSubstitutionTemplateLiteral(template)) {
+    return [template.text];
+  }
+
+  return [
+    template.head.text,
+    ...template.templateSpans.map((span) => span.literal.text),
+  ];
+}
+
+/** The `errorCodes.<CODE>` a raiser `code()` tag names, if `node` is one. */
+function raiserCode(
+  node: ts.Node,
+  codeOf: (argument: ts.Node | undefined) => string | undefined,
+): string | undefined {
+  if (!ts.isTaggedTemplateExpression(node) || !ts.isCallExpression(node.tag)) {
+    return undefined;
+  }
+
+  const tag = node.tag.expression;
+
+  if (!ts.isPropertyAccessExpression(tag) || tag.name.text !== "code") {
+    return undefined;
+  }
+
+  return codeOf(node.tag.arguments[0]);
+}
+
+/**
+ * Every reentrancy-coded `RouterError` in one file, in BOTH forms a refusal is
+ * built in: `new RouterError(errorCodes.<CODE>, …)` and the raiser's
+ * ``at.code(errorCodes.<CODE>)`…` `` (#2487). ⚠ Reading one form only made the
+ * positive control below report an empty set the moment the bans converted —
+ * which is what that control exists to catch.
+ */
 function reentrancyConstructions(file: string): Construction[] {
   const sf = ts.createSourceFile(
     file,
@@ -70,20 +106,37 @@ function reentrancyConstructions(file: string): Construction[] {
 
   const hits: Construction[] = [];
 
+  const codeOf = (argument: ts.Node | undefined): string | undefined =>
+    argument &&
+    ts.isPropertyAccessExpression(argument) &&
+    ts.isIdentifier(argument.expression) &&
+    argument.expression.text === "errorCodes"
+      ? argument.name.text
+      : undefined;
+
   const visit = (node: ts.Node): void => {
+    // the raiser's form: ``<binding>.code(errorCodes.<CODE>, …)`…` ``
+    const raised = raiserCode(node, codeOf);
+
+    if (raised !== undefined && REENTRANCY_CODES.has(raised)) {
+      hits.push({
+        site: `${path.relative(SRC_DIR, file)}:${
+          sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1
+        }`,
+        code: raised,
+        hasMessage: templateParts(
+          (node as ts.TaggedTemplateExpression).template,
+        ).some((part) => part !== ""),
+      });
+    }
+
     if (
       ts.isNewExpression(node) &&
       ts.isIdentifier(node.expression) &&
       node.expression.text === "RouterError"
     ) {
       const [codeArg, optionsArg] = node.arguments ?? [];
-      const code =
-        codeArg &&
-        ts.isPropertyAccessExpression(codeArg) &&
-        ts.isIdentifier(codeArg.expression) &&
-        codeArg.expression.text === "errorCodes"
-          ? codeArg.name.text
-          : undefined;
+      const code = codeOf(codeArg);
 
       if (code !== undefined && REENTRANCY_CODES.has(code)) {
         const hasMessage =

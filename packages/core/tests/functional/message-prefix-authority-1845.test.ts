@@ -185,6 +185,134 @@ const prefixOf = (text: string): string | undefined =>
  * opens with a value. It is pinned by the control below so it is not closed by
  * accident.
  */
+/**
+ * Whether `expression` is a call to a local builder that cannot contribute a head:
+ * every `return` in its declaration is a string or template literal whose text does
+ * not open with `[`. Anything else — a parameter, a member call, a builder with a
+ * computed return — answers false, because the head then cannot be read.
+ */
+/** The literal text a `return` contributes, or `undefined` when it is not a literal. */
+function returnedText(value: ts.Expression | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (ts.isStringLiteral(value) || ts.isNoSubstitutionTemplateLiteral(value)) {
+    return value.text;
+  }
+
+  if (ts.isTemplateExpression(value)) {
+    return value.head.text;
+  }
+
+  return undefined;
+}
+
+/** Whether every `return` in `declaration` is a literal that does not open a head. */
+function returnsNoHead(declaration: ts.FunctionDeclaration): boolean {
+  let ok = true;
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isReturnStatement(node)) {
+      const text = returnedText(node.expression);
+
+      if (text === undefined || text.startsWith("[")) {
+        ok = false;
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(declaration);
+
+  return ok;
+}
+
+/**
+ * Whether `expression` is a call to a local builder that cannot contribute a head.
+ * Anything else — a parameter, a member call, a builder with a computed return —
+ * answers false, because the head then cannot be read off the source.
+ */
+function headFreeBuilderCall(
+  expression: ts.Expression | undefined,
+  root: string,
+): boolean {
+  if (expression === undefined || !ts.isCallExpression(expression)) {
+    return false;
+  }
+
+  if (!ts.isIdentifier(expression.expression)) {
+    return false;
+  }
+
+  const name = expression.expression.text;
+  let seen = false;
+
+  for (const file of globSync(`${root}/**/*.ts`)) {
+    const source = ts.createSourceFile(
+      file,
+      readFileSync(file, "utf8"),
+      ts.ScriptTarget.Latest,
+      /* setParentNodes */ true,
+      ts.ScriptKind.TS,
+    );
+
+    const visit = (node: ts.Node): void => {
+      if (ts.isFunctionDeclaration(node) && node.name?.text === name) {
+        seen = true;
+
+        if (!returnsNoHead(node)) {
+          seen = false;
+        }
+      }
+
+      ts.forEachChild(node, visit);
+    };
+
+    visit(source);
+  }
+
+  return seen;
+}
+
+/**
+ * What is wrong with a raiser body, or `undefined` when nothing is.
+ *
+ * ⚠ A body that is ONE interpolation hands the whole sentence to an expression, so
+ * the head cannot be read off the source. It is accepted only when that expression is
+ * a call to a builder whose every return is a literal carrying no head — a check,
+ * not a name on a list.
+ */
+function judgeBody(
+  template: ts.TemplateLiteral,
+  root: string,
+): string | undefined {
+  const parts = bodyParts(template);
+
+  if (parts.every((part) => part === "")) {
+    const fed = ts.isTemplateExpression(template)
+      ? template.templateSpans[0]?.expression
+      : undefined;
+
+    return headFreeBuilderCall(fed, root) ? undefined : "pass-through body";
+  }
+
+  return parts[0].startsWith("[") ? "body opens with a head" : undefined;
+}
+
+/** The literal parts of a template, interpolations excluded. */
+function bodyParts(template: ts.TemplateLiteral): string[] {
+  if (ts.isNoSubstitutionTemplateLiteral(template)) {
+    return [template.text];
+  }
+
+  return [
+    template.head.text,
+    ...template.templateSpans.map((span) => span.literal.text),
+  ];
+}
+
 function doubleHeads(root: string = SRC): Offender[] {
   const found: Offender[] = [];
 
@@ -203,24 +331,10 @@ function doubleHeads(root: string = SRC): Offender[] {
         const bound = boundNameOfTag(node.tag);
 
         if (bound !== undefined && heads.has(bound)) {
-          const template = node.template;
-          const parts = ts.isNoSubstitutionTemplateLiteral(template)
-            ? [template.text]
-            : [
-                template.head.text,
-                ...template.templateSpans.map((span) => span.literal.text),
-              ];
+          const verdict = judgeBody(node.template, root);
 
-          if (parts.every((part) => part === "")) {
-            found.push({
-              file: path.relative(root, file),
-              prefix: "pass-through body",
-            });
-          } else if (parts[0].startsWith("[")) {
-            found.push({
-              file: path.relative(root, file),
-              prefix: "body opens with a head",
-            });
+          if (verdict !== undefined) {
+            found.push({ file: path.relative(root, file), prefix: verdict });
           }
         }
       }
