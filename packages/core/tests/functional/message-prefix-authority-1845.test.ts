@@ -301,10 +301,10 @@ const BARE: readonly string[] = [];
 /**
  * `Route "${current}" does not exist` → the shape, substitutions collapsed.
  *
- * ⚠ The WHOLE argument, not its leftmost operand: two of the rows below are `+`
- * chains, and rendering only the head made the row hold half a message — so a
- * `printWidth` change that re-split the chain moved the row while the message
- * stayed byte-identical.
+ * ⚠ The WHOLE argument, not its leftmost operand: rendering only the head of a
+ * `+` chain would make the row hold half a message — so a `printWidth` change
+ * that re-split the chain would move the row while the message stayed
+ * byte-identical.
  */
 const shapeOf = (node: ts.Expression, source: ts.SourceFile): string =>
   node

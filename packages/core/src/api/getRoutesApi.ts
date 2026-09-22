@@ -1089,7 +1089,7 @@ export function getRoutesApi<
 
       const canClear = validateClearRoutes(ctx.isTransitioning(), ctx.logger);
 
-      /* v8 ignore next 3 -- @preserve: race condition guard, mirrors Router.clearRoutes() same-path guard tested via validateClearRoutes unit tests */
+      /* v8 ignore next 3 -- @preserve: the no-op arm of `validateClearRoutes`, twin of its call at `replace()` below; reaching it needs a transition in flight with no committed state, and no test builds that pair */
       if (!canClear) {
         return;
       }

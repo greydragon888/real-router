@@ -72,8 +72,11 @@ const PUBLISHED_NAME: ReadonlySet<string> = new Set([
   // `@real-router/core/api` exports it, and it takes no router receiver — so
   // `[router.cloneRouter]` would be the wrong shape rather than the right one.
   "cloneRouter",
-  // This package's own name, for the retrospective pass no call reaches. Its
-  // README documents both the spelling and the reason.
+  // This package's own name, for the sweep over an already-registered table
+  // that no call reaches. Its README documents both the spelling and the
+  // reason.
+  // ⚠ Not all of `retrospective.ts`: `validateResolvedDefaultRoute` there IS
+  // reached by a call, and it names a router door instead.
   "validation-plugin",
 ]);
 
