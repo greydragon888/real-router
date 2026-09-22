@@ -493,7 +493,8 @@ describe("a message prefix names something the caller can look up (#1845)", () =
   it("CONTROL — the walk reads messages at all, so an empty result means clean", () => {
     // Without this, a change to the AST shapes walked empties the result and the
     // assertion above passes over files it never inspected.
-    let messages = 0;
+    let bracketed = 0;
+    let bindings = 0;
 
     for (const file of globSync(`${SRC}/**/*.ts`)) {
       const source = ts.createSourceFile(
@@ -510,9 +511,18 @@ describe("a message prefix names something the caller can look up (#1845)", () =
             const text = textOf(argument);
 
             if (text !== undefined && prefixOf(text) !== undefined) {
-              messages++;
+              bracketed++;
             }
           }
+        }
+
+        // A raiser binding is where a converted head lives, so it is what the
+        // tier reads there instead of an argument.
+        if (
+          ts.isCallExpression(node) &&
+          node.expression.getText(source) === "raiser"
+        ) {
+          bindings++;
         }
 
         ts.forEachChild(node, walk);
@@ -521,7 +531,13 @@ describe("a message prefix names something the caller can look up (#1845)", () =
       walk(source);
     }
 
-    expect(messages).toBeGreaterThan(50);
+    // ⚠ TWO claims, not a total. A sum would hide either half going to zero, and
+    // the halves move in opposite directions: literal heads fall as families
+    // convert while bindings rise, and bindings are FEWER than the sites they
+    // replace — that shrink is what the raiser is for, so no sum of the two is
+    // invariant. Each is floored on its own, and each reds alone.
+    expect(bracketed).toBeGreaterThan(20);
+    expect(bindings).toBeGreaterThan(0);
   });
 });
 
@@ -1066,8 +1082,12 @@ describe("a refusal with no prefix at all is registered, not invisible (#2456)",
     // The construction subject carries its own floors (#2493), because a broken
     // construction walk empties `bare` exactly the way a broken throw walk does,
     // and the floors above cannot see it: they count throws.
-    expect(seen.constructions).toBeGreaterThan(130);
-    expect(seen.judged).toBeGreaterThan(95);
+    // ⚠ Summed with the converted half, for the reason the literal floor is.
+    // Measured across steps 3 and 4: `constructions + raised` is 151 and
+    // `judged + raised` is 115 on both sides of every conversion, because a
+    // conversion MOVES a site between the two rather than removing one.
+    expect(seen.constructions + seen.raised).toBeGreaterThan(130);
+    expect(seen.judged + seen.raised).toBeGreaterThan(95);
     // О-1's marker is recognised rather than registered, and a recogniser that
     // stopped matching would empty this without emptying anything above.
     expect(seen.marked).toBeGreaterThan(0);
