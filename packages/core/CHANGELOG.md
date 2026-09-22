@@ -1,5 +1,16 @@
 # @real-router/core
 
+## 0.147.5
+
+### Patch Changes
+
+- [#2524](https://github.com/greydragon888/real-router/pull/2524) [`30f1654`](https://github.com/greydragon888/real-router/commit/30f1654e580d27990ca5ac35901b09c28a488be2) Thanks [@greydragon888](https://github.com/greydragon888)! - Thirty more refusals build through the raiser ([#2487](https://github.com/greydragon888/real-router/issues/2487))
+
+  Internal refactor across fourteen core files: the refusals thrown as
+  `new TypeError` / `new Error` / `new ReferenceError` / `new RangeError` with a
+  bracketed literal now write their head once as a binding. No message text moves —
+  measured by comparing the rendered set against `origin/master`, not assumed.
+
 ## 0.147.4
 
 ### Patch Changes
