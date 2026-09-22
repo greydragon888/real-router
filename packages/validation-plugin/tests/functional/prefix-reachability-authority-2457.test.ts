@@ -967,6 +967,13 @@ describe("a message names a door that can reach it (#2457)", () => {
 
     expect(core.vocabulary.size).toBeGreaterThan(20);
     expect(core.consulted.size).toBeGreaterThan(25);
+    // ⚠ Both count the PRE-raiser form, and step 7 of #2487 converts this package.
+    // When they fall, the answer is not a lower number: a floor on a count the
+    // design drives toward zero reds on the work succeeding, and lowering it by
+    // reflex is how a ratchet stops ratcheting. Core's authority took the two
+    // shapes that fix it — sum the count with the converted half where a
+    // conversion MOVES a site, and move the anti-vacuum half to a control on a
+    // purpose-built tree where a conversion EMPTIES it.
     expect(seen.judged).toBeGreaterThan(40);
     expect(seen.interpolated).toBeGreaterThan(20);
   });

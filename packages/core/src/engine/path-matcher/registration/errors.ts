@@ -2,7 +2,15 @@
 // `throwSegmentGrammarError` code→message dispatcher (Decision 2-A). Pure leaf — each
 // builds a message and throws; none reads trie state.
 
+import { raiser } from "../../../RouterError";
+
 import type { SegmentErrorCode } from "../parseSegment";
+
+/**
+ * Every refusal in this file is a registration fault a caller can provoke from
+ * several doors — `createRouter`, `add`, `replace` — so none of them names one.
+ */
+const at = raiser("router");
 
 /**
  * Guards against param-name aliasing in the segment trie (issue #736).
@@ -28,12 +36,7 @@ export function throwParamNameConflict(
   newName: string,
   marker: ":" | "*",
 ): never {
-  throw new Error(
-    `[router] Parameter name conflict at the same path ` +
-      `position: '${marker}${existingName}' and '${marker}${newName}'. One ` +
-      `position binds one name across every route that shares it. Rename one — ` +
-      `e.g. use '${marker}${existingName}' in both.`,
-  );
+  throw at.plain`Parameter name conflict at the same path position: '${marker}${existingName}' and '${marker}${newName}'. One position binds one name across every route that shares it. Rename one — e.g. use '${marker}${existingName}' in both.`;
 }
 
 /**
@@ -49,11 +52,7 @@ export function throwEmptyParamName(): never {
   // static segment with a trailing '?' (`/faq?`) — all routed here from
   // `processSegment`'s error backstop (#1998). So the message names both shapes
   // and pins neither to a specific marker — there is none for `/faq?` (#1241).
-  throw new Error(
-    `[router] Empty parameter name: a ':'/'*' marker must ` +
-      `be followed by a name (e.g. ':id', '*rest'), and a segment cannot end in ` +
-      `a bare '?'.`,
-  );
+  throw at.plain`Empty parameter name: a ':'/'*' marker must be followed by a name (e.g. ':id', '*rest'), and a segment cannot end in a bare '?'.`;
 }
 
 /**
@@ -65,10 +64,7 @@ export function throwEmptyParamName(): never {
  * the standalone registration backstop.
  */
 function throwFusedMarker(segment: string): never {
-  throw new Error(
-    `[router] Fused parameter marker in segment "${segment}": ` +
-      `a ':'/'*' marker must begin a segment — write 'a/:b', not 'a:b'.`,
-  );
+  throw at.plain`Fused parameter marker in segment "${segment}": a ':'/'*' marker must begin a segment — write 'a/:b', not 'a:b'.`;
 }
 
 /**
@@ -80,10 +76,7 @@ function throwFusedMarker(segment: string): never {
  * (#1050) on the trailing-marker axis.
  */
 function throwTrailingMarker(segment: string): never {
-  throw new Error(
-    `[router] Trailing parameter marker in segment "${segment}": ` +
-      `a param name cannot end in a bare ':' or '*'. Drop the stray marker.`,
-  );
+  throw at.plain`Trailing parameter marker in segment "${segment}": a param name cannot end in a bare ':' or '*'. Drop the stray marker.`;
 }
 
 /**
@@ -93,10 +86,7 @@ function throwTrailingMarker(segment: string): never {
  * the axis's largest bug cluster; the hierarchy already expresses optionality.
  */
 function throwOptionalRemoved(segment: string): never {
-  throw new Error(
-    `[router] Optional params are not supported: "${segment}" — ` +
-      `declare two sibling routes instead, one with the segment and one without.`,
-  );
+  throw at.plain`Optional params are not supported: "${segment}" — declare two sibling routes instead, one with the segment and one without.`;
 }
 
 /**
@@ -105,19 +95,11 @@ function throwOptionalRemoved(segment: string): never {
  * constraints were dropped; validate the value in a guard instead.
  */
 function throwConstraintRemoved(segment: string): never {
-  throw new Error(
-    `[router] Regex constraints are not supported: '<' and ` +
-      `'>' are reserved in path segments ("${segment}"). Match it as a plain ` +
-      `string and validate the value in a canActivate guard.`,
-  );
+  throw at.plain`Regex constraints are not supported: '<' and '>' are reserved in path segments ("${segment}"). Match it as a plain string and validate the value in a canActivate guard.`;
 }
 
 export function throwNonAsciiStatic(segment: string): never {
-  throw new Error(
-    `[router] Non-ASCII static segment "${segment}": match ` +
-      `compares static keys raw and rejects non-ASCII input, so this route can ` +
-      `never match. Percent-encode it (e.g. "/caf%C3%A9") or use a param.`,
-  );
+  throw at.plain`Non-ASCII static segment "${segment}": match compares static keys raw and rejects non-ASCII input, so this route can never match. Percent-encode it (e.g. "/caf%C3%A9") or use a param.`;
 }
 
 /**
@@ -169,22 +151,14 @@ export function throwDuplicateParamName(
 
   // ⚠ No ':' prefix: the caller counts params AND splats, so a `/:x/*x` clash
   // arrives here with one position spelled `*x` (#1151).
-  throw new Error(
-    `[router] Duplicate parameter name '${duplicate}' in ` +
-      `route "${routeName}": a name must be unique within a route — the second ` +
-      `position overwrites the first. Rename one.`,
-  );
+  throw at.plain`Duplicate parameter name '${duplicate}' in route "${routeName}": a name must be unique within a route — the second position overwrites the first. Rename one.`;
 }
 
 export function throwInvalidQueryParamName(
   routeName: string,
   name: string,
 ): never {
-  throw new Error(
-    `[router] Invalid query-param declaration "${name}" in ` +
-      `route "${routeName}": a query-param name cannot contain '<' or '>'. ` +
-      `Rename it.`,
-  );
+  throw at.plain`Invalid query-param declaration "${name}" in route "${routeName}": a query-param name cannot contain '<' or '>'. Rename it.`;
 }
 
 /**
@@ -197,22 +171,14 @@ export function throwInvalidQueryParamName(
  * (#1526).
  */
 export function throwDoubleSlashInPath(path: string): never {
-  throw new Error(
-    `[router] Double slashes are not allowed in path ` +
-      `"${path}": the route would build a URL its own matcher refuses. ` +
-      `Remove the empty segment.`,
-  );
+  throw at.plain`Double slashes are not allowed in path "${path}": the route would build a URL its own matcher refuses. Remove the empty segment.`;
 }
 
 export function throwDuplicateRoutePath(
   existingName: string,
   newName: string,
 ): never {
-  throw new Error(
-    `[router] Duplicate route path: routes "${existingName}" ` +
-      `and "${newName}" resolve to the same URL — the later would shadow the ` +
-      `earlier. Give them distinct paths.`,
-  );
+  throw at.plain`Duplicate route path: routes "${existingName}" and "${newName}" resolve to the same URL — the later would shadow the earlier. Give them distinct paths.`;
 }
 
 /**
@@ -223,10 +189,5 @@ export function throwIndexUnderSplatParent(
   routeName: string,
   parentPath: string,
 ): never {
-  throw new Error(
-    `[router] Index route "${routeName}" (path "/") under the ` +
-      `splat parent "${parentPath}" is unreachable: the wildcard match never ` +
-      `reaches the index node. Give the index a distinct path, or make the ` +
-      `parent static.`,
-  );
+  throw at.plain`Index route "${routeName}" (path "/") under the splat parent "${parentPath}" is unreachable: the wildcard match never reaches the index node. Give the index a distinct path, or make the parent static.`;
 }
