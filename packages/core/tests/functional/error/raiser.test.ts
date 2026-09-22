@@ -24,6 +24,12 @@ describe("raiser", () => {
     );
   });
 
+  it("reads an EMPTY door as the bare form, never as `[router.]`", () => {
+    expect(raiser("router", "").plain`cannot commit`.message).toBe(
+      "[router] cannot commit",
+    );
+  });
+
   const CONSTRUCTORS: readonly (readonly [string, Error, ErrorConstructor])[] =
     [
       ["type", at.type`x`, TypeError],

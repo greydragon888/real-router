@@ -485,7 +485,12 @@ const interpolate = (
  * door the caller never called is the defect this exists to remove.
  */
 export function raiser(receiver: Receiver, door?: string): Raiser {
-  const head = door === undefined ? `[${receiver}] ` : `[${receiver}.${door}] `;
+  // An empty door reads as the bare form rather than printing `[router.]`, a
+  // head that looks like a door without naming one.
+  const head =
+    door === undefined || door === ""
+      ? `[${receiver}] `
+      : `[${receiver}.${door}] `;
   const message = (
     strings: TemplateStringsArray,
     values: readonly unknown[],
