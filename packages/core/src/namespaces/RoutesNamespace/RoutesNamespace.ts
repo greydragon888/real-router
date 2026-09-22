@@ -33,6 +33,7 @@ import {
   materialize,
   materializePending,
 } from "../../pipeline";
+import { raiser } from "../../RouterError";
 import { getTransitionPath } from "../../transitionPath";
 
 import type { RoutesStore } from "./routesStore";
@@ -55,6 +56,10 @@ import type {
   Route,
 } from "../../types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
+
+/** One binding per door this module refuses behind (#2487). */
+const atRouter = raiser("router");
+const atShouldUpdateNode = raiser("router", "shouldUpdateNode");
 
 /** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
 const freeze = Object.freeze;
@@ -190,9 +195,7 @@ export class RoutesNamespace<
     return (toState: State, fromState?: State): boolean => {
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (!(toState && typeof toState === "object" && "name" in toState)) {
-        throw new TypeError(
-          "[router.shouldUpdateNode] toState must be valid State object",
-        );
+        throw atShouldUpdateNode.type`toState must be valid State object`;
       }
 
       // ⚑ `?.` on a field the type declares REQUIRED, and the honest form here
@@ -1373,20 +1376,18 @@ export class RoutesNamespace<
     const MAX_DEPTH = 100;
 
     if (typeof current !== "string") {
-      throw new TypeError(
-        `[router] forwardTo callback must return a string, got ${typeof current}`,
-      );
+      throw atRouter.type`forwardTo callback must return a string, got ${typeof current}`;
     }
 
     while (depth < MAX_DEPTH) {
       if (this.#store.matcher.getSegmentsByName(current) === undefined) {
-        throw new Error(`[router] Route "${current}" does not exist`);
+        throw atRouter.plain`Route "${current}" does not exist`;
       }
 
       if (visited.has(current)) {
         const cycle = [...visited, current].join(" → ");
 
-        throw new Error(`[router] Circular forwardTo: ${cycle}`);
+        throw atRouter.plain`Circular forwardTo: ${cycle}`;
       }
 
       visited.add(current);
@@ -1416,6 +1417,6 @@ export class RoutesNamespace<
       return { target: current, chain, params };
     }
 
-    throw new Error(`[router] forwardTo exceeds maximum depth of ${MAX_DEPTH}`);
+    throw atRouter.plain`forwardTo exceeds maximum depth of ${MAX_DEPTH}`;
   }
 }

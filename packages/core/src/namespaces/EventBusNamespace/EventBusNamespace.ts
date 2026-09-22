@@ -8,7 +8,7 @@ import {
   events,
 } from "../../constants";
 import { adoptForeignBag, adoptForeignTransition } from "../../helpers";
-import { RouterError, freezeThrownError } from "../../RouterError";
+import { raiser, RouterError, freezeThrownError } from "../../RouterError";
 import { routerEvents, routerStates } from "../../routerFSM";
 
 import type { EventBusOptions, ScopeDecision } from "./types";
@@ -38,6 +38,10 @@ import type { RouterEventMap } from "../../types/internal";
 import type { RouterValidator } from "../../types/RouterValidator";
 import type { EventEmitter } from "../../utils/event-emitter";
 import type { FSM } from "../../utils/fsm";
+
+/** One binding per door this module refuses behind (#2487). */
+const atSubscribe = raiser("router", "subscribe");
+const atSubscribeLeave = raiser("router", "subscribeLeave");
 
 /** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
 const freeze = Object.freeze;
@@ -200,10 +204,7 @@ export class EventBusNamespace {
 
   static validateSubscribeListener(listener: unknown): void {
     if (typeof listener !== "function") {
-      throw new TypeError(
-        "[router.subscribe] Expected a function. " +
-          "For Observable pattern use observable(router) from @real-router/rx",
-      );
+      throw atSubscribe.type`Expected a function. For Observable pattern use observable(router) from @real-router/rx`;
     }
   }
 
@@ -217,7 +218,7 @@ export class EventBusNamespace {
    */
   static validateSubscribeLeaveListener(listener: unknown): void {
     if (typeof listener !== "function") {
-      throw new TypeError("[router.subscribeLeave] Expected a function");
+      throw atSubscribeLeave.type`Expected a function`;
     }
   }
 

@@ -20,6 +20,7 @@ import {
 } from "../../engine";
 import { assertRouteNameIsString } from "../../guards";
 import { copyOwnData } from "../../helpers";
+import { raiser } from "../../RouterError";
 import { putField } from "../../utils/ingest";
 
 import type { RouteConfig, RoutesDependencies } from "./types";
@@ -42,6 +43,10 @@ import type {
   Route,
 } from "../../types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
+
+/** One binding per door this module refuses behind (#2487). */
+const atRouter = raiser("router");
+const atAddRoute = raiser("router", "addRoute");
 
 /** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
 /**
@@ -337,10 +342,7 @@ export function assertForwardToShape(
 ): void {
   if (typeof forwardTo !== "function") {
     if (typeof forwardTo !== "string" && forwardTo !== null) {
-      throw new TypeError(
-        `[router] forwardTo must be a string or function for route "${fullName}", ` +
-          `got ${typeof forwardTo}`,
-      );
+      throw atRouter.type`forwardTo must be a string or function for route "${fullName}", got ${typeof forwardTo}`;
     }
 
     return;
@@ -354,10 +356,7 @@ export function assertForwardToShape(
     .includes("__awaiter");
 
   if (isNativeAsync || isTranspiledAsync) {
-    throw new TypeError(
-      `[router] forwardTo callback cannot be async for route "${fullName}". ` +
-        `Async functions break matchPath/buildPath.`,
-    );
+    throw atRouter.type`forwardTo callback cannot be async for route "${fullName}". Async functions break matchPath/buildPath.`;
   }
 }
 
@@ -846,14 +845,12 @@ export function assertAddable<Dependencies extends DefaultDependencies>(
   assertNoDottedNamesInBatch(routes, "addRoute");
 
   if (parentName !== undefined && !store.matcher.hasRoute(parentName)) {
-    throw new Error(
-      `[router.addRoute] Parent route "${parentName}" does not exist`,
-    );
+    throw atAddRoute.plain`Parent route "${parentName}" does not exist`;
   }
 
   walkRouteNames(routes, parentName ?? "", (fullName) => {
     if (store.matcher.hasRoute(fullName)) {
-      throw new Error(`[router.addRoute] Route "${fullName}" already exists`);
+      throw atAddRoute.plain`Route "${fullName}" already exists`;
     }
   });
 

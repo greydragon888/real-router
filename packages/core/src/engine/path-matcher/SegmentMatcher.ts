@@ -2,6 +2,7 @@ import { DECODING_METHODS, ENCODING_METHODS } from "./encoding";
 import { createSegmentNode, normalizeTrailingSlash } from "./pathUtils";
 import { validatePercentEncoding } from "./percentEncoding";
 import { registerNode } from "./registration";
+import { raiser } from "../../RouterError";
 import { copyFields, putField } from "../../utils/ingest";
 
 import type {
@@ -14,6 +15,9 @@ import type {
   SegmentNode,
   URLParamsEncodingType,
 } from "./types";
+
+/** One binding per door this module refuses behind (#2487). */
+const atBuildPath = raiser("router", "buildPath");
 
 /**
  * The marker `search-params`' `requireStrategy` puts on the ONE error the parse
@@ -372,7 +376,7 @@ export class SegmentMatcher {
     const route = this.#routesByName.get(name);
 
     if (!route) {
-      throw new Error(`[router.buildPath] '${name}' is not defined`);
+      throw atBuildPath.plain`'${name}' is not defined`;
     }
 
     const path = this.#buildUrlPath(route, params);
@@ -473,18 +477,14 @@ export class SegmentMatcher {
       // 3-token grammar (M1): every param slot is required — no optional-omit
       // branch. A missing param is an error.
       if (value === undefined || value === null) {
-        throw new Error(
-          `[router.buildPath] Missing required param '${slot.paramName}'`,
-        );
+        throw atBuildPath.plain`Missing required param '${slot.paramName}'`;
       }
 
       // #740 item 3: an empty value collapses the segment, silently producing a
       // path that matches the parent route (`buildPath("u.p", {id:""})` →
       // `/users/` → matches `u`). Reject it like a missing param.
       if (value === "") {
-        throw new Error(
-          `[router.buildPath] Missing required param '${slot.paramName}' (empty string)`,
-        );
+        throw atBuildPath.plain`Missing required param '${slot.paramName}' (empty string)`;
       }
 
       const encoded = slot.encoder(stringifyParamValue(value));
