@@ -187,8 +187,10 @@ describe("retrospective validation — triggered at usePlugin() time", () => {
 
       await router.start("/home");
 
+      // The door, not just the body: this path IS reached by a call the caller
+      // made, and it arrives as a rejection rather than a throw.
       await expect(router.navigateToDefault()).rejects.toThrow(
-        /defaultRoute resolved to non-existent route: "ghost"/,
+        /^\[router\.navigateToDefault\] defaultRoute callback resolved to non-existent route: "ghost"$/u,
       );
     });
 

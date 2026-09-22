@@ -63,6 +63,7 @@ import {
   validateForwardToTargetsStore,
   validateDependenciesStructure,
   validateLimitsConsistency,
+  validateConfiguredDefaultRoute,
   validateResolvedDefaultRoute,
   warnOrphanedGuards,
 } from "./validators/retrospective";
@@ -461,7 +462,7 @@ export function validationPlugin<
       );
 
       if (typeof options.defaultRoute === "string") {
-        validateResolvedDefaultRoute(options.defaultRoute, lookup);
+        validateConfiguredDefaultRoute(options.defaultRoute, lookup);
       }
     } catch (error) {
       releaseIfStillOurs();

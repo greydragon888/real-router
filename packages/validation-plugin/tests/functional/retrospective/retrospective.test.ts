@@ -1,13 +1,14 @@
 import { describe, it, expect } from "vitest";
 
 import {
+  validateConfiguredDefaultRoute,
+  validateDependenciesStructure,
   validateExistingRoutes,
   validateForwardToConsistency,
-  validateRoutePropertiesStore,
   validateForwardToTargetsStore,
-  validateDependenciesStructure,
   validateLimitsConsistency,
   validateResolvedDefaultRoute,
+  validateRoutePropertiesStore,
 } from "../../../src/validators/retrospective";
 import { lookupOf } from "../../helpers";
 
@@ -529,12 +530,43 @@ describe("validateResolvedDefaultRoute", () => {
     }).not.toThrow();
   });
 
-  it("throws when route does not exist", () => {
+  it("throws when route does not exist, naming the door that reached it", () => {
     expect(() => {
       validateResolvedDefaultRoute("missing", lookup);
-    }).toThrow(/defaultRoute resolved to non-existent route: "missing"/);
+    }).toThrow(
+      /^\[router\.navigateToDefault\] defaultRoute callback resolved to non-existent route: "missing"$/u,
+    );
     expect(() => {
       validateResolvedDefaultRoute("admin.settings", lookup);
-    }).toThrow(/non-existent route: "admin.settings"/);
+    }).toThrow(/non-existent route: "admin.settings"/u);
+  });
+});
+
+describe("validateConfiguredDefaultRoute", () => {
+  // The same predicate behind a different head: the retrospective sweep runs over
+  // a registered table, so no call reaches it and the package name is the address.
+  const lookup = lookupOf({ home: [], about: [] });
+
+  it("is a no-op for a non-string or an empty string", () => {
+    expect(() => {
+      validateConfiguredDefaultRoute(undefined, lookup);
+    }).not.toThrow();
+    expect(() => {
+      validateConfiguredDefaultRoute("", lookup);
+    }).not.toThrow();
+  });
+
+  it("passes when the route exists", () => {
+    expect(() => {
+      validateConfiguredDefaultRoute("home", lookup);
+    }).not.toThrow();
+  });
+
+  it("throws under the package name, not a door", () => {
+    expect(() => {
+      validateConfiguredDefaultRoute("missing", lookup);
+    }).toThrow(
+      /^\[validation-plugin\] defaultRoute resolved to non-existent route: "missing"$/u,
+    );
   });
 });

@@ -444,17 +444,47 @@ export function validateLimitsConsistency(
  * No-op for empty string (means "no default configured" — handled upstream by
  * NavigationNamespace.navigateToDefault).
  */
+/** Shared predicate; each door owns its own head, so no prefix travels as data. */
+function namesNoRoute(
+  routeName: unknown,
+  lookup: RouteLookup,
+): routeName is string {
+  return (
+    typeof routeName === "string" &&
+    routeName !== "" &&
+    !lookup.hasRoute(routeName)
+  );
+}
+
+/**
+ * The retrospective pass, for a `defaultRoute` configured as a STRING. No call
+ * reaches it — the sweep runs over a table that is already registered — so the
+ * refusal names the package rather than a door.
+ */
+export function validateConfiguredDefaultRoute(
+  routeName: unknown,
+  lookup: RouteLookup,
+): void {
+  if (namesNoRoute(routeName, lookup)) {
+    throw new Error(
+      `[validation-plugin] defaultRoute resolved to non-existent route: "${routeName}"`,
+    );
+  }
+}
+
+/**
+ * The runtime pass, for a `defaultRoute` configured as a CALLBACK. Reached from
+ * `navigateToDefault()` alone, so the caller made a call they can look up and the
+ * refusal names it. ⚠ It arrives as a rejected promise: the `catch` around
+ * `resolveDefault()` preserves the user callback's throw shape.
+ */
 export function validateResolvedDefaultRoute(
   routeName: unknown,
   lookup: RouteLookup,
 ): void {
-  if (typeof routeName !== "string" || !routeName) {
-    return;
-  }
-
-  if (!lookup.hasRoute(routeName)) {
+  if (namesNoRoute(routeName, lookup)) {
     throw new Error(
-      `[validation-plugin] defaultRoute resolved to non-existent route: "${routeName}"`,
+      `[router.navigateToDefault] defaultRoute callback resolved to non-existent route: "${routeName}"`,
     );
   }
 }
