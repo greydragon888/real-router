@@ -96,6 +96,75 @@ const CORE_INTERNAL: ReadonlySet<string> = new Set([
   "[FSM.on]",
 ]);
 
+/**
+ * Tier four: the form О-1 gives a refusal no caller input can reach. No bracket
+ * — there is no door to name — and a marker instead, which is what makes it
+ * greppable and keeps it out of the bare register.
+ */
+const INTERNAL_DEFECT = "Internal error (please report): ";
+
+/**
+ * The head a `raiser(receiver, door?)` binding prints, for every name bound to
+ * one in a file (#2487).
+ *
+ * The raiser writes the head once per door, so at the throw there is no literal
+ * bracket for tier one to read — the head is the BINDING. A door that is not a
+ * literal is the dynamic case, out of this tier's reach, and is counted rather
+ * than judged.
+ */
+function raiserHeads(source: ts.SourceFile): {
+  readonly heads: ReadonlyMap<string, string>;
+  readonly dynamic: number;
+} {
+  const heads = new Map<string, string>();
+  let dynamic = 0;
+
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer !== undefined &&
+      ts.isCallExpression(node.initializer) &&
+      node.initializer.expression.getText(source) === "raiser"
+    ) {
+      const [receiver, door] = node.initializer.arguments;
+      const receiverText =
+        receiver !== undefined && ts.isStringLiteral(receiver)
+          ? receiver.text
+          : undefined;
+
+      if (receiverText === undefined) {
+        dynamic += 1;
+      } else if (door === undefined) {
+        heads.set(node.name.text, `[${receiverText}]`);
+      } else if (ts.isStringLiteral(door)) {
+        heads.set(node.name.text, `[${receiverText}.${door.text}]`);
+      } else {
+        dynamic += 1;
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(source);
+
+  return { heads, dynamic };
+}
+
+/**
+ * The raiser a tagged template was built from: `at` in ``at.type`…` `` and in
+ * ``at.code(code)`…` ``, or undefined when the tag is neither.
+ */
+function boundNameOfTag(tag: ts.Expression): string | undefined {
+  const member = ts.isCallExpression(tag) ? tag.expression : tag;
+
+  return ts.isPropertyAccessExpression(member) &&
+    ts.isIdentifier(member.expression)
+    ? member.expression.text
+    : undefined;
+}
+
 interface Offender {
   readonly file: string;
   readonly prefix: string;
@@ -103,6 +172,67 @@ interface Offender {
 
 const prefixOf = (text: string): string | undefined =>
   /^\[[^\]]+\]/u.exec(text)?.[0];
+
+/**
+ * Raiser bodies that would render a SECOND head (О-3).
+ *
+ * Two shapes have a static signature and are refused: a body that is one
+ * substitution and nothing else, and a body opening with `[`.
+ *
+ * ⚠ A body that opens with a substitution and continues — `` `${prebuilt} more` ``
+ * — passes both and can still render a double head. That residue is accepted:
+ * the rule that would catch it also rejects the sites whose body legitimately
+ * opens with a value. It is pinned by the control below so it is not closed by
+ * accident.
+ */
+function doubleHeads(root: string = SRC): Offender[] {
+  const found: Offender[] = [];
+
+  for (const file of globSync(`${root}/**/*.ts`)) {
+    const source = ts.createSourceFile(
+      file,
+      readFileSync(file, "utf8"),
+      ts.ScriptTarget.Latest,
+      /* setParentNodes */ true,
+      ts.ScriptKind.TS,
+    );
+    const { heads } = raiserHeads(source);
+
+    const walk = (node: ts.Node): void => {
+      if (ts.isTaggedTemplateExpression(node)) {
+        const bound = boundNameOfTag(node.tag);
+
+        if (bound !== undefined && heads.has(bound)) {
+          const template = node.template;
+          const parts = ts.isNoSubstitutionTemplateLiteral(template)
+            ? [template.text]
+            : [
+                template.head.text,
+                ...template.templateSpans.map((span) => span.literal.text),
+              ];
+
+          if (parts.every((part) => part === "")) {
+            found.push({
+              file: path.relative(root, file),
+              prefix: "pass-through body",
+            });
+          } else if (parts[0].startsWith("[")) {
+            found.push({
+              file: path.relative(root, file),
+              prefix: "body opens with a head",
+            });
+          }
+        }
+      }
+
+      ts.forEachChild(node, walk);
+    };
+
+    walk(source);
+  }
+
+  return found;
+}
 
 function offenders(root: string = SRC): Offender[] {
   const found: Offender[] = [];
@@ -150,10 +280,27 @@ function offenders(root: string = SRC): Offender[] {
       }
     };
 
+    const { heads } = raiserHeads(source);
+
     const walk = (node: ts.Node): void => {
       if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
         for (const argument of node.arguments ?? []) {
           inspect(argument);
+        }
+      }
+
+      // A raiser throw carries no literal bracket: the head is the binding, and
+      // it is judged by the same two rules the literal heads answer to.
+      if (ts.isTaggedTemplateExpression(node)) {
+        const bound = boundNameOfTag(node.tag);
+        const head = bound === undefined ? undefined : heads.get(bound);
+
+        if (
+          head !== undefined &&
+          !PUBLISHED.test(head) &&
+          !CORE_INTERNAL.has(head)
+        ) {
+          found.push({ file: path.relative(root, file), prefix: head });
         }
       }
 
@@ -199,6 +346,121 @@ describe("a message prefix names something the caller can look up (#1845)", () =
 
       expect(offenders(directory)).toStrictEqual([
         { file: "concatenated.ts", prefix: "[Layer.thing]" },
+      ]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("CONTROL — a raiser head is judged by its BINDING, both polarities", () => {
+    // The raiser writes no bracket at the throw, so the literal walk above sees
+    // nothing there. Until a family converts, the whole branch is unreachable
+    // from the tree and a green suite says nothing about it.
+    const directory = mkdtempSync(path.join(tmpdir(), "prefix-raiser-"));
+
+    try {
+      writeFileSync(
+        path.join(directory, "well-shaped.ts"),
+        'const at = raiser("router", "buildPath");\n' +
+          "throw at.type`Missing required param`;\n",
+      );
+      // О-2's bare form, for a raiser several doors reach. The PLUGIN's own
+      // receiver is not admissible here and is not meant to be: core writes no
+      // such binding, and #2457 judges the heads that do.
+      writeFileSync(
+        path.join(directory, "bare.ts"),
+        'const at = raiser("router");\n' +
+          "throw at.plain`cannot commit a state before the router has started`;\n",
+      );
+      writeFileSync(
+        path.join(directory, "mis-shaped.ts"),
+        'const at = raiser("router", "Segment Matcher");\n' +
+          "throw at.type`Invalid format`;\n",
+      );
+
+      expect(offenders(directory)).toStrictEqual([
+        { file: "mis-shaped.ts", prefix: "[router.Segment Matcher]" },
+      ]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("no raiser body renders a second head, and the residue stays open", () => {
+    expect(doubleHeads()).toStrictEqual([]);
+  });
+
+  it("CONTROL — О-3's two rejections fire, and the third shape does not", () => {
+    const directory = mkdtempSync(path.join(tmpdir(), "double-head-"));
+
+    try {
+      writeFileSync(
+        path.join(directory, "pass-through.ts"),
+        'const at = raiser("router", "buildPath");\n' +
+          "throw at.type`${prebuilt}`;\n",
+      );
+      writeFileSync(
+        path.join(directory, "second-head.ts"),
+        'const at = raiser("router", "buildPath");\n' +
+          "throw at.type`[router.x] Missing ${name}`;\n",
+      );
+      writeFileSync(
+        path.join(directory, "residue.ts"),
+        'const at = raiser("router", "buildPath");\n' +
+          "throw at.type`${prebuilt} Missing '${name}'`;\n",
+      );
+      writeFileSync(
+        path.join(directory, "honest.ts"),
+        'const at = raiser("router", "buildPath");\n' +
+          "throw at.type`Missing required param '${name}'`;\n",
+      );
+
+      expect(doubleHeads(directory)).toStrictEqual([
+        { file: "pass-through.ts", prefix: "pass-through body" },
+        { file: "second-head.ts", prefix: "body opens with a head" },
+      ]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("every raiser use is the shape the head tier can read", () => {
+    expect(unreadableRaiserUses()).toStrictEqual([]);
+  });
+
+  it("CONTROL — the four spellings the tier cannot read are refused", () => {
+    // Each file carries a MIS-SHAPED door, so a spelling missing from the result
+    // is one the head tier would pass silently.
+    const directory = mkdtempSync(path.join(tmpdir(), "raiser-shape-"));
+
+    try {
+      writeFileSync(
+        path.join(directory, "bound.ts"),
+        'const at = raiser("router", "Segment Matcher");\nthrow at.type`x`;\n',
+      );
+      writeFileSync(
+        path.join(directory, "aliased.ts"),
+        'import { raiser as r } from "./utils";\nconst at = r("router", "x");\n',
+      );
+      writeFileSync(
+        path.join(directory, "inline.ts"),
+        'throw raiser("router", "Segment Matcher").type`x`;\n',
+      );
+      writeFileSync(
+        path.join(directory, "destructured.ts"),
+        'const { type } = raiser("router", "Segment Matcher");\nthrow type`x`;\n',
+      );
+      writeFileSync(
+        path.join(directory, "reassigned.ts"),
+        'let at = raiser("router", "buildPath");\n' +
+          'at = raiser("router", "Segment Matcher");\nthrow at.type`x`;\n',
+      );
+
+      expect(unreadableRaiserUses(directory)).toStrictEqual([
+        "aliased.ts · imported under an alias",
+        "destructured.ts · not bound to a name",
+        "inline.ts · not bound to a name",
+        "reassigned.ts · not bound to a name",
       ]);
     } finally {
       rmSync(directory, { recursive: true, force: true });
@@ -296,12 +558,7 @@ describe("a message prefix names something the caller can look up (#1845)", () =
  * every `throw` in the tree, so a new one cannot arrive unnoticed even where it
  * cannot be judged.
  */
-const BARE: readonly string[] = [
-  // The unbracketed form O-1 prescribes: a defect no caller input can reach, so
-  // there is no door to name. Registered rather than prefixed, and step 2 of
-  // #2487 replaces this row with a tier that judges the MARKER.
-  "RouterError.ts · Internal error (please report): ${}",
-];
+const BARE: readonly string[] = [];
 
 /**
  * `Route "${current}" does not exist` → the shape, substitutions collapsed.
@@ -349,6 +606,12 @@ interface Refusals {
   readonly judged: number;
   /** Files the glob reached — reach, asserted apart from recognition. */
   readonly files: number;
+  /** Constructions carrying О-1's marker — admissible without a bracket. */
+  readonly marked: number;
+  /** ``internalDefect.plain`…` `` sites, which write no literal message. */
+  readonly defects: number;
+  /** Bracketed heads reaching a bag through a variable — bounded, not judged. */
+  readonly variableFed: number;
 }
 
 /**
@@ -444,6 +707,132 @@ function messageOfConstruction(
   return ts.isObjectLiteralExpression(first) ? fromBag() : first;
 }
 
+/**
+ * A name bound to a bracketed literal, by declaration or by assignment — the
+ * left half of О-6's shape. The right half, a `RouterError` bag consuming that
+ * name, is a text match in the same file.
+ *
+ * ⚠ Both spellings, deliberately. Measured: with only the assignment form, a
+ * planted `const` site passed the bound this feeds.
+ */
+/**
+ * Which bucket an error CONSTRUCTION falls in — the bare-message tier's subject,
+ * whatever carries the error to the caller afterwards.
+ */
+/**
+ * Raiser uses that the head tier cannot read (#2487).
+ *
+ * The tier reads `const at = raiser(receiver, door)` and nothing else. Measured,
+ * four other spellings carry a head it never judges: an aliased import, an
+ * inline call with no binding, a reassignment, and a destructured flavour. Rather
+ * than teach four shapes — and still miss a raiser returned from a helper — the
+ * OTHER spellings are refused, which makes the tier's reach exhaustive by
+ * construction.
+ */
+function unreadableRaiserUses(root: string = SRC): string[] {
+  const found: string[] = [];
+
+  for (const file of globSync(`${root}/**/*.ts`)) {
+    const source = ts.createSourceFile(
+      file,
+      readFileSync(file, "utf8"),
+      ts.ScriptTarget.Latest,
+      /* setParentNodes */ true,
+      ts.ScriptKind.TS,
+    );
+    const where = path.relative(root, file);
+
+    const visit = (node: ts.Node): void => {
+      // An alias would make the callee text below lie about which function it is.
+      if (
+        ts.isImportSpecifier(node) &&
+        node.propertyName !== undefined &&
+        ["raiser", "internalDefect"].includes(node.propertyName.text)
+      ) {
+        found.push(`${where} · imported under an alias`);
+      }
+
+      if (
+        ts.isCallExpression(node) &&
+        node.expression.getText(source) === "raiser" &&
+        !(
+          node.parent !== undefined &&
+          ts.isVariableDeclaration(node.parent) &&
+          ts.isIdentifier(node.parent.name)
+        )
+      ) {
+        found.push(`${where} · not bound to a name`);
+      }
+
+      ts.forEachChild(node, visit);
+    };
+
+    visit(source);
+  }
+
+  return found.toSorted(byteOrder);
+}
+
+function classifyConstruction(
+  node: ts.Node,
+  source: ts.SourceFile,
+):
+  | { readonly kind: "none" }
+  | { readonly kind: "unjudged" }
+  | { readonly kind: "marked" }
+  | { readonly kind: "headed" }
+  | { readonly kind: "bare"; readonly shape: string } {
+  if (
+    !ts.isNewExpression(node) ||
+    !ERROR_CONSTRUCTORS.has(node.expression.getText())
+  ) {
+    return { kind: "none" };
+  }
+
+  const message = messageOfConstruction(node);
+  const text = message === undefined ? undefined : textOf(message);
+
+  if (message === undefined || text === undefined || text === "") {
+    return { kind: "unjudged" };
+  }
+
+  if (text.startsWith(INTERNAL_DEFECT)) {
+    return { kind: "marked" };
+  }
+
+  return text.startsWith("[")
+    ? { kind: "headed" }
+    : { kind: "bare", shape: shapeOf(message, source) };
+}
+
+function bracketedNameOf(node: ts.Node): string | undefined {
+  let name: string | undefined;
+  let value: ts.Expression | undefined;
+
+  if (
+    ts.isBinaryExpression(node) &&
+    node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+    ts.isIdentifier(node.left)
+  ) {
+    name = node.left.text;
+    value = node.right;
+  } else if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
+    name = node.name.text;
+    value = node.initializer;
+  }
+
+  if (
+    name === undefined ||
+    value === undefined ||
+    !(ts.isStringLiteral(value) || ts.isNoSubstitutionTemplateLiteral(value)) ||
+    !value.text.startsWith("[")
+  ) {
+    return undefined;
+  }
+
+  return name;
+}
+
 function refusals(root: string = SRC): Refusals {
   const bare: string[] = [];
   let literals = 0;
@@ -454,14 +843,19 @@ function refusals(root: string = SRC): Refusals {
   let throwStatements = 0;
   let constructions = 0;
   let judged = 0;
+  let marked = 0;
+  let defects = 0;
+  let variableFed = 0;
   let files = 0;
 
   for (const file of globSync(`${root}/**/*.ts`)) {
     files++;
 
+    const fileText = readFileSync(file, "utf8");
+    const fed: string[] = [];
     const source = ts.createSourceFile(
       file,
-      readFileSync(file, "utf8"),
+      fileText,
       ts.ScriptTarget.Latest,
       /* setParentNodes */ true,
       ts.ScriptKind.TS,
@@ -500,32 +894,67 @@ function refusals(root: string = SRC): Refusals {
         }
       }
 
-      // The bare-message tier's own subject: every error CONSTRUCTION, whatever
-      // carries it to the caller afterwards.
-      if (
-        ts.isNewExpression(node) &&
-        ERROR_CONSTRUCTORS.has(node.expression.getText())
-      ) {
-        constructions++;
+      const construction = classifyConstruction(node, source);
 
-        const message = messageOfConstruction(node);
-        const text = message === undefined ? undefined : textOf(message);
+      switch (construction.kind) {
+        case "none": {
+          break;
+        }
+        case "unjudged": {
+          constructions++;
 
-        if (message !== undefined && text !== undefined && text !== "") {
+          break;
+        }
+        case "marked": {
+          constructions++;
+          judged++;
+          marked++;
+
+          break;
+        }
+        case "headed": {
+          constructions++;
           judged++;
 
-          if (!text.startsWith("[")) {
-            bare.push(
-              `${path.relative(root, file)} · ${shapeOf(message, source)}`,
-            );
-          }
+          break;
         }
+        default: {
+          constructions++;
+          judged++;
+          bare.push(`${path.relative(root, file)} · ${construction.shape}`);
+        }
+      }
+
+      // A bracketed literal assigned to a NAME that a `RouterError` bag later
+      // consumes. О-6's ratified answer is to bound the count rather than judge
+      // the shape: the only detector is a same-file heuristic, and a heuristic
+      // in a gate decides cases nobody reviewed.
+      const fedName = bracketedNameOf(node);
+
+      if (fedName !== undefined) {
+        fed.push(fedName);
+      }
+
+      // A site raising through О-1's marker writes no literal message at all,
+      // so the construction walk above cannot see it. Counted here, and floored
+      // below, so the form stays visible rather than silently unwatched.
+      if (
+        ts.isTaggedTemplateExpression(node) &&
+        boundNameOfTag(node.tag) === "internalDefect"
+      ) {
+        defects++;
       }
 
       ts.forEachChild(node, walk);
     };
 
     walk(source);
+
+    for (const name of fed) {
+      if (new RegExp(String.raw`message:\s*${name}\b`, "u").test(fileText)) {
+        variableFed++;
+      }
+    }
   }
 
   return {
@@ -539,6 +968,9 @@ function refusals(root: string = SRC): Refusals {
     constructions,
     judged,
     files,
+    marked,
+    defects,
+    variableFed,
   };
 }
 
@@ -595,6 +1027,52 @@ describe("a refusal with no prefix at all is registered, not invisible (#2456)",
     // and the floors above cannot see it: they count throws.
     expect(seen.constructions).toBeGreaterThan(130);
     expect(seen.judged).toBeGreaterThan(95);
+    // О-1's marker is recognised rather than registered, and a recogniser that
+    // stopped matching would empty this without emptying anything above.
+    expect(seen.marked).toBeGreaterThan(0);
+  });
+
+  it("the variable-fed head does not spread (О-6, ratified 2026-09-22)", () => {
+    // A bracketed literal assigned to a name a `RouterError` bag later consumes
+    // is the one shape neither tier can judge: the authority reads the bag's
+    // expression and finds an identifier. Teaching it would put a same-file
+    // heuristic inside a gate, so the count is BOUNDED instead — a new site of
+    // this shape reds here without any door being judged.
+    const seen = refusals();
+
+    expect(seen.variableFed).toBeLessThanOrEqual(3);
+    // Anti-vacuum: a detector that stopped matching would satisfy the bound.
+    expect(seen.variableFed).toBeGreaterThan(0);
+  });
+
+  it("CONTROL — the marker is admissible, a bare message is not, and raise sites are counted", () => {
+    // `defects` is zero in the tree today — step 6 of #2487 is what converts the
+    // FSM onto this form — so a floor on it would be vacuous. Its detector is
+    // controlled here instead.
+    const directory = mkdtempSync(path.join(tmpdir(), "marker-"));
+
+    try {
+      writeFileSync(
+        path.join(directory, "marked.ts"),
+        "throw new Error(`Internal error (please report): ${why}`);\n",
+      );
+      writeFileSync(
+        path.join(directory, "bare.ts"),
+        "throw new Error(`Circular forwardTo: ${chain}`);\n",
+      );
+      writeFileSync(
+        path.join(directory, "raised.ts"),
+        "throw internalDefect.plain`unreachable: ${why}`;\n",
+      );
+
+      const seen = refusals(directory);
+
+      expect(seen.bare).toStrictEqual(["bare.ts · Circular forwardTo: ${}"]);
+      expect(seen.marked).toBe(1);
+      expect(seen.defects).toBe(1);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it("CONTROL — both polarities, on a tree written for the purpose", () => {
