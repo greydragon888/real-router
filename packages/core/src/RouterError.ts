@@ -412,3 +412,122 @@ export class RouterError extends Error {
     return result;
   }
 }
+
+/**
+ * A receiver a reader can IMPORT, plus this package's own name for a refusal no
+ * call reaches (#1845). The door beside it is an unconstrained `string`, so the
+ * type is not the guard — `message-prefix-authority-1845` judges the argument.
+ */
+export type Receiver =
+  "router" | "RouterError" | "cloneRouter" | "validation-plugin";
+
+type Tag<E extends Error> = (
+  strings: TemplateStringsArray,
+  ...values: unknown[]
+) => E;
+
+/** One member per constructor the refusal surface holds. */
+export interface Raiser {
+  /**
+   * ⚠ `type` and `plain` also take `ErrorOptions` and RETURN the tag, because
+   * `cause` cannot be attached afterwards: measured, the constructor defines it
+   * non-enumerable and an assignment defines it enumerable.
+   */
+  type: Tag<TypeError> & ((options: ErrorOptions) => Tag<TypeError>);
+  plain: Tag<Error> & ((options: ErrorOptions) => Tag<Error>);
+  ref: Tag<ReferenceError>;
+  range: Tag<RangeError>;
+  /**
+   * A coded `RouterError`, frozen for the throw (#1960) — so a site using this
+   * flavour needs no `freezeThrownError` of its own. `fields` carries the bag's
+   * other entries; `message` is not among them, since the template writes it.
+   */
+  code: (
+    code: string,
+    fields?: Readonly<Record<string, unknown>>,
+  ) => Tag<RouterError>;
+}
+
+/** A refusal unreachable from caller input: no bracket, an explicit marker. */
+export interface InternalDefect {
+  plain: Tag<Error>;
+}
+
+const interpolate = (
+  strings: TemplateStringsArray,
+  values: readonly unknown[],
+): string => {
+  let text = strings[0];
+
+  for (const [index, value] of values.entries()) {
+    text += String(value) + strings[index + 1];
+  }
+
+  return text;
+};
+
+/**
+ * Build the refusals of one door, so the head is written once per module rather
+ * than once per throw (#2487).
+ *
+ * ```ts
+ * const at = raiser("router", "buildPath");
+ *
+ * throw at.type`Missing required param '${name}'`;
+ * throw at.code(errorCodes.ROUTE_NOT_FOUND, { routeName })`No route '${routeName}'`;
+ * ```
+ *
+ * ⚠ It RETURNS the error rather than throwing it, so the site keeps `throw` —
+ * which greps, narrows types natively, and leaves room to tag the error between
+ * construction and throw, as the search-params config fault does.
+ *
+ * ⚠ Omit `door` only where several doors reach one raiser; a head that names a
+ * door the caller never called is the defect this exists to remove.
+ */
+export function raiser(receiver: Receiver, door?: string): Raiser {
+  const head = door === undefined ? `[${receiver}] ` : `[${receiver}.${door}] `;
+  const message = (
+    strings: TemplateStringsArray,
+    values: readonly unknown[],
+  ): string => head + interpolate(strings, values);
+
+  const flavour = <E extends Error>(
+    build: (text: string, options?: ErrorOptions) => E,
+  ): Tag<E> & ((options: ErrorOptions) => Tag<E>) =>
+    ((
+      first: TemplateStringsArray | ErrorOptions,
+      ...values: readonly unknown[]
+    ) =>
+      Array.isArray(first)
+        ? build(message(first as TemplateStringsArray, values))
+        : (strings: TemplateStringsArray, ...rest: readonly unknown[]) =>
+            build(message(strings, rest), first as ErrorOptions)) as Tag<E> &
+      ((options: ErrorOptions) => Tag<E>);
+
+  return {
+    type: flavour((text, options) => new TypeError(text, options)),
+    plain: flavour((text, options) => new Error(text, options)),
+    ref: (strings, ...values) => new ReferenceError(message(strings, values)),
+    range: (strings, ...values) => new RangeError(message(strings, values)),
+    code:
+      (code, fields) =>
+      (strings, ...values) =>
+        freezeThrownError(
+          new RouterError(code, {
+            ...fields,
+            message: message(strings, values),
+          }),
+        ),
+  };
+}
+
+/**
+ * A defect a caller cannot provoke. Unbracketed on purpose: there is no door to
+ * name, and a marker is greppable where a bare sentence is not (#1845).
+ */
+export const internalDefect: InternalDefect = {
+  plain: (strings, ...values) =>
+    new Error(
+      `Internal error (please report): ${interpolate(strings, values)}`,
+    ),
+};

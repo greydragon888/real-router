@@ -209,9 +209,16 @@ describe("reachability census (#2303)", () => {
     });
   });
 
-  it("/utils — four ingestion primitives, no types", () => {
+  it("/utils — six discipline primitives, no types", () => {
     expect(exportsOf(SUBPATHS[3].file)).toStrictEqual({
-      values: ["adoptChannel", "copyFields", "freezeThrownError", "putField"],
+      values: [
+        "adoptChannel",
+        "copyFields",
+        "freezeThrownError",
+        "internalDefect",
+        "putField",
+        "raiser",
+      ],
       types: [],
       stars: [],
     });
