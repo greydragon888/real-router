@@ -531,13 +531,13 @@ describe("a message prefix names something the caller can look up (#1845)", () =
       walk(source);
     }
 
-    // ⚠ TWO claims, not a total. A sum would hide either half going to zero, and
-    // the halves move in opposite directions: literal heads fall as families
-    // convert while bindings rise, and bindings are FEWER than the sites they
-    // replace — that shrink is what the raiser is for, so no sum of the two is
-    // invariant. Each is floored on its own, and each reds alone.
-    expect(bracketed).toBeGreaterThan(20);
+    // ⚠ Only the half that cannot reach zero is a live floor. Bindings rise as
+    // families convert; literal heads fall toward zero BY DESIGN, so a floor on
+    // them would red on the migration succeeding. That half is a control below,
+    // on a tree written for it.
     expect(bindings).toBeGreaterThan(0);
+    // Both kinds are still READ here, which is what this cell is for.
+    expect(bracketed + bindings).toBeGreaterThan(20);
   });
 });
 
@@ -1102,8 +1102,26 @@ describe("a refusal with no prefix at all is registered, not invisible (#2456)",
     const seen = refusals();
 
     expect(seen.variableFed).toBeLessThanOrEqual(3);
-    // Anti-vacuum: a detector that stopped matching would satisfy the bound.
-    expect(seen.variableFed).toBeGreaterThan(0);
+  });
+
+  it("CONTROL — the variable-fed detector still finds one", () => {
+    // ⚠ The anti-vacuum half cannot be a floor on the live count. Step 5 converts
+    // `EventBusNamespace`, which holds all three, and the count then reaches zero
+    // BY DESIGN — a floor there would red on the work succeeding, and the reflex
+    // would be to lower it, which is how a ratchet stops ratcheting.
+    const directory = mkdtempSync(path.join(tmpdir(), "variable-fed-"));
+
+    try {
+      writeFileSync(
+        path.join(directory, "fed.ts"),
+        'const phase = "[router] cannot commit";\n' +
+          "throw new RouterError(code, { message: phase });\n",
+      );
+
+      expect(refusals(directory).variableFed).toBe(1);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it("CONTROL — only a raiser flavour counts as converted", () => {
