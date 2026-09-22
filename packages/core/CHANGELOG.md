@@ -1,5 +1,15 @@
 # @real-router/core
 
+## 0.147.3
+
+### Patch Changes
+
+- [#2520](https://github.com/greydragon888/real-router/pull/2520) [`899fa56`](https://github.com/greydragon888/real-router/commit/899fa56c7c0e327865526f824b440b622ac52118) Thanks [@greydragon888](https://github.com/greydragon888)! - `guards.ts` builds its refusals through the raiser ([#2487](https://github.com/greydragon888/real-router/issues/2487))
+
+  Internal refactor: the seventeen bracketed heads in that file are now written once
+  per door as a binding instead of once per throw inside a template. No message text
+  moves — the existing suite asserts every one of them verbatim.
+
 ## 0.147.2
 
 ### Patch Changes
