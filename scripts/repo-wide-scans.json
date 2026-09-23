@@ -104,7 +104,7 @@
     },
     {
       "file": "packages/validation-plugin/tests/functional/prefix-reachability-authority-2457.test.ts",
-      "reads": "packages/core/src — the door names core publishes, and which of them consults each validator member"
+      "reads": "packages/core/src — the door names core publishes, and which of them consults each validator member; packages/core/tests/fixtures/raiser-heads — the shared raiser-head fixture"
     },
     {
       "file": "packages/validation-plugin/tests/functional/validator-boundary-authority-2322.test.ts",

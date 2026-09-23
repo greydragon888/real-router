@@ -20,30 +20,6 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import ts from "typescript";
 
-// Committed AND uncommitted, because a conversion is measured both before it lands
-// and after. ⚠ Two spellings of the file set each printed `lost: 0  new: 0` on work
-// that WAS converted — `git diff --name-only` alone went quiet once the work was
-// committed, and without `HEAD` it goes quiet again once the work is staged. An empty
-// set is a REFUSAL, not a pass.
-const files = [
-  ...new Set(
-    [
-      ...execFileSync("git", ["diff", "--name-only", "HEAD"], {
-        encoding: "utf8",
-      }).split("\n"),
-      ...execFileSync("git", ["diff", "--name-only", "origin/master...HEAD"], {
-        encoding: "utf8",
-      }).split("\n"),
-    ].filter((f) => f.endsWith(".ts") && f.startsWith("packages/")),
-  ),
-];
-
-if (files.length === 0) {
-  console.error(
-    "no changed .ts files against origin/master \u2014 nothing to compare, which is not a pass",
-  );
-  process.exit(1);
-}
 const PLAIN = new Set(["TypeError", "Error", "ReferenceError", "RangeError"]);
 const CONSTRUCTORS = new Set([...PLAIN, "RouterError"]);
 
@@ -84,7 +60,7 @@ const parse = (name, text) =>
 // the binding form on EACH side: reading literals on the left only reported a file's
 // EARLIER conversions as `new` the next time a step touched it, which is a false
 // positive that grows with every step.
-const render = (name, text) => {
+export const render = (name, text) => {
   const src = parse(name, text);
   const out = new Set();
   // ⚠ The BODY, head stripped, is a second comparison and step 6 is why. When a
@@ -183,47 +159,87 @@ const render = (name, text) => {
   return { out, bodies };
 };
 
-const before = new Set(),
-  after = new Set(),
-  beforeBodies = new Set(),
-  afterBodies = new Set();
+function main() {
+  // Committed AND uncommitted, because a conversion is measured both before it lands
+  // and after. ⚠ Two spellings of the file set each printed `lost: 0  new: 0` on work
+  // that WAS converted — `git diff --name-only` alone went quiet once the work was
+  // committed, and without `HEAD` it goes quiet again once the work is staged. An empty
+  // set is a REFUSAL, not a pass.
+  const files = [
+    ...new Set(
+      [
+        ...execFileSync("git", ["diff", "--name-only", "HEAD"], {
+          encoding: "utf8",
+        }).split("\n"),
+        ...execFileSync(
+          "git",
+          ["diff", "--name-only", "origin/master...HEAD"],
+          {
+            encoding: "utf8",
+          },
+        ).split("\n"),
+      ].filter((f) => f.endsWith(".ts") && f.startsWith("packages/")),
+    ),
+  ];
 
-for (const f of files) {
-  // A file the branch ADDS has no `before` side. ⚠ Reading it as an error crashed
-  // the guard outright, so it could not run on any branch that adds a file.
-  let master = "";
-
-  try {
-    master = execFileSync("git", ["show", `origin/master:${f}`], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-  } catch {
-    master = "";
+  if (files.length === 0) {
+    console.error(
+      "no changed .ts files against origin/master \u2014 nothing to compare, which is not a pass",
+    );
+    process.exit(1);
   }
 
-  const was = render(f, master);
-  const now = render(f, readFileSync(f, "utf8"));
+  const before = new Set(),
+    after = new Set(),
+    beforeBodies = new Set(),
+    afterBodies = new Set();
 
-  for (const head of was.out) before.add(head);
-  for (const body of was.bodies) beforeBodies.add(body);
-  for (const head of now.out) after.add(head);
-  for (const body of now.bodies) afterBodies.add(body);
+  for (const f of files) {
+    // A file the branch ADDS has no `before` side. ⚠ Reading it as an error crashed
+    // the guard outright, so it could not run on any branch that adds a file.
+    let master = "";
+
+    try {
+      master = execFileSync("git", ["show", `origin/master:${f}`], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+    } catch {
+      master = "";
+    }
+
+    const was = render(f, master);
+    const now = render(f, readFileSync(f, "utf8"));
+
+    for (const head of was.out) before.add(head);
+    for (const body of was.bodies) beforeBodies.add(body);
+    for (const head of now.out) after.add(head);
+    for (const body of now.bodies) afterBodies.add(body);
+  }
+
+  const lostBodies = [...beforeBodies].filter((x) => !afterBodies.has(x));
+  const newBodies = [...afterBodies].filter((x) => !beforeBodies.has(x));
+
+  console.log(
+    `  bodies: ${beforeBodies.size} → ${afterBodies.size}   lost: ${lostBodies.length}   new: ${newBodies.length}`,
+  );
+
+  for (const x of [...lostBodies, ...newBodies].slice(0, 6))
+    console.log(`     body  ${x.slice(0, 86)}`);
+
+  const missing = [...before].filter((x) => !after.has(x));
+  const extra = [...after].filter((x) => !before.has(x));
+  console.log(`  before: ${before.size}   after: ${after.size}`);
+  console.log(`  lost:   ${missing.length}   new: ${extra.length}`);
+  for (const x of [...missing, ...extra].slice(0, 6))
+    console.log(`     ${x.slice(0, 92)}`);
 }
 
-const lostBodies = [...beforeBodies].filter((x) => !afterBodies.has(x));
-const newBodies = [...afterBodies].filter((x) => !beforeBodies.has(x));
-
-console.log(
-  `  bodies: ${beforeBodies.size} → ${afterBodies.size}   lost: ${lostBodies.length}   new: ${newBodies.length}`,
-);
-
-for (const x of [...lostBodies, ...newBodies].slice(0, 6))
-  console.log(`     body  ${x.slice(0, 86)}`);
-
-const missing = [...before].filter((x) => !after.has(x));
-const extra = [...after].filter((x) => !before.has(x));
-console.log(`  before: ${before.size}   after: ${after.size}`);
-console.log(`  lost:   ${missing.length}   new: ${extra.length}`);
-for (const x of [...missing, ...extra].slice(0, 6))
-  console.log(`     ${x.slice(0, 92)}`);
+// Run main() only when invoked directly (`node scripts/raiser-text-equality.mjs`),
+// not when the fixture test imports `render`. ⚠ `import.meta.main`, not a
+// comparison of `import.meta.url` with `file://${argv[1]}`: Node resolves a main
+// module's symlinks and its URL escapes a space, so that comparison fails on
+// such a path and main() never runs (#2539).
+if (import.meta.main) {
+  main();
+}

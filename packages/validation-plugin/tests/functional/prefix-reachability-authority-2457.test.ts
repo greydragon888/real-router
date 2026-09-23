@@ -38,6 +38,12 @@ import { describe, expect, it } from "vitest";
 const CORE_SRC = path.resolve(__dirname, "../../../core/src");
 const PLUGIN_SRC = path.resolve(__dirname, "../../src");
 
+/** The raiser-head fixture every reader of a raiser head answers for (#2537). */
+const FIXTURE = path.resolve(
+  __dirname,
+  "../../../core/tests/fixtures/raiser-heads",
+);
+
 /**
  * ⚠ Named predicates, not inline `/…/.test(…)`: `vitest/no-conditional-tests`
  * reads a `.test(` call inside an `if` as the vitest global in a conditional and
@@ -1081,6 +1087,38 @@ describe("a message names a door that can reach it (#2457)", () => {
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
+  });
+
+  it("CONTROL — the shared raiser fixture: each site reads its own binding (#2537)", () => {
+    // ⚑ The fixture is SHARED: every reader of a raiser head answers for every
+    // site in it, each in its own terms. Here a head is the text inside a CLOSED
+    // bracket, so a dynamic door — rendered `[router.` and never closed — is
+    // interpolated rather than read. `two-bindings.ts` is the row that matters:
+    // a reader resolving a name file-wide gives both sites the second binding.
+    // Keyed by FILE, so a file with no head still has to be answered for: a new
+    // one reds this cell until its answer is written below.
+    const heads = new Map<string, string[]>(
+      globSync(`${FIXTURE}/**/*.ts`).map((file) => [
+        path.relative(FIXTURE, file),
+        [],
+      ]),
+    );
+    const read = [...readPlugin(FIXTURE).fns.values()]
+      .flatMap((fn) => fn.heads)
+      .toSorted((left, right) => left.line - right.line);
+
+    for (const head of read) {
+      heads.get(head.file)?.push(head.prefix ?? "<interpolated>");
+    }
+
+    expect(Object.fromEntries(heads)).toStrictEqual({
+      "bare-receiver.ts": ["router"],
+      "binding-after-use.ts": ["router.matchPath"],
+      "code-flavour.ts": ["router.navigateToState"],
+      "dynamic-door.ts": ["<interpolated>"],
+      "static-door.ts": ["router.buildPath"],
+      "two-bindings.ts": ["router.Segment Matcher", "router.navigate"],
+    });
   });
 
   it("CONTROL — both polarities, on a tree written for the purpose", () => {

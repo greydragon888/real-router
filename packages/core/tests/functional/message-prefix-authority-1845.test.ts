@@ -43,6 +43,9 @@ import { describe, expect, it } from "vitest";
  */
 const SRC = path.resolve(__dirname, "../../src");
 
+/** The raiser-head fixture every reader of a raiser head answers for (#2537). */
+const FIXTURE = path.resolve(__dirname, "../fixtures/raiser-heads");
+
 /**
  * The leftmost leaf of a `+` chain — a message is often CONCATENATED, and the
  * prefix then sits in the head of the first operand rather than in the argument
@@ -86,43 +89,147 @@ const PUBLISHED =
 const INTERNAL_DEFECT = "Internal error (please report): ";
 
 /**
- * The head a `raiser(receiver, door?)` binding prints, for every name bound to
- * one in a file (#2487).
- *
- * The raiser writes the head once per door, so at the throw there is no literal
- * bracket for tier one to read — the head is the BINDING. A door that is not a
- * literal is the dynamic case, out of this tier's reach, and is counted rather
- * than judged.
+ * What one `raiser(receiver, door?)` call prints (#2487): a head when both
+ * arguments are literals, and otherwise the dynamic case, which is out of this
+ * tier's reach and is not judged.
  */
-function raiserHeads(source: ts.SourceFile): {
-  readonly heads: ReadonlyMap<string, string>;
-  readonly dynamic: number;
-} {
-  const heads = new Map<string, string>();
-  let dynamic = 0;
+type BoundHead =
+  | { readonly kind: "static"; readonly head: string }
+  | { readonly kind: "dynamic" };
+
+function headOfRaiserCall(call: ts.CallExpression): BoundHead {
+  const [receiver, door] = call.arguments;
+
+  if (receiver === undefined || !ts.isStringLiteral(receiver)) {
+    return { kind: "dynamic" };
+  }
+
+  if (door === undefined) {
+    return { kind: "static", head: `[${receiver.text}]` };
+  }
+
+  return ts.isStringLiteral(door)
+    ? { kind: "static", head: `[${receiver.text}.${door.text}]` }
+    : { kind: "dynamic" };
+}
+
+/** The name and head a declaration binds, when it binds `raiser(...)`. */
+function raiserBindingOf(
+  node: ts.Node,
+  source: ts.SourceFile,
+): { readonly name: string; readonly bound: BoundHead } | undefined {
+  if (
+    !ts.isVariableDeclaration(node) ||
+    !ts.isIdentifier(node.name) ||
+    node.initializer === undefined ||
+    !ts.isCallExpression(node.initializer) ||
+    node.initializer.expression.getText(source) !== "raiser"
+  ) {
+    return undefined;
+  }
+
+  return { name: node.name.text, bound: headOfRaiserCall(node.initializer) };
+}
+
+/**
+ * Every raiser binding in a file, ONE ENTRY PER BINDING.
+ *
+ * The raiser writes the head once per binding, so at the throw there is no
+ * literal bracket for tier one to read — the head is the BINDING, and each one
+ * is judged whether or not another binding shares its name.
+ *
+ * ⚠ Not a map keyed by name. `validation-plugin` names every per-call binding
+ * `at`, and a map hands the last binding's head to every site: on the shared
+ * fixture, a mis-shaped door in the first of two such bindings passed this
+ * tier (#2537).
+ */
+function raiserBindings(source: ts.SourceFile): BoundHead[] {
+  const found: BoundHead[] = [];
 
   const visit = (node: ts.Node): void => {
-    if (
-      ts.isVariableDeclaration(node) &&
-      ts.isIdentifier(node.name) &&
-      node.initializer !== undefined &&
-      ts.isCallExpression(node.initializer) &&
-      node.initializer.expression.getText(source) === "raiser"
-    ) {
-      const [receiver, door] = node.initializer.arguments;
-      const receiverText =
-        receiver !== undefined && ts.isStringLiteral(receiver)
-          ? receiver.text
-          : undefined;
+    const binding = raiserBindingOf(node, source);
 
-      if (receiverText === undefined) {
-        dynamic += 1;
-      } else if (door === undefined) {
-        heads.set(node.name.text, `[${receiverText}]`);
-      } else if (ts.isStringLiteral(door)) {
-        heads.set(node.name.text, `[${receiverText}.${door.text}]`);
-      } else {
-        dynamic += 1;
+    if (binding !== undefined) {
+      found.push(binding.bound);
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(source);
+
+  return found;
+}
+
+/** The head `name` is bound to by a statement of this one scope, if any. */
+function boundHeadIn(
+  scope: ts.Block | ts.SourceFile,
+  name: string,
+  source: ts.SourceFile,
+): BoundHead | undefined {
+  for (const statement of scope.statements) {
+    if (!ts.isVariableStatement(statement)) {
+      continue;
+    }
+
+    for (const declaration of statement.declarationList.declarations) {
+      const binding = raiserBindingOf(declaration, source);
+
+      if (binding?.name === name) {
+        return binding.bound;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * The binding a tag reads, resolved from the tag by LEXICAL SCOPE: the nearest
+ * enclosing block or file that binds `name` to a raiser. Each scope is read
+ * whole, so a binding written below the site still answers for it.
+ */
+function boundHeadAt(
+  node: ts.Node,
+  name: string,
+  source: ts.SourceFile,
+): BoundHead | undefined {
+  // ⚠ `parent` is typed as present and IS undefined at the root, so the cast is
+  // a guard rather than noise.
+  for (
+    let scope = node.parent as ts.Node | undefined;
+    scope !== undefined;
+    scope = scope.parent
+  ) {
+    const bound =
+      ts.isBlock(scope) || ts.isSourceFile(scope)
+        ? boundHeadIn(scope, name, source)
+        : undefined;
+
+    if (bound !== undefined) {
+      return bound;
+    }
+  }
+
+  return undefined;
+}
+
+/** A tag read off a named base, with the binding it resolves to. */
+interface RaiserTag {
+  readonly node: ts.TaggedTemplateExpression;
+  readonly bound: BoundHead | undefined;
+}
+
+/** Every tag read off a named base in a file, with the binding it resolves to. */
+function raiserTags(source: ts.SourceFile): RaiserTag[] {
+  const found: RaiserTag[] = [];
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isTaggedTemplateExpression(node)) {
+      const name = boundNameOfTag(node.tag);
+
+      if (name !== undefined) {
+        found.push({ node, bound: boundHeadAt(node, name, source) });
       }
     }
 
@@ -131,7 +238,7 @@ function raiserHeads(source: ts.SourceFile): {
 
   visit(source);
 
-  return { heads, dynamic };
+  return found;
 }
 
 /**
@@ -306,25 +413,20 @@ function doubleHeads(root: string = SRC): Offender[] {
       /* setParentNodes */ true,
       ts.ScriptKind.TS,
     );
-    const { heads } = raiserHeads(source);
 
-    const walk = (node: ts.Node): void => {
-      if (ts.isTaggedTemplateExpression(node)) {
-        const bound = boundNameOfTag(node.tag);
-
-        if (bound !== undefined && heads.has(bound)) {
-          const verdict = judgeBody(node.template, root);
-
-          if (verdict !== undefined) {
-            found.push({ file: path.relative(root, file), prefix: verdict });
-          }
-        }
+    // A dynamic-door binding has no head to read, so this rule does not judge
+    // its body either.
+    for (const { node, bound } of raiserTags(source)) {
+      if (bound?.kind !== "static") {
+        continue;
       }
 
-      ts.forEachChild(node, walk);
-    };
+      const verdict = judgeBody(node.template, root);
 
-    walk(source);
+      if (verdict !== undefined) {
+        found.push({ file: path.relative(root, file), prefix: verdict });
+      }
+    }
   }
 
   return found;
@@ -372,8 +474,6 @@ function offenders(root: string = SRC): Offender[] {
       }
     };
 
-    const { heads } = raiserHeads(source);
-
     const walk = (node: ts.Node): void => {
       if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
         for (const argument of node.arguments ?? []) {
@@ -381,21 +481,18 @@ function offenders(root: string = SRC): Offender[] {
         }
       }
 
-      // A raiser throw carries no literal bracket: the head is the binding, and
-      // it is judged by the same two rules the literal heads answer to.
-      if (ts.isTaggedTemplateExpression(node)) {
-        const bound = boundNameOfTag(node.tag);
-        const head = bound === undefined ? undefined : heads.get(bound);
-
-        if (head !== undefined && !PUBLISHED.test(head)) {
-          found.push({ file: path.relative(root, file), prefix: head });
-        }
-      }
-
       ts.forEachChild(node, walk);
     };
 
     walk(source);
+
+    // A raiser throw carries no literal bracket: the head is the binding, and
+    // each binding is judged by the same rule the literal heads answer to.
+    for (const bound of raiserBindings(source)) {
+      if (bound.kind === "static" && !PUBLISHED.test(bound.head)) {
+        found.push({ file: path.relative(root, file), prefix: bound.head });
+      }
+    }
   }
 
   return found;
@@ -472,6 +569,42 @@ describe("a message prefix names something the caller can look up (#1845)", () =
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
+  });
+
+  it("CONTROL — the shared raiser fixture: each binding answers for its own sites (#2537)", () => {
+    // ⚑ The fixture is SHARED: every reader of a raiser head answers for every
+    // site in it, each in its own terms. `two-bindings.ts` is the row that
+    // matters — a reader resolving a name file-wide hands the second binding to
+    // both sites and loses the door planted in the first. A new file there reds
+    // this cell until its answer is written below.
+    const read: Record<string, string[]> = {};
+
+    for (const file of globSync(`${FIXTURE}/**/*.ts`)) {
+      const source = ts.createSourceFile(
+        file,
+        readFileSync(file, "utf8"),
+        ts.ScriptTarget.Latest,
+        /* setParentNodes */ true,
+        ts.ScriptKind.TS,
+      );
+
+      read[path.relative(FIXTURE, file)] = raiserTags(source).map(
+        ({ bound }) =>
+          bound?.kind === "static" ? bound.head : (bound?.kind ?? "unbound"),
+      );
+    }
+
+    expect(read).toStrictEqual({
+      "bare-receiver.ts": ["[router]"],
+      "binding-after-use.ts": ["[router.matchPath]"],
+      "code-flavour.ts": ["[router.navigateToState]"],
+      "dynamic-door.ts": ["dynamic"],
+      "static-door.ts": ["[router.buildPath]"],
+      "two-bindings.ts": ["[router.Segment Matcher]", "[router.navigate]"],
+    });
+    expect(offenders(FIXTURE)).toStrictEqual([
+      { file: "two-bindings.ts", prefix: "[router.Segment Matcher]" },
+    ]);
   });
 
   it("no raiser body renders a second head, and the residue stays open", () => {
