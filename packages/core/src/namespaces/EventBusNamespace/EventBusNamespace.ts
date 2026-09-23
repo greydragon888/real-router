@@ -81,7 +81,9 @@ function settleLeavePromises(
         reason instanceof RouterError &&
           reason.code === errorCodes.TRANSITION_CANCELLED
           ? reason
-          : new RouterError(errorCodes.TRANSITION_CANCELLED, { reason }),
+          : freezeThrownError(
+              new RouterError(errorCodes.TRANSITION_CANCELLED, { reason }),
+            ),
       );
     };
 
@@ -1223,8 +1225,12 @@ export class EventBusNamespace {
       // inverting the order stated above. The controller is a field of
       // `ctx.inflight`, so there is no second slot to fall out of step with.
       // `?.` because allocating one is conditional (cut A allocates none).
+      //
+      // Only the fallback is frozen: a `reason` handed in belongs to whoever
+      // aborted, and `freezeThrownError` leaves a foreign value untouched.
       const cancelReason =
-        reason ?? new RouterError(errorCodes.TRANSITION_CANCELLED);
+        reason ??
+        freezeThrownError(new RouterError(errorCodes.TRANSITION_CANCELLED));
 
       // ⚑ RECORD first, abort second (#1706). The controller is allocated
       // lazily by whichever consumer needs a signal, so `?.` here is not "no

@@ -59,7 +59,9 @@ function isTransitionCancelled(error: unknown): boolean {
 export function asCancellation(error: unknown): unknown {
   return isTransitionCancelled(error)
     ? error
-    : new RouterError(errorCodes.TRANSITION_CANCELLED, { reason: error });
+    : freezeThrownError(
+        new RouterError(errorCodes.TRANSITION_CANCELLED, { reason: error }),
+      );
 }
 
 export function routeTransitionError(

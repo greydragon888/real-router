@@ -62,11 +62,12 @@ describe("a root moved in the boot window (#1752)", () => {
     router.dispose();
   });
 
-  it("without allowNotFound it fails, with the code the pre-window gate uses", async () => {
+  it("without allowNotFound it fails, with the code and the field the pre-window gate uses", async () => {
     const { router, started } = bootWithRootMove(false, "/home");
 
     await expect(started).rejects.toMatchObject({
       code: errorCodes.ROUTE_NOT_FOUND,
+      path: "/home",
     });
 
     router.dispose();

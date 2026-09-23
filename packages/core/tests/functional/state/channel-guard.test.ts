@@ -109,6 +109,9 @@ describe("channel guard (#1572)", () => {
         .catch((error: unknown) => error as RouterError);
 
       expect(rejection?.code).toBe(errorCodes.WRONG_CHANNEL);
+      // The route rides in a field as well as in the sentence, so a consumer
+      // branching on the code reads it without parsing prose (#2538).
+      expect(rejection?.routeName).toBe("q");
       // Actionable: names the offending key AND the channel it belongs in.
       expect(rejection?.message).toContain("page");
       expect(rejection?.message).toContain("search");

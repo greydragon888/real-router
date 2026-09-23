@@ -79,8 +79,12 @@ describe("#1643 — leaving a state always asks canDeactivate", () => {
 
       getPluginApi(router).addEventListener(events.TRANSITION_ERROR, onError);
 
+      // `path` names the URL that was refused (#2538).
       expect(() => router.navigateToNotFound("/no/such/url")).toThrow(
-        expect.objectContaining({ code: errorCodes.CANNOT_DEACTIVATE }),
+        expect.objectContaining({
+          code: errorCodes.CANNOT_DEACTIVATE,
+          path: "/no/such/url",
+        }),
       );
 
       // The state is HELD — that is the whole point; before #1643 it was
