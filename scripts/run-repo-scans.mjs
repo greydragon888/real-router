@@ -13,8 +13,8 @@
 // this runner EXECUTES the scans, and `repo-scan-authority-2241` proves the list is
 // complete by deriving the set from the AST instead of trusting it.
 //
-// Cost, measured on this tree: 12 scans, 117 cells, three vitest invocations,
-// ~8.6 s wall. It replaces three hook steps that covered three of the twelve.
+// What it does with the list — every entry run, a failing workspace failing the run,
+// an empty list refused — is pinned by `scripts/run-repo-scans.test.mjs` (#2542).
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -27,7 +27,7 @@ const REGISTRY = path.join(REPO_ROOT, "scripts/repo-wide-scans.json");
 const registry = JSON.parse(readFileSync(REGISTRY, "utf8"));
 
 // Group by the workspace that owns each scan: vitest is invoked once per package, not
-// once per file, so the start-up is paid three times rather than twelve.
+// once per file, so the start-up is paid per workspace rather than per scan.
 /** @type {Map<string, string[]>} */
 const byWorkspace = new Map();
 

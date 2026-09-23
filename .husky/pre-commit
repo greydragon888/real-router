@@ -60,7 +60,7 @@ pnpm lint:coverage-scope
 # `Object.keys` and tests MEMBERSHIP with `hasOwnProperty` or `in` disagrees with
 # itself about the keys the count refuses to see, and two disjoint records compare
 # equal — #1815 and #2064 are the two instances (#2108). A static scan of
-# `packages` and `shared`, ~0.6 s, so it runs ahead of the ~8.6 s scans below.
+# `packages` and `shared`, ~0.6 s, so it runs ahead of the slower scans below.
 #
 # ⚠ pre-push runs it too, and that is not belt-and-braces: git runs NO pre-commit
 # for a tree that `git merge` or `git rebase` produced — it looks for
@@ -80,8 +80,7 @@ pnpm lint:membership
 # This replaces three steps that covered three of TWELVE scans. The other nine had
 # no scheduler at all, including two outside core — `target-predicate-authority-1834`
 # in `@real-router/react` and `core-union-mirror-authority-2091` in
-# `validation-plugin`. Cost measured: 12 scans, 117 cells, three vitest invocations,
-# ~8.6 s, against ~5.4 s for the three it replaces.
+# `validation-plugin`.
 #
 # ⚠ The list lives in `scripts/repo-wide-scans.json` and is proved COMPLETE by
 # `repo-scan-authority-2241`, which derives the set from the AST rather than reading

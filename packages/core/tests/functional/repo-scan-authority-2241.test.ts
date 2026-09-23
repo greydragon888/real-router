@@ -738,17 +738,6 @@ describe("every repository-wide scan is registered (#2241)", () => {
     expect(named.map((entry) => entry.file)).toStrictEqual([]);
   });
 
-  it("the runner refuses an empty registry instead of passing", () => {
-    // An empty list would make the runner exit 0 having run nothing, which reads
-    // exactly like success — the failure mode this whole issue is about.
-    const runner = readFileSync(
-      path.join(REPO_ROOT, "scripts/run-repo-scans.mjs"),
-      "utf8",
-    );
-
-    expect(runner).toContain("lists no scans");
-  });
-
   it("the runner reaches BOTH schedulers, not one", () => {
     // ⚠ A hook is not a gate on this repository: infrastructure commits use
     // `--no-verify` routinely, so a hook-only scan stands between a defect and `master`

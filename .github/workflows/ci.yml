@@ -853,7 +853,6 @@ jobs:
       # nine uncovered ones are not even in core — `target-predicate-authority-1834`
       # in `@real-router/react`, `core-union-mirror-authority-2091` in
       # `validation-plugin` — so "lift the core ones" would not have reached them.
-      # Cost measured: 12 scans, 117 cells, three vitest invocations, ~8.6 s.
       #
       # ⚠ CI as well as the hook, and that is not belt-and-braces: infrastructure
       # commits here use `--no-verify` routinely, so a hook-only scan gates only
