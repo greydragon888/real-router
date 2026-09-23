@@ -139,7 +139,10 @@ const render = (name, text) => {
       const args = [...(n.arguments ?? [])];
       const head = shape(bagMessage(args) ?? args[0], src);
 
-      if (head && /^\[[A-Za-z]+(\.([\w.]+|\$\{\}))?\]\s/u.test(head)) {
+      // ⚠ A HYPHEN is legal in a receiver — `[validation-plugin]` is one of the four
+      // О-2 admits — and requiring `[A-Za-z]+` hid all fourteen of its sites on the
+      // BEFORE side, which reported them as new the moment step 7 converted them.
+      if (head && /^\[[A-Za-z][\w-]*(\.([\w.]+|\$\{\}))?\]\s/u.test(head)) {
         out.add(head);
         bodies.add(head.replace(/^\[[^\]]*\]\s/u, ""));
       }

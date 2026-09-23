@@ -7,6 +7,7 @@
  */
 
 import { resolveForwardChain } from "@real-router/core";
+import { raiser } from "@real-router/core/utils";
 import {
   findMisChanneledKey,
   validateRoute,
@@ -31,14 +32,22 @@ import type {
 } from "@real-router/core";
 import type { RouteTree } from "@real-router/core/validation";
 
+const atUpdateRoute = raiser("router", "updateRoute");
+const atAddRoute = raiser("router", "addRoute");
+const atShouldUpdateNode = raiser("router", "shouldUpdateNode");
+const atMatchPath = raiser("router", "matchPath");
+const atBuildPath = raiser("router", "buildPath");
+const atIsActiveRoute = raiser("router", "isActiveRoute");
+const atSetRootPath = raiser("router", "setRootPath");
+
 // Internal constant (matches core's INTERNAL_ROUTE_PREFIX)
 const INTERNAL_ROUTE_PREFIX = "@@";
 
 export function throwIfInternalRoute(name: string, methodName: string): void {
   if (name.startsWith(INTERNAL_ROUTE_PREFIX)) {
-    throw new Error(
-      `[router.${methodName}] Route name "${name}" uses the reserved "${INTERNAL_ROUTE_PREFIX}" prefix. Routes with this prefix are internal and cannot be modified through the public API.`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.plain`Route name "${name}" uses the reserved "${INTERNAL_ROUTE_PREFIX}" prefix. Routes with this prefix are internal and cannot be modified through the public API.`;
   }
 }
 
@@ -70,9 +79,7 @@ export function validateSetRootPathArgs(
   rootPath: unknown,
 ): asserts rootPath is string {
   if (typeof rootPath !== "string") {
-    throw new TypeError(
-      `[router.setRootPath] rootPath must be a string, got ${getTypeDescription(rootPath)}`,
-    );
+    throw atSetRootPath.type`rootPath must be a string, got ${getTypeDescription(rootPath)}`;
   }
 }
 
@@ -90,18 +97,14 @@ export function guardRouteCallbacks(route: unknown): void {
     routeObj.canActivate !== undefined &&
     typeof routeObj.canActivate !== "function"
   ) {
-    throw new TypeError(
-      `[router.addRoute] canActivate must be a function, got ${getTypeDescription(routeObj.canActivate)}`,
-    );
+    throw atAddRoute.type`canActivate must be a function, got ${getTypeDescription(routeObj.canActivate)}`;
   }
 
   if (
     routeObj.canDeactivate !== undefined &&
     typeof routeObj.canDeactivate !== "function"
   ) {
-    throw new TypeError(
-      `[router.addRoute] canDeactivate must be a function, got ${getTypeDescription(routeObj.canDeactivate)}`,
-    );
+    throw atAddRoute.type`canDeactivate must be a function, got ${getTypeDescription(routeObj.canDeactivate)}`;
   }
 }
 
@@ -118,27 +121,21 @@ export function guardNoAsyncCallbacks(route: unknown): void {
     routeObj.decodeParams !== undefined &&
     isAsyncFunction(routeObj.decodeParams)
   ) {
-    throw new TypeError(
-      `[router.addRoute] decodeParams cannot be async for route "${String(routeName)}"`,
-    );
+    throw atAddRoute.type`decodeParams cannot be async for route "${String(routeName)}"`;
   }
 
   if (
     routeObj.encodeParams !== undefined &&
     isAsyncFunction(routeObj.encodeParams)
   ) {
-    throw new TypeError(
-      `[router.addRoute] encodeParams cannot be async for route "${String(routeName)}"`,
-    );
+    throw atAddRoute.type`encodeParams cannot be async for route "${String(routeName)}"`;
   }
 
   if (
     typeof routeObj.forwardTo === "function" &&
     isAsyncFunction(routeObj.forwardTo)
   ) {
-    throw new TypeError(
-      `[router.addRoute] forwardTo callback cannot be async for route "${String(routeName)}"`,
-    );
+    throw atAddRoute.type`forwardTo callback cannot be async for route "${String(routeName)}"`;
   }
 }
 
@@ -153,9 +150,7 @@ export function validateAddRouteArgs(routes: readonly Route<any>[]): void {
     // Runtime check for invalid types passed via `as any`
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime check
     if (route === null || typeof route !== "object" || Array.isArray(route)) {
-      throw new TypeError(
-        `[router.addRoute] Route must be an object, got ${getTypeDescription(route)}`,
-      );
+      throw atAddRoute.type`Route must be an object, got ${getTypeDescription(route)}`;
     }
 
     // Validate route properties (canActivate, canDeactivate, defaultParams, async checks)
@@ -171,9 +166,7 @@ export function validateParentOption(
   parent: unknown,
 ): asserts parent is string {
   if (typeof parent !== "string" || parent === "") {
-    throw new TypeError(
-      `[router.addRoute] parent option must be a non-empty string, got ${getTypeDescription(parent)}`,
-    );
+    throw atAddRoute.type`parent option must be a non-empty string, got ${getTypeDescription(parent)}`;
   }
 
   // Validate parent is a valid route name format (can contain dots — it's a fullName reference)
@@ -209,9 +202,7 @@ export function validateIsActiveRouteArgs(
 ): asserts name is string {
   // Validate name - non-string throws
   if (!isString(name)) {
-    throw new TypeError(
-      `[router.isActiveRoute] name must be a string, got ${typeof name}`,
-    );
+    throw atIsActiveRoute.type`name must be a string, got ${typeof name}`;
   }
 
   // The shape half only — same rule, same message, one spelling.
@@ -219,9 +210,7 @@ export function validateIsActiveRouteArgs(
 
   // Validate strictEquality if provided
   if (strictEquality !== undefined && typeof strictEquality !== "boolean") {
-    throw new TypeError(
-      `[router.isActiveRoute] strictEquality must be a boolean, got ${typeof strictEquality}`,
-    );
+    throw atIsActiveRoute.type`strictEquality must be a boolean, got ${typeof strictEquality}`;
   }
 
   // Validate ignoreQueryParams if provided
@@ -229,9 +218,7 @@ export function validateIsActiveRouteArgs(
     ignoreQueryParams !== undefined &&
     typeof ignoreQueryParams !== "boolean"
   ) {
-    throw new TypeError(
-      `[router.isActiveRoute] ignoreQueryParams must be a boolean, got ${typeof ignoreQueryParams}`,
-    );
+    throw atIsActiveRoute.type`ignoreQueryParams must be a boolean, got ${typeof ignoreQueryParams}`;
   }
 }
 
@@ -245,15 +232,15 @@ export function validateStateBuilderArgs(
   methodName: string,
 ): void {
   if (!isString(routeName)) {
-    throw new TypeError(
-      `[router.${methodName}] Invalid routeName: ${getTypeDescription(routeName)}. Expected string.`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Invalid routeName: ${getTypeDescription(routeName)}. Expected string.`;
   }
 
   if (!isParams(routeParams)) {
-    throw new TypeError(
-      `[router.${methodName}] Invalid routeParams: ${getTypeDescription(routeParams)}. Expected plain object.`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Invalid routeParams: ${getTypeDescription(routeParams)}. Expected plain object.`;
   }
 }
 
@@ -271,24 +258,18 @@ export function validateUpdateRouteBasicArgs<
   validateRouteName(name, "updateRoute");
 
   if (name === "") {
-    throw new ReferenceError(
-      `[router.updateRoute] Invalid name: empty string. Cannot update root node.`,
-    );
+    throw atUpdateRoute.ref`Invalid name: empty string. Cannot update root node.`;
   }
 
   // Validate updates is not null
 
   if (updates === null) {
-    throw new TypeError(
-      `[router.updateRoute] updates must be an object, got null`,
-    );
+    throw atUpdateRoute.type`updates must be an object, got null`;
   }
 
   // Validate updates is an object (not array)
   if (typeof updates !== "object" || Array.isArray(updates)) {
-    throw new TypeError(
-      `[router.updateRoute] updates must be an object, got ${getTypeDescription(updates)}`,
-    );
+    throw atUpdateRoute.type`updates must be an object, got ${getTypeDescription(updates)}`;
   }
 }
 
@@ -303,9 +284,7 @@ function assertNotAsync(value: Function, paramName: string): void {
       "AsyncFunction" ||
     (value as { toString: () => string }).toString().includes("__awaiter")
   ) {
-    throw new TypeError(
-      `[router.updateRoute] ${paramName} cannot be an async function`,
-    );
+    throw atUpdateRoute.type`${paramName} cannot be an async function`;
   }
 }
 
@@ -318,9 +297,7 @@ function validateFunctionParam(value: unknown, paramName: string): void {
   }
 
   if (typeof value !== "function") {
-    throw new TypeError(
-      `[router.updateRoute] ${paramName} must be a function or null, got ${typeof value}`,
-    );
+    throw atUpdateRoute.type`${paramName} must be a function or null, got ${typeof value}`;
   }
 
   assertNotAsync(value, paramName);
@@ -352,9 +329,7 @@ export function validateUpdateRoutePropertyTypes(cached: {
   // Validate forwardTo type (existence check is done by instance method)
   if (forwardTo !== undefined && forwardTo !== null) {
     if (typeof forwardTo !== "string" && typeof forwardTo !== "function") {
-      throw new TypeError(
-        `[router.updateRoute] forwardTo must be a string, function, or null, got ${getTypeDescription(forwardTo)}`,
-      );
+      throw atUpdateRoute.type`forwardTo must be a string, function, or null, got ${getTypeDescription(forwardTo)}`;
     }
 
     if (typeof forwardTo === "function") {
@@ -387,9 +362,7 @@ function validateBagParam(
     value !== null &&
     (typeof value !== "object" || Array.isArray(value))
   ) {
-    throw new TypeError(
-      `[router.updateRoute] ${paramName} must be an object or null, got ${getTypeDescription(value)}`,
-    );
+    throw atUpdateRoute.type`${paramName} must be an object or null, got ${getTypeDescription(value)}`;
   }
 }
 
@@ -398,9 +371,7 @@ function validateBagParam(
  */
 export function validateBuildPathArgs(route: unknown): asserts route is string {
   if (!isString(route) || route === "") {
-    throw new TypeError(
-      `[router.buildPath] route must be a non-empty string, got ${typeof route === "string" ? '""' : typeof route}`,
-    );
+    throw atBuildPath.type`route must be a non-empty string, got ${typeof route === "string" ? '""' : typeof route}`;
   }
 }
 
@@ -473,9 +444,7 @@ export function createMisChanneledKeyReporter(
  */
 export function validateMatchPathArgs(path: unknown): asserts path is string {
   if (!isString(path)) {
-    throw new TypeError(
-      `[router.matchPath] path must be a string, got ${typeof path}`,
-    );
+    throw atMatchPath.type`path must be a string, got ${typeof path}`;
   }
 }
 
@@ -486,9 +455,7 @@ export function validateShouldUpdateNodeArgs(
   nodeName: unknown,
 ): asserts nodeName is string {
   if (!isString(nodeName)) {
-    throw new TypeError(
-      `[router.shouldUpdateNode] nodeName must be a string, got ${typeof nodeName}`,
-    );
+    throw atShouldUpdateNode.type`nodeName must be a string, got ${typeof nodeName}`;
   }
 }
 
@@ -517,9 +484,7 @@ export function validateRoutes<Dependencies extends DefaultDependencies>(
       node = node.children.get(segment);
 
       if (!node) {
-        throw new ReferenceError(
-          `[router.addRoute] Parent route "${parentName}" does not exist`,
-        );
+        throw atAddRoute.ref`Parent route "${parentName}" does not exist`;
       }
     }
   }
@@ -571,10 +536,7 @@ export function validateForwardToParamCompatibility(
     .filter((param) => !sourceParams.has(param));
 
   if (missingParams.length > 0) {
-    throw new Error(
-      `[router.updateRoute] forwardTo target "${targetName}" requires params ` +
-        `[${missingParams.join(", ")}] that are not available in source route "${sourceName}"`,
-    );
+    throw atUpdateRoute.plain`forwardTo target "${targetName}" requires params [${missingParams.join(", ")}] that are not available in source route "${sourceName}"`;
   }
 }
 
@@ -620,9 +582,7 @@ export function validateUpdateRoute<
 ): void {
   // Validate route exists
   if (!lookup.hasRoute(name)) {
-    throw new ReferenceError(
-      `[router.updateRoute] route "${name}" does not exist`,
-    );
+    throw atUpdateRoute.ref`route "${name}" does not exist`;
   }
 
   // Validate forwardTo target exists and is valid (only for string forwardTo)
@@ -632,9 +592,7 @@ export function validateUpdateRoute<
     typeof forwardTo === "string"
   ) {
     if (!lookup.hasRoute(forwardTo)) {
-      throw new Error(
-        `[router.updateRoute] forwardTo target "${forwardTo}" does not exist`,
-      );
+      throw atUpdateRoute.plain`forwardTo target "${forwardTo}" does not exist`;
     }
 
     // Check forwardTo param compatibility

@@ -1,5 +1,7 @@
 // packages/validation-plugin/src/validators/navigation.ts
 
+import { raiser } from "@real-router/core/utils";
+
 import {
   getTypeDescription,
   isNavigationOptions,
@@ -8,6 +10,11 @@ import {
 } from "../type-guards";
 
 import type { NavigationOptions } from "@real-router/core";
+
+const atStart = raiser("router", "start");
+const atNavigateToState = raiser("router", "navigateToState");
+const atNavigateToDefault = raiser("router", "navigateToDefault");
+const atNavigate = raiser("router", "navigate");
 
 /**
  * Intrinsics captured at module load (#1971).
@@ -27,43 +34,31 @@ const getPrototypeOf = Object.getPrototypeOf;
 
 export function validateNavigateArgs(name: unknown): asserts name is string {
   if (typeof name !== "string") {
-    throw new TypeError(
-      `[router.navigate] Invalid route name: expected string, got ${getTypeDescription(name)}`,
-    );
+    throw atNavigate.type`Invalid route name: expected string, got ${getTypeDescription(name)}`;
   }
 }
 
 export function validateNavigateToDefaultArgs(opts: unknown): void {
   if (opts !== undefined && (typeof opts !== "object" || opts === null)) {
-    throw new TypeError(
-      `[router.navigateToDefault] Invalid options: ${getTypeDescription(opts)}. Expected NavigationOptions object.`,
-    );
+    throw atNavigateToDefault.type`Invalid options: ${getTypeDescription(opts)}. Expected NavigationOptions object.`;
   }
 }
 
 export function validateNavigateToStateArgs(state: unknown): void {
   if (typeof state !== "object" || state === null) {
-    throw new TypeError(
-      `[router.navigateToState] Invalid state: ${getTypeDescription(state)}. Expected State object.`,
-    );
+    throw atNavigateToState.type`Invalid state: ${getTypeDescription(state)}. Expected State object.`;
   }
 
   const candidate = state as { name: unknown; params: unknown; path: unknown };
 
   if (!isString(candidate.name)) {
-    throw new TypeError(
-      `[router.navigateToState] Invalid state.name: ${getTypeDescription(candidate.name)}. Expected string.`,
-    );
+    throw atNavigateToState.type`Invalid state.name: ${getTypeDescription(candidate.name)}. Expected string.`;
   }
   if (!isParams(candidate.params)) {
-    throw new TypeError(
-      `[router.navigateToState] Invalid state.params: ${getTypeDescription(candidate.params)}. Expected plain object.`,
-    );
+    throw atNavigateToState.type`Invalid state.params: ${getTypeDescription(candidate.params)}. Expected plain object.`;
   }
   if (!isString(candidate.path)) {
-    throw new TypeError(
-      `[router.navigateToState] Invalid state.path: ${getTypeDescription(candidate.path)}. Expected string.`,
-    );
+    throw atNavigateToState.type`Invalid state.path: ${getTypeDescription(candidate.path)}. Expected string.`;
   }
 }
 
@@ -72,9 +67,9 @@ export function validateNavigationOptions(
   methodName: string,
 ): asserts opts is NavigationOptions {
   if (!isNavigationOptions(opts)) {
-    throw new TypeError(
-      `[router.${methodName}] Invalid options: ${getTypeDescription(opts)}. Expected NavigationOptions object.`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Invalid options: ${getTypeDescription(opts)}. Expected NavigationOptions object.`;
   }
 }
 
@@ -107,15 +102,15 @@ function assertValidParamValues(
     const valueType = typeof value;
 
     if (valueType === "symbol" || valueType === "bigint") {
-      throw new TypeError(
-        `[router.${methodName}] param "${key}" cannot be a ${valueType} — it does not round-trip through the URL path. Use a string, number, or boolean.`,
-      );
+      const at = raiser("router", methodName);
+
+      throw at.type`param "${key}" cannot be a ${valueType} — it does not round-trip through the URL path. Use a string, number, or boolean.`;
     }
 
     if (valueType === "string" && CONTROL_CHARS_RE.test(value as string)) {
-      throw new TypeError(
-        `[router.${methodName}] param "${key}" must not contain control characters (NUL / C0 / DEL) — they corrupt the URL path.`,
-      );
+      const at = raiser("router", methodName);
+
+      throw at.type`param "${key}" must not contain control characters (NUL / C0 / DEL) — they corrupt the URL path.`;
     }
   }
 }
@@ -164,9 +159,9 @@ export function validateNavigateParamsShape(
   const proto = params !== null && (getPrototypeOf(params) as object | null);
 
   if (Array.isArray(params) || (proto !== null && proto !== Object.prototype)) {
-    throw new TypeError(
-      `[router.${methodName}] params must be a plain object, got ${getTypeDescription(params)}`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`params must be a plain object, got ${getTypeDescription(params)}`;
   }
 }
 
@@ -199,9 +194,9 @@ export function validateNavigateParams(
   assertValidParamValues(params as Record<string, unknown>, methodName);
 
   if (!isParams(params)) {
-    throw new TypeError(
-      `[router.${methodName}] params must be a plain object, got ${getTypeDescription(params)}`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`params must be a plain object, got ${getTypeDescription(params)}`;
   }
 }
 
@@ -220,31 +215,25 @@ export function validateSearch(search: unknown, methodName: string): void {
   }
 
   if (typeof search !== "object" || search === null || Array.isArray(search)) {
-    throw new TypeError(
-      `[router.${methodName}] search must be a plain object, got ${getTypeDescription(search)}`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`search must be a plain object, got ${getTypeDescription(search)}`;
   }
 }
 
 export function validateStartArgs(path: unknown): void {
   // undefined is allowed — browser-plugin injects path via interceptor AFTER facade validation
   if (path !== undefined && typeof path !== "string") {
-    throw new TypeError(
-      `[router.start] path must be a string, got ${getTypeDescription(path)}.`,
-    );
+    throw atStart.type`path must be a string, got ${getTypeDescription(path)}.`;
   }
   if (typeof path === "string") {
     // #942: a NUL byte / control char would be silently percent-encoded into
     // state.path (%00, %01) by core — reject it with an actionable error.
     if (CONTROL_CHARS_RE.test(path)) {
-      throw new TypeError(
-        `[router.start] path must not contain control characters (NUL / C0 / DEL).`,
-      );
+      throw atStart.type`path must not contain control characters (NUL / C0 / DEL).`;
     }
     if (path !== "" && !path.startsWith("/")) {
-      throw new TypeError(
-        `[router.start] path must start with "/", got "${path}".`,
-      );
+      throw atStart.type`path must start with "/", got "${path}".`;
     }
   }
 }

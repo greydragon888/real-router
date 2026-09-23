@@ -258,15 +258,7 @@ only to translate `#runStart` into `start` and `#startPlugin` → `use` into
 measured, that gave one validator eleven doors, because `navigate`, `start` and
 `matchPath` all reach a path build eventually, and a wrong door then passed.
 
-⚑ The register holds ONE entry (`[internal]`, whose own `v8 ignore … unreachable`
-is the reason) plus two published names (`[cloneRouter]`, `[validation-plugin]`).
-"Both batch doors report `addRoute`" needs no entry: the shared helper is reached
-from both batch positions, so the rule admits it unaided. A cell asserts that
-entry's REASON is present at its site, not merely written here.
-
-⚠ **That cell catches the marker being deleted and cannot catch it outliving its
-truth**, because nothing in this repository flags an unnecessary `v8 ignore` —
-proving one unnecessary costs a coverage run per ignore.
+⚑ The register holds the two published names (`[cloneRouter]`, `[validation-plugin]`) and nothing else. `[internal]` left it with #2487: a refusal no caller input can reach now takes O-1's `Internal error (please report): ` marker rather than a bracketed head, so there is no entry to justify. "Both batch doors report `addRoute`" needs none either — the shared helper is reached from both batch positions, so the rule admits it unaided.
 
 ⚑ **Functions are keyed by file, not by name.** Names ARE declared in two files
 each here — `assertNotAsync` carries a `[validation-plugin]` head in one and a

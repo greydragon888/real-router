@@ -1,6 +1,10 @@
 // packages/validation-plugin/src/validators/state.ts
 
+import { raiser } from "@real-router/core/utils";
+
 import { isString, isParams, getTypeDescription } from "../type-guards";
+
+const atMakeState = raiser("router", "makeState");
 
 export function validateMakeStateArgs(
   name: unknown,
@@ -8,21 +12,15 @@ export function validateMakeStateArgs(
   path: unknown,
 ): void {
   if (!isString(name)) {
-    throw new TypeError(
-      `[router.makeState] Invalid name: ${getTypeDescription(name)}. Expected string.`,
-    );
+    throw atMakeState.type`Invalid name: ${getTypeDescription(name)}. Expected string.`;
   }
 
   if (params !== undefined && !isParams(params)) {
-    throw new TypeError(
-      `[router.makeState] Invalid params: ${getTypeDescription(params)}. Expected plain object.`,
-    );
+    throw atMakeState.type`Invalid params: ${getTypeDescription(params)}. Expected plain object.`;
   }
 
   if (path !== undefined && !isString(path)) {
-    throw new TypeError(
-      `[router.makeState] Invalid path: ${getTypeDescription(path)}. Expected string.`,
-    );
+    throw atMakeState.type`Invalid path: ${getTypeDescription(path)}. Expected string.`;
   }
 }
 

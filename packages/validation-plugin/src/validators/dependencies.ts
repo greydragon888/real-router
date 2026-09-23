@@ -1,9 +1,15 @@
 // packages/validation-plugin/src/validators/dependencies.ts
 
+import { raiser } from "@real-router/core/utils";
+
 import { computeThresholds } from "../helpers";
 import { getTypeDescription } from "../type-guards";
 
 import type { RouterLogger } from "@real-router/core";
+
+const atCloneRouter = raiser("cloneRouter");
+const atGetDependency = raiser("router", "getDependency");
+const atSetDependency = raiser("router", "setDependency");
 
 /**
  * Captured at module load, mirroring `core/src/guards.ts`. A validator is only
@@ -51,9 +57,9 @@ export function validateDependencyName(
   methodName: string,
 ): asserts name is string {
   if (typeof name !== "string") {
-    throw new TypeError(
-      `[router.${methodName}] dependency name must be a string, got ${typeof name}`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`dependency name must be a string, got ${typeof name}`;
   }
 }
 
@@ -61,9 +67,7 @@ export function validateSetDependencyArgs(
   name: unknown,
 ): asserts name is string {
   if (typeof name !== "string") {
-    throw new TypeError(
-      `[router.setDependency] dependency name must be a string, got ${typeof name}`,
-    );
+    throw atSetDependency.type`dependency name must be a string, got ${typeof name}`;
   }
 }
 
@@ -72,16 +76,16 @@ export function validateDependenciesObject(
   methodName: string,
 ): asserts deps is Record<string, unknown> {
   if (!isPlainBag(deps)) {
-    throw new TypeError(
-      `[router.${methodName}] Invalid argument: expected plain object, received ${getTypeDescription(deps)}`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Invalid argument: expected plain object, received ${getTypeDescription(deps)}`;
   }
 
   for (const key of objectKeys(deps)) {
     if (getOwnPropertyDescriptor(deps, key)?.get) {
-      throw new TypeError(
-        `[router.${methodName}] Getters not allowed: "${key}"`,
-      );
+      const at = raiser("router", methodName);
+
+      throw at.type`Getters not allowed: "${key}"`;
     }
   }
 }
@@ -136,10 +140,9 @@ export function validateDependencyBatchLimit(
   const currentCount = heldKeys.length;
 
   if (currentCount + added > maxDependencies) {
-    throw new RangeError(
-      `[router.${methodName}] Dependency limit exceeded (${maxDependencies}). ` +
-        `Current: ${currentCount}, this batch adds ${added}.`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.range`Dependency limit exceeded (${maxDependencies}). Current: ${currentCount}, this batch adds ${added}.`;
   }
 }
 
@@ -148,9 +151,7 @@ export function validateDependencyExists(
   dependencyName: string,
 ): asserts value is NonNullable<unknown> {
   if (value === undefined) {
-    throw new ReferenceError(
-      `[router.getDependency] dependency "${dependencyName}" not found`,
-    );
+    throw atGetDependency.ref`dependency "${dependencyName}" not found`;
   }
 }
 
@@ -167,9 +168,9 @@ export function validateDependencyCount(
   const { warn, error } = computeThresholds(maxDependencies);
 
   if (currentCount >= maxDependencies) {
-    throw new RangeError(
-      `[router.${methodName}] Dependency limit exceeded (${maxDependencies}). Current: ${currentCount}.`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.range`Dependency limit exceeded (${maxDependencies}). Current: ${currentCount}.`;
   }
   if (currentCount === error) {
     logger.error(
@@ -190,16 +191,12 @@ export function validateCloneArgs(dependencies: unknown): void {
   }
 
   if (!isPlainBag(dependencies)) {
-    throw new TypeError(
-      `[cloneRouter] Invalid dependencies: expected plain object or undefined, received ${typeof dependencies}`,
-    );
+    throw atCloneRouter.type`Invalid dependencies: expected plain object or undefined, received ${typeof dependencies}`;
   }
 
   for (const key of objectKeys(dependencies)) {
     if (getOwnPropertyDescriptor(dependencies, key)?.get) {
-      throw new TypeError(
-        `[cloneRouter] Getters not allowed in dependencies: "${key}"`,
-      );
+      throw atCloneRouter.type`Getters not allowed in dependencies: "${key}"`;
     }
   }
 }

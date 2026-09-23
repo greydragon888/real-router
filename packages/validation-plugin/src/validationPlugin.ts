@@ -2,7 +2,7 @@
 
 import { RouterError } from "@real-router/core";
 import { getPluginApi, getRoutesApi } from "@real-router/core/api";
-import { freezeThrownError } from "@real-router/core/utils";
+import { raiser, freezeThrownError } from "@real-router/core/utils";
 import { getInternals } from "@real-router/core/validation";
 
 import { CORE_LIMIT_DEFAULTS } from "./helpers";
@@ -104,6 +104,9 @@ import type {
   RoutesApi,
   Plugin,
 } from "@real-router/core";
+
+const atAddRoute = raiser("router", "addRoute");
+const atAreStatesEqual = raiser("router", "areStatesEqual");
 
 /** The one question existence asks of a tree node: its children by segment. */
 interface TreeNode {
@@ -320,19 +323,13 @@ function buildValidatorObject(
       reportUndeclaredParamKey: createUndeclaredParamKeyReporter(),
       validateAreStatesEqualArgs(s1, s2, ignoreQP) {
         if (!isState(s1)) {
-          throw new TypeError(
-            `[router.areStatesEqual] Invalid state1: ${getTypeDescription(s1)}. Expected State object.`,
-          );
+          throw atAreStatesEqual.type`Invalid state1: ${getTypeDescription(s1)}. Expected State object.`;
         }
         if (!isState(s2)) {
-          throw new TypeError(
-            `[router.areStatesEqual] Invalid state2: ${getTypeDescription(s2)}. Expected State object.`,
-          );
+          throw atAreStatesEqual.type`Invalid state2: ${getTypeDescription(s2)}. Expected State object.`;
         }
         if (ignoreQP !== undefined && !isBoolean(ignoreQP)) {
-          throw new TypeError(
-            `[router.areStatesEqual] Invalid ignoreQueryParams: ${getTypeDescription(ignoreQP)}. Expected boolean.`,
-          );
+          throw atAreStatesEqual.type`Invalid ignoreQueryParams: ${getTypeDescription(ignoreQP)}. Expected boolean.`;
         }
       },
     },
@@ -585,9 +582,7 @@ export function validationPlugin<
         validateParentOptionRaw(parentName);
 
         if (!lookup.hasRoute(parentName)) {
-          throw new ReferenceError(
-            `[router.addRoute] Parent route "${parentName}" does not exist`,
-          );
+          throw atAddRoute.ref`Parent route "${parentName}" does not exist`;
         }
       }
 
