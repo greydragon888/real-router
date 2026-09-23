@@ -742,7 +742,7 @@ describe("FSM", () => {
             transitions: { a: { go: "b" }, b: {} },
           }),
       ).toThrow(
-        '[FSM.constructor] state "GHOST" is not declared in config.transitions',
+        'Internal error (please report): state "GHOST" is not declared in config.transitions',
       );
     });
 
@@ -756,7 +756,7 @@ describe("FSM", () => {
       expect(() => {
         fsm.on("GHOST", "go", () => {});
       }).toThrow(
-        '[FSM.on] state "GHOST" is not declared in config.transitions',
+        'Internal error (please report): state "GHOST" is not declared in config.transitions',
       );
     });
 
@@ -773,7 +773,9 @@ describe("FSM", () => {
 
       expect(() => {
         fsm.on("b", "go", () => {});
-      }).toThrow('[FSM.on] event "go" has no edge from state "b"');
+      }).toThrow(
+        'Internal error (please report): event "go" has no edge from state "b"',
+      );
     });
 
     it("refuses the declared no-op target too — it is equally dead (#1682)", () => {
@@ -791,7 +793,9 @@ describe("FSM", () => {
 
       expect(() => {
         fsm.on("a", "stay", () => {});
-      }).toThrow('[FSM.on] event "stay" has no edge from state "a"');
+      }).toThrow(
+        'Internal error (please report): event "stay" has no edge from state "a"',
+      );
     });
 
     it.each(["toString", "constructor", "hasOwnProperty", "__proto__"])(
@@ -810,7 +814,9 @@ describe("FSM", () => {
 
         expect(() => {
           fsm.on("a", member, () => {});
-        }).toThrow(`[FSM.on] event "${member}" has no edge from state "a"`);
+        }).toThrow(
+          `Internal error (please report): event "${member}" has no edge from state "a"`,
+        );
       },
     );
 
@@ -826,7 +832,7 @@ describe("FSM", () => {
             transitions: { a: { go: "GHOST" }, b: {} },
           }),
       ).toThrow(
-        '[FSM.constructor] state "GHOST" is not declared in config.transitions',
+        'Internal error (please report): state "GHOST" is not declared in config.transitions',
       );
     });
 
@@ -997,7 +1003,7 @@ describe("FSM", () => {
             transitions: { a: { go: { target: "GHOST" } }, b: {} },
           }),
       ).toThrow(
-        '[FSM.constructor] state "GHOST" is not declared in config.transitions',
+        'Internal error (please report): state "GHOST" is not declared in config.transitions',
       );
     });
 
@@ -1014,7 +1020,7 @@ describe("FSM", () => {
             },
           }),
       ).toThrow(
-        '[FSM.constructor] transitions["a"]["go"].when is not a function',
+        'Internal error (please report): transitions["a"]["go"].when is not a function',
       );
     });
 
@@ -1029,7 +1035,7 @@ describe("FSM", () => {
             },
           }),
       ).toThrow(
-        '[FSM.constructor] transitions["a"]["go"].update is not a function',
+        'Internal error (please report): transitions["a"]["go"].update is not a function',
       );
     });
 

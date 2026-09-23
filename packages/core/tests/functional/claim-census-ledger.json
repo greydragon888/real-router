@@ -1007,8 +1007,8 @@
       "e08da5832d9e"
     ],
     "packages/core/src/utils/fsm/fsm.ts": [
-      "60d82f2fab98",
-      "7f091bcc4c24",
+      "83265a21ef2d",
+      "66fc5038f853",
       "1a9864dfed80",
       "d7294177f708",
       "7cbef82587f6",
@@ -1979,7 +1979,7 @@
     ],
     "packages/core/src/utils/fsm/CLAUDE.md": [
       "b5f3246192f7",
-      "8c1de5e890f8"
+      "7431af1a5bd2"
     ],
     "packages/core/src/utils/logger/INVARIANTS.md": [
       "af432506a5f7"

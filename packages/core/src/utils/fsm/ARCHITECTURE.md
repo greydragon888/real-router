@@ -4,7 +4,7 @@
 
 ## Overview
 
-`@real-router/fsm` is a **standalone, zero-dependency** synchronous finite state machine engine.
+This engine is a synchronous finite state machine, `src/utils/fsm` in core since wave-3 — the standalone `@real-router/fsm` package is published at `0.6.1` and is no longer built from this source. Its one import is `internalDefect`, which marks a refusal no caller input can reach (#2487).
 It drives the entire router lifecycle — all states (IDLE, STARTING, READY, TRANSITION_STARTED, LEAVE_APPROVED, DISPOSED) and transitions are managed by a single FSM instance.
 
 **Key role:** No boolean flags, no ad-hoc state management. Every router state change is an FSM transition.
@@ -186,7 +186,7 @@ send(event, ...args) {
 
 ```typescript
 on(from, event, action) {
-  requireDeclared(this.#transitions, from, "on"); // #885 — reject undeclared `from`
+  if (this.#transitions[from] === undefined) throw …; // #885 — reject undeclared `from`
   this.#actions ??= new Map();                     // lazy init (outer: state → inner map)
 
   let stateActions = this.#actions.get(from);      // inner map: event → action
@@ -207,7 +207,7 @@ on(from, event, action) {
 }
 ```
 
-- **Declared-`from` guard (#885):** `on()` starts with `requireDeclared` — an undeclared `from` throws instead of dead-registering an action that could never fire
+- **Declared-`from` guard (#885):** `on()` starts by reading the table for `from` — an undeclared `from` throws instead of dead-registering an action that could never fire
 - **Nested Map:** `#actions` is `Map<from, Map<event, action>>` — one inner map per source state (replaced the pre-#316 `${from}\0${event}` string key)
 - **One action per (from, event) pair** — second `on()` overwrites the first (last-write-wins)
 - **Identity-guarded unsubscribe (#427):** the returned unsubscribe deletes the entry **only if it is still the action this call registered** (`stateMap?.get(event) === capturedAction`) — a no-op once the pair was overwritten by a later `on()`, matching INVARIANTS "Action #5"
@@ -274,18 +274,14 @@ This **intentionally differs** from the sibling `@real-router/event-emitter`, wh
 
 ## Declared-state guard
 
-The constructor (`initial`), `on` (`from`), and every transition **target** in the table (validated for closure at construction, [#1159](https://github.com/greydragon888/real-router/issues/1159)) share a `requireDeclared` guard: an undeclared state throws **before** any mutation instead of silently leaving `#currentTransitions` undefined and bricking the next `canSend`/`send` ([#754](https://github.com/greydragon888/real-router/issues/754) originally the `forceState` guard; [#885](https://github.com/greydragon888/real-router/issues/885) constructor + `on`; [#1159](https://github.com/greydragon888/real-router/issues/1159) table targets). The closure check runs once at construction (cold path) and skips explicit `undefined` targets (the "no transition" no-op); post-construction mutation of the shared table stays a documented GIGO boundary.
+The constructor (`initial`), `on` (`from`), and every transition **target** in the table (validated for closure at construction, [#1159](https://github.com/greydragon888/real-router/issues/1159)) each check the table directly — three separate sites raising one message, not a shared helper (#2529): an undeclared state throws **before** any mutation instead of silently leaving `#currentTransitions` undefined and bricking the next `canSend`/`send` ([#754](https://github.com/greydragon888/real-router/issues/754) originally the `forceState` guard; [#885](https://github.com/greydragon888/real-router/issues/885) constructor + `on`; [#1159](https://github.com/greydragon888/real-router/issues/1159) table targets). The closure check runs once at construction (cold path) and skips explicit `undefined` targets (the "no transition" no-op); post-construction mutation of the shared table stays a documented GIGO boundary.
 
 ```typescript
-// shared guard — single source of truth for "the state is declared"
-function requireDeclared(transitions, state, where) {
-  const t = transitions[state];
-  if (t === undefined) {
-    throw new Error(
-      `[FSM.${where}] state "${state}" is not declared in config.transitions`,
-    );
-  }
-  return t;
+// each entry point reads the table itself — three sites, one message
+const edges = this.#transitions[from];
+
+if (edges === undefined) {
+  throw internalDefect.plain`state "${from}" is not declared in config.transitions`;
 }
 ```
 

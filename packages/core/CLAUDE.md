@@ -630,11 +630,12 @@ wire it in `validationPlugin.ts`.
 **Message prefixes:** name the facade call the message comes from, not the class
 raising it — `[router.buildPath]`, or bare `[router]` where several doors reach
 one raiser. `tests/functional/message-prefix-authority-1845.test.ts` derives the
-rule and owns two registers rather than carve-outs: the internal prefixes that
-stay (`CORE_INTERNAL`), and the refusals that carry no prefix at all (#2456).
-The second is EMPTY since #2459 adjudicated it — twelve of its thirteen rows
-were reachable from a door and took the bare `[router]`, and the thirteenth is
-`EventEmitter`'s callback check, which no caller input reaches.
+rule and owns ONE register rather than carve-outs: the refusals that carry no
+prefix at all (#2456). It is EMPTY since #2459 adjudicated it — twelve of its
+thirteen rows were reachable from a door and took the bare `[router]`, and the
+thirteenth was `EventEmitter`'s callback check, retired with the method. A refusal
+no caller input can reach takes O-1's `Internal error (please report): ` marker
+instead of a class-name prefix (#2487).
 
 **Logger channels take the same rule, and the vocabulary is the DOOR** — `clear`
 logs and raises under `router.clearRoutes`, `add` under `router.addRoute` (#2461).
