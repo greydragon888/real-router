@@ -1,5 +1,25 @@
 # @real-router/core
 
+## 0.147.6
+
+### Patch Changes
+
+- [#2526](https://github.com/greydragon888/real-router/pull/2526) [`0dd4fc1`](https://github.com/greydragon888/real-router/commit/0dd4fc1859bbc4721ae72d00150cbca426fe5398) Thanks [@greydragon888](https://github.com/greydragon888)! - The refusals that carry their message in a `RouterError` bag build through the raiser ([#2487](https://github.com/greydragon888/real-router/issues/2487))
+
+  One observable change: a `subscribeChanges` call on a disposed router said
+  `[router.treeChanged.subscribe]`, which names the internal channel the method
+  delegates to rather than the call anyone made. It now says
+  `[router.subscribeChanges]`. The wrong door was there before the refactor — the door
+  authority could not see a door spelled inside an options bag, and the conversion is
+  what made it visible.
+
+- [#2526](https://github.com/greydragon888/real-router/pull/2526) [`0dd4fc1`](https://github.com/greydragon888/real-router/commit/0dd4fc1859bbc4721ae72d00150cbca426fe5398) Thanks [@greydragon888](https://github.com/greydragon888)! - Twenty-three more refusals build through the raiser ([#2487](https://github.com/greydragon888/real-router/issues/2487))
+
+  Internal refactor across seven core files. Two local duplicates of the raiser's own
+  job go with them: `route-name.ts`'s `head()` helper, which re-implemented the bare-head
+  rule, and the head format inside `routes.ts`'s `createRouterError` factory — its ten
+  call sites are untouched, since the door arrives there as an argument.
+
 ## 0.147.5
 
 ### Patch Changes
