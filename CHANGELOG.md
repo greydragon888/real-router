@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-23]
 
+### @real-router/core@0.147.7
+
+### Patch Changes
+
+- [#2530](https://github.com/greydragon888/real-router/pull/2530) [`ecf6abd`](https://github.com/greydragon888/real-router/commit/ecf6abd28c3ecaea98aa8de0a3df58e3b14ac7d9) Thanks [@greydragon888](https://github.com/greydragon888)! - The FSM's six refusals take the unbracketed internal form ([#2487](https://github.com/greydragon888/real-router/issues/2487))
+
+  Six messages change. `[FSM.constructor] …` and `[FSM.on] …` become
+  `Internal error (please report): …` — reaching one of them means core's own
+  transition table is malformed, and O-1 gives that shape a marker rather than a
+  prefix naming a class no application author can look up.
+
+  The `CORE_INTERNAL` register goes with them: the FSM pair was its only entry.
+
+
 ### @real-router/core@0.147.6
 
 ### Patch Changes
