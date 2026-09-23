@@ -12,6 +12,14 @@ import path from "node:path";
 import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import {
+  raiserBindingOf,
+  raiserPartsAt,
+  raiserTagOf,
+} from "../../../../scripts/lib/raiser-head.mjs";
+
+import type { RaiserParts } from "../../../../scripts/lib/raiser-head.mjs";
+
 /**
  * A message prefix names something the caller can look up (#1845).
  *
@@ -97,38 +105,18 @@ type BoundHead =
   | { readonly kind: "static"; readonly head: string }
   | { readonly kind: "dynamic" };
 
-function headOfRaiserCall(call: ts.CallExpression): BoundHead {
-  const [receiver, door] = call.arguments;
-
-  if (receiver === undefined || !ts.isStringLiteral(receiver)) {
+function boundOf(parts: RaiserParts): BoundHead {
+  if (parts.receiver === undefined || parts.dynamic) {
     return { kind: "dynamic" };
   }
 
-  if (door === undefined) {
-    return { kind: "static", head: `[${receiver.text}]` };
-  }
-
-  return ts.isStringLiteral(door)
-    ? { kind: "static", head: `[${receiver.text}.${door.text}]` }
-    : { kind: "dynamic" };
-}
-
-/** The name and head a declaration binds, when it binds `raiser(...)`. */
-function raiserBindingOf(
-  node: ts.Node,
-  source: ts.SourceFile,
-): { readonly name: string; readonly bound: BoundHead } | undefined {
-  if (
-    !ts.isVariableDeclaration(node) ||
-    !ts.isIdentifier(node.name) ||
-    node.initializer === undefined ||
-    !ts.isCallExpression(node.initializer) ||
-    node.initializer.expression.getText(source) !== "raiser"
-  ) {
-    return undefined;
-  }
-
-  return { name: node.name.text, bound: headOfRaiserCall(node.initializer) };
+  return {
+    kind: "static",
+    head:
+      parts.door === undefined
+        ? `[${parts.receiver}]`
+        : `[${parts.receiver}.${parts.door}]`,
+  };
 }
 
 /**
@@ -147,10 +135,10 @@ function raiserBindings(source: ts.SourceFile): BoundHead[] {
   const found: BoundHead[] = [];
 
   const visit = (node: ts.Node): void => {
-    const binding = raiserBindingOf(node, source);
+    const binding = raiserBindingOf(node);
 
     if (binding !== undefined) {
-      found.push(binding.bound);
+      found.push(boundOf(binding.parts));
     }
 
     ts.forEachChild(node, visit);
@@ -159,59 +147,6 @@ function raiserBindings(source: ts.SourceFile): BoundHead[] {
   visit(source);
 
   return found;
-}
-
-/** The head `name` is bound to by a statement of this one scope, if any. */
-function boundHeadIn(
-  scope: ts.Block | ts.SourceFile,
-  name: string,
-  source: ts.SourceFile,
-): BoundHead | undefined {
-  for (const statement of scope.statements) {
-    if (!ts.isVariableStatement(statement)) {
-      continue;
-    }
-
-    for (const declaration of statement.declarationList.declarations) {
-      const binding = raiserBindingOf(declaration, source);
-
-      if (binding?.name === name) {
-        return binding.bound;
-      }
-    }
-  }
-
-  return undefined;
-}
-
-/**
- * The binding a tag reads, resolved from the tag by LEXICAL SCOPE: the nearest
- * enclosing block or file that binds `name` to a raiser. Each scope is read
- * whole, so a binding written below the site still answers for it.
- */
-function boundHeadAt(
-  node: ts.Node,
-  name: string,
-  source: ts.SourceFile,
-): BoundHead | undefined {
-  // ⚠ `parent` is typed as present and IS undefined at the root, so the cast is
-  // a guard rather than noise.
-  for (
-    let scope = node.parent as ts.Node | undefined;
-    scope !== undefined;
-    scope = scope.parent
-  ) {
-    const bound =
-      ts.isBlock(scope) || ts.isSourceFile(scope)
-        ? boundHeadIn(scope, name, source)
-        : undefined;
-
-    if (bound !== undefined) {
-      return bound;
-    }
-  }
-
-  return undefined;
 }
 
 /** A tag read off a named base, with the binding it resolves to. */
@@ -220,17 +155,23 @@ interface RaiserTag {
   readonly bound: BoundHead | undefined;
 }
 
-/** Every tag read off a named base in a file, with the binding it resolves to. */
+/**
+ * Every tag read off a named base in a file, with the binding it resolves to by
+ * lexical scope (`raiserPartsAt`).
+ */
 function raiserTags(source: ts.SourceFile): RaiserTag[] {
   const found: RaiserTag[] = [];
 
   const visit = (node: ts.Node): void => {
-    if (ts.isTaggedTemplateExpression(node)) {
-      const name = boundNameOfTag(node.tag);
+    const tag = raiserTagOf(node);
 
-      if (name !== undefined) {
-        found.push({ node, bound: boundHeadAt(node, name, source) });
-      }
+    if (tag !== undefined) {
+      const parts = raiserPartsAt(node, tag.base);
+
+      found.push({
+        node: node as ts.TaggedTemplateExpression,
+        bound: parts === undefined ? undefined : boundOf(parts),
+      });
     }
 
     ts.forEachChild(node, visit);
@@ -239,19 +180,6 @@ function raiserTags(source: ts.SourceFile): RaiserTag[] {
   visit(source);
 
   return found;
-}
-
-/**
- * The raiser a tagged template was built from: `at` in ``at.type`…` `` and in
- * ``at.code(code)`…` ``, or undefined when the tag is neither.
- */
-function boundNameOfTag(tag: ts.Expression): string | undefined {
-  const member = ts.isCallExpression(tag) ? tag.expression : tag;
-
-  return ts.isPropertyAccessExpression(member) &&
-    ts.isIdentifier(member.expression)
-    ? member.expression.text
-    : undefined;
 }
 
 interface Offender {
@@ -839,13 +767,12 @@ interface Refusals {
  * joins the unjudgeable rather than the offenders.
  */
 /** `at.type`, `atRouter.plain`, `internalDefect.plain`, `at.code(code)` — and nothing else. */
-function isRaiserTag(tag: ts.Expression): boolean {
-  const member = ts.isCallExpression(tag) ? tag.expression : tag;
+function isRaiserTag(node: ts.Node): boolean {
+  const member = raiserTagOf(node)?.member;
 
   return (
-    ts.isPropertyAccessExpression(member) &&
-    ts.isIdentifier(member.expression) &&
-    ["type", "plain", "ref", "range", "code"].includes(member.name.text)
+    member !== undefined &&
+    ["type", "plain", "ref", "range", "code"].includes(member)
   );
 }
 
@@ -868,7 +795,7 @@ function classify(thrown: ts.Expression): Seen {
   // ⚠ The FLAVOUR is part of the test. `isTaggedTemplateExpression` alone would
   // count any tagged template thrown anywhere as a converted refusal, and the floor
   // below would then be satisfied by something that is not one.
-  if (ts.isTaggedTemplateExpression(thrown) && isRaiserTag(thrown.tag)) {
+  if (isRaiserTag(thrown)) {
     return { kind: "raised" };
   }
 
@@ -1185,10 +1112,7 @@ function refusals(root: string = SRC): Refusals {
       // A site raising through O-1's marker writes no literal message at all,
       // so the construction walk above cannot see it. Counted here, and floored
       // below, so the form stays visible rather than silently unwatched.
-      if (
-        ts.isTaggedTemplateExpression(node) &&
-        boundNameOfTag(node.tag) === "internalDefect"
-      ) {
+      if (raiserTagOf(node)?.base === "internalDefect") {
         defects++;
       }
 

@@ -20,6 +20,8 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import ts from "typescript";
 
+import { raiserPartsAt, raiserTagOf } from "./lib/raiser-head.mjs";
+
 const PLAIN = new Set(["TypeError", "Error", "ReferenceError", "RangeError"]);
 const CONSTRUCTORS = new Set([...PLAIN, "RouterError"]);
 
@@ -68,45 +70,18 @@ export const render = (name, text) => {
   // head diff says nothing about whether a body moved with it.
   const bodies = new Set();
 
-  const headOfBinding = (declaration) => {
-    const [r, d] = declaration.initializer.arguments;
+  // A dynamic door is `${}`, as `shape` spells an interpolation: both revisions
+  // must collapse it identically, or the diff is noise.
+  const headOf = (parts) =>
+    parts?.receiver === undefined
+      ? undefined
+      : parts.dynamic
+        ? `[${parts.receiver}.\${}] `
+        : parts.door === undefined
+          ? `[${parts.receiver}] `
+          : `[${parts.receiver}.${parts.door}] `;
 
-    if (!r || !ts.isStringLiteral(r)) return undefined;
-
-    return d === undefined
-      ? `[${r.text}] `
-      : ts.isStringLiteral(d)
-        ? `[${r.text}.${d.text}] `
-        : `[${r.text}.\${}] `;
-  };
-
-  const isBinding = (n) =>
-    ts.isVariableDeclaration(n) &&
-    ts.isIdentifier(n.name) &&
-    n.initializer !== undefined &&
-    ts.isCallExpression(n.initializer) &&
-    n.initializer.expression.getText(src) === "raiser";
-
-  const walk = (n, outer) => {
-    let scope = outer;
-
-    // ⚠ A scope's bindings are hoisted before its children are walked. Resolving
-    // them in TEXTUAL order lost three heads when `RouterError.ts` moved its
-    // bindings below the class that uses them — legal, since a method resolves the
-    // binding when it runs, not where it is written.
-    if (ts.isBlock(n) || ts.isSourceFile(n) || ts.isModuleBlock(n)) {
-      scope = new Map(outer);
-
-      for (const statement of n.statements)
-        if (ts.isVariableStatement(statement))
-          for (const declaration of statement.declarationList.declarations)
-            if (isBinding(declaration)) {
-              const head = headOfBinding(declaration);
-
-              if (head !== undefined) scope.set(declaration.name.text, head);
-            }
-    }
-
+  const walk = (n) => {
     // ⚠ Wherever the refusal is BUILT, not only where it is thrown. A third of
     // this family is delivered by `Promise.reject`, by a `const` the caller reports
     // before throwing, or by a module-cached instance — a throw-only reader reports
@@ -124,37 +99,31 @@ export const render = (name, text) => {
       }
     }
 
-    if (ts.isTaggedTemplateExpression(n)) {
-      const tag = n.tag;
-      const member = ts.isCallExpression(tag) ? tag.expression : tag;
+    const tag = raiserTagOf(n);
 
-      if (
-        ts.isPropertyAccessExpression(member) &&
-        ts.isIdentifier(member.expression)
-      ) {
-        // `internalDefect` is a module-level constant rather than a binding, and
-        // its head is fixed. ⚠ Without this the whole marker family was outside
-        // the comparison: measured on step 6, appending a period to three bodies
-        // left the FSM suite 76/76 green, because its pins are `toThrow(string)`
-        // and that is substring containment.
-        const head =
-          member.expression.text === "internalDefect"
-            ? "Internal error (please report): "
-            : scope.get(member.expression.text);
+    if (tag !== undefined) {
+      // `internalDefect` is a module-level constant rather than a binding, and
+      // its head is fixed. ⚠ Without this the whole marker family was outside
+      // the comparison: measured on step 6, appending a period to three bodies
+      // left the FSM suite 76/76 green, because its pins are `toThrow(string)`
+      // and that is substring containment.
+      const head =
+        tag.base === "internalDefect"
+          ? "Internal error (please report): "
+          : headOf(raiserPartsAt(n, tag.base));
 
-        if (head !== undefined) {
-          const body = shape(n.template, src);
+      if (head !== undefined) {
+        const body = shape(n.template, src);
 
-          out.add(head + body);
-          bodies.add(body);
-        }
+        out.add(head + body);
+        bodies.add(body);
       }
     }
 
-    ts.forEachChild(n, (c) => walk(c, scope));
+    ts.forEachChild(n, walk);
   };
 
-  walk(src, new Map());
+  walk(src);
 
   return { out, bodies };
 };

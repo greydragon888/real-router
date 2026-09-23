@@ -21,6 +21,8 @@
 import ts from "typescript";
 import { globSync, readFileSync } from "node:fs";
 
+import { raiserPartsAt, raiserTagOf } from "./lib/raiser-head.mjs";
+
 const ROOTS = ["packages/core/src", "packages/validation-plugin/src"];
 const CONSTRUCTORS = new Set([
   "TypeError",
@@ -56,81 +58,29 @@ const FLAVOUR_CLASS = {
   code: "RouterError",
 };
 
-/** The head one `raiser(...)` call builds, or `undefined` if it names no receiver. */
-const headOfRaiserCall = (call) => {
-  const receiver = call.arguments.at(0);
-
-  if (receiver === undefined || !ts.isStringLiteral(receiver)) {
+/** The head a binding's parts build, or `undefined` if it names no receiver. */
+const headOf = (parts) => {
+  if (parts?.receiver === undefined) {
     return undefined;
   }
 
-  const door = call.arguments.at(1);
-
-  if (door === undefined) {
-    return `[${receiver.text}] `;
+  if (parts.dynamic) {
+    // A dynamic door is spelled as the literal form spelled it, so the counts a
+    // conversion moves stay comparable across it.
+    return `[${parts.receiver}.\${}] `;
   }
 
-  // A dynamic door is spelled as the literal form spelled it, so the counts a
-  // conversion moves stay comparable across it.
-  return ts.isStringLiteral(door)
-    ? `[${receiver.text}.${door.text}] `
-    : `[${receiver.text}.\${}] `;
-};
-
-/**
- * The head the binding `name` builds AT `node`, resolved by LEXICAL SCOPE.
- *
- * ⚠ Not a file-wide map keyed by name: measured on `validation-plugin`, whose
- * per-call bindings are all called `at`, the last one answers for every site.
- */
-const raiserHeadAt = (node, name) => {
-  for (let scope = node.parent; scope !== undefined; scope = scope.parent) {
-    if (!ts.isBlock(scope) && !ts.isSourceFile(scope)) {
-      continue;
-    }
-
-    for (const statement of scope.statements) {
-      if (!ts.isVariableStatement(statement)) {
-        continue;
-      }
-
-      for (const declaration of statement.declarationList.declarations) {
-        if (
-          ts.isIdentifier(declaration.name) &&
-          declaration.name.text === name &&
-          declaration.initializer !== undefined &&
-          ts.isCallExpression(declaration.initializer) &&
-          declaration.initializer.expression.getText() === "raiser"
-        ) {
-          return headOfRaiserCall(declaration.initializer);
-        }
-      }
-    }
-  }
-
-  return undefined;
+  return parts.door === undefined
+    ? `[${parts.receiver}] `
+    : `[${parts.receiver}.${parts.door}] `;
 };
 
 /** The flavour and head a raiser tag carries, if `node` is one. */
 export const raiserTag = (node) => {
-  if (!ts.isTaggedTemplateExpression(node)) {
-    return undefined;
-  }
-
-  const member = ts.isCallExpression(node.tag) ? node.tag.expression : node.tag;
-
-  if (
-    !ts.isPropertyAccessExpression(member) ||
-    !ts.isIdentifier(member.expression)
-  ) {
-    return undefined;
-  }
-
-  const flavour = FLAVOUR_CLASS[member.name.text];
+  const tag = raiserTagOf(node);
+  const flavour = tag === undefined ? undefined : FLAVOUR_CLASS[tag.member];
   const head =
-    flavour === undefined
-      ? undefined
-      : raiserHeadAt(node, member.expression.text);
+    flavour === undefined ? undefined : headOf(raiserPartsAt(node, tag.base));
 
   return head === undefined ? undefined : { flavour, head };
 };

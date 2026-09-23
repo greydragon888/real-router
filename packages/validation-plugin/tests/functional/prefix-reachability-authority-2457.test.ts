@@ -11,6 +11,13 @@ import path from "node:path";
 import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import {
+  raiserPartsAt,
+  raiserTagOf,
+} from "../../../../scripts/lib/raiser-head.mjs";
+
+import type { RaiserParts } from "../../../../scripts/lib/raiser-head.mjs";
+
 /**
  * A message names a door that can REACH it (#2457).
  *
@@ -78,103 +85,46 @@ const parse = (file: string): ts.SourceFile =>
     ts.ScriptKind.TS,
   );
 
-/** The literal text a node contributes as a message head. */
-/** The head one `raiser(...)` call builds, or `undefined` if it names no receiver. */
-function headOfRaiserCall(call: ts.CallExpression): string | undefined {
-  const receiver = call.arguments.at(0);
-
-  if (receiver === undefined || !ts.isStringLiteral(receiver)) {
-    return undefined;
-  }
-
-  const door = call.arguments.at(1);
-
-  if (door === undefined) {
-    return `[${receiver.text}] `;
-  }
-
-  return ts.isStringLiteral(door)
-    ? `[${receiver.text}.${door.text}] `
-    : `[${receiver.text}.`;
-}
-
-/** Whether `statement` binds `name` to a `raiser(...)` call, and to what head. */
-function boundHeadIn(
-  statement: ts.Statement,
-  name: string,
-): string | undefined {
-  if (!ts.isVariableStatement(statement)) {
-    return undefined;
-  }
-
-  for (const declaration of statement.declarationList.declarations) {
-    if (
-      ts.isIdentifier(declaration.name) &&
-      declaration.name.text === name &&
-      declaration.initializer !== undefined &&
-      ts.isCallExpression(declaration.initializer) &&
-      calleeName(declaration.initializer) === "raiser"
-    ) {
-      return headOfRaiserCall(declaration.initializer);
-    }
-  }
-
-  return undefined;
-}
-
 /**
- * The head the binding `name` builds AT `node`, resolved by LEXICAL SCOPE.
+ * The head a binding's parts build, or `undefined` if it names no receiver.
  *
- * ⚠ A file-wide map keyed by name is wrong here and was measured wrong: a package
- * whose per-call bindings are all called `at` gives the LAST one to every site, so a
- * door planted in the first passed green. Walking up from the site is what keeps two
- * `const at = raiser(…)` in two functions apart.
+ * ⚠ A dynamic door is left UNCLOSED — `[router.` — so the regexes below miss it
+ * exactly as they miss the literal `[router.${methodName}]`.
  */
-function headForBindingAt(node: ts.Node, name: string): string | undefined {
-  // ⚠ `parent` is typed as present and IS undefined at the root, so the cast is a
-  // guard rather than noise — the same reason the `addCheck` walk below casts.
-  let scope = node.parent as ts.Node | undefined;
-
-  while (scope !== undefined) {
-    if (ts.isBlock(scope) || ts.isSourceFile(scope)) {
-      for (const statement of scope.statements) {
-        const head = boundHeadIn(statement, name);
-
-        if (head !== undefined) {
-          return head;
-        }
-      }
-    }
-
-    scope = scope.parent;
+function headOf(parts: RaiserParts | undefined): string | undefined {
+  if (parts?.receiver === undefined) {
+    return undefined;
   }
 
-  return undefined;
+  if (parts.dynamic) {
+    return `[${parts.receiver}.`;
+  }
+
+  return parts.door === undefined
+    ? `[${parts.receiver}] `
+    : `[${parts.receiver}.${parts.door}] `;
 }
 
+/** The literal text a node contributes as a message head. */
 function headTextOf(node: ts.Node): string | undefined {
   // ⛑ The raiser builds the head from its binding, so the literal carries only
   // the BODY. Measured before this branch existed: the same unreachable door reds
   // this file in the literal form and passes in the raiser form, so converting the
   // package without it disarms the authority silently (#2487 step 7).
-  if (ts.isTaggedTemplateExpression(node)) {
-    const tag = node.tag;
-    const member = ts.isCallExpression(tag) ? tag.expression : tag;
+  const tag = raiserTagOf(node);
 
-    if (
-      ts.isPropertyAccessExpression(member) &&
-      ts.isIdentifier(member.expression)
-    ) {
-      const head = headForBindingAt(node, member.expression.text);
+  if (tag !== undefined) {
+    const head = headOf(raiserPartsAt(node, tag.base));
 
-      if (head !== undefined) {
-        return (
-          head +
-          (ts.isNoSubstitutionTemplateLiteral(node.template)
-            ? node.template.text
-            : node.template.head.text)
-        );
-      }
+    if (head !== undefined) {
+      const { template } = node as ts.TaggedTemplateExpression;
+
+      return (
+        head +
+        (ts.isNoSubstitutionTemplateLiteral(template)
+          ? template.text
+          : template.head.text)
+      );
     }
   }
 

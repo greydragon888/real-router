@@ -11,6 +11,8 @@ import path from "node:path";
 import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { raiserBindingOf } from "../../../../scripts/lib/raiser-head.mjs";
+
 /**
  * A door a message names must be one a caller can CALL, and one that can reach
  * the message (#2479).
@@ -216,31 +218,12 @@ function collectApiMembers(node: ts.Node, into: Sink): void {
  * shared fixture, the door planted in the first of two such bindings was never
  * judged (#2537).
  */
-function collectRaiserDoor(
-  node: ts.Node,
-  source: ts.SourceFile,
-  into: string[],
-): void {
-  if (
-    !ts.isVariableDeclaration(node) ||
-    !ts.isIdentifier(node.name) ||
-    node.initializer === undefined ||
-    !ts.isCallExpression(node.initializer) ||
-    node.initializer.expression.getText(source) !== "raiser"
-  ) {
-    return;
-  }
+function collectRaiserDoor(node: ts.Node, into: string[]): void {
+  const parts = raiserBindingOf(node)?.parts;
 
-  const [receiver, door] = node.initializer.arguments;
-
-  if (
-    receiver !== undefined &&
-    ts.isStringLiteral(receiver) &&
-    receiver.text === "router" &&
-    door !== undefined &&
-    ts.isStringLiteral(door)
-  ) {
-    into.push(door.text);
+  // A dynamic door and a bare receiver name no door to judge.
+  if (parts?.receiver === "router" && parts.door !== undefined) {
+    into.push(parts.door);
   }
 }
 
@@ -307,7 +290,7 @@ function readCore(root: string = SRC): Facts {
       collectPosition(node, where, sink);
       collectClassMethods(node, sink);
       collectApiMembers(node, sink);
-      collectRaiserDoor(node, source, bound);
+      collectRaiserDoor(node, bound);
 
       for (const text of messageTexts(node)) {
         const printed =
