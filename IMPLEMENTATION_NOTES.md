@@ -11568,3 +11568,29 @@ Measured on 2026-09-16/17 while pricing the rejected option.
 **Solution.** The owner restated the policy on 2026-09-23. `f86488813` is reverted in all 27 files. `CLAUDE.md` keeps the one fact that commit measured, as a warning beside the rule: the push bypasses the ruleset and every check it requires, and `ci.yml` runs on pull requests only, so the local git hooks are the only checks a change gets before it lands.
 
 **Why.** The ruleset binds every contributor without the bypass role; the owner's infrastructure commits land through that bypass by design. Reading the ruleset as the delivery policy is the step that produced `f86488813`, and the same reading would reverse an owner decision again. The cost it named — no CI on the push — is real, and it is what the warning now says.
+
+## One fixture holds every reader of a raiser head (2026-09-23)
+
+### Problem
+
+Six places read a `raiser(...)` binding and print, count or judge the head it writes: `scripts/raiser-text-equality.mjs`, `scripts/refusal-census.mjs`, core's `message-prefix-authority-1845` and `door-reachability-authority-2479`, the plugin's `prefix-reachability-authority-2457`, and the wiki's `check-messages.mjs`. Each parses the binding on its own, and one defect was written into that parse four times — twice caught while #2487 was in flight, twice still live: a map keyed by the binding's NAME. `validation-plugin` gives every per-call binding the name `at`, so such a map hands one binding's head to every site that shares the name.
+
+Nothing could have caught it. No control in any of them put two bindings of one name in one file, and the real tree answers the same under both resolutions, because each same-named pair there shares one dynamic spelling. Measured: a mutant restoring the map passed every cell of 1845, 2479 and 2457, and passed the wiki's full run with no findings.
+
+### Solution
+
+`packages/core/tests/fixtures/raiser-heads/` is one tree of the shapes a reader must handle: a static door, a dynamic door, a bare receiver, two same-named bindings with a mis-shaped door planted in the first, and a binding written below its use. Each reader answers for every site in it, in its own terms — a rendered head, a counted class, a resolved binding, a judged door — and asserts the whole answer keyed by FILE, so a new file there reds every reader until its answer is written, including a reader that ignores it and must say so with an empty answer.
+
+- It found both live copies. 1845 now judges the form of each BINDING, and resolves a tag to its binding by lexical scope for the body rule; 2479 keeps one door per binding.
+- The two scripts ran their report at module scope, so nothing could import their parse. Each now runs `main()` behind `import.meta.main`, the idiom #2539 recommends for every CLI there — the `file://${argv[1]}` comparison other scripts use never matches a symlinked or space-carrying path, so `main()` silently does not run — and a `scripts/*.test.mjs` beside it pins the parse and runs the CLI through such a path; `node --test` runs those in pre-push and CI. The census prints byte-identical output before and after.
+- The wiki's checker now checks its own extractor against the fixture before it reads a page, and refuses on a wrong answer or a missing fixture; its `--selftest` never ran the extractor. `wiki-checkers.yml` also runs on a pull request that touches the fixture, so a changed answer reaches the author as the advisory comment rather than as the next morning's tracking issue.
+
+Each was verified by mutation: restoring the map reds the fixture's cell or check in every reader, and nothing else in its file.
+
+### Why the fixture lives in core's tests
+
+Turbo keys a package's `test` task on `tests/**/*.{ts,tsx}`, so inside core the tree invalidates the cache of the two core readers, and they stay readers of their own workspace. Outside a package both would read across workspaces, and #2241's ratchet would require them in `scripts/repo-wide-scans.json`; 2457 is registered there already. The price is that the tree is real TypeScript that `tsc` and eslint read, and that the core authorities scanning `packages/*/tests/**` read it too — which is why it carries raiser shapes and no API wiring for them to count.
+
+⚠ **The wiki's side lands after the monorepo's.** Its daily run reads `master`, and on a `master` without the fixture the new check refuses. Two repositories cannot land one change atomically, so the order is the obligation.
+
+⚠ The fixture pins how each reader RESOLVES a binding, not how every reader judges what it resolved: 2457's reachability verdict and 2479's membership verdict are not asserted on it.
