@@ -115,6 +115,12 @@ pnpm resolve:dependabot <PR#>  # Rebase+dedupe a Dependabot PR — conflicting O
 
 `/bump-dep <pkg>` still ANALYSES any of these on request — it reads the releases and reports impact, and only refuses to apply the bump.
 
+## Searching the Code
+
+- **A plain search of a consumer package skips its shared sources.** `rg`, `git grep` and `ast-grep` do not descend into symlinked directories, so searching `packages/react/src` omits `src/dom-utils` without saying so. Search `shared/` itself, or pass `rg -L` / `ast-grep --follow`. `packages/angular/src/dom-utils` is a real copy, so a search over all of `packages/` finds dom-utils code twice.
+- **`rg` and `ast-grep` skip dot-directories**, and this repository's CI, hooks, changesets and prompts live in `.github/`, `.husky/`, `.changeset/` and `.claude/`. Use `rg --hidden -g '!.git'` / `ast-grep --no-ignore hidden`, or `git grep` when the scope must be exactly the tracked files.
+- **Count call sites with the type checker, not a pattern.** A text or syntax pattern misses generic calls (`f<T>(…)`), renamed imports and re-exports, and the count comes back smaller rather than empty. LSP `findReferences` / `incomingCalls` resolves them; an alias shows up as a `read` of the function that is not a call — follow it from there.
+
 ## Non-Obvious Conventions
 
 - 100% test coverage required (enforced in vitest.config). Framework adapters may sit below it, because compiler-generated phantom code is unreachable from a test (Solid: babel-preset-solid, Vue: defineComponent, Svelte: compiler transforms, Angular: JIT TestBed does not bind signal `input()`, so `contentChildren`/directive callbacks need AOT). ⚠ **The numbers are deliberately not repeated here.** This line carried Angular's as `94/84/94/94` while the config said `98/94/99/98`, and the correct value already had two homes inside that package. Each adapter's thresholds live in its own `vitest.config.mts` and are restated in that package's `CLAUDE.md` — read those, or `grep -A6 thresholds packages/*/vitest.config.mts`. ⚠ Nor is it only branches/functions: measured, Solid and Angular lower statements and lines too
