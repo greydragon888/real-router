@@ -91,7 +91,99 @@ const parse = (file: string): ts.SourceFile =>
   );
 
 /** The literal text a node contributes as a message head. */
+const raiserHeadsCache = new WeakMap<
+  ts.SourceFile,
+  ReadonlyMap<string, string>
+>();
+
+/**
+ * The head each `raiser` binding in one file builds, keyed by the bound name.
+ *
+ * ⚠ A DYNAMIC door is spelled `[<receiver>.` on purpose, because that is what a
+ * template's `head.text` carries for the literal form it replaces
+ * (`` `[router.${methodName}] …` `` → `"[router."`). Both regexes below miss it
+ * either way, so teaching this file the raiser form changes no verdict on that shape.
+ */
+/** The head one `raiser(...)` call builds, or `undefined` if it names no receiver. */
+function headOfRaiserCall(call: ts.CallExpression): string | undefined {
+  const receiver = call.arguments.at(0);
+
+  if (receiver === undefined || !ts.isStringLiteral(receiver)) {
+    return undefined;
+  }
+
+  const door = call.arguments.at(1);
+
+  if (door === undefined) {
+    return `[${receiver.text}] `;
+  }
+
+  return ts.isStringLiteral(door)
+    ? `[${receiver.text}.${door.text}] `
+    : `[${receiver.text}.`;
+}
+
+function raiserHeadsOf(source: ts.SourceFile): ReadonlyMap<string, string> {
+  const cached = raiserHeadsCache.get(source);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const heads = new Map<string, string>();
+
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer !== undefined &&
+      ts.isCallExpression(node.initializer) &&
+      calleeName(node.initializer) === "raiser"
+    ) {
+      const head = headOfRaiserCall(node.initializer);
+
+      if (head !== undefined) {
+        heads.set(node.name.text, head);
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(source);
+  raiserHeadsCache.set(source, heads);
+
+  return heads;
+}
+
 function headTextOf(node: ts.Node): string | undefined {
+  // ⛑ The raiser builds the head from its binding, so the literal carries only
+  // the BODY. Measured before this branch existed: the same unreachable door reds
+  // this file in the literal form and passes in the raiser form, so converting the
+  // package without it disarms the authority silently (#2487 step 7).
+  if (ts.isTaggedTemplateExpression(node)) {
+    const tag = node.tag;
+    const member = ts.isCallExpression(tag) ? tag.expression : tag;
+
+    if (
+      ts.isPropertyAccessExpression(member) &&
+      ts.isIdentifier(member.expression)
+    ) {
+      const head = raiserHeadsOf(node.getSourceFile()).get(
+        member.expression.text,
+      );
+
+      if (head !== undefined) {
+        return (
+          head +
+          (ts.isNoSubstitutionTemplateLiteral(node.template)
+            ? node.template.text
+            : node.template.head.text)
+        );
+      }
+    }
+  }
+
   if (ts.isTemplateExpression(node)) {
     return node.head.text;
   }
