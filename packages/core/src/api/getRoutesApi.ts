@@ -34,7 +34,7 @@ import {
   compileArtifactGuards,
   resetStore,
 } from "../namespaces/RoutesNamespace/routesStore";
-import { RouterError, freezeThrownError } from "../RouterError";
+import { raiser } from "../RouterError";
 import { getTransitionPath } from "../transitionPath";
 import { putField } from "../utils/ingest";
 
@@ -59,6 +59,8 @@ import type {
   GuardFnFactory,
   Route,
 } from "../types";
+
+const atClear = raiser("router", "clear");
 
 /** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
 const freeze = Object.freeze;
@@ -1078,13 +1080,9 @@ export function getRoutesApi<
       // this one never does — the caller has to change the code. That is the
       // same line `REENTRANT_TREE_MUTATION` sits on (#1032).
       if (ctx.getStateName() !== undefined) {
-        throw freezeThrownError(
-          new RouterError(errorCodes.ROUTER_NOT_STOPPED, {
-            message:
-              "[router.clear] Cannot clear routes while a state is committed. " +
-              "Use replace(routes) to swap the tree on a running router, or stop() first.",
-          }),
-        );
+        throw atClear.code(
+          errorCodes.ROUTER_NOT_STOPPED,
+        )`Cannot clear routes while a state is committed. Use replace(routes) to swap the tree on a running router, or stop() first.`;
       }
 
       const canClear = validateClearRoutes(ctx.isTransitioning(), ctx.logger);

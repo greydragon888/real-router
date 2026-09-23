@@ -1,7 +1,9 @@
 // packages/core/src/api/helpers.ts
 
 import { errorCodes } from "../constants";
-import { RouterError, freezeThrownError } from "../RouterError";
+import { raiser } from "../RouterError";
+
+const atRouter = raiser("router");
 
 /**
  * Bans synchronous reentrant tree mutation: a mutator called while a
@@ -22,12 +24,9 @@ export function throwIfReentrantTreeMutation(
   isRevalidating: () => boolean,
 ): void {
   if (isEmitting()) {
-    throw freezeThrownError(
-      new RouterError(errorCodes.REENTRANT_TREE_MUTATION, {
-        message:
-          "[router] cannot mutate the route tree from inside a subscribeChanges handler — the mutation would run while a TREE_CHANGED emit is on the stack and the tree must stay atomic. Defer it: queueMicrotask(() => routes.add(...)) or await.",
-      }),
-    );
+    throw atRouter.code(
+      errorCodes.REENTRANT_TREE_MUTATION,
+    )`cannot mutate the route tree from inside a subscribeChanges handler — the mutation would run while a TREE_CHANGED emit is on the stack and the tree must stay atomic. Defer it: queueMicrotask(() => routes.add(...)) or await.`;
   }
 
   // ⚠ A SECOND window with its own text, for the reason #1665 states about the
@@ -36,11 +35,8 @@ export function throwIfReentrantTreeMutation(
   // as spurious. The two windows are adjacent and the code is the same; the
   // sentence is what tells them apart (#1758).
   if (isRevalidating()) {
-    throw freezeThrownError(
-      new RouterError(errorCodes.REENTRANT_TREE_MUTATION, {
-        message:
-          "[router] cannot mutate the route tree from inside replace()'s revalidation — the tree would move under a state that has not been revalidated yet. Defer it: queueMicrotask(() => routes.replace(...)) or await.",
-      }),
-    );
+    throw atRouter.code(
+      errorCodes.REENTRANT_TREE_MUTATION,
+    )`cannot mutate the route tree from inside replace()'s revalidation — the tree would move under a state that has not been revalidated yet. Defer it: queueMicrotask(() => routes.replace(...)) or await.`;
   }
 }

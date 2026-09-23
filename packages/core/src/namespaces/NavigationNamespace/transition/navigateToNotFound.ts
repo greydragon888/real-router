@@ -5,7 +5,7 @@ import {
   constants,
   errorCodes,
 } from "../../../constants";
-import { RouterError, freezeThrownError } from "../../../RouterError";
+import { raiser } from "../../../RouterError";
 import { nameToIDs } from "../../../transitionPath";
 
 import type { NavigationOptions, State, TransitionMeta } from "../../../types";
@@ -17,6 +17,7 @@ import type { NavigationDependencies } from "../types";
 // constants below are frozen at import, before any application code runs, so
 // they need no capture; these four call sites do.
 const freeze = Object.freeze;
+const atNavigateToNotFound = raiser("router", "navigateToNotFound");
 
 /**
  * The one commit primitive that is NOT a transition.
@@ -115,12 +116,9 @@ function commitNotFound(
     // caller receive the same object, so freezing afterwards hands every
     // `$$error` listener a window in which a write lands in what the caller
     // then catches. The three siblings in `NavigationNamespace` freeze here too.
-    const error = freezeThrownError(
-      new RouterError(errorCodes.CANNOT_DEACTIVATE, {
-        path,
-        message: `[router.navigateToNotFound] a canDeactivate guard on "${fromState.name}" refused to leave for ${path}`,
-      }),
-    );
+    const error = atNavigateToNotFound.code(errorCodes.CANNOT_DEACTIVATE, {
+      path,
+    })`a canDeactivate guard on "${fromState.name}" refused to leave for ${path}`;
 
     // Report before throwing, so an observer sees the refusal on the same
     // channel a blocked `navigate` uses — the popstate handler's own `catch`

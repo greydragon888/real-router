@@ -6,7 +6,7 @@ import { getLifecycleApi } from "./getLifecycleApi";
 import { assignConfigEntries } from "../namespaces/RoutesNamespace/helpers";
 import { adoptForwardState } from "../namespaces/RoutesNamespace/routesStore";
 import { Router as RouterClass } from "../Router";
-import { RouterError, freezeThrownError } from "../RouterError";
+import { freezeThrownError, raiser } from "../RouterError";
 import { putField } from "../utils/ingest";
 
 import type {
@@ -31,6 +31,8 @@ import type {
  */
 const objectEntries = Object.entries;
 const hasOwn = Object.hasOwn;
+
+const atCloneRouter = raiser("cloneRouter");
 
 /**
  * Per-clone overrides beyond dependencies.
@@ -123,10 +125,9 @@ export function cloneRouter<
 
   if (ctx.isDisposed()) {
     throw freezeThrownError(
-      new RouterError(errorCodes.ROUTER_DISPOSED, {
-        message:
-          "[cloneRouter] cannot clone a disposed router — dispose() is terminal",
-      }),
+      atCloneRouter.code(
+        errorCodes.ROUTER_DISPOSED,
+      )`cannot clone a disposed router — dispose() is terminal`,
     );
   }
 

@@ -290,8 +290,9 @@ validateRoutePath(path, routeName, methodName, parentNode?)
 
 ### Validation Errors
 
-Validation failures surface as `RouterError` (via `createRouterError`, see
-`validation/routes.ts`) or `TypeError` (`validation/route-batch.ts`). There is no
+Validation failures surface as `TypeError` — both the ten that go through
+`createRouterError` in `validation/routes.ts` and the ones `validation/route-batch.ts`
+throws directly; each head is built by the raiser (#2487). There is no
 package-specific error-subclass hierarchy.
 
 ## Query Operations

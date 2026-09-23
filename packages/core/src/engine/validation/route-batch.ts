@@ -13,6 +13,7 @@ import {
   assertRouteNameWithinLength,
 } from "./route-name";
 import { validateRoutePath } from "./routes";
+import { raiser } from "../../RouterError";
 
 import type { RouteDefinition, RouteTree } from "../types";
 
@@ -107,25 +108,25 @@ export function validateRouteType(
   methodName: string,
 ): asserts route is Record<string, unknown> {
   if (!route || typeof route !== "object") {
-    throw new TypeError(
-      `[router.${methodName}] Route must be an object, got ${getTypeDescription(route)}`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Route must be an object, got ${getTypeDescription(route)}`;
   }
 
   // Check for plain object (prototype must be Object.prototype or null)
   const proto: object | null = getPrototypeOf(route) as object | null;
 
   if (proto !== Object.prototype && proto !== null) {
-    throw new TypeError(
-      `[router.${methodName}] Route must be a plain object, got ${getTypeDescription(route)}`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Route must be a plain object, got ${getTypeDescription(route)}`;
   }
 
   // Check for getters/setters (could cause mutations during processing)
   if (hasGettersOrSetters(route as Record<string, unknown>)) {
-    throw new TypeError(
-      `[router.${methodName}] Route must not have getters or setters`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Route must not have getters or setters`;
   }
 }
 
@@ -144,9 +145,9 @@ function validateEncodeParams(
     route.encodeParams !== undefined &&
     typeof route.encodeParams !== "function"
   ) {
-    throw new TypeError(
-      `[router.${methodName}] Route "${String(route.name)}" encodeParams must be a function`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Route "${String(route.name)}" encodeParams must be a function`;
   }
 }
 
@@ -165,9 +166,9 @@ function validateDecodeParams(
     route.decodeParams !== undefined &&
     typeof route.decodeParams !== "function"
   ) {
-    throw new TypeError(
-      `[router.${methodName}] Route "${String(route.name)}" decodeParams must be a function`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Route "${String(route.name)}" decodeParams must be a function`;
   }
 }
 
@@ -194,9 +195,9 @@ function validateRouteName(
   methodName: string,
 ): asserts route is Record<string, unknown> & { name: string } {
   if (typeof route.name !== "string") {
-    throw new TypeError(
-      `[router.${methodName}] Route name must be a string, got ${getTypeDescription(route.name)}`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Route name must be a string, got ${getTypeDescription(route.name)}`;
   }
 
   const name = route.name;
@@ -260,9 +261,9 @@ function checkTreeNameDuplicate(
   methodName: string,
 ): void {
   if (findNodeByFullName(rootNode, fullName)) {
-    throw new Error(
-      `[router.${methodName}] Route "${fullName}" already exists`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.plain`Route "${fullName}" already exists`;
   }
 }
 
@@ -280,9 +281,9 @@ function checkBatchNameDuplicate(
   methodName: string,
 ): void {
   if (seenNames.has(fullName)) {
-    throw new Error(
-      `[router.${methodName}] Duplicate route "${fullName}" in batch`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.plain`Duplicate route "${fullName}" in batch`;
   }
 
   seenNames.add(fullName);
@@ -311,9 +312,9 @@ function checkTreePathDuplicate(
 
   for (const child of parentNode.children.values()) {
     if (child.path === routePath) {
-      throw new Error(
-        `[router.${methodName}] Path "${routePath}" is already defined`,
-      );
+      const at = raiser("router", methodName);
+
+      throw at.plain`Path "${routePath}" is already defined`;
     }
   }
 }
@@ -335,9 +336,9 @@ function checkBatchPathDuplicate(
   const pathsAtLevel = seenPathsByParent.get(parentName);
 
   if (pathsAtLevel?.has(routePath)) {
-    throw new Error(
-      `[router.${methodName}] Path "${routePath}" is already defined`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.plain`Path "${routePath}" is already defined`;
   }
 
   if (pathsAtLevel) {
@@ -435,9 +436,9 @@ export function validateRoute(
   // Validate children recursively
   if (routeDef.children !== undefined) {
     if (!Array.isArray(routeDef.children)) {
-      throw new TypeError(
-        `[router.${methodName}] Route "${routeName}" children must be an array, got ${getTypeDescription(routeDef.children)}`,
-      );
+      const at = raiser("router", methodName);
+
+      throw at.type`Route "${routeName}" children must be an array, got ${getTypeDescription(routeDef.children)}`;
     }
 
     for (const child of routeDef.children) {

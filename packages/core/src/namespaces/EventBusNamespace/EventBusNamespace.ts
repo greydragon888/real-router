@@ -41,6 +41,11 @@ import type { FSM } from "../../utils/fsm";
 
 /** One binding per door this module refuses behind (#2487). */
 const atSubscribe = raiser("router", "subscribe");
+
+// The caller types `routes.subscribeChanges`; `treeChanged.subscribe` is the
+// internal channel this method delegates to, and names no call anyone made.
+const atSubscribeChanges = raiser("router", "subscribeChanges");
+const atSubscribeDiagnostic = raiser("router", "subscribeDiagnostic");
 const atSubscribeLeave = raiser("router", "subscribeLeave");
 
 /** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
@@ -366,12 +371,9 @@ export class EventBusNamespace {
     // is DISPOSED, the route tree is torn down, no future emit) — a silent
     // no-op, the internal-channel counterpart of the #946 hazard.
     if (this.isDisposed()) {
-      throw freezeThrownError(
-        new RouterError(errorCodes.ROUTER_DISPOSED, {
-          message:
-            "[router.treeChanged.subscribe] cannot subscribe on a disposed router — dispose() is terminal",
-        }),
-      );
+      throw atSubscribeChanges.code(
+        errorCodes.ROUTER_DISPOSED,
+      )`cannot subscribe on a disposed router — dispose() is terminal`;
     }
 
     return this.#emitter.on(TREE_CHANGED, (event: TreeChangedEvent) => {
@@ -406,12 +408,9 @@ export class EventBusNamespace {
     handler: (...args: DiagnosticEventMap[K]) => void,
   ): Unsubscribe {
     if (this.isDisposed()) {
-      throw freezeThrownError(
-        new RouterError(errorCodes.ROUTER_DISPOSED, {
-          message:
-            "[router.subscribeDiagnostic] cannot subscribe on a disposed router — dispose() is terminal",
-        }),
-      );
+      throw atSubscribeDiagnostic.code(
+        errorCodes.ROUTER_DISPOSED,
+      )`cannot subscribe on a disposed router — dispose() is terminal`;
     }
 
     return this.#emitter.on(key, (...args: DiagnosticEventMap[K]) => {
@@ -757,12 +756,9 @@ export class EventBusNamespace {
     // listener that can never fire (clearAll already ran, FSM is DISPOSED, no
     // future emit) — a silent no-op / stuck-UI hazard (#946).
     if (this.isDisposed()) {
-      throw freezeThrownError(
-        new RouterError(errorCodes.ROUTER_DISPOSED, {
-          message:
-            "[router.subscribe] cannot subscribe on a disposed router — dispose() is terminal",
-        }),
-      );
+      throw atSubscribe.code(
+        errorCodes.ROUTER_DISPOSED,
+      )`cannot subscribe on a disposed router — dispose() is terminal`;
     }
 
     this.#checkListenerThreshold(events.TRANSITION_SUCCESS, "subscribe");
@@ -824,12 +820,9 @@ export class EventBusNamespace {
     // reference would otherwise push onto #leaveListeners after dispose() and
     // silently never fire (FSM is DISPOSED, no LEAVE_APPROVE emit).
     if (this.isDisposed()) {
-      throw freezeThrownError(
-        new RouterError(errorCodes.ROUTER_DISPOSED, {
-          message:
-            "[router.subscribeLeave] cannot subscribe on a disposed router — dispose() is terminal",
-        }),
-      );
+      throw atSubscribeLeave.code(
+        errorCodes.ROUTER_DISPOSED,
+      )`cannot subscribe on a disposed router — dispose() is terminal`;
     }
 
     this.#leaveListeners.push(listener);

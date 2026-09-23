@@ -126,9 +126,7 @@ export class RouterError extends Error {
     // Issue #39: Throw for reserved properties to match setAdditionalFields behavior
     for (const [key, value] of objectEntries(rest)) {
       if (reservedProperties.has(key)) {
-        throw new TypeError(
-          `[RouterError] Cannot set reserved property "${key}"`,
-        );
+        throw atRouterError.type`Cannot set reserved property "${key}"`;
       }
 
       // ⚑ `UNSAFE_KEY` skipped for the reason the state channels give (#1852):
@@ -208,9 +206,7 @@ export class RouterError extends Error {
   setErrorInstance(err: Error): void {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!err) {
-      throw new TypeError(
-        "[RouterError.setErrorInstance] err parameter is required and must be an Error instance",
-      );
+      throw atSetErrorInstance.type`err parameter is required and must be an Error instance`;
     }
 
     this.message = err.message;
@@ -257,9 +253,7 @@ export class RouterError extends Error {
     // Assign fields, throwing for reserved properties, silently ignoring methods
     for (const [key, value] of objectEntries(fields)) {
       if (reservedProperties.has(key)) {
-        throw new TypeError(
-          `[RouterError.setAdditionalFields] Cannot set reserved property "${key}"`,
-        );
+        throw atSetAdditionalFields.type`Cannot set reserved property "${key}"`;
       }
 
       // ⚑ `UNSAFE_KEY` skipped, and `putField` rather than assignment, for the
@@ -525,6 +519,9 @@ export function raiser(receiver: Receiver, door?: string): Raiser {
         ),
   };
 }
+const atRouterError = raiser("RouterError");
+const atSetErrorInstance = raiser("RouterError", "setErrorInstance");
+const atSetAdditionalFields = raiser("RouterError", "setAdditionalFields");
 
 /**
  * A defect a caller cannot provoke. Unbracketed on purpose: there is no door to

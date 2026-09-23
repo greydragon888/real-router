@@ -12,8 +12,11 @@ import { arrayStrategies, type ArrayStrategy } from "./array";
 import { booleanStrategies, type BooleanStrategy } from "./boolean";
 import { nullStrategies, type NullStrategy } from "./null";
 import { numberStrategies, type NumberStrategy } from "./number";
+import { raiser } from "../../../RouterError";
 
 import type { FinalOptions } from "../types";
+
+const atRouter = raiser("router");
 
 /**
  * Intrinsics captured at module load: `defineProperty`, `objectKeys`, `hasOwn`.
@@ -139,13 +142,11 @@ const requireStrategy = <T>(
   // a rebuild has nothing left that can fail, and `cloneRouter` raises through
   // `new RouterClass(...)`. Both doors that can raise ARE the constructor.
   if (!hasOwn(table, key)) {
-    const error = new TypeError(
-      `[router] Invalid "queryParams.${field}": "${key}" — expected ${objectKeys(
-        table,
-      )
-        .map((name) => `"${name}"`)
-        .join(" | ")}`,
-    );
+    const error = atRouter.type`Invalid "queryParams.${field}": "${key}" — expected ${objectKeys(
+      table,
+    )
+      .map((name) => `"${name}"`)
+      .join(" | ")}`;
 
     // ⚑ TAGGED, because the parse catch must recognise this by ORIGIN and not by
     // class. `match()` must never throw on INPUT, and the catch around the parse
