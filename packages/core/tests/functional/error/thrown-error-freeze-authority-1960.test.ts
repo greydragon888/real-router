@@ -9,12 +9,12 @@
 // class, same fields, same `name`. One shape refused an annotation and the other
 // accepted it, with nothing to discriminate on (#1960).
 //
-// ⚠ THE TABLE KEYS ON CHANNELS, NOT ON THROW SITES, and that is the whole point
-// of its shape. Core throws a `RouterError` from ~30 places; a guard that
-// enumerated them would go stale at the 31st and would still say nothing about
-// what a consumer actually receives. These rows are the doors: a rejected
-// navigation, a rejected `start`, a plugin hook, a call after `dispose`. A new
-// throw site inside any of them is covered without editing this file.
+// ⚠ THE TABLE KEYS ON CHANNELS, NOT ON THROW SITES. These rows are the doors
+// consumer code receives an error through: a rejected navigation, a rejected
+// `start`, a plugin hook, a leave signal's `reason`, a call after `dispose`.
+// Each row drives ONE producer behind its door, so a second producer behind the
+// same door is not covered here — `construction-freeze-authority-2528` holds
+// every construction site, and is what reds a new one built unfrozen.
 //
 // ⚠ FROZEN AT THE THROW, NOT IN THE CONSTRUCTOR. `RouterError` publishes three
 // mutators — `setCode`, `setErrorInstance`, `setAdditionalFields` — with worked
@@ -31,14 +31,24 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { createRouter, RouterError } from "@real-router/core";
-import { getLifecycleApi, getRoutesApi } from "@real-router/core/api";
+import {
+  createRouter,
+  errorCodes,
+  events,
+  RouterError,
+} from "@real-router/core";
+import {
+  getLifecycleApi,
+  getPluginApi,
+  getRoutesApi,
+} from "@real-router/core/api";
 
 import type { Router } from "@real-router/core";
 
 const ROUTES = [
   { name: "home", path: "/home" },
   { name: "blocked", path: "/blocked" },
+  { name: "other", path: "/other" },
 ];
 
 async function started(): Promise<Router> {
@@ -194,6 +204,82 @@ const CHANNELS = [
       return seen;
     },
   },
+  {
+    // The removal of "a route removed mid-transition", from a SYNCHRONOUS
+    // guard. The FAIL `completeTransition` sends ends the transition first, so
+    // the caller's promise carries `asCancellation`'s restatement instead of
+    // the refusal.
+    name: "a route removed by a synchronous guard",
+    produce: async () => {
+      const router = createRouter(ROUTES);
+
+      getLifecycleApi(router).addActivateGuard("blocked", () => () => {
+        getRoutesApi(router).remove("blocked");
+
+        return true;
+      });
+      await router.start("/home");
+
+      return catchError(() => router.navigate("blocked"));
+    },
+  },
+  {
+    name: "the caller's own signal aborted while a leave listener is pending",
+    produce: async () => {
+      const router = createRouter(ROUTES);
+      const controller = new AbortController();
+
+      await router.start("/home");
+      router.subscribeLeave(() => new Promise<void>(() => {}));
+
+      const pending = catchError(() =>
+        router.navigate("other", {}, {}, { signal: controller.signal }),
+      );
+
+      controller.abort("the caller changed its mind");
+
+      return pending;
+    },
+  },
+  {
+    name: "navigate stopped while a leave listener is pending",
+    produce: async () => {
+      const router = createRouter(ROUTES);
+
+      await router.start("/home");
+      router.subscribeLeave(() => new Promise<void>(() => {}));
+
+      const pending = catchError(() => router.navigate("other"));
+
+      router.stop();
+
+      return pending;
+    },
+  },
+  {
+    name: "a guard's signal.reason once its navigation is stopped",
+    produce: async () => {
+      const router = createRouter(ROUTES);
+      let signal: AbortSignal | undefined;
+
+      getLifecycleApi(router).addActivateGuard(
+        "blocked",
+        () => (_to, _from, received) => {
+          signal = received;
+
+          return new Promise<boolean>(() => {});
+        },
+      );
+      await router.start("/home");
+
+      const pending = catchError(() => router.navigate("blocked"));
+
+      router.stop();
+      await pending;
+
+      return signal?.reason;
+    },
+  },
 ] as const;
 
 const SRC = path.resolve(__dirname, "../../../src");
@@ -236,7 +322,7 @@ describe("thrown-error freeze authority (#1960)", () => {
   it("covers every consumer-facing channel", () => {
     // Counted outside the `each` (`table-vacuity-authority`): an empty table
     // registers no cells and still exits green.
-    expect(CHANNELS).toHaveLength(12);
+    expect(CHANNELS).toHaveLength(16);
   });
 
   it("the detector distinguishes frozen from not", () => {
@@ -272,4 +358,30 @@ describe("thrown-error freeze authority (#1960)", () => {
       expect(Object.isFrozen(error)).toBe(true);
     },
   );
+
+  it("a $$error listener receives the vanished-route refusal frozen", async () => {
+    // ⚠ Read INSIDE the listener. The throw freezes the same object right after
+    // the report, so a check made once the navigation settles is green whether
+    // or not the listener could write to it.
+    const router = createRouter(ROUTES);
+    let atListener: { frozen: boolean; code: unknown } | undefined;
+
+    getPluginApi(router).addEventListener(
+      events.TRANSITION_ERROR,
+      (_to: unknown, _from: unknown, error: RouterError) => {
+        atListener = { frozen: Object.isFrozen(error), code: error.code };
+      },
+    );
+    getLifecycleApi(router).addActivateGuard("blocked", () => async () => {
+      getRoutesApi(router).remove("blocked");
+
+      return true;
+    });
+    await router.start("/home");
+    await catchError(() => router.navigate("blocked"));
+
+    // CONTROL: the listener fired on THIS refusal, or the cell measures nothing.
+    expect(atListener?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+    expect(atListener?.frozen).toBe(true);
+  });
 });

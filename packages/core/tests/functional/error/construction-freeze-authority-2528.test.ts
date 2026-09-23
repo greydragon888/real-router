@@ -105,10 +105,8 @@ function sites(root: string): Site[] {
 }
 
 /**
- * What each unsettled site does instead of freezing at construction. ⚠ Four of
- * them are NOT established, and saying so is the point: #2528 owns them, and a
- * reason of "not established" is a claim a reader can check rather than a hole
- * they have to find.
+ * What each unsettled site does instead of freezing at construction, and why
+ * that still hands consumer code a frozen error.
  */
 const DEFERRED: ReadonlyMap<string, string> = new Map([
   [
@@ -116,20 +114,8 @@ const DEFERRED: ReadonlyMap<string, string> = new Map([
     "thrown through `freezeThrownError` below, with no report in between — the comment above the site says why none is emitted",
   ],
   [
-    "namespaces/NavigationNamespace/transition/completeTransition.ts · ROUTE_NOT_FOUND · const err",
-    "REPORTED to FAIL listeners and only then thrown through `freezeThrownError` — the freeze lands after the report, which is the shape #2509 corrected at `navigateToNotFound`. NOT ESTABLISHED that a listener's write reaches the caller: the branch needs a route to vanish between the guards and the commit, and three probes failed to reach it (#2528)",
-  ],
-  [
-    "namespaces/NavigationNamespace/transition/errorHandling.ts · TRANSITION_CANCELLED · ternary",
-    "`asCancellation` RETURNS it unfrozen. NOT ESTABLISHED where it reaches a caller (#2528)",
-  ],
-  [
     "namespaces/NavigationNamespace/transition/errorHandling.ts · code as string · const copy",
     "a re-coded copy: `setCode` and `stack` are written after construction, so the freeze cannot move there — it happens at the throw",
-  ],
-  [
-    "namespaces/EventBusNamespace/EventBusNamespace.ts · TRANSITION_CANCELLED · ternary",
-    "handed to `reject(...)` unfrozen, i.e. straight to a consumer's `.catch()`. NOT ESTABLISHED (#2528)",
   ],
   [
     "namespaces/EventBusNamespace/EventBusNamespace.ts · ROUTER_DISPOSED · return",
@@ -138,10 +124,6 @@ const DEFERRED: ReadonlyMap<string, string> = new Map([
   [
     "namespaces/EventBusNamespace/EventBusNamespace.ts · ROUTER_NOT_STARTED · return",
     "`#refuseSystemCommit`'s phase return, frozen by the same caller wrapper",
-  ],
-  [
-    "namespaces/EventBusNamespace/EventBusNamespace.ts · TRANSITION_CANCELLED · ?? fallback",
-    "`cancelReason`, recorded on the navigation rather than thrown. NOT ESTABLISHED (#2528)",
   ],
 ]);
 

@@ -67,13 +67,17 @@ export function completeTransition(
     toState.name !== constants.UNKNOWN_ROUTE &&
     !deps.hasRoute(toState.name)
   ) {
-    const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-      routeName: toState.name,
-    });
+    // Frozen before the report: the FAIL listeners and the caller receive the
+    // same object (#2509).
+    const err = freezeThrownError(
+      new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+        routeName: toState.name,
+      }),
+    );
 
     deps.sendTransitionFail(fromState, err, nav);
 
-    throw freezeThrownError(err);
+    throw err;
   }
 
   // ⚑ No literal: the navigation's own context IS the commit payload (#1648) —
