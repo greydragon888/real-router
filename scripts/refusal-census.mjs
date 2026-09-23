@@ -47,6 +47,94 @@ const leftmost = (node) => {
 };
 
 /** The head a reader sees, or undefined when the expression carries none. */
+/** What each raiser flavour constructs, so a tag counts as its class. */
+const FLAVOUR_CLASS = {
+  type: "TypeError",
+  plain: "Error",
+  ref: "ReferenceError",
+  range: "RangeError",
+  code: "RouterError",
+};
+
+/** The head one `raiser(...)` call builds, or `undefined` if it names no receiver. */
+const headOfRaiserCall = (call) => {
+  const receiver = call.arguments.at(0);
+
+  if (receiver === undefined || !ts.isStringLiteral(receiver)) {
+    return undefined;
+  }
+
+  const door = call.arguments.at(1);
+
+  if (door === undefined) {
+    return `[${receiver.text}] `;
+  }
+
+  // A dynamic door is spelled as the literal form spelled it, so the counts a
+  // conversion moves stay comparable across it.
+  return ts.isStringLiteral(door)
+    ? `[${receiver.text}.${door.text}] `
+    : `[${receiver.text}.\${}] `;
+};
+
+/**
+ * The head the binding `name` builds AT `node`, resolved by LEXICAL SCOPE.
+ *
+ * ⚠ Not a file-wide map keyed by name: measured on `validation-plugin`, whose
+ * per-call bindings are all called `at`, the last one answers for every site.
+ */
+const raiserHeadAt = (node, name) => {
+  for (let scope = node.parent; scope !== undefined; scope = scope.parent) {
+    if (!ts.isBlock(scope) && !ts.isSourceFile(scope)) {
+      continue;
+    }
+
+    for (const statement of scope.statements) {
+      if (!ts.isVariableStatement(statement)) {
+        continue;
+      }
+
+      for (const declaration of statement.declarationList.declarations) {
+        if (
+          ts.isIdentifier(declaration.name) &&
+          declaration.name.text === name &&
+          declaration.initializer !== undefined &&
+          ts.isCallExpression(declaration.initializer) &&
+          declaration.initializer.expression.getText() === "raiser"
+        ) {
+          return headOfRaiserCall(declaration.initializer);
+        }
+      }
+    }
+  }
+
+  return undefined;
+};
+
+/** The flavour and head a raiser tag carries, if `node` is one. */
+const raiserTag = (node) => {
+  if (!ts.isTaggedTemplateExpression(node)) {
+    return undefined;
+  }
+
+  const member = ts.isCallExpression(node.tag) ? node.tag.expression : node.tag;
+
+  if (
+    !ts.isPropertyAccessExpression(member) ||
+    !ts.isIdentifier(member.expression)
+  ) {
+    return undefined;
+  }
+
+  const flavour = FLAVOUR_CLASS[member.name.text];
+  const head =
+    flavour === undefined
+      ? undefined
+      : raiserHeadAt(node, member.expression.text);
+
+  return head === undefined ? undefined : { flavour, head };
+};
+
 const headOfExpression = (node) => {
   if (node === undefined) return undefined;
 
@@ -151,6 +239,26 @@ for (const root of ROOTS) {
         }
       }
 
+      const tag = raiserTag(node);
+
+      if (tag !== undefined) {
+        rows.push({
+          package: root.includes("/core/") ? "core" : "plugin",
+          site: `${relative}:${at(node)}`,
+          constructor: tag.flavour,
+          receiver: receiverOf(tag.head),
+          inside: /^\[([^\]]+)\]/u.exec(tag.head)?.[1] ?? "?",
+          // The message is the TAG's template: neither a constructor argument nor
+          // a bag, and saying so keeps the position tally honest across the
+          // conversion rather than folding the new shape into an old name.
+          position: "tag",
+          form: ts.isNoSubstitutionTemplateLiteral(node.template)
+            ? "plain"
+            : "template",
+          delivery: deliveryOf(node),
+        });
+      }
+
       if (
         (ts.isStringLiteral(node) ||
           ts.isNoSubstitutionTemplateLiteral(node) ||
@@ -208,7 +316,38 @@ const tally = (key, of = rows) =>
 const thrownHere = rows.filter((row) => row.delivery === "thrown here");
 const elsewhere = rows.filter((row) => row.delivery !== "thrown here");
 
+// ⚠ An ANTI-VACUUM line, and the reason it exists is measured: this script read
+// `5` for a while after the conversion landed — it knew only the literal form, and
+// nothing compared its output to an independent count, so the drift was silent.
+// `throw` statements are that count; they cannot fall while refusals exist.
+let thrownInRoots = 0;
+
+for (const root of ROOTS) {
+  for (const file of globSync(`${root}/**/*.ts`)) {
+    const source = ts.createSourceFile(
+      file,
+      readFileSync(file, "utf8"),
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TS,
+    );
+    const walk = (node) => {
+      if (ts.isThrowStatement(node)) thrownInRoots += 1;
+
+      ts.forEachChild(node, walk);
+    };
+
+    walk(source);
+  }
+}
+
 console.log(`REFUSALS with a bracketed head: ${rows.length}\n`);
+console.log(
+  `  against ${thrownInRoots} \`throw\` statements in the same roots — a head count far`,
+);
+console.log(
+  "  below this one means a form went unread, not that the refusals left.\n",
+);
 console.log("by delivery:  ", tally("delivery"));
 console.log("by position:  ", tally("position"));
 console.log("by constructor:", tally("constructor"));
@@ -550,7 +689,13 @@ for (const root of ROOTS) {
   }
 }
 
-const freeze = { direct: 0, directFrozen: 0, viaHelper: 0, viaHelperFrozen: 0 };
+const freeze = {
+  direct: 0,
+  directFrozen: 0,
+  viaHelper: 0,
+  viaHelperFrozen: 0,
+  raised: 0,
+};
 
 for (const root of ROOTS) {
   for (const file of globSync(`${root}/**/*.ts`)) {
@@ -567,7 +712,15 @@ for (const root of ROOTS) {
         const body = node.getText();
         const frozenHere = /freezeThrownError\(/u.test(body);
 
-        if (/new RouterError\(/u.test(body)) {
+        const tag = raiserTag(node.expression);
+
+        if (tag?.flavour === "RouterError") {
+          // A THIRD written shape, and it needs no wrapper: `code()` calls
+          // `freezeThrownError` itself. Counted so the two rows below stay a
+          // statement about the shapes that DO need one, rather than a
+          // denominator that shrank as the conversion moved sites out of them.
+          freeze.raised++;
+        } else if (/new RouterError\(/u.test(body)) {
           freeze.direct++;
 
           if (frozenHere) freeze.directFrozen++;
@@ -596,9 +749,17 @@ console.log(
   `built by a helper:    ${freeze.viaHelperFrozen} of ${freeze.viaHelper} frozen  (helpers declared \`: RouterError\`: ${helpersReturningRouterError.size})`,
 );
 console.log(
-  "⚠ The second row is the shape #2503 lived in: a count of the first alone read 34 of 34",
+  `built by the raiser:  ${freeze.raised} of ${freeze.raised} frozen by construction`,
 );
-console.log("  both before the defect and after its fix.");
+console.log(
+  "⚠ The second row is the shape #2503 lived in: counting the first alone read the",
+);
+console.log(
+  "  same number before that defect and after its fix. The third needs no wrapper,",
+);
+console.log(
+  "  and is counted so the first two stay a claim about shapes that do.",
+);
 
 console.log("\n── О-10's categories, counted ────────────────────────────────");
 
