@@ -87,6 +87,10 @@ const parse = (name, text) =>
 const render = (name, text) => {
   const src = parse(name, text);
   const out = new Set();
+  // ⚠ The BODY, head stripped, is a second comparison and step 6 is why. When a
+  // family's head changes on purpose every member is lost-and-new at once, so the
+  // head diff says nothing about whether a body moved with it.
+  const bodies = new Set();
 
   const headOfBinding = (declaration) => {
     const [r, d] = declaration.initializer.arguments;
@@ -135,8 +139,10 @@ const render = (name, text) => {
       const args = [...(n.arguments ?? [])];
       const head = shape(bagMessage(args) ?? args[0], src);
 
-      if (head && /^\[[A-Za-z]+(\.([\w.]+|\$\{\}))?\]\s/u.test(head))
+      if (head && /^\[[A-Za-z]+(\.([\w.]+|\$\{\}))?\]\s/u.test(head)) {
         out.add(head);
+        bodies.add(head.replace(/^\[[^\]]*\]\s/u, ""));
+      }
     }
 
     if (ts.isTaggedTemplateExpression(n)) {
@@ -147,9 +153,22 @@ const render = (name, text) => {
         ts.isPropertyAccessExpression(member) &&
         ts.isIdentifier(member.expression)
       ) {
-        const head = scope.get(member.expression.text);
+        // `internalDefect` is a module-level constant rather than a binding, and
+        // its head is fixed. ⚠ Without this the whole marker family was outside
+        // the comparison: measured on step 6, appending a period to three bodies
+        // left the FSM suite 76/76 green, because its pins are `toThrow(string)`
+        // and that is substring containment.
+        const head =
+          member.expression.text === "internalDefect"
+            ? "Internal error (please report): "
+            : scope.get(member.expression.text);
 
-        if (head !== undefined) out.add(head + shape(n.template, src));
+        if (head !== undefined) {
+          const body = shape(n.template, src);
+
+          out.add(head + body);
+          bodies.add(body);
+        }
       }
     }
 
@@ -158,21 +177,46 @@ const render = (name, text) => {
 
   walk(src, new Map());
 
-  return out;
+  return { out, bodies };
 };
 
 const before = new Set(),
-  after = new Set();
+  after = new Set(),
+  beforeBodies = new Set(),
+  afterBodies = new Set();
 
 for (const f of files) {
-  for (const head of render(
-    f,
-    execFileSync("git", ["show", `origin/master:${f}`], { encoding: "utf8" }),
-  ))
-    before.add(head);
+  // A file the branch ADDS has no `before` side. ⚠ Reading it as an error crashed
+  // the guard outright, so it could not run on any branch that adds a file.
+  let master = "";
 
-  for (const head of render(f, readFileSync(f, "utf8"))) after.add(head);
+  try {
+    master = execFileSync("git", ["show", `origin/master:${f}`], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    master = "";
+  }
+
+  const was = render(f, master);
+  const now = render(f, readFileSync(f, "utf8"));
+
+  for (const head of was.out) before.add(head);
+  for (const body of was.bodies) beforeBodies.add(body);
+  for (const head of now.out) after.add(head);
+  for (const body of now.bodies) afterBodies.add(body);
 }
+
+const lostBodies = [...beforeBodies].filter((x) => !afterBodies.has(x));
+const newBodies = [...afterBodies].filter((x) => !beforeBodies.has(x));
+
+console.log(
+  `  bodies: ${beforeBodies.size} → ${afterBodies.size}   lost: ${lostBodies.length}   new: ${newBodies.length}`,
+);
+
+for (const x of [...lostBodies, ...newBodies].slice(0, 6))
+  console.log(`     body  ${x.slice(0, 86)}`);
 
 const missing = [...before].filter((x) => !after.has(x));
 const extra = [...after].filter((x) => !before.has(x));
