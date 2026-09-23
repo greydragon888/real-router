@@ -6,7 +6,7 @@
  * sync with the package set because their scope lived in hand-maintained lists.
  * This script is now the SINGLE source of truth for that scope:
  *
- * Check mode (default, `pnpm lint:coverage-scope` — pre-commit + CI pipeline):
+ * Check mode (default, `pnpm lint:coverage-scope` — both hooks + CI pipeline):
  *   1. `codecov.yml` `component_management.individual_components` — must list
  *      exactly the coverage-producing packages (ones with a `tests/` dir).
  *      (Components, not flags: Codecov flags only exist when uploads are tagged

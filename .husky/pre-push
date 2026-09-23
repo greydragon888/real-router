@@ -9,12 +9,18 @@
 #                   of the checks; no files → no-op)
 # - lint:duplicates: Copy-paste detection (jscpd)
 # - lint:doc-dup: Docblock sentences that restate the package's own docs
-# - scripts tests: The repo's own tooling tests (scripts/*.test.mjs), the
-#                  suite CI's Repo Lints runs
 # - lint:membership: One record counted with Object.keys and tested with
 #                    hasOwnProperty — the #1815 / #2064 class. pre-commit
 #                    runs it too; this hook is the one that sees a merged
 #                    or rebased tree (#2392)
+# - lint:repo-scans, lint:coverage-scope, lint:e2e, lint:angular-sync:
+#                    pre-commit's other checks of the tree, repeated for the
+#                    same reason; a --no-verify commit skips pre-commit too
+#                    (#2548)
+# - lint:dedupe: The lockfile is deduplicated — the check twin of the
+#                `pnpm dedupe` pre-commit runs when the lockfile is staged
+# - scripts tests: The repo's own tooling tests (scripts/*.test.mjs), the
+#                  suite CI's Repo Lints runs
 # - lint:reach: Every workspace package is read by a lint step of this hook,
 #               derived from its own `turbo run` lines (#2370)
 # - build: Final build to ensure compilation
@@ -84,6 +90,38 @@ pnpm lint:duplicates
 echo "📚 Checking docblocks against the docs..."
 pnpm lint:doc-dup
 
+# The predicate check pre-commit also runs (#2392). Repeated on purpose: git runs
+# no pre-commit for a tree `git merge` or `git rebase` produced, and this hook
+# reads the tree that is actually leaving — the push guard above has just proved
+# it is the pushed one. ~0.6 s, pure Node, no skip arm.
+echo "🔑 Checking membership predicates..."
+pnpm lint:membership
+
+# The rest of pre-commit's checks of the tree, repeated for the reason above —
+# and a `--no-verify` commit skips pre-commit as well (#2548). A direct push to
+# master reaches no ci.yml, so without these a rebased or merged tree lands with
+# none of them run. `scripts/ci-hook-parity.test.mjs` holds every check
+# pre-commit runs to a twin here.
+echo "🔭 Running the repository-wide scans..."
+pnpm lint:repo-scans
+
+echo "📊 Checking coverage scope..."
+pnpm lint:coverage-scope
+
+echo "🎭 Checking e2e specs..."
+pnpm lint:e2e
+
+# Unconditional here. pre-commit gates it on the staged set because a dirty,
+# unstaged shared/dom-utils would regenerate the copy; the push guard has
+# already refused a dirty tree.
+echo "🔁 Checking angular dom-utils copy..."
+pnpm lint:angular-sync
+
+# The check twin of the `pnpm dedupe` pre-commit runs when the lockfile is
+# staged: a rebased or merged lockfile never passes through that step.
+echo "🔗 Checking the lockfile is deduplicated..."
+pnpm lint:dedupe
+
 # The repo's own tooling tests — the shard planner's, the gate-completeness
 # meta-test and the rest of scripts/*.test.mjs — the files and runner CI's
 # Repo Lints uses. Infrastructure reaches master by direct push, where no
@@ -96,13 +134,6 @@ pnpm lint:doc-dup
 # repositories: with GIT_DIR inherited, their `git init` / `git config` /
 # `git worktree add` write to THIS repository instead (core.bare=true and a
 # test identity in .git/config — see IMPLEMENTATION_NOTES).
-# The predicate check pre-commit also runs (#2392). Repeated on purpose: git runs
-# no pre-commit for a tree `git merge` or `git rebase` produced, and this hook
-# reads the tree that is actually leaving — the push guard above has just proved
-# it is the pushed one. ~0.6 s, pure Node, no skip arm.
-echo "🔑 Checking membership predicates..."
-pnpm lint:membership
-
 echo "🧰 Testing repo scripts..."
 # shellcheck disable=SC2046 # the names must split: one operand per variable
 (unset $(git rev-parse --local-env-vars); node --test --test-reporter=dot scripts/*.test.mjs)

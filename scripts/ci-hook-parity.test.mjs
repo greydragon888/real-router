@@ -15,6 +15,12 @@
 // commits that added or moved these steps reached master by direct push, where
 // no `ci.yml` runs at all.
 //
+// A second axis (#2548): every check `.husky/pre-commit` runs also runs in
+// `.husky/pre-push`, or is allowlisted with a reason. git runs no pre-commit for
+// a tree `git rebase` or `git merge` produced, nor for a `--no-verify` commit, so
+// on a direct push a check pre-commit alone runs is not run at all. The first
+// axis cannot see that: it treats the two hooks as one set.
+//
 // Stdlib node:test/node:assert only, and deliberately NOT a YAML library — the
 // extractors below are single-purpose and fail on a shape they cannot read,
 // which is the same posture `ci-gate-completeness.test.mjs` takes toward its own
@@ -55,11 +61,6 @@ export const NOT_A_CHECK = new Map([
  * hygiene test below.
  */
 export const CI_ONLY = new Map([
-  [
-    "lint:dedupe",
-    "pre-commit runs `pnpm dedupe` itself whenever the lockfile is staged, so a " +
-      "lockfile cannot reach CI un-deduped; the check step has nothing left to catch",
-  ],
   [
     "lint:bench-apps",
     "preflight of the scheduled cross-router bench suite, which no hook runs — the " +
@@ -242,6 +243,43 @@ export function findViolations(
   return { unpaired, unclassified, staleAllowed, paired };
 }
 
+/**
+ * Checks `.husky/pre-commit` runs that `.husky/pre-push` does not, each with the
+ * reason. An entry that gets its twin, or names a check pre-commit no longer
+ * runs, fails the hygiene test below.
+ */
+export const PRE_COMMIT_ONLY = new Map();
+
+/**
+ * The second axis, pure: the checks pre-commit runs that have no pre-push twin.
+ * `hooks` maps a hook name to its text, as {@link findViolations} takes it.
+ *
+ * ⚠ It pairs by {@link checkId}, so it sees what the first axis sees and no
+ * more. `pnpm turbo run …` and a writer such as `pnpm dedupe` are not checks,
+ * and a check written as a bare `node scripts/…` is invisible — the angular copy
+ * check runs as `pnpm lint:angular-sync` in both hooks for that reason.
+ *
+ * @param {Record<string, string>} hooks
+ * @returns {{ missing: string[], staleAllowed: string[], twinned: string[] }}
+ */
+export function findPrePushGaps(
+  hooks,
+  { preCommitOnly = PRE_COMMIT_ONLY } = {},
+) {
+  const commit = hookChecks(hooks["pre-commit"]);
+  const push = new Set(hookChecks(hooks["pre-push"]));
+
+  const missing = commit
+    .filter((id) => !push.has(id) && !preCommitOnly.has(id))
+    .sort();
+  const staleAllowed = [...preCommitOnly.keys()]
+    .filter((id) => push.has(id) || !commit.includes(id))
+    .sort();
+  const twinned = commit.filter((id) => push.has(id)).sort();
+
+  return { missing, staleAllowed, twinned };
+}
+
 // --------------------------------------------------------------------------
 // Fixtures: the check has to FAIL on the mutations it exists for. A green run
 // against the real repository proves nothing on its own.
@@ -406,6 +444,93 @@ test("fixture: a commented-out hook line does not count as coverage", () => {
   assert.deepEqual(found.unpaired, ["lint:deps"]);
 });
 
+// The second axis. PRE_COMMIT carries a conditional check, a writer and a turbo
+// run, the three shapes a real pre-commit holds beside its plain checks.
+const PRE_COMMIT = `#!/bin/sh
+pnpm lint:deps
+pnpm lint:repo-scans
+if git diff --cached --name-only | grep -q shared/; then
+  pnpm lint:angular-sync
+fi
+pnpm dedupe
+pnpm turbo run test lint --filter='!./examples/**'
+`;
+
+const PRE_PUSH = `#!/bin/sh
+pnpm lint:deps
+pnpm lint:repo-scans
+pnpm lint:angular-sync
+`;
+
+const noAllowlist = { preCommitOnly: new Map() };
+
+test("fixture: every pre-commit check with a pre-push twin — no gap, and the writer and the turbo run need none", () => {
+  const found = findPrePushGaps(
+    { "pre-commit": PRE_COMMIT, "pre-push": PRE_PUSH },
+    noAllowlist,
+  );
+
+  assert.deepEqual(found.missing, []);
+  assert.deepEqual(found.twinned, [
+    "lint:angular-sync",
+    "lint:deps",
+    "lint:repo-scans",
+  ]);
+});
+
+test("fixture: the #2548 shape — a check pre-commit alone runs — is caught", () => {
+  const found = findPrePushGaps(
+    {
+      "pre-commit": PRE_COMMIT,
+      "pre-push": PRE_PUSH.replace("pnpm lint:repo-scans\n", ""),
+    },
+    noAllowlist,
+  );
+
+  assert.deepEqual(found.missing, ["lint:repo-scans"]);
+});
+
+test("fixture: a check inside a pre-commit conditional needs its twin too", () => {
+  const found = findPrePushGaps(
+    {
+      "pre-commit": PRE_COMMIT,
+      "pre-push": PRE_PUSH.replace("pnpm lint:angular-sync\n", ""),
+    },
+    noAllowlist,
+  );
+
+  assert.deepEqual(found.missing, ["lint:angular-sync"]);
+});
+
+test("fixture: an allowlisted pre-commit-only check is not a gap, and going stale is", () => {
+  const preCommitOnly = new Map([["lint:repo-scans", "a reason"]]);
+  const twinless = PRE_PUSH.replace("pnpm lint:repo-scans\n", "");
+
+  const allowed = findPrePushGaps(
+    { "pre-commit": PRE_COMMIT, "pre-push": twinless },
+    { preCommitOnly },
+  );
+  assert.deepEqual(allowed.missing, []);
+  assert.deepEqual(allowed.staleAllowed, []);
+
+  assert.deepEqual(
+    findPrePushGaps(
+      { "pre-commit": PRE_COMMIT, "pre-push": PRE_PUSH },
+      { preCommitOnly },
+    ).staleAllowed,
+    ["lint:repo-scans"],
+    "the allowlist names a check pre-push runs — the entry is stale",
+  );
+  assert.deepEqual(
+    findPrePushGaps(
+      { "pre-commit": PRE_COMMIT, "pre-push": PRE_PUSH },
+      { preCommitOnly: new Map([["lint:retired", "a reason"]]) },
+    ).staleAllowed,
+    ["lint:retired"],
+    "the allowlist names a check pre-commit no longer runs — the entry is stale",
+  );
+});
+
 // --------------------------------------------------------------------------
 // The real repository.
 // --------------------------------------------------------------------------
@@ -458,4 +583,33 @@ test("the guard is reading both sides: the pairing is not vacuously empty", () =
     real.paired.get("lint:membership")?.length === 2,
     "lint:membership is expected in both hooks (#2392)",
   );
+});
+
+const gaps = findPrePushGaps(hooks);
+
+test("every check pre-commit runs also runs in pre-push, or is allowlisted (#2548)", () => {
+  assert.deepEqual(
+    gaps.missing,
+    [],
+    "add the check to .husky/pre-push, or to PRE_COMMIT_ONLY with the reason it cannot run there",
+  );
+});
+
+test("the PRE_COMMIT_ONLY allowlist is current", () => {
+  assert.deepEqual(
+    gaps.staleAllowed,
+    [],
+    "an entry that now has its twin, or names a check pre-commit no longer runs — drop it",
+  );
+});
+
+test("the second axis is reading both hooks: its pairing is not vacuously empty", () => {
+  // An extractor that returned nothing for either hook would pass the two
+  // assertions above while measuring nothing.
+  for (const id of ["lint:membership", "lint:repo-scans"]) {
+    assert.ok(
+      gaps.twinned.includes(id),
+      `${id} is expected in both hooks (#2392, #2548)`,
+    );
+  }
 });

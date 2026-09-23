@@ -7,10 +7,10 @@
  * ng-packagr ships the fresh one — green CI, untested dist (#810).
  *
  * This script re-runs the sync and fails when the committed copy was out of
- * date. It is the ONE implementation of that check: `ci.yml` and
- * `.husky/pre-commit` both call it (#1838). It used to live inline in the
- * workflow only, so drift was committable locally and surfaced on the PR, after
- * a push and a full CI round.
+ * date. It is the ONE implementation of that check: `ci.yml` calls it, and
+ * both hooks through `pnpm lint:angular-sync` (#1838, #2548). It used to live
+ * inline in the workflow only, so drift was committable locally and surfaced on
+ * the PR, after a push and a full CI round.
  *
  * ⚠ `git status --porcelain`, not `git diff`: a newly added shared file is
  * UNTRACKED in the copy, and `git diff` does not report untracked paths.

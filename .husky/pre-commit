@@ -100,7 +100,7 @@ pnpm lint:repo-scans
 if git diff --cached --name-only |
   grep -qE '^(shared/dom-utils/|packages/angular/src/dom-utils/)'; then
   echo "🔁 Checking angular dom-utils copy..."
-  node scripts/check-angular-dom-utils-sync.mjs
+  pnpm lint:angular-sync
 fi
 
 # Run type checking, linting, and tests via turbo pipeline

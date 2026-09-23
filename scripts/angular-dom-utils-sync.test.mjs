@@ -4,8 +4,9 @@
 // a shared edit that lands without re-running the sync leaves angular testing
 // the stale copy while ng-packagr ships the fresh one (#810). The check lived
 // inline in `ci.yml` only, so drift was committable locally and surfaced on the
-// PR after a push and a full CI round. It is one script now, called by both
-// `ci.yml` and `.husky/pre-commit` — and this file is what keeps it honest.
+// PR after a push and a full CI round. It is one script now, called by `ci.yml`
+// and, through `pnpm lint:angular-sync`, by both hooks — and this file is what
+// keeps it honest.
 //
 // ⚠ Why a test at all: the hook is executed by git, not by the suite, so nothing
 // in the repo ever ran that code. Its terms were the one vector of the #1838
@@ -34,6 +35,8 @@ const SCRIPT = "scripts/check-angular-dom-utils-sync.mjs";
 const COPY_FILE = join(ROOT, "packages/angular/src/dom-utils/link-utils.ts");
 const SHARED_FILE = join(ROOT, "shared/dom-utils/link-utils.ts");
 const HOOK = join(ROOT, ".husky/pre-commit");
+const PRE_PUSH = join(ROOT, ".husky/pre-push");
+const PACKAGE = join(ROOT, "package.json");
 const WORKFLOW = join(ROOT, ".github/workflows/ci.yml");
 
 /** Runs the checker, returning its exit code and combined output. */
@@ -193,21 +196,42 @@ test("under GitHub Actions the failure carries an ::error:: annotation", () => {
   }
 });
 
-test("both callers invoke the ONE script, with no second copy of the logic", () => {
+test("every caller invokes the ONE script, with no second copy of the logic", () => {
   // The duplication is what let the two drift apart in the first place: the
   // workflow had the check and the hook had nothing.
-  const hook = readFileSync(HOOK, "utf8");
-  const workflow = readFileSync(WORKFLOW, "utf8");
+  const { scripts } = JSON.parse(readFileSync(PACKAGE, "utf8"));
+  const callers = {
+    "pre-commit": readFileSync(HOOK, "utf8"),
+    "pre-push": readFileSync(PRE_PUSH, "utf8"),
+    "ci.yml": readFileSync(WORKFLOW, "utf8"),
+  };
 
-  assert.match(hook, /node scripts\/check-angular-dom-utils-sync\.mjs/);
-  assert.match(workflow, /node scripts\/check-angular-dom-utils-sync\.mjs/);
-
-  // Neither may re-implement it: a second `git status --porcelain` over the copy
-  // is the shape that was there before.
-  assert.doesNotMatch(
-    workflow,
-    /git status --porcelain packages\/angular\/src\/dom-utils/,
+  // The hooks call it by the npm script, the name `ci-hook-parity` can pair.
+  assert.equal(scripts["lint:angular-sync"], `node ${SCRIPT}`);
+  assert.match(callers["pre-commit"], /pnpm lint:angular-sync/);
+  assert.match(callers["pre-push"], /pnpm lint:angular-sync/);
+  assert.match(
+    callers["ci.yml"],
+    /node scripts\/check-angular-dom-utils-sync\.mjs/,
   );
+
+  // None may re-implement it: a second `git status --porcelain` over the copy
+  // is the shape that was there before.
+  for (const [name, text] of Object.entries(callers)) {
+    assert.doesNotMatch(
+      text,
+      /git status --porcelain packages\/angular\/src\/dom-utils/,
+      name,
+    );
+  }
+});
+
+test("pre-push runs it unconditionally (#2548)", () => {
+  // Gated on the staged set as pre-commit gates it, the call could never run
+  // here: the push guard refuses anything uncommitted, so nothing is staged.
+  const prePush = readFileSync(PRE_PUSH, "utf8");
+
+  assert.match(prePush, /^pnpm lint:angular-sync$/m);
 });
 
 test("the hook gates on the STAGED set, not on every commit", () => {
