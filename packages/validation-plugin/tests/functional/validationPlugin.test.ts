@@ -26,7 +26,7 @@ describe("validationPlugin", () => {
 
       expect(() => router.usePlugin(validationPlugin())).toThrow(RouterError);
       expect(() => router.usePlugin(validationPlugin())).toThrow(
-        "validation-plugin must be registered before router.start()",
+        "[validation-plugin] must be registered before router.start()",
       );
     });
 
@@ -35,7 +35,7 @@ describe("validationPlugin", () => {
       await router.start("/home");
 
       expect(() => router.usePlugin(validationPlugin())).toThrow(
-        "validation-plugin must be registered before router.start()",
+        "[validation-plugin] must be registered before router.start()",
       );
     });
   });

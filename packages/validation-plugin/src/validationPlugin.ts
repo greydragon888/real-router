@@ -1,8 +1,7 @@
 // packages/validation-plugin/src/validationPlugin.ts
 
-import { RouterError } from "@real-router/core";
 import { getPluginApi, getRoutesApi } from "@real-router/core/api";
-import { raiser, freezeThrownError } from "@real-router/core/utils";
+import { raiser } from "@real-router/core/utils";
 import { getInternals } from "@real-router/core/validation";
 
 import { CORE_LIMIT_DEFAULTS } from "./helpers";
@@ -105,6 +104,7 @@ import type {
   Plugin,
 } from "@real-router/core";
 
+const atValidationPlugin = raiser("validation-plugin");
 const atAddRoute = raiser("router", "addRoute");
 const atAreStatesEqual = raiser("router", "areStatesEqual");
 
@@ -379,11 +379,9 @@ export function validationPlugin<
     const api = getPluginApi(router);
 
     if (router.isActive()) {
-      throw freezeThrownError(
-        new RouterError("VALIDATION_PLUGIN_AFTER_START", {
-          message: "validation-plugin must be registered before router.start()",
-        }),
-      );
+      throw atValidationPlugin.code(
+        "VALIDATION_PLUGIN_AFTER_START",
+      )`must be registered before router.start()`;
     }
 
     // ⚑ One router, one validator (#2349). `RouterInternals.validator` is a
@@ -395,13 +393,9 @@ export function validationPlugin<
     // ⚠ A CLONE needs no install of its own: `cloneRouter` re-runs plugin
     // factories by contract, which is what the message points at.
     if (ctx.validator !== null) {
-      throw freezeThrownError(
-        new RouterError("VALIDATION_PLUGIN_ALREADY_INSTALLED", {
-          message:
-            "validation-plugin is already installed on this router — " +
-            "a clone re-runs plugin factories, so it needs no usePlugin of its own",
-        }),
-      );
+      throw atValidationPlugin.code(
+        "VALIDATION_PLUGIN_ALREADY_INSTALLED",
+      )`is already installed on this router — a clone re-runs plugin factories, so it needs no usePlugin of its own`;
     }
 
     // RouterInternals.validator is now mutable — direct assignment works
