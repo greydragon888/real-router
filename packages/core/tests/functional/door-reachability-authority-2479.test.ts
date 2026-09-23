@@ -35,6 +35,9 @@ import { describe, expect, it } from "vitest";
  */
 const SRC = path.resolve(__dirname, "../../src");
 
+/** The raiser-head fixture every reader of a raiser head answers for (#2537). */
+const FIXTURE = path.resolve(__dirname, "../fixtures/raiser-heads");
+
 /**
  * Doors named after core's own verb rather than the member a caller types, kept
  * because `@real-router/validation-plugin` prints the same two — measured, 18
@@ -205,11 +208,18 @@ function collectApiMembers(node: ts.Node, into: Sink): void {
   }
 }
 
-/** `const at = raiser("router", "door")` — the head is the binding, not the throw. */
+/**
+ * `const at = raiser("router", "door")` — the head is the binding, not the throw.
+ *
+ * ⚠ One door per BINDING, never one per name. `validation-plugin` names every
+ * per-call binding `at`, and a map keyed by name kept only the last: on the
+ * shared fixture, the door planted in the first of two such bindings was never
+ * judged (#2537).
+ */
 function collectRaiserDoor(
   node: ts.Node,
   source: ts.SourceFile,
-  into: Map<string, string>,
+  into: string[],
 ): void {
   if (
     !ts.isVariableDeclaration(node) ||
@@ -230,7 +240,7 @@ function collectRaiserDoor(
     door !== undefined &&
     ts.isStringLiteral(door)
   ) {
-    into.set(node.name.text, door.text);
+    into.push(door.text);
   }
 }
 
@@ -291,7 +301,7 @@ function readCore(root: string = SRC): Facts {
   for (const file of globSync(`${root}/**/*.ts`)) {
     const source = parse(file);
     const where = path.relative(root, file);
-    const bound = new Map<string, string>();
+    const bound: string[] = [];
 
     const visit = (node: ts.Node): void => {
       collectPosition(node, where, sink);
@@ -326,7 +336,7 @@ function readCore(root: string = SRC): Facts {
 
     visit(source);
 
-    for (const door of bound.values()) {
+    for (const door of bound) {
       heads.push({ file: where, door, owner: "", surface: "message" });
     }
   }
@@ -360,6 +370,36 @@ describe("a door a message names is one a caller can call (#2479)", () => {
     expect(facts.vocabulary.size).toBeGreaterThan(100);
     expect(facts.heads.length).toBeGreaterThan(15);
     expect(facts.vocabulary.has("Segment Matcher")).toBe(false);
+  });
+
+  it("CONTROL — the shared raiser fixture: every binding's door is judged (#2537)", () => {
+    // ⚑ The fixture is SHARED: every reader of a raiser head answers for every
+    // site in it, each in its own terms. This one reads a door off each binding
+    // whose receiver is `router` and whose door is a literal, and nothing else —
+    // so the dynamic door and the bare receiver judge no door, and their files
+    // answer with an empty list. ⚠ Keyed by FILE for that reason: a flat list of
+    // doors stays green on a new file this reader ignores, and every file has to
+    // be answered for here, so a new one reds this cell until it is.
+    const judged = new Map<string, string[]>(
+      globSync(`${FIXTURE}/**/*.ts`).map((file) => [
+        path.relative(FIXTURE, file),
+        [],
+      ]),
+    );
+
+    for (const head of readCore(FIXTURE).heads) {
+      if (head.surface === "message") {
+        judged.get(head.file)?.push(head.door);
+      }
+    }
+
+    expect(Object.fromEntries(judged)).toStrictEqual({
+      "bare-receiver.ts": [],
+      "binding-after-use.ts": ["matchPath"],
+      "dynamic-door.ts": [],
+      "static-door.ts": ["buildPath"],
+      "two-bindings.ts": ["Segment Matcher", "navigate"],
+    });
   });
 
   it("CONTROL — a planted door outside the vocabulary is found", () => {
