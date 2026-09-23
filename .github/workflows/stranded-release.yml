@@ -7,8 +7,9 @@ name: Stranded Release Watch
 # builds out of the cancelling concurrency group, which is the prevention; this
 # is the detection, because a silent permanent drop deserves both.
 #
-# ⚑ It does NOT reuse `.changeset/unpublished-packages.mjs`, which #2057
-# proposed. That script asks "is the CURRENT version published", and the answer
+# ⚑ It does NOT reuse the question `.changeset/unpublished-packages.mjs` asks,
+# which #2057 proposed — it imports only that module's not-found classifier.
+# That question is "is the CURRENT version published", and the answer
 # heals the moment the next release succeeds — measured, the window on the
 # reproduction was 35 minutes, so a schedule would miss it. This asks a question
 # whose answer does not heal.
@@ -41,12 +42,14 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          # ⚠ This job installs nothing — the script is node builtins plus `git`
-          # and `npm view` — and setup-node's automatic package-manager cache is
-          # what killed its only run (2026-09-06). v5 enabled that cache for ANY
-          # `packageManager` field, found `pnpm@…`, and failed with "Unable to
-          # locate executable file: pnpm" before the script could run. v7 only
-          # auto-caches when the field names npm, so the version alone fixes it;
+          # ⚠ This job installs nothing — the script and the one repo module it
+          # imports (`.changeset/unpublished-packages.mjs`) are node builtins, plus
+          # `git` and `npm view` — and setup-node's automatic package-manager cache is
+          # what killed its first run (2026-09-06). v5 enabled that cache for a
+          # `packageManager` field naming npm, yarn or pnpm, found `pnpm@…`, and
+          # failed with "Unable to locate executable file: pnpm" before the
+          # script could run. v7 only auto-caches when the field names npm, so
+          # the version alone fixes it;
           # the explicit `false` states the intent and survives the default
           # moving again.
           package-manager-cache: false

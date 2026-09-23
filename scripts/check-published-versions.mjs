@@ -22,8 +22,9 @@
  * the baseline when a version is genuinely published later — never grow it
  * without meaning to.
  *
- * Usage: node scripts/check-published-versions.mjs [--update]
+ * Usage: node scripts/check-published-versions.mjs [--update] [--root=D]
  *   --update  rewrite the baseline from what npm and the tags say today
+ *   --root=D  read D instead of the repository (the tests use it)
  */
 
 import { execFileSync } from "node:child_process";
@@ -31,13 +32,35 @@ import { globSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+import { NOT_FOUND } from "../.changeset/unpublished-packages.mjs";
+
+const args = process.argv.slice(2);
+
+// Only the two documented arguments. Anything else — `--root D` for `--root=D`,
+// an empty `--root=` — would be ignored, and the watch would read (and with
+// `--update`, rewrite) a tree the caller did not name.
+const unknown = args.filter((a) => a !== "--update" && !/^--root=./.test(a));
+
+if (unknown.length > 0) {
+  throw new Error(
+    `unknown argument(s): ${unknown.join(" ")} — usage: [--update] [--root=D]`,
+  );
+}
+
+const rootArg = args.find((a) => a.startsWith("--root="));
+
+/** `--root=` exists for the tests, which need a tree they control. */
+const ROOT = rootArg
+  ? rootArg.slice("--root=".length)
+  : join(dirname(fileURLToPath(import.meta.url)), "..");
 const BASELINE = join(ROOT, "scripts", "published-versions-baseline.json");
-const update = process.argv.includes("--update");
+const update = args.includes("--update");
 
 /** Every tag in the checkout. CI must fetch them — a shallow clone has none. */
 const tags = new Set(
-  execFileSync("git", ["tag"], { cwd: ROOT, encoding: "utf8" }).split("\n"),
+  execFileSync("git", ["tag"], { cwd: ROOT, encoding: "utf8" })
+    .split("\n")
+    .filter(Boolean),
 );
 
 // ⚑ Non-vacuity on the tag half: a shallow checkout returns an empty set, and
@@ -50,23 +73,61 @@ if (tags.size < 50) {
   );
 }
 
+/**
+ * The versions npm lists for `name`, or `undefined` when the registry answers
+ * that it has no such package — a package that never published is not this
+ * guard's subject.
+ *
+ * ⚠ Every other outcome throws — a registry that did not answer, an answer that
+ * is not a list. Read as "never published", each would drop its package from
+ * the comparison, and a run that dropped every package would report ✅ (#2540).
+ */
 const npmVersions = (name) => {
+  let answer;
+
   try {
-    return new Set(
-      JSON.parse(
-        execFileSync("npm", ["view", name, "versions", "--json"], {
-          encoding: "utf8",
-          stdio: ["ignore", "pipe", "ignore"],
-        }),
-      ),
-    );
-  } catch {
-    // A package that has never published at all is not this guard's subject.
-    return undefined;
+    answer = execFileSync("npm", ["view", name, "versions", "--json"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (error) {
+    const text = `${error.stdout ?? ""}${error.stderr ?? ""}`;
+
+    if (NOT_FOUND.test(text)) return undefined;
+
+    throw new Error(`npm view ${name} failed — ${text || error.message}`);
   }
+
+  let versions;
+
+  try {
+    versions = JSON.parse(answer);
+  } catch {
+    versions = undefined;
+  }
+
+  if (!Array.isArray(versions)) {
+    throw new Error(
+      `npm view ${name} answered with something other than a JSON list of ` +
+        `versions: ${answer.trim().slice(0, 200) || "(nothing)"}`,
+    );
+  }
+
+  return new Set(versions);
 };
 
 const found = {};
+
+/** The packages npm answered for — the only ones this run can speak about. */
+const compared = new Set();
+
+/**
+ * Packages that could not be compared, one line each. Collected rather than
+ * thrown, so a package the registry did not answer for cannot hide another
+ * package's stranded version: that alarm is actionable only while the version
+ * is still current.
+ */
+const unread = [];
 
 for (const manifest of globSync("packages/*/package.json", { cwd: ROOT })) {
   const pkg = JSON.parse(readFileSync(join(ROOT, manifest), "utf8"));
@@ -82,19 +143,67 @@ for (const manifest of globSync("packages/*/package.json", { cwd: ROOT })) {
         "utf8",
       ).matchAll(/^## (\d+\.\d+\.\d+)$/gm),
     ].map((match) => match[1]);
-  } catch {
+  } catch (error) {
+    // No CHANGELOG yet means no history to check; any other failure to read
+    // one leaves the package uncompared, like a registry that did not answer.
+    if (error.code === "ENOENT") continue;
+    unread.push(`${pkg.name}: ${error.message}`);
     continue;
   }
 
-  const published = npmVersions(pkg.name);
+  let published;
 
-  if (published === undefined) continue;
+  try {
+    published = npmVersions(pkg.name);
+  } catch (error) {
+    unread.push(error.message);
+    continue;
+  }
+
+  if (published === undefined) {
+    // ⚑ npm's "no such package" is believed only while the tags agree. A
+    // package with release tags has been published, so for it that answer is
+    // wrong — a stale mirror, an auth wall that answers 404.
+    if (headings.some((version) => tags.has(`${pkg.name}@${version}`))) {
+      unread.push(
+        `npm view ${pkg.name} says it was never published, but it has release tags`,
+      );
+    }
+    continue;
+  }
+
+  compared.add(pkg.name);
 
   const stranded = headings.filter(
     (version) => !published.has(version) && !tags.has(`${pkg.name}@${version}`),
   );
 
   if (stranded.length > 0) found[pkg.name] = stranded.toSorted();
+}
+
+const unreadReport =
+  unread.length === 0
+    ? ""
+    : `\n\n❌ ${unread.length} package(s) could not be compared:\n  ` +
+      unread.join("\n  ");
+
+// ⚑ Non-vacuity on the npm half, ahead of `--update` so a blind run records
+// nothing: with no package compared, "nothing is stranded" is not an answer.
+if (compared.size === 0) {
+  throw new Error(
+    "compared no public package against npm" +
+      (unreadReport ||
+        " — the registry has none of them, or none has a CHANGELOG; " +
+          "check which registry this runner asks"),
+  );
+}
+
+// `--update` records only a complete comparison: a package it could not read
+// would drop out of the baseline and come back as "new" on the next run.
+if (update && unread.length > 0) {
+  throw new Error(
+    `--update refuses a run that could not compare every package${unreadReport}`,
+  );
 }
 
 if (update) {
@@ -114,10 +223,13 @@ const fresh = Object.entries(found).flatMap(([name, versions]) =>
     .map((version) => `${name}@${version}`),
 );
 
+// Only a package this run compared can have healed.
 const healed = Object.entries(baseline).flatMap(([name, versions]) =>
-  versions
-    .filter((version) => !(found[name] ?? []).includes(version))
-    .map((version) => `${name}@${version}`),
+  compared.has(name)
+    ? versions
+        .filter((version) => !(found[name] ?? []).includes(version))
+        .map((version) => `${name}@${version}`)
+    : [],
 );
 
 console.error(
@@ -143,8 +255,10 @@ if (fresh.length > 0) {
       "WHILE the version is still current; once the next release lands, the " +
       "number is unrecoverable and only the record can be repaired.",
   );
-
-  process.exit(1);
 }
+
+if (unread.length > 0) console.error(unreadReport);
+
+if (fresh.length > 0 || unread.length > 0) process.exit(1);
 
 console.error("✅ every CHANGELOG version is published or tagged");

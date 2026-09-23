@@ -66,8 +66,11 @@ const CONCURRENCY = 16;
  * client runs, nor on which half of a spec is missing. Measured with pnpm
  * 12.4.1 — a missing package answers `ERR_PNPM_FETCH_404`, a missing version
  * `ERR_PNPM_PACKAGE_NOT_FOUND` + "No matching version found".
+ *
+ * Exported for `scripts/check-published-versions.mjs`, which asks npm directly
+ * and classifies its answer with this same pattern.
  */
-const NOT_FOUND =
+export const NOT_FOUND =
   /ERR_PNPM_FETCH_404|E404|Not Found - 404|ERR_PNPM_PACKAGE_NOT_FOUND|No matching version found/;
 
 /**
