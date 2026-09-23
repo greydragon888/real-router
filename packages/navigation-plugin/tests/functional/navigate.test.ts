@@ -141,10 +141,12 @@ describe("Navigation Plugin — Navigate", () => {
       // No silent fallback
       expect(navigateDefaultSpy).not.toHaveBeenCalled();
 
-      // Error surfaces via onTransitionError
+      // Error surfaces via onTransitionError, and `path` names the URL that
+      // matched nothing (#2538).
       expect(errorHook).toHaveBeenCalledTimes(1);
       expect(errorHook.mock.calls[0][2]).toMatchObject({
         code: "ROUTE_NOT_FOUND",
+        path: "/nonexistent-path",
       });
 
       // FROZEN, like every error core throws (#1960 / #1964). It is also the

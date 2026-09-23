@@ -306,8 +306,12 @@ describe("popstate handler", () => {
       handler(makePopStateEvent(null));
       await flushAsync();
 
+      // `path` names the URL that matched nothing (#2538).
       expect(deps.api.emitTransitionError).toHaveBeenCalledWith(
-        expect.objectContaining({ code: errorCodes.ROUTE_NOT_FOUND }),
+        expect.objectContaining({
+          code: errorCodes.ROUTE_NOT_FOUND,
+          path: "/nope",
+        }),
       );
       // Rollback: the committed state's own path, prefixed. One argument —
       // `toHaveBeenCalledWith` is exact about arity, which is the runtime half
