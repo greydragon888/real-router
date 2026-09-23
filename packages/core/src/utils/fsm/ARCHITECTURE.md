@@ -4,7 +4,7 @@
 
 ## Overview
 
-`@real-router/fsm` is a **standalone, zero-dependency** synchronous finite state machine engine.
+This engine is a synchronous finite state machine, `src/utils/fsm` in core since wave-3 — the standalone `@real-router/fsm` package is published at `0.6.1` and is no longer built from this source. Its one import is `internalDefect`, which marks a refusal no caller input can reach (#2487).
 It drives the entire router lifecycle — all states (IDLE, STARTING, READY, TRANSITION_STARTED, LEAVE_APPROVED, DISPOSED) and transitions are managed by a single FSM instance.
 
 **Key role:** No boolean flags, no ad-hoc state management. Every router state change is an FSM transition.
@@ -186,7 +186,7 @@ send(event, ...args) {
 
 ```typescript
 on(from, event, action) {
-  requireDeclared(this.#transitions, from, "on"); // #885 — reject undeclared `from`
+  requireDeclared(this.#transitions, from); // #885 — reject undeclared `from`
   this.#actions ??= new Map();                     // lazy init (outer: state → inner map)
 
   let stateActions = this.#actions.get(from);      // inner map: event → action
@@ -278,12 +278,10 @@ The constructor (`initial`), `on` (`from`), and every transition **target** in t
 
 ```typescript
 // shared guard — single source of truth for "the state is declared"
-function requireDeclared(transitions, state, where) {
+function requireDeclared(transitions, state) {
   const t = transitions[state];
   if (t === undefined) {
-    throw new Error(
-      `[FSM.${where}] state "${state}" is not declared in config.transitions`,
-    );
+    throw internalDefect.plain`state "${state}" is not declared in config.transitions`;
   }
   return t;
 }

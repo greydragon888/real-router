@@ -63,7 +63,8 @@ const UNREACHABLE_BY_CONSTRUCTION: ReadonlyMap<string, string> = new Map([
   [
     "internal",
     "collectPathsToRoute's not-found throw, which its own `v8 ignore … unreachable` " +
-      "marks as beyond caller input — the analogue of core's CORE_INTERNAL register",
+      "marks as beyond caller input — core spells this shape with O-1's " +
+      "`Internal error (please report): ` marker instead (#2487)",
   ],
 ]);
 

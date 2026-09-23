@@ -1,3 +1,5 @@
+import { internalDefect } from "../../RouterError";
+
 import type {
   FSMConfig,
   PayloadOf,
@@ -6,26 +8,20 @@ import type {
 } from "./types";
 
 /**
- * ⚑ **Every message in this file keeps a `[FSM.*]` prefix, and that is a
- * STATEMENT rather than an oversight (#1845).**
+ * ⚑ **Every refusal in this file takes O-1's unbracketed form (#2487).**
  *
- * The rest of core names the facade call a message comes from, because its reader
- * is the application author: a prefix naming an internal class points at a name
- * they cannot grep in their own code, find on the exports map, or look up in the
- * wiki. These six are the exception, and the reason is reachability rather than
- * taste — no caller input arrives here. `FSM` is on neither the exports map nor
- * `src/index.ts`; its sole construction is `routerFSM.ts`, which passes core's
- * own module-level `routerTransitions` literal and a `routerStates` constant, so
- * nothing from options or routes arrives here. Reaching one of these means
- * CORE's transition table is malformed — a bug in this package — and the reader
- * who needs the message is working on core, for whom the class name is the
- * useful one.
+ * No caller input arrives here: `FSM` is on neither the exports map nor
+ * `src/index.ts`, and its sole construction is `routerFSM.ts`, which passes core's
+ * own module-level `routerTransitions` literal and a `routerStates` constant.
+ * Reaching one of these means CORE's transition table is malformed — a bug in this
+ * package — so there is no door for a prefix to name, and `internalDefect` marks
+ * them for the reader who can act on them.
  *
- * ⚠ So the prefix is not "an accident of where the code lives", which is what
- * #1845 refused to leave standing. It is registered as `CORE_INTERNAL` in
- * `tests/functional/message-prefix-authority-1845.test.ts`, which reds both when
- * an unregistered internal prefix appears and when a registered one stops being
- * raised.
+ * ⚠ The cells that pin these messages are told apart by WHAT THEY CALL, not by a
+ * prefix: the `on()` cell in `fsm.test.ts` builds the FSM outside its assertion
+ * lambda with a valid `initial`, so a constructor refusal cannot reach it, and the
+ * constructor cell asserts on a lambda that only constructs. Dropping the prefix
+ * merges no cell.
  */
 
 /** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
@@ -99,15 +95,11 @@ function normalizeEdge(
   const update = declaration.update;
 
   if (when !== undefined && typeof when !== "function") {
-    throw new Error(
-      `[FSM.constructor] transitions["${state}"]["${event}"].when is not a function`,
-    );
+    throw internalDefect.plain`transitions["${state}"]["${event}"].when is not a function`;
   }
 
   if (update !== undefined && typeof update !== "function") {
-    throw new Error(
-      `[FSM.constructor] transitions["${state}"]["${event}"].update is not a function`,
-    );
+    throw internalDefect.plain`transitions["${state}"]["${event}"].update is not a function`;
   }
 
   return {
@@ -164,9 +156,7 @@ function normalizeTable(table: object): NormTable<string> {
     for (const edge of objectValues(edges)) {
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `Object.values` widens to include the record's `| undefined` member
       if (edge !== undefined && out[edge.target] === undefined) {
-        throw new Error(
-          `[FSM.constructor] state "${edge.target}" is not declared in config.transitions`,
-        );
+        throw internalDefect.plain`state "${edge.target}" is not declared in config.transitions`;
       }
     }
   }
@@ -228,9 +218,7 @@ export class FSM<
 
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime guard for JS / cast / string-typed callers
     if (this.#transitions[initial] === undefined) {
-      throw new Error(
-        `[FSM.constructor] state "${initial}" is not declared in config.transitions`,
-      );
+      throw internalDefect.plain`state "${initial}" is not declared in config.transitions`;
     }
 
     this.#currentTransitions = this.#transitions[initial];
@@ -361,9 +349,7 @@ export class FSM<
 
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime guard for JS / cast / string-typed callers
     if (edges === undefined) {
-      throw new Error(
-        `[FSM.on] state "${from}" is not declared in config.transitions`,
-      );
+      throw internalDefect.plain`state "${from}" is not declared in config.transitions`;
     }
 
     // #1682 — the state check above is ONE AXIS SHORT of what #885 claimed. An
@@ -384,9 +370,7 @@ export class FSM<
     // exactly why the `in` form passes its test — but it makes this guard depend
     // on a distant detail of `normalizeTable` instead of on itself.
     if (!hasOwn(edges, event)) {
-      throw new Error(
-        `[FSM.on] event "${event}" has no edge from state "${from}"`,
-      );
+      throw internalDefect.plain`event "${event}" has no edge from state "${from}"`;
     }
 
     this.#actions ??= new Map();

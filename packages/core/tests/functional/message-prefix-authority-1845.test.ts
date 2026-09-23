@@ -28,20 +28,12 @@ import { describe, expect, it } from "vitest";
  * naming it is naming something they can look up — which is why those were
  * excluded from the inventory rather than renamed.
  *
- * ⚑ **`CORE_INTERNAL` is the second tier, and registering a prefix there is the
- * STATEMENT, not an exemption.** A prefix belongs to it when no caller input can
- * reach the message, so arriving at one is a bug in this package rather than a
- * mistake in the application — and then naming the internal class is the most
- * useful thing the message can do, because the reader who needs it is working on
- * core. Measured for the two entries below: `FSM` is on neither the exports map
- * nor `src/index.ts`, its sole construction (`routerFSM.ts`) passes core's own
- * module-level `routerTransitions` literal, and nothing from options or routes
- * reaches it, so every one of its six messages is about core's own table.
- *
- * ⚠ The register is what #1845 asked for over a rename here: collapsing the two
- * would cost a discriminator. `fsm.test.ts` pins `state "GHOST" is not declared
- * in config.transitions` under BOTH prefixes, and the prefix is the only thing
- * that tells the two cells apart.
+ * ⚑ **Every refusal core raises now takes one of two forms (#2487).** A prefix
+ * names a call the reader made, or the message carries O-1's `Internal error
+ * (please report): ` marker because no caller input can reach it. There is no
+ * register of class-name prefixes: the FSM pair was the only entry, and
+ * unbracketing it merged no cell — measured, 76/76 green, because `fsm.test.ts`
+ * tells its cells apart by WHAT THEY CALL and not by a prefix.
  *
  * ⚠ **An ARGUMENT, not any bracketed literal.** Computed keys
  * (`[routerStates.STARTING]: …`) and ordinary values (`"[dynamic]"` for a
@@ -87,17 +79,7 @@ const PUBLISHED =
   /^\[(router(\.[A-Za-z$.{}]+)?|RouterError(\.[A-Za-z]+)?|cloneRouter)\]$/u;
 
 /**
- * Tier two: unreachable from caller input, so the internal name is the useful
- * one. Each entry carries its reason in the docblock above; adding one without
- * measuring that reachability is what this list exists to make deliberate.
- */
-const CORE_INTERNAL: ReadonlySet<string> = new Set([
-  "[FSM.constructor]",
-  "[FSM.on]",
-]);
-
-/**
- * Tier four: the form О-1 gives a refusal no caller input can reach. No bracket
+ * Tier four: the form O-1 gives a refusal no caller input can reach. No bracket
  * — there is no door to name — and a marker instead, which is what makes it
  * greppable and keeps it out of the bare register.
  */
@@ -385,11 +367,7 @@ function offenders(root: string = SRC): Offender[] {
 
       const prefix = prefixOf(text);
 
-      if (
-        prefix !== undefined &&
-        !PUBLISHED.test(prefix) &&
-        !CORE_INTERNAL.has(prefix)
-      ) {
+      if (prefix !== undefined && !PUBLISHED.test(prefix)) {
         found.push({ file: path.relative(root, file), prefix });
       }
     };
@@ -409,11 +387,7 @@ function offenders(root: string = SRC): Offender[] {
         const bound = boundNameOfTag(node.tag);
         const head = bound === undefined ? undefined : heads.get(bound);
 
-        if (
-          head !== undefined &&
-          !PUBLISHED.test(head) &&
-          !CORE_INTERNAL.has(head)
-        ) {
+        if (head !== undefined && !PUBLISHED.test(head)) {
           found.push({ file: path.relative(root, file), prefix: head });
         }
       }
@@ -581,29 +555,6 @@ describe("a message prefix names something the caller can look up (#1845)", () =
     }
   });
 
-  it("CONTROL — every CORE_INTERNAL entry is still raised somewhere", () => {
-    // A register whose entries no longer exist stops being a statement and
-    // becomes slack: the next prefix of that shape would be admitted by a name
-    // nothing raises. Both tiers red when a member leaves.
-    const raised = new Set<string>();
-
-    for (const file of globSync(`${SRC}/**/*.ts`)) {
-      const text = readFileSync(file, "utf8");
-
-      for (const entry of CORE_INTERNAL) {
-        if (text.includes(entry)) {
-          raised.add(entry);
-        }
-      }
-    }
-
-    const byName = (a: string, b: string): number => a.localeCompare(b);
-
-    expect([...raised].toSorted(byName)).toStrictEqual(
-      [...CORE_INTERNAL].toSorted(byName),
-    );
-  });
-
   it("CONTROL — the walk reads messages at all, so an empty result means clean", () => {
     // Without this, a change to the AST shapes walked empties the result and the
     // assertion above passes over files it never inspected.
@@ -738,7 +689,7 @@ interface Refusals {
   readonly judged: number;
   /** Files the glob reached — reach, asserted apart from recognition. */
   readonly files: number;
-  /** Constructions carrying О-1's marker — admissible without a bracket. */
+  /** Constructions carrying O-1's marker — admissible without a bracket. */
   readonly marked: number;
   /** ``internalDefect.plain`…` `` sites, which write no literal message. */
   readonly defects: number;
@@ -1098,7 +1049,7 @@ function refusals(root: string = SRC): Refusals {
         fed.push(fedName);
       }
 
-      // A site raising through О-1's marker writes no literal message at all,
+      // A site raising through O-1's marker writes no literal message at all,
       // so the construction walk above cannot see it. Counted here, and floored
       // below, so the form stays visible rather than silently unwatched.
       if (
@@ -1202,7 +1153,7 @@ describe("a refusal with no prefix at all is registered, not invisible (#2456)",
     // conversion MOVES a site between the two rather than removing one.
     expect(seen.constructions + seen.raised).toBeGreaterThan(130);
     expect(seen.judged + seen.raised).toBeGreaterThan(95);
-    // О-1's marker is recognised rather than registered, and a recogniser that
+    // O-1's marker is recognised rather than registered, and a recogniser that
     // stopped matching would empty this without emptying anything above.
     expect(seen.marked).toBeGreaterThan(0);
   });
