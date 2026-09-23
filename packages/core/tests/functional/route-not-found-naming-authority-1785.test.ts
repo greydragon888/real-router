@@ -1,15 +1,13 @@
-import {
-  globSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
+
+import { refusalSites } from "./helpers";
+
+import type { RefusalSite } from "./helpers";
 
 /**
  * `RouterError.routeName` names a ROUTE, or is absent (#1785).
@@ -21,11 +19,11 @@ import { describe, expect, it } from "vitest";
  * (`if (e.code === "ROUTE_NOT_FOUND") retry(e.routeName)`) is then handed prose
  * to navigate to.
  *
- * ⚑ **Derived, not listed.** The sites are found by walking `src` for
- * `new RouterError(errorCodes.ROUTE_NOT_FOUND, …)`, so a new producer that
+ * ⚑ **Derived, not listed.** The sites are found by walking `src` for both
+ * arrival forms — `new RouterError(errorCodes.ROUTE_NOT_FOUND, …)` and the
+ * raiser tag `at.code(errorCodes.ROUTE_NOT_FOUND, …)` — so a new producer that
  * spells prose into the slot reds this file without anyone remembering to add a
- * row. A hand-written list would have been written against the two sites an
- * earlier inventory named, and the walk finds three.
+ * row.
  *
  * ⚠ **This half cannot see the OTHER half of the defect**, and saying so is what
  * keeps the pair honest: a producer that omits `routeName` entirely passes here
@@ -99,62 +97,32 @@ const proseInitialiser = (
   return undefined;
 };
 
-/** Every `new RouterError(errorCodes.ROUTE_NOT_FOUND, …)` under `root`, visited once. */
-function eachProducer(
-  root: string,
-  visit: (
-    node: ts.NewExpression,
-    source: ts.SourceFile,
-    relativePath: string,
-  ) => void,
-): void {
-  for (const file of globSync(`${root}/**/*.ts`)) {
-    const source = ts.createSourceFile(
-      file,
-      readFileSync(file, "utf8"),
-      ts.ScriptTarget.Latest,
-      /* setParentNodes */ true,
-      ts.ScriptKind.TS,
-    );
-    const relativePath = path.relative(root, file);
-
-    const walk = (node: ts.Node): void => {
-      const code = ts.isNewExpression(node) ? node.arguments?.[0] : undefined;
-
-      if (
-        ts.isNewExpression(node) &&
-        node.expression.getText(source) === "RouterError" &&
-        code !== undefined &&
-        ts.isPropertyAccessExpression(code) &&
-        code.name.text === "ROUTE_NOT_FOUND"
-      ) {
-        visit(node, source, relativePath);
-      }
-
-      ts.forEachChild(node, walk);
-    };
-
-    walk(source);
-  }
+/** Every producer of `ROUTE_NOT_FOUND` under `root`, in either arrival form. */
+function producers(root: string): RefusalSite[] {
+  return refusalSites(root).filter(
+    ({ code }) =>
+      code !== undefined &&
+      ts.isPropertyAccessExpression(code) &&
+      code.name.text === "ROUTE_NOT_FOUND",
+  );
 }
 
 function proseSites(root: string = SRC): Site[] {
-  const found: Site[] = [];
+  return producers(root).flatMap(({ bag, file, source }) => {
+    const prose = proseInitialiser(bag, source);
 
-  eachProducer(root, (node, source, relativePath) => {
-    const prose = proseInitialiser(node.arguments?.[1], source);
-
-    if (prose !== undefined) {
-      found.push({
-        file: relativePath,
-        line:
-          source.getLineAndCharacterOfPosition(prose.getStart(source)).line + 1,
-        prose: prose.getText(source),
-      });
-    }
+    return prose === undefined
+      ? []
+      : [
+          {
+            file,
+            line:
+              source.getLineAndCharacterOfPosition(prose.getStart(source))
+                .line + 1,
+            prose: prose.getText(source),
+          },
+        ];
   });
-
-  return found;
 }
 
 describe("routeName names a route, or nothing (#1785)", () => {
@@ -162,16 +130,16 @@ describe("routeName names a route, or nothing (#1785)", () => {
     expect(proseSites()).toStrictEqual([]);
   });
 
-  it("CONTROL — the walk finds producers at all, so an empty result means clean", () => {
+  it("CONTROL — the walk finds producers in BOTH forms, so an empty result means clean", () => {
     // Without this, a rename of `RouterError` or of the `errorCodes` member
     // empties the walk and the assertion above passes on files it never read.
-    let producers = 0;
+    // Both forms, because a walk that lost one of them still finds producers.
+    const found = producers(SRC);
 
-    eachProducer(SRC, () => {
-      producers++;
-    });
-
-    expect(producers).toBeGreaterThan(3);
+    expect(found.length).toBeGreaterThan(3);
+    expect(new Set(found.map(({ form }) => form))).toStrictEqual(
+      new Set(["new", "tag"]),
+    );
   });
 
   it("CONTROL — the predicate reads THROUGH a cast, in both directions", () => {
@@ -198,12 +166,21 @@ describe("routeName names a route, or nothing (#1785)", () => {
         path.join(directory, "template.ts"),
         "new RouterError(errorCodes.ROUTE_NOT_FOUND, { routeName: `resolved to ${kind}` });\n",
       );
+      // The raiser tag, in both polarities too.
+      writeFileSync(
+        path.join(directory, "tag.ts"),
+        'at.code(errorCodes.ROUTE_NOT_FOUND, { routeName: "prose" })`no route`;\n',
+      );
+      writeFileSync(
+        path.join(directory, "tag-expression.ts"),
+        "at.code(errorCodes.ROUTE_NOT_FOUND, { routeName: name })`no route`;\n",
+      );
 
       expect(
         proseSites(directory)
           .map((site) => site.file)
           .toSorted((a, b) => a.localeCompare(b)),
-      ).toStrictEqual(["cast.ts", "template.ts"]);
+      ).toStrictEqual(["cast.ts", "tag.ts", "template.ts"]);
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
