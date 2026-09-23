@@ -2,7 +2,7 @@
   "name": "@real-router/preload-plugin",
   "version": "0.8.0",
   "type": "commonjs",
-  "description": "Preload plugin \u2014 trigger data preloading on navigation intent (hover, touch)",
+  "description": "Preload plugin — trigger data preloading on navigation intent (hover, touch)",
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.mjs",
   "types": "./dist/esm/index.d.mts",
@@ -54,7 +54,7 @@
   "sideEffects": false,
   "devDependencies": {
     "@real-router/core": "workspace:^",
-    "jsdom": "30.1.0"
+    "jsdom": "30.1.1"
   },
   "peerDependencies": {
     "@real-router/core": "workspace:>=0.147.0"
