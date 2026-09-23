@@ -6,7 +6,7 @@ import { getLifecycleApi } from "./getLifecycleApi";
 import { assignConfigEntries } from "../namespaces/RoutesNamespace/helpers";
 import { adoptForwardState } from "../namespaces/RoutesNamespace/routesStore";
 import { Router as RouterClass } from "../Router";
-import { freezeThrownError, raiser } from "../RouterError";
+import { raiser } from "../RouterError";
 import { putField } from "../utils/ingest";
 
 import type {
@@ -124,11 +124,9 @@ export function cloneRouter<
   const ctx = getInternals(router);
 
   if (ctx.isDisposed()) {
-    throw freezeThrownError(
-      atCloneRouter.code(
-        errorCodes.ROUTER_DISPOSED,
-      )`cannot clone a disposed router — dispose() is terminal`,
-    );
+    throw atCloneRouter.code(
+      errorCodes.ROUTER_DISPOSED,
+    )`cannot clone a disposed router — dispose() is terminal`;
   }
 
   ctx.validator?.dependencies.validateCloneArgs(dependencies);
