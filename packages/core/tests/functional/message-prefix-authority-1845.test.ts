@@ -85,6 +85,24 @@ const textOf = (node: ts.Expression): string | undefined => {
   return ts.isTemplateExpression(leaf) ? leaf.head.text : undefined;
 };
 
+/**
+ * The messages an expression can BE: itself, or each arm of a ternary that
+ * chooses between two, each judged on its own (#2489). `leftmost` descends a `+`
+ * chain and nothing else, so a chosen message read as no text at all and was
+ * judged by no tier.
+ */
+const messageArms = (node: ts.Expression): ts.Expression[] => {
+  let leaf = leftmost(node);
+
+  while (ts.isParenthesizedExpression(leaf)) {
+    leaf = leftmost(leaf.expression);
+  }
+
+  return ts.isConditionalExpression(leaf)
+    ? [...messageArms(leaf.whenTrue), ...messageArms(leaf.whenFalse)]
+    : [node];
+};
+
 /** Tier one: the prefix names something published, so the caller can look it up. */
 const PUBLISHED =
   /^\[(router(\.[A-Za-z$.{}]+)?|RouterError(\.[A-Za-z]+)?|cloneRouter)\]$/u;
@@ -389,6 +407,16 @@ function offenders(root: string = SRC): Offender[] {
         return;
       }
 
+      const arms = messageArms(node);
+
+      if (arms.length > 1) {
+        for (const arm of arms) {
+          inspect(arm);
+        }
+
+        return;
+      }
+
       const text = textOf(node);
 
       if (text === undefined) {
@@ -426,9 +454,21 @@ function offenders(root: string = SRC): Offender[] {
   return found;
 }
 
+/**
+ * Offenders the rule sees and a decision elsewhere owns, one row per message.
+ *
+ * ⚠ `internals.ts` names the npm package, `[real-router]`, once per arm of the
+ * ternary that chooses its message. The receiver it should name waits on #2339
+ * retiring `getInternals`, so #2489 moves the prefix then; the row goes with it.
+ */
+const DEFERRED_OFFENDERS: readonly Offender[] = [
+  { file: "internals.ts", prefix: "[real-router]" },
+  { file: "internals.ts", prefix: "[real-router]" },
+];
+
 describe("a message prefix names something the caller can look up (#1845)", () => {
-  it("no message in core names an internal class or layer", () => {
-    expect(offenders()).toStrictEqual([]);
+  it("no message in core names an internal class or layer, beyond the deferred", () => {
+    expect(offenders()).toStrictEqual(DEFERRED_OFFENDERS);
   });
 
   it("CONTROL — the two discriminators the walk rests on, both polarities", () => {
@@ -456,8 +496,17 @@ describe("a message prefix names something the caller can look up (#1845)", () =
         path.join(directory, "admissible.ts"),
         "throw new Error(`[router.buildPath] fine` + ` and still fine`);\n",
       );
+      // A message a ternary chooses is judged arm by arm (#2489), including one
+      // parenthesised at the head of a `+` chain: one bad arm, one good.
+      writeFileSync(
+        path.join(directory, "chosen.ts"),
+        'throw new Error(ok ? "[router.navigate] fine" : "[Layer.chosen] not");\n' +
+          'throw new Error((ok ? "[Layer.inner] x" : "[router] y") + " tail");\n',
+      );
 
       expect(offenders(directory)).toStrictEqual([
+        { file: "chosen.ts", prefix: "[Layer.chosen]" },
+        { file: "chosen.ts", prefix: "[Layer.inner]" },
         { file: "concatenated.ts", prefix: "[Layer.thing]" },
       ]);
     } finally {
@@ -812,9 +861,16 @@ function classify(thrown: ts.Expression): Seen {
   }
 
   const argument = thrown.arguments?.[0];
-  const text = argument === undefined ? undefined : textOf(argument);
+  // A message a ternary chooses is in the tree when EVERY arm is (#2489).
+  const texts =
+    argument === undefined
+      ? []
+      : messageArms(argument).map((arm) => textOf(arm));
+  const [text] = texts;
 
-  return argument === undefined || text === undefined || text === ""
+  return argument === undefined ||
+    text === undefined ||
+    texts.some((arm) => arm === undefined || arm === "")
     ? { kind: "opaque" }
     : { kind: "literal", text, argument };
 }
@@ -941,26 +997,17 @@ function unreadableRaiserUses(root: string = SRC): string[] {
   return found.toSorted(byteOrder);
 }
 
-function classifyConstruction(
-  node: ts.Node,
-  source: ts.SourceFile,
-):
-  | { readonly kind: "none" }
+type Verdict =
   | { readonly kind: "unjudged" }
   | { readonly kind: "marked" }
   | { readonly kind: "headed" }
-  | { readonly kind: "bare"; readonly shape: string } {
-  if (
-    !ts.isNewExpression(node) ||
-    !ERROR_CONSTRUCTORS.has(node.expression.getText())
-  ) {
-    return { kind: "none" };
-  }
+  | { readonly kind: "bare"; readonly shape: string };
 
-  const message = messageOfConstruction(node);
-  const text = message === undefined ? undefined : textOf(message);
+/** The verdict on ONE message, whatever construction carries it. */
+function verdictOf(message: ts.Expression, source: ts.SourceFile): Verdict {
+  const text = textOf(message);
 
-  if (message === undefined || text === undefined || text === "") {
+  if (text === undefined || text === "") {
     return { kind: "unjudged" };
   }
 
@@ -971,6 +1018,38 @@ function classifyConstruction(
   return text.startsWith("[")
     ? { kind: "headed" }
     : { kind: "bare", shape: shapeOf(message, source) };
+}
+
+/**
+ * The verdict on a construction. A message a ternary chooses is judged arm by
+ * arm (#2489), and the worst arm answers for the construction: a bare arm is
+ * reported, and an arm with no text leaves the whole message unjudged.
+ */
+function classifyConstruction(
+  node: ts.Node,
+  source: ts.SourceFile,
+): { readonly kind: "none" } | Verdict {
+  if (
+    !ts.isNewExpression(node) ||
+    !ERROR_CONSTRUCTORS.has(node.expression.getText())
+  ) {
+    return { kind: "none" };
+  }
+
+  const message = messageOfConstruction(node);
+
+  if (message === undefined) {
+    return { kind: "unjudged" };
+  }
+
+  const verdicts = messageArms(message).map((arm) => verdictOf(arm, source));
+
+  return (
+    verdicts.find((verdict) => verdict.kind === "bare") ??
+    verdicts.find((verdict) => verdict.kind === "unjudged") ??
+    verdicts.find((verdict) => verdict.kind === "headed") ??
+    verdicts[0]
+  );
 }
 
 function bracketedNameOf(node: ts.Node): string | undefined {
@@ -1348,29 +1427,35 @@ describe("a refusal with no prefix at all is registered, not invisible (#2456)",
         path.join(directory, "nested", "deep.ts"),
         "throw new Error(`deeper and bare`);\n",
       );
+      // A message a ternary chooses (#2489): the prefixed arm hides no bare one.
+      writeFileSync(
+        path.join(directory, "chosen.ts"),
+        "throw new Error(ok ? `[router.navigate] fine` : `chosen and bare`);\n",
+      );
 
       const seen = refusals(directory);
 
       expect(seen.bare).toStrictEqual([
         "bag.ts · no prefix in a bag",
         "bare.ts · no prefix here: ${}",
+        "chosen.ts · chosen and bare",
         "nested/deep.ts · deeper and bare",
         "rejected.ts · bare and never thrown",
         "wrapped.ts · bare inside a factory",
       ]);
       // The two subjects, side by side: `literals` counts THROWS whose message is
-      // a literal (bare, prefixed, deep); `constructions` counts every error
-      // built, whatever carries it afterwards.
-      expect(seen.literals).toBe(3);
-      expect(seen.constructions).toBe(8);
-      expect(seen.judged).toBe(6);
+      // a literal (bare, prefixed, deep, chosen); `constructions` counts every
+      // error built, whatever carries it afterwards.
+      expect(seen.literals).toBe(4);
+      expect(seen.constructions).toBe(9);
+      expect(seen.judged).toBe(7);
       // `buildMessage(x)` and the hoisted-prefix template, which is prefixed at
       // runtime and would be a FALSE offender if the empty head were judged.
       expect(seen.opaque).toBe(2);
       // Two, because `bag.ts` is a second factory-wrapped throw.
       expect(seen.wrapped).toBe(2);
       expect(seen.rethrown).toBe(1);
-      expect(seen.files).toBe(9);
+      expect(seen.files).toBe(10);
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
