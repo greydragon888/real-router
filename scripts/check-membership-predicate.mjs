@@ -240,7 +240,7 @@ export function scan(files = trackedSources()) {
   return found;
 }
 
-/* v8 ignore start -- @preserve: CLI arm, exercised by the gate rather than by a test */
+/* v8 ignore start -- @preserve: CLI arm; its test runs a copy of this file as a child process (#2543) */
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const found = scan();
 

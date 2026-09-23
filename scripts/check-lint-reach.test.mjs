@@ -9,10 +9,20 @@
 // Runs in the repo-lints CI job via `node --test scripts/*.test.mjs`.
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import {
+  chmodSync,
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import test from "node:test";
+import test, { after } from "node:test";
 
 import {
   LINT_TASKS,
@@ -275,4 +285,176 @@ test("nothing to read: only what ESLint reads counts, and a file belongs to its 
   ]);
 
   assert.deepEqual([...nothing].sort(), ["agg-children-only", "only-ignored"]);
+});
+
+// --------------------------------------------------------------------------
+// The CLI, run the way `pnpm lint:reach` runs it (#2543). The cells above hold
+// the verdict; these hold the step that turns it into an exit code.
+//
+// The script takes its root from its own location, so each cell runs byte copies
+// of it and of `lint-reach.mjs` inside a fixture git repository — two workspace
+// packages, a `turbo.json` and a `.husky/pre-push` — from its `packages/`, so a
+// copy that took its root from the working directory fails here. `pnpm` is a
+// stub first on PATH: it logs every call and answers `ls` with the fixture's
+// packages and `turbo` with the tasks a cell names, and the cells hold the exact
+// arguments, the hook's `--filter` among them.
+//
+// The fixture sits at the path `os.tmpdir()` returns, which on macOS runs
+// through a symlink. This CLI has no entry guard and resolves its root and every
+// package path pnpm reports to real paths itself, so the symlink exercises that.
+// --------------------------------------------------------------------------
+
+const fixtures = [];
+after(() => {
+  for (const root of fixtures) rmSync(root, { recursive: true, force: true });
+});
+
+/**
+ * Git without the caller's repository variables: a push from a linked worktree
+ * exports GIT_DIR to its hook.
+ */
+const gitEnv = {
+  ...Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")),
+  ),
+  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_SYSTEM: "/dev/null",
+};
+
+/** One lint task per named package, as `turbo run lint --dry=json` lists it. */
+const lints = (...names) =>
+  names.map((name) => ({ task: "lint", package: name, command: "eslint src" }));
+
+/** The hook every cell but the vacuous one carries: a lint run with a filter. */
+const HOOK = "pnpm turbo run lint --filter='./packages/*'";
+
+/** The two calls the CLI makes for {@link HOOK}, as the stub must receive them. */
+const EXPECTED_CALLS = [
+  ["ls", "-r", "--depth", "-1", "--json"],
+  ["turbo", "run", "lint", "--filter=./packages/*", "--dry=json"],
+];
+
+/**
+ * A fixture repository holding byte copies of the CLI and its verdict module.
+ *
+ * @param {{ hook: string, tasks: { task: string, package: string, command: string }[] }} options
+ *   the pre-push hook's text, and the tasks the stubbed dry run reports
+ * @returns {string} the fixture root
+ */
+function cliFixture({ hook, tasks }) {
+  const root = mkdtempSync(path.join(tmpdir(), "lint-reach-"));
+  fixtures.push(root);
+
+  mkdirSync(path.join(root, "scripts"));
+  for (const file of ["check-lint-reach.mjs", "lint-reach.mjs"]) {
+    copyFileSync(
+      path.join(ROOT, "scripts", file),
+      path.join(root, "scripts", file),
+    );
+  }
+
+  mkdirSync(path.join(root, ".husky"));
+  writeFileSync(path.join(root, ".husky", "pre-push"), `${hook}\n`);
+  writeFileSync(
+    path.join(root, "turbo.json"),
+    JSON.stringify({ tasks: { lint: {} } }),
+  );
+
+  const packages = [{ name: "fixture-root", path: root }];
+  for (const dir of ["a", "b"]) {
+    const home = path.join(root, "packages", dir);
+    mkdirSync(path.join(home, "src"), { recursive: true });
+    writeFileSync(
+      path.join(home, "package.json"),
+      JSON.stringify({ name: `@fx/${dir}` }),
+    );
+    writeFileSync(path.join(home, "src", "index.ts"), "export const x = 1;\n");
+    packages.push({ name: `@fx/${dir}`, path: home });
+  }
+
+  execFileSync("git", ["init", "-q"], { cwd: root, env: gitEnv });
+  execFileSync("git", ["add", "packages"], { cwd: root, env: gitEnv });
+
+  const bin = path.join(root, "bin");
+  const log = path.join(root, "pnpm-calls.jsonl");
+  mkdirSync(bin);
+  writeFileSync(log, "");
+  writeFileSync(
+    path.join(bin, "pnpm"),
+    `#!/usr/bin/env node
+const args = process.argv.slice(2);
+process.getBuiltinModule("node:fs").appendFileSync(${JSON.stringify(log)}, JSON.stringify(args) + "\\n");
+if (args[0] === "ls") console.log(${JSON.stringify(JSON.stringify(packages))});
+else if (args[0] === "turbo") console.log(${JSON.stringify(JSON.stringify({ tasks }))});
+else process.exit(9);
+`,
+  );
+  chmodSync(path.join(bin, "pnpm"), 0o755);
+
+  return root;
+}
+
+/** @returns {{ status: number | null, output: string, calls: string[][] }} */
+function runCli(root) {
+  const result = spawnSync(
+    process.execPath,
+    [path.join(root, "scripts", "check-lint-reach.mjs")],
+    {
+      cwd: path.join(root, "packages"),
+      encoding: "utf8",
+      env: {
+        ...gitEnv,
+        PATH: `${path.join(root, "bin")}:${process.env.PATH ?? ""}`,
+      },
+    },
+  );
+
+  const calls = readFileSync(path.join(root, "pnpm-calls.jsonl"), "utf8")
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+
+  return {
+    status: result.status,
+    output: `${result.stdout}${result.stderr}`,
+    calls,
+  };
+}
+
+test("CONTROL — the CLI passes a hook that lints every package, and says so", () => {
+  const result = runCli(
+    cliFixture({ hook: HOOK, tasks: lints("@fx/a", "@fx/b") }),
+  );
+
+  assert.equal(result.status, 0, result.output);
+  assert.match(
+    result.output,
+    /✓ lint:reach: 2 of 2 workspace packages linted by \.husky\/pre-push/,
+  );
+  assert.deepEqual(result.calls, EXPECTED_CALLS);
+});
+
+test("the CLI refuses a package no lint step reads, and names it", () => {
+  const result = runCli(cliFixture({ hook: HOOK, tasks: lints("@fx/a") }));
+
+  assert.equal(result.status, 1, result.output);
+  assert.match(
+    result.output,
+    /@fx\/b: no lint step of \.husky\/pre-push reads it/,
+  );
+  assert.doesNotMatch(result.output, /✓ lint:reach/);
+  assert.deepEqual(result.calls, EXPECTED_CALLS);
+});
+
+test("the CLI refuses a hook with nothing to replay: exit 2, not a pass", () => {
+  const result = runCli(
+    cliFixture({
+      hook: "echo nothing to replay",
+      tasks: lints("@fx/a", "@fx/b"),
+    }),
+  );
+
+  assert.equal(result.status, 2, result.output);
+  assert.match(result.output, /refusing to pass over nothing/);
+  assert.deepEqual(result.calls, [EXPECTED_CALLS[0]]);
 });

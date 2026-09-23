@@ -8,9 +8,8 @@
 // `Object.hasOwn(` and the site spells the module-load capture `hasOwn(`.
 //
 // ⚠ Why a test at all: a scan with zero hits is indistinguishable from a broken
-// one, and this scan's set is empty by design. Everything below is a planted
-// site — the predicate is exercised on source STRINGS, so nothing writes to the
-// tree.
+// one, and this scan's set is empty by design. The detector cells run on source
+// STRINGS and the CLI cells on a temp fixture, so nothing writes to the tree.
 //
 // ⚠ The discriminator under test is the RECEIVER. A count of `a` beside a
 // membership test on `b` is ordinary code and must NOT be reported; the same
@@ -19,7 +18,22 @@
 // Runs in the repo-lints CI job via `node --test scripts/*.test.mjs`.
 
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { execFileSync, spawnSync } from "node:child_process";
+import {
+  copyFileSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { after, test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   OWN_PREDICATES,
@@ -207,4 +221,116 @@ test("the scan reaches shared/ — the half a package-rooted scan cannot", () =>
     !files.some((f) => /\.(test|spec|properties)\./.test(f)),
     "tests must not be scanned — they plant these shapes on purpose",
   );
+});
+
+// --------------------------------------------------------------------------
+// The CLI, run the way `pnpm lint:membership` runs it (#2543). The cells above
+// hold the detector; these hold the step that turns a finding into an exit code.
+//
+// The script takes its root from its own location, so each cell runs a byte
+// copy inside a fixture git repository and scans that repository's tracked
+// `packages/`. It runs from `packages/`, not from the fixture root, so a copy
+// that took its root from the working directory fails here. `node_modules` is
+// linked in so the copy resolves `typescript`.
+//
+// ⚠ The fixture sits at the REAL path of the temp directory. The CLI arm runs
+// only when `process.argv[1] === fileURLToPath(import.meta.url)`, and on macOS
+// the path `os.tmpdir()` returns runs through a symlink: a copy started through
+// it never enters the arm and exits 0 without a word (#2539).
+// --------------------------------------------------------------------------
+
+const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+
+const fixtures = [];
+after(() => {
+  for (const root of fixtures) {
+    // The link first, on its own: removing the tree must never reach through it.
+    const link = join(root, "node_modules");
+
+    if (lstatSync(link, { throwIfNoEntry: false })?.isSymbolicLink()) {
+      unlinkSync(link);
+    }
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+/**
+ * Git without the caller's repository variables: a push from a linked worktree
+ * exports GIT_DIR to its hook.
+ */
+const gitEnv = {
+  ...Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")),
+  ),
+  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_SYSTEM: "/dev/null",
+};
+
+/**
+ * A fixture git repository holding a byte copy of the CLI and one tracked source.
+ *
+ * @param {string} source the content of `packages/probe/src/eq.ts`
+ * @returns {string} the fixture root
+ */
+function cliFixture(source) {
+  const root = mkdtempSync(join(realpathSync(tmpdir()), "membership-"));
+  fixtures.push(root);
+
+  mkdirSync(join(root, "scripts"));
+  copyFileSync(
+    join(repoRoot, "scripts", "check-membership-predicate.mjs"),
+    join(root, "scripts", "check-membership-predicate.mjs"),
+  );
+  symlinkSync(join(repoRoot, "node_modules"), join(root, "node_modules"));
+  mkdirSync(join(root, "packages", "probe", "src"), { recursive: true });
+  writeFileSync(join(root, "packages", "probe", "src", "eq.ts"), source);
+  execFileSync("git", ["init", "-q"], { cwd: root, env: gitEnv });
+  execFileSync("git", ["add", "packages"], { cwd: root, env: gitEnv });
+
+  return root;
+}
+
+/** @returns {{ status: number | null, output: string }} */
+function runCli(root) {
+  const result = spawnSync(
+    process.execPath,
+    [join(root, "scripts", "check-membership-predicate.mjs")],
+    { cwd: join(root, "packages"), encoding: "utf8", env: gitEnv },
+  );
+
+  return { status: result.status, output: `${result.stdout}${result.stderr}` };
+}
+
+test("the CLI refuses a tree carrying the #2064 shape, and names the site", () => {
+  const result = runCli(
+    cliFixture(`export function eq(prev: object, next: object) {
+  const prevKeys = Object.keys(prev);
+  if (prevKeys.length !== Object.keys(next).length) return false;
+  for (const key of prevKeys) {
+    if (!Object.prototype.hasOwnProperty.call(next, key)) return false;
+  }
+  return true;
+}
+`),
+  );
+
+  assert.equal(result.status, 1, result.output);
+  assert.match(result.output, /packages\/probe\/src\/eq\.ts:5 {2}/);
+  assert.match(result.output, /✖ 1 site\(s\) ask two different questions/);
+  assert.doesNotMatch(result.output, /✓/);
+});
+
+test("CONTROL — the CLI passes a tree carrying the fixed form, and says so", () => {
+  const result = runCli(
+    cliFixture(`export function eq(prev: object, next: object) {
+  const prevKeys = Object.keys(prev);
+  const nextKeys = Object.keys(next);
+  if (prevKeys.length !== nextKeys.length) return false;
+  return prevKeys.every((k) => nextKeys.includes(k));
+}
+`),
+  );
+
+  assert.equal(result.status, 0, result.output);
+  assert.match(result.output, /✓ no site counts a record's own keys/);
 });
