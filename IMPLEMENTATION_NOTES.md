@@ -11603,3 +11603,11 @@ Turbo keys a package's `test` task on `tests/**/*.{ts,tsx}`, so inside core the 
 ⚠ **The wiki's side lands after the monorepo's.** Its daily run reads `master`, and on a `master` without the fixture the new check refuses. Two repositories cannot land one change atomically, so the order is the obligation.
 
 ⚠ The fixture pins how each reader RESOLVES a binding, not how every reader judges what it resolved: 2457's reachability verdict and 2479's membership verdict are not asserted on it.
+
+## `lint:prose` read the tracked part of `.claude/`, which its own comments put out of scope (2026-09-23)
+
+**Problem.** `.vale.ini` and `scripts/check-prose.sh` state that `.claude/**` is out of the prose gate's scope by owner decision, and `.vale.ini` adds that `git ls-files` excludes it structurally. That holds only for the ignored part of `.claude/`. The skills and rules under it are tracked, `git ls-files` returns them, and Vale linted them: 38 of the 161 files the gate read. A `used to be` planted in a skill reddened the gate.
+
+**Solution.** `check-prose.sh` filters `^\.claude/` explicitly, beside the `benchmarks/` and `examples/` filters, and its list of exclusions gives the reason. The gate now reads 123 files. With the same phrase planted in a skill and in `README.md`, one run reports only the `README.md` one.
+
+**Why.** The decision stands — the owner restated it on 2026-09-23: the skills and rules have their own checks, `line-anchor-authority` among them, which reads `.claude`. So the behaviour moved to match the comments rather than the comments to match the behaviour.
