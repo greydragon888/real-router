@@ -46,6 +46,9 @@ on:
     # tree with 163 matching commits in thirty days.
     paths:
       - "packages/*/src/**"
+      # `check-messages.mjs` checks its own extractor against this tree before it
+      # reads a page (#2537), so a change here changes the answer it expects.
+      - "packages/core/tests/fixtures/raiser-heads/**"
       # So a change to this workflow is exercised by its own pull request.
       - ".github/workflows/wiki-checkers.yml"
 
