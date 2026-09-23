@@ -11560,3 +11560,11 @@ Measured on 2026-09-16/17 while pricing the rejected option.
 
 - **The spy seam gates slice 7 (#2386).** Eight files outside core use `getInternals` as a seam for a spy — twenty places — because `PluginApi` is frozen and `vitest` cannot redefine a property on it. A replacement is measured for thirteen of them (a `subscribeLeave` listener that throws makes `navigateToState` refuse with a non-`RouterError`); the seven OBSERVING places have none, and #2339's acceptance asks for a seam that does not publish the bag.
 - **The membership rule has never refused anyone.** A criterion with no negative example is indistinguishable from a description of the current set. Both clauses now derive (#2350, #2383); the first member that satisfies both and is still turned away is the one that makes it a rule, and whoever meets it writes it down.
+
+## Infrastructure goes straight to `master` again (2026-09-23)
+
+**Problem.** On 2026-09-17, `f86488813` rewrote the delivery rule in `CLAUDE.md` and in the 26 skill files that repeat it, from "infrastructure goes straight to `master` — no PR, no changeset" to "infrastructure needs no changeset — it still needs a PR". It read the rule off the `protect-master` ruleset, which carries a `pull_request` rule and required status checks. The owner's policy had not changed: infrastructure is committed on `master` and pushed through the ruleset bypass, and the repository's own tooling assumes it — `.husky/pre-push` says infrastructure "reaches master by direct push, where no ci.yml runs", and `ci-hook-parity.test.mjs` counts the steps that shipped that way.
+
+**Solution.** The owner restated the policy on 2026-09-23. `f86488813` is reverted in all 27 files. `CLAUDE.md` keeps the one fact that commit measured, as a warning beside the rule: the push bypasses the ruleset and every check it requires, and `ci.yml` runs on pull requests only, so the local git hooks are the only checks a change gets before it lands.
+
+**Why.** The ruleset binds every contributor without the bypass role; the owner's infrastructure commits land through that bypass by design. Reading the ruleset as the delivery policy is the step that produced `f86488813`, and the same reading would reverse an owner decision again. The cost it named — no CI on the push — is real, and it is what the warning now says.
