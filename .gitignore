@@ -70,13 +70,19 @@ packages/**/.eslintcache
 .angular
 
 # AI / tooling
-# Ignore all .claude dirs (root + per-package), but track root .claude/commands
-# and root .claude/rules (path-scoped instructions — see CLAUDE.md)
+# Ignore all .claude dirs (root + per-package), but track root .claude/commands,
+# root .claude/rules (path-scoped instructions — see CLAUDE.md) and the root
+# .claude/prompts that a tracked file cites — a new citation adds its line here
 **/.claude/
 !/.claude/
 /.claude/*
 !/.claude/commands/
 !/.claude/rules/
+!/.claude/prompts/
+/.claude/prompts/*
+!/.claude/prompts/benchmark-harness-audit.md
+!/.claude/prompts/boolean-flag-audit.md
+!/.claude/prompts/perf-optimization-deep-analysis.md
 .sisyphus
 .omo
 
