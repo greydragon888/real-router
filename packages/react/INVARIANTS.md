@@ -29,13 +29,13 @@
 | --- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | No double spaces in active concat         | When `isActive=true`, result must NOT contain `"  "` regardless of whitespace padding in base/active inputs. Regression-locks the original token-join bug.                                           |
 | 2   | Active class present                      | When `isActive=true` and `activeClassName` is a non-empty token, the result contains the token.                                                                                                      |
-| 3   | Active class appears at most once         | If the active token already exists in base, the result has exactly one occurrence (token-level dedup via `Set`).                                                                                     |
+| 3   | Active class never added twice            | A single-token active class is added once when absent from base; a base that already holds it keeps its own count (§5.4 — base duplicates are preserved, not collapsed).                                                                                     |
 | 4   | `isActive=false` returns base verbatim    | When `isActive=false`, the function returns `baseClassName` unchanged.                                                                                                                               |
 | 5   | Whitespace-only active → base verbatim    | When `activeClassName` is empty/whitespace-only (no `\S+` tokens after `parseTokens`), the function returns `baseClassName` as-is via `?? undefined` (not `?:`, so empty strings are preserved).     |
 | 6   | Idempotency                               | `buildActiveClassName(true, a, buildActiveClassName(true, a, base))` yields the same token set as one application (no duplicates accumulate over repeated apply).                                    |
 | 7   | Whitespace normalization                  | Output never contains tab / newline / CR or any consecutive whitespace runs. Stronger than #1: catches a regression to character iteration that would emit non-space whitespace mid-result.          |
 | 8   | Double-apply different active accumulates | `buildActiveClassName(true, B, buildActiveClassName(true, A, base))` contains both `A` and `B`. Chaining different active tokens performs union over base, not replacement.                          |
-| 9   | Very long base className                  | A base with 256..1024 unique tokens + `isActive=true` yields exactly `K + 1` tokens (where K is the base token count) and the active token appears exactly once. Catches O(n²) regressions in dedup. |
+| 9   | Very long base className                  | A base with 256..1024 unique tokens + `isActive=true` yields `K + 1` tokens (where K is the base token count), or `K` when the base already holds the active token, and the active token appears exactly once. Catches O(n²) regressions in dedup. |
 
 ## Href Builder (buildHref)
 

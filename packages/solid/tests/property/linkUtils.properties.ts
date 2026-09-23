@@ -128,7 +128,8 @@ describe("buildActiveClassName — Property Tests (Solid)", () => {
 
         // §5.4 behaviour lock: buildActiveClassName dedupes ONLY the active
         // token it would add — it preserves pre-existing duplicates in base
-        // (see the "Behaviour lock … (review §5.4)" suite below). So the active
+        // (the "Behaviour lock …" suite in the react, preact and vue property
+        // files pins it on fixed inputs). So the active
         // token appears exactly once when it was absent from base, and exactly
         // as many times as it already did when present — NOT collapsed to 1.
         // The earlier `toBe(1)` contradicted §5.4 and flakily failed when the
@@ -242,8 +243,10 @@ describe("buildActiveClassName — Property Tests (Solid)", () => {
     // (no truncation, no thrash) at ≥256 chars.
     test.prop([arbActiveClassName, arbLongString], {
       numRuns: NUM_RUNS.standard,
+      // A long base that already carries the active token twice (#2546).
+      examples: [["a", `a a ${"b".repeat(252)}`]],
     })(
-      "active class still present exactly once after ≥256-char base",
+      "active class still present after ≥256-char base, once or as often as the base has it",
       (activeClassName, longBase) => {
         const result = buildActiveClassName(true, activeClassName, longBase);
 
@@ -252,8 +255,12 @@ describe("buildActiveClassName — Property Tests (Solid)", () => {
         const occurrences = result!
           .split(/\s+/)
           .filter((t) => t === activeClassName).length;
+        // Invariant 3's count: a long base may already carry the active token.
+        const baseOccurrences = (longBase.match(/\S+/g) ?? []).filter(
+          (t) => t === activeClassName,
+        ).length;
 
-        expect(occurrences).toBe(1);
+        expect(occurrences).toBe(baseOccurrences === 0 ? 1 : baseOccurrences);
       },
     );
   });
@@ -300,8 +307,10 @@ describe("buildActiveClassName — Property Tests (Solid)", () => {
 
     test.prop([arbMultiActive, arbBaseClassName], {
       numRuns: NUM_RUNS.standard,
+      // A base that already repeats an active token (#2546).
+      examples: [["a l", "l  l  "]],
     })(
-      "all distinct active tokens appear in the result exactly once",
+      "every distinct active token is added once, or kept as often as the base has it",
       (active, base) => {
         const result = buildActiveClassName(true, active, base);
 
@@ -309,9 +318,16 @@ describe("buildActiveClassName — Property Tests (Solid)", () => {
 
         const activeTokens = active.split(/\s+/).filter(Boolean);
         const resultTokens = result!.split(/\s+/).filter(Boolean);
+        const baseTokens = base.match(/\S+/g) ?? [];
 
+        // The rule Invariant 3 states for one token, per token: a duplicate the
+        // base already carries is kept, not collapsed to one.
         for (const token of activeTokens) {
-          expect(resultTokens.filter((t) => t === token)).toHaveLength(1);
+          const baseOccurrences = baseTokens.filter((t) => t === token).length;
+
+          expect(resultTokens.filter((t) => t === token)).toHaveLength(
+            baseOccurrences === 0 ? 1 : baseOccurrences,
+          );
         }
       },
     );

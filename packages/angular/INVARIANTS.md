@@ -33,7 +33,7 @@ are the same code.
 | 2 | **Active includes activeClassName** — result contains `activeClassName` when `isActive=true` | Active links must visually indicate their state |
 | 3 | **No "undefined" string** — result never contains the literal `"undefined"` | String concatenation with `undefined` must not leak into DOM class attribute |
 | 4 | **No leading/trailing spaces** — `result === result.trim()` | DOM class attributes must be clean |
-| 5 | **Token deduplication** — every token appears exactly once across the merged result | Set-based dedup must not regress to naïve concat (would inflate class strings and break cascade order) |
+| 5 | **Token deduplication** — with single-token active and base classes, every token appears exactly once in the merged result (a base's own duplicates are kept, §5.4) | Set-based dedup must not regress to naïve concat (would inflate class strings and break cascade order) |
 | 6 | **Multi-token order preserved** — multi-token `activeClassName` keeps declaration order in the output | Cascade order matters: `.btn.active { … }` rules rely on consistent token ordering |
 | 7 | **Whitespace-only active falls back to base** — whitespace-only `activeClassName` returns `baseClassName ?? undefined` | The function uses `??` (not `?:`), so empty-string base is preserved verbatim |
 | 8 | **Strict idempotency** — `buildActiveClassName(true, a, buildActiveClassName(true, a, base)) === buildActiveClassName(true, a, base)` | First call normalizes whitespace; second call must be a no-op |

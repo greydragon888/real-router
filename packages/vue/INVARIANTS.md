@@ -51,7 +51,7 @@ File: `tests/property/linkUtils.properties.ts`
 |---|-----------|-----------------|
 | 1 | **No double spaces** — when `isActive=true`, result never contains `"  "` | Regression lock for a bug where active concat produced `"base  active"`; whitespace-padded base strings must collapse to single-space joins |
 | 2 | **Active token present** — when `isActive=true` with non-empty `activeClassName`, the result contains the active token | The whole purpose of the helper — active state must be reflected in CSS |
-| 3 | **Active token appears at most once** — no duplicate of `activeClassName` in the output | Prevents accidental `class="active active"` when `activeClassName` already exists in `base` |
+| 3 | **Active token never added twice** — a single-token `activeClassName` is added once when absent from `base`; a `base` that already holds it keeps its own count (§5.4) | Prevents accidental `class="active active"` when `activeClassName` already exists in `base` |
 | 4 | **Base preserved when inactive** — `isActive=false` returns `baseClassName` verbatim | The helper must be a no-op for inactive Links — preserves consumer-supplied class string exactly |
 | 5 | **Whitespace-only `activeClassName` falls back to base verbatim** — `??`, not `?:` | Empty-string `base` is preserved verbatim and not coerced to `undefined` |
 | 6 | **Strict idempotency** — `f(true, a, f(true, a, base)) === f(true, a, base)` | The first apply normalizes whitespace; the second over the normalized output reproduces the exact same string (not just the same token set) — catches token reordering or re-padding regressions |

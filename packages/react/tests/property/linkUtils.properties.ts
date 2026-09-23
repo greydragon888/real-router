@@ -214,6 +214,10 @@ describe("buildActiveClassName — Property Tests", () => {
 
     test.prop([arbActiveClassName, arbLongBaseClassName], {
       numRuns: NUM_RUNS.standard,
+      // An active token the long base already holds (#2546).
+      examples: [
+        ["cls-5", Array.from({ length: 256 }, (_, i) => `cls-${i}`).join(" ")],
+      ],
     })(
       "long base (256..1024 unique tokens) + isActive=true preserves token shape",
       (activeClassName, baseClassName) => {
@@ -232,13 +236,13 @@ describe("buildActiveClassName — Property Tests", () => {
 
         expect(activeCount).toBe(1);
 
-        // Base tokens preserved in count: base had K unique cls-N tokens,
-        // result has K + 1 tokens (those K plus the active token).
-        const baseTokenCount = baseClassName
-          .split(/\s+/)
-          .filter(Boolean).length;
+        // Base tokens preserved in count: base had K unique cls-N tokens, and
+        // the result has K + 1 — or K when the base already holds the active
+        // token, which `arbToken` can spell (#2546).
+        const baseTokens = baseClassName.split(/\s+/).filter(Boolean);
+        const added = baseTokens.includes(activeClassName) ? 0 : 1;
 
-        expect(tokens).toHaveLength(baseTokenCount + 1);
+        expect(tokens).toHaveLength(baseTokens.length + added);
       },
     );
   });

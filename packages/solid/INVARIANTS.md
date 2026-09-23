@@ -70,12 +70,12 @@ Invariants verified by property-based tests in `tests/property/`. Test count: **
 |---|-----------|-----------------|
 | 1 | **No double spaces** — when `isActive=true`, result never contains `"  "` | Bug-1 regression: active concat used to emit `"base  active"`. CSS class lists tolerate it but downstream selectors and snapshot diffs do not. |
 | 2 | **Active token present** — `isActive=true` + non-empty `activeClassName` → result contains the active token | Defines the function's primary purpose |
-| 3 | **Active token at most once** — even if the active class is already in `baseClassName`, it must appear exactly once after merge | Set-based dedup of active vs base tokens |
+| 3 | **Active token never added twice** — a single-token active class is added once when absent from `baseClassName`; a base that already holds it keeps its own count (§5.4: base duplicates preserved) | Set-based dedup of active vs base tokens |
 | 4 | **Preserve base when inactive** — `isActive=false` → result is `baseClassName` verbatim | No `??`/coercion side-effect on the inactive branch |
 | 5 | **Whitespace-only active token → base** — `activeClassName === ""` / whitespace → result equals `baseClassName` verbatim | `??`-not-`?:` branch in the helper |
 | 6 | **Strict idempotency** — `f(true, a, f(true, a, base)) === f(true, a, base)` | First apply normalizes whitespace; second apply must reproduce the same string byte-for-byte |
 | 6a | **Whitespace-immunity** — padded base (`\t`, `\n`, extra spaces) produces the same sorted token list as unpadded base | `parseTokens(value.match(/\S+/g))` normalizes; token set is the API-meaningful unit, not raw string |
-| 7 | **Long-string length stress** — ≥256-char base preserves "active class present exactly once" | `parseTokens` is linear in length; no truncation, no thrash on `clsx(...arbitraryArgs)` |
+| 7 | **Long-string length stress** — a ≥256-char base keeps the active class present: once, or as often as the base already has it | `parseTokens` is linear in length; no truncation, no thrash on `clsx(...arbitraryArgs)` |
 | 8 | **base=undefined edge cases** (4 explicit pin-tests) — `(true, 'x', undefined)` → `'x'`; `(false, 'x', undefined)` → `undefined` (защита `??` vs `||`); `(true, '', undefined)` → `undefined`; `(true, 'a b c', undefined)` → `'a b c'` | Lock the `??` operator branch — switch to `||` would coerce `undefined` to `""` silently |
 
 ## buildHref (`shared/dom-utils/link-utils.ts`)
