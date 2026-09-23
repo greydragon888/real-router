@@ -45,6 +45,9 @@ test("the shared raiser fixture: each site renders its own binding's head", () =
     "binding-after-use.ts": [
       "[router.matchPath] this site is written above the binding that serves it",
     ],
+    "code-flavour.ts": [
+      "[router.navigateToState] a code refusal names its binding through a call",
+    ],
     "dynamic-door.ts": ["[router.${}] a dynamic door arrives as an argument"],
     "static-door.ts": [
       "[router.buildPath] a static door is written into the binding",

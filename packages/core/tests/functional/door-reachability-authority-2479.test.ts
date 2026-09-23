@@ -396,6 +396,7 @@ describe("a door a message names is one a caller can call (#2479)", () => {
     expect(Object.fromEntries(judged)).toStrictEqual({
       "bare-receiver.ts": [],
       "binding-after-use.ts": ["matchPath"],
+      "code-flavour.ts": ["navigateToState"],
       "dynamic-door.ts": [],
       "static-door.ts": ["buildPath"],
       "two-bindings.ts": ["Segment Matcher", "navigate"],

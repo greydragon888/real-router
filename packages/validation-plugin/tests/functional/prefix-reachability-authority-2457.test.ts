@@ -1114,6 +1114,7 @@ describe("a message names a door that can reach it (#2457)", () => {
     expect(Object.fromEntries(heads)).toStrictEqual({
       "bare-receiver.ts": ["router"],
       "binding-after-use.ts": ["router.matchPath"],
+      "code-flavour.ts": ["router.navigateToState"],
       "dynamic-door.ts": ["<interpolated>"],
       "static-door.ts": ["router.buildPath"],
       "two-bindings.ts": ["router.Segment Matcher", "router.navigate"],

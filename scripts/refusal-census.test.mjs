@@ -61,6 +61,7 @@ test("the shared raiser fixture: each tag counts under its own binding's head", 
   assert.deepEqual(counted, {
     "bare-receiver.ts": ["Error [router]"],
     "binding-after-use.ts": ["TypeError [router.matchPath]"],
+    "code-flavour.ts": ["RouterError [router.navigateToState]"],
     "dynamic-door.ts": ["TypeError [router.${}]"],
     "static-door.ts": ["TypeError [router.buildPath]"],
     "two-bindings.ts": [
