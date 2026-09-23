@@ -1,5 +1,7 @@
 // packages/validation-plugin/src/validators/options.ts
 
+import { raiser } from "@real-router/core/utils";
+
 import { isObjKey } from "../type-guards";
 
 import type {
@@ -125,17 +127,17 @@ export function validateLimitValue(
   methodName: string,
 ): void {
   if (typeof value !== "number" || !Number.isInteger(value)) {
-    throw new TypeError(
-      `[router.${methodName}] limit "${limitName}" must be an integer, got ${String(value)}`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`limit "${limitName}" must be an integer, got ${String(value)}`;
   }
 
   const bounds = LIMIT_BOUNDS[limitName];
 
   if (value < bounds.min || value > bounds.max) {
-    throw new RangeError(
-      `[router.${methodName}] limit "${limitName}" must be between ${bounds.min} and ${bounds.max}, got ${value}`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.range`limit "${limitName}" must be between ${bounds.min} and ${bounds.max}, got ${value}`;
   }
 }
 
@@ -165,14 +167,16 @@ export function validateLimits(
   methodName: string,
 ): asserts limits is Partial<LimitsConfig> {
   if (!limits || typeof limits !== "object" || !isPlainBag(limits)) {
-    throw new TypeError(
-      `[router.${methodName}] invalid limits: expected plain object, got ${typeof limits}`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`invalid limits: expected plain object, got ${typeof limits}`;
   }
 
   for (const [key, value] of objectEntries(limits)) {
     if (!hasOwn(LIMIT_BOUNDS, key)) {
-      throw new TypeError(`[router.${methodName}] unknown limit: "${key}"`);
+      const at = raiser("router", methodName);
+
+      throw at.type`unknown limit: "${key}"`;
     }
 
     if (value === undefined) {
@@ -190,9 +194,9 @@ export function validateLimits(
     maxListeners > 0 &&
     warnListeners > maxListeners
   ) {
-    throw new RangeError(
-      `[router.${methodName}] "limits.warnListeners" (${warnListeners}) must not exceed "limits.maxListeners" (${maxListeners}) — the warning channel would be unreachable`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.range`"limits.warnListeners" (${warnListeners}) must not exceed "limits.maxListeners" (${maxListeners}) — the warning channel would be unreachable`;
   }
 }
 
@@ -210,9 +214,9 @@ function validateStringEnum(
     const validList = validValues.map((val) => `"${val}"`).join(", ");
     const display = typeof value === "string" ? value : `(${typeof value})`;
 
-    throw new TypeError(
-      `[router.${methodName}] Invalid "${optionName}": "${display}". Must be one of: ${validList}`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Invalid "${optionName}": "${display}". Must be one of: ${validList}`;
   }
 }
 
@@ -222,9 +226,9 @@ function validateDefaultRoute(defaultRoute: unknown, methodName: string): void {
   }
 
   if (typeof defaultRoute !== "string" && typeof defaultRoute !== "function") {
-    throw new TypeError(
-      `[router.${methodName}] Invalid "defaultRoute": expected string or function, got ${typeof defaultRoute}`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Invalid "defaultRoute": expected string or function, got ${typeof defaultRoute}`;
   }
 }
 
@@ -253,9 +257,9 @@ function validateDefaultBag(
     Array.isArray(value) ||
     !isPlainBag(value)
   ) {
-    throw new TypeError(
-      `[router.${methodName}] Invalid "${optionName}": expected plain object or function, got ${typeof value}`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Invalid "${optionName}": expected plain object or function, got ${typeof value}`;
   }
 }
 
@@ -272,9 +276,9 @@ function validateQueryParamsOptions(
     typeof queryParams !== "object" ||
     Array.isArray(queryParams)
   ) {
-    throw new TypeError(
-      `[router.${methodName}] Invalid "queryParams": expected plain object`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Invalid "queryParams": expected plain object`;
   }
 
   const qp = queryParams as Record<string, unknown>;
@@ -283,25 +287,27 @@ function validateQueryParamsOptions(
   // see `KNOWN_QUERY_PARAMS`.
   for (const key of objectKeys(qp)) {
     if (!isObjKey(key, KNOWN_QUERY_PARAMS)) {
-      throw new TypeError(
-        `[router.${methodName}] Invalid "queryParams.${key}": unknown option`,
-      );
+      const at = raiser("router", methodName);
+
+      throw at.type`Invalid "queryParams.${key}": unknown option`;
     }
   }
 }
 
 export function validateOptions(options: unknown, methodName: string): void {
   if (!options || typeof options !== "object" || Array.isArray(options)) {
-    throw new TypeError(
-      `[router.${methodName}] Invalid options: expected plain object`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Invalid options: expected plain object`;
   }
 
   const opts = options as Record<string, unknown>;
 
   for (const key of objectKeys(opts)) {
     if (!KNOWN_OPTIONS.has(key)) {
-      throw new TypeError(`[router.${methodName}] Unknown option: "${key}"`);
+      const at = raiser("router", methodName);
+
+      throw at.type`Unknown option: "${key}"`;
     }
   }
 
@@ -331,27 +337,27 @@ export function validateOptions(options: unknown, methodName: string): void {
     opts.allowNotFound !== undefined &&
     typeof opts.allowNotFound !== "boolean"
   ) {
-    throw new TypeError(
-      `[router.${methodName}] Invalid "allowNotFound": expected boolean, got ${typeof opts.allowNotFound}`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Invalid "allowNotFound": expected boolean, got ${typeof opts.allowNotFound}`;
   }
 
   if (
     opts.rewritePathOnMatch !== undefined &&
     typeof opts.rewritePathOnMatch !== "boolean"
   ) {
-    throw new TypeError(
-      `[router.${methodName}] Invalid "rewritePathOnMatch": expected boolean, got ${typeof opts.rewritePathOnMatch}`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Invalid "rewritePathOnMatch": expected boolean, got ${typeof opts.rewritePathOnMatch}`;
   }
 
   if (
     opts.caseSensitive !== undefined &&
     typeof opts.caseSensitive !== "boolean"
   ) {
-    throw new TypeError(
-      `[router.${methodName}] Invalid "caseSensitive": expected boolean, got ${typeof opts.caseSensitive}`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Invalid "caseSensitive": expected boolean, got ${typeof opts.caseSensitive}`;
   }
 
   validateQueryParamsOptions(opts.queryParams, methodName);

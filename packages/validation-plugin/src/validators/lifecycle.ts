@@ -1,5 +1,7 @@
 // packages/validation-plugin/src/validators/lifecycle.ts
 
+import { raiser } from "@real-router/core/utils";
+
 import { computeThresholds, CORE_LIMIT_DEFAULTS } from "../helpers";
 import { isBoolean, getTypeDescription } from "../type-guards";
 
@@ -14,10 +16,9 @@ export function validateHandler<D extends DefaultDependencies>(
   methodName: string,
 ): asserts handler is GuardFnFactory<D> | boolean {
   if (!isBoolean(handler) && typeof handler !== "function") {
-    throw new TypeError(
-      `[router.${methodName}] Handler must be a boolean or factory function, ` +
-        `got ${getTypeDescription(handler)}`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.type`Handler must be a boolean or factory function, got ${getTypeDescription(handler)}`;
   }
 }
 
@@ -31,11 +32,9 @@ export function validateHandlerLimit(
   }
 
   if (currentCount >= maxLifecycleHandlers) {
-    throw new RangeError(
-      `[router.${methodName}] Lifecycle handler limit exceeded (${maxLifecycleHandlers}). ` +
-        `This indicates too many routes with individual handlers. ` +
-        `Consider using plugins for cross-cutting concerns.`,
-    );
+    const at = raiser("router", methodName);
+
+    throw at.range`Lifecycle handler limit exceeded (${maxLifecycleHandlers}). This indicates too many routes with individual handlers. Consider using plugins for cross-cutting concerns.`;
   }
 }
 

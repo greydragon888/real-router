@@ -1,8 +1,7 @@
 // packages/validation-plugin/src/validationPlugin.ts
 
-import { RouterError } from "@real-router/core";
 import { getPluginApi, getRoutesApi } from "@real-router/core/api";
-import { freezeThrownError } from "@real-router/core/utils";
+import { raiser } from "@real-router/core/utils";
 import { getInternals } from "@real-router/core/validation";
 
 import { CORE_LIMIT_DEFAULTS } from "./helpers";
@@ -104,6 +103,10 @@ import type {
   RoutesApi,
   Plugin,
 } from "@real-router/core";
+
+const atValidationPlugin = raiser("validation-plugin");
+const atAddRoute = raiser("router", "addRoute");
+const atAreStatesEqual = raiser("router", "areStatesEqual");
 
 /** The one question existence asks of a tree node: its children by segment. */
 interface TreeNode {
@@ -320,19 +323,13 @@ function buildValidatorObject(
       reportUndeclaredParamKey: createUndeclaredParamKeyReporter(),
       validateAreStatesEqualArgs(s1, s2, ignoreQP) {
         if (!isState(s1)) {
-          throw new TypeError(
-            `[router.areStatesEqual] Invalid state1: ${getTypeDescription(s1)}. Expected State object.`,
-          );
+          throw atAreStatesEqual.type`Invalid state1: ${getTypeDescription(s1)}. Expected State object.`;
         }
         if (!isState(s2)) {
-          throw new TypeError(
-            `[router.areStatesEqual] Invalid state2: ${getTypeDescription(s2)}. Expected State object.`,
-          );
+          throw atAreStatesEqual.type`Invalid state2: ${getTypeDescription(s2)}. Expected State object.`;
         }
         if (ignoreQP !== undefined && !isBoolean(ignoreQP)) {
-          throw new TypeError(
-            `[router.areStatesEqual] Invalid ignoreQueryParams: ${getTypeDescription(ignoreQP)}. Expected boolean.`,
-          );
+          throw atAreStatesEqual.type`Invalid ignoreQueryParams: ${getTypeDescription(ignoreQP)}. Expected boolean.`;
         }
       },
     },
@@ -382,11 +379,9 @@ export function validationPlugin<
     const api = getPluginApi(router);
 
     if (router.isActive()) {
-      throw freezeThrownError(
-        new RouterError("VALIDATION_PLUGIN_AFTER_START", {
-          message: "validation-plugin must be registered before router.start()",
-        }),
-      );
+      throw atValidationPlugin.code(
+        "VALIDATION_PLUGIN_AFTER_START",
+      )`must be registered before router.start()`;
     }
 
     // ⚑ One router, one validator (#2349). `RouterInternals.validator` is a
@@ -398,13 +393,9 @@ export function validationPlugin<
     // ⚠ A CLONE needs no install of its own: `cloneRouter` re-runs plugin
     // factories by contract, which is what the message points at.
     if (ctx.validator !== null) {
-      throw freezeThrownError(
-        new RouterError("VALIDATION_PLUGIN_ALREADY_INSTALLED", {
-          message:
-            "validation-plugin is already installed on this router — " +
-            "a clone re-runs plugin factories, so it needs no usePlugin of its own",
-        }),
-      );
+      throw atValidationPlugin.code(
+        "VALIDATION_PLUGIN_ALREADY_INSTALLED",
+      )`is already installed on this router — a clone re-runs plugin factories, so it needs no usePlugin of its own`;
     }
 
     // RouterInternals.validator is now mutable — direct assignment works
@@ -585,9 +576,7 @@ export function validationPlugin<
         validateParentOptionRaw(parentName);
 
         if (!lookup.hasRoute(parentName)) {
-          throw new ReferenceError(
-            `[router.addRoute] Parent route "${parentName}" does not exist`,
-          );
+          throw atAddRoute.ref`Parent route "${parentName}" does not exist`;
         }
       }
 

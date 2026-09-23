@@ -1,10 +1,14 @@
 // packages/validation-plugin/src/validators/retrospective.ts
 
 import { resolveForwardChain as coreResolveForwardChain } from "@real-router/core";
+import { raiser } from "@real-router/core/utils";
 
 import type { RouteLookup } from "./forwardTo";
 import type { LimitsConfig } from "@real-router/core";
 import type { RouterLogger } from "@real-router/core/types";
+
+const atNavigateToDefault = raiser("router", "navigateToDefault");
+const atValidationPlugin = raiser("validation-plugin");
 
 /**
  * Intrinsics captured at module load (#1971).
@@ -105,7 +109,7 @@ function resolveForwardChainWithPrefix(
   } catch (error) {
     const bare = (error as Error).message.replace(/^\[router\] /u, "");
 
-    throw new Error(`[validation-plugin] ${bare}`, { cause: error });
+    throw atValidationPlugin.plain({ cause: error })`${bare}`;
   }
 }
 
@@ -124,9 +128,7 @@ function assertNotAsync(fn: Function, label: string, routeName: string): void {
     function_.constructor.name === "AsyncFunction" ||
     function_.toString().includes("__awaiter")
   ) {
-    throw new TypeError(
-      `[validation-plugin] Route "${routeName}" ${label} cannot be async`,
-    );
+    throw atValidationPlugin.type`Route "${routeName}" ${label} cannot be async`;
   }
 }
 
@@ -153,9 +155,7 @@ function assertNotAsync(fn: Function, label: string, routeName: string): void {
 export function validateExistingRoutes(routes: readonly RouteFacts[]): void {
   walkRoutes(routes, (route, fullName) => {
     if (typeof route.name !== "string" || !route.name) {
-      throw new TypeError(
-        `[validation-plugin] validateExistingRoutes: route has invalid name: ${route.name}`,
-      );
+      throw atValidationPlugin.type`validateExistingRoutes: route has invalid name: ${route.name}`;
     }
 
     // ⚑ No dotted-name check here, and its absence is load-bearing rather
@@ -166,9 +166,7 @@ export function validateExistingRoutes(routes: readonly RouteFacts[]): void {
     // construction.
 
     if (typeof route.path !== "string") {
-      throw new TypeError(
-        `[validation-plugin] validateExistingRoutes: route "${fullName}" has non-string path (${typeof route.path})`,
-      );
+      throw atValidationPlugin.type`validateExistingRoutes: route "${fullName}" has non-string path (${typeof route.path})`;
     }
   });
 }
@@ -195,10 +193,7 @@ export function validateForwardToConsistency(
   // Check target existence and param compatibility for each static mapping
   for (const [fromRoute, targetRoute] of objectEntries(forwardMap)) {
     if (!lookup.hasRoute(targetRoute)) {
-      throw new Error(
-        `[validation-plugin] validateForwardToConsistency: forwardTo target "${targetRoute}" ` +
-          `does not exist in tree (source route: "${fromRoute}")`,
-      );
+      throw atValidationPlugin.plain`validateForwardToConsistency: forwardTo target "${targetRoute}" does not exist in tree (source route: "${fromRoute}")`;
     }
 
     // Validate param compatibility: target must not require params absent in source
@@ -208,10 +203,7 @@ export function validateForwardToConsistency(
     );
 
     if (missingParams.length > 0) {
-      throw new Error(
-        `[validation-plugin] validateForwardToConsistency: forwardTo target "${targetRoute}" ` +
-          `requires params [${missingParams.join(", ")}] not available in source route "${fromRoute}"`,
-      );
+      throw atValidationPlugin.plain`validateForwardToConsistency: forwardTo target "${targetRoute}" requires params [${missingParams.join(", ")}] not available in source route "${fromRoute}"`;
     }
   }
 
@@ -232,9 +224,7 @@ function assertPlainBagSlot(
 ): void {
   for (const [routeName, bag] of slot) {
     if (bag === null || typeof bag !== "object" || Array.isArray(bag)) {
-      throw new TypeError(
-        `[validation-plugin] validateRoutePropertiesStore: route "${routeName}" ${slotName} must be a plain object, got ${Array.isArray(bag) ? "array" : typeof bag}`,
-      );
+      throw atValidationPlugin.type`validateRoutePropertiesStore: route "${routeName}" ${slotName} must be a plain object, got ${Array.isArray(bag) ? "array" : typeof bag}`;
     }
   }
 }
@@ -262,9 +252,7 @@ export function validateRoutePropertiesStore(
   // Validate decoders — must be non-async functions (sync required for matchPath/buildPath)
   for (const [routeName, decoder] of decoders) {
     if (typeof decoder !== "function") {
-      throw new TypeError(
-        `[validation-plugin] validateRoutePropertiesStore: route "${routeName}" decoder must be a function, got ${typeof decoder}`,
-      );
+      throw atValidationPlugin.type`validateRoutePropertiesStore: route "${routeName}" decoder must be a function, got ${typeof decoder}`;
     }
 
     assertNotAsync(decoder, "decoder", routeName);
@@ -273,9 +261,7 @@ export function validateRoutePropertiesStore(
   // Validate encoders — must be non-async functions (sync required for matchPath/buildPath)
   for (const [routeName, encoder] of encoders) {
     if (typeof encoder !== "function") {
-      throw new TypeError(
-        `[validation-plugin] validateRoutePropertiesStore: route "${routeName}" encoder must be a function, got ${typeof encoder}`,
-      );
+      throw atValidationPlugin.type`validateRoutePropertiesStore: route "${routeName}" encoder must be a function, got ${typeof encoder}`;
     }
 
     assertNotAsync(encoder, "encoder", routeName);
@@ -297,9 +283,7 @@ export function validateRoutePropertiesStore(
   // Validate forwardTo function callbacks — must be non-async functions
   for (const [routeName, callback] of forwardCallbacks) {
     if (typeof callback !== "function") {
-      throw new TypeError(
-        `[validation-plugin] validateRoutePropertiesStore: route "${routeName}" forwardTo callback must be a function, got ${typeof callback}`,
-      );
+      throw atValidationPlugin.type`validateRoutePropertiesStore: route "${routeName}" forwardTo callback must be a function, got ${typeof callback}`;
     }
 
     assertNotAsync(callback, "forwardTo callback", routeName);
@@ -325,10 +309,7 @@ export function validateForwardToTargetsStore(
 ): void {
   for (const [fromRoute, targetRoute] of objectEntries(forwardMap)) {
     if (!lookup.hasRoute(targetRoute)) {
-      throw new Error(
-        `[validation-plugin] validateForwardToTargetsStore: forwardTo target "${targetRoute}" ` +
-          `does not exist for route "${fromRoute}"`,
-      );
+      throw atValidationPlugin.plain`validateForwardToTargetsStore: forwardTo target "${targetRoute}" does not exist for route "${fromRoute}"`;
     }
   }
 }
@@ -358,9 +339,7 @@ export function validateDependenciesStructure(
   // Getters can throw, return different values, or have side effects — reject them
   for (const key of objectKeys(dependencies)) {
     if (getOwnPropertyDescriptor(dependencies, key)?.get) {
-      throw new TypeError(
-        `[validation-plugin] validateDependenciesStructure: dependency "${key}" must not use a getter`,
-      );
+      throw atValidationPlugin.type`validateDependenciesStructure: dependency "${key}" must not use a getter`;
     }
   }
 
@@ -374,9 +353,7 @@ export function validateDependenciesStructure(
     // the check on the same predicate `validateLimitValue` already uses, so the
     // two mirrors agree.
     if (!Number.isInteger(value)) {
-      throw new TypeError(
-        `[validation-plugin] validateDependenciesStructure: deps.limits.${key} must be an integer, got ${String(value)}`,
-      );
+      throw atValidationPlugin.type`validateDependenciesStructure: deps.limits.${key} must be an integer, got ${String(value)}`;
     }
   }
 }
@@ -421,9 +398,7 @@ export function validateLimitsConsistency(
   // STRICTLY exceeds the limit — else every SSR per-request clone of an at-limit
   // base throws.
   if (maxDeps > 0 && dependencyCount > maxDeps) {
-    throw new RangeError(
-      `[validation-plugin] validateLimitsConsistency: dependency count (${dependencyCount}) exceeds maxDependencies limit (${maxDeps})`,
-    );
+    throw atValidationPlugin.range`validateLimitsConsistency: dependency count (${dependencyCount}) exceeds maxDependencies limit (${maxDeps})`;
   }
 }
 
@@ -466,9 +441,7 @@ export function validateConfiguredDefaultRoute(
   lookup: RouteLookup,
 ): void {
   if (namesNoRoute(routeName, lookup)) {
-    throw new Error(
-      `[validation-plugin] defaultRoute resolved to non-existent route: "${routeName}"`,
-    );
+    throw atValidationPlugin.plain`defaultRoute resolved to non-existent route: "${routeName}"`;
   }
 }
 
@@ -483,9 +456,7 @@ export function validateResolvedDefaultRoute(
   lookup: RouteLookup,
 ): void {
   if (namesNoRoute(routeName, lookup)) {
-    throw new Error(
-      `[router.navigateToDefault] defaultRoute callback resolved to non-existent route: "${routeName}"`,
-    );
+    throw atNavigateToDefault.plain`defaultRoute callback resolved to non-existent route: "${routeName}"`;
   }
 }
 

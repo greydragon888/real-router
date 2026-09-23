@@ -1,5 +1,7 @@
 // packages/validation-plugin/src/type-guards/internal/router-error.ts
 
+import { raiser } from "@real-router/core/utils";
+
 /**
  * Checks if string contains at least one non-whitespace character.
  * Used to validate that route name is not empty or only whitespace.
@@ -42,5 +44,7 @@ export function createRouterError(
   methodName: string,
   message: string,
 ): TypeError {
-  return new TypeError(`[router.${methodName}] ${message}`);
+  const at = raiser("router", methodName);
+
+  return at.type`${message}`;
 }

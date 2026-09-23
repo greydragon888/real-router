@@ -1,8 +1,12 @@
 // packages/validation-plugin/src/validators/plugins.ts
 
+import { raiser } from "@real-router/core/utils";
+
 import { computeThresholds, CORE_LIMIT_DEFAULTS } from "../helpers";
 
 import type { RouterLogger } from "@real-router/core";
+
+const atUsePlugin = raiser("router", "usePlugin");
 
 /**
  * Intrinsics captured at module load (#1971).
@@ -43,11 +47,7 @@ export function validatePluginLimit(
   const totalCount = currentCount + newCount;
 
   if (totalCount > maxPlugins) {
-    throw new RangeError(
-      `[router.usePlugin] Plugin limit exceeded (${maxPlugins}). ` +
-        `Current: ${currentCount}, Attempting to add: ${newCount}. ` +
-        `This indicates an architectural problem. Consider consolidating plugins.`,
-    );
+    throw atUsePlugin.range`Plugin limit exceeded (${maxPlugins}). Current: ${currentCount}, Attempting to add: ${newCount}. This indicates an architectural problem. Consider consolidating plugins.`;
   }
 }
 
@@ -56,10 +56,7 @@ export function validateNoDuplicatePlugins(
   factories: unknown[],
 ): void {
   if (factories.includes(factory)) {
-    throw new Error(
-      `[router.usePlugin] Plugin factory already registered. ` +
-        `To re-register, first unsubscribe the existing plugin.`,
-    );
+    throw atUsePlugin.plain`Plugin factory already registered. To re-register, first unsubscribe the existing plugin.`;
   }
 }
 
@@ -90,9 +87,7 @@ export function validateCountThresholds(
 export function validatePluginKeys(plugin: unknown): void {
   for (const key in plugin as Record<string, unknown>) {
     if (!(key === "teardown" || hasOwn(PLUGIN_EVENTS_MAP, key))) {
-      throw new TypeError(
-        `[router.usePlugin] Unknown property '${key}'. Plugin must only contain event handlers and optional teardown.`,
-      );
+      throw atUsePlugin.type`Unknown property '${key}'. Plugin must only contain event handlers and optional teardown.`;
     }
   }
 }

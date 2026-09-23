@@ -48,7 +48,7 @@ describe("a thrown RouterError is frozen (#1964)", () => {
     // Without this the cell above is satisfied by any frozen object, including
     // one thrown for an unrelated reason.
     expect(() => router.usePlugin(validationPlugin())).toThrow(
-      "validation-plugin must be registered before router.start()",
+      "[validation-plugin] must be registered before router.start()",
     );
 
     router.dispose();

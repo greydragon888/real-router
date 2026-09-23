@@ -1,11 +1,13 @@
 // packages/validation-plugin/src/validators/forwardTo.ts
 
 import { resolveForwardChain } from "@real-router/core";
-import { putField } from "@real-router/core/utils";
+import { internalDefect, raiser, putField } from "@real-router/core/utils";
 
 import { getTypeDescription } from "../type-guards";
 
 import type { Route, DefaultDependencies } from "@real-router/core";
+
+const atAddRoute = raiser("router", "addRoute");
 
 /**
  * What a route validator asks about routes that ALREADY exist (#2382).
@@ -48,10 +50,7 @@ function validateForwardToProperty(forwardTo: unknown, fullName: string): void {
   // async branch's `typeof` test, fails it, and leaves the function — measured,
   // and the reason this door admitted what `update` refuses.
   if (typeof forwardTo !== "string" && typeof forwardTo !== "function") {
-    throw new TypeError(
-      `[router.addRoute] forwardTo must be a string or function for route "${fullName}", ` +
-        `got ${getTypeDescription(forwardTo)}`,
-    );
+    throw atAddRoute.type`forwardTo must be a string or function for route "${fullName}", got ${getTypeDescription(forwardTo)}`;
   }
 
   if (typeof forwardTo === "function") {
@@ -61,10 +60,7 @@ function validateForwardToProperty(forwardTo: unknown, fullName: string): void {
     const isTranspiledAsync = forwardTo.toString().includes("__awaiter");
 
     if (isNativeAsync || isTranspiledAsync) {
-      throw new TypeError(
-        `[router.addRoute] forwardTo callback cannot be async for route "${fullName}". ` +
-          `Async functions break matchPath/buildPath.`,
-      );
+      throw atAddRoute.type`forwardTo callback cannot be async for route "${fullName}". Async functions break matchPath/buildPath.`;
     }
   }
 }
@@ -84,10 +80,7 @@ function assertPlainBag(
   }
 
   if (bag === null || typeof bag !== "object" || Array.isArray(bag)) {
-    throw new TypeError(
-      `[router.addRoute] ${slot} must be an object for route "${fullName}", ` +
-        `got ${getTypeDescription(bag)}`,
-    );
+    throw atAddRoute.type`${slot} must be an object for route "${fullName}", got ${getTypeDescription(bag)}`;
   }
 }
 
@@ -98,20 +91,14 @@ export function validateRouteProperties<
     route.canActivate !== undefined &&
     typeof route.canActivate !== "function"
   ) {
-    throw new TypeError(
-      `[router.addRoute] canActivate must be a function for route "${fullName}", ` +
-        `got ${getTypeDescription(route.canActivate)}`,
-    );
+    throw atAddRoute.type`canActivate must be a function for route "${fullName}", got ${getTypeDescription(route.canActivate)}`;
   }
 
   if (
     route.canDeactivate !== undefined &&
     typeof route.canDeactivate !== "function"
   ) {
-    throw new TypeError(
-      `[router.addRoute] canDeactivate must be a function for route "${fullName}", ` +
-        `got ${getTypeDescription(route.canDeactivate)}`,
-    );
+    throw atAddRoute.type`canDeactivate must be a function for route "${fullName}", got ${getTypeDescription(route.canDeactivate)}`;
   }
 
   assertPlainBag(route.defaultParams, "defaultParams", fullName);
@@ -121,15 +108,11 @@ export function validateRouteProperties<
   assertPlainBag(route.defaultSearch, "defaultSearch", fullName);
 
   if (route.decodeParams?.constructor.name === "AsyncFunction") {
-    throw new TypeError(
-      `[router.addRoute] decodeParams cannot be async for route "${fullName}". Async functions break matchPath/buildPath.`,
-    );
+    throw atAddRoute.type`decodeParams cannot be async for route "${fullName}". Async functions break matchPath/buildPath.`;
   }
 
   if (route.encodeParams?.constructor.name === "AsyncFunction") {
-    throw new TypeError(
-      `[router.addRoute] encodeParams cannot be async for route "${fullName}". Async functions break matchPath/buildPath.`,
-    );
+    throw atAddRoute.type`encodeParams cannot be async for route "${fullName}". Async functions break matchPath/buildPath.`;
   }
 
   validateForwardToProperty(route.forwardTo, fullName);
@@ -197,9 +180,7 @@ function collectPathsToRoute<Dependencies extends DefaultDependencies>(
   }
 
   /* v8 ignore next -- @preserve unreachable: callers validate existence */
-  throw new Error(
-    `[internal] collectPathsToRoute: route "${routeName}" not found`,
-  );
+  throw internalDefect.plain`collectPathsToRoute: route "${routeName}" not found`;
 }
 
 function collectRouteNames<Dependencies extends DefaultDependencies>(
@@ -276,10 +257,7 @@ function validateSingleForward<Dependencies extends DefaultDependencies>(
   const existsInBatch = batchNames.has(targetRoute);
 
   if (!exists && !existsInBatch) {
-    throw new ReferenceError(
-      `[router.addRoute] forwardTo target "${targetRoute}" does not exist ` +
-        `for route "${fromRoute}"`,
-    );
+    throw atAddRoute.ref`forwardTo target "${targetRoute}" does not exist for route "${fromRoute}"`;
   }
 
   // A batch route added under { parent } inherits the parent's path params, so
@@ -294,10 +272,7 @@ function validateSingleForward<Dependencies extends DefaultDependencies>(
   const missingParams = [...toParams].filter((param) => !fromParams.has(param));
 
   if (missingParams.length > 0) {
-    throw new Error(
-      `[router.addRoute] forwardTo target "${targetRoute}" requires params ` +
-        `[${missingParams.join(", ")}] that are not available in source route "${fromRoute}"`,
-    );
+    throw atAddRoute.plain`forwardTo target "${targetRoute}" requires params [${missingParams.join(", ")}] that are not available in source route "${fromRoute}"`;
   }
 }
 

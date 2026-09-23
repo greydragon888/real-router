@@ -50,24 +50,6 @@ const isApiFactory = (name: string): boolean =>
   /^get[A-Z][A-Za-z]*Api$/u.test(name);
 const isAddCheck = (text: string): boolean => text.endsWith("addCheck");
 
-/**
- * The one head that names neither a door nor an export, kept with its reason.
- *
- * ⚑ One entry, where the issue expected two. "Both batch doors report `addRoute`"
- * needs none: the shared helper is reached from `addRoute:batch` and
- * `replaceRoutes:batch` alike, so `addRoute` is in its reacher set and the rule
- * admits it unaided. An exception that dissolves under the derivation is the
- * derivation working.
- */
-const UNREACHABLE_BY_CONSTRUCTION: ReadonlyMap<string, string> = new Map([
-  [
-    "internal",
-    "collectPathsToRoute's not-found throw, which its own `v8 ignore … unreachable` " +
-      "marks as beyond caller input — core spells this shape with O-1's " +
-      "`Internal error (please report): ` marker instead (#2487)",
-  ],
-]);
-
 /** Heads that name a published export rather than a door, admissible as such. */
 const PUBLISHED_NAME: ReadonlySet<string> = new Set([
   // `@real-router/core/api` exports it, and it takes no router receiver — so
@@ -91,7 +73,105 @@ const parse = (file: string): ts.SourceFile =>
   );
 
 /** The literal text a node contributes as a message head. */
+/** The head one `raiser(...)` call builds, or `undefined` if it names no receiver. */
+function headOfRaiserCall(call: ts.CallExpression): string | undefined {
+  const receiver = call.arguments.at(0);
+
+  if (receiver === undefined || !ts.isStringLiteral(receiver)) {
+    return undefined;
+  }
+
+  const door = call.arguments.at(1);
+
+  if (door === undefined) {
+    return `[${receiver.text}] `;
+  }
+
+  return ts.isStringLiteral(door)
+    ? `[${receiver.text}.${door.text}] `
+    : `[${receiver.text}.`;
+}
+
+/** Whether `statement` binds `name` to a `raiser(...)` call, and to what head. */
+function boundHeadIn(
+  statement: ts.Statement,
+  name: string,
+): string | undefined {
+  if (!ts.isVariableStatement(statement)) {
+    return undefined;
+  }
+
+  for (const declaration of statement.declarationList.declarations) {
+    if (
+      ts.isIdentifier(declaration.name) &&
+      declaration.name.text === name &&
+      declaration.initializer !== undefined &&
+      ts.isCallExpression(declaration.initializer) &&
+      calleeName(declaration.initializer) === "raiser"
+    ) {
+      return headOfRaiserCall(declaration.initializer);
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * The head the binding `name` builds AT `node`, resolved by LEXICAL SCOPE.
+ *
+ * ⚠ A file-wide map keyed by name is wrong here and was measured wrong: a package
+ * whose per-call bindings are all called `at` gives the LAST one to every site, so a
+ * door planted in the first passed green. Walking up from the site is what keeps two
+ * `const at = raiser(…)` in two functions apart.
+ */
+function headForBindingAt(node: ts.Node, name: string): string | undefined {
+  // ⚠ `parent` is typed as present and IS undefined at the root, so the cast is a
+  // guard rather than noise — the same reason the `addCheck` walk below casts.
+  let scope = node.parent as ts.Node | undefined;
+
+  while (scope !== undefined) {
+    if (ts.isBlock(scope) || ts.isSourceFile(scope)) {
+      for (const statement of scope.statements) {
+        const head = boundHeadIn(statement, name);
+
+        if (head !== undefined) {
+          return head;
+        }
+      }
+    }
+
+    scope = scope.parent;
+  }
+
+  return undefined;
+}
+
 function headTextOf(node: ts.Node): string | undefined {
+  // ⛑ The raiser builds the head from its binding, so the literal carries only
+  // the BODY. Measured before this branch existed: the same unreachable door reds
+  // this file in the literal form and passes in the raiser form, so converting the
+  // package without it disarms the authority silently (#2487 step 7).
+  if (ts.isTaggedTemplateExpression(node)) {
+    const tag = node.tag;
+    const member = ts.isCallExpression(tag) ? tag.expression : tag;
+
+    if (
+      ts.isPropertyAccessExpression(member) &&
+      ts.isIdentifier(member.expression)
+    ) {
+      const head = headForBindingAt(node, member.expression.text);
+
+      if (head !== undefined) {
+        return (
+          head +
+          (ts.isNoSubstitutionTemplateLiteral(node.template)
+            ? node.template.text
+            : node.template.head.text)
+        );
+      }
+    }
+  }
+
   if (ts.isTemplateExpression(node)) {
     return node.head.text;
   }
@@ -919,43 +999,15 @@ describe("a message names a door that can reach it (#2457)", () => {
 
   it("the heads naming neither the facade nor a door are registered", () => {
     const unregistered = [...census().otherHeads.keys()]
-      .filter(
-        (head) =>
-          !UNREACHABLE_BY_CONSTRUCTION.has(head) && !PUBLISHED_NAME.has(head),
-      )
+      .filter((head) => !PUBLISHED_NAME.has(head))
       .toSorted((a, b) => a.localeCompare(b));
 
     expect(unregistered).toStrictEqual([]);
   });
 
-  it("a register entry's reason is present where it is claimed", () => {
-    // `[internal]` is admissible only because its own site says the throw is
-    // beyond caller input. Asserting the head alone would keep passing after that
-    // justification was deleted, which is the moment the entry stops being true.
-    const graph = readPlugin();
-    const unjustified: string[] = [];
-
-    for (const info of graph.fns.values()) {
-      for (const head of info.heads) {
-        if (
-          head.prefix !== undefined &&
-          UNREACHABLE_BY_CONSTRUCTION.has(head.prefix) &&
-          !head.justification.includes("unreachable")
-        ) {
-          unjustified.push(`${head.file}:${head.line} [${head.prefix}]`);
-        }
-      }
-    }
-
-    expect(unjustified).toStrictEqual([]);
-  });
-
-  it("CONTROL — every register entry is still raised", () => {
+  it("CONTROL — every published name is still raised", () => {
     const seen = census().otherHeads;
-    const stale = [
-      ...UNREACHABLE_BY_CONSTRUCTION.keys(),
-      ...PUBLISHED_NAME,
-    ].filter((head) => !seen.has(head));
+    const stale = [...PUBLISHED_NAME].filter((head) => !seen.has(head));
 
     expect(stale).toStrictEqual([]);
   });

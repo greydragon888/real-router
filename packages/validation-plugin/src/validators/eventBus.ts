@@ -1,6 +1,7 @@
 // packages/validation-plugin/src/validators/eventBus.ts
 
 import { events } from "@real-router/core";
+import { raiser } from "@real-router/core/utils";
 
 import { computeThresholds, CORE_LIMIT_DEFAULTS } from "../helpers";
 
@@ -10,6 +11,8 @@ import type {
   Plugin,
   RouterLogger,
 } from "@real-router/core";
+
+const atAddEventListener = raiser("router", "addEventListener");
 
 // Derived from the constant core declares them in (#1888) — core enforces
 // membership at `addEventListener` itself, so a hand-written second list here
@@ -22,9 +25,7 @@ const validEventNames = new Set<EventName>(
 
 export function validateEventName(eventName: unknown): void {
   if (!validEventNames.has(eventName as EventName)) {
-    throw new TypeError(
-      `[router.addEventListener] Invalid event name: ${String(eventName)}. Must be one of: $start, $stop, $$start, $$leaveApprove, $$cancel, $$success, $$error`,
-    );
+    throw atAddEventListener.type`Invalid event name: ${String(eventName)}. Must be one of: $start, $stop, $$start, $$leaveApprove, $$cancel, $$success, $$error`;
   }
 }
 
@@ -35,9 +36,7 @@ export function validateListenerArgs<E extends EventName>(
   validateEventName(eventName);
 
   if (typeof cb !== "function") {
-    throw new TypeError(
-      `[router.addEventListener] callback must be a function, got ${typeof cb}`,
-    );
+    throw atAddEventListener.type`callback must be a function, got ${typeof cb}`;
   }
 }
 
