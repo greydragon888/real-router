@@ -109,6 +109,8 @@ describe("routes API validation — with validationPlugin", () => {
     });
 
     it("should throw when decodeParams is not a function", () => {
+      // The plugin's head, not core's `[router]`: core refuses this value too
+      // (#2397), so a bare `toThrow()` would pass without this plugin's check.
       expect(() => {
         routes.add([
           {
@@ -117,7 +119,9 @@ describe("routes API validation — with validationPlugin", () => {
             decodeParams: "not-a-function" as never,
           },
         ]);
-      }).toThrow();
+      }).toThrow(
+        '[router.addRoute] Route "bad" decodeParams must be a function',
+      );
     });
 
     it("should throw when decodeParams is async", () => {
@@ -142,7 +146,9 @@ describe("routes API validation — with validationPlugin", () => {
             encodeParams: 123 as never,
           },
         ]);
-      }).toThrow();
+      }).toThrow(
+        '[router.addRoute] Route "bad" encodeParams must be a function',
+      );
     });
 
     it("should throw when encodeParams is async", () => {

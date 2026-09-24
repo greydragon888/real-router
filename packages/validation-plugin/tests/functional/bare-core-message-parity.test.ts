@@ -251,4 +251,86 @@ describe("bare core matches the validated build, message for message (#1896)", (
       `[router.addRoute] ${sentenceOf(bareMessage)}`,
     );
   });
+
+  describe("add: both layers refuse a codec that is not a function with one sentence (#2397)", () => {
+    // ⚑ One predicate, two callers: core's registration and this plugin's
+    // `validateRoute` both call `assertRouteCodecIsFunction`, so the template
+    // cannot drift. What each caller passes can — the route's name and which
+    // codec it checks first — and those are what these cells hold together.
+    const CODEC_CASES: [
+      label: string,
+      add: (api: RoutesApi) => void,
+      sentence: string,
+    ][] = [
+      [
+        "a route nested through { parent }",
+        (api) => {
+          api.add([{ name: "c", path: "/c", decodeParams: 42 }] as never, {
+            parent: "home",
+          });
+        },
+        'Route "home.c" decodeParams must be a function',
+      ],
+      [
+        "a route nested through children",
+        (api) => {
+          api.add([
+            {
+              name: "q",
+              path: "/q",
+              children: [{ name: "c", path: "/c", encodeParams: 42 }],
+            },
+          ] as never);
+        },
+        'Route "q.c" encodeParams must be a function',
+      ],
+      [
+        "a route with both codecs wrong",
+        (api) => {
+          api.add([
+            { name: "u", path: "/u", decodeParams: 42, encodeParams: 42 },
+          ] as never);
+        },
+        'Route "u" encodeParams must be a function',
+      ],
+      // A value with no `constructor` — this plugin's async checks run before
+      // its shape check and must not be the thing that throws.
+      [
+        "a null-prototype decodeParams",
+        (api) => {
+          api.add([
+            { name: "x", path: "/x", decodeParams: Object.create(null) },
+          ] as never);
+        },
+        'Route "x" decodeParams must be a function',
+      ],
+      [
+        "a null-prototype encodeParams",
+        (api) => {
+          api.add([
+            { name: "x", path: "/x", encodeParams: Object.create(null) },
+          ] as never);
+        },
+        'Route "x" encodeParams must be a function',
+      ],
+    ];
+
+    it("covers every case", () => {
+      expect(CODEC_CASES).toHaveLength(5);
+    });
+
+    it.each(CODEC_CASES)("%s", (_label, add, sentence) => {
+      const bareMessage = messageOf(() => {
+        add(bare());
+      });
+      const validatedMessage = messageOf(() => {
+        add(withPlugin());
+      });
+
+      // The sentence is named, not only compared, so the two cannot drift to
+      // the same wrong string together.
+      expect(bareMessage).toBe(`[router] ${sentence}`);
+      expect(validatedMessage).toBe(`[router.addRoute] ${sentence}`);
+    });
+  });
 });

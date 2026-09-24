@@ -15,10 +15,10 @@ import { validationPlugin } from "@real-router/validation-plugin";
  * while the caller's own value is sitting in the store, inspectable.
  *
  * ⚠ "Unreachable" is DERIVED, never asserted from a list. Core drops a falsy
- * structural field before anything is stored, and wraps a codec in a closure so
- * the slot holds a function whatever was passed — in both cases the value this
- * plugin would have to judge does not exist by the time it installs, because it
- * installs through `usePlugin`, i.e. after construction.
+ * structural field before anything is stored, and a codec or guard slot holds
+ * core's own function, never the caller's — so the value this plugin would have
+ * to judge does not exist by the time it installs, because it installs through
+ * `usePlugin`, i.e. after construction.
  */
 describe("structural-field coverage, classified per cell (#1787)", () => {
   /** The five fields core keeps in a `config` slot, and the slot's name. */
@@ -165,9 +165,8 @@ describe("structural-field coverage, classified per cell (#1787)", () => {
    * adopted the route-config bags (#2172), and identity was an accurate proxy
    * only while the store held the caller's literal. A frozen copy with the same
    * own entries is judged exactly as well — what makes a cell unreachable is
-   * the value being GONE, and the two ways that happens are unchanged: a falsy
-   * structural field never reaches the store, and a codec is wrapped so the
-   * slot holds core's closure instead of the caller's function.
+   * the value being GONE: a falsy structural field never reaches the store,
+   * and a codec slot holds core's closure instead of the caller's function.
    *
    * ⚠ One level, matching the adoption's own depth. A deeper walk here would
    * assert something core does not promise.
@@ -252,8 +251,13 @@ describe("structural-field coverage, classified per cell (#1787)", () => {
   it("CONTROL — the two mechanisms that make a cell unreachable are real", () => {
     // A falsy structural field never reaches the store …
     expect(inspectable("defaultSearch", 0)).toBe(false);
-    // … a codec is wrapped, so the slot holds a function, not the caller's value …
-    expect(inspectable("decodeParams", 42)).toBe(false);
+
+    // … a codec slot holds core's closure, not the caller's function — the SAME
+    // function is judgeable in the slot that stores it as given …
+    const callback = (value: unknown): unknown => value;
+
+    expect(inspectable("decodeParams", callback)).toBe(false);
+    expect(inspectable("forwardTo", callback)).toBe(true);
 
     // … and a truthy bag ARRIVES, as core's own frozen copy of it since
     // #2172, which is what makes the rest of this table a statement about
@@ -289,12 +293,13 @@ describe("structural-field coverage, classified per cell (#1787)", () => {
     }
 
     expect(byOutcome).toStrictEqual({
-      // `forwardTo: []` and `forwardTo: 42` at all four doors are core's: a
-      // truthy forward that is neither a string nor a function is refused
-      // before anything is stored (#2394).
-      core: 24,
-      plugin: 110,
-      unreachable: 31,
+      // `[]` and `42` at all four doors, for the five fields that are not
+      // bags: `forwardTo` (#2394), both codecs (#2397) and both guard
+      // factories.
+      core: 40,
+      plugin: 98,
+      // Every falsy value at the constructor but `forwardTo: ""`.
+      unreachable: 27,
       // `forwardTo: ""` at the three doors that admit a string — see `typeValid`.
       valid: 3,
     });

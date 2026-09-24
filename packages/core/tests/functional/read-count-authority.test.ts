@@ -2680,18 +2680,14 @@ describe("how many times core reads a caller-owned SCALAR slot (#2085)", () => {
       "packages/core/src/namespaces/RoutesNamespace/routesStore.ts · registerForwardTo · route.forwardTo": 8,
       "packages/core/src/namespaces/RoutesNamespace/routesStore.ts · registerSingleRouteHandlers · route.canActivate": 2,
       "packages/core/src/namespaces/RoutesNamespace/routesStore.ts · registerSingleRouteHandlers · route.canDeactivate": 2,
-      "packages/core/src/namespaces/RoutesNamespace/routesStore.ts · registerSingleRouteHandlers · route.decodeParams": 2,
       "packages/core/src/namespaces/RoutesNamespace/routesStore.ts · registerSingleRouteHandlers · route.defaultParams": 2,
       "packages/core/src/namespaces/RoutesNamespace/routesStore.ts · registerSingleRouteHandlers · route.defaultSearch": 2,
-      "packages/core/src/namespaces/RoutesNamespace/routesStore.ts · registerSingleRouteHandlers · route.encodeParams": 2,
 
       // ── the VALIDATION lane reads what the door hands it ─────────────────
       // ⚠ The one group whose inertness is NOT structural here: the door hands
       // the validator the caller's array, so a definition answering differently
       // is judged on one answer and registered on another. Moving the validator
       // onto the same snapshot is #1911's door change.
-      "packages/core/src/engine/validation/route-batch.ts · validateDecodeParams · route.decodeParams": 2,
-      "packages/core/src/engine/validation/route-batch.ts · validateEncodeParams · route.encodeParams": 2,
       "packages/core/src/engine/validation/route-batch.ts · validateRouteName · route.name": 3,
       "packages/validation-plugin/src/validators/forwardTo.ts · validateRouteProperties · route.canActivate": 3,
       "packages/validation-plugin/src/validators/forwardTo.ts · validateRouteProperties · route.canDeactivate": 3,

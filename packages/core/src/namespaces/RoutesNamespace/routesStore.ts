@@ -13,6 +13,7 @@ import {
 import { assertChannelCorrect } from "../../channels";
 import {
   assertNoDottedRouteName,
+  assertRouteCodecIsFunction,
   assertRouteNameNotEmpty,
   createMatcher,
   createRouteTree,
@@ -360,6 +361,49 @@ export function assertForwardToShape(
   }
 }
 
+/**
+ * Throws unless each codec is a function or falsy: a falsy codec is absent
+ * (#1797), and on `update` a `null` one removes it. Runs inside
+ * `registerSingleRouteHandlers` (the build path) AND inside `commitRouteUpdate`'s
+ * PREPARE, so every registration door refuses the same values with the same
+ * message.
+ *
+ * ⚑ Here, before the wrap: `registerSingleRouteHandlers` wraps a codec in a
+ * closure, and a closure over a non-function fails only when the route is
+ * read — `decode is not a function` from `matchPath` — naming neither the
+ * route nor the field (#2397).
+ *
+ * ⚠ The head is the bare `[router]` at every door, as
+ * {@link assertForwardToShape}'s is.
+ *
+ * ⚠ The encoder is checked first, as `validateRoute` checks it, so on `add` and
+ * `replace` a route with both codecs wrong names the same field with and
+ * without `@real-router/validation-plugin`.
+ */
+function assertCodecsAreFunctions(
+  decodeParams: unknown,
+  encodeParams: unknown,
+  fullName: string,
+): void {
+  if (encodeParams) {
+    assertRouteCodecIsFunction(
+      "encodeParams",
+      encodeParams,
+      fullName,
+      undefined,
+    );
+  }
+
+  if (decodeParams) {
+    assertRouteCodecIsFunction(
+      "decodeParams",
+      decodeParams,
+      fullName,
+      undefined,
+    );
+  }
+}
+
 function registerForwardTo<Dependencies extends DefaultDependencies>(
   route: Route<Dependencies>,
   fullName: string,
@@ -413,6 +457,11 @@ function registerSingleRouteHandlers<Dependencies extends DefaultDependencies>(
   pendingCanDeactivate: Map<string, GuardFnFactory<Dependencies>>,
   logger: RouterLogger,
 ): void {
+  const { decodeParams: decode, encodeParams: encode } = route;
+
+  // First, so a refused route logs no `forwardTo` warning below.
+  assertCodecsAreFunctions(decode, encode, fullName);
+
   const customFields = fromEntries(
     objectEntries(route).filter(([key]) => !STANDARD_ROUTE_KEYS.has(key)),
   );
@@ -453,17 +502,13 @@ function registerSingleRouteHandlers<Dependencies extends DefaultDependencies>(
     registerForwardTo(route, fullName, config, logger);
   }
 
-  if (route.decodeParams) {
-    const decode = route.decodeParams;
-
+  if (decode) {
     config.decoders[fullName] = (channels: ParamsSearch): ParamsSearch =>
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime fallback if a user-provided decoder violates its `{ params, search }` return type
       decode(channels) ?? channels;
   }
 
-  if (route.encodeParams) {
-    const encode = route.encodeParams;
-
+  if (encode) {
     config.encoders[fullName] = (channels: ParamsSearch): ParamsSearch =>
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime fallback if a user-provided encoder violates its `{ params, search }` return type
       encode(channels) ?? channels;
@@ -1205,6 +1250,9 @@ export function commitRouteUpdate<Dependencies extends DefaultDependencies>(
       "Move it to `defaultSearch`",
     );
   }
+
+  // Before `forwardTo`, as on the build path.
+  assertCodecsAreFunctions(decodeParams, encodeParams, name);
 
   const forwardToPlan =
     forwardTo === undefined

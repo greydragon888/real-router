@@ -117,15 +117,17 @@ export function guardNoAsyncCallbacks(route: unknown): void {
   };
   const routeName = routeObj.name;
 
+  // Only a function is asked whether it is async: any other codec is
+  // `validateRoute`'s to refuse, and `isAsyncFunction` reads its `constructor`.
   if (
-    routeObj.decodeParams !== undefined &&
+    typeof routeObj.decodeParams === "function" &&
     isAsyncFunction(routeObj.decodeParams)
   ) {
     throw atAddRoute.type`decodeParams cannot be async for route "${String(routeName)}"`;
   }
 
   if (
-    routeObj.encodeParams !== undefined &&
+    typeof routeObj.encodeParams === "function" &&
     isAsyncFunction(routeObj.encodeParams)
   ) {
     throw atAddRoute.type`encodeParams cannot be async for route "${String(routeName)}"`;
