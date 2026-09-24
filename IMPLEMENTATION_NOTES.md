@@ -11829,3 +11829,34 @@ Without a run id, a series survives across runs, so `rate` and `increase` work a
 - one local run of three tasks wrote 79 series, 64 of them histogram buckets. Active series against the free tier's 10k are measured after a week.
 
 **The host is shared.** It also runs production services and the benchmark runner. So the collector is capped at 256 MB and half a CPU, and listens on loopback only.
+
+## Per-task duration reaches Grafana as a sum and a count, not a histogram (#1745, 2026-09-24)
+
+**Problem.** The first PR run with telemetry (#2564's CI) wrote 5,871 series. Of them, 4,608 were the buckets of `turbo.task.duration_ms`: 288 task streams × 16 buckets. `turbo_scm_branch` is a point attribute, so every PR writes a set of its own.
+
+After #2564, its post-merge and the release PR #2565, 9,873 series had a sample in the last 20 minutes. That is Grafana Cloud's definition of an active series, and the free tier allows 10k. Nothing was rejected: at 13k series in an hour the collector logged nothing. But the bill is the 95th percentile of active series over 30 days, and overlapping PR runs would push that past 10k.
+
+**Solution.** The collector turns the task histogram into two counters before accumulating:
+
+- `transform/task-duration` runs `extract_sum_metric(true, ".sum")` and `extract_count_metric(true, ".count")` on `turbo.task.duration_ms`;
+- `filter/task-duration` drops the histogram;
+- both run before `delta_to_cumulative`, so the accumulator sees the counters.
+
+In Prometheus they read `turbo_task_duration_ms_sum_milliseconds_total` and `turbo_task_duration_ms_count_total`. A task's mean duration over a window is the ratio of their `increase`s. The run histogram `turbo.run.duration_ms` stays: one series set per job, not per task.
+
+**Why sum and count.** The buckets gave a task's percentiles across runs, and those are lost. The time spent and the run count remain, and so does any window's mean. A single run's durations stay in the turbo run summaries, kept 90 days.
+
+**Measured on 2026-09-24,** a local two-task run through the new pipeline:
+
+- it wrote no task bucket;
+- the sums were 3,591 ms for `core#type-check` and 636 ms for `route-utils#type-check`;
+- the run histogram's sum was 4,414 ms, which is turbo's own `Time: 4.414s`;
+- `extract_sum_metric` kept the unit, hence `_milliseconds` in the name, though the transform processor's README does not list the unit among the copied fields.
+
+Counted from #2564's run, a PR run becomes about 1,263 series:
+
+- 3 × 288 task series (sum, count, cache events);
+- the run histogram's 304;
+- the 95 run counters.
+
+The next PR run confirms it. Recreating the container reset the accumulator, so every stream restarted from zero, which PromQL reads as a counter reset.

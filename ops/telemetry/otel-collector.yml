@@ -26,6 +26,22 @@ processors:
     check_interval: 1s
     limit_mib: 200
     spike_limit_mib: 40
+  # The per-task duration histogram sends 16 bucket series per task stream:
+  # 4,608 of the 5,871 series one PR run produced (#2564's run, #1745). Its
+  # sum and count carry what a task's trend needs, the time spent and the runs,
+  # so the collector keeps those two as counters and drops the histogram.
+  # In Prometheus they read `turbo_task_duration_ms_sum_milliseconds_total`
+  # and `turbo_task_duration_ms_count_total` (measured).
+  transform/task-duration:
+    error_mode: ignore
+    metric_statements:
+      - extract_sum_metric(true, ".sum") where metric.name == "turbo.task.duration_ms"
+      - extract_count_metric(true, ".count") where metric.name == "turbo.task.duration_ms"
+  filter/task-duration:
+    error_mode: ignore
+    metrics:
+      metric:
+        - metric.name == "turbo.task.duration_ms"
   # A stream is keyed by resource + scope + metric + point attributes, and a
   # point that starts before the stream's state is dropped. turbo records its
   # metrics when a run ends, so a point starts when it is recorded: two
@@ -51,5 +67,14 @@ service:
   pipelines:
     metrics:
       receivers: [otlp]
-      processors: [memory_limiter, delta_to_cumulative, batch]
+      # The task-duration pair runs before the accumulator, so it accumulates
+      # the extracted counters rather than a histogram nothing exports.
+      processors:
+        [
+          memory_limiter,
+          transform/task-duration,
+          filter/task-duration,
+          delta_to_cumulative,
+          batch,
+        ]
       exporters: [prometheus_remote_write]
