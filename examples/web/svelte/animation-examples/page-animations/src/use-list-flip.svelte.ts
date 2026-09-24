@@ -1,3 +1,4 @@
+/* eslint-disable svelte/prefer-svelte-reactivity -- the maps are per-run FLIP bookkeeping that nothing renders */
 import { useRoute } from "@real-router/svelte";
 
 const FLIP_DURATION_MS = 1800;

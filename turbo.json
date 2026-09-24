@@ -120,7 +120,7 @@
       "dependsOn": ["^type-check"],
       "outputs": [],
       "inputs": [
-        "**/*.{ts,tsx,js,jsx,svelte}",
+        "**/*.{ts,tsx,js,jsx,svelte,vue}",
         "../../shared/**/*.ts",
         "../../scripts/lib/**",
         "!dist/**",
@@ -135,7 +135,7 @@
       "dependsOn": ["^bundle"],
       "outputs": [],
       "inputs": [
-        "**/*.{ts,tsx,mts,cts,js,jsx,cjs}",
+        "**/*.{ts,tsx,mts,cts,js,jsx,cjs,svelte,vue}",
         "**/tsconfig*.json",
         "package.json",
         "!dist/**",
@@ -148,7 +148,7 @@
       "dependsOn": ["^bundle"],
       "outputs": [],
       "inputs": [
-        "**/*.{ts,tsx,mts,cts,js,jsx,cjs}",
+        "**/*.{ts,tsx,mts,cts,js,jsx,cjs,svelte,vue}",
         "**/tsconfig*.json",
         "eslint.config.*",
         "package.json",
@@ -161,7 +161,7 @@
     "lint:fix": {
       "outputs": [],
       "inputs": [
-        "**/*.{ts,tsx,js,jsx,svelte}",
+        "**/*.{ts,tsx,js,jsx,svelte,vue}",
         "../../shared/**/*.ts",
         "../../scripts/lib/**",
         "!dist/**",

@@ -17,9 +17,9 @@ import ProductsList from "./ProductsList.vue";
     -->
     <h1>Products</h1>
     <p>
-      Click a product card to see the hero-morph transition. The colored
-      square on the card smoothly morphs into the large cover on the detail
-      page via matching <code>view-transition-name</code>.
+      Click a product card to see the hero-morph transition. The colored square
+      on the card smoothly morphs into the large cover on the detail page via
+      matching <code>view-transition-name</code>.
     </p>
 
     <RouteView nodeName="products">

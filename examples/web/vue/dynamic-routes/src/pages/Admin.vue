@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { RouteView } from "@real-router/vue";
+
 import AdminSettings from "./AdminSettings.vue";
 import AdminUsers from "./AdminUsers.vue";
 </script>

@@ -1,13 +1,14 @@
 <script lang="ts">
   import { RouteView } from "@real-router/svelte";
+
+  import { useHeroMorph } from "./animations/useHeroMorph.svelte";
+  import { useListFlip } from "./animations/useListFlip.svelte";
+  import { usePageAnimator } from "./animations/usePageAnimator.svelte";
   import About from "./pages/About.svelte";
   import Home from "./pages/Home.svelte";
   import ProductDetail from "./pages/ProductDetail.svelte";
   import ProductsList from "./pages/ProductsList.svelte";
   import QueryDemo from "./pages/QueryDemo.svelte";
-  import { useHeroMorph } from "./animations/useHeroMorph.svelte";
-  import { useListFlip } from "./animations/useListFlip.svelte";
-  import { usePageAnimator } from "./animations/usePageAnimator.svelte";
 
   // Three thin composables own the app's animation behavior — each
   // calls `useRouteExit` from `@real-router/svelte` once with its own

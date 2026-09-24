@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { useRoute, useRouter } from "@real-router/svelte";
   import { invalidate } from "@real-router/ssr-data-plugin";
+  import { useRoute, useRouter } from "@real-router/svelte";
 
   interface HomeData {
     greeting: string;

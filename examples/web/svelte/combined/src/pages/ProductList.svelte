@@ -1,6 +1,8 @@
 <script lang="ts">
   import { Link } from "@real-router/svelte";
+
   import { store } from "../../../../../shared/store";
+
   import type { Product } from "../../../../../shared/api";
 
   let products = $state(store.get("products") as Product[] | null);
@@ -25,7 +27,7 @@
 {:else}
   <div>
     <h1>Products</h1>
-    {#each products as product}
+    {#each products as product (product.id)}
       <div class="card">
         <strong>{product.name}</strong>
         <span style="margin-left: 8px; color: #888">${product.price}</span>

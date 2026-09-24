@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Link, useRoute } from "@real-router/svelte";
+
   import { useListFlip } from "../use-list-flip.svelte";
   import { useRouteAnimation } from "../use-route-animation.svelte";
 
@@ -51,7 +52,7 @@
   </p>
 
   <div class="qd-toolbar">
-    {#each FILTERS as value}
+    {#each FILTERS as value (value)}
       <Link
         routeName="queryDemo"
         routeSearch={{ filter: value }}

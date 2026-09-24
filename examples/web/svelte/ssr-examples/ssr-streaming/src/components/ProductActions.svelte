@@ -47,7 +47,7 @@
     </button>
   </section>
 
-  {#snippet failed(error, reset)}
+  {#snippet failed(error: unknown, reset: () => void)}
     <section data-testid="product-actions-error">
       <h3>Actions unavailable</h3>
       <p data-testid="actions-error-message">

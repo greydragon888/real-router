@@ -30,7 +30,7 @@
 
   <h2>page-animations/</h2>
   <p>
-    Distributed via <code>{`useRouteAnimation(() => ref, …)`}</code>
+    Distributed via <code>useRouteAnimation(() =&gt; ref, …)</code>
     per page. Each page calls the composable in its own component; the
     composable itself is built on <code>useRouteExit</code> +
     <code>useRouteEnter</code> from <code>@real-router/svelte</code>.
@@ -56,7 +56,7 @@
     <strong>Difference from motion-react:</strong> the React
     equivalent (<code>motion</code> v12+) ships <code>layoutId</code>
     for cross-component hero morphs and
-    <code>{`<motion.li layout>`}</code> for automatic list reorder
+    <code>&lt;motion.li layout&gt;</code> for automatic list reorder
     animations. Svelte's transitions are per-element entry/exit only.
     For those scenarios in Svelte, see <code>route-animations/</code>
     for the hand-rolled WAAPI recipes.

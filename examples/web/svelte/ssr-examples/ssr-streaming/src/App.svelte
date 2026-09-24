@@ -16,7 +16,7 @@
     <header>
       <nav>
         <Link routeName="home" data-testid="nav-home">Home</Link>
-        {" | "}
+        |
         <Link routeName="products.list" data-testid="nav-products-list">
           Products
         </Link>

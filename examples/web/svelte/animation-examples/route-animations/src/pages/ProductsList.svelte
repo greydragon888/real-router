@@ -53,7 +53,7 @@
     >
       A → Z
     </Link>
-    {" · "}
+    ·
     <Link
       routeName="products"
       routeSearch={{ sort: "desc" }}
@@ -61,7 +61,7 @@
     >
       Z → A
     </Link>
-    {" · "}
+    ·
     <strong>current: {sort}</strong>
   </div>
 

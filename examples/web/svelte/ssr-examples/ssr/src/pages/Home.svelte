@@ -31,11 +31,9 @@
   <section aria-labelledby="ssr-boundaries-heading">
     <h2 id="ssr-boundaries-heading">SSR boundaries</h2>
     <ClientOnly>
-      {#snippet children()}
-        <p data-testid="ssr-boundaries-client">
-          Mounted on the client
-        </p>
-      {/snippet}
+      <p data-testid="ssr-boundaries-client">
+        Mounted on the client
+      </p>
       {#snippet fallback()}
         <p data-testid="ssr-boundaries-client-fallback">
           Loading client widget…
@@ -43,11 +41,9 @@
       {/snippet}
     </ClientOnly>
     <ServerOnly>
-      {#snippet children()}
-        <p data-testid="ssr-boundaries-server">
-          Server-only content (e.g. SEO meta, zero-JS notice)
-        </p>
-      {/snippet}
+      <p data-testid="ssr-boundaries-server">
+        Server-only content (e.g. SEO meta, zero-JS notice)
+      </p>
       {#snippet fallback()}
         <p data-testid="ssr-boundaries-server-fallback">
           Hidden after hydration

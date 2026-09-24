@@ -10,7 +10,7 @@
   <h1>Page Animations</h1>
   <p>
     Distributed per-page recipe: each page calls
-    <code>{`useRouteAnimation(() => ref, …)`}</code> in its own component.
+    <code>useRouteAnimation(() =&gt; ref, …)</code> in its own component.
     The composable is built on <code>useRouteExit</code> +
     <code>useRouteEnter</code> from <code>@real-router/svelte</code>, both
     of which subscribe to the router for the page's lifetime. No

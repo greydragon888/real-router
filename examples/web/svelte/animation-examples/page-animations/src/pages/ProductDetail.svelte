@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Link, useRoute } from "@real-router/svelte";
+
   import { useRouteAnimation } from "../use-route-animation.svelte";
 
   const COVERS: Partial<Record<string, { name: string; color: string }>> = {
@@ -16,7 +17,7 @@
   useRouteAnimation(() => ref, { entryClass: "fade-in", exitClass: "fade-out" });
 
   const { route } = useRoute<{ id: string }>();
-  const id = $derived(route.current.params.id ?? "1");
+  const id = $derived(route.current.params.id);
   const product = $derived(COVERS[id]);
 </script>
 

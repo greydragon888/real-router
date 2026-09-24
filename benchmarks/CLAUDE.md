@@ -94,8 +94,8 @@ Weekly `schedule` + `workflow_dispatch(runs=100)` runs the full 5-cohort matrix 
 pnpm cpu                # Check CPU load before benchmarking (run from benchmarks/)
 ```
 
-`lint:bench` is ESLint over this whole tree, and pre-push runs it after its
-build. CI runs it too when a lockfile or global-input change reaches the tree,
+`lint:bench` is ESLint over this whole tree, the apps' `.svelte` components
+included, and pre-push runs it after its build. CI runs it too when a lockfile or global-input change reaches the tree,
 such as an ESLint bump (#2402). Run it through turbo — `pnpm turbo run lint:bench --filter=router-benchmarks`
 — because the Angular apps resolve `@real-router/*` through `dist/`, which
 `^bundle` builds first.
@@ -146,6 +146,14 @@ bundle time. For a probe, the check is running it.
 `./Host.svelte` import lands on Svelte's ambient `*.svelte` declaration
 (`LegacyComponentType`), so the import is typed but the component's own props
 are the build's business, not `tsc`'s.
+
+⚠ **The lint's typed rules read the components, in a `Bundler` program.**
+`cross-router/tsconfig.json` includes `apps/**/*.svelte` for that, and
+`adapter-bench/apps/svelte/tsconfig.json` exists for it; `tsc` reads no
+`.svelte` file through either.
+Under the root's `NodeNext`, `@real-router/svelte`'s source cannot resolve its
+own extensionless `./composables/*.svelte` imports, and every hook it exports
+lints as an error type (#2556).
 
 ⚠ **A green run says nothing about how much it looked at.** Narrowing an
 `include` makes every one of these commands greener, so coverage is the one

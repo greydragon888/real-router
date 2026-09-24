@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Link, RouteView, useRoute, useRouteNode, useRouteUtils } from "@real-router/svelte";
+
   import type { Params } from "@real-router/core";
 
   const { route: nodeRoute } = useRouteNode("users");
@@ -9,11 +10,13 @@
   const routeLabels: Record<string, string> = { home: "Home", users: "Users" };
 
   function getLabel(name: string, params: Params): string {
-    if (name in routeLabels) return routeLabels[name];
+    if (name in routeLabels) {return routeLabels[name];}
     if (name === "users.profile") {
       const id = typeof params.id === "string" ? params.id : "?";
+
       return `User #${id}`;
     }
+
     return name;
   }
 </script>
@@ -21,7 +24,7 @@
 {#if nodeRoute.current}
   <div>
     <nav class="breadcrumbs" aria-label="breadcrumb">
-      {#each ["home", ...(utils.getChain(route.current.name) ?? [route.current.name])] as name, i}
+      {#each ["home", ...(utils.getChain(route.current.name) ?? [route.current.name])] as name, i (name)}
         {#if i > 0}<span> › </span>{/if}
         {#if i === ["home", ...(utils.getChain(route.current.name) ?? [route.current.name])].length - 1}
           <span>{getLabel(name, route.current.params)}</span>

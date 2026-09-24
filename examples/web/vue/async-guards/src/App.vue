@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { RouteView } from "@real-router/vue";
-import Layout from "../../shared/Layout.vue";
+
 import ProgressBar from "./components/ProgressBar.vue";
 import About from "./pages/About.vue";
 import Checkout from "./pages/Checkout.vue";
 import Editor from "./pages/Editor.vue";
 import Home from "./pages/Home.vue";
+import Layout from "../../shared/Layout.vue";
 
 const links = [
   { routeName: "home", label: "Home" },

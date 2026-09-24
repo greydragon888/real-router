@@ -35,7 +35,7 @@ useListFlip(list);
 const { route } = useRoute();
 
 const sort = computed<SortDirection>(() =>
-  route.value?.search.sort === "desc" ? "desc" : "asc",
+  route.value.search.sort === "desc" ? "desc" : "asc",
 );
 
 const items = computed(() => {
@@ -51,11 +51,10 @@ const items = computed(() => {
   <div ref="root">
     <h1>Products</h1>
     <p>
-      Click a product to see the detail. Each page (this list and the
-      detail) registers its own <code>useRouteAnimation</code>
-      composable on its wrapper — slide-out for the list's exit,
-      fade-in for the detail's entry, no shared shell, no centralised
-      policy.
+      Click a product to see the detail. Each page (this list and the detail)
+      registers its own <code>useRouteAnimation</code>
+      composable on its wrapper — slide-out for the list's exit, fade-in for the
+      detail's entry, no shared shell, no centralised policy.
     </p>
 
     <div class="products-toolbar">
@@ -86,10 +85,7 @@ const items = computed(() => {
         :data-flip-key="product.id"
         class="product-card"
       >
-        <Link
-          routeName="products.detail"
-          :routeParams="{ id: product.id }"
-        >
+        <Link routeName="products.detail" :routeParams="{ id: product.id }">
           <span
             class="product-thumb"
             :style="{ backgroundColor: product.color }"

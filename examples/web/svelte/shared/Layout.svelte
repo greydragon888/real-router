@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Link } from "@real-router/svelte";
+
   import type { Snippet } from "svelte";
 
   interface NavLink {
@@ -13,14 +14,14 @@
 <div class="app">
   <header class="header">{title}</header>
   <aside class="sidebar">
-    {#each links as link}
+    {#each links as link (link.routeName)}
       <Link routeName={link.routeName} activeClassName="active">
         {link.label}
       </Link>
     {/each}
   </aside>
   <main class="content">
-    {@render children?.()}
+    {@render children()}
   </main>
   <footer class="footer">@real-router/svelte</footer>
 </div>

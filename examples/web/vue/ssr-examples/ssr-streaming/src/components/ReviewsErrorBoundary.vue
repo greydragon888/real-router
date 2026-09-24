@@ -9,8 +9,11 @@ const error = ref<Error | null>(null);
 
 onErrorCaptured((capturedError) => {
   error.value =
-    capturedError instanceof Error ? capturedError : new Error(String(capturedError));
+    capturedError instanceof Error
+      ? capturedError
+      : new Error(String(capturedError));
   console.warn("[Reviews] section failed:", error.value.message);
+
   return false;
 });
 </script>

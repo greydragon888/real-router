@@ -27,10 +27,14 @@ import test, { after } from "node:test";
 
 import {
   LINT_TASKS,
+  NOT_CODE,
   evaluateReach,
+  extensionOf,
+  isCode,
   lintTargets,
   lintedPackages,
   packagesWithNothingToRead,
+  staleDeliberate,
   turboRuns,
   unlintedFiles,
   unreadSharedDirs,
@@ -44,6 +48,7 @@ const PACKAGES = [
   { name: "@real-router/shared-sources", dir: "shared" },
   { name: "react-basic-example", dir: "examples/web/react/basic" },
   { name: "vue-examples-shared", dir: "examples/web/vue" },
+  { name: "docs-only", dir: "docs" },
 ];
 
 const TRACKED = [
@@ -52,6 +57,7 @@ const TRACKED = [
   "shared/dom-utils/link-utils.ts",
   "examples/web/react/basic/src/main.tsx",
   "examples/web/vue/shared/Layout.vue",
+  "docs/README.md",
 ];
 
 const HEALTHY_SCRIPTS = {
@@ -61,6 +67,9 @@ const HEALTHY_SCRIPTS = {
   },
   "react-basic-example": {
     "lint:example": "eslint --cache . --max-warnings 0",
+  },
+  "vue-examples-shared": {
+    "lint:example": "eslint --cache shared/ --max-warnings 0",
   },
 };
 
@@ -139,6 +148,7 @@ test("healthy: every package is linted, read through a consumer, or has nothing 
     "@real-router/core",
     "@real-router/react",
     "react-basic-example",
+    "vue-examples-shared",
   ]);
   assert.deepEqual(result.unreached, []);
   assert.deepEqual(result.staleExemptions, []);
@@ -155,7 +165,16 @@ test("#2370 shape 1: an example with no lint script is unreached", () => {
 test("#2370 shape 2: a hook filter that drops the glob leaves it unreached, script or not", () => {
   const hookText = "pnpm turbo run build --filter='!./examples/**'";
 
-  assert.deepEqual(reach({ hookText }).unreached, ["react-basic-example"]);
+  assert.deepEqual(reach({ hookText }).unreached, [
+    "react-basic-example",
+    "vue-examples-shared",
+  ]);
+});
+
+test("#2556: a workspace that holds only a component is unreached without a lint step", () => {
+  const { "vue-examples-shared": _dropped, ...scripts } = HEALTHY_SCRIPTS;
+
+  assert.deepEqual(reach({ scripts }).unreached, ["vue-examples-shared"]);
 });
 
 test("a consumer that lints src/ alone does not read the shared dir behind its symlink", () => {
@@ -271,23 +290,57 @@ test("a shared dir is read only when a command names its alias as a whole path",
   assert.deepEqual(unread("eslint src/shared-ssr-legacy/"), ["ssr"]);
 });
 
-test("nothing to read: only what ESLint reads counts, and a file belongs to its nearest package", () => {
+test("nothing to read: a package holds code unless NOT_CODE lists every file's kind, and a file belongs to its nearest package", () => {
   const packages = [
     { name: "agg-with-layout", dir: "examples/web/react" },
-    { name: "agg-children-only", dir: "examples/web/vue" },
-    { name: "child", dir: "examples/web/vue/basic" },
-    { name: "only-ignored", dir: "tools" },
+    { name: "agg-component-only", dir: "examples/web/vue" },
+    { name: "agg-children-only", dir: "examples/web/solid" },
+    { name: "child", dir: "examples/web/solid/basic" },
+    { name: "docs-only", dir: "docs" },
   ];
   const nothing = packagesWithNothingToRead(packages, [
     "examples/web/react/shared/Layout.tsx",
+    // #2556: a component is code, though no config addressed its extension.
     "examples/web/vue/shared/Layout.vue",
-    "examples/web/vue/basic/src/main.ts",
-    "tools/run.mjs",
-    "tools/types.d.ts",
-    "tools/App.svelte",
+    "examples/web/solid/package.json",
+    "examples/web/solid/basic/src/main.tsx",
+    "docs/README.md",
+    "docs/logo.png",
+    "docs/.gitignore",
   ]);
 
-  assert.deepEqual([...nothing].sort(), ["agg-children-only", "only-ignored"]);
+  assert.deepEqual([...nothing].sort(), ["agg-children-only", "docs-only"]);
+});
+
+test("code is every extension NOT_CODE does not list, whatever a config addresses", () => {
+  for (const file of [
+    "src/App.vue",
+    "src/App.svelte",
+    "src/rune.svelte.ts",
+    "src/types.d.ts",
+    "scripts/run.mjs",
+    // A language no config here reads.
+    "src/Page.astro",
+  ]) {
+    assert.ok(isCode(file), file);
+  }
+
+  for (const file of [
+    "README.md",
+    "package.json",
+    "index.html",
+    "public/logo.png",
+    ".gitignore",
+    "src/dom-utils",
+    "LICENSE",
+  ]) {
+    assert.ok(!isCode(file), file);
+  }
+
+  assert.equal(extensionOf("src/types.d.ts"), ".ts");
+  assert.equal(extensionOf("shared/.gitkeep"), ".gitkeep");
+  assert.equal(extensionOf("src/dom-utils"), "");
+  assert.ok(!NOT_CODE.has(".vue") && !NOT_CODE.has(".svelte"));
 });
 
 // ─── file reach: what a package's own config lints (#2407) ───────────────────
@@ -332,52 +385,81 @@ test("lint targets: the paths a command names, and nothing a flag carries", () =
   assert.throws(() => lintTargets(["tsc --noEmit"], exists), /cannot read/);
 });
 
-test("#2407: a file the package's own config addresses and ignores is unlinted", () => {
+/** A census entry, as the CLI records one: `file` from the package, `repoPath` from the root. */
+const entry = (pkg, dir, file, linted) => ({
+  pkg,
+  file,
+  repoPath: `${dir}/${file}`,
+  linted,
+});
+
+test("#2407: a file the package's own config ignores is unlinted", () => {
   const census = [
-    { pkg: "svelte", file: "src/index.ts", addressed: true, linted: true },
-    { pkg: "svelte", file: "src/App.svelte", addressed: true, linted: false },
-    {
-      pkg: "svelte",
-      file: "src/link.svelte.ts",
-      addressed: true,
-      linted: false,
-    },
-    { pkg: "svelte", file: "src/CLAUDE.md", addressed: false, linted: false },
-    { pkg: "svelte", file: "src/dom-utils", addressed: false, linted: false },
+    entry("svelte", "packages/svelte", "src/index.ts", true),
+    entry("svelte", "packages/svelte", "src/App.svelte", false),
+    entry("svelte", "packages/svelte", "src/link.svelte.ts", false),
+    entry("svelte", "packages/svelte", "src/CLAUDE.md", false),
+    entry("svelte", "packages/svelte", "src/dom-utils", false),
   ];
 
   assert.deepEqual(
-    unlintedFiles(census),
+    unlintedFiles(census, new Map()),
     new Map([["svelte", ["src/App.svelte", "src/link.svelte.ts"]]]),
   );
 });
 
-test("an extension one config addresses counts in a package whose config has no block for it", () => {
+test("#2556: an extension no config addresses is unlinted code, not skipped", () => {
   const census = [
-    { pkg: "svelte", file: "src/App.svelte", addressed: true, linted: true },
-    { pkg: "other", file: "src/index.ts", addressed: true, linted: true },
-    {
-      pkg: "other",
-      file: "src/Widget.svelte",
-      addressed: false,
-      linted: false,
-    },
+    entry("vue-example", "examples/vue", "src/main.ts", true),
+    entry("vue-example", "examples/vue", "src/App.vue", false),
   ];
 
   assert.deepEqual(
-    unlintedFiles(census),
-    new Map([["other", ["src/Widget.svelte"]]]),
+    unlintedFiles(census, new Map()),
+    new Map([["vue-example", ["src/App.vue"]]]),
   );
+});
+
+test("a file DELIBERATE names is excused, and only that file", () => {
+  const census = [
+    entry("bench", "benchmarks", "deck/template.js", false),
+    entry("bench", "benchmarks", "deck/other.js", false),
+  ];
+  const deliberate = new Map([["benchmarks/deck/template.js", "#0"]]);
+
+  assert.deepEqual(
+    unlintedFiles(census, deliberate),
+    new Map([["bench", ["deck/other.js"]]]),
+  );
+  assert.deepEqual(staleDeliberate(census, deliberate), []);
+});
+
+test("a DELIBERATE entry goes stale once its file is linted, is not code, or is out of every lint target", () => {
+  const census = [
+    entry("bench", "benchmarks", "deck/linted.js", true),
+    entry("bench", "benchmarks", "deck/notes.md", false),
+  ];
+  const deliberate = new Map([
+    ["benchmarks/deck/linted.js", "#0"],
+    ["benchmarks/deck/notes.md", "#0"],
+    ["benchmarks/deck/gone.js", "#0"],
+  ]);
+
+  assert.deepEqual(staleDeliberate(census, deliberate), [
+    "benchmarks/deck/linted.js",
+    "benchmarks/deck/notes.md",
+    "benchmarks/deck/gone.js",
+  ]);
 });
 
 test("CONTROL — a census that lints every code file reports nothing", () => {
   const census = [
-    { pkg: "svelte", file: "src/App.svelte", addressed: true, linted: true },
-    { pkg: "svelte", file: "src/index.ts", addressed: true, linted: true },
-    { pkg: "svelte", file: "README.md", addressed: false, linted: false },
+    entry("svelte", "packages/svelte", "src/App.svelte", true),
+    entry("svelte", "packages/svelte", "src/index.ts", true),
+    entry("svelte", "packages/svelte", "README.md", false),
   ];
 
-  assert.deepEqual(unlintedFiles(census), new Map());
+  assert.deepEqual(unlintedFiles(census, new Map()), new Map());
 });
 
 // --------------------------------------------------------------------------
@@ -444,6 +526,7 @@ const EXPECTED_CALLS = [
  * @param {string} [options.rootConfig] the root ESLint config text
  * @param {string[]} [options.extraPackages] package dirs outside `packages/`
  * @param {boolean} [options.track] `git add` the packages
+ * @param {Record<string, string>} [options.deliberate] the fixture's DELIBERATE
  * @returns {string} the fixture root
  */
 function cliFixture({
@@ -454,6 +537,7 @@ function cliFixture({
   rootConfig = 'export default [{ files: ["**/*.ts"] }];',
   extraPackages = [],
   track = true,
+  deliberate = {},
 }) {
   const root = mkdtempSync(path.join(tmpdir(), "lint-reach-"));
   fixtures.push(root);
@@ -465,6 +549,10 @@ function cliFixture({
       path.join(root, "scripts", file),
     );
   }
+  writeFileSync(
+    path.join(root, "scripts", "lint-reach-deliberate.mjs"),
+    `export const DELIBERATE = new Map(${JSON.stringify(Object.entries(deliberate))});\n`,
+  );
 
   mkdirSync(path.join(root, ".husky"));
   writeFileSync(path.join(root, ".husky", "pre-push"), `${hook}\n`);
@@ -553,7 +641,7 @@ function runCli(root) {
 /** The census's success line, anchored so that `2` does not match `12`. */
 const censusLine = (linted, named, packageCount) =>
   new RegExp(
-    `\\b${String(linted)} of ${String(named)} tracked files in ${String(packageCount)} packages under packages\\/ linted by their own config`,
+    `\\b${String(linted)} of ${String(named)} tracked files in ${String(packageCount)} packages linted by their own config`,
   );
 
 test("CONTROL — the CLI passes a hook that lints every package, and says so", () => {
@@ -721,7 +809,7 @@ test("a lint command that names two paths counts the files of both", () => {
   assert.match(result.output, censusLine(3, 3, 2));
 });
 
-test("a package outside packages/ is not in the file census", () => {
+test("#2556: a package outside packages/ is in the file census", () => {
   const result = runCli(
     cliFixture({
       hook: HOOK,
@@ -735,11 +823,66 @@ test("a package outside packages/ is not in the file census", () => {
     }),
   );
 
-  assert.equal(result.status, 0, result.output);
-  assert.match(result.output, censusLine(2, 2, 2));
+  assert.equal(result.status, 1, result.output);
+  assert.match(
+    result.output,
+    /@fx\/x: 1 file\(s\) its lint command reaches, and no block of its ESLint config lints — src\/App\.svelte;/,
+  );
 });
 
-test("the CLI refuses a census no config addresses: exit 2, not a pass", () => {
+test("#2556: the CLI names a file of an extension no config addresses", () => {
+  const result = runCli(
+    cliFixture({
+      hook: HOOK,
+      tasks: lints("@fx/a", "@fx/b"),
+      files: { "packages/b/src/App.vue": "<template><p>hi</p></template>\n" },
+    }),
+  );
+
+  assert.equal(result.status, 1, result.output);
+  assert.match(
+    result.output,
+    /@fx\/b: 1 file\(s\) its lint command reaches, and no block of its ESLint config lints — src\/App\.vue;/,
+  );
+  assert.doesNotMatch(result.output, /@fx\/a:/);
+});
+
+test("the CLI passes a file DELIBERATE names, and fails an entry that excuses nothing", () => {
+  const fixture = (deliberate) =>
+    cliFixture({
+      hook: HOOK,
+      tasks: lints("@fx/a", "@fx/b"),
+      files: { "packages/b/src/template.js": "__TOKEN__\n" },
+      configs: {
+        "packages/b":
+          'export default [{ files: ["**/*.ts", "**/*.js"] }, { ignores: ["src/template.js"] }];',
+      },
+      deliberate,
+    });
+
+  const excused = runCli(
+    fixture({ "packages/b/src/template.js": "a template, not JavaScript" }),
+  );
+
+  assert.equal(excused.status, 0, excused.output);
+  assert.match(excused.output, censusLine(2, 3, 2));
+
+  const stale = runCli(
+    fixture({
+      "packages/b/src/template.js": "a template, not JavaScript",
+      "packages/b/src/gone.js": "a file that no longer exists",
+    }),
+  );
+
+  assert.equal(stale.status, 1, stale.output);
+  assert.match(
+    stale.output,
+    /packages\/b\/src\/gone\.js: DELIBERATE names it, but no lint command reaches it or its config lints it now — drop the entry/,
+  );
+  assert.doesNotMatch(stale.output, /template\.js: DELIBERATE/);
+});
+
+test("the CLI refuses a census no config lints: exit 2, not a pass", () => {
   const result = runCli(
     cliFixture({
       hook: HOOK,
@@ -749,20 +892,7 @@ test("the CLI refuses a census no config addresses: exit 2, not a pass", () => {
   );
 
   assert.equal(result.status, 2, result.output);
-  assert.match(result.output, /no config addresses any file of the census/);
-});
-
-test("the CLI refuses a census with no linted package under packages/: exit 2, not a pass", () => {
-  const result = runCli(
-    cliFixture({
-      hook: HOOK,
-      tasks: lints("@fx/x"),
-      extraPackages: ["examples/x"],
-    }),
-  );
-
-  assert.equal(result.status, 2, result.output);
-  assert.match(result.output, /no linted package lies under packages\//);
+  assert.match(result.output, /no config lints any file of the census/);
 });
 
 test("a file a lint command names is in the census", () => {

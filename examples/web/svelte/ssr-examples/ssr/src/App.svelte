@@ -28,11 +28,11 @@
     <div>
       <nav>
         <Link routeName="home">Home</Link>
-        {" | "}
+        |
         <Link routeName="users">Users</Link>
-        {" | "}
+        |
         <Link routeName="dashboard">Dashboard</Link>
-        {" | "}
+        |
         <Link routeName="admin" data-testid="nav-admin">Admin</Link>
       </nav>
       <main>
@@ -68,10 +68,10 @@
 
 {#if httpStatusSink}
   <HttpStatusProvider sink={httpStatusSink}>
-    {#snippet children()}
-      {@render appBody()}
-    {/snippet}
+    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression, sonarjs/no-use-of-empty-return-value -- `{@render}` of a local snippet, not a call whose result is used -->
+    {@render appBody()}
   </HttpStatusProvider>
 {:else}
+  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression, sonarjs/no-use-of-empty-return-value -- `{@render}` of a local snippet, not a call whose result is used -->
   {@render appBody()}
 {/if}

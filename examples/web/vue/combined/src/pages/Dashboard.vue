@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useNavigator, useRoute } from "@real-router/vue";
 import { computed, onMounted, onUnmounted, shallowRef } from "vue";
+
 import { store } from "../../../../../shared/store";
 
 import type { User } from "../../../../../shared/api";

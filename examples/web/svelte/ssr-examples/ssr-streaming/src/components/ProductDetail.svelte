@@ -1,11 +1,11 @@
 <script lang="ts">
   import { useRoute } from "@real-router/svelte";
 
-  import { trackView } from "../actions/track-view";
   import ProductActions from "./ProductActions.svelte";
   import RelatedItems from "./RelatedItems.svelte";
   import Reviews from "./Reviews.svelte";
   import ServerStats from "./ServerStats.svelte";
+  import { trackView } from "../actions/track-view";
 
   import type { ProductDetailData } from "../router/loaders";
 

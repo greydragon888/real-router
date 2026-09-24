@@ -15,7 +15,7 @@
   <div>
     <nav>
       <Link routeName="home">Home</Link>
-      {" | "}
+      |
       <Link routeName="users">Users</Link>
     </nav>
     <main>

@@ -1,8 +1,10 @@
 <script lang="ts">
   import { RouterProvider } from "@real-router/svelte";
-  import type { Router } from "@real-router/core";
-  import Layout from "../../../shared/Layout.svelte";
+
   import TransitionHost from "./TransitionHost.svelte";
+  import Layout from "../../../shared/Layout.svelte";
+
+  import type { Router } from "@real-router/core";
 
   let { router }: { router: Router } = $props();
 

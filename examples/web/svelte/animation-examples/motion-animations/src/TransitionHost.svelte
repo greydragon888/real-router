@@ -1,7 +1,8 @@
 <script lang="ts">
   import { RouteView } from "@real-router/svelte";
-  import { fly } from "svelte/transition";
   import { cubicInOut } from "svelte/easing";
+  import { fly } from "svelte/transition";
+
   import About from "./pages/About.svelte";
   import Home from "./pages/Home.svelte";
   import ProductDetail from "./pages/ProductDetail.svelte";

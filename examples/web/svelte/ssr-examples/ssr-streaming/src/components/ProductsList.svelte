@@ -19,7 +19,7 @@
         <Link routeName="products.detail" routeParams={{ id: product.id }}>
           {product.name}
         </Link>
-        {" — $"}{product.price}
+        — ${product.price}
       </li>
     {/each}
   </ul>

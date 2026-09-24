@@ -30,6 +30,7 @@
       is visible immediately. We track first-mount via a
       <code>$state</code> flag and zero the entry duration on the very
       first instantiation, equivalent to motion-react's
+      <!-- eslint-disable-next-line unicorn/no-incorrect-template-string-interpolation -- the literal prints Svelte markup, braces included -->
       <code>{`initial={false}`}</code>.
     </li>
     <li>
@@ -43,7 +44,7 @@
       <code>prefers-reduced-motion: reduce</code>, the transition
       durations on transform animations should be respected — Svelte's
       transitions honor the media query when used with
-      <code>{`reduceMotion: "user"`}</code> patterns. Implementation
+      <code>reduceMotion: "user"</code> patterns. Implementation
       detail of the chosen transition function.
     </li>
     <li>
@@ -57,7 +58,7 @@
   <h2>Differences from motion-react</h2>
   <p>
     motion-react ships <code>layoutId</code> for cross-component hero
-    morphs and <code>{`<motion.li layout>`}</code> for automatic list
+    morphs and <code>&lt;motion.li layout&gt;</code> for automatic list
     reorder. Svelte's built-in transitions are
     <strong>per-element entry/exit</strong> only — they do not pair
     elements across the route boundary or animate position changes

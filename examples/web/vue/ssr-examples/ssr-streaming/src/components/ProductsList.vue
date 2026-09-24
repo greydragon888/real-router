@@ -6,7 +6,10 @@ import type { ProductsListData } from "../router/loaders";
 
 const { route } = useRoute();
 const data = computed<ProductsListData>(
-  () => (route.value.context.data as ProductsListData | undefined) ?? { products: [] },
+  () =>
+    (route.value.context.data as ProductsListData | undefined) ?? {
+      products: [],
+    },
 );
 </script>
 

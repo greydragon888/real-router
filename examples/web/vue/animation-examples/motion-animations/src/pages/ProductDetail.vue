@@ -12,7 +12,7 @@ const COVERS: Partial<Record<string, { name: string; color: string }>> = {
 };
 
 const { route } = useRoute<{ id: string }>();
-const id = computed(() => route.value?.params.id ?? "1");
+const id = computed(() => route.value.params.id);
 const product = computed(() => COVERS[id.value]);
 </script>
 
@@ -26,23 +26,18 @@ const product = computed(() => COVERS[id.value]);
     />
     <p>
       Note: no library-driven hero morph here. Vue's built-in
-      <code>&lt;Transition&gt;</code> is per-element entry/exit only —
-      it does not pair elements across the route boundary. For an
-      inverse-FLIP hero morph in Vue, see
-      <code>route-animations/</code> → <code>useHeroMorph</code>:
-      capture rect on <code>useRouteExit</code>, animate via WAAPI on
-      <code>navigator.subscribe</code>.
+      <code>&lt;Transition&gt;</code> is per-element entry/exit only — it does
+      not pair elements across the route boundary. For an inverse-FLIP hero
+      morph in Vue, see <code>route-animations/</code> →
+      <code>useHeroMorph</code>: capture rect on <code>useRouteExit</code>,
+      animate via WAAPI on <code>navigator.subscribe</code>.
     </p>
     <p>
-      <Link routeName="products" activeStrict>
-        ← Back to products
-      </Link>
+      <Link routeName="products" activeStrict> ← Back to products </Link>
     </p>
   </div>
   <div v-else>
     <h2>Unknown product</h2>
-    <Link routeName="products" activeStrict>
-      Back to products
-    </Link>
+    <Link routeName="products" activeStrict> Back to products </Link>
   </div>
 </template>

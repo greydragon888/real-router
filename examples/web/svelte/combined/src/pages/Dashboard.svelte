@@ -1,6 +1,8 @@
 <script lang="ts">
   import { useRoute, useNavigator } from "@real-router/svelte";
+
   import { store } from "../../../../../shared/store";
+
   import type { User } from "../../../../../shared/api";
 
   let { onLogout }: { onLogout: () => Promise<void> } = $props();
@@ -28,7 +30,9 @@
   <div style="display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap">
     <button onclick={() => {
       const current = navigator.getState();
-      if (!current) return;
+
+      if (!current) {return;}
+
       void navigator.navigate(current.name, current.params, { ...current.search, lang: lang === "en" ? "ru" : "en" }, { reload: true });
     }}>
       Toggle lang ({lang === "en" ? "→ RU" : "→ EN"})

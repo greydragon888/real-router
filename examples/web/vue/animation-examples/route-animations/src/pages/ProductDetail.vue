@@ -12,16 +12,12 @@ const COVERS: Partial<Record<string, { name: string; color: string }>> = {
 };
 
 const { route } = useRoute<{ id: string }>();
-const id = computed(() => route.value?.params.id ?? "1");
+const id = computed(() => route.value.params.id);
 const product = computed(() => COVERS[id.value]);
 </script>
 
 <template>
-  <div
-    v-if="product"
-    data-route-root
-    data-route-anim="hero-flip"
-  >
+  <div v-if="product" data-route-root data-route-anim="hero-flip">
     <h2>{{ product.name }}</h2>
     <!--
       `data-product-id` is the same stable handle the thumbnail on
@@ -41,26 +37,18 @@ const product = computed(() => COVERS[id.value]);
       animation: source rect captured on leave (inside the
       <code>useRouteExit</code> handler in <code>useHeroMorph</code>),
       destination rect measured after commit (in
-      <code>navigator.subscribe</code> + <code>setTimeout(0)</code>),
-      then the delta plays via <code>element.animate()</code>. The
-      parallel <code>view-transitions/</code> example does this with
-      two CSS rules and matching <code>view-transition-name</code> —
-      the recipe pays in JS for cross-browser support.
+      <code>navigator.subscribe</code> + <code>setTimeout(0)</code>), then the
+      delta plays via <code>element.animate()</code>. The parallel
+      <code>view-transitions/</code> example does this with two CSS rules and
+      matching <code>view-transition-name</code> — the recipe pays in JS for
+      cross-browser support.
     </p>
     <p>
-      <Link routeName="products" activeStrict>
-        ← Back to products
-      </Link>
+      <Link routeName="products" activeStrict> ← Back to products </Link>
     </p>
   </div>
-  <div
-    v-else
-    data-route-root
-    data-route-anim="hero-flip"
-  >
+  <div v-else data-route-root data-route-anim="hero-flip">
     <h2>Unknown product</h2>
-    <Link routeName="products" activeStrict>
-      Back to products
-    </Link>
+    <Link routeName="products" activeStrict> Back to products </Link>
   </div>
 </template>

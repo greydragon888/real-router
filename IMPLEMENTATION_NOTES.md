@@ -11760,3 +11760,38 @@ Nothing recorded which tasks those were.
 - `post-merge.yml` passes `--summarize` and uploads `turbo-summary-post-merge` for 90 days, under `if: always()`.
 
 **Why 90 days, and not the metrics store alone.** The summaries hold each task's start and end time. Critical-path questions such as #2429 and #2437 therefore stay answerable from them after the store's 14 days are gone. The volume is small: at most 1.40 GB at 90 days, against 0.22 GB at 14. The estimate treats every `ci.yml` run as being as heavy as the CI run of #2557 (17 summaries, 777 KB), at the 147 runs of the seven days to 2026-09-24. Leaf runs upload fewer summaries.
+
+## Components outside `packages/` are linted, and `lint:reach` names code by an explicit list (#2556, 2026-09-24)
+
+**Problem.** No config under `examples/` or `benchmarks/` addressed `.svelte` or `.vue`, so `lint:example` and `lint:bench` skipped 342 components without a word: 145 `.svelte` and 136 `.vue` files in the examples, and 61 `.svelte` files in the benchmarks. `lint:reach` could not see it. It waived the two aggregators that hold only a layout component, because it counted neither extension as something ESLint reads. The #2407 census covered `packages/` only, and it counted an extension as code only when some config addressed it, so it was blind to `.vue`.
+
+**Solution.**
+
+- The root config lints components. `withComponentFiles` gives every block that addresses `*.ts` the component extensions too, in the block itself, and section 15.2 adds the two parsers and what differs for a component. `packages/svelte` drops its own copy of those blocks. `benchmarks/eslint.config.mjs` passes its measured-apps blocks through the same helper.
+- Every file the project service parses gets the same `extraFileExtensions`, `[".svelte", ".vue"]`.
+- The component parsers get the `@typescript-eslint/parser` module itself.
+- The benchmark components get `moduleResolution: Bundler` programs: `cross-router/tsconfig.json` includes `apps/**/*.svelte`, and `adapter-bench/apps/svelte/tsconfig.json` is new.
+- `lint:example` and `lint:bench` take `*.svelte` and `*.vue` among their turbo inputs, and `lint` and `lint:fix` take `*.vue` beside `*.svelte`.
+- The svelte and vue aggregators lint `shared/`, each with a `shared/tsconfig.json`.
+- In `lint:reach`, `NOT_CODE` lists what is not code, and every other tracked file is code. The census covers every linted workspace with one ESLint instance. A package's deliberate `ignores` passes only for a file `scripts/lint-reach-deliberate.mjs` names.
+- `scripts/component-lint-config.test.mjs` (formerly `svelte-lint-config.test.mjs`) pins which rules reach a component in each tree, the shared `extraFileExtensions`, the parser module, and `import-x/no-duplicates` off for svelte files. Each of 15 mutants of the guard and the pins fails a test.
+- The debt was fixed in place. `eslint --fix` changed 120 files, and 96 findings were left for a hand fix; 17 of those are answered by a disable directive that names its reason.
+
+**What the lint found.** `examples/web/svelte/reactive-source`'s navigation monitor read `name`, `path` and `params` off the route source's snapshot, which holds `route` and `previousRoute`. It has shown "—" and an empty history since it was written. Beside it the lint found four dead imports or bindings, thirteen unkeyed `{#each}` blocks, and optional chains and fallbacks on values the types say are always there.
+
+**Four traps, each measured.**
+
+- **An `extraFileExtensions` that differs between files.** typescript-eslint reloads every project whenever the value changes from one file to the next, and #2407 set it on components only. Cold, cache off: `packages/svelte`'s lint took 46.4 s, and 8.9 s with one value for every file; `lint:bench` with the components took 505.7 s, against 27.2 s (24.3 s without them). The findings matched file for file. The #2407 entry above credits its "about a minute" to the file count; it was the reloads.
+- **svelte-eslint-parser tests a parser object it does not recognise** by parsing an empty file with no `tsconfigRootDir`, and `tsEslint.parser` is such an object. `benchmarks/eslint.config.mjs` reads a preset off `tseslint.configs`, which registers a second candidate root (#2390), so under `benchmarks/` that parse throws. The parser swallows the error and reads the component as JavaScript, without the rune types: `$props()` came out `any`, 24 findings.
+- **`moduleResolution: NodeNext` cannot resolve the svelte adapter's own source.** Through the root tsconfig's `@real-router/internal-source` condition, `@real-router/svelte` resolves to `src/index.ts`, which imports its rune modules as `./composables/useRoute.svelte`. As ESM under NodeNext that specifier does not reach `useRoute.svelte.ts`, so every hook the adapter exports is an error type, 39 findings. The cross-router components fell through to the root tsconfig, because `cross-router/tsconfig.json` included only `*.ts` and `*.tsx`; the adapter-bench ones inherited NodeNext.
+- **`import-x/no-duplicates` merges `svelte/*` subpaths.** They all resolve to `svelte/types/index.d.ts`, and the rule's fix turned `svelte/transition` and `svelte/easing` into one import from `svelte/easing`, which `vite build` rejected. The rule is off for `.svelte` and `.svelte.ts`. A `.ts` file that imports two svelte subpaths has the same exposure; none does today.
+
+`unicorn/prefer-global-this`'s fix also needed a hand: it turned a `window as Window & {…}` cast into `globalThis as Window & {…}`, which `vue-tsc` rejects. The cast is `typeof globalThis & {…}` now.
+
+**Why an explicit list of what is not code.** Derived from the configs, the census cannot see an extension none of them addresses, which is this issue's `.vue`. A list of code extensions drifts silently, as `LINTABLE` did. A list of what is not code drifts loudly: a new kind of file in a lint target fails the census until it is classified.
+
+**How "the bundles did not change" was established.** Every svelte bundle the benchmarks measure was built on the base commit and after the change, and compared by sha256: the 27 cross-router svelte apps and the adapter-bench svelte bundle, 55 files, all identical. A second build of the base was identical to the first, and a planted text change in one component changed exactly that app's two files.
+
+**How the examples were checked.** `vue-tsc` and `vite build` pass for every svelte and vue example, and `build:app` passes for the SSR ones, with `svelte-check` or `vue-tsc`. `svelte-check`, run by hand over the svelte examples that no gate type-checks, reports 51 errors on the base commit and 47 after the change; the four gone are the monitor's.
+
+**Cost, measured.** `lint:reach` takes about 9 s, against about 8 s for the `packages/`-only census. A lint process that loads the root config starts about 0.2 s later, for the svelte parser and plugin.

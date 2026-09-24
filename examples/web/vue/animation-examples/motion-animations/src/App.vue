@@ -6,8 +6,8 @@ import Home from "./pages/Home.vue";
 import ProductDetail from "./pages/ProductDetail.vue";
 import ProductsList from "./pages/ProductsList.vue";
 import QueryDemo from "./pages/QueryDemo.vue";
-import Layout from "../../../shared/Layout.vue";
 import { useRouteExitCoordination } from "./use-route-exit-coordination";
+import Layout from "../../../shared/Layout.vue";
 
 const links = [
   { routeName: "home", label: "Home" },

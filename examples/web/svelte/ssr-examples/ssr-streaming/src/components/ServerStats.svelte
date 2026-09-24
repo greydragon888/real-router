@@ -26,9 +26,9 @@
   }
 
   const STATS_BY_PRODUCT: Record<string, ProductStats> = {
-    "1": { productId: "1", views: 18432, rating: 4.7 },
+    "1": { productId: "1", views: 18_432, rating: 4.7 },
     "2": { productId: "2", views: 9201, rating: 4.4 },
-    "3": { productId: "3", views: 27109, rating: 4.9 },
+    "3": { productId: "3", views: 27_109, rating: 4.9 },
     "4": { productId: "4", views: 12, rating: 1.2 },
     "5": { productId: "5", views: 3, rating: 0 },
   };
@@ -46,7 +46,7 @@
       // Server: simulate a database query. render() awaits us before
       // emitting HTML, so the resolved data lands in the SSR response.
       return new Promise((resolve) =>
-        setTimeout(() => resolve(stats), SERVER_STATS_DELAY_MS),
+        setTimeout(() => { resolve(stats); }, SERVER_STATS_DELAY_MS),
       );
     }
 

@@ -11,7 +11,7 @@
 <div>
   <h1>Users</h1>
   <p>Click a user to view their profile. Notice how breadcrumbs update.</p>
-  {#each users as user}
+  {#each users as user (user.id)}
     <div class="card">
       <strong>{user.name}</strong>
       <span style="margin-left: 8px; color: #888;">{user.role}</span>

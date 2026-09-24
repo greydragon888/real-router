@@ -1,21 +1,22 @@
 <script lang="ts">
   import { getDependenciesApi, getRoutesApi } from "@real-router/core/api";
   import { RouterProvider, RouteView } from "@real-router/svelte";
-  import type { Router } from "@real-router/core";
-  import Layout from "../../shared/Layout.svelte";
+
+  import Admin from "./pages/Admin.svelte";
+  import Contacts from "./pages/Contacts.svelte";
+  import Dashboard from "./pages/Dashboard.svelte";
   import Home from "./pages/Home.svelte";
   import Login from "./pages/Login.svelte";
-  import Dashboard from "./pages/Dashboard.svelte";
-  import Settings from "./pages/Settings.svelte";
-  import Admin from "./pages/Admin.svelte";
   import Services from "./pages/Services.svelte";
-  import Contacts from "./pages/Contacts.svelte";
+  import Settings from "./pages/Settings.svelte";
   import { publicRoutes, privateRoutes } from "./routes";
   import { defineAbilities } from "../../../../shared/abilities";
   import { store } from "../../../../shared/store";
+  import Layout from "../../shared/Layout.svelte";
 
-  import type { User } from "../../../../shared/api";
   import type { AppDependencies } from "./types";
+  import type { User } from "../../../../shared/api";
+  import type { Router } from "@real-router/core";
 
   let { router }: { router: Router<AppDependencies> } = $props();
 

@@ -26,7 +26,7 @@ useListFlip(list);
 const { route } = useRoute();
 
 const filter = computed<Filter>(
-  () => (route.value?.search.filter as Filter | undefined) ?? "all",
+  () => (route.value.search.filter as Filter | undefined) ?? "all",
 );
 
 const visible = computed(() =>
@@ -40,18 +40,16 @@ const visible = computed(() =>
   <div ref="root">
     <h1>Query-only navigation</h1>
     <p>
-      Click a filter — the page itself does not fade because the
-      composable's default <code>skipSameRoute: true</code>
+      Click a filter — the page itself does not fade because the composable's
+      default <code>skipSameRoute: true</code>
       short-circuits when
-      <code>route.name === nextRoute.name</code>. Three coordinated
-      WAAPI animations play instead, all driven by
-      <code>useListFlip</code>: survivors translate from old to new
-      positions (inverse-FLIP from a
-      <code>getBoundingClientRect</code> diff in
-      <code>watch(route)</code>); newly-visible items fade in; items
-      removed by a narrowing filter fade out via cloned ghosts
-      reconstructed from <code>outerHTML</code> and pinned at their
-      last-known rect. View-local — no router events, no shared state
+      <code>route.name === nextRoute.name</code>. Three coordinated WAAPI
+      animations play instead, all driven by <code>useListFlip</code>: survivors
+      translate from old to new positions (inverse-FLIP from a
+      <code>getBoundingClientRect</code> diff in <code>watch(route)</code>);
+      newly-visible items fade in; items removed by a narrowing filter fade out
+      via cloned ghosts reconstructed from <code>outerHTML</code> and pinned at
+      their last-known rect. View-local — no router events, no shared state
       between components.
     </p>
 

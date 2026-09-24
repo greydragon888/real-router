@@ -19,11 +19,7 @@ const data = computed<UserPostsData | undefined>(
   <div v-else data-testid="user-posts">
     <h3>Posts</h3>
     <ul>
-      <li
-        v-for="post in data.posts"
-        :key="post.id"
-        :data-post-id="post.id"
-      >
+      <li v-for="post in data.posts" :key="post.id" :data-post-id="post.id">
         {{ post.title }}
       </li>
     </ul>

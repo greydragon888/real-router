@@ -22,8 +22,9 @@ const count = ref(0);
 onMounted(() => {
   // Stamp the moment hydration completes — e2e suite reads this to
   // verify hydration was deferred AND eventually fired.
+  // eslint-disable-next-line unicorn/no-global-object-property-assignment -- the e2e suite reads this stamp
   (
-    window as Window & { __LAZY_HYDRATED_AT__?: number }
+    globalThis as typeof globalThis & { __LAZY_HYDRATED_AT__?: number }
   ).__LAZY_HYDRATED_AT__ = Date.now();
 });
 
@@ -39,14 +40,10 @@ function increment(): void {
   >
     <h2>Heavy Analytics (lazy-hydrated)</h2>
     <p>
-      Below-the-fold component, server-rendered eagerly but hydrated only
-      when scrolled into view.
+      Below-the-fold component, server-rendered eagerly but hydrated only when
+      scrolled into view.
     </p>
-    <button
-      type="button"
-      data-testid="heavy-counter"
-      @click="increment"
-    >
+    <button type="button" data-testid="heavy-counter" @click="increment">
       Clicked: {{ count }}
     </button>
   </section>

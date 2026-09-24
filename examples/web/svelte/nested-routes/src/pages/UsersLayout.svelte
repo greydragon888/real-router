@@ -1,8 +1,10 @@
 <script lang="ts">
   import { Link, RouteView, useRoute, useRouteNode, useRouteUtils } from "@real-router/svelte";
-  import type { Params } from "@real-router/core";
-  import UsersList from "./UsersList.svelte";
+
   import UserProfile from "./UserProfile.svelte";
+  import UsersList from "./UsersList.svelte";
+
+  import type { Params } from "@real-router/core";
 
   const routeLabels: Record<string, string> = {
     home: "Home",
@@ -16,8 +18,10 @@
     }
     if (name === "users.profile") {
       const id = typeof params.id === "string" ? params.id : "?";
+
       return `User #${id}`;
     }
+
     return name;
   }
 
@@ -30,7 +34,7 @@
   {@const chain = utils.getChain(globalRoute.current.name) ?? [globalRoute.current.name]}
   {@const crumbs = ["home", ...chain]}
   <nav class="breadcrumbs" aria-label="breadcrumb">
-    {#each crumbs as name, i}
+    {#each crumbs as name, i (name)}
       {#if i > 0}<span> › </span>{/if}
       {#if i === crumbs.length - 1}
         <span>{getLabel(name, globalRoute.current.params)}</span>

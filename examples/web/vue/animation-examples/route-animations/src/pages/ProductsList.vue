@@ -22,7 +22,7 @@ type SortDirection = "asc" | "desc";
 const { route } = useRoute();
 
 const sort = computed<SortDirection>(() =>
-  route.value?.search.sort === "desc" ? "desc" : "asc",
+  route.value.search.sort === "desc" ? "desc" : "asc",
 );
 
 const items = computed(() => {
@@ -38,13 +38,12 @@ const items = computed(() => {
   <div data-route-root data-route-anim="slide">
     <h1>Products</h1>
     <p>
-      Click a product card to see the manual hero-morph: the
-      thumbnail's bounding rect is captured before leave, an
-      inverse-FLIP transform on the destination cover after the new
-      page mounts. Compare with the parallel
+      Click a product card to see the manual hero-morph: the thumbnail's
+      bounding rect is captured before leave, an inverse-FLIP transform on the
+      destination cover after the new page mounts. Compare with the parallel
       <code>view-transitions/</code> example, where the browser pairs
-      <code>view-transition-name</code> values and animates for you in
-      two CSS rules.
+      <code>view-transition-name</code> values and animates for you in two CSS
+      rules.
     </p>
 
     <div class="products-toolbar">
@@ -75,10 +74,7 @@ const items = computed(() => {
         class="product-card"
         :data-flip-key="product.id"
       >
-        <Link
-          routeName="products.detail"
-          :routeParams="{ id: product.id }"
-        >
+        <Link routeName="products.detail" :routeParams="{ id: product.id }">
           <span
             class="product-thumb"
             :data-product-id="product.id"

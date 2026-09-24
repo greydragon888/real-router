@@ -36,6 +36,7 @@
 
   const toggleCart = () => {
     const next = !cartHasItems;
+
     cartHasItems = next;
     cartState.hasItems = next;
   };
@@ -87,7 +88,7 @@
       Dismiss manually or navigate successfully to auto-reset.
     </p>
     <RouterErrorBoundary>
-      {#snippet fallback(error, resetError)}
+      {#snippet fallback(error: RouterError, resetError: () => void)}
         <div class="toast error" style="position: relative">
           {error.code}: cart is empty
           <button onclick={resetError} style="margin-left: 8px">✕</button>

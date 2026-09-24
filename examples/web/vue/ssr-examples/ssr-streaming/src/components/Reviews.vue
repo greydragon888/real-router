@@ -52,9 +52,7 @@ const reviews = await fetchReviews(props.productId);
 </script>
 
 <template>
-  <p v-if="reviews.length === 0" data-testid="reviews-empty">
-    No reviews yet.
-  </p>
+  <p v-if="reviews.length === 0" data-testid="reviews-empty">No reviews yet.</p>
   <section v-else data-testid="reviews-section">
     <h2>Reviews ({{ reviews.length }})</h2>
     <ul>
