@@ -58,12 +58,10 @@ const PACKAGES_DIR = path.resolve(__dirname, "../../..");
  * pins all three, because a narrower glob is silent: it reds nothing and simply
  * stops looking.
  *
- * ⚠ `globSync` does not descend into a symlinked directory, so the ten
- * `shared/` aliases inside consumer packages are absent from the glob by
- * construction and are reached through their real path instead. Without that
- * second term they would be scanned zero times, not twice. The eleventh,
- * `packages/angular/src/dom-utils`, is a git-tracked COPY rather than a link,
- * so it IS in the glob and answers for itself.
+ * ⚠ `globSync` does not descend into a symlinked directory, so the `shared/`
+ * aliases inside consumer packages are absent from the glob by construction
+ * and are reached through their real path instead. Without that second term
+ * they would be scanned zero times, not twice.
  */
 function scannedFiles(): string[] {
   const fromPackages = globSync(`${PACKAGES_DIR}/*/src/**/*.{ts,tsx,svelte}`);
@@ -948,16 +946,6 @@ const NARRATION_FORMS: readonly {
  */
 const NARRATION_BASELINE: readonly Row[] = [
   {
-    file: "packages/angular/src/dom-utils/scroll-restore.ts",
-    form: "was/were + state",
-    count: 1,
-  },
-  {
-    file: "packages/angular/src/dom-utils/scroll-spy.ts",
-    form: "was/were + state",
-    count: 1,
-  },
-  {
     file: "packages/core/src/api/cloneRouter.ts",
     form: "had + participle",
     count: 1,
@@ -1281,16 +1269,6 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
 ];
 
 const COUNT_BASELINE: readonly Row[] = [
-  {
-    file: "packages/angular/src/dom-utils/link-utils.ts",
-    form: "all/only/exactly N",
-    count: 1,
-  },
-  {
-    file: "packages/angular/src/dom-utils/scroll-spy.ts",
-    form: "N code-artifacts",
-    count: 1,
-  },
   {
     file: "packages/angular/src/functions/injectRouteEnter.ts",
     form: "N code-artifacts",

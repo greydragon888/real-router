@@ -24,30 +24,22 @@ export default mergeConfig(
   defineConfig({
     test: {
       coverage: {
-        // Ratcheted again after #1512 layers 1-2: the ordinary non-JIT gaps
-        // (providersFactory, dom-utils) are closed in the jit suite, and the
-        // aot project now exercises RouteView's fallback resolution AND the
-        // RealLink / RealLinkActive signal-input paths for real. What keeps
-        // the floor below 100 is no longer untested code but merge
-        // duplicates: the jit (esbuild) and aot (Angular) emits map some
-        // statements of dual-tested files (RouteView, RealLink,
-        // RealLinkActive) to different ranges, so the merged report keeps
-        // uncovered jit-emit twins of lines the aot map covers (verify with
+        // These floors measure angular's own code. `src/dom-utils` is the
+        // `shared/dom-utils` symlink, which `vitest.config.unit.mts` leaves
+        // out of every consumer's coverage; react measures it as its owner
+        // (#2552). What keeps the floors below 100 is merge duplicates: the
+        // jit (esbuild) and aot (Angular) emits map some statements of
+        // dual-tested files (RouteView, RealLink, RealLinkActive) to
+        // different ranges, so the merged report keeps uncovered jit-emit
+        // twins of lines the aot map covers (verify with
         // `pnpm test --project aot`) — plus a few AOT-emit phantom branches.
-        // These are the measured floors, locked to catch regressions
-        // (actual: 98.89 / 94.72 / 99.45 / 98.83).
+        // The floors are measured and locked to catch regressions.
         thresholds: {
-          statements: 98,
-          branches: 94,
-          functions: 99,
-          lines: 98,
+          statements: 96,
+          branches: 86,
+          functions: 98,
+          lines: 97,
         },
-        // `src/dom-utils/direction-tracker.ts` is no longer excluded —
-        // `tests/functional/direction-tracker.test.ts` now covers all
-        // branches (review-2026-05-10 §5.5 КРИТИЧНО gap closed). See
-        // also `tests/stress/direction-tracker-popstate.stress.ts` for
-        // at-scale coverage (50 popstate × 100 navs, 100 install/destroy
-        // cycles).
       },
       projects: [
         {

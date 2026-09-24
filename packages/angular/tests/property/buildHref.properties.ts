@@ -2,7 +2,7 @@
 
 /**
  * Property-based tests for `buildHref` from `packages/angular/src/dom-utils/`
- * (git-tracked copy of `shared/dom-utils/link-utils.ts`).
+ * (the `shared/dom-utils` symlink).
  *
  * Closes review-2026-05-10 §6.2 invariants 3 (idempotency on `#` prefix) and
  * 4 (hash append correctness). The full surface mirrors svelte's coverage so
@@ -28,9 +28,6 @@ import { describe, expect, vi } from "vitest";
 
 import { NUM_RUNS, arbDottedNameExtended, arbHash } from "./helpers";
 import { buildHref } from "../../src/dom-utils";
-// Imported directly from `shared/` because Angular's `sync-dom-utils.mjs`
-// strips `__`-prefixed test-helper dirs from its `src/dom-utils/` copy
-// (ng-packagr would otherwise bundle them into the lib output).
 
 import type { Params, Router } from "@real-router/core";
 
@@ -443,9 +440,8 @@ describe("buildHref — Property Tests", () => {
     });
   });
 
-  // The Angular adapter holds a git-tracked copy of `link-utils.ts`. The
-  // identical `encodeFragmentInline` formula also lives in
-  // `shared/browser-env/url-context.ts` (`encodeHashFragment`). Three copies
+  // The identical `encodeFragmentInline` formula also lives in
+  // `shared/browser-env/url-context.ts` (`encodeHashFragment`). The two copies
   // must stay aligned; this drift sentinel pins the documented formula.
   describe("Invariant 12: encodeFragmentInline matches the documented RFC 3986 + %23 formula", () => {
     test.prop([arbHash, fc.string({ minLength: 1, maxLength: 16 })], {

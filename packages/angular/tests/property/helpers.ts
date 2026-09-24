@@ -3,11 +3,8 @@
 /**
  * Shared arbitraries for the Angular property suite.
  *
- * Angular's `src/dom-utils/` is a **git-tracked copy** of `shared/dom-utils/`
- * (not a symlink — ng-packagr doesn't follow them the same way tsdown does).
- * The property tests exercise the copy by direct import; if anyone forgets to
- * run `pnpm -F @real-router/angular bundle` after editing the shared source,
- * the property suite is the canary that catches the drift.
+ * Angular's `src/dom-utils/` is the `shared/dom-utils/` symlink (#2552); the
+ * property tests import through it.
  *
  * Arbitraries mirror `packages/svelte/tests/property/helpers.ts` so the two
  * suites stay in lockstep — the same functions, the same invariant surface.

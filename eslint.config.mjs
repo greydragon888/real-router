@@ -957,10 +957,10 @@ export default tsEslint.config(
 
       // --- Low-value stylistic whose ONLY prod sites are the symlinked shared
       // sources (shared/browser-env, shared/dom-utils). Those lint under several
-      // path views (packages/dom-utils/src/X vs packages/angular/src/dom-utils/X
-      // vs adapter symlinks), so a `files` glob carve-out is unreliable — and
-      // shared/dom-utils is frozen (no cleanliness refactors, hand-synced angular
-      // copy). Not worth it for escape-style / `Infinity` / decl-ordering. ---
+      // path views (shared/<dir>/X vs the consumers' symlinks), so a `files`
+      // glob carve-out is unreliable — and shared/dom-utils is frozen (no
+      // cleanliness refactors). Not worth it for escape-style / `Infinity` /
+      // decl-ordering. ---
       "unicorn/prefer-unicode-code-point-escapes": "off",
       "unicorn/prefer-global-number-constants": "off",
       "unicorn/no-declarations-before-early-exit": "off",

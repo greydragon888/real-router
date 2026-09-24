@@ -210,7 +210,7 @@ async function createTestRouter(opts?: {
   return router;
 }
 
-describe("createScrollSpy (Angular dom-utils copy)", () => {
+describe("createScrollSpy (Angular dom-utils)", () => {
   beforeEach(() => {
     ioInstances.length = 0;
     moInstances.length = 0;

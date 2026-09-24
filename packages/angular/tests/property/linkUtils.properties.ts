@@ -4,9 +4,8 @@
  * Property-based tests for `shouldNavigate` and `buildActiveClassName` as
  * imported and used by Angular's directives (`RealLink`, `RealLinkActive`).
  * These exercise the production functions in
- * `packages/angular/src/dom-utils/link-utils.ts` (git-tracked copy of the
- * shared source). Drift between the copy and `shared/dom-utils/link-utils.ts`
- * surfaces here as a property-test failure.
+ * `packages/angular/src/dom-utils/link-utils.ts` (the `shared/dom-utils`
+ * symlink).
  *
  * Closes review-2026-05-10 §6.2 invariants 5, 6, 7 + mirrors svelte parity.
  *

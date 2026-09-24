@@ -218,14 +218,6 @@ jobs:
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
 
-      # ONE implementation, shared with `.husky/pre-commit` (#1838). It used to
-      # live inline here only, so drift was committable locally and surfaced on
-      # the PR after a push and a full CI round. Dependency-free and <1s, so it
-      # runs before the expensive turbo steps (fail-fast); the script emits the
-      # same `::error::` annotation when GITHUB_ACTIONS is set.
-      - name: Check angular dom-utils copy is in sync
-        run: node scripts/check-angular-dom-utils-sync.mjs
-
       # Leaf EXECUTION scope = the ROUTING decision. build-matrix.mjs emits
       # leaf_filter as explicit `--filter=<pkg>` tokens from `turbo query affected
       # --packages`, which attributes a ROOT-file change (pnpm-lock.yaml, root
@@ -404,11 +396,6 @@ jobs:
 
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
-
-      # ONE implementation, shared with the other jobs and `.husky/pre-commit`
-      # (#1838). This block was copied verbatim into three jobs.
-      - name: Check angular dom-utils copy is in sync
-        run: node scripts/check-angular-dom-utils-sync.mjs
 
       - name: Bundle core layer
         run: pnpm turbo run bundle --filter='@real-router/core...' --summarize
@@ -948,11 +935,6 @@ jobs:
 
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
-
-      # ONE implementation, shared with the other jobs and `.husky/pre-commit`
-      # (#1838). This block was copied verbatim into three jobs.
-      - name: Check angular dom-utils copy is in sync
-        run: node scripts/check-angular-dom-utils-sync.mjs
 
       # matrix.filter is one or more `--filter=<pkg>` tokens. Route it through an
       # env var (no ${{ }} inside run: — keeps actionlint clean) and leave it

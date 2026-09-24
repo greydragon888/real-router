@@ -253,17 +253,9 @@ describe("every deciding intrinsic is captured (#1971)", () => {
     // read" are the same answer to a broken scanner.
     const packageFiles = globSync(`${PACKAGES}/*/src/**/*.ts`).length;
     const sharedFiles = globSync(`${SHARED}/**/*.ts`).length;
-    // ⚠ `packages/angular/src/dom-utils` is `shared/dom-utils` re-materialised by
-    // angular's `prebundle` (ng-packagr does not follow symlinks the way tsdown
-    // does), so it is the same source shipped twice — and it was a hole while
-    // the roots were core + `shared/` alone: planting a raw `Object.keys` there
-    // left this suite GREEN. The `packages/*/src` wildcard reaches it now, but
-    // only while the walk descends there at all, so it is asserted by name.
-    const copied = globSync(`${PACKAGES}/angular/src/dom-utils/**/*.ts`).length;
 
     expect(packageFiles).toBeGreaterThan(300);
     expect(sharedFiles).toBeGreaterThan(10);
-    expect(copied).toBeGreaterThan(5);
   });
 
   it("leaves no unclassified raw read anywhere the repository ships source", () => {

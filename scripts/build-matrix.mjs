@@ -213,9 +213,7 @@ export function classify(pkg, dirOf, readers = defaultReaders) {
   const symlinks = readers.readSymlinks(dir);
 
   // Adapter — dual signature: deps {sources, route-utils} OR a shared/dom-utils
-  // symlink. 5/6 adapters carry the symlink; angular is a git-tracked copy
-  // (ng-packagr can't follow symlinks) and is caught by the deps signature.
-  // `endsWith` (not `includes`) guards against future siblings like
+  // symlink. `endsWith` (not `includes`) guards against future siblings like
   // `shared/dom-utils-extra` collision-matching here.
   if (
     (deps.has("@real-router/sources") &&

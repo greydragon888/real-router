@@ -2,8 +2,8 @@
 
 /**
  * Property-based tests for `navigateWithHash` (#532) from
- * `packages/angular/src/dom-utils/link-utils.ts` (git-tracked copy of the
- * shared source).
+ * `packages/angular/src/dom-utils/link-utils.ts` (the `shared/dom-utils`
+ * symlink).
  *
  * Closes review-2026-05-10 §6.2 invariant 8 (same-route + same-hash
  * idempotency). The full surface mirrors svelte's coverage so the two

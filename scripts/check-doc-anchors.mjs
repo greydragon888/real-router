@@ -63,12 +63,9 @@ function indexRepo(dir, out = []) {
         continue;
       // ⚠ The tree is LIVE — this walk runs beside whatever else is touching
       // the checkout, and a directory listed a moment ago can be gone before
-      // it is opened. Measured at 3 crashes in 100 walks under a tight churn
-      // loop, plus one red CI job, when a concurrent step rebuilt
-      // `packages/angular/src/dom-utils` by wiping it first. That particular
-      // wiper is gone — `sync-dom-utils.mjs` now writes in place and prunes
-      // only what the source dropped — but nothing makes this walk the only
-      // process in the checkout, so the guard stays.
+      // it is opened (measured: 3 crashes in 100 walks under a tight churn
+      // loop). Nothing makes this walk the only process in the checkout, so
+      // the guard stays.
       //
       // Skipping is the right answer rather than merely the safe one: a
       // directory that no longer exists holds no files to index. The cost is

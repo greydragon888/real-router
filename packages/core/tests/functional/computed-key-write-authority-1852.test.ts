@@ -49,10 +49,8 @@ const SRC_DIR = path.resolve(__dirname, "../../src");
 
 /**
  * Every OTHER package's `src` (#1901). `packages/*` minus core — the glob does
- * not descend into a symlinked directory, so the three `shared/` aliases are
- * absent from it by construction and stay with their coverage owners (#1838).
- * `packages/angular/src/dom-utils` IS reached, because that one is a tracked
- * copy rather than a symlink, and it costs nothing: it scans clean.
+ * not descend into a symlinked directory, so the `shared/` aliases are absent
+ * from it by construction and stay with their coverage owners (#1838).
  */
 const PACKAGES_DIR = path.resolve(__dirname, "../../..");
 

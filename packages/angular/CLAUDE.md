@@ -55,7 +55,7 @@ src/                            # Main entry — client API
 │   ├── RouterErrorBoundary.ts  # Error handling component
 │   ├── NavigationAnnouncer.ts  # Accessibility announcer
 │   └── index.ts
-├── dom-utils/                  # Shared DOM utilities (git-tracked copy of shared/dom-utils/)
+├── dom-utils/                  # Symlink → shared/dom-utils/, as in the other adapters (#2552)
 │   ├── link-utils.ts           # buildHref, buildActiveClassName, applyLinkA11y, navigateWithHash, shallowEqual, shouldNavigate, targetsAnotherContext, anchorTargetsAnotherContext
 │   ├── route-announcer.ts      # createRouteAnnouncer
 │   ├── scroll-restore.ts       # createScrollRestoration
@@ -454,9 +454,9 @@ Despite the `subscribe` method name and `output()` source, the boundary's `onErr
 
 `createScrollRestoration` toggles `history.scrollRestoration = "manual"` inside a `try { ... } catch { /* ignore */ }`. Some embedded browsers (older Android WebView, certain JSDOM versions) declare the property non-writable; the setter throws `TypeError`. The catch keeps the rest of the scroll-restore wiring functional and falls back to native browser scroll restoration. Pinned by `tests/functional/scroll-restore.test.ts`.
 
-## Coverage Ceiling (~98%) — JIT Limitation, not Poor Testing
+## Coverage Ceiling — JIT Limitation, not Poor Testing
 
-Coverage thresholds are **98%/94%/99%/98%** (statements/branches/functions/lines), not 100%. Since #1512 layers 1-2 this is **no longer untested code**: the ordinary non-JIT gaps (providersFactory, dom-utils) are closed in the jit suite, and the aot project exercises every previously JIT-unreachable path (`RouteView` fallback resolution, `RealLink` / `RealLinkActive` active flips, href writes, class transitions) with mutation-validated assertions.
+Coverage thresholds are **96%/86%/98%/97%** (statements/branches/functions/lines), not 100%, and they measure angular's own code: `src/dom-utils` is the `shared/dom-utils` symlink, which `vitest.config.unit.mts` leaves out of every consumer's coverage and react measures as its owner (#2552). The gap is **not untested code**: the ordinary non-JIT gaps (providersFactory) are closed in the jit suite, and the aot project exercises every JIT-unreachable path (`RouteView` fallback resolution, `RealLink` / `RealLinkActive` active flips, href writes, class transitions) with mutation-validated assertions.
 
 What keeps the floor below 100 is structural: **merge duplicates** (files tested in BOTH projects keep uncovered jit-emit twins of lines the aot map covers — see the gotcha below) and a few **AOT-emit phantom branches** (the angular#64583 class: branch records on lines whose every semantic path executes). Closing those would require evicting each Angular-entity file's tests wholly into the aot project and would still not guarantee 100% branches — measured and deliberately not pursued.
 
@@ -487,7 +487,7 @@ Gotchas baked into the setup (hard-won on 2026-07-18, see RFC `.claude/rfc-1512-
 - `sourceToSignal` bridge including rapid emissions and destroy-during-emission
 - All public `inject*` functions with positive and negative cases
 - `RouterErrorBoundary` 100% coverage via public API access (`boundary.errorContext()`, `boundary.onError.subscribe()`)
-- `src/dom-utils/` — 100% across all four metrics in the jit map (incl. `buildHref` defensive arms, scroll-restore reload/hash edge branches, the #781 stale-timer guard)
+- `src/dom-utils/` — the `shared/dom-utils` symlink: angular's own dom-utils tests still run against it, and react's coverage gates it
 
 **Paths to true 100% (deliberately not pursued):**
 

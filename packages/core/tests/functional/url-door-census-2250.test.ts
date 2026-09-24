@@ -219,17 +219,12 @@ describe("which door a URL producer outside core asks (#2250)", () => {
   });
 
   it("every URL a user follows is built by the RESOLVING door", () => {
-    // Five sites, and the two `link-utils` rows are one source: `packages/
-    // angular/src/dom-utils` is a git-tracked COPY of `shared/dom-utils`, so it
-    // ships the same code and is counted as the separate artefact it is.
-    //
     // ⚑ `forwardedHref` is not an href a user follows — it is the SSG manifest's
     // check asking where one WOULD land (#2256). It belongs in this column for
     // exactly that reason: a check that asked the literal door would compare the
     // manifest against a URL no link renders, which is the defect it exists to
     // catch.
     expect(census().fallback).toStrictEqual([
-      "packages/angular/src/dom-utils/link-utils.ts::buildHref",
       "packages/hash-plugin/src/plugin.ts::pluginBuildUrl",
       "packages/ssr-utils/src/getStaticPaths.ts::forwardedHref",
       "shared/browser-env/plugin-utils.ts::(anonymous)",

@@ -110,7 +110,7 @@ function createMockStorage(): Storage {
   };
 }
 
-describe("createScrollRestoration (Angular dom-utils copy)", () => {
+describe("createScrollRestoration (Angular dom-utils)", () => {
   beforeEach(() => {
     vi.stubGlobal("sessionStorage", createMockStorage());
     sessionStorage.clear();

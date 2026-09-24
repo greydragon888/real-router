@@ -28,20 +28,7 @@
 
 «Рефактор ради чистоты» здесь запрещён — микро-изменение ломает сразу 6 bundle'ов. Изменение кода требует: конкретный баг/юз-кейс, тест на него, прогон `pnpm build`.
 
-### 3. Angular sync после любой правки
-
-`packages/angular/src/dom-utils/` — **git-tracked copy**, не symlink (ng-packagr не следует за symlinks как tsdown).
-
-После правки `shared/dom-utils/*.ts`:
-
-```bash
-pnpm -F @real-router/angular bundle     # пере-материализует копию через prebundle
-diff -r shared/dom-utils/ packages/angular/src/dom-utils/ | grep -v index.ts  # должно быть пусто
-```
-
-Коммитить нужно **оба** варианта: источник в `shared/` и копию в `packages/angular/src/dom-utils/`.
-
-### 4. Валидация изменений
+### 3. Валидация изменений
 
 Минимальный чек-лист перед коммитом:
 
@@ -53,10 +40,9 @@ pnpm -F @real-router/svelte test:properties -- --run # property-тесты (ду
 
 ## Консумеры
 
-| Источник            | Как подключено                       | Пакеты                                      |
-| ------------------- | ------------------------------------ | ------------------------------------------- |
-| `shared/dom-utils/` | symlink → `src/dom-utils`            | `preact`, `react`, `solid`, `svelte`, `vue` |
-| `shared/dom-utils/` | git-tracked copy (через `prebundle`) | `angular`                                   |
+| Источник            | Как подключено            | Пакеты                                                 |
+| ------------------- | ------------------------- | ------------------------------------------------------ |
+| `shared/dom-utils/` | symlink → `src/dom-utils` | `angular`, `preact`, `react`, `solid`, `svelte`, `vue` |
 
 Проверка, что symlink цел: `readlink packages/preact/src/dom-utils` должен вернуть относительный путь к `shared/dom-utils/`.
 

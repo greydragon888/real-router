@@ -2657,7 +2657,6 @@ describe("how many times core reads a caller-owned SCALAR slot (#2085)", () => {
       // ── the State is CORE's committed one, deeply frozen ─────────────────
       // Every consumer here is handed `getState()` or a hook argument, and the
       // slot of a frozen State cannot answer twice.
-      "packages/angular/src/dom-utils/route-announcer.ts · resolveText · route.name": 2,
       "packages/core/src/api/getRoutesApi.ts · replaceRoutes · currentState.name": 2,
       "packages/core/src/api/getRoutesApi.ts · replaceRoutes · currentState.path": 3,
       "packages/core/src/transitionPath.ts · computeTransitionPath · fromState.name": 3,

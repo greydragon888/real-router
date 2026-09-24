@@ -4453,6 +4453,11 @@ Framework compilers generate code that v8 coverage tracks but tests can't reach:
 > `@real-router/sources` / `@real-router/core` as **external** (resolved, not inlined). So
 > the anchor's remaining job is purely tsc resolution of those imports from `shared/`'s
 > own location — not the rolldown inline-resolution the narrative below describes.
+>
+> **Superseded further (#2552, 2026-09-24).** `packages/angular/src/dom-utils` is a
+> symlink too, like the other five adapters'. The git-tracked copy, its `prebundle` sync
+> and the `lint:angular-sync` gate are gone; see "`packages/angular/src/dom-utils` is a
+> symlink" at the end of this file.
 
 ### Problem
 
@@ -4501,7 +4506,7 @@ packages/preact/src/dom-utils              → ../../../shared/dom-utils      (s
 packages/vue/src/dom-utils                 → ../../../shared/dom-utils      (symlink)
 packages/solid/src/dom-utils               → ../../../shared/dom-utils      (symlink)
 packages/svelte/src/dom-utils              → ../../../shared/dom-utils      (symlink)
-packages/angular/src/dom-utils             → (git-tracked COPY, re-materialized by prebundle — not a symlink)
+packages/angular/src/dom-utils             → ../../../shared/dom-utils      (symlink)
 
 packages/browser-plugin/src/browser-env    → ../../../shared/browser-env    (symlink, git-tracked)
 packages/hash-plugin/src/browser-env       → ../../../shared/browser-env    (symlink)
@@ -11656,3 +11661,11 @@ Turbo keys a package's `test` task on `tests/**/*.{ts,tsx}`, so inside core the 
 **Solution.** `scripts/check-coverage-scope.test.mjs` runs the real script with `cwd` at a fixture tree the script accepts, and each cell plants one departure from it: a control with the exact summary line; 17 drift cells, one per line the report can print plus the no-tests/phantom wording, a symlink aimed at another dir, and `lint:fix`, each requiring exit 1, its own line, exactly one drift line and no `✓`; and two `--emit` cells, the refusal with empty stdout and the three exact lines CI appends to `$GITHUB_OUTPUT`.
 
 **Why.** The script takes its root from the working directory, and `pnpm` hands it the repository root, so the real file runs in the fixture the way it runs in the hooks: no copy and no flag, unlike #2542 and #2543, whose scripts find their root from their own location. The fixture carries a public `svelte` package because `SIZE_LIMIT_EXCEPTIONS` names it; renaming that exception reds the control. Measured: 30 mutants, all killed with the unmutated control green — each of the 14 drift checks switched off, the report and the refusal switched off, `exitCode` in place of `exit` in both, each emitted line dropped, and the conditions the checks rest on (the phantom threshold, phantom packages in the exclusions, shared-dir components, the `lint:fix` key, the alias target, the `esm()` entries, the owner predicate, the private flag).
+
+## `packages/angular/src/dom-utils` is a symlink (#2552, 2026-09-24)
+
+**Problem.** Angular was the only adapter whose `src/dom-utils` was a git-tracked copy of `shared/dom-utils`, kept because "ng-packagr does not follow symlinks the way tsdown does". The copy needed a sync script run as `prebundle`, a drift gate in both hooks and in three CI jobs, a test of that gate that wrote into the live index (#2551), and a second edit for every `shared/dom-utils` change.
+
+**Solution.** `src/dom-utils` is a symlink to `../../../shared/dom-utils`, as in preact, react, solid, svelte and vue. `prebundle`, `packages/angular/scripts/sync-dom-utils.mjs`, `scripts/check-angular-dom-utils-sync.mjs`, its test, `pnpm lint:angular-sync` and its hook and CI steps are removed. CodeQL lists `shared/dom-utils/**` by its real path, because its extractor does not follow symlinked directories, and Sonar drops its exclusion of the copy's path. Angular's coverage thresholds are its own code's: 96 / 86 / 98 / 97. The scanners and ledgers that counted or filtered the copy (#2092 claim census, comment historiography, read counts, the #2250 URL-door census, and the #1971, #1852, #2197 and #1834 authorities) no longer name it.
+
+**Why.** Measured on ng-packagr 22.1.1: the package built through the symlink is byte-identical to the one built from the copy (`diff -rq` over `dist`, sourcemaps and `.d.ts` included), and so is a build from a plain copy without the sync's two transforms. Type-check passes, and the unit and property suites run the same 437 and 193 tests. The thresholds move because `vitest.config.unit.mts` excludes a symlinked `src/*` from coverage: the copy was 328 of the 444 branches angular measured, all of them covered, and react already measures `shared/dom-utils` as its owner. Angular's own code measures 86.21 % of branches. ESLint does not walk into the symlink, as for preact, solid, svelte and vue; react lints `src/dom-utils/` by name. The sync and the gate had to go before the symlink: both ran the sync, which would have written through the link into `shared/dom-utils`.

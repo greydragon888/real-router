@@ -13,9 +13,8 @@ import type { Router } from "@real-router/core";
  *   - listens to `window.popstate`
  *   - writes `<html data-nav-direction>` on every leave
  *
- * Audit gaps: no functional tests, no stress tests at the package level —
- * the dom-utils package has its own coverage, but the Angular adapter's
- * git-tracked copy is not exercised. This file pins:
+ * It runs through angular's `src/dom-utils` symlink to `shared/dom-utils`.
+ * This file pins:
  *
  *   - popstate flag flips only on real popstate events (not on navigate)
  *   - leave subscriber writes the right direction and resets the flag
@@ -23,7 +22,7 @@ import type { Router } from "@real-router/core";
  *   - 100 install/destroy cycles do not leak listeners or memory
  *   - 50 popstate × 100 navigations stays bounded
  */
-describe("createDirectionTracker stress (Angular copy)", () => {
+describe("createDirectionTracker stress (Angular dom-utils)", () => {
   let router: Router;
 
   beforeEach(async () => {

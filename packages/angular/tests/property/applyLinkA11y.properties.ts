@@ -3,8 +3,8 @@
 
 /**
  * Property-based tests for `applyLinkA11y` from
- * `packages/angular/src/dom-utils/link-utils.ts` (git-tracked copy of the
- * shared source).
+ * `packages/angular/src/dom-utils/link-utils.ts` (the `shared/dom-utils`
+ * symlink).
  *
  * Angular's `RealLink` directive calls `applyLinkA11y(this.host.nativeElement)`
  * in `ngOnInit` so a `<div realLink>` host receives `role="link"` +

@@ -13,7 +13,7 @@
 #                    hasOwnProperty — the #1815 / #2064 class. pre-commit
 #                    runs it too; this hook is the one that sees a merged
 #                    or rebased tree (#2392)
-# - lint:repo-scans, lint:coverage-scope, lint:e2e, lint:angular-sync:
+# - lint:repo-scans, lint:coverage-scope, lint:e2e:
 #                    pre-commit's other checks of the tree, repeated for the
 #                    same reason; a --no-verify commit skips pre-commit too
 #                    (#2548)
@@ -110,12 +110,6 @@ pnpm lint:coverage-scope
 
 echo "🎭 Checking e2e specs..."
 pnpm lint:e2e
-
-# Unconditional here. pre-commit gates it on the staged set because a dirty,
-# unstaged shared/dom-utils would regenerate the copy; the push guard has
-# already refused a dirty tree.
-echo "🔁 Checking angular dom-utils copy..."
-pnpm lint:angular-sync
 
 # The check twin of the `pnpm dedupe` pre-commit runs when the lockfile is
 # staged: a rebased or merged lockfile never passes through that step.

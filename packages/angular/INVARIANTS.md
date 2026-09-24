@@ -2,12 +2,9 @@
 
 Invariants verified by property-based tests in `tests/property/`.
 
-Angular is the only framework adapter whose `src/dom-utils/` is a **git-tracked
-copy** of `shared/dom-utils/` (ng-packagr does not follow symlinks the way
-tsdown does). The property suite imports directly from
-`packages/angular/src/dom-utils/` — if the copy ever drifts from the shared
-source after a `pnpm -F @real-router/angular bundle` is forgotten, these tests
-are the canary that catches it.
+`src/dom-utils/` is a symlink to `shared/dom-utils/`, as in the other framework
+adapters (#2552). The property suite imports through it, so it runs against the
+shared sources the package ships.
 
 The invariant set mirrors `packages/svelte/INVARIANTS.md` one-for-one; any
 divergence between the two suites is itself a smell — the underlying functions

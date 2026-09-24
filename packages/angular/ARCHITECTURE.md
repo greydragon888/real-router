@@ -38,7 +38,7 @@ dist/
 └── ssr/                       # ng-packagr secondary entry
 ```
 
-ng-packagr produces FESM2022 bundles (ESM-only, no CJS). The `dom-utils` directory is an independent in-package copy of `shared/dom-utils/` — not a symlink (unlike the other framework adapters). The `prebundle` script copies `shared/dom-utils/` into `src/dom-utils/` before ng-packagr runs, because ng-packagr does not follow symlinks the same way tsdown does.
+ng-packagr produces FESM2022 bundles (ESM-only, no CJS). `src/dom-utils/` is a symlink to `shared/dom-utils/`, as in the other framework adapters; ng-packagr compiles the shared sources through it (#2552).
 
 The `/ssr` subpath is built as a ng-packagr secondary entry point with its own `ssr/ng-package.json`. Importing from `@real-router/angular/ssr` does not pull SSR-only dependencies into client bundles.
 
@@ -263,7 +263,7 @@ Same subscription pattern as `RealLink` (constructor `effect()` + `subscribeSour
 - Partial compilation artifacts — linked at application build time by the consumer's Angular compiler
 - No Zone.js dependency — signal-first, compatible with `provideExperimentalZonelessChangeDetection()`
 
-**dom-utils prebuild copy:** The `src/dom-utils/` directory is a git-tracked copy of `shared/dom-utils/` — not a symlink (root `CLAUDE.md` calls this out explicitly for the Angular adapter). The `prebundle` script re-materializes the copy before every bundle to keep it in sync with `shared/dom-utils/`. ng-packagr does not follow symlinks the same way tsdown does, so the sources are copied into the package before compilation.
+**dom-utils symlink:** `src/dom-utils/` is a symlink to `shared/dom-utils/`, and ng-packagr compiles through it. The artifact is the one a copy of the same sources produces (#2552).
 
 **JIT mode limitation:** Angular 22 JIT mode (used in TestBed without a compiler transform) does not support signal-based `input()` in template bindings, and `contentChildren()` queries never populate. Paths that need real template compilation are unit-tested in the dedicated **aot** vitest project (`tests/aot/**`, compiled by `@analogjs/vite-plugin-angular`) — see Testing Strategy below.
 

@@ -2,8 +2,8 @@
 
 /**
  * Property-based tests for `shallowEqual` from
- * `packages/angular/src/dom-utils/link-utils.ts` (git-tracked copy of
- * `shared/dom-utils/link-utils.ts`).
+ * `packages/angular/src/dom-utils/link-utils.ts` (the `shared/dom-utils`
+ * symlink).
  *
  * Closes review-2026-05-10 §6.2 invariants 1 (reflexivity + symmetry) and 2
  * (key-count discriminator). The full surface mirrors svelte's coverage so
