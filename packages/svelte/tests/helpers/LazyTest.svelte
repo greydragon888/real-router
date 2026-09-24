@@ -1,6 +1,6 @@
 <script lang="ts">
-  import Lazy from "../../src/components/Lazy.svelte";
   import TestRouterProvider from "./TestRouterProvider.svelte";
+  import Lazy from "../../src/components/Lazy.svelte";
 
   import type { Router } from "@real-router/core";
   import type { Component } from "svelte";

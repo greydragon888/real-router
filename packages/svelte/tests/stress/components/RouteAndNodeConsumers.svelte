@@ -1,6 +1,6 @@
 <script lang="ts">
-  import StressRouteConsumer from "./StressRouteConsumer.svelte";
   import StressConsumer from "./StressConsumer.svelte";
+  import StressRouteConsumer from "./StressRouteConsumer.svelte";
 
   let {
     routeCount,

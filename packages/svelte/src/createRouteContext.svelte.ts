@@ -1,6 +1,5 @@
-import type { Navigator, State } from "@real-router/core";
-
 import type { RouteContext } from "./types";
+import type { Navigator, State } from "@real-router/core";
 
 export interface RouteSnapshot {
   readonly route: State | undefined;

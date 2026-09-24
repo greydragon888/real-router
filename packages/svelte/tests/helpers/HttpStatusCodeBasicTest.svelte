@@ -13,7 +13,5 @@
 </script>
 
 <HttpStatusProvider {sink}>
-  {#snippet children()}
-    <HttpStatusCode {code} />
-  {/snippet}
+  <HttpStatusCode {code} />
 </HttpStatusProvider>

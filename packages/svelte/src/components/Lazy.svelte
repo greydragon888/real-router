@@ -28,27 +28,36 @@
     // invoking the loader synchronously on mount (throw-isolation class, #806).
     let pending: Promise<{ default: Component }>;
 
+    // eslint-disable-next-line sonarjs/no-try-promise -- the try catches a loader that throws before it returns a promise, as the comment above says
     try {
       pending = loader();
-    } catch (err) {
-      pending = Promise.reject(err);
+    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- the `.catch` below wraps a non-Error reason in an Error
+      pending = Promise.reject(error);
     }
 
     pending
       .then((module) => {
-        if (!active) return;
-        if (!module || typeof module.default === "undefined") {
+        if (!active) {
+          return;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- a loader outside its type can resolve to anything
+        if (typeof module?.default === "undefined") {
           throw new Error(
             "[real-router] Lazy loader resolved without a `default` export.",
           );
         }
+
         state = { status: "ready", component: module.default };
       })
-      .catch((err: unknown) => {
-        if (!active) return;
+      .catch((error: unknown) => {
+        if (!active) {
+          return;
+        }
+
         state = {
           status: "error",
-          error: err instanceof Error ? err : new Error(String(err)),
+          error: error instanceof Error ? error : new Error(String(error)),
         };
       });
 

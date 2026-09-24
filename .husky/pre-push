@@ -22,7 +22,9 @@
 # - scripts tests: The repo's own tooling tests (scripts/*.test.mjs), the
 #                  suite CI's Repo Lints runs
 # - lint:reach: Every workspace package is read by a lint step of this hook,
-#               derived from its own `turbo run` lines (#2370)
+#               derived from its own `turbo run` lines (#2370); under
+#               packages/, its own ESLint config lints each tracked file
+#               of code its lint command names (#2407)
 # - build: Final build to ensure compilation
 # - lint:example / lint:bench: ESLint over every example app and over
 #                 benchmarks/, after build — the examples and the Angular

@@ -12,10 +12,8 @@
 </script>
 
 <HttpStatusProvider {sink}>
-  {#snippet children()}
-    <div data-testid="content">
-      <HttpStatusCode code={410} />
-      <p>Hello</p>
-    </div>
-  {/snippet}
+  <div data-testid="content">
+    <HttpStatusCode code={410} />
+    <p>Hello</p>
+  </div>
 </HttpStatusProvider>

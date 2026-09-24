@@ -2,11 +2,11 @@
   import RouteExitProbe from "./RouteExitProbe.svelte";
   import TestRouterProvider from "./TestRouterProvider.svelte";
 
-  import type { Router } from "@real-router/core";
   import type {
     RouteExitHandler,
     UseRouteExitOptions,
   } from "../../src/composables/useRouteExit.svelte";
+  import type { Router } from "@real-router/core";
 
   let {
     router,

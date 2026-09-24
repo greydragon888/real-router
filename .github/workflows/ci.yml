@@ -890,13 +890,14 @@ jobs:
       - name: Check for unused code
         run: pnpm lint:unused
 
-      # Unit-test the CI meta-layer itself (scripts/*.test.mjs — stdlib
-      # node:test, zero install/turbo dependency, so it runs here rather than
-      # in the turbo graph): the shard planner (build-matrix.*) gating the
-      # leaf/sharded routing + input-aware membership logic (#1067, R2.18), and
-      # the gate needs-completeness meta-test (ci-gate-completeness.test.mjs) —
-      # every ci.yml job must feed the CI Result gate or be allowlisted with a
-      # written reason (the #1127 class, debt-map axis A6).
+      # Unit-test the CI meta-layer itself (scripts/*.test.mjs — node:test
+      # outside the turbo graph, so it runs here; several files import tooling
+      # the setup step installs, such as typescript and eslint): the shard
+      # planner (build-matrix.*) gating the leaf/sharded routing + input-aware
+      # membership logic (#1067, R2.18), and the gate needs-completeness
+      # meta-test (ci-gate-completeness.test.mjs) — every ci.yml job must feed
+      # the CI Result gate or be allowlisted with a written reason (the #1127
+      # class, debt-map axis A6).
       - name: Test CI meta (shard planner + gate completeness)
         if: env.DEPENDABOT_PR != 'true' && env.NO_SOURCE != 'true'
         run: node --test scripts/*.test.mjs

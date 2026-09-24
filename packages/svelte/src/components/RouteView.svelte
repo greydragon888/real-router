@@ -1,8 +1,8 @@
 <script lang="ts">
   import { UNKNOWN_ROUTE } from "@real-router/core";
 
-  import { useRouteNode } from "../composables/useRouteNode.svelte";
   import { getActiveSegment } from "./RouteView.helpers";
+  import { useRouteNode } from "../composables/useRouteNode.svelte";
 
   import type { Snippet } from "svelte";
 
@@ -12,10 +12,10 @@
     notFound,
     ...segmentSnippets
   }: {
+    [key: string]: Snippet | string | undefined;
     nodeName: string;
     self?: Snippet;
     notFound?: Snippet;
-    [key: string]: Snippet | string | undefined;
   } = $props();
 
   // svelte-ignore state_referenced_locally

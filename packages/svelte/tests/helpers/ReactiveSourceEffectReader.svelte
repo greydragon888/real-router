@@ -1,7 +1,8 @@
 <script lang="ts">
+  import { createReactiveSource } from "../../src/createReactiveSource.svelte";
+
   import type { RouterSource } from "@real-router/sources";
 
-  import { createReactiveSource } from "../../src/createReactiveSource.svelte";
 
   // Probe component for §5.9 row 4 / row 8: reads `.current` inside `$effect`
   // and reports the read value via `onRead`. The parent test verifies that

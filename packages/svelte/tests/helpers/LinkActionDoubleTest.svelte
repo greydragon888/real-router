@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createLinkAction } from "../../src/actions/link.svelte";
+
   import type { LinkActionParams } from "../../src/actions/link.svelte";
 
   let { params1, params2 }: { params1: LinkActionParams; params2: LinkActionParams } = $props();

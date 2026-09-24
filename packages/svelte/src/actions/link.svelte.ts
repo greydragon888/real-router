@@ -1,12 +1,13 @@
-import type { ActionReturn } from "svelte/action";
-import type { Router, Params, NavigationOptions } from "@real-router/core";
-import { ROUTER_KEY, getContextOrThrow } from "../context";
 import { EMPTY_OPTIONS, EMPTY_PARAMS, NOOP } from "../constants";
+import { ROUTER_KEY, getContextOrThrow } from "../context";
 import {
   shouldNavigate,
   anchorTargetsAnotherContext,
   applyLinkA11y,
 } from "../dom-utils";
+
+import type { Router, Params, NavigationOptions } from "@real-router/core";
+import type { ActionReturn } from "svelte/action";
 
 export interface LinkActionParams {
   name: string;
@@ -45,13 +46,14 @@ function findRegisteredNode(
   nodes: WeakMap<HTMLElement, LinkActionParams>,
   target: EventTarget | null,
 ): HTMLElement | undefined {
-  let el = target instanceof HTMLElement ? target : null;
+  let element = target instanceof HTMLElement ? target : null;
 
-  while (el) {
-    if (nodes.has(el)) {
-      return el;
+  while (element) {
+    if (nodes.has(element)) {
+      return element;
     }
-    el = el.parentElement;
+
+    element = element.parentElement;
   }
 
   return undefined;
@@ -98,6 +100,7 @@ function getDelegation(router: Router): DelegationState {
     }
 
     evt.preventDefault();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- findRegisteredNode returns only a node the map holds
     navigate(nodes.get(node)!);
   }
 
@@ -121,6 +124,7 @@ function getDelegation(router: Router): DelegationState {
       return;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- findRegisteredNode returns only a node the map holds
     navigate(nodes.get(node)!);
   }
 

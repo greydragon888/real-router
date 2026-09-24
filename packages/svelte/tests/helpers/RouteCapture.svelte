@@ -10,5 +10,5 @@
   onCapture(ctx);
 </script>
 
-<div data-testid="route-name">{ctx.route.current?.name ?? "none"}</div>
+<div data-testid="route-name">{ctx.route.current.name}</div>
 <div data-testid="previous-route">{ctx.previousRoute.current?.name ?? "none"}</div>

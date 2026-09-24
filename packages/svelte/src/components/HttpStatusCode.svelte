@@ -54,6 +54,7 @@
   const sink = getContext<HttpStatusSink | undefined>(HTTP_STATUS_KEY);
 
   if (sink) {
+    // eslint-disable-next-line svelte/no-unused-svelte-ignore -- svelte-check reports `state_referenced_locally` on `code` without it
     // svelte-ignore state_referenced_locally
     // Intentional one-time read at component init: the sink is read by the
     // server after `await render()` and a single value is the contract.

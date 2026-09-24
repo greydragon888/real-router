@@ -12,4 +12,4 @@
   onCapture(snapshot);
 </script>
 
-<div data-testid="error">{String(snapshot.current.error?.code ?? "none")}</div>
+<div data-testid="error">{(snapshot.current.error?.code ?? "none")}</div>

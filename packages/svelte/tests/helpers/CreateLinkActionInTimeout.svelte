@@ -15,8 +15,8 @@
       const action = createLinkAction();
 
       onCapture(action, null);
-    } catch (err) {
-      onCapture(null, err);
+    } catch (error) {
+      onCapture(null, error);
     }
   }, 0);
 </script>
