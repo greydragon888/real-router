@@ -1,5 +1,6 @@
 import {
   globSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -177,19 +178,28 @@ interface Declared {
   readonly parameters: readonly ts.ParameterDeclaration[];
 }
 
-/** A declaration that introduces a named function. */
+/**
+ * A declaration that introduces a named function with a body.
+ *
+ * ⚠ Only the one with a body: an overloaded function declares its signatures
+ * first, and a call resolved to a signature would reach none of its calls.
+ */
 function declaredFunction(node: ts.Node): Declared | undefined {
   const source = node.getSourceFile();
 
   if (
     (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) &&
-    node.name !== undefined
+    node.name !== undefined &&
+    node.body !== undefined
   ) {
     return { name: node.name.getText(source), parameters: node.parameters };
   }
 
+  // A variable, an object property or a class field holding a function.
   if (
-    ts.isVariableDeclaration(node) &&
+    (ts.isVariableDeclaration(node) ||
+      ts.isPropertyAssignment(node) ||
+      ts.isPropertyDeclaration(node)) &&
     node.initializer !== undefined &&
     (ts.isArrowFunction(node.initializer) ||
       ts.isFunctionExpression(node.initializer))
@@ -224,35 +234,20 @@ function ownerOf(node: ts.Node, source: ts.SourceFile): string | undefined {
   return undefined;
 }
 
-/** Every name called anywhere inside `node`. */
-function calleesOf(node: ts.Node): Set<string> {
-  const names = new Set<string>();
-
-  const visit = (child: ts.Node): void => {
-    if (ts.isCallExpression(child)) {
-      const name = calleeName(child);
-
-      if (name !== undefined) {
-        names.add(name);
-      }
-    }
-
-    ts.forEachChild(child, visit);
-  };
-
-  visit(node);
-
-  return names;
-}
-
-function add(map: Map<string, Set<string>>, key: string, value: string): void {
-  const bucket = map.get(key) ?? new Set<string>();
+function add<K, V>(map: Map<K, Set<V>>, key: K, value: V): void {
+  const bucket = map.get(key) ?? new Set<V>();
 
   bucket.add(value);
   map.set(key, bucket);
 }
 
-/** The members `RouterValidator` declares. */
+/**
+ * The members `RouterValidator` declares, each as `namespace.member`.
+ *
+ * ⚠ Qualified, because a member name is not unique across namespaces:
+ * `validateCountThresholds` belongs to three of them, and core consults each one
+ * from its own doors (#2545).
+ */
 function contractMembers(): Set<string> {
   const source = parse(path.join(CORE_SRC, "types/RouterValidator.ts"));
   const members = new Set<string>();
@@ -263,9 +258,11 @@ function contractMembers(): Set<string> {
       node.type !== undefined &&
       ts.isTypeLiteralNode(node.type)
     ) {
+      const namespace = node.name.getText(source);
+
       for (const member of node.type.members) {
         if (member.name !== undefined) {
-          members.add(member.name.getText(source));
+          members.add(`${namespace}.${member.name.getText(source)}`);
         }
       }
     }
@@ -310,7 +307,7 @@ function silentDoors(node: ts.Node, into: Set<string>): void {
 }
 
 interface CoreFacts {
-  /** validator member → the implementations that consult it. */
+  /** `namespace.member` → the implementations that consult it. */
   readonly consulted: Map<string, Set<string>>;
   /** implementation → the door strings core itself hands down from it. */
   readonly passed: Map<string, Set<string>>;
@@ -318,6 +315,27 @@ interface CoreFacts {
   readonly callers: Map<string, Set<string>>;
   /** Every name a caller can type as a door. */
   readonly vocabulary: Set<string>;
+}
+
+/**
+ * `validator.<namespace>.<member>(…)` → `namespace.member`, in every spelling of
+ * the receiver core uses: optional, a local, a getter's result.
+ *
+ * ⚠ The namespace is what makes a call a CONSULTATION. Read by the member name
+ * alone, core's own `validateRouteName` in the route batch — a function sharing a
+ * member's name, not the validator — counted as consulting it.
+ */
+function consultedMember(node: ts.CallExpression): string | undefined {
+  const target = node.expression;
+
+  if (
+    !ts.isPropertyAccessExpression(target) ||
+    !ts.isPropertyAccessExpression(target.expression)
+  ) {
+    return undefined;
+  }
+
+  return `${target.expression.name.text}.${target.name.text}`;
 }
 
 /** One consultation core makes, recorded three ways. */
@@ -337,11 +355,13 @@ function recordConsultation(
     add(facts.callers, name, owner);
   }
 
-  if (!contract.has(name)) {
+  const member = consultedMember(node);
+
+  if (member === undefined || !contract.has(member)) {
     return;
   }
 
-  add(facts.consulted, name, owner);
+  add(facts.consulted, member, owner);
 
   for (const argument of node.arguments) {
     const text = headTextOf(argument);
@@ -403,6 +423,11 @@ function readCore(): CoreFacts {
   return { ...facts, vocabulary };
 }
 
+/** Core's facts, read once: every census judges against the same core. */
+let coreFacts: CoreFacts | undefined;
+
+const readCoreOnce = (): CoreFacts => (coreFacts ??= readCore());
+
 interface Head {
   readonly file: string;
   readonly line: number;
@@ -413,107 +438,107 @@ interface Head {
 }
 
 interface Fn {
-  readonly calls: Set<string>;
+  /** The declarations its calls reach. */
+  readonly calls: Set<ts.Node>;
   readonly heads: Head[];
   takesDoor: boolean;
 }
 
 interface PluginGraph {
-  /** `<relative file>#<name>` → the function. */
-  readonly fns: Map<string, Fn>;
-  /** file → the names it can call, each resolved to the key that declares it. */
-  readonly scopes: Map<string, Map<string, string>>;
-  /** Calls whose callee no scope resolves — a dropped edge, floored below. */
-  unresolved: number;
+  /** A function's declaration → the function. */
+  readonly fns: Map<ts.Node, Fn>;
+  readonly checker: ts.TypeChecker;
+  /** The tree's own files, in the order the glob lists them. */
+  readonly files: readonly ts.SourceFile[];
+  readonly root: string;
 }
 
 /**
- * ⚠ **Functions are keyed by FILE, not by name.** Measured on this package: three
- * a name can be declared in more than one file, and `assertNotAsync` is —
- * `retrospective.ts` gives it a `[validation-plugin]` head, `routes.ts` a
- * `[router.updateRoute]` one. Keyed by name they merge into a single entry whose
- * door set is the union of both, and a wrong door written into either can then be
- * admitted by the other's reachers. Measured, that union is empty on this tree
- * today and the merge is inert — so this is the assumption removed rather than a
- * defect fixed, and what it removes is an assumption nothing was holding.
+ * ⚠ **A function is its DECLARATION, and the checker says which one a call
+ * reaches (#2545).** Keyed by name — even with the file in the key — two
+ * declarations sharing a name are one function whose calls are the union of both,
+ * and each one's reachers then admit the other's door. A file declares a name
+ * twice in more ways than a key anticipates: two object-literal methods, a
+ * function and a method, two nested helpers. The checker binds a call as the
+ * compiler does — lexical scope, an import through a barrel's re-export, a method
+ * on the object or class that declares it — so no spelling of the collision is
+ * left for a key to separate. It also keeps the wiring table's inline methods out
+ * of lexical scope, where most share a name with the function they delegate to.
+ *
+ * Only a relative import resolves: a package import stays unresolved, so the
+ * program never reads core's sources or a `dist` behind them.
  */
-const keyOf = (relative: string, name: string): string => `${relative}#${name}`;
+function programOf(root: string): ts.Program {
+  const options: ts.CompilerOptions = {
+    module: ts.ModuleKind.ESNext,
+    moduleResolution: ts.ModuleResolutionKind.Bundler,
+    noEmit: true,
+    noLib: true,
+    target: ts.ScriptTarget.Latest,
+    types: [],
+  };
+  const host = ts.createCompilerHost(options, /* setParentNodes */ true);
 
-/** `./routes` or `../type-guards/validators/routes` → the file it names. */
-function resolveSpecifier(
-  fromFile: string,
-  specifier: string,
-  root: string,
-): string | undefined {
-  if (!specifier.startsWith(".")) {
-    return undefined;
-  }
+  host.resolveModuleNameLiterals = (literals, containingFile) =>
+    literals.map((literal) =>
+      literal.text.startsWith(".")
+        ? ts.resolveModuleName(literal.text, containingFile, options, host)
+        : { resolvedModule: undefined },
+    );
 
-  const base = path.resolve(path.dirname(fromFile), specifier);
+  return ts.createProgram(globSync(`${root}/**/*.ts`), options, host);
+}
 
-  for (const candidate of [`${base}.ts`, path.join(base, "index.ts")]) {
-    if (globSync(candidate).length > 0) {
-      return path.relative(root, candidate);
+/** The function a symbol names, past any import or re-export of it. */
+function functionOf(
+  found: ts.Symbol | undefined,
+  checker: ts.TypeChecker,
+): ts.Node | undefined {
+  const symbol =
+    found !== undefined && (found.flags & ts.SymbolFlags.Alias) !== 0
+      ? checker.getAliasedSymbol(found)
+      : found;
+
+  return symbol?.declarations?.find(
+    (declaration) => declaredFunction(declaration) !== undefined,
+  );
+}
+
+/** The declaration a call reaches, or `undefined` when the tree holds none. */
+function declarationCalled(
+  node: ts.CallExpression,
+  checker: ts.TypeChecker,
+): ts.Node | undefined {
+  return functionOf(checker.getSymbolAtLocation(node.expression), checker);
+}
+
+/** Every declaration a call anywhere inside `node` reaches. */
+function calledFrom(node: ts.Node, checker: ts.TypeChecker): Set<ts.Node> {
+  const reached = new Set<ts.Node>();
+
+  const visit = (child: ts.Node): void => {
+    if (ts.isCallExpression(child)) {
+      const target = declarationCalled(child, checker);
+
+      if (target !== undefined) {
+        reached.add(target);
+      }
     }
-  }
 
-  return undefined;
+    ts.forEachChild(child, visit);
+  };
+
+  visit(node);
+
+  return reached;
 }
 
-/** Per file: every name its code can call, mapped to the key declaring it. */
-function fileScopes(
-  files: readonly string[],
-  root: string,
-): Map<string, Map<string, string>> {
-  const scopes = new Map<string, Map<string, string>>();
-
-  for (const file of files) {
-    const source = parse(file);
-    const relative = path.relative(root, file);
-    const scope = new Map<string, string>();
-
-    const visit = (node: ts.Node): void => {
-      const declared = declaredFunction(node);
-
-      // ⚠ A METHOD of an object literal is not a lexical binding, so it must not
-      // enter the scope. The wiring table names an inline method exactly as the
-      // imported function it delegates to — `validateListenerArgs(name, cb) {
-      // validateListenerArgs<EventName>(…) }` — and letting the method win
-      // overwrote the import and dropped the edge to the real implementation.
-      // Measured: eight functions lost their door that way.
-      if (declared !== undefined && !ts.isMethodDeclaration(node)) {
-        scope.set(declared.name, keyOf(relative, declared.name));
-      }
-
-      if (
-        ts.isImportDeclaration(node) &&
-        ts.isStringLiteral(node.moduleSpecifier)
-      ) {
-        const target = resolveSpecifier(file, node.moduleSpecifier.text, root);
-        const bindings = node.importClause?.namedBindings;
-
-        if (
-          target !== undefined &&
-          bindings !== undefined &&
-          ts.isNamedImports(bindings)
-        ) {
-          for (const element of bindings.elements) {
-            const declaredName = (element.propertyName ?? element.name).text;
-
-            scope.set(element.name.text, keyOf(target, declaredName));
-          }
-        }
-      }
-
-      ts.forEachChild(node, visit);
-    };
-
-    visit(source);
-    scopes.set(relative, scope);
-  }
-
-  return scopes;
-}
+/** The nearest declaration around `node` that introduces a function. */
+const enclosingFunction = (node: ts.Node): ts.Node | undefined =>
+  ts.findAncestor(
+    node.parent,
+    (ancestor) => declaredFunction(ancestor) !== undefined,
+  );
 
 /**
  * The comments above the statement raising a message.
@@ -545,15 +570,13 @@ function leadingCommentsOf(node: ts.Node, source: ts.SourceFile): string {
 function absorb(
   node: ts.Node,
   source: ts.SourceFile,
-  relative: string,
   graph: PluginGraph,
-  ensure: (key: string) => Fn,
+  ensure: (fn: ts.Node) => Fn,
 ): void {
-  const scope = graph.scopes.get(relative) ?? new Map<string, string>();
   const declared = declaredFunction(node);
 
   if (declared !== undefined) {
-    const entry = ensure(keyOf(relative, declared.name));
+    const entry = ensure(node);
 
     if (
       declared.parameters.some(
@@ -564,24 +587,15 @@ function absorb(
     }
   }
 
-  const owner = ownerOf(node, source);
-
-  if (owner === undefined) {
-    return;
-  }
-
-  const entry = ensure(keyOf(relative, owner));
+  // ⚠ Outside every function a node belongs to its FILE, which no root reaches,
+  // so a door named there is refused as undetermined instead of dropped unjudged.
+  const entry = ensure(enclosingFunction(node) ?? source);
 
   if (ts.isCallExpression(node)) {
-    const name = calleeName(node);
-    const target = name === undefined ? undefined : scope.get(name);
+    const target = declarationCalled(node, graph.checker);
 
     if (target !== undefined) {
       entry.calls.add(target);
-    } else if (name !== undefined) {
-      // A method call, a global, or a name no import brought in: not an edge
-      // between two functions of this package. Counted so the floor can see it.
-      graph.unresolved++;
     }
   }
 
@@ -594,7 +608,7 @@ function absorb(
   const closed = /^\[([^\]]+)\]/u.exec(text);
 
   entry.heads.push({
-    file: relative,
+    file: path.relative(graph.root, source.fileName),
     line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
     prefix: closed === null ? undefined : closed[1],
     justification: leadingCommentsOf(node, source),
@@ -602,30 +616,38 @@ function absorb(
 }
 
 function readPlugin(root: string = PLUGIN_SRC): PluginGraph {
-  const files = globSync(`${root}/**/*.ts`);
+  const program = programOf(root);
   const graph: PluginGraph = {
-    fns: new Map<string, Fn>(),
-    scopes: fileScopes(files, root),
-    unresolved: 0,
+    fns: new Map<ts.Node, Fn>(),
+    checker: program.getTypeChecker(),
+    files: program.getRootFileNames().map((file) => {
+      const source = program.getSourceFile(file);
+
+      // ⚠ Refused, not dropped: the glob also lists a directory or a dangling
+      // link named `*.ts`, and a file the walk cannot read hides every head in it.
+      if (source === undefined) {
+        throw new Error(`The program did not load ${file}`);
+      }
+
+      return source;
+    }),
+    root,
   };
-  const ensure = (key: string): Fn => {
-    const found = graph.fns.get(key) ?? {
-      calls: new Set<string>(),
+  const ensure = (fn: ts.Node): Fn => {
+    const found = graph.fns.get(fn) ?? {
+      calls: new Set<ts.Node>(),
       heads: [],
       takesDoor: false,
     };
 
-    graph.fns.set(key, found);
+    graph.fns.set(fn, found);
 
     return found;
   };
 
-  for (const file of files) {
-    const source = parse(file);
-    const relative = path.relative(root, file);
-
+  for (const source of graph.files) {
     const visit = (node: ts.Node): void => {
-      absorb(node, source, relative, graph, ensure);
+      absorb(node, source, graph, ensure);
       ts.forEachChild(node, visit);
     };
 
@@ -636,11 +658,20 @@ function readPlugin(root: string = PLUGIN_SRC): PluginGraph {
 }
 
 interface Root {
-  readonly seed: string;
+  readonly seed: ts.Node;
   readonly doors: Set<string>;
 }
 
-/** The doors that can consult `member`, as a caller would name them. */
+/**
+ * The doors that can consult `member`, as a caller would name them.
+ *
+ * ⚠ **Core's call graph stays keyed by NAME, unlike this package's (#2545).** Core
+ * reaches some of its doors through a dependency-injection interface the checker
+ * cannot follow, and linking those calls by name is what finds the door behind
+ * them. Measured, a checker-resolved graph that falls back to names where it
+ * cannot resolve gives every member the same doors as this one, and without the
+ * fallback a member loses a door behind the injection.
+ */
 function doorsForMember(
   core: CoreFacts,
   member: string,
@@ -698,11 +729,8 @@ function doorsForMember(
   return doors;
 }
 
-/**
- * The contract member a wiring entry implements, in any of the three shapes the
- * table uses: shorthand, an alias to another name, and an inline method.
- */
-function wiringMemberName(node: ts.Node): string | undefined {
+/** The name a wiring entry declares, in the three shapes the table uses. */
+function wiringEntryName(node: ts.Node): string | undefined {
   if (ts.isPropertyAssignment(node) && ts.isIdentifier(node.name)) {
     return node.name.text;
   }
@@ -718,24 +746,56 @@ function wiringMemberName(node: ts.Node): string | undefined {
   return undefined;
 }
 
-/** Roots from the wiring table, whose three shapes all appear in it. */
-function wiringRoots(
-  core: CoreFacts,
-  root: string,
-  graph: PluginGraph,
-): Root[] {
-  const file = path.join(root, "validationPlugin.ts");
+/**
+ * The contract member a wiring entry implements, as `namespace.member`: the entry
+ * sits in an object literal that is itself the value of a namespace.
+ */
+function wiringMemberName(node: ts.Node): string | undefined {
+  const name = wiringEntryName(node);
+  // ⚠ `parent` is typed non-optional and IS undefined at the root of a tree.
+  const table = node.parent as ts.Node | undefined;
+  const namespace = table?.parent;
 
-  // A synthetic tree carries no wiring table; its doors come from positions alone.
-  if (globSync(file).length === 0) {
+  if (
+    name === undefined ||
+    namespace === undefined ||
+    !ts.isPropertyAssignment(namespace) ||
+    !ts.isIdentifier(namespace.name)
+  ) {
+    return undefined;
+  }
+
+  return `${namespace.name.text}.${name}`;
+}
+
+/** The function a wiring entry delegates to or, written inline, is. */
+function wiringSeed(
+  node: ts.Node,
+  checker: ts.TypeChecker,
+): ts.Node | undefined {
+  if (ts.isShorthandPropertyAssignment(node)) {
+    return functionOf(checker.getShorthandAssignmentValueSymbol(node), checker);
+  }
+
+  if (ts.isPropertyAssignment(node) && ts.isIdentifier(node.initializer)) {
+    return functionOf(checker.getSymbolAtLocation(node.initializer), checker);
+  }
+
+  return declaredFunction(node) === undefined ? undefined : node;
+}
+
+/** Roots from the wiring table, whose three shapes all appear in it. */
+function wiringRoots(core: CoreFacts, graph: PluginGraph): Root[] {
+  const source = graph.files.find(
+    (file) =>
+      path.relative(graph.root, file.fileName) === "validationPlugin.ts",
+  );
+
+  // A tree without a wiring table takes its doors from positions alone.
+  if (source === undefined) {
     return [];
   }
 
-  const source = parse(file);
-  const relative = path.relative(root, file);
-  const scope = graph.scopes.get(relative) ?? new Map<string, string>();
-  const seedOf = (name: string): string =>
-    scope.get(name) ?? keyOf(relative, name);
   const roots: Root[] = [];
 
   const visit = (node: ts.Node): void => {
@@ -743,19 +803,11 @@ function wiringRoots(
     const doors =
       member === undefined ? undefined : doorsForMember(core, member);
 
-    // Both guards, not one: `doors` is computed FROM `member`, but only naming
-    // `member` here narrows it for the branch that seeds a root with it.
-    if (member !== undefined && doors !== undefined) {
-      if (ts.isPropertyAssignment(node) && ts.isIdentifier(node.initializer)) {
-        roots.push({ seed: seedOf(node.initializer.text), doors });
-      } else if (ts.isShorthandPropertyAssignment(node)) {
-        roots.push({ seed: seedOf(node.name.text), doors });
-      } else if (ts.isMethodDeclaration(node)) {
-        roots.push({ seed: keyOf(relative, member), doors });
+    if (doors !== undefined) {
+      const seed = wiringSeed(node, graph.checker);
 
-        for (const seed of calleesOf(node)) {
-          roots.push({ seed: seedOf(seed), doors });
-        }
+      if (seed !== undefined) {
+        roots.push({ seed, doors });
       }
     }
 
@@ -768,16 +820,10 @@ function wiringRoots(
 }
 
 /** Roots from `addCheck("<door>:<slot>", cb)`. */
-function positionRoots(root: string, graph: PluginGraph): Root[] {
+function positionRoots(graph: PluginGraph): Root[] {
   const roots: Root[] = [];
 
-  for (const file of globSync(`${root}/**/*.ts`)) {
-    const source = parse(file);
-    const relative = path.relative(root, file);
-    const scope = graph.scopes.get(relative) ?? new Map<string, string>();
-    const seedOf = (name: string): string =>
-      scope.get(name) ?? keyOf(relative, name);
-
+  for (const source of graph.files) {
     const visit = (node: ts.Node): void => {
       if (
         ts.isCallExpression(node) &&
@@ -792,8 +838,8 @@ function positionRoots(root: string, graph: PluginGraph): Root[] {
         if (text !== undefined && callback !== undefined) {
           const [door] = text.split(":", 1);
 
-          for (const seed of calleesOf(callback)) {
-            roots.push({ seed: seedOf(seed), doors: new Set([door]) });
+          for (const seed of calledFrom(callback, graph.checker)) {
+            roots.push({ seed, doors: new Set([door]) });
           }
         }
       }
@@ -809,32 +855,32 @@ function positionRoots(root: string, graph: PluginGraph): Root[] {
 
 function closure(
   roots: readonly Root[],
-  fns: ReadonlyMap<string, Fn>,
-): Map<string, Set<string>> {
-  const reach = new Map<string, Set<string>>();
+  fns: ReadonlyMap<ts.Node, Fn>,
+): Map<ts.Node, Set<string>> {
+  const reach = new Map<ts.Node, Set<string>>();
 
   for (const { seed, doors } of roots) {
-    const queue = [seed];
-    const seen = new Set<string>();
+    const seen = new Set<ts.Node>();
 
-    while (queue.length > 0) {
-      const current = queue.pop() ?? "";
+    const visit = (current: ts.Node): void => {
       const fn = fns.get(current);
 
       if (seen.has(current) || fn === undefined) {
-        continue;
+        return;
       }
 
       seen.add(current);
 
       for (const callee of fn.calls) {
-        queue.push(callee);
+        visit(callee);
       }
-    }
+    };
 
-    for (const name of seen) {
+    visit(seed);
+
+    for (const fn of seen) {
       for (const door of doors) {
-        add(reach, name, door);
+        add(reach, fn, door);
       }
     }
   }
@@ -907,10 +953,10 @@ function judge(
 }
 
 function census(root: string = PLUGIN_SRC): Census {
-  const core = readCore();
+  const core = readCoreOnce();
   const graph = readPlugin(root);
   const reach = closure(
-    [...wiringRoots(core, root, graph), ...positionRoots(root, graph)],
+    [...wiringRoots(core, graph), ...positionRoots(graph)],
     graph.fns,
   );
   const out: Census = {
@@ -922,9 +968,9 @@ function census(root: string = PLUGIN_SRC): Census {
     interpolated: 0,
   };
 
-  for (const [name, info] of graph.fns) {
+  for (const [fn, info] of graph.fns) {
     for (const head of info.heads) {
-      judge(head, info, reach.get(name), out);
+      judge(head, info, reach.get(fn), out);
     }
   }
 
@@ -971,7 +1017,7 @@ describe("a message names a door that can reach it (#2457)", () => {
   it("CONTROL — the walks read both trees, so an empty result means clean", () => {
     // Floors, not counts: adding a door or a message must not make this a promise
     // to re-measure. Each sits far below what the trees hold.
-    const core = readCore();
+    const core = readCoreOnce();
     const seen = census();
 
     expect(core.vocabulary.size).toBeGreaterThan(20);
@@ -989,9 +1035,8 @@ describe("a message names a door that can reach it (#2457)", () => {
 
   it("CONTROL — one name in separate files: the keys keep them apart", () => {
     // Keyed by NAME they merge, their reacher sets union, and BOTH heads pass.
-    // This tree is what makes the file key load-bearing rather than merely tidier:
-    // measured, the three real collisions in this package are inert today, so
-    // nothing else here would notice the keys collapsing.
+    // This tree holds the two declarations apart across files; the next one
+    // holds them apart inside one.
     const directory = mkdtempSync(path.join(tmpdir(), "prefix-2457-dupe-"));
 
     try {
@@ -1039,6 +1084,151 @@ describe("a message names a door that can reach it (#2457)", () => {
     }
   });
 
+  it("CONTROL — one name declared twice in one file: each declaration keeps its own doors (#2545)", () => {
+    // Keyed by name, even with the file in the key, the two declarations of `run`
+    // or `helper` are one function whose calls are the union of both, so `alpha`
+    // inherits the door that reaches `beta` and its wrong door passes. Each file
+    // below declares a name twice in a different form. An overload is the one
+    // form whose declarations ARE one function: its call has to land on the
+    // body, where the calls are.
+    const heads = [
+      "function alpha() {",
+      '  throw new Error("[router.buildPath] only navigate reaches alpha");',
+      "}",
+      "",
+      "function beta() {",
+      '  throw new Error("[router.buildPath] and buildPath reaches beta");',
+      "}",
+      "",
+    ];
+    const forms: Record<string, readonly string[]> = {
+      "object-literal-methods.ts": [
+        "const first = { run() { alpha(); } };",
+        "const second = { run() { beta(); } };",
+        'api.addCheck("navigate:entry", () => { first.run(); });',
+        'api.addCheck("buildPath:entry", () => { second.run(); });',
+      ],
+      "property-arrows.ts": [
+        "const first = { run: () => { alpha(); } };",
+        "const second = { run: () => { beta(); } };",
+        'api.addCheck("navigate:entry", () => { first.run(); });',
+        'api.addCheck("buildPath:entry", () => { second.run(); });',
+      ],
+      "class-methods.ts": [
+        "class First { run() { alpha(); } }",
+        "class Second { run() { beta(); } }",
+        'api.addCheck("navigate:entry", () => { new First().run(); });',
+        'api.addCheck("buildPath:entry", () => { new Second().run(); });',
+      ],
+      "nested-functions.ts": [
+        "function outerA() { function helper() { alpha(); } helper(); }",
+        "function outerB() { function helper() { beta(); } helper(); }",
+        'api.addCheck("navigate:entry", () => { outerA(); });',
+        'api.addCheck("buildPath:entry", () => { outerB(); });',
+      ],
+      "nested-arrows.ts": [
+        "function outerA() { const helper = () => { alpha(); }; helper(); }",
+        "function outerB() { const helper = () => { beta(); }; helper(); }",
+        'api.addCheck("navigate:entry", () => { outerA(); });',
+        'api.addCheck("buildPath:entry", () => { outerB(); });',
+      ],
+      "function-and-method.ts": [
+        "function run() { alpha(); }",
+        "const second = { run() { beta(); } };",
+        'api.addCheck("navigate:entry", () => { run(); });',
+        'api.addCheck("buildPath:entry", () => { second.run(); });',
+      ],
+      "class-fields.ts": [
+        "class First { run = () => { alpha(); }; }",
+        "class Second { run = () => { beta(); }; }",
+        'api.addCheck("navigate:entry", () => { new First().run(); });',
+        'api.addCheck("buildPath:entry", () => { new Second().run(); });',
+      ],
+      "overload.ts": [
+        "function run(): void;",
+        "function run() { alpha(); }",
+        'api.addCheck("navigate:entry", () => { run(); });',
+        'api.addCheck("buildPath:entry", () => { beta(); });',
+      ],
+    };
+    const byFile = (findings: readonly Finding[]): Finding[] =>
+      findings.toSorted((a, b) => a.file.localeCompare(b.file));
+    const directory = mkdtempSync(path.join(tmpdir(), "prefix-2457-twice-"));
+
+    try {
+      for (const [file, lines] of Object.entries(forms)) {
+        // `export {}` makes each file a module, so no name is shared between two.
+        writeFileSync(
+          path.join(directory, file),
+          ["export {};", ...lines, "", ...heads].join("\n"),
+        );
+      }
+
+      // `alpha`'s throw follows the module marker, the form, a blank line and
+      // `function alpha() {`.
+      expect(byFile(census(directory).wrongDoor)).toStrictEqual(
+        byFile(
+          Object.entries(forms).map(([file, lines]) => ({
+            file,
+            line: lines.length + 4,
+            says: "router.buildPath",
+            reachers: "navigate",
+          })),
+        ),
+      );
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("CONTROL — one member name in two namespaces: each keeps the doors that consult it (#2545)", () => {
+    // `validateCountThresholds` is a member of `plugins`, `lifecycle` and
+    // `eventBus`, and core consults each one from its own doors. Keyed by the bare
+    // name, the consultations pool their doors, and a head wired only to the
+    // plugins member passes with a door that only the event bus consults. The
+    // event bus entry is an arrow: of the shapes `wiringSeed` reads, the one the
+    // real table does not use.
+    const directory = mkdtempSync(path.join(tmpdir(), "prefix-2457-member-"));
+
+    try {
+      writeFileSync(
+        path.join(directory, "validationPlugin.ts"),
+        [
+          "export function buildValidatorObject() {",
+          "  return {",
+          "    plugins: { validateCountThresholds: pluginThresholds },",
+          "    eventBus: { validateCountThresholds: () => listenerThresholds() },",
+          "  };",
+          "}",
+          "",
+          "function pluginThresholds() {",
+          '  throw new Error("[router.subscribe] only usePlugin consults this one");',
+          "}",
+          "",
+          "function listenerThresholds() {",
+          '  throw new Error("[router.subscribe] and subscribe consults this one");',
+          "}",
+          "",
+        ].join("\n"),
+      );
+
+      const seen = census(directory);
+
+      expect(seen.wrongDoor).toStrictEqual([
+        {
+          file: "validationPlugin.ts",
+          line: 9,
+          says: "router.subscribe",
+          reachers: "usePlugin",
+        },
+      ]);
+      expect(seen.noDoor).toStrictEqual([]);
+      expect(seen.judged).toBe(2);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it("CONTROL — the shared raiser fixture: each site reads its own binding (#2537)", () => {
     // ⚑ The fixture is SHARED: every reader of a raiser head answers for every
     // site in it, each in its own terms. Here a head is the text inside a CLOSED
@@ -1081,6 +1271,8 @@ describe("a message names a door that can reach it (#2457)", () => {
           'api.addCheck("updateRoute:entry", () => {',
           "  reachable();",
           "  wrongDoor();",
+          '  hardcoded("route");',
+          '  handed("updateRoute");',
           "});",
           "",
           "function reachable() {",
@@ -1089,6 +1281,22 @@ describe("a message names a door that can reach it (#2457)", () => {
           "",
           "function wrongDoor() {",
           '  throw new Error("[router.addRoute] no position here reaches addRoute");',
+          "}",
+          "",
+          "function unreached() {",
+          '  throw new Error("[router.updateRoute] no position reaches this one");',
+          "}",
+          "",
+          "const outside = {",
+          '  message: "[router.updateRoute] a head outside every function",',
+          "};",
+          "",
+          "function hardcoded(name) {",
+          "  throw new Error(`[router.${door}] builds a door nobody handed it`);",
+          "}",
+          "",
+          "function handed(methodName) {",
+          "  throw new Error(`[router.${methodName}] builds the door it was handed`);",
           "}",
           "",
         ].join("\n"),
@@ -1103,13 +1311,51 @@ describe("a message names a door that can reach it (#2457)", () => {
       expect(seen.wrongDoor).toStrictEqual([
         {
           file: "checks.ts",
-          line: 11,
+          line: 13,
           says: "router.addRoute",
           reachers: "updateRoute",
         },
       ]);
-      expect(seen.noDoor).toStrictEqual([]);
-      expect(seen.judged).toBe(2);
+      // A head no root reaches, inside a function or outside every one.
+      expect(seen.noDoor.toSorted((a, b) => a.line - b.line)).toStrictEqual([
+        {
+          file: "checks.ts",
+          line: 17,
+          says: "router.updateRoute",
+          reachers: "",
+        },
+        {
+          file: "checks.ts",
+          line: 21,
+          says: "router.updateRoute",
+          reachers: "",
+        },
+      ]);
+      // A door interpolated with nothing handed in; `handed` takes its door.
+      expect(seen.hardcodedShared).toStrictEqual([
+        {
+          file: "checks.ts",
+          line: 25,
+          says: "<interpolated>",
+          reachers: "updateRoute",
+        },
+      ]);
+      expect(seen.judged).toBe(4);
+      expect(seen.interpolated).toBe(2);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("CONTROL — a file the glob lists and the program cannot load is refused (#2545)", () => {
+    // The glob lists a directory named `*.ts` as readily as a file.
+    const directory = mkdtempSync(path.join(tmpdir(), "prefix-2457-unread-"));
+
+    try {
+      writeFileSync(path.join(directory, "checks.ts"), "export {};\n");
+      mkdirSync(path.join(directory, "folder.ts"));
+
+      expect(() => census(directory)).toThrow(/did not load .*folder\.ts/u);
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

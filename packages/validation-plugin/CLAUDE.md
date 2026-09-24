@@ -260,14 +260,21 @@ measured, that gave one validator eleven doors, because `navigate`, `start` and
 
 ⚑ The register holds the two published names (`[cloneRouter]`, `[validation-plugin]`) and nothing else. `[internal]` left it with #2487: a refusal no caller input can reach now takes O-1's `Internal error (please report): ` marker rather than a bracketed head, so there is no entry to justify. "Both batch doors report `addRoute`" needs none either — the shared helper is reached from both batch positions, so the rule admits it unaided.
 
-⚑ **Functions are keyed by file, not by name.** Names ARE declared in two files
-each here — `assertNotAsync` carries a `[validation-plugin]` head in one and a
-`[router.updateRoute]` head in the other — and keyed by name they merge, so each
-one's reachers admit the other's door. Measured, the merge is inert on this tree
-today, which is why a synthetic two-file cell is what keeps the key load-bearing
-rather than the real collisions. Object-literal METHODS stay out of the scope that
-resolves a call: the wiring table names an inline method exactly as the function it
-delegates to, and letting the method win dropped doors that the wiring had wired.
+⚑ **A function is keyed by its declaration, and the TypeScript checker resolves
+each call (#2545).** A name — even qualified by its file — merges two declarations
+that share it: two object-literal methods, a function and a method, two nested
+helpers, each reached from a different door. Through the checker a call follows
+lexical scope, an import through the `type-guards` barrel, and a method to the
+object or class that declares it, so no form of the collision is left for a key to
+separate. The member a wiring entry implements is keyed `namespace.member` for the
+same reason: `validateCountThresholds` belongs to three namespaces, each consulted
+from its own doors. The real tree's collisions are inert today, so synthetic cells
+hold both keys.
+
+⚠ **Core's call graph stays keyed by name.** Core reaches some doors through a
+dependency-injection interface the checker cannot follow, and linking those calls
+by name is what finds the door behind them. `doorsForMember` in the authority
+records the measurement.
 
 `route-door-prefix-2399.test.ts` stays beside it and answers a different question —
 what a caller SEES, driven end to end. Its reach is the sixteen refusals it drives:
