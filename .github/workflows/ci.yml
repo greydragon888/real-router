@@ -298,7 +298,7 @@ jobs:
           # names can't actually collide), but comparing runs later would.
           name: turbo-summary-pipeline-leaf
           path: .turbo/runs/
-          retention-days: 14
+          retention-days: 90
 
       # Did turbo's affected filter actually build/test any package? On a
       # root config/docs-only PR the answer is no — and there are no dist/
@@ -410,7 +410,7 @@ jobs:
         with:
           name: turbo-summary-base-bundle
           path: .turbo/runs/
-          retention-days: 14
+          retention-days: 90
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
@@ -530,7 +530,7 @@ jobs:
         with:
           name: turbo-summary-base-test-${{ matrix.shard }}
           path: .turbo/runs/
-          retention-days: 14
+          retention-days: 90
 
       # The shard's raw V8 coverage, not a report. `--merge-reports` in
       # `base-coverage` merges these before the Istanbul conversion, so the
@@ -662,7 +662,7 @@ jobs:
         with:
           name: turbo-summary-base-lint
           path: .turbo/runs/
-          retention-days: 14
+          retention-days: 90
 
   # ============================================
   # REPO-LINTS: repo-global lints (syncpack / pnpm dedupe / coverage-scope /
@@ -721,7 +721,7 @@ jobs:
         with:
           name: turbo-summary-base-properties
           path: .turbo/runs/
-          retention-days: 14
+          retention-days: 90
   repo-lints:
     name: Repo Lints
     runs-on: ubuntu-latest
@@ -964,18 +964,18 @@ jobs:
       # vite-plugin-solid's on-the-fly babel compile). if: always() so a failing
       # shard still uploads what ran.
       #
-      # 14 days, not 1: at one day these are per-run forensics you can only read
-      # while the run is still fresh. Two weeks is what makes "is this shard
-      # slower than it was?" answerable at all — the artifacts are a few KB each,
-      # unlike the coverage/dist uploads below, which stay at 1 day because they
-      # are only consumed by downstream jobs of the SAME run.
+      # 90 days, the repository's maximum, not 1. At one day these are
+      # per-run records you can read only while the run is still fresh. A
+      # trend such as "is this shard slower than it was?" needs weeks of runs.
+      # They are tens of KB each. The coverage/dist uploads below stay at
+      # 1 day, because only downstream jobs of the SAME run consume them.
       - name: Upload turbo run summary (per-task timings)
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: turbo-summary-${{ matrix.name }}
           path: .turbo/runs/
-          retention-days: 14
+          retention-days: 90
 
       - name: Validate shard published artifacts (publint + attw)
         env:

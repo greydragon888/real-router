@@ -8267,6 +8267,8 @@ Everything else lives in `tsdown.config.mts`, not in the script. Pass 1 discards
 
 ## Per-task CI timings: `--summarize` everywhere, summaries kept 14 days
 
+> **Superseded in part (#1745, 2026-09-24).** The summaries are now kept 90 days, and `post-merge.yml` uploads its own. See "Run summaries are kept 90 days, and post-merge keeps its own" below.
+
 ### Problem
 
 The required gate's critical path is `base-test` — **231 s of 297 s** wall-clock (measured on run 30693854030, 2026-08-01 CI/CD audit §3.2) — and nothing in CI could say how that time splits between `core#test`, `core#test:properties` and their `lint` / `type-check` dependencies. Only the shards passed `--summarize` (and kept the result for one day), so every "which task dominates?" question — and therefore every proposal to split or shard a job — was guesswork. The same blindness covered `pipeline-leaf` and `base-bundle`.
@@ -11740,3 +11742,21 @@ The svelte package lints its components. The global ignore is gone, `.svelte` an
 **Why only `packages/`.** Every `.svelte` and `.vue` file under `examples/` and `benchmarks/` is unlinted, because no config there addresses either extension. A census there would fail on the `.svelte` files, which `packages/svelte` makes code, and not on the `.vue` files, which no config addresses. The `shared/` files behind a consumer's symlink stay outside it too: the census sees the symlink's entry, not the files behind it.
 
 **Cost, measured.** `lint:reach` went from about 1.3 s to 8–10 s, for the ESLint instances the census asks. The svelte package's lint reads 189 files instead of 78, and a cold run takes about a minute instead of about nine seconds.
+
+## Run summaries are kept 90 days, and post-merge keeps its own (#1745, 2026-09-24)
+
+**Problem.** The per-task run summaries expired after 14 days. The metrics store that #1745 wires up, Grafana Cloud Free, also keeps 14 days, and its metrics carry durations but no start times. Past two weeks, nothing would hold a task's timing, and a run's critical path could not be rebuilt at all.
+
+Master had no summaries either. `post-merge.yml` built every push without `--summarize`, and for a direct push, which gets no PR run, that build is the only CI there is. Measured on 2026-09-24:
+
+- after a PR merge, post-merge replays 115 of 115 tasks from cache in 41–46 s;
+- after a direct push that touched core, it takes 23 of 115 from cache and runs 11 m 46 s and 15 m 41 s.
+
+Nothing recorded which tasks those were.
+
+**Solution.**
+
+- The six `turbo-summary-*` uploads in `ci.yml` keep 90 days, the repository's maximum.
+- `post-merge.yml` passes `--summarize` and uploads `turbo-summary-post-merge` for 90 days, under `if: always()`.
+
+**Why 90 days, and not the metrics store alone.** The summaries hold each task's start and end time. Critical-path questions such as #2429 and #2437 therefore stay answerable from them after the store's 14 days are gone. The volume is small: at most 1.40 GB at 90 days, against 0.22 GB at 14. The estimate treats every `ci.yml` run as being as heavy as the CI run of #2557 (17 summaries, 777 KB), at the 147 runs of the seven days to 2026-09-24. Leaf runs upload fewer summaries.

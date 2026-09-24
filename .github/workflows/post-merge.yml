@@ -70,6 +70,19 @@ jobs:
         run: >-
           pnpm turbo run bundle test test:properties lint
           --filter='!./examples/**'
+          --summarize
+
+      # Per-task timings of master's own build (.turbo/runs/*.json). A direct
+      # push to master gets no PR run, so this is the only record of what it
+      # rebuilt and for how long. `if: always()` makes a failing build still
+      # upload what ran. The 90 days match ci.yml's summaries.
+      - name: Upload turbo run summary (per-task timings)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: turbo-summary-post-merge
+          path: .turbo/runs/
+          retention-days: 90
 
       # Publish master's bundle sizes so each PR's `bundle-size` job can diff
       # against them via artifact download — instead of re-checking-out,
