@@ -29,6 +29,12 @@
  * degenerates to assignment plus two wasted checks. That is why the null-proto
  * arms are here at all: they price WIRING a door that already has the guarantee
  * by construction.
+ *
+ * ⚑ **Each pair shares one batch count, and the counts differ between pairs.**
+ * A pair's count is sized from its lighter arm to clear the floor `batched()`
+ * sets, so the twins' measurements compare directly; an arm with no twin takes
+ * its own. A per-call cost is an arm's measurement divided by its OWN count,
+ * never by one number for the whole suite.
  */
 import { batched, isMain, keep, makeBench, settleHeap } from "./fixtures";
 import { copyFields, putField } from "../../src/utils/ingest";
@@ -39,12 +45,18 @@ const INHERITED = ["__proto__", "constructor"];
 
 export async function run(): Promise<void> {
   const bench = makeBench("ingest-primitive");
-  const ITER = 1000;
+
+  // One batch count per pair, plus one per arm without a twin — see the header.
+  const PLAIN_BATCH = 4096;
+  const NULL_PROTO_BATCH = 3072;
+  const RECORD_BATCH = 6144;
+  const SPREAD_BATCH = 16_384;
+  const INHERITED_BATCH = 1000;
 
   // ── plain `{}` target — the shape `channels/` writes into ──────────────────
   bench.add(
     "putField/plain-target/ordinary-keys",
-    batched(ITER, () => {
+    batched(PLAIN_BATCH, () => {
       const target: Record<string, unknown> = {};
 
       for (const key of ORDINARY) {
@@ -57,7 +69,7 @@ export async function run(): Promise<void> {
 
   bench.add(
     "assign/plain-target/ordinary-keys",
-    batched(ITER, () => {
+    batched(PLAIN_BATCH, () => {
       const target: Record<string, unknown> = {};
 
       for (const key of ORDINARY) {
@@ -70,7 +82,7 @@ export async function run(): Promise<void> {
 
   bench.add(
     "putField/plain-target/with-inherited-names",
-    batched(ITER, () => {
+    batched(INHERITED_BATCH, () => {
       const target: Record<string, unknown> = {};
 
       for (const key of [...ORDINARY, ...INHERITED]) {
@@ -84,7 +96,7 @@ export async function run(): Promise<void> {
   // ── `Object.create(null)` target — the shape `dependenciesStore` writes into ─
   bench.add(
     "putField/null-proto-target/ordinary-keys",
-    batched(ITER, () => {
+    batched(NULL_PROTO_BATCH, () => {
       const target = Object.create(null) as Record<string, unknown>;
 
       for (const key of ORDINARY) {
@@ -97,7 +109,7 @@ export async function run(): Promise<void> {
 
   bench.add(
     "assign/null-proto-target/ordinary-keys",
-    batched(ITER, () => {
+    batched(NULL_PROTO_BATCH, () => {
       const target = Object.create(null) as Record<string, unknown>;
 
       for (const key of ORDINARY) {
@@ -119,7 +131,7 @@ export async function run(): Promise<void> {
 
   bench.add(
     "copyFields/plain-target",
-    batched(ITER, () => {
+    batched(RECORD_BATCH, () => {
       const target: Record<string, unknown> = {};
 
       copyFields(target, source);
@@ -129,7 +141,7 @@ export async function run(): Promise<void> {
 
   bench.add(
     "Object.assign/plain-target",
-    batched(ITER, () => {
+    batched(RECORD_BATCH, () => {
       const target: Record<string, unknown> = {};
 
       // The point of this arm IS the `Object.assign` call: `{ ...source }` is a
@@ -142,7 +154,7 @@ export async function run(): Promise<void> {
 
   bench.add(
     "spread/plain-target",
-    batched(ITER, () => {
+    batched(SPREAD_BATCH, () => {
       keep({ ...source });
     }),
   );
@@ -151,15 +163,17 @@ export async function run(): Promise<void> {
   // `copyFields` sits in `SegmentMatcher.#traverseFrom` and `#matchSplat`, and
   // a route's params bag there is one or two keys, not five. The five-key arms
   // above price the PRIMITIVE; these price the DOOR.
-  const bags: readonly (readonly [string, Record<string, unknown>])[] = [
-    ["1-key", { id: 1 }],
-    ["2-key", { id: 1, page: 2 }],
-  ];
+  // The third field is the pair's batch count.
+  const bags: readonly (readonly [string, Record<string, unknown>, number])[] =
+    [
+      ["1-key", { id: 1 }, 12_288],
+      ["2-key", { id: 1, page: 2 }, 8192],
+    ];
 
-  for (const [label, bag] of bags) {
+  for (const [label, bag, batch] of bags) {
     bench.add(
       `copyFields/${label}`,
-      batched(ITER, () => {
+      batched(batch, () => {
         const target: Record<string, unknown> = {};
 
         copyFields(target, bag);
@@ -169,7 +183,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       `Object.assign/${label}`,
-      batched(ITER, () => {
+      batched(batch, () => {
         const target: Record<string, unknown> = {};
 
         // `Object.assign` on purpose — see the five-key arm above.
