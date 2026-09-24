@@ -1,5 +1,22 @@
 # @real-router/validation-plugin
 
+## 0.28.3
+
+### Patch Changes
+
+- [#2564](https://github.com/greydragon888/real-router/pull/2564) [`fa32d0b`](https://github.com/greydragon888/real-router/commit/fa32d0b38dd39473f3ec2ad4484356fcef7c11f1) Thanks [@greydragon888](https://github.com/greydragon888)! - The async check no longer throws on a codec that is not a function ([#2397](https://github.com/greydragon888/real-router/issues/2397))
+
+  `add` and `replace` asked whether `decodeParams` / `encodeParams` was async
+  before asking whether it was a function, and read its `constructor` to find out.
+  A codec with no `constructor` — `Object.create(null)` — made that read throw
+  `TypeError: Cannot read properties of undefined (reading 'name')`, naming neither
+  the route nor the field. The async check now reads only a function, so such a
+  codec reaches the plugin's own refusal: `[router.addRoute] Route "<name>"
+decodeParams must be a function`.
+
+- Updated dependencies [[`fa32d0b`](https://github.com/greydragon888/real-router/commit/fa32d0b38dd39473f3ec2ad4484356fcef7c11f1)]:
+  - @real-router/core@0.147.9
+
 ## 0.28.2
 
 ### Patch Changes
