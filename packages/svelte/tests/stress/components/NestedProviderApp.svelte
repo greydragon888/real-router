@@ -1,6 +1,6 @@
 <script lang="ts">
-  import RouterProvider from "../../../src/RouterProvider.svelte";
   import StressConsumer from "./StressConsumer.svelte";
+  import RouterProvider from "../../../src/RouterProvider.svelte";
 
   import type { Router } from "@real-router/core";
 

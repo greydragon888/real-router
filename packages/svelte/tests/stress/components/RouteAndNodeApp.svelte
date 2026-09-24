@@ -1,6 +1,6 @@
 <script lang="ts">
-  import RouterProvider from "../../../src/RouterProvider.svelte";
   import RouteAndNodeConsumers from "./RouteAndNodeConsumers.svelte";
+  import RouterProvider from "../../../src/RouterProvider.svelte";
 
   import type { Router } from "@real-router/core";
 

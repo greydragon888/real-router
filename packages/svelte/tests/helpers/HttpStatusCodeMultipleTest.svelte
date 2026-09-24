@@ -12,9 +12,7 @@
 </script>
 
 <HttpStatusProvider {sink}>
-  {#snippet children()}
-    <HttpStatusCode code={404} />
-    <HttpStatusCode code={410} />
-    <HttpStatusCode code={503} />
-  {/snippet}
+  <HttpStatusCode code={404} />
+  <HttpStatusCode code={410} />
+  <HttpStatusCode code={503} />
 </HttpStatusProvider>

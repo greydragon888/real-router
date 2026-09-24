@@ -5,8 +5,8 @@
 
   let {
     routeName,
-    routeParams = undefined,
-    search = undefined,
+    routeParams,
+    search,
     strict = false,
     ignoreQueryParams = true,
     onCapture,

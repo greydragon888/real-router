@@ -11721,3 +11721,22 @@ Measured: 23 mutants, all killed, each by the cells expected for it:
 - the detector made blind to `endsWith`, or made to read comments.
 
 The membership CLI's fixture no longer sits at the temp directory's real path: its copy now runs through the macOS temp symlink as well.
+
+## `lint:reach` asks each package's own config about the files its lint command names (#2407, 2026-09-24)
+
+**Problem.** `packages/svelte/eslint.config.mjs` opened with a config object whose only key was `ignores: ["**/*.svelte", "**/*.svelte.ts"]`, and flat config reads that as a global ignore. ESLint skipped all 111 component files while the package's `lint` script exited 0 over the 78 `.ts` files left. `lint:reach` counted the package as linted, because it asks whether a lint step runs for a package, not what that step reads.
+
+**Solution.** `lint:reach` also takes a file census of every package under `packages/`:
+
+- each tracked file its lint command names is asked of the package's own ESLint config twice, as it stands and with its global ignores off;
+- a file of an extension some config addresses, which its own config does not lint, fails the check;
+- a file the root config ignores globally is the repository's policy (`*.mjs`, `*.d.ts`, `e2e/`), not the package's, and is left out;
+- a package whose command names no tracked file fails; no linted package under `packages/`, or a census no config addresses, exits 2.
+
+The svelte package lints its components. The global ignore is gone, `.svelte` and `.svelte.ts` get the TypeScript parser with `extraFileExtensions`, and the root's blocks for `**/*.ts` apply to a component's script. For a component the package config turns `prettier/prettier` off and adjusts the rules two rune idioms trip, `$props()` destructuring and `void x` inside `$effect`; `scripts/svelte-lint-config.test.mjs` pins which rules reach which file kind. turbo's `lint` and `lint:fix` inputs gain `*.svelte`, or an edit to a component alone would replay the last lint from cache.
+
+**Why the extensions are derived.** A list of code extensions drifts, and `LINTABLE` in the same module is one: it has no `.svelte`. An extension counts as code when some config addresses a file of it, so a package that gives its config a new language is held to it without an edit to the guard. The derivation cannot see an extension no config addresses: a package that drops the only block for its own extension drops that extension from the census.
+
+**Why only `packages/`.** Every `.svelte` and `.vue` file under `examples/` and `benchmarks/` is unlinted, because no config there addresses either extension. A census there would fail on the `.svelte` files, which `packages/svelte` makes code, and not on the `.vue` files, which no config addresses. The `shared/` files behind a consumer's symlink stay outside it too: the census sees the symlink's entry, not the files behind it.
+
+**Cost, measured.** `lint:reach` went from about 1.3 s to 8–10 s, for the ESLint instances the census asks. The svelte package's lint reads 189 files instead of 78, and a cold run takes about a minute instead of about nine seconds.

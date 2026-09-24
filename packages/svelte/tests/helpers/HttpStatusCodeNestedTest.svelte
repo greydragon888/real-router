@@ -13,11 +13,7 @@
 </script>
 
 <HttpStatusProvider sink={outer}>
-  {#snippet children()}
-    <HttpStatusProvider sink={inner}>
-      {#snippet children()}
-        <HttpStatusCode code={404} />
-      {/snippet}
-    </HttpStatusProvider>
-  {/snippet}
+  <HttpStatusProvider sink={inner}>
+    <HttpStatusCode code={404} />
+  </HttpStatusProvider>
 </HttpStatusProvider>

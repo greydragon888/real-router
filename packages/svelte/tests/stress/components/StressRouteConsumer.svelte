@@ -6,9 +6,9 @@
   const { route } = useRoute();
 
   $effect(() => {
-    route.current;
+    void route.current;
     onRender?.();
   });
 </script>
 
-<div data-testid="route-consumer">{route.current?.name ?? "none"}</div>
+<div data-testid="route-consumer">{route.current.name}</div>

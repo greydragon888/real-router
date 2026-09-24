@@ -3,7 +3,5 @@
 </script>
 
 <ServerOnly>
-  {#snippet children()}
-    <span data-testid="children">server content</span>
-  {/snippet}
+  <span data-testid="children">server content</span>
 </ServerOnly>

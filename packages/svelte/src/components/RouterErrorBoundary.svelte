@@ -25,9 +25,15 @@
 
   $effect(() => {
     const snap = snapshot.current;
-    if (!snap.error) return;
+
+    if (!snap.error) {
+
+      return;
+
+    }
 
     const { error, toRoute, fromRoute } = snap;
+
     untrack(() => {
       try {
         onError?.(error, toRoute, fromRoute);
@@ -41,6 +47,7 @@
   });
 </script>
 
+<!-- eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `children` is typed as required; a consumer outside the type renders nothing rather than throwing -->
 {@render children?.()}
 {#if snapshot.current.error}
   {@render fallback(snapshot.current.error, snapshot.current.resetError)}

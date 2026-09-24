@@ -1,17 +1,17 @@
 <script lang="ts">
   import { getNavigator } from "@real-router/core";
   import { createRouteSource, primeErrorSource } from "@real-router/sources";
+  import { setContext, untrack } from "svelte";
+
+  import { NAVIGATOR_KEY, ROUTE_KEY, ROUTER_KEY } from "./context";
+  import { createReactiveSource } from "./createReactiveSource.svelte";
+  import { createRouteContext } from "./createRouteContext.svelte";
   import {
     createRouteAnnouncer,
     createScrollRestoration,
     createScrollSpy,
     createViewTransitions,
   } from "./dom-utils";
-  import { setContext, untrack } from "svelte";
-
-  import { createReactiveSource } from "./createReactiveSource.svelte";
-  import { createRouteContext } from "./createRouteContext.svelte";
-  import { NAVIGATOR_KEY, ROUTE_KEY, ROUTER_KEY } from "./context";
 
   import type {
     RouteAnnouncerOptions,
@@ -54,13 +54,19 @@
   );
 
   $effect(() => {
-    if (!anEnabled) return;
+    if (!anEnabled) {
+      return;
+    }
+
     void anPrefix;
     const options = untrack(() =>
       typeof announceNavigation === "object" ? announceNavigation : undefined,
     );
     const announcer = createRouteAnnouncer(router, options);
-    return () => announcer.destroy();
+
+    return () => {
+      announcer.destroy();
+    };
   });
 
   // $derived memoizes by === so inline `{ mode: "restore" }` doesn't thrash:
@@ -73,7 +79,10 @@
   const srStorageKey = $derived(scrollRestoration?.storageKey);
 
   $effect(() => {
-    if (!srEnabled) return;
+    if (!srEnabled) {
+      return;
+    }
+
     // Pin primitive $derived deps as explicit dependencies of this effect
     // BEFORE constructing the utility. The four `void srX` reads make
     // intent unambiguous: even if `createScrollRestoration` throws after
@@ -97,7 +106,10 @@
       storageKey: srStorageKey,
       scrollContainer: untrack(() => scrollRestoration?.scrollContainer),
     });
-    return () => sr.destroy();
+
+    return () => {
+      sr.destroy();
+    };
   });
 
   const spyEnabled = $derived(
@@ -107,20 +119,32 @@
   const spyRootMargin = $derived(scrollSpy?.rootMargin);
 
   $effect(() => {
-    if (!spyEnabled || !spySelector) return;
+    if (!spyEnabled || !spySelector) {
+      return;
+    }
+
     void spyRootMargin;
     const spy = createScrollSpy(router, {
       selector: spySelector,
       rootMargin: spyRootMargin,
       scrollContainer: untrack(() => scrollSpy?.scrollContainer),
     });
-    return () => spy.destroy();
+
+    return () => {
+      spy.destroy();
+    };
   });
 
   $effect(() => {
-    if (!viewTransitions) return;
+    if (!viewTransitions) {
+      return;
+    }
+
     const vt = createViewTransitions(router);
-    return () => vt.destroy();
+
+    return () => {
+      vt.destroy();
+    };
   });
 
   // svelte-ignore state_referenced_locally
@@ -142,7 +166,6 @@
   // svelte-ignore state_referenced_locally
   // Context exposes the same stable router instance for this provider.
   setContext(ROUTER_KEY, router);
-  // svelte-ignore state_referenced_locally
   // Context exposes the navigator derived once from the stable router.
   setContext(NAVIGATOR_KEY, navigator);
   setContext(ROUTE_KEY, routeContext);

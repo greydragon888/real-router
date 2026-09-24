@@ -12,7 +12,9 @@ type ActiveRouteContext<P extends Params> = Omit<RouteContext<P>, "route"> & {
   route: { readonly current: State<P> };
 };
 
-export const useRoute = <P extends Params = Params>(): ActiveRouteContext<P> => {
+export const useRoute = <
+  P extends Params = Params,
+>(): ActiveRouteContext<P> => {
   const ctx = getContextOrThrow<RouteContext>(ROUTE_KEY, "useRoute");
 
   if (!ctx.route.current) {

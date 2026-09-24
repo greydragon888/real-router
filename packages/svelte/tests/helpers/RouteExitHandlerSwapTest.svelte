@@ -2,11 +2,11 @@
   import RouteExitProbe from "./RouteExitProbe.svelte";
   import TestRouterProvider from "./TestRouterProvider.svelte";
 
-  import type { Router } from "@real-router/core";
   import type {
     RouteExitHandler,
     UseRouteExitOptions,
   } from "../../src/composables/useRouteExit.svelte";
+  import type { Router } from "@real-router/core";
 
   // Two distinct handler references. The test swaps `handler` between them at
   // runtime via the exported `setHandler` accessor in the parent test, then

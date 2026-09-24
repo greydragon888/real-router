@@ -1,6 +1,6 @@
 <script lang="ts">
-  import RouterProvider from "../../../src/RouterProvider.svelte";
   import MountUnmountProbeChild from "./MountUnmountProbeChild.svelte";
+  import RouterProvider from "../../../src/RouterProvider.svelte";
 
   import type { Router } from "@real-router/core";
 

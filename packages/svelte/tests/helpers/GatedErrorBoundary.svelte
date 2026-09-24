@@ -1,6 +1,6 @@
 <script lang="ts">
-  import RouterErrorBoundary from "../../src/components/RouterErrorBoundary.svelte";
   import TestRouterProvider from "./TestRouterProvider.svelte";
+  import RouterErrorBoundary from "../../src/components/RouterErrorBoundary.svelte";
 
   import type { Router, RouterError } from "@real-router/core";
 
@@ -14,9 +14,7 @@
 <TestRouterProvider {router}>
   {#if show}
     <RouterErrorBoundary>
-      {#snippet children()}
-        <div>app</div>
-      {/snippet}
+      <div>app</div>
       {#snippet fallback(error: RouterError)}
         <div data-testid="fb">{error.code}</div>
       {/snippet}

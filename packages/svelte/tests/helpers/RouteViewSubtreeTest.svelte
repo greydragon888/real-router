@@ -1,7 +1,7 @@
 <script lang="ts">
-  import RouteView from "../../src/components/RouteView.svelte";
   import RouteViewSubtreeProbe from "./RouteViewSubtreeProbe.svelte";
   import TestRouterProvider from "./TestRouterProvider.svelte";
+  import RouteView from "../../src/components/RouteView.svelte";
 
   import type { Router } from "@real-router/core";
 

@@ -25,16 +25,17 @@
     routeSearch,
     to,
     routeOptions = EMPTY_OPTIONS,
-    class: className = undefined,
+    class: className,
     activeClassName = "active",
     activeStrict = false,
     ignoreQueryParams = true,
-    hash = undefined,
-    target = undefined,
-    children = undefined,
-    onclick: userOnClick = undefined,
+    hash,
+    target,
+    children,
+    onclick: userOnClick,
     ...restProps
   }: {
+    [key: string]: unknown;
     routeName?: string;
     routeParams?: Params;
     routeSearch?: SearchParams;
@@ -54,7 +55,6 @@
     target?: string;
     children?: Snippet;
     onclick?: (evt: MouseEvent) => void;
-    [key: string]: unknown;
   } = $props();
 
   const router = useRouter();

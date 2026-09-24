@@ -7,7 +7,7 @@
 
   $effect(() => {
     // Access .current in reactive context to register subscription
-    route.current;
+    void route.current;
     onRender?.();
   });
 </script>

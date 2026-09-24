@@ -120,7 +120,7 @@
       "dependsOn": ["^type-check"],
       "outputs": [],
       "inputs": [
-        "**/*.{ts,tsx,js,jsx}",
+        "**/*.{ts,tsx,js,jsx,svelte}",
         "../../shared/**/*.ts",
         "../../scripts/lib/**",
         "!dist/**",
@@ -161,7 +161,7 @@
     "lint:fix": {
       "outputs": [],
       "inputs": [
-        "**/*.{ts,tsx,js,jsx}",
+        "**/*.{ts,tsx,js,jsx,svelte}",
         "../../shared/**/*.ts",
         "../../scripts/lib/**",
         "!dist/**",

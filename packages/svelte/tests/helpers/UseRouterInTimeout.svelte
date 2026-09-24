@@ -16,8 +16,8 @@
       const router = useRouter();
 
       onCapture(router, null);
-    } catch (err) {
-      onCapture(null, err);
+    } catch (error) {
+      onCapture(null, error);
     }
   }, 0);
 </script>

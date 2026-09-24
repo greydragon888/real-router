@@ -36,6 +36,7 @@
   // `useDeferred(name)` reads `state.context.ssrDataDeferred[name]` —
   // wrap in `$derived` so a dynamic `name` prop re-resolves the promise
   // (vs. capturing the initial value at component init).
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-arguments -- `T` is this component's generic; without it the promise is `Promise<unknown>` and svelte-check fails
   const promise = $derived(useDeferred<T>(name));
 </script>
 

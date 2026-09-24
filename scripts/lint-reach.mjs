@@ -1,12 +1,19 @@
-// Which workspace packages the lint steps of a hook actually read (#2370).
+// Which workspace packages the lint steps of a hook actually read (#2370), and
+// which of their files the package's own ESLint config lints (#2407).
 //
 // Pure functions: `check-lint-reach.mjs` feeds them the hook, turbo's dry-run
-// output and the tracked tree; `check-lint-reach.test.mjs` feeds them fixtures.
+// output, the tracked tree and ESLint's answers; `check-lint-reach.test.mjs`
+// feeds them fixtures.
+
+import path from "node:path";
 
 /** Tasks that run ESLint over a package. */
 export const LINT_TASKS = new Set(["lint", "lint:example", "lint:bench"]);
 
-/** What ESLint reads here: `eslint.config.mjs` ignores `*.mjs` and `*.d.ts` globally. */
+/**
+ * What the root config reads: `eslint.config.mjs` ignores `*.mjs` and `*.d.ts`
+ * globally. A package's own config can read more, which `unlintedFiles` asks.
+ */
 const LINTABLE = /(?<!\.d)\.(?:[cm]?ts|tsx|c?js|jsx)$/;
 
 const TURBO_RUN = "pnpm turbo run ";
@@ -129,6 +136,77 @@ export function packagesWithNothingToRead(packages, trackedFiles) {
   return new Set(
     packages.filter(({ name }) => !reading.has(name)).map(({ name }) => name),
   );
+}
+
+/**
+ * The paths a package's lint commands name: each word after `eslint` that
+ * names a path in the package, spelled as git spells it (`./src/` → `src`).
+ * A flag and the usual flag values (`--cache`, `--ext .ts`, `--max-warnings
+ * 0`) name none, so no list of flags is kept.
+ *
+ * ⚠ A flag's value that does name a path in the package (`-c
+ * eslint.config.mjs`) is read as a target.
+ *
+ * ⚠ A command that is not an `eslint` invocation throws instead of being
+ * skipped: a skipped command is a package whose files nobody counts.
+ *
+ * @param {string[]} commands
+ * @param {(target: string) => boolean} exists whether a path is in the package
+ * @returns {string[]} in first-named order
+ */
+export function lintTargets(commands, exists) {
+  const targets = new Set();
+
+  for (const command of commands) {
+    const words = command.split(/\s+/);
+    const at = words.indexOf("eslint");
+
+    if (at === -1) {
+      throw new Error(`a lint command this guard cannot read: ${command}`);
+    }
+
+    for (const word of words.slice(at + 1)) {
+      const target = path.posix.normalize(word).replace(/\/+$/, "");
+
+      if (word !== "" && exists(target)) {
+        targets.add(target);
+      }
+    }
+  }
+
+  return [...targets];
+}
+
+/**
+ * Files a lint command reaches that no block of the package's own ESLint
+ * config lints — a global `ignores`, or no `files` block for the extension.
+ *
+ * An extension is code when any config in the census addresses a file of it:
+ * `addressed` is ESLint's answer with the config's global ignores off. A
+ * `.md`, a `.json` or a symlink's entry is addressed by no block, so it never
+ * counts, and no list of extensions is kept.
+ *
+ * ⚠ An extension no config addresses is not code here, so a package that drops
+ * the only block for its own extension drops that extension from the census.
+ *
+ * @param {{ pkg: string, file: string, addressed: boolean, linted: boolean }[]} census
+ * @returns {Map<string, string[]>} package → its unlinted files
+ */
+export function unlintedFiles(census) {
+  const code = new Set(
+    census
+      .filter(({ addressed }) => addressed)
+      .map(({ file }) => path.extname(file)),
+  );
+  const unlinted = new Map();
+
+  for (const { pkg, file, linted } of census) {
+    if (!linted && code.has(path.extname(file))) {
+      unlinted.set(pkg, [...(unlinted.get(pkg) ?? []), file]);
+    }
+  }
+
+  return unlinted;
 }
 
 /**
