@@ -5,6 +5,7 @@
 
   $effect(() => {
     store.set("settings:unsaved", displayName !== "");
+
     return () => { store.set("settings:unsaved", false); };
   });
 </script>

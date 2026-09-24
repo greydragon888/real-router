@@ -42,7 +42,7 @@
   </p>
 
   <div class="qd-toolbar">
-    {#each FILTERS as value}
+    {#each FILTERS as value (value)}
       <Link
         routeName="queryDemo"
         routeSearch={{ filter: value }}

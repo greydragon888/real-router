@@ -15,17 +15,17 @@
 <div>
   <nav>
     <Link routeName="home">Home</Link>
-    {" | "}
+    |
     <Link routeName="admin.dashboard">Admin (client-only)</Link>
-    {" | "}
+    |
     <Link routeName="users.profile" routeParams={{ id: "42" }}>
       User 42 (data-only)
     </Link>
-    {" | "}
+    |
     <Link routeName="docs.detail" routeParams={{ id: "guide" }}>
       Doc HTML
     </Link>
-    {" | "}
+    |
     <Link
       routeName="docs.detail"
       routeParams={{ id: "guide" }}

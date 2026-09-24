@@ -98,7 +98,7 @@
       appears alongside the links.
     </p>
     <RouterErrorBoundary>
-      {#snippet fallback(error, resetError)}
+      {#snippet fallback(error: RouterError, resetError: () => void)}
         <div class="toast error" style="position: relative">
           {error.code}
           <button onclick={resetError} style="margin-left: 8px">✕</button>

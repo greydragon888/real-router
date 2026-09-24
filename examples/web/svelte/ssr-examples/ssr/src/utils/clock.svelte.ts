@@ -1,3 +1,4 @@
+/* eslint-disable svelte/prefer-svelte-reactivity -- `now` is replaced each tick, never mutated, and createSubscriber drives the update */
 import { createSubscriber } from "svelte/reactivity";
 
 // Demonstrates `createSubscriber` — Svelte 5's canonical primitive for

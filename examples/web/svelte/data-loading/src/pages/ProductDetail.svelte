@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Link } from "@real-router/svelte";
+
   import { store } from "../../../../../shared/store";
 
   import type { Product } from "../../../../../shared/api";

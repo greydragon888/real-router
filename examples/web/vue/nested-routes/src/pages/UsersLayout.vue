@@ -6,11 +6,10 @@ import {
   useRouteNode,
   useRouteUtils,
 } from "@real-router/vue";
+import { computed } from "vue";
 
 import UserProfile from "./UserProfile.vue";
 import UsersList from "./UsersList.vue";
-
-import { computed } from "vue";
 
 import type { Params } from "@real-router/core";
 
@@ -40,6 +39,7 @@ const utils = useRouteUtils();
 
 const crumbs = computed(() => {
   const chain = utils.getChain(route.value.name) ?? [route.value.name];
+
   return ["home", ...chain];
 });
 </script>

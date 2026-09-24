@@ -19,8 +19,8 @@
       <li>
         The browser captures the old DOM snapshot (per CSS VT spec §7.3 —
         mandatory before <code>updateCallback</code> runs), then invokes the
-        callback. Inside the callback we call <code>resolveLeave()</code> —
-        the router unblocks and proceeds through activation guards and
+        callback. Inside the callback we call <code>resolveLeave()</code> — the
+        router unblocks and proceeds through activation guards and
         <code>setState</code>.
       </li>
       <li>
@@ -40,20 +40,21 @@
 
     <p>
       <strong>
-        Why <code>setTimeout(0)</code>, not
-        <code>requestAnimationFrame</code>?
+        Why <code>setTimeout(0)</code>, not <code>requestAnimationFrame</code>?
       </strong>
     </p>
     <p>
       Once <code>updateCallback</code> has been invoked, VT enters the
       <code>update-callback-called</code> phase and Chromium sets rendering
-      suppression on the document — which <em>also blocks rAF callbacks</em>.
-      An rAF scheduled from <code>subscribe</code> would never fire, the
-      deferred would hang, and after 4 s Chromium aborts with
-      <code>TimeoutError: Transition was aborted because of timeout in DOM
-      update</code>. <code>setTimeout</code> runs on the task queue independent
-      of the rendering pipeline, so it fires regardless of suppression. This
-      is the one non-obvious detail of the whole design — see
+      suppression on the document — which <em>also blocks rAF callbacks</em>. An
+      rAF scheduled from <code>subscribe</code> would never fire, the deferred
+      would hang, and after 4 s Chromium aborts with
+      <code
+        >TimeoutError: Transition was aborted because of timeout in DOM
+        update</code
+      >. <code>setTimeout</code> runs on the task queue independent of the
+      rendering pipeline, so it fires regardless of suppression. This is the one
+      non-obvious detail of the whole design — see
       <code>shared/dom-utils/view-transitions.ts</code> for the comments.
     </p>
 
@@ -61,13 +62,13 @@
     <p>
       While a View Transition is animating, the document is under
       <strong>rendering suppression</strong>
-      (<a href="https://drafts.csswg.org/css-view-transitions-1/">CSS VT L1
-      §4</a>): the real DOM is still mounted, but it is not painted and is
+      (<a href="https://drafts.csswg.org/css-view-transitions-1/"
+        >CSS VT L1 §4</a
+      >): the real DOM is still mounted, but it is not painted and is
       effectively absent from the hit-test tree. Only the
-      <code>::view-transition</code> pseudo stack is visible and hit-testable.
-      A click during playback lands on the overlay — not on the underlying
-      Link — so <code>Link.onClick</code> never fires and no new navigation
-      starts.
+      <code>::view-transition</code> pseudo stack is visible and hit-testable. A
+      click during playback lands on the overlay — not on the underlying Link —
+      so <code>Link.onClick</code> never fires and no new navigation starts.
     </p>
     <p>
       Adding <code>pointer-events: none</code> to

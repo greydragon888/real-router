@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { RouteView } from "@real-router/vue";
 import { defineAsyncComponent, h } from "vue";
-import Layout from "../../shared/Layout.vue";
+
 import Home from "./pages/Home.vue";
 import Spinner from "./Spinner.vue";
+import Layout from "../../shared/Layout.vue";
 
 const spinnerVNode = h(Spinner);
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link } from "@real-router/vue";
 import { onMounted, onUnmounted, shallowRef } from "vue";
+
 import { store } from "../../../../../shared/store";
 
 import type { Product } from "../../../../../shared/api";
@@ -22,9 +23,7 @@ onMounted(() => {
     product.value = store.get("products.detail") as Product | null | undefined;
     loading.value = store.get("products.detail:loading") as boolean | undefined;
     error.value = store.get("products.detail:error") as
-      | string
-      | null
-      | undefined;
+      string | null | undefined;
   });
 });
 

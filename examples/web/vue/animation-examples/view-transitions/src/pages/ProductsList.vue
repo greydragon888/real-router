@@ -22,7 +22,7 @@ type SortDirection = "asc" | "desc";
 const { route } = useRoute();
 
 const sort = computed<SortDirection>(() =>
-  route.value?.search.sort === "desc" ? "desc" : "asc",
+  route.value.search.sort === "desc" ? "desc" : "asc",
 );
 
 const items = computed(() => {
@@ -63,10 +63,7 @@ const items = computed(() => {
       class="vt-product-card"
       :style="{ '--vt-card-name': `vt-card-${product.id}` }"
     >
-      <Link
-        routeName="products.detail"
-        :routeParams="{ id: product.id }"
-      >
+      <Link routeName="products.detail" :routeParams="{ id: product.id }">
         <span
           class="vt-product-thumb"
           :data-product-id="product.id"

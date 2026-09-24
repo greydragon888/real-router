@@ -1,24 +1,25 @@
 <script lang="ts">
   import { getDependenciesApi, getRoutesApi } from "@real-router/core/api";
   import { RouterProvider, RouteView } from "@real-router/svelte";
-  import type { Router } from "@real-router/core";
-  import Layout from "../../shared/Layout.svelte";
+
   import ProgressBar from "./components/ProgressBar.svelte";
-  import Home from "./pages/Home.svelte";
-  import Login from "./pages/Login.svelte";
-  import Dashboard from "./pages/Dashboard.svelte";
-  import ProductList from "./pages/ProductList.svelte";
-  import ProductDetail from "./pages/ProductDetail.svelte";
-  import UsersLayout from "./pages/UsersLayout.svelte";
-  import Settings from "./pages/Settings.svelte";
   import Admin from "./pages/Admin.svelte";
   import Checkout from "./pages/Checkout.svelte";
+  import Dashboard from "./pages/Dashboard.svelte";
+  import Home from "./pages/Home.svelte";
+  import Login from "./pages/Login.svelte";
+  import ProductDetail from "./pages/ProductDetail.svelte";
+  import ProductList from "./pages/ProductList.svelte";
+  import Settings from "./pages/Settings.svelte";
+  import UsersLayout from "./pages/UsersLayout.svelte";
   import { publicRoutes, privateRoutes } from "./routes";
   import { defineAbilities } from "../../../../shared/abilities";
   import { store } from "../../../../shared/store";
+  import Layout from "../../shared/Layout.svelte";
 
-  import type { User } from "../../../../shared/api";
   import type { AppDependencies } from "./types";
+  import type { User } from "../../../../shared/api";
+  import type { Router } from "@real-router/core";
 
   let { router }: { router: Router<AppDependencies> } = $props();
 

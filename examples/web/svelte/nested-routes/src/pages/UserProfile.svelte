@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Link, RouteView, useRouteNode } from "@real-router/svelte";
+
   import UserSettings from "./UserSettings.svelte";
 
   const userData: Record<string, { name: string; role: string; email: string }> = {

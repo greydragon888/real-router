@@ -6,7 +6,9 @@
   // recomputes across navigations.
   import { readSearch } from "../../../_shared/search-param-spec";
 
-  let { route } = $props();
+  import type { RouteResult } from "@mateothegreat/svelte5-router";
+
+  let { route }: { route: RouteResult } = $props();
   const stats = $derived(
     readSearch(Object.entries(route.result.querystring.params ?? {})),
   );

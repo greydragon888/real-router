@@ -27,11 +27,7 @@ const otherSort = computed(() => (data.value.sort === "asc" ? "desc" : "asc"));
       Toggle to {{ otherSort }}
     </Link>
     <ul data-testid="users-list">
-      <li
-        v-for="user in data.users"
-        :key="user.id"
-        :data-user-id="user.id"
-      >
+      <li v-for="user in data.users" :key="user.id" :data-user-id="user.id">
         <Link routeName="users.profile" :routeParams="{ id: user.id }">
           {{ user.name }}
         </Link>

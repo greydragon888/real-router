@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref, watchEffect } from "vue";
 import { useNavigator } from "@real-router/vue";
+import { onMounted, ref, watchEffect } from "vue";
 
 const navigator = useNavigator();
 const scrollContainerRef = ref<Element | null>(null);
@@ -24,6 +24,7 @@ watchEffect((onCleanup) => {
       );
     }
   });
+
   onCleanup(unsub);
 });
 </script>
@@ -32,7 +33,8 @@ watchEffect((onCleanup) => {
   <div>
     <h1>Reports</h1>
     <p style="color: #666; font-size: 14px">
-      Scroll position preserved via <code>subscribeLeave()</code> — no KeepAlive needed.
+      Scroll position preserved via <code>subscribeLeave()</code> — no KeepAlive
+      needed.
     </p>
     <div
       ref="scrollContainerRef"

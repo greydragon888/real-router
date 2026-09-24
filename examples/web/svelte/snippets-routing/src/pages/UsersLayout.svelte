@@ -1,6 +1,5 @@
 <script lang="ts">
   import { Link, RouteView, useRouteNode } from "@real-router/svelte";
-  import type { Snippet } from "svelte";
 
   const { route } = useRouteNode("users");
 

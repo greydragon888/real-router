@@ -59,7 +59,9 @@ function tryInvalid() {
     <div class="card">
       <h3>Current Params</h3>
       <p style="margin-top: 8px">
-        <code>q={{ query || "(empty)" }}, page={{ page }}, sort={{ sort }}</code>
+        <code
+          >q={{ query || "(empty)" }}, page={{ page }}, sort={{ sort }}</code
+        >
       </p>
       <p style="margin-top: 4px; font-size: 13px; color: #888">
         These params are validated by searchSchema on every navigation.

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onUnmounted, ref, watch } from "vue";
+
 import { editorState } from "../editor-state";
 
 const text = ref("");

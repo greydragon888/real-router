@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useRoute, useRouter } from "@real-router/vue";
 import { invalidate } from "@real-router/ssr-data-plugin";
+import { useRoute, useRouter } from "@real-router/vue";
 import { computed } from "vue";
 
 interface HomeData {
@@ -37,11 +37,7 @@ function handleRefresh(): void {
     <p v-if="data?.aborts !== undefined" data-testid="aborts">
       {{ data.aborts }}
     </p>
-    <button
-      type="button"
-      data-testid="refresh-btn"
-      @click="handleRefresh"
-    >
+    <button type="button" data-testid="refresh-btn" @click="handleRefresh">
       Refresh data
     </button>
   </main>

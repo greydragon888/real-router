@@ -18,7 +18,7 @@
   <nav>
     {#each items as i (i)}
       <a
-        href={p(`/r${i}` as `/r${number}`)}
+        href={p(`/r${i}`)}
         data-testid={i === COUNT - 1 ? "last-link" : undefined}
       >
         r{i}

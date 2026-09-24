@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { createReactiveSource, useRouter } from "@real-router/svelte";
   import { createRouteSource, createTransitionSource } from "@real-router/sources";
+  import { createReactiveSource, useRouter } from "@real-router/svelte";
 
   const router = useRouter();
 
@@ -10,7 +10,8 @@
   let history = $state<string[]>([]);
 
   $effect(() => {
-    const name = routeState.current?.name;
+    const name = routeState.current.route?.name;
+
     if (name) {
       history = [...history, `${new Date().toLocaleTimeString()} → ${name}`].slice(-10);
     }
@@ -27,9 +28,9 @@
     <div>
       <strong style="font-size: 12px; color: #888">CURRENT ROUTE</strong>
       <div style="margin-top: 4px">
-        <p>Name: <strong>{routeState.current?.name ?? "—"}</strong></p>
-        <p>Path: <code>{routeState.current?.path ?? "—"}</code></p>
-        <p>Params: <code>{JSON.stringify(routeState.current?.params ?? {})}</code></p>
+        <p>Name: <strong>{routeState.current.route?.name ?? "—"}</strong></p>
+        <p>Path: <code>{routeState.current.route?.path ?? "—"}</code></p>
+        <p>Params: <code>{JSON.stringify(routeState.current.route?.params ?? {})}</code></p>
       </div>
     </div>
     <div>
@@ -49,7 +50,7 @@
       <p style="font-size: 13px; color: #888">No navigations yet.</p>
     {:else}
       <ul style="padding-left: 16px; margin-top: 4px">
-        {#each history.toReversed() as entry}
+        {#each history.toReversed() as entry, index (index)}
           <li style="font-size: 13px">{entry}</li>
         {/each}
       </ul>

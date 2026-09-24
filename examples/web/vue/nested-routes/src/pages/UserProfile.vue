@@ -23,7 +23,9 @@ const id = computed(() => {
 
 const user = computed(() => (id.value ? userData[id.value] : undefined));
 
-const displayName = computed(() => user.value?.name ?? `User ${id.value || "?"}`);
+const displayName = computed(
+  () => user.value?.name ?? `User ${id.value || "?"}`,
+);
 </script>
 
 <template>

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { useRoute } from "@real-router/svelte";
   import { getSsrDataMode } from "@real-router/ssr-data-plugin";
+  import { useRoute } from "@real-router/svelte";
   import { onDestroy, onMount } from "svelte";
 
   interface DocData {
@@ -9,28 +9,29 @@
     body: string;
   }
 
-  const { route } = useRoute();
+  const { route } = useRoute<{ id: string }>();
   const mode = $derived(getSsrDataMode(route.current));
   const ssrData = $derived(route.current.context.data as DocData | undefined);
   let clientData = $state<DocData | null>(null);
   let handle: ReturnType<typeof setTimeout> | undefined;
 
   onMount(() => {
-    if (mode !== "client-only" || ssrData !== undefined) return;
+    if (mode !== "client-only" || ssrData !== undefined) {return;}
 
     const params = route.current.params;
     const search = route.current.search;
+
     handle = setTimeout(() => {
       clientData = {
-        id: String(params.id),
+        id: params.id,
         format: String(search.format),
-        body: `(client) PDF placeholder for ${String(params.id)}`,
+        body: `(client) PDF placeholder for ${params.id}`,
       };
     }, 50);
   });
 
   onDestroy(() => {
-    if (handle !== undefined) clearTimeout(handle);
+    if (handle !== undefined) {clearTimeout(handle);}
   });
 
   const data = $derived(ssrData ?? clientData);

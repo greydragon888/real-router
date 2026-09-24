@@ -11,10 +11,43 @@ import path from "node:path";
 export const LINT_TASKS = new Set(["lint", "lint:example", "lint:bench"]);
 
 /**
- * What the root config reads: `eslint.config.mjs` ignores `*.mjs` and `*.d.ts`
- * globally. A package's own config can read more, which `unlintedFiles` asks.
+ * The extensions that hold no code. Every other tracked file is code, whether
+ * or not a config addresses its extension, so a language no config reads yet
+ * is named rather than skipped (#2556). The list is kept apart from the
+ * configs it checks: derived from them, it was blind to `.vue`, which none of
+ * them addressed. A new kind of file in a lint target fails the census until
+ * it is added here.
+ *
+ * "" is a file with no extension: a symlink's entry, such as `src/dom-utils`.
  */
-const LINTABLE = /(?<!\.d)\.(?:[cm]?ts|tsx|c?js|jsx)$/;
+export const NOT_CODE = new Set([
+  "",
+  ".css",
+  ".gitignore",
+  ".gitkeep",
+  ".html",
+  ".icns",
+  ".ico",
+  ".json",
+  ".lock",
+  ".md",
+  ".png",
+  ".rs",
+  ".sh",
+  ".svg",
+  ".toml",
+]);
+
+/**
+ * @param {string} file
+ * @returns {string} `.ts` for `a.d.ts`, `.gitignore` for `.gitignore`, "" for `LICENSE`
+ */
+export function extensionOf(file) {
+  return /\.[^./]+$/.exec(path.posix.basename(file))?.[0] ?? "";
+}
+
+/** @param {string} file */
+export const isCode = (file) => !NOT_CODE.has(extensionOf(file));
 
 const TURBO_RUN = "pnpm turbo run ";
 
@@ -110,8 +143,9 @@ export function unreadSharedDirs(sharedDirs, aliases, linted) {
 }
 
 /**
- * Workspace packages whose own tracked files hold nothing ESLint reads. A file
- * under a nested workspace package belongs to that package.
+ * Workspace packages whose own tracked files hold no code: every file is of a
+ * kind `NOT_CODE` lists. A file under a nested workspace package belongs to
+ * that package.
  *
  * @param {{ name: string, dir: string }[]} packages
  * @param {string[]} trackedFiles
@@ -122,7 +156,7 @@ export function packagesWithNothingToRead(packages, trackedFiles) {
   const reading = new Set();
 
   for (const file of trackedFiles) {
-    if (!LINTABLE.test(file)) {
+    if (!isCode(file)) {
       continue;
     }
 
@@ -178,35 +212,44 @@ export function lintTargets(commands, exists) {
 }
 
 /**
- * Files a lint command reaches that no block of the package's own ESLint
- * config lints — a global `ignores`, or no `files` block for the extension.
+ * Code files a lint command reaches that no block of the package's own ESLint
+ * config lints — a global `ignores`, or no `files` block for the extension —
+ * less the ones `deliberate` names.
  *
- * An extension is code when any config in the census addresses a file of it:
- * `addressed` is ESLint's answer with the config's global ignores off. A
- * `.md`, a `.json` or a symlink's entry is addressed by no block, so it never
- * counts, and no list of extensions is kept.
- *
- * ⚠ An extension no config addresses is not code here, so a package that drops
- * the only block for its own extension drops that extension from the census.
- *
- * @param {{ pkg: string, file: string, addressed: boolean, linted: boolean }[]} census
+ * @param {{ pkg: string, file: string, repoPath: string, linted: boolean }[]} census
+ *   `file` from the package's directory, `repoPath` from the repository's
+ * @param {Map<string, string>} deliberate repository path → why its package's
+ *   config ignores it
  * @returns {Map<string, string[]>} package → its unlinted files
  */
-export function unlintedFiles(census) {
-  const code = new Set(
-    census
-      .filter(({ addressed }) => addressed)
-      .map(({ file }) => path.extname(file)),
-  );
+export function unlintedFiles(census, deliberate) {
   const unlinted = new Map();
 
-  for (const { pkg, file, linted } of census) {
-    if (!linted && code.has(path.extname(file))) {
+  for (const { pkg, file, repoPath, linted } of census) {
+    if (!linted && isCode(file) && !deliberate.has(repoPath)) {
       unlinted.set(pkg, [...(unlinted.get(pkg) ?? []), file]);
     }
   }
 
   return unlinted;
+}
+
+/**
+ * The `deliberate` entries that excuse nothing: no lint command reaches the
+ * file, or its package's config lints it now.
+ *
+ * @param {{ repoPath: string, file: string, linted: boolean }[]} census
+ * @param {Map<string, string>} deliberate
+ * @returns {string[]}
+ */
+export function staleDeliberate(census, deliberate) {
+  const excusable = new Set(
+    census
+      .filter(({ file, linted }) => !linted && isCode(file))
+      .map(({ repoPath }) => repoPath),
+  );
+
+  return [...deliberate.keys()].filter((repoPath) => !excusable.has(repoPath));
 }
 
 /**

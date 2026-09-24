@@ -18,7 +18,7 @@ const root = ref<HTMLDivElement | null>(null);
 useRouteAnimation(root, { entryClass: "fade-in", exitClass: "fade-out" });
 
 const { route } = useRoute<{ id: string }>();
-const id = computed(() => route.value?.params.id ?? "1");
+const id = computed(() => route.value.params.id);
 const product = computed(() => COVERS[id.value]);
 </script>
 
@@ -31,21 +31,17 @@ const product = computed(() => COVERS[id.value]);
       aria-hidden="true"
     />
     <p>
-      Note: no hero morph here. The thumbnail on the products page
-      slides away with that page; this cover fades in independently.
-      Bridging the two requires shared state across components — out
-      of scope for the distributed pattern.
+      Note: no hero morph here. The thumbnail on the products page slides away
+      with that page; this cover fades in independently. Bridging the two
+      requires shared state across components — out of scope for the distributed
+      pattern.
     </p>
     <p>
-      <Link routeName="products" activeStrict>
-        ← Back to products
-      </Link>
+      <Link routeName="products" activeStrict> ← Back to products </Link>
     </p>
   </div>
   <div v-else ref="root">
     <h2>Unknown product</h2>
-    <Link routeName="products" activeStrict>
-      Back to products
-    </Link>
+    <Link routeName="products" activeStrict> Back to products </Link>
   </div>
 </template>

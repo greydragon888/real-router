@@ -15,7 +15,7 @@ const COVERS: Partial<Record<string, { name: string; color: string }>> = {
 
 const { route } = useRoute<{ id: string }>();
 
-const id = computed(() => route.value?.params.id ?? "1");
+const id = computed(() => route.value.params.id);
 const product = computed(() => COVERS[id.value]);
 </script>
 
@@ -38,9 +38,9 @@ const product = computed(() => COVERS[id.value]);
       aria-hidden="true"
     />
     <p>
-      Notice how the square morphed from the Products list into this cover.
-      The morph is pure CSS: identical <code>view-transition-name</code> on
-      both elements → browser pairs them → automatic FLIP-style animation.
+      Notice how the square morphed from the Products list into this cover. The
+      morph is pure CSS: identical <code>view-transition-name</code> on both
+      elements → browser pairs them → automatic FLIP-style animation.
     </p>
     <p>
       <Link routeName="products" activeStrict>← Back to products</Link>

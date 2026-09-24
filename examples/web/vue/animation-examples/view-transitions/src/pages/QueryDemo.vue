@@ -21,7 +21,7 @@ type Filter = "all" | "letter" | "number" | "color";
 const { route } = useRoute();
 
 const filter = computed<Filter>(
-  () => (route.value?.search.filter as Filter | undefined) ?? "all",
+  () => (route.value.search.filter as Filter | undefined) ?? "all",
 );
 
 const visible = computed(() =>

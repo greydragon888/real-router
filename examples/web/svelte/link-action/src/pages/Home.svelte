@@ -19,7 +19,7 @@
 
   <h2>Product Cards (use:link on div)</h2>
   <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px">
-    {#each products as product}
+    {#each products as product (product.id)}
       <div
         class="card"
         use:link={{ name: "products.detail", params: { id: product.id } }}

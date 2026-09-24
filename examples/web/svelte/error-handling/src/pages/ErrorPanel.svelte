@@ -1,9 +1,7 @@
 <script lang="ts">
   import { errorStore } from "../error-store";
 
-  import type { ErrorEntry } from "../error-store";
-
-  let errors = $state(errorStore.getAll() as readonly ErrorEntry[]);
+  let errors = $state(errorStore.getAll());
 
   $effect(() => {
     return errorStore.subscribe(() => {
@@ -20,7 +18,7 @@
     </p>
   {:else}
     <ul style="padding-left: 16px; margin-top: 8px">
-      {#each errors.toReversed() as entry}
+      {#each errors.toReversed() as entry, index (index)}
         <li style="margin-bottom: 4px; font-size: 13px">
           <strong style="color: #c62828">{entry.code}</strong>
           {#if entry.path}

@@ -22,7 +22,7 @@ type SortDirection = "asc" | "desc";
 const { route } = useRoute();
 
 const sort = computed<SortDirection>(() =>
-  route.value?.search.sort === "desc" ? "desc" : "asc",
+  route.value.search.sort === "desc" ? "desc" : "asc",
 );
 
 const items = computed(() => {
@@ -37,12 +37,12 @@ const items = computed(() => {
 <template>
   <h1>Products</h1>
   <p>
-    Click a product card to see the page-level transition: the list
-    slides out, the detail page slides in. There is no library
-    layoutId hero morph in this Vue example — Vue's built-in
-    <code>&lt;Transition&gt;</code> is per-element entry/exit only.
-    For cross-component hero morphs in Vue, see
-    <code>route-animations/</code> → <code>useHeroMorph</code>.
+    Click a product card to see the page-level transition: the list slides out,
+    the detail page slides in. There is no library layoutId hero morph in this
+    Vue example — Vue's built-in
+    <code>&lt;Transition&gt;</code> is per-element entry/exit only. For
+    cross-component hero morphs in Vue, see <code>route-animations/</code> →
+    <code>useHeroMorph</code>.
   </p>
 
   <div class="products-toolbar">
@@ -67,15 +67,8 @@ const items = computed(() => {
   </div>
 
   <ul class="product-list">
-    <li
-      v-for="product in items"
-      :key="product.id"
-      class="product-card"
-    >
-      <Link
-        routeName="products.detail"
-        :routeParams="{ id: product.id }"
-      >
+    <li v-for="product in items" :key="product.id" class="product-card">
+      <Link routeName="products.detail" :routeParams="{ id: product.id }">
         <span
           class="product-thumb"
           :style="{ backgroundColor: product.color }"

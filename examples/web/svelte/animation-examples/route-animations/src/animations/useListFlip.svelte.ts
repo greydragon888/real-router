@@ -1,3 +1,4 @@
+/* eslint-disable svelte/prefer-svelte-reactivity -- the maps and sets are per-run FLIP bookkeeping that nothing renders */
 import { useNavigator, useRouteExit } from "@real-router/svelte";
 import { onDestroy } from "svelte";
 

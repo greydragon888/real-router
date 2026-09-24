@@ -53,12 +53,12 @@
           type="checkbox"
           data-testid={`select-${user.id}`}
           checked={selected.has(user.id)}
-          onchange={() => toggle(user.id)}
+          onchange={() => { toggle(user.id); }}
         />
         <Link routeName="users.profile" routeParams={{ id: user.id }}>
           {user.name}
         </Link>
-        {" — "}
+        —
         <span data-testid={`role-${user.id}`}>{user.role}</span>
       </li>
     {/each}

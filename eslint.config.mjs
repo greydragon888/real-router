@@ -21,11 +21,58 @@ import jsdoc from "eslint-plugin-jsdoc";
 import unicorn from "eslint-plugin-unicorn";
 import noOnlyTests from "eslint-plugin-no-only-tests";
 import security from "eslint-plugin-security";
+import tsParser from "@typescript-eslint/parser";
+import sveltePlugin from "eslint-plugin-svelte";
+import svelteParser from "svelte-eslint-parser";
+import vueParser from "vue-eslint-parser";
 
 const gitignorePath = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   ".gitignore",
 );
+
+// ============================================
+// COMPONENTS — a .svelte or .vue file is TypeScript with markup (#2556)
+// ============================================
+const COMPONENT_EXTENSIONS = ["svelte", "vue"];
+
+// ⚠ One value for every file the project service parses. typescript-eslint
+// reloads every project whenever `extraFileExtensions` differs from the
+// previous file's, so a value set on components alone makes a run that mixes
+// them with `.ts` files many times slower, with the same findings.
+const extraFileExtensions = COMPONENT_EXTENSIONS.map((ext) => `.${ext}`);
+
+/** A `files` pattern that names TypeScript sources and nothing else. */
+const TYPESCRIPT_PATTERN =
+  /\.(?:[cm]?ts|tsx|\{(?:[cm]?ts|tsx)(?:,(?:[cm]?ts|tsx))*\})$/;
+
+/**
+ * Gives each block that addresses TypeScript files the component extensions
+ * as well, in the block itself, so its position among the others — what it
+ * overrides and what overrides it — stays the same. A rune module
+ * (`*.svelte.ts`) is TypeScript already.
+ *
+ * @param {import("eslint").Linter.Config[]} blocks
+ * @returns {import("eslint").Linter.Config[]}
+ */
+export function withComponentFiles(blocks) {
+  return blocks.map((block) => {
+    const files = block.files ?? [];
+    const twins = files.flatMap((pattern) =>
+      typeof pattern === "string" &&
+      TYPESCRIPT_PATTERN.test(pattern) &&
+      !pattern.includes(".svelte.")
+        ? COMPONENT_EXTENSIONS.map((ext) =>
+            pattern.replace(TYPESCRIPT_PATTERN, `.${ext}`),
+          )
+        : [],
+    );
+
+    return twins.length === 0
+      ? block
+      : { ...block, files: [...new Set([...files, ...twins])] };
+  });
+}
 
 // ============================================
 // v66/v67 unicorn rules — NON-SHIPPED carve-out
@@ -71,7 +118,7 @@ const UNICORN_NON_SHIPPED_OFF = {
   "unicorn/no-nonstandard-builtin-properties": "off", // proto-pollution tests touch nonstandard Symbol props
 };
 
-export default tsEslint.config(
+const blocks = tsEslint.config(
   // ============================================
   // 1. GLOBAL IGNORES (ESLint 9.30+ globalIgnores helper)
   // ============================================
@@ -228,6 +275,7 @@ export default tsEslint.config(
         // Provides better performance and easier configuration than project: true
         projectService: true,
         tsconfigRootDir: import.meta.dirname,
+        extraFileExtensions,
       },
     },
     rules: {
@@ -1330,7 +1378,7 @@ export default tsEslint.config(
       // would clutter the examples without illustrating router behavior.
       "sonarjs/prefer-read-only-props": "off",
       // Demo abbreviations (id, e, ev) are fine in component bodies.
-      "unicorn/prevent-abbreviations": "off",
+      "unicorn/name-replacements": "off",
     },
   },
 
@@ -1432,6 +1480,65 @@ export default tsEslint.config(
   },
 
   // ============================================
+  // 15.2 COMPONENTS (.svelte, .vue)
+  // ============================================
+  // Every block above that addresses `*.ts` addresses a component as well
+  // (`withComponentFiles`). These give a component its parser and say what
+  // differs from a `.ts` file.
+  ...sveltePlugin.configs["flat/recommended"],
+  {
+    files: ["**/*.svelte", "**/*.svelte.ts"],
+    languageOptions: {
+      parser: svelteParser,
+      parserOptions: {
+        // ⚠ The parser module, not `tsEslint.parser`. svelte-eslint-parser
+        // recognises the module by its exports, and tests a smaller object by
+        // parsing an empty file with no `tsconfigRootDir`. Under `benchmarks/`
+        // that parse fails (two candidate roots, see section 5), and the parser
+        // then reads the component as JavaScript, without the rune types.
+        parser: tsParser,
+        extraFileExtensions,
+      },
+    },
+    rules: {
+      "import-x/no-mutable-exports": "off",
+      "import-x/no-default-export": "off",
+      // ⚠ Every `svelte/*` subpath resolves to one declaration file,
+      // `svelte/types/index.d.ts`, so the rule reads `svelte/transition` and
+      // `svelte/easing` as one module, and its fix merges them into an import
+      // that does not exist.
+      "import-x/no-duplicates": "off",
+    },
+  },
+  {
+    // Prettier has no `.svelte` parser here. Two rune idioms the TypeScript
+    // rules misread: `let { … } = $props()` is how props are declared, and
+    // the svelte rule knows it; `void x` inside `$effect` reads `x` to make it
+    // a dependency without using it. A recursive component imports itself,
+    // which Svelte 5 prefers to the deprecated `<svelte:self>`.
+    files: ["**/*.svelte"],
+    rules: {
+      "prettier/prettier": "off",
+      "prefer-const": "off",
+      "svelte/prefer-const": "error",
+      "@typescript-eslint/no-meaningless-void-operator": "off",
+      "sonarjs/void-use": "off",
+      "import-x/no-self-import": "off",
+    },
+  },
+  {
+    files: ["**/*.vue"],
+    languageOptions: {
+      parser: vueParser,
+      parserOptions: {
+        parser: tsParser,
+        extraFileExtensions,
+        sourceType: "module",
+      },
+    },
+  },
+
+  // ============================================
   // 16. TURBO CONFIGURATION (must be last)
   // ============================================
   // eslint-config-turbo — co-versioned with the turbo CLI, so it moves with it
@@ -1450,3 +1557,5 @@ export default tsEslint.config(
     },
   },
 );
+
+export default withComponentFiles(blocks);

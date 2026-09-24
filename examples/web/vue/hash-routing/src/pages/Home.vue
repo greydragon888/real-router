@@ -3,7 +3,7 @@ import { useRoute } from "@real-router/vue";
 import { computed } from "vue";
 
 const { route } = useRoute();
-const currentHash = computed(() => window.location.hash || "(empty)");
+const currentHash = computed(() => globalThis.location.hash || "(empty)");
 </script>
 
 <template>

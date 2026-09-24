@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Link } from "@real-router/svelte";
+
   import { store } from "../../../../../shared/store";
 
   import type { Product } from "../../../../../shared/api";
@@ -40,7 +41,7 @@
       Data loaded via <code>loadData</code> in route config + data-loader
       plugin.
     </p>
-    {#each products as product}
+    {#each products as product (product.id)}
       <div class="card">
         <strong>{product.name}</strong>
         <span style="margin-left: 8px; color: #888">

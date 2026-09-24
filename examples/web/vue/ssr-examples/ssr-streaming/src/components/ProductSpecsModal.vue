@@ -21,6 +21,7 @@ const open = ref(false);
 // Client mount: onMounted fires, mounted flips to true, the teleport
 // activates and any open content moves to #modal-target.
 const mounted = ref(false);
+
 onMounted(() => {
   mounted.value = true;
 });
@@ -31,11 +32,7 @@ function toggle(): void {
 </script>
 
 <template>
-  <button
-    type="button"
-    data-testid="open-specs-modal"
-    @click="toggle"
-  >
+  <button type="button" data-testid="open-specs-modal" @click="toggle">
     {{ open ? "Close" : "Open" }} specs
   </button>
 

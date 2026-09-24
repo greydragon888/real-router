@@ -18,7 +18,7 @@ const data = computed<UserProfileData | undefined>(
 // the new value (no remount). See src/directives/track-view.ts.
 const manualOverride = ref<string | null>(null);
 const trackedId = computed<string>(
-  () => manualOverride.value ?? (data.value?.user?.id ?? ""),
+  () => manualOverride.value ?? data.value?.user.id ?? "",
 );
 </script>
 

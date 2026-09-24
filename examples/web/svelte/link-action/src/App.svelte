@@ -1,10 +1,12 @@
 <script lang="ts">
   import { RouterProvider, RouteView } from "@real-router/svelte";
-  import type { Router } from "@real-router/core";
-  import Layout from "../../shared/Layout.svelte";
+
+  import About from "./pages/About.svelte";
   import Home from "./pages/Home.svelte";
   import ProductDetail from "./pages/ProductDetail.svelte";
-  import About from "./pages/About.svelte";
+  import Layout from "../../shared/Layout.svelte";
+
+  import type { Router } from "@real-router/core";
 
   let { router }: { router: Router } = $props();
 

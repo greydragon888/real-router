@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { RouteView } from "@real-router/vue";
 
+import { useHeroMorph } from "./animations/useHeroMorph";
+import { useListFlip } from "./animations/useListFlip";
+import { usePageAnimator } from "./animations/usePageAnimator";
 import About from "./pages/About.vue";
 import Home from "./pages/Home.vue";
 import ProductDetail from "./pages/ProductDetail.vue";
 import ProductsList from "./pages/ProductsList.vue";
 import QueryDemo from "./pages/QueryDemo.vue";
 import Layout from "../../../shared/Layout.vue";
-import { useHeroMorph } from "./animations/useHeroMorph";
-import { useListFlip } from "./animations/useListFlip";
-import { usePageAnimator } from "./animations/usePageAnimator";
 
 const links = [
   { routeName: "home", label: "Home" },

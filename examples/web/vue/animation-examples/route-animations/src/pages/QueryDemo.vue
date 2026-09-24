@@ -17,7 +17,7 @@ const FILTERS: Filter[] = ["all", "letter", "number", "color"];
 const { route } = useRoute();
 
 const filter = computed<Filter>(
-  () => (route.value?.search.filter as Filter | undefined) ?? "all",
+  () => (route.value.search.filter as Filter | undefined) ?? "all",
 );
 
 const visible = computed(() =>
@@ -31,14 +31,14 @@ const visible = computed(() =>
   <div data-route-root data-route-anim="fade">
     <h1>Query-only navigation</h1>
     <p>
-      Changing the filter via query params is a same-route navigation
-      (<code>route.name === nextRoute.name</code>).
-      <code>useRouteExit</code> detects this via its default
-      <code>skipSameRoute: true</code> and skips the page-level fade
-      entirely — the page does not animate. <code>useListFlip</code>
-      opts in via <code>skipSameRoute: false</code> to own the
-      same-route window: items glide between positions, newcomers fade
-      in, removed items fade out via ghost clones.
+      Changing the filter via query params is a same-route navigation (<code
+        >route.name === nextRoute.name</code
+      >). <code>useRouteExit</code> detects this via its default
+      <code>skipSameRoute: true</code> and skips the page-level fade entirely —
+      the page does not animate. <code>useListFlip</code> opts in via
+      <code>skipSameRoute: false</code> to own the same-route window: items
+      glide between positions, newcomers fade in, removed items fade out via
+      ghost clones.
     </p>
 
     <div class="qd-toolbar">

@@ -9,6 +9,6 @@
     "tsBuildInfoFile": "./.tsbuildinfo",
     "incremental": false
   },
-  "include": ["apps/**/*.ts", "apps/**/*.tsx"],
+  "include": ["apps/**/*.ts", "apps/**/*.tsx", "apps/**/*.svelte"],
   "exclude": ["apps/vue/**", "apps/solid/**"]
 }

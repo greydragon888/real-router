@@ -18,7 +18,9 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  if (handle !== undefined) clearTimeout(handle);
+  if (handle !== undefined) {
+    clearTimeout(handle);
+  }
 });
 </script>
 

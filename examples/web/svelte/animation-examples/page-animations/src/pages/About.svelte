@@ -39,7 +39,7 @@
 
   <h2>page-animations/ (this example)</h2>
   <p>
-    Distributed via <code>{`useRouteAnimation(() => ref, …)`}</code> per
+    Distributed via <code>useRouteAnimation(() =&gt; ref, …)</code> per
     page. Each page subscribes to the router for its own lifetime; no
     central module. Encapsulated, simpler mental model, less boilerplate
     per new page after the composable is in place. The trade-off: each
@@ -93,9 +93,10 @@
   </p>
   <p>
     <strong>Svelte pattern:</strong> pages declare
-    <code>{`let ref: HTMLDivElement | undefined = $state()`}</code>,
+    <code>let ref: HTMLDivElement | undefined = $state()</code>,
+    <!-- eslint-disable-next-line unicorn/no-incorrect-template-string-interpolation -- the literal prints Svelte markup, braces included -->
     bind via <code>{`bind:this={ref}`}</code>, and pass
-    <code>{`() => ref`}</code> to the composable. The getter is read
+    <code>() =&gt; ref</code> to the composable. The getter is read
     inside the handler at exit / enter time — no <code>useRef</code>
     abstraction needed.
   </p>

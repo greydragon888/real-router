@@ -5,7 +5,7 @@
 <section data-testid="home-page">
   <h1>Streaming SSR Example</h1>
   <p>
-    Demonstrates Svelte 5 async SSR with <code>{"<svelte:boundary>"}</code>
+    Demonstrates Svelte 5 async SSR with <code>&lt;svelte:boundary&gt;</code>
     + <code>{`{#await}`}</code> blocks for deferred data — wired through
     <code>@real-router/ssr-data-plugin</code> with
     <strong>zero router-specific streaming API</strong>.

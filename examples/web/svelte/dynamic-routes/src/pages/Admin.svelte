@@ -1,7 +1,8 @@
 <script lang="ts">
   import { RouteView } from "@real-router/svelte";
-  import AdminUsers from "./AdminUsers.svelte";
+
   import AdminSettings from "./AdminSettings.svelte";
+  import AdminUsers from "./AdminUsers.svelte";
 </script>
 
 <div>

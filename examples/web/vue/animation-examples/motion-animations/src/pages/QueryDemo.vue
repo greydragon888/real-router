@@ -17,7 +17,7 @@ const FILTERS: Filter[] = ["all", "letter", "number", "color"];
 const { route } = useRoute();
 
 const filter = computed<Filter>(
-  () => (route.value?.search.filter as Filter | undefined) ?? "all",
+  () => (route.value.search.filter as Filter | undefined) ?? "all",
 );
 
 const visible = computed(() =>
@@ -32,18 +32,16 @@ const visible = computed(() =>
     <h1>Query-only navigation</h1>
     <p>
       Switch a filter — the page-level
-      <code>&lt;Transition&gt;</code> does not exit/enter because
-      filter changes are same-route
-      (<code>route.name === nextRoute.name</code>) and
+      <code>&lt;Transition&gt;</code> does not exit/enter because filter changes
+      are same-route (<code>route.name === nextRoute.name</code>) and
       <code>useRouteExit</code>'s default
-      <code>skipSameRoute: true</code> short-circuits before the
-      exitToken bumps. The <code>v-for</code> re-renders the visible
-      items array in place. Vue's <code>&lt;Transition&gt;</code>
-      does not ship list-layout primitives at this level — for
-      animated list reorder in Vue, see
-      <code>page-animations/</code> → <code>useListFlip</code> or
-      Vue's built-in <code>&lt;TransitionGroup&gt;</code> for FLIP
-      reorder.
+      <code>skipSameRoute: true</code> short-circuits before the exitToken
+      bumps. The <code>v-for</code> re-renders the visible items array in place.
+      Vue's <code>&lt;Transition&gt;</code>
+      does not ship list-layout primitives at this level — for animated list
+      reorder in Vue, see
+      <code>page-animations/</code> → <code>useListFlip</code> or Vue's built-in
+      <code>&lt;TransitionGroup&gt;</code> for FLIP reorder.
     </p>
 
     <div class="qd-toolbar">
@@ -59,11 +57,7 @@ const visible = computed(() =>
     </div>
 
     <ul class="qd-list">
-      <li
-        v-for="item in visible"
-        :key="item.id"
-        class="qd-item"
-      >
+      <li v-for="item in visible" :key="item.id" class="qd-item">
         <strong>{{ item.label }}</strong>
         <span> — {{ item.category }}</span>
       </li>

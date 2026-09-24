@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Link, useRoute } from "@real-router/svelte";
+
   import { useListFlip } from "../use-list-flip.svelte";
   import { useRouteAnimation } from "../use-route-animation.svelte";
 
@@ -63,7 +64,7 @@
     >
       A → Z
     </Link>
-    {" · "}
+    ·
     <Link
       routeName="products"
       routeSearch={{ sort: "desc" }}
@@ -71,7 +72,7 @@
     >
       Z → A
     </Link>
-    {" · "}
+    ·
     <strong>current: {sort}</strong>
   </div>
 

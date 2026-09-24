@@ -3,9 +3,11 @@
 
   import User from "../../_shared/User.svelte";
 
+  import type { RouteResult } from "@mateothegreat/svelte5-router";
+
   // @mateothegreat passes the matched route (RouteResult) as the `route` prop;
   // named regex groups land in route.result.path.params.
-  let { route } = $props();
+  let { route }: { route: RouteResult } = $props();
   const id = $derived(String(route.result.path.params.id));
 </script>
 

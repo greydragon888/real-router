@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useRoute } from "@real-router/vue";
 import { getSsrDataMode } from "@real-router/ssr-data-plugin";
+import { useRoute } from "@real-router/vue";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 
 interface DocData {
@@ -9,28 +9,30 @@ interface DocData {
   body: string;
 }
 
-const { route } = useRoute();
+const { route } = useRoute<{ id: string }>();
 const mode = computed(() => getSsrDataMode(route.value));
-const ssrData = computed(
-  () => route.value.context.data as DocData | undefined,
-);
+const ssrData = computed(() => route.value.context.data as DocData | undefined);
 const clientData = ref<DocData | null>(null);
 let handle: ReturnType<typeof setTimeout> | undefined;
 
 onMounted(() => {
-  if (mode.value !== "client-only" || ssrData.value !== undefined) return;
+  if (mode.value !== "client-only" || ssrData.value !== undefined) {
+    return;
+  }
 
   handle = setTimeout(() => {
     clientData.value = {
-      id: String(route.value.params.id),
+      id: route.value.params.id,
       format: String(route.value.search.format),
-      body: `(client) PDF placeholder for ${String(route.value.params.id)}`,
+      body: `(client) PDF placeholder for ${route.value.params.id}`,
     };
   }, 50);
 });
 
 onUnmounted(() => {
-  if (handle !== undefined) clearTimeout(handle);
+  if (handle !== undefined) {
+    clearTimeout(handle);
+  }
 });
 
 const data = computed(() => ssrData.value ?? clientData.value);

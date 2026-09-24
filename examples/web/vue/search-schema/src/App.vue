@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { RouteView } from "@real-router/vue";
-import Layout from "../../shared/Layout.vue";
+
 import Home from "./pages/Home.vue";
 import Products from "./pages/Products.vue";
+import Layout from "../../shared/Layout.vue";
 
 const links = [
   { routeName: "home", label: "Home" },

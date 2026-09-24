@@ -29,7 +29,7 @@
 
     if (typeof globalThis.window === "undefined") {
       return new Promise((resolve) =>
-        setTimeout(() => resolve(reviews), SERVER_REVIEWS_DELAY_MS),
+        setTimeout(() => { resolve(reviews); }, SERVER_REVIEWS_DELAY_MS),
       );
     }
 

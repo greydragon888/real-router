@@ -1,12 +1,14 @@
 <script lang="ts">
   import { getRoutesApi } from "@real-router/core/api";
-  import { RouterProvider, RouteView, Link, useRoute, useNavigator } from "@real-router/svelte";
-  import type { Router } from "@real-router/core";
-  import Home from "./pages/Home.svelte";
+  import { RouterProvider, RouteView, Link, useNavigator } from "@real-router/svelte";
+
   import About from "./pages/About.svelte";
-  import Analytics from "./pages/Analytics.svelte";
   import Admin from "./pages/Admin.svelte";
+  import Analytics from "./pages/Analytics.svelte";
+  import Home from "./pages/Home.svelte";
   import { analyticsRoute, adminRoutes } from "./routes";
+
+  import type { Router } from "@real-router/core";
 
   let { router }: { router: Router } = $props();
 
@@ -15,7 +17,6 @@
 </script>
 
 <RouterProvider {router}>
-  {@const { route } = useRoute()}
   {@const navigator = useNavigator()}
   {@const routesApi = getRoutesApi(router)}
   <div class="app">
@@ -46,6 +47,7 @@
                 if (navigator.getState()?.name.startsWith("analytics")) {
                   await navigator.navigate("home");
                 }
+
                 routesApi.remove("analytics");
                 analyticsEnabled = false;
               } else {
@@ -66,6 +68,7 @@
                 if (navigator.getState()?.name.startsWith("admin")) {
                   await navigator.navigate("home");
                 }
+
                 routesApi.remove("admin");
                 adminEnabled = false;
               } else {

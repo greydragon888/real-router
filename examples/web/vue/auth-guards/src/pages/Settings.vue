@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onUnmounted, ref, watch, watchEffect } from "vue";
 import { useNavigator } from "@real-router/vue";
+import { onUnmounted, ref, watch, watchEffect } from "vue";
+
 import { store } from "../../../../../shared/store";
 
 const displayName = ref("");
@@ -20,6 +21,7 @@ watchEffect((onCleanup) => {
       localStorage.setItem("settings:draft", displayName.value);
     }
   });
+
   onCleanup(unsub);
 });
 </script>
