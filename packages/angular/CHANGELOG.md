@@ -1,5 +1,13 @@
 # @real-router/angular
 
+## 0.22.2
+
+### Patch Changes
+
+- [#2553](https://github.com/greydragon888/real-router/pull/2553) [`4900d48`](https://github.com/greydragon888/real-router/commit/4900d489f2a0d371bebfc89115fee14c799c061d) Thanks [@greydragon888](https://github.com/greydragon888)! - Build `src/dom-utils` through a symlink to the shared sources ([#2552](https://github.com/greydragon888/real-router/issues/2552))
+
+  `src/dom-utils` links to `shared/dom-utils`, as in the other framework adapters, instead of holding a copy that a `prebundle` script regenerated before every build. The published package is byte-identical to the previous build.
+
 ## 0.22.1
 
 ### Patch Changes
