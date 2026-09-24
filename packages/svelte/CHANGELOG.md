@@ -1,5 +1,21 @@
 # @real-router/svelte
 
+## 0.22.1
+
+### Patch Changes
+
+- [#2557](https://github.com/greydragon888/real-router/pull/2557) [`3af7bd0`](https://github.com/greydragon888/real-router/commit/3af7bd059945649062632421e17a8068ed8ca340) Thanks [@greydragon888](https://github.com/greydragon888)! - Lint the package's `.svelte` and `.svelte.ts` sources ([#2407](https://github.com/greydragon888/real-router/issues/2407))
+
+  The package's ESLint config ignored every component file, so ESLint had never read them. They are linted now, and the findings are fixed without a change in behavior. Among them:
+
+  - import order and spacing;
+  - braces on one-line `if` statements;
+  - catch parameters named `error`;
+  - `= undefined` defaults dropped from `$props()`;
+  - the `Link` and `RouteView` prop types declare their index signature first.
+
+  In the published components, the checks that guard input outside a declared type stay, each marked with its reason: `Lazy`'s check of the resolved module, and `RouterErrorBoundary`'s optional call of `children`.
+
 ## 0.22.0
 
 ### Minor Changes
