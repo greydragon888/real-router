@@ -14,7 +14,7 @@
 // complete by deriving the set from the AST instead of trusting it.
 //
 // What it does with the list — every entry run, a failing workspace failing the run,
-// an empty list refused — is pinned by `scripts/run-repo-scans.test.mjs` (#2542).
+// an empty list refused — is pinned by `scripts/tests/run-repo-scans.test.mjs` (#2542).
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";

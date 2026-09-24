@@ -8,7 +8,7 @@ $ARGUMENTS
 ## Канон
 
 - **Only workflow:** `changesets.yml` — publishing via npm OIDC Trusted Publishing. There is no `release.yml`; an "emergency release" is a re-run of this workflow (`changeset publish` is idempotent — already-published versions are skipped, and the reconcile step backfills tags/Releases)
-- Trusted Publisher configured for all @real-router/\* packages with workflow `changesets.yml`. The release job **must stay on a GitHub-hosted runner** — npm trusted publishing does not support self-hosted ones, and moving it would fail only at publish time, on master. Guarded by `scripts/release-workflow.test.mjs`
+- Trusted Publisher configured for all @real-router/\* packages with workflow `changesets.yml`. The release job **must stay on a GitHub-hosted runner** — npm trusted publishing does not support self-hosted ones, and moving it would fail only at publish time, on master. Guarded by `scripts/tests/release-workflow.test.mjs`
 - **Publishing is tokenless.** No `NPM_TOKEN` anywhere; every version is published by `trustedPublisher: github` with SLSA provenance. Never "fix" a publish problem by minting an npm token — least of all a 2FA-bypass granular token, the credential class npm is winding down (it loses direct publishing around Jan 2027)
 
 ### Adding a new package to npm (one-time, human-only)

@@ -19,7 +19,7 @@
 #                    (#2548)
 # - lint:dedupe: The lockfile is deduplicated — the check twin of the
 #                `pnpm dedupe` pre-commit runs when the lockfile is staged
-# - scripts tests: The repo's own tooling tests (scripts/*.test.mjs), the
+# - scripts tests: The repo's own tooling tests (scripts/tests/*.test.mjs), the
 #                  suite CI's Repo Lints runs
 # - lint:reach: Every workspace package is read by a lint step of this hook,
 #               derived from its own `turbo run` lines (#2370); under
@@ -49,7 +49,7 @@ set -e
 
 echo "🚀 Running pre-push checks..."
 
-# >>> push guard: start — scripts/pre-push-guard.test.mjs runs this block
+# >>> push guard: start — scripts/tests/pre-push-guard.test.mjs runs this block
 # Every step below reads the WORKING TREE, not the commits being pushed, so
 # refuse unless they are the same thing: each branch this push updates must
 # receive HEAD, and nothing may be uncommitted — an unstaged fix or an
@@ -102,7 +102,7 @@ pnpm lint:membership
 # The rest of pre-commit's checks of the tree, repeated for the reason above —
 # and a `--no-verify` commit skips pre-commit as well (#2548). A direct push to
 # master reaches no ci.yml, so without these a rebased or merged tree lands with
-# none of them run. `scripts/ci-hook-parity.test.mjs` holds every check
+# none of them run. `scripts/tests/ci-hook-parity.test.mjs` holds every check
 # pre-commit runs to a twin here.
 echo "🔭 Running the repository-wide scans..."
 pnpm lint:repo-scans
@@ -119,7 +119,7 @@ echo "🔗 Checking the lockfile is deduplicated..."
 pnpm lint:dedupe
 
 # The repo's own tooling tests — the shard planner's, the gate-completeness
-# meta-test and the rest of scripts/*.test.mjs — the files and runner CI's
+# meta-test and the rest of scripts/tests/*.test.mjs — the files and runner CI's
 # Repo Lints uses. Infrastructure reaches master by direct push, where no
 # ci.yml runs, so this is the one run such a change gets before it lands
 # (#2359). Pure Node and a few seconds, so it sits ahead of the build like
@@ -132,7 +132,7 @@ pnpm lint:dedupe
 # test identity in .git/config — see IMPLEMENTATION_NOTES).
 echo "🧰 Testing repo scripts..."
 # shellcheck disable=SC2046 # the names must split: one operand per variable
-(unset $(git rev-parse --local-env-vars); node --test --test-reporter=dot scripts/*.test.mjs)
+(unset $(git rev-parse --local-env-vars); node --test --test-reporter=dot scripts/tests/*.test.mjs)
 
 # Build packages and validate published artifacts
 # Every workspace package must be read by a lint step of this hook (#2370).
@@ -178,7 +178,7 @@ pnpm lint:security
 echo "📝 Linting Markdown prose..."
 pnpm lint:prose
 
-# >>> push guard: end — scripts/pre-push-guard.test.mjs runs this block
+# >>> push guard: end — scripts/tests/pre-push-guard.test.mjs runs this block
 # The steps above took minutes; the tree they read must still be this push.
 if [ "$(git rev-parse HEAD)" != "$HEAD_SHA" ] || [ -n "$(git status --porcelain)" ]; then
   echo "❌ The working tree changed while the checks ran — they validated something other than this push."

@@ -531,7 +531,7 @@ const blocks = tsEslint.config(
       // no-cycle below linted a textbook cycle clean. These three settings are
       // verbatim from importX.flatConfigs.typescript (kept inline so the
       // resolver block stays the single settings home). Guarded by
-      // scripts/no-cycle-guard.test.mjs — a fixture cycle must keep failing.
+      // scripts/tests/no-cycle-guard.test.mjs — a fixture cycle must keep failing.
       "import-x/extensions": [
         ".ts",
         ".tsx",

@@ -11878,3 +11878,18 @@ The next PR run confirms it. Recreating the container reset the accumulator, so 
 - A spawn test per script runs a byte copy of it in a fixture checkout, by a relative path, from the root and from subdirectories: `scripts/check-e2e-specs.test.mjs`, `check-prose.test.mjs`, `check-semgrep.test.mjs` and `check-changeset.test.mjs`. Vale and semgrep are stubbed, and each stub records the directory it ran in and its argv. The semgrep stub exits 7 for a missing config and 2 for a missing target, as semgrep does. Against the base scripts 12 of the 22 cells fail, and each of 17 mutants of the change fails a cell.
 
 **Why the script's own location, not a refusal outside the root.** Of the eleven local gates a hook or CI runs through `lint:*`, six took their root from their own location and five from the cwd, and both sides were written down. Refusing a run from a subdirectory closes the same holes and keeps that split. Resolving from the script's own location leaves one gate on the cwd: `check-coverage-scope.mjs`, which fails loudly from a subdirectory, and whose test (#2541) runs it with the cwd at a fixture.
+
+## `scripts/` keeps its tests in `scripts/tests/` (2026-09-24)
+
+**Change.** By owner decision, the 37 `node:test` files of `scripts/` moved to `scripts/tests/`, out of a directory they shared with 49 scripts, modules and data files. The pre-push step and CI's "Test CI meta" step run `node --test scripts/tests/*.test.mjs`.
+
+**What moved with them.**
+
+- Each test finds the repository root two levels up, and imports the module it tests from `../`.
+- `cli-entry.test.mjs` leaves itself out of its detector scan by its new path.
+- The suite glob in `ci-hook-parity.test.mjs`'s fixtures is the new one, like the hook and the workflow those fixtures model.
+- Comments that name a test by its path follow it: `.husky/pre-push`, `eslint.config.mjs`, `sonar-project.properties`, `scripts/run-repo-scans.mjs`, the `release` command, and the ARCHITECTURE.md of the browser, hash and navigation plugins.
+
+**What did not.** Two comments inside shipped source still name the old paths: `shared/browser-env/state-guard.ts` names `scripts/twin-lockstep.test.mjs`, and `packages/core/src/utils/fsm/ARCHITECTURE.md` names `scripts/fsm-diagram-parity.test.mjs`. `changeset-check.yml` counts every file under a public package's `src/`, and every `shared/**/*.ts`, as source, so repointing either one is a change that needs a changeset.
+
+**Measured.** The suite lists the same 432 tests with the same verdicts before and after the move. knip's report did not change. Its root entry `scripts/*.{sh,mjs,ts}` no longer matches the tests, and nothing depended on that: the tests' only package imports are `typescript` and `eslint`, which other entries import too, and no file under `scripts/` is a knip project file.

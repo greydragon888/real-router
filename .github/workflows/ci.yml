@@ -902,7 +902,7 @@ jobs:
       - name: Check for unused code
         run: pnpm lint:unused
 
-      # Unit-test the CI meta-layer itself (scripts/*.test.mjs — node:test
+      # Unit-test the CI meta-layer itself (scripts/tests/*.test.mjs — node:test
       # outside the turbo graph, so it runs here; several files import tooling
       # the setup step installs, such as typescript and eslint): the shard
       # planner (build-matrix.*) gating the leaf/sharded routing + input-aware
@@ -912,7 +912,7 @@ jobs:
       # class, debt-map axis A6).
       - name: Test CI meta (shard planner + gate completeness)
         if: env.DEPENDABOT_PR != 'true' && env.NO_SOURCE != 'true'
-        run: node --test scripts/*.test.mjs
+        run: node --test scripts/tests/*.test.mjs
 
   # ============================================
   # PIPELINE-SHARDED: one runner per affected class (mode=sharded). The matrix
