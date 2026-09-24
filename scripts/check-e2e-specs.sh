@@ -2,9 +2,21 @@
 
 # Verify that every example with a playwright.config.ts has at least one e2e spec.
 # Prevents shipping examples with empty e2e/ directories.
-# Usage: ./scripts/check-e2e-specs.sh
+# Usage: ./scripts/check-e2e-specs.sh   (from any directory)
 
 set -e
+
+# The examples are this checkout's: found from the script's own location, never
+# from the cwd (#2544). From a subdirectory there is no `examples/` to list.
+cd "$(dirname "$0")/.."
+
+# Listed before the loop, so that a failing `find` fails the run under `set -e`
+# and an empty list can be refused: a run that checked nothing is not a pass.
+configs="$(find examples -name playwright.config.ts -not -path '*/node_modules/*')"
+if [ -z "$configs" ]; then
+  echo "ERROR: no playwright.config.ts under examples/ — nothing was checked."
+  exit 1
+fi
 
 errors=0
 
@@ -24,7 +36,7 @@ while IFS= read -r config; do
     echo "ERROR: $e2e_dir has 0 spec files"
     errors=$((errors + 1))
   fi
-done < <(find examples -name playwright.config.ts -not -path '*/node_modules/*' 2>/dev/null)
+done <<<"$configs"
 
 if [ "$errors" -gt 0 ]; then
   echo ""

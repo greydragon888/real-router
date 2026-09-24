@@ -19,11 +19,17 @@
 #   brew install semgrep        (or: uv tool install semgrep)
 #
 # Exit handling: findings (exit 1) BLOCK the push; tool/network errors (exit >=2)
-# only WARN — CI CodeQL remains the authoritative gate either way.
+# only WARN — CI CodeQL remains the authoritative gate either way. A rule set or
+# target missing from the checkout fails (exit 1) before semgrep runs.
 #
-# Usage: ./scripts/check-semgrep.sh
+# Usage: ./scripts/check-semgrep.sh   (from any directory)
 
 set -e
+
+# Everything is resolved from the script's own location, never from the cwd
+# (#2544). From a subdirectory, `.semgrep/` and the targets would not resolve:
+# semgrep exits 7 for a missing config, and the tool-error arm below only warns.
+cd "$(dirname "$0")/.."
 
 # Resolve a semgrep runner (installed binary preferred, else ephemeral uvx).
 if command -v semgrep >/dev/null 2>&1; then
@@ -44,6 +50,16 @@ fi
 # Only scan shipped source; tests/benchmarks build throwaway adversarial inputs
 # that trip security heuristics with no shipped risk.
 TARGETS="packages shared"
+
+# A rule set or target that is not there is this checkout's own breakage, not a
+# tool or network error, so it is refused here instead of reaching the
+# `exit >= 2` arm below, which only warns.
+for subject in .semgrep $TARGETS; do
+  if [ ! -d "$subject" ]; then
+    echo "❌ no $subject/ in the repository — nothing was scanned."
+    exit 1
+  fi
+done
 
 # Baseline: the merge-base with origin/master → report only NEW findings.
 BASELINE=""

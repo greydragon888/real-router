@@ -11860,3 +11860,21 @@ Counted from #2564's run, a PR run becomes about 1,263 series:
 - the 95 run counters.
 
 The next PR run confirms it. Recreating the container reset the accumulator, so every stream restarted from zero, which PromQL reads as a counter reset.
+
+## Four gate scripts read their subject from their own checkout (#2544, 2026-09-24)
+
+**Problem.** `check-e2e-specs.sh`, `check-prose.sh`, `check-semgrep.sh` and `.changeset/check-changeset.mjs` found what they check relative to the working directory. pnpm, the hooks and CI run them at the root, so none of their callers reached it; a direct call from a subdirectory did. Measured on `69f304cc7`, each with a planted violation the root run caught:
+
+- `check-e2e-specs.sh`, from `packages/` and `examples/`: `All e2e directories have specs.`, exit 0. Nothing refused zero configs, and `find`'s errors went to `/dev/null`, so a checkout without `examples/` passed from the root as well.
+- `check-semgrep.sh`, from `packages/`, `shared/` and `packages/core/`: semgrep exited 7 for the missing `.semgrep/`, and the `exit >= 2` arm, which only warns, passed the finding. A checkout without `.semgrep/` passed from the root as well.
+- `check-changeset.mjs`, from `packages/`: `📝 No changesets to validate.`, exit 0, because a missing `.changeset/` read as no changesets.
+- `check-prose.sh`: `git ls-files` lists the files under the cwd, with paths relative to it, and the exclusions are written against paths from the root. From `packages/` it linted 114 of the 123 files and passed a finding in the root README. From `benchmarks/`, `examples/` and `.claude/` it linted only prose that is out of scope, and from `benchmarks/` it went red on it.
+
+**Solution.**
+
+- Each of the four takes its root from its own location, as `check-deps-audit.sh` does. The bash scripts `cd "$(dirname "$0")/.."`, and `check-changeset.mjs` sets `ROOT` from `import.meta.dirname`. `check-prose.sh` does so only when no paths are passed; paths on the command line stay the caller's.
+- `check-e2e-specs.sh` lists its configs before the loop, so a failing `find` fails the run under `set -e`, and it refuses an empty list.
+- `check-semgrep.sh` refuses a checkout without `.semgrep/` or one of its targets before semgrep runs. That is the checkout's own breakage, not a tool error.
+- A spawn test per script runs a byte copy of it in a fixture checkout, by a relative path, from the root and from subdirectories: `scripts/check-e2e-specs.test.mjs`, `check-prose.test.mjs`, `check-semgrep.test.mjs` and `check-changeset.test.mjs`. Vale and semgrep are stubbed, and each stub records the directory it ran in and its argv. The semgrep stub exits 7 for a missing config and 2 for a missing target, as semgrep does. Against the base scripts 12 of the 22 cells fail, and each of 17 mutants of the change fails a cell.
+
+**Why the script's own location, not a refusal outside the root.** Of the eleven local gates a hook or CI runs through `lint:*`, six took their root from their own location and five from the cwd, and both sides were written down. Refusing a run from a subdirectory closes the same holes and keeps that split. Resolving from the script's own location leaves one gate on the cwd: `check-coverage-scope.mjs`, which fails loudly from a subdirectory, and whose test (#2541) runs it with the cwd at a fixture.

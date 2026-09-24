@@ -24,6 +24,8 @@
 # non-zero exit read as "no network", and a planted bad reference passed.
 #
 # Usage: ./scripts/check-prose.sh [path ...]
+#   Paths are relative to the caller's cwd. With none, the corpus is the
+#   repository's, from any directory.
 
 set -e
 
@@ -55,6 +57,10 @@ fi
 if [ "$#" -gt 0 ]; then
   TARGETS=("$@")
 else
+  # From the script's own location, never from the cwd (#2544): `git ls-files`
+  # lists the files under the cwd, with paths relative to it, and the
+  # exclusions below are written against paths from the root.
+  cd "$(dirname "$0")/.."
   # shellcheck disable=SC2207 # paths in this repository carry no spaces
   TARGETS=($(git ls-files '*.md' |
     grep -v 'CHANGELOG\.md$' |

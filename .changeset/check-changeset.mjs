@@ -39,7 +39,9 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
-const ROOT = process.cwd();
+// The checkout this file lives in, never the cwd (#2544): the cwd of a call
+// from `packages/` has no `.changeset/` to validate.
+const ROOT = join(import.meta.dirname, "..");
 const CHANGESET_DIR = join(ROOT, ".changeset");
 const PKG_DIR = join(ROOT, "packages");
 const VALID_LEVELS = new Set(["major", "minor", "patch"]);
@@ -174,8 +176,6 @@ function validateChangeset(name, content, registry) {
  * @returns {{ file: string, errors: string[], warnings: string[] }[]}
  */
 function validateAll() {
-  if (!existsSync(CHANGESET_DIR)) return [];
-
   const files = readdirSync(CHANGESET_DIR)
     .filter((f) => f.endsWith(".md") && f !== "README.md")
     .sort();
