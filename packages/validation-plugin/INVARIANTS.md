@@ -88,6 +88,16 @@ lists that used to stand here could never fire.
 | 17  | `validateUpdateRouteBasicArgs`: null/array updates throws `TypeError`              | —    |
 | 18  | `validateUpdateRouteBasicArgs`: empty name throws `ReferenceError`                 | —    |
 
+## Route batches — `replace`
+
+`replace` discards the registered table, so this plugin judges its batch as the whole new one (#2562). Tested in `replace-batch.properties.ts`.
+
+| #   | Invariant                                                                                                           | Runs |
+| --- | ------------------------------------------------------------------------------------------------------------------- | ---- |
+| 1   | The route checks judge `replace(batch)` over any table the plugin installs over as they judge `add(batch)` on an empty router with the same root path — the same message, or both accepted | 300  |
+
+The one refusal that names a different door is outside the property's name pool: a reserved `@@` name is refused as `[router.replaceRoutes]` on `replace`, the door the caller called (`validator-boundary-authority-2322.test.ts`).
+
 ## State namespace
 
 | #   | Invariant                                                                  | Runs |

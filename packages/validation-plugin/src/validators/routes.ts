@@ -462,13 +462,16 @@ export function validateShouldUpdateNodeArgs(
 }
 
 /**
- * Validates routes for addition to the router.
+ * Validates a batch against the table it joins.
  * Checks parent existence, duplicates, and forwardTo targets/cycles.
  *
+ * The table is the registered one for `add`, and an empty one under the kept
+ * root for `replace` (#2562) — `validationPlugin.ts` picks it per door.
+ *
  * @param routes - Routes to validate
- * @param tree - The route tree, from `PluginApi.getTree()`
- * @param lookup - Existence and path slots of routes that already exist
- * @param forwardMap - The ONE-HOP forward map, from `PluginApi.getForwardMap()`
+ * @param tree - The tree of the table the batch joins
+ * @param lookup - Existence and path slots of that table's routes
+ * @param forwardMap - That table's ONE-HOP forward map
  * @param parentName - Optional parent route fullName for nesting via addRoute({ parent })
  */
 export function validateRoutes<Dependencies extends DefaultDependencies>(

@@ -244,6 +244,8 @@ Callbacks are intentionally **not** probed at registration time — their return
 
 The plugin does **not** import the foundation `route-tree` package. `validateRoute` (the batch route/path validator — no matcher equivalent) comes from the `@real-router/core/validation` subpath; the route validators ask existence by walking `PluginApi.getTree()` and read path slots from `PluginApi.getUrlParams` (a `RouteLookup`, threaded into `validateRoutes` → `validateForwardToTargets`), and the retrospective pass reads the same two answers from that lookup; the `RouteTree` type comes from core. This keeps core the sole consumer of the routing engine. `tests/functional/no-route-tree.test.ts` scans `src/` for any `route-tree` import and fails on a regression — keep it green (and `route-tree` out of `devDependencies`).
 
+⚠ Those answers describe the registered table, which is what an `add` batch joins. A `replace` batch discards it, so `emptyTableUnder` hands the same route validators the root with no route and no forward under it (#2562) — judged against the registered table, a batch that keeps a route is refused as a duplicate.
+
 ### A message names a door that can reach it, and a walk says so (#2457)
 
 Every `[router.<door>]` head in `src/` is checked against the doors that can
