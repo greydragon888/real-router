@@ -47,6 +47,22 @@ runs:
         node-version-file: .nvmrc
         cache: ${{ inputs.node-cache }}
 
+    - name: Stamp CI identity for turbo telemetry
+      # Resource attributes for turbo's OTLP metrics (#1745). Only a workflow
+      # that sets TURBO_EXPERIMENTAL_OTEL_ENDPOINT exports, so elsewhere this is
+      # inert. Every value is bounded: the job plus its matrix suffix, the
+      # event, the runner kind and the Node version. A run id would make every
+      # run write new series.
+      shell: bash
+      run: |
+        {
+          printf 'TURBO_EXPERIMENTAL_OTEL_RESOURCE=service.name=turbo,service.namespace=real-router'
+          printf ',ci.job=%s%s' "${GITHUB_JOB}" "${TURBO_TELEMETRY_JOB_SUFFIX:+-${TURBO_TELEMETRY_JOB_SUFFIX}}"
+          printf ',ci.event=%s' "${GITHUB_EVENT_NAME}"
+          printf ',ci.runner=%s' "${RUNNER_ENVIRONMENT:-unknown}"
+          printf ',process.runtime.version=%s\n' "$(node -v)"
+        } >> "$GITHUB_ENV"
+
     - name: Install dependencies
       shell: bash
       # Unquoted on purpose: install-args may carry multiple flags that must

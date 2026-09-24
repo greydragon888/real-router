@@ -11795,3 +11795,37 @@ Nothing recorded which tasks those were.
 **How the examples were checked.** `vue-tsc` and `vite build` pass for every svelte and vue example, and `build:app` passes for the SSR ones, with `svelte-check` or `vue-tsc`. `svelte-check`, run by hand over the svelte examples that no gate type-checks, reports 51 errors on the base commit and 47 after the change; the four gone are the monitor's.
 
 **Cost, measured.** `lint:reach` takes about 9 s, against about 8 s for the `packages/`-only census. A lint process that loads the root config starts about 0.2 s later, for the svelte parser and plugin.
+
+## turbo's OTLP metrics go through a collector on the runner host (#1745, 2026-09-24)
+
+**Problem.** Per-task turbo timings had no trend store: the run summaries are files, one set per run. turbo exports OTLP metrics itself, but only with delta temporality: `default_temporality()` returns `Temporality::Delta` (vercel/turborepo#12136). Grafana Cloud's ingest rejects delta, and grafana/mimir#10439 is still open. Measured on 2026-09-24:
+
+- a local turbo run was answered `400`, and turbo reported that only as a DEBUG line. Only `target_info` landed;
+- a hand-made delta counter got `400 invalid temporality and type combination`, and the same counter as cumulative got `200`.
+
+**Solution.** A collector sits between turbo and the store. This is the recipe of vercel/turborepo's `examples/with-otel`, and of a production report in vercel/turborepo#12922.
+
+- **`ops/telemetry/`** holds the host side:
+  - the OTel Collector (contrib 0.161.0) runs in Docker on the runner host. It chains `delta_to_cumulative` into `prometheus_remote_write` to Grafana Cloud Free, and only `ci.*` and `process.runtime.version` become labels;
+  - the host's own nginx owns ports 80 and 443. It terminates TLS for `77-222-38-47.sslip.io`, with a Let's Encrypt certificate from certbot's webroot, and proxies `/v1/metrics` only;
+  - the collector rejects a request without the ingest token.
+- **CI side:**
+  - `experimentalObservability` in `turbo.json`;
+  - the OTLP env block in `ci.yml` and `post-merge.yml`, with the endpoint and the ingest token from secrets;
+  - a stamp step in the setup action, and inline in `post-merge.yml`. It sets `service.name`, `service.namespace`, `ci.job` (with a matrix suffix for `base-test` and `pipeline-sharded`), `ci.event`, `ci.runner` from `RUNNER_ENVIRONMENT`, and `process.runtime.version`.
+
+**Why no run id in the identity.** `delta_to_cumulative` drops a point that starts before its stream's state. That suggested concurrent jobs on one stream would lose data. Measured, they do not: two concurrent turbo runs shared one identity, the first started 3 s earlier and reported 35.4 s later, and both accumulated (5 = 2 + 3 attempted tasks). turbo records its metrics when a run ends, so a point starts when it is recorded.
+
+Without a run id, a series survives across runs, so `rate` and `increase` work and the series count stays bounded. The same reason keeps `ci.runner` to the runner kind rather than `RUNNER_NAME`.
+
+**Measured on 2026-09-24:**
+
+- the flag changes no task hash: post-merge's task set kept 125 of 125 hashes on turbo 2.10.13;
+- an empty endpoint starts no exporter: 0 `turborepo_otel` lines, against 4 with an endpoint. So fork PRs and Dependabot runs export nothing;
+- the ingested metric names are:
+  - `turbo_run_duration_ms_milliseconds_*` and `turbo_task_duration_ms_milliseconds_*`, histograms with build-scale buckets up to 1 h (vercel/turborepo#12939);
+  - `turbo_run_tasks_{attempted,cached,failed}_total`;
+  - `turbo_task_cache_events_total`;
+- one local run of three tasks wrote 79 series, 64 of them histogram buckets. Active series against the free tier's 10k are measured after a week.
+
+**The host is shared.** It also runs production services and the benchmark runner. So the collector is capped at 256 MB and half a CPU, and listens on loopback only.

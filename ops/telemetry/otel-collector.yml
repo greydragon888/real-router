@@ -1,0 +1,55 @@
+# OTel Collector for turbo's OTLP metrics (#1745).
+#
+# turbo exports delta temporality only, and Grafana Cloud's ingest rejects
+# delta, so the collector accumulates deltas into cumulative series before it
+# remote-writes them. The ingest token and the Grafana token come from `.env`
+# next to docker-compose.yml.
+extensions:
+  bearertokenauth/ingest:
+    scheme: Bearer
+    token: ${env:OTEL_INGEST_TOKEN}
+  basicauth/grafana:
+    client_auth:
+      username: "3609314"
+      password: ${env:GRAFANA_CLOUD_TOKEN}
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+        auth:
+          authenticator: bearertokenauth/ingest
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 200
+    spike_limit_mib: 40
+  # A stream is keyed by resource + scope + metric + point attributes, and a
+  # point that starts before the stream's state is dropped. turbo records its
+  # metrics when a run ends, so a point starts when it is recorded: two
+  # concurrent runs on one stream both accumulate (measured, #1745). A stream
+  # idle longer than `max_stale` restarts from zero, which PromQL reads as a
+  # counter reset.
+  delta_to_cumulative:
+    max_stale: 72h
+  batch: {}
+
+exporters:
+  prometheus_remote_write:
+    endpoint: https://prometheus-prod-37-prod-ap-southeast-1.grafana.net/api/prom/push
+    auth:
+      authenticator: basicauth/grafana
+    # Only these resource attributes become labels, so an unexpected one
+    # cannot multiply the series.
+    resource_constant_labels:
+      included: ["ci.*", "process.runtime.version"]
+
+service:
+  extensions: [bearertokenauth/ingest, basicauth/grafana]
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, delta_to_cumulative, batch]
+      exporters: [prometheus_remote_write]

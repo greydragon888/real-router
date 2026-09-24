@@ -1,0 +1,25 @@
+# The #1745 collector on the runner host (77.222.38.47), in
+# /opt/real-router-telemetry/ next to otel-collector.yml and `.env`.
+#
+# `.env` (mode 0600, never committed) holds OTEL_INGEST_TOKEN, the token CI
+# sends, and GRAFANA_CLOUD_TOKEN, the `metrics:write` token for remote write.
+# The port is published on loopback only: nginx terminates TLS and proxies
+# /v1/metrics to it (nginx-otel.conf).
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.161.0@sha256:b5cf983651c32c3ca13f936deb51742015a54d121f388cac248923ddeb8cc9fc
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./otel-collector.yml:/etc/otelcol-contrib/config.yaml:ro
+    env_file: .env
+    ports:
+      - "127.0.0.1:4318:4318"
+    # The host also runs production services and the benchmark runner.
+    mem_limit: 256m
+    cpus: 0.5
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"

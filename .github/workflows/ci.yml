@@ -22,6 +22,15 @@ env:
   TURBO_API: ${{ vars.TURBO_API }}
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+  # turbo's OTLP metrics (#1745) go to the collector in ops/telemetry, which
+  # turns turbo's delta temporality into what Grafana Cloud accepts. A fork PR
+  # gets empty secrets, and turbo starts no exporter without an endpoint. The
+  # resource attributes come from the setup action's stamp step.
+  TURBO_EXPERIMENTAL_OTEL_ENABLED: "true"
+  TURBO_EXPERIMENTAL_OTEL_PROTOCOL: http-protobuf
+  TURBO_EXPERIMENTAL_OTEL_ENDPOINT: ${{ secrets.TELEMETRY_OTLP_ENDPOINT }}
+  TURBO_EXPERIMENTAL_OTEL_HEADERS: authorization=Bearer ${{ secrets.TELEMETRY_OTLP_AUTH }}
+  TURBO_EXPERIMENTAL_OTEL_METRICS_TASK_DETAILS: "true"
 
 jobs:
   # Fast check to determine if CI should run
@@ -444,6 +453,9 @@ jobs:
         # splits by a hash of the file path and one heavy file dominates whatever
         # shard it lands in. Past four, more jobs buy less.
         shard: [1, 2, 3, 4]
+    env:
+      # Keeps the four shards apart in turbo's telemetry (#1745).
+      TURBO_TELEMETRY_JOB_SUFFIX: ${{ matrix.shard }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -924,6 +936,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.check.outputs.matrix || '{"include":[]}') }}
+    env:
+      # Keeps the shards apart in turbo's telemetry (#1745).
+      TURBO_TELEMETRY_JOB_SUFFIX: ${{ matrix.name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7

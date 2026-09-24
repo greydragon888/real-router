@@ -5,7 +5,8 @@
     "errorsOnlyShowHash": true,
     "affectedUsingTaskInputs": true,
     "watchUsingTaskInputs": true,
-    "filterUsingTasks": true
+    "filterUsingTasks": true,
+    "experimentalObservability": true
   },
   "global": {
     "concurrency": "4",

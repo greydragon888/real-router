@@ -38,6 +38,12 @@ env:
   TURBO_API: ${{ vars.TURBO_API }}
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+  # turbo's OTLP metrics (#1745), as in ci.yml.
+  TURBO_EXPERIMENTAL_OTEL_ENABLED: "true"
+  TURBO_EXPERIMENTAL_OTEL_PROTOCOL: http-protobuf
+  TURBO_EXPERIMENTAL_OTEL_ENDPOINT: ${{ secrets.TELEMETRY_OTLP_ENDPOINT }}
+  TURBO_EXPERIMENTAL_OTEL_HEADERS: authorization=Bearer ${{ secrets.TELEMETRY_OTLP_AUTH }}
+  TURBO_EXPERIMENTAL_OTEL_METRICS_TASK_DETAILS: "true"
 
 jobs:
   build:
@@ -55,6 +61,17 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
+
+      # The same stamp as the setup action's (#1745): this job does not use it.
+      - name: Stamp CI identity for turbo telemetry
+        run: |
+          {
+            printf 'TURBO_EXPERIMENTAL_OTEL_RESOURCE=service.name=turbo,service.namespace=real-router'
+            printf ',ci.job=%s' "${GITHUB_JOB}"
+            printf ',ci.event=%s' "${GITHUB_EVENT_NAME}"
+            printf ',ci.runner=%s' "${RUNNER_ENVIRONMENT:-unknown}"
+            printf ',process.runtime.version=%s\n' "$(node -v)"
+          } >> "$GITHUB_ENV"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
