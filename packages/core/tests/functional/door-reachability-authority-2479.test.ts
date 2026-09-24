@@ -254,6 +254,36 @@ function messageTexts(node: ts.Node): (string | undefined)[] {
 }
 
 /**
+ * The levels `RouterLogger` publishes, read off the class: a method that takes
+ * the label first, `(context, message, …)`. The wiki's `check-messages.mjs` reads
+ * the same set.
+ *
+ * ⚠ Read, not written down: the class has `log` and no `info` or `debug`, and a
+ * list written from memory gets both wrong.
+ */
+function loggerLevels(): ReadonlySet<string> {
+  const source = parse(path.join(SRC, "utils/logger/RouterLogger.ts"));
+  const levels = new Set<string>();
+
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isMethodDeclaration(node) &&
+      node.parameters.at(0)?.name.getText(source) === "context"
+    ) {
+      levels.add(node.name.getText(source));
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(source);
+
+  return levels;
+}
+
+const LOGGER_LEVELS = loggerLevels();
+
+/**
  * The SECOND surface. `ctx.logger.warn("router.removeRoute", …)` is read by
  * whoever made the call, exactly as a refusal is, so the same rule binds it — and
  * the logger renders that label into the head the reader sees.
@@ -262,7 +292,7 @@ function loggerDoor(node: ts.Node, source: ts.SourceFile): string | undefined {
   if (
     !ts.isCallExpression(node) ||
     !ts.isPropertyAccessExpression(node.expression) ||
-    !["warn", "error", "info", "debug"].includes(node.expression.name.text) ||
+    !LOGGER_LEVELS.has(node.expression.name.text) ||
     !/logger$/iu.test(node.expression.expression.getText(source))
   ) {
     return undefined;
@@ -352,6 +382,9 @@ describe("a door a message names is one a caller can call (#2479)", () => {
     // admit everything.
     expect(facts.vocabulary.size).toBeGreaterThan(100);
     expect(facts.heads.length).toBeGreaterThan(15);
+    // The logger surface is read at all: its levels are derived, and an empty
+    // derivation would leave the surface unjudged and this file green.
+    expect(facts.heads.some((head) => head.surface === "logger")).toBe(true);
     expect(facts.vocabulary.has("Segment Matcher")).toBe(false);
   });
 
@@ -406,14 +439,24 @@ describe("a door a message names is one a caller can call (#2479)", () => {
           "  throw new TypeError(`[router.navigate] boom`);\n" +
           "}\n",
       );
+      // The logger surface, at the level a list written from memory missed —
+      // and a method that takes no label, whose string must not read as one.
+      writeFileSync(
+        path.join(directory, "logged.ts"),
+        "function report(logger) {\n" +
+          '  logger.log("router.nosuchlog", "boom");\n' +
+          '  logger.getConfig("router.nosuchconfig");\n' +
+          "}\n",
+      );
 
       const planted = readCore(directory);
 
       expect(
         planted.heads
           .filter((head) => !planted.vocabulary.has(head.door))
-          .map((head) => `${head.file} · ${head.door}`),
-      ).toStrictEqual(["planted.ts · nosuchdoor"]);
+          .map((head) => `${head.file} · ${head.door}`)
+          .toSorted((left, right) => left.localeCompare(right)),
+      ).toStrictEqual(["logged.ts · nosuchlog", "planted.ts · nosuchdoor"]);
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
