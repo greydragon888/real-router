@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-24]
 
+### @real-router/core@0.147.9
+
+### Patch Changes
+
+- [#2564](https://github.com/greydragon888/real-router/pull/2564) [`fa32d0b`](https://github.com/greydragon888/real-router/commit/fa32d0b38dd39473f3ec2ad4484356fcef7c11f1) Thanks [@greydragon888](https://github.com/greydragon888)! - `decodeParams` and `encodeParams` must be functions at every registration door ([#2397](https://github.com/greydragon888/real-router/issues/2397))
+
+  `createRouter`, `add`, `replace` and `update` refuse a `decodeParams` or
+  `encodeParams` that is truthy but not a function — a number, an object, `true`,
+  an array, a `Symbol`, a string — with `TypeError: [router] Route "<name>"
+decodeParams must be a function` (or `encodeParams`), naming a nested route by
+  its full dotted name. Such a value was otherwise stored, and the first read of
+  the route failed far from its cause, naming neither the route nor the field:
+  `matchPath` threw and `start` rejected with `TypeError: decode is not a
+function` (`encode …` for an encoder, which broke `buildPath` as well;
+  `decoder …` / `encoder …` after `update`). `replace` on a started router whose
+  URL resolved to such a route threw only after it had swapped the route table and
+  announced the change.
+
+  Core still drops a falsy value (`0`, `false`, `NaN`, `""`) rather than refusing
+  it, `update(name, { decodeParams: null })` still removes the codec, and an async
+  codec is still admitted ([#2348](https://github.com/greydragon888/real-router/issues/2348)).
+
+  The refusal happens at construction, so a route config carrying such a value
+  fails in `createRouter` even when that route is never read. With
+  `@real-router/validation-plugin` installed before `add` or `replace`, the plugin
+  refuses first with the same sentence under `[router.addRoute]`: its check now
+  names a nested route in full too, and when both codecs are wrong both layers name
+  the encoder. Before `update`, the plugin refuses with its own `decodeParams must
+be a function or null, got number`.
+
+### @real-router/validation-plugin@0.28.3
+
+### Patch Changes
+
+- [#2564](https://github.com/greydragon888/real-router/pull/2564) [`fa32d0b`](https://github.com/greydragon888/real-router/commit/fa32d0b38dd39473f3ec2ad4484356fcef7c11f1) Thanks [@greydragon888](https://github.com/greydragon888)! - The async check no longer throws on a codec that is not a function ([#2397](https://github.com/greydragon888/real-router/issues/2397))
+
+  `add` and `replace` asked whether `decodeParams` / `encodeParams` was async
+  before asking whether it was a function, and read its `constructor` to find out.
+  A codec with no `constructor` — `Object.create(null)` — made that read throw
+  `TypeError: Cannot read properties of undefined (reading 'name')`, naming neither
+  the route nor the field. The async check now reads only a function, so such a
+  codec reaches the plugin's own refusal: `[router.addRoute] Route "<name>"
+decodeParams must be a function`.
+
+- Updated dependencies [[`fa32d0b`](https://github.com/greydragon888/real-router/commit/fa32d0b38dd39473f3ec2ad4484356fcef7c11f1)]:
+  - @real-router/core@0.147.9
+
+
 ### @real-router/svelte@0.22.1
 
 ### Patch Changes
