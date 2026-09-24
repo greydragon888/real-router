@@ -103,6 +103,7 @@ import type {
   RoutesApi,
   Plugin,
 } from "@real-router/core";
+import type { RouteTree } from "@real-router/core/validation";
 
 const atValidationPlugin = raiser("validation-plugin");
 const atAddRoute = raiser("router", "addRoute");
@@ -141,6 +142,42 @@ function createRouteLookup(api: PluginApi): RouteLookup {
       return true;
     },
     getUrlParams: (name) => api.getUrlParams(name),
+  };
+}
+
+/** What the route validators read about the table a batch joins. */
+interface JoinedTable {
+  tree: RouteTree;
+  lookup: RouteLookup;
+  forwardMap: Readonly<Record<string, string>>;
+}
+
+/**
+ * The lookup of a table with no route in it. A `RouteLookup` is asked for the
+ * path slots of a route that exists, so this one is never asked for them.
+ */
+const NO_ROUTES: RouteLookup = {
+  hasRoute: () => false,
+  /* v8 ignore next -- @preserve unreachable: the table holds no route to ask about */
+  getUrlParams: () => [],
+};
+
+/**
+ * The table a `replace()` batch joins (#2562): the root the router keeps, with
+ * no route and no forward under it. `add` extends the registered table and
+ * `replace` discards it, so the route checks judge a replace batch as they judge
+ * the same batch added to an empty router under that root —
+ * `replace-batch.properties.ts` holds the two doors to that.
+ *
+ * ⚠ `children` and `nonAbsoluteChildren` both list the root's routes. Only
+ * `children` is read by a validator today; the second is emptied too, so a
+ * check that starts reading it does not get the discarded routes back.
+ */
+function emptyTableUnder(root: RouteTree): JoinedTable {
+  return {
+    tree: { ...root, children: new Map(), nonAbsoluteChildren: [] },
+    lookup: NO_ROUTES,
+    forwardMap: {},
   };
 }
 
@@ -569,6 +606,7 @@ export function validationPlugin<
       batch: readonly Route[],
       caller: "addRoute" | "replaceRoutes",
       parentName: string | undefined,
+      readTable: () => JoinedTable,
     ): void => {
       walkRouteCallbacks(batch);
 
@@ -582,11 +620,17 @@ export function validationPlugin<
 
       throwIfInternalRouteInArray(batch, caller);
       validateAddRouteArgs(batch);
+
+      // ⚠ Read HERE, not at the door: the walk and the argument checks above
+      // run application code (a route function's own `toString`), and a table
+      // read before it can be one the router no longer holds.
+      const table = readTable();
+
       validateRoutes(
         batch as Route[],
-        api.getTree(),
-        lookup,
-        api.getForwardMap(),
+        table.tree,
+        table.lookup,
+        table.forwardMap,
         parentName,
       );
     };
@@ -594,14 +638,28 @@ export function validationPlugin<
     const removeAddRouteCheck = api.addCheck(
       "addRoute:batch",
       (batch, parentName) => {
-        checkRouteBatch(batch as readonly Route[], "addRoute", parentName);
+        checkRouteBatch(
+          batch as readonly Route[],
+          "addRoute",
+          parentName,
+          () => ({
+            tree: api.getTree(),
+            lookup,
+            forwardMap: api.getForwardMap(),
+          }),
+        );
       },
     );
 
     const removeReplaceRoutesCheck = api.addCheck(
       "replaceRoutes:batch",
       (batch) => {
-        checkRouteBatch(batch as readonly Route[], "replaceRoutes", undefined);
+        checkRouteBatch(
+          batch as readonly Route[],
+          "replaceRoutes",
+          undefined,
+          () => emptyTableUnder(api.getTree()),
+        );
       },
     );
 

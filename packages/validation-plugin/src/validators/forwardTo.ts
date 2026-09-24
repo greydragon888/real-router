@@ -12,10 +12,11 @@ const atAddRoute = raiser("router", "addRoute");
 /**
  * What a route validator asks about routes that ALREADY exist (#2382).
  *
- * ⚑ Two questions, both answered from the curated surface: existence walks
- * `PluginApi.getTree()`, and the path slots come from `PluginApi.getUrlParams`.
- * These validators need exactly these two answers about routes that already
- * exist, and both are data — so the route matcher is not handed to them.
+ * ⚑ Two questions, both data — so the route matcher is not handed to them. For
+ * the registered table both are answered from the curated surface: existence
+ * walks `PluginApi.getTree()`, and the path slots come from
+ * `PluginApi.getUrlParams`. The table a `replace()` batch joins holds no route,
+ * and its lookup answers accordingly (#2562).
  */
 export interface RouteLookup {
   hasRoute: (name: string) => boolean;
