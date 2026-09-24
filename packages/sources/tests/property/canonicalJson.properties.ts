@@ -1,5 +1,5 @@
 import { fc, test } from "@fast-check/vitest";
-import { describe, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { canonicalJson } from "../../src/canonicalJson.js";
 
@@ -17,22 +17,27 @@ const arbJsonPrimitive: fc.Arbitrary<unknown> = fc.oneof(
   fc.constant(null),
 );
 
+// ⚑ No key this file generates holds a backslash. Two properties hand values
+// to `JSON.parse`, and V8's parser can return a later escaped key as a
+// backslash key that an earlier object held — parsed or not (#1709,
+// IMPLEMENTATION_NOTES "V8's `JSON.parse` renames escaped keys"). Keys that
+// must be unescaped stay in.
+function arbKey(maxLength: number): fc.Arbitrary<string> {
+  return fc
+    .string({ minLength: 1, maxLength })
+    .filter((key) => !key.includes("\\"));
+}
+
 const arbJsonValue: fc.Arbitrary<unknown> = fc.letrec((tie) => ({
   value: fc.oneof(
     { withCrossShrink: true },
     arbJsonPrimitive,
     fc.array(tie("value"), { maxLength: 4 }),
-    fc.dictionary(fc.string({ minLength: 1, maxLength: 8 }), tie("value"), {
-      maxKeys: 4,
-    }),
+    fc.dictionary(arbKey(8), tie("value"), { maxKeys: 4 }),
   ),
 })).value;
 
-const arbJsonRecord = fc.dictionary(
-  fc.string({ minLength: 1, maxLength: 8 }),
-  arbJsonValue,
-  { maxKeys: 6 },
-);
+const arbJsonRecord = fc.dictionary(arbKey(8), arbJsonValue, { maxKeys: 6 });
 
 function shuffleKeysDeep(value: unknown): unknown {
   if (Array.isArray(value)) {
@@ -54,6 +59,22 @@ function shuffleKeysDeep(value: unknown): unknown {
   }
 
   return value;
+}
+
+/** Every object key of `value`, at any depth. */
+function keysDeep(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => keysDeep(item));
+  }
+
+  if (value !== null && typeof value === "object") {
+    return Object.entries(value).flatMap(([key, item]) => [
+      key,
+      ...keysDeep(item),
+    ]);
+  }
+
+  return [];
 }
 
 describe("canonicalJson — invariants", () => {
@@ -82,6 +103,18 @@ describe("canonicalJson — invariants", () => {
       expect(twice).toBe(once);
     },
   );
+
+  it("generated records hold no backslash key, and JSON.parse still meets keys it must unescape (#1709)", () => {
+    const sample = (arbitrary: fc.Arbitrary<unknown>): string[] =>
+      fc
+        .sample(arbitrary, { numRuns: 2000, seed: 1709 })
+        .flatMap((value) => keysDeep(value));
+    const parsedKeys = sample(arbJsonValue);
+    const keys = [...parsedKeys, ...sample(arbJsonRecord)];
+
+    expect(keys.filter((key) => key.includes("\\"))).toStrictEqual([]);
+    expect(parsedKeys.some((key) => key.includes('"'))).toBe(true);
+  });
 
   test.prop([arbJsonRecord, arbJsonRecord], { numRuns: PURE_RUNS })(
     "different records produce different canonical forms (no spurious collisions)",
@@ -146,7 +179,7 @@ describe("canonicalJson — throw-contract (audit §6 HIGH)", () => {
     },
   );
 
-  test.prop([arbDisallowedBuiltin, fc.string({ minLength: 1, maxLength: 4 })], {
+  test.prop([arbDisallowedBuiltin, arbKey(4)], {
     numRuns: PURE_RUNS,
   })(
     "Map / Set / WeakMap / WeakSet / RegExp nested at depth ≥ 2 → TypeError",
@@ -287,7 +320,7 @@ describe("canonicalJson — locale independence (audit §6 HIGH)", () => {
   // `localeCompare`, the order of "é"/"e", "ё"/"е", "İ"/"i" varies by locale.
   const arbUnicodeKey = fc.oneof(
     fc.constantFrom("é", "e", "ё", "е", "İ", "i", "ñ", "n", "ä", "a"),
-    fc.string({ minLength: 1, maxLength: 4 }),
+    arbKey(4),
   );
 
   test.prop([fc.uniqueArray(arbUnicodeKey, { minLength: 2, maxLength: 6 })], {

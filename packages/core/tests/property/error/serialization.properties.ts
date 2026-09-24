@@ -1,5 +1,5 @@
 import { test } from "@fast-check/vitest";
-import { describe, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { RouterError } from "@real-router/core";
 
@@ -9,40 +9,97 @@ import {
   errorCodeArbitrary,
 } from "./helpers";
 
+interface Options {
+  message?: string | undefined;
+  segment?: string | undefined;
+  path?: string | undefined;
+}
+
 /**
- * Recursively checks if a value is not JSON-serializable or loses information during serialization
- * (undefined, Infinity, -Infinity, NaN, -0, functions, symbols)
+ * What `JSON.stringify(err)` must print: `code`, `message` (the code when none
+ * is given), `segment` and `path` when defined, and every custom field — the
+ * record `toJSON` builds, in its insertion order. `toJSON` omits an undefined
+ * `segment` or `path`, and `JSON.stringify` drops it from the expected record.
+ * `fields` must avoid the names `RouterError` reserves, which
+ * `customFieldsArbitrary` excludes. The expected text is taken before the
+ * error is built, so an error that rewrote the caller's values would show.
+ *
+ * ⚑ Compared as TEXT. `JSON.parse` is the engine's, and V8's substitutes keys
+ * in a way no printed seed replays (#1709, see `parseAdoptsPlantedKey`). The
+ * text also checks the fields whose values `JSON.stringify` drops or rewrites.
  */
-function isNotJsonSerializable(value: unknown): boolean {
-  // Check for non-serializable primitives
-  if (value === undefined) {
-    return true;
-  }
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) {
-      return true;
-    } // Infinity, -Infinity, NaN
-    if (Object.is(value, -0)) {
-      return true;
-    } // -0 becomes 0 in JSON
-  }
-  if (typeof value === "function") {
-    return true;
-  }
-  if (typeof value === "symbol") {
-    return true;
+function assertStringifiesAsRecord(
+  code: string,
+  options: Options,
+  fields: Record<string, unknown>,
+): void {
+  const expected = JSON.stringify({
+    code,
+    message: options.message ?? code,
+    segment: options.segment,
+    path: options.path,
+    ...fields,
+  });
+
+  expect(JSON.stringify(new RouterError(code, { ...options, ...fields }))).toBe(
+    expected,
+  );
+}
+
+const BACKSLASH = "\\";
+
+/**
+ * An object whose second key is `second`, after `prefix`, padded to sixteen
+ * keys. V8 roots object shapes by property count, and a root stops taking new
+ * shapes once full; a check that parsed the generated inputs would fill the
+ * small counts, not this one.
+ */
+function sixteenKeys(
+  prefix: string,
+  second: string,
+  value: unknown,
+): Record<string, unknown> {
+  const record: Record<string, unknown> = { [prefix]: value, [second]: value };
+
+  for (let index = 0; index < 14; index++) {
+    record[`filler${index}`] = value;
   }
 
-  // Recursively check objects and arrays
-  if (value === null || typeof value !== "object") {
-    return false;
-  }
+  return record;
+}
 
-  if (Array.isArray(value)) {
-    return value.some((item) => isNotJsonSerializable(item));
-  }
+function throughJsonParse(record: Record<string, unknown>): unknown {
+  // eslint-disable-next-line unicorn/prefer-structured-clone -- the point is the shape `JSON.parse` leaves behind, which a clone never builds
+  return JSON.parse(JSON.stringify(record));
+}
 
-  return Object.values(value).some((val) => isNotJsonSerializable(val));
+/**
+ * Parses an object whose `prefix` key is followed by a backslash key, which
+ * leaves that shape in the realm for later parses to find.
+ *
+ * ⚠ The caller must hold the returned object until its check is done: once
+ * nothing uses the shape, a full garbage collection drops it.
+ */
+function plantBackslashShape(prefix: string): unknown {
+  return throughJsonParse(sixteenKeys(prefix, BACKSLASH, 0));
+}
+
+/**
+ * Whether this engine's `JSON.parse` carries V8's escaped-key defect: once a
+ * backslash key has been parsed after some prefix, a one-character ESCAPED key
+ * after the same prefix, in an object of as many keys — a quote, a newline, a
+ * `\u0041` — comes back as the backslash (#1709). Fixed upstream in V8
+ * `93cd21e8254b` (Chromium bug 521080746).
+ */
+function parseAdoptsPlantedKey(): boolean {
+  const prefix = "#1709 engine probe";
+  const planted = plantBackslashShape(prefix);
+  const parsed = throughJsonParse(sixteenKeys(prefix, '"', 0)) as object;
+
+  // Reading `planted` after the parse keeps its shape alive through it.
+  return (
+    Object.hasOwn(planted as object, BACKSLASH) && !Object.hasOwn(parsed, '"')
+  );
 }
 
 describe("RouterError Serialization Properties", () => {
@@ -181,46 +238,30 @@ describe("RouterError Serialization Properties", () => {
       {
         numRuns: 10_000,
       },
-    )("JSON.stringify + JSON.parse preserves data", (code, options, fields) => {
-      const err = new RouterError(code, { ...options, ...fields });
+    )(
+      "JSON.stringify prints exactly the expected record",
+      (code, options, fields) => {
+        assertStringifiesAsRecord(code, options, fields);
+      },
+    );
 
-      const jsonString = JSON.stringify(err);
-      const parsed = JSON.parse(jsonString) as Record<string, unknown>;
+    it.skipIf(!parseAdoptsPlantedKey())(
+      "the check does not depend on object shapes an earlier JSON.parse left behind (#1709)",
+      () => {
+        const prefix = "#1709 regression cell";
+        const planted = plantBackslashShape(prefix);
 
-      // Basic fields
-      expect(parsed.code).toBe(code);
-      expect(parsed.message).toBe(options.message ?? code);
-
-      // Optional fields
-      if (options.segment !== undefined) {
-        expect(parsed.segment).toBe(options.segment);
-      }
-
-      if (options.path !== undefined) {
-        expect(parsed.path).toBe(options.path);
-      }
-
-      // Arbitrary fields (except reserved ones)
-      for (const [key, value] of Object.entries(fields)) {
-        if (
-          ![
-            "setCode",
-            "toJSON",
-            "hasField",
-            "getField",
-            "setAdditionalFields",
-            "setErrorInstance",
-          ].includes(key) && // JSON.stringify may alter some types (undefined, Infinity, functions, etc)
-          // Skip values that are not JSON-serializable
-          !isNotJsonSerializable(value)
-        ) {
-          expect(parsed[key]).toStrictEqual(value);
-        }
-      }
-
-      // stack should not be in JSON
-      expect(parsed).not.toHaveProperty("stack");
-    });
+        expect(() => {
+          assertStringifiesAsRecord(
+            "NOT_STARTED",
+            {},
+            { field: sixteenKeys(prefix, '"', {}) },
+          );
+        }).not.toThrow();
+        // Keeps `planted` reachable until the check above has run.
+        expect(planted).toStrictEqual(sixteenKeys(prefix, BACKSLASH, 0));
+      },
+    );
   });
 
   describe("toJSON invariants", () => {

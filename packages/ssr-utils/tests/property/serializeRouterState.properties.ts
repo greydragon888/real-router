@@ -1,11 +1,19 @@
 import { fc, test } from "@fast-check/vitest";
-import { describe, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { serializeRouterState } from "@real-router/ssr-utils";
 
 import { arbState, NUM_RUNS } from "./helpers";
 
 import type { State } from "@real-router/core";
+
+// ⚑ No backslash in the key: the serialized context goes through `JSON.parse`,
+// and V8's parser can return a later escaped key as a backslash key that an
+// earlier object held — parsed or not (#1709, IMPLEMENTATION_NOTES "V8's
+// `JSON.parse` renames escaped keys"). Keys that must be unescaped stay in.
+const arbNamespaceKey = fc
+  .string({ minLength: 0, maxLength: 30 })
+  .filter((key) => !key.includes("\\"));
 
 /**
  * Property-based invariants for `serializeRouterState` (#563).
@@ -101,7 +109,7 @@ describe("serializeRouterState properties", () => {
   test.prop(
     [
       arbState,
-      fc.string({ minLength: 0, maxLength: 30 }),
+      arbNamespaceKey,
       fc.option(
         fc.dictionary(
           fc.stringMatching(/^[a-z]\w{0,8}$/),
@@ -141,6 +149,13 @@ describe("serializeRouterState properties", () => {
       ).toStrictEqual({ ...payload });
     },
   );
+
+  it("feeds JSON.parse no backslash key, and still feeds it keys it must unescape (#1709)", () => {
+    const keys = fc.sample(arbNamespaceKey, { numRuns: 2000, seed: 1709 });
+
+    expect(keys.filter((key) => key.includes("\\"))).toStrictEqual([]);
+    expect(keys.some((key) => /[<>&"]/.test(key))).toBe(true);
+  });
 
   test.prop([arbState, fc.string({ maxLength: 20 })], {
     numRuns: NUM_RUNS.standard,

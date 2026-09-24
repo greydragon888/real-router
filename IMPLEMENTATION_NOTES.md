@@ -2,6 +2,29 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## V8's `JSON.parse` renames escaped keys — property tests that parse generated keys (#1709, 2026-09-24)
+
+**Problem.** The JSON round-trip property of `packages/core/tests/property/error/serialization.properties.ts` failed twice — a local build and release PR #2470 (run 35524491155) — and neither failure replayed: the first not from its printed `{ seed, path }`, green 11 of 11 times, the second not from its shrunk counterexample. Both were one key substitution: a `"` key parsed back as `\` (`expected { '': {}, '\': {} } to strictly equal { '': {}, '"': {} }`; the first sighting's `expected undefined to strictly equal {}` is the same swap seen from the missing key).
+
+The cause is V8's, fixed upstream in `93cd21e8254b` (2026-09-17, Chromium bug 521080746). To find an existing hidden-class transition for a key, `JSON.parse` compares the key's RAW source characters, cut to its DECODED length. For `"\""` that cut is the lone backslash, so once an object with a `\` key after the same preceding keys exists, a parsed object with as many keys gets its quote key back as `\`. Measured on 2026-09-24: v24.18.1, v24.21.0 and v26.10.0 all reproduce it.
+
+⚑ **The planting object need not be parsed.** A parsed object starts from the root shape V8 keeps per property count, and object literals with as many constant keys share it. On the V8 of Node 24 and 26 the four-key root is also the `{}` literal's, so a four-key object built by assignment or `defineProperty` plants too; of the counts 2 to 8, only four behaves so. What cannot plant is a key without a backslash: in the raw cut of an escaped key, the first escape's backslash always lies inside the decoded length. A sweep of 3800 planted-key × escaped-key cells, in four processes of 950 that each end in a positive control, found no corruption from any other planted key.
+
+⚑ **Why no seed replayed it.** Transitions are shared across the realm and held weakly. The planting object comes from an EARLIER run, so a `path` replay never executes it, and a full garbage collection in between takes the shape away. One seed in 24 identical fresh isolates failed in 13 to 19 of them across four repeats, and in 24 of 24 under `--no-concurrent-marking`. Running 2000 unrelated `toJSON` cases first — the file's earlier properties do that — took it to 0 of 24, with or without concurrent marking. The defect also needs the map to hold at most eight transitions and its root to still accept new shapes — consistent with both sightings falling early, at runs 239 and 253 of 10 000.
+
+**Solution.** Two forms, by what each property is for.
+
+- `serialization.properties.ts` compares TEXT: `JSON.stringify(err)` against `JSON.stringify` of the expected record, taken before the error is built. No `JSON.parse` is left in the check. A regression cell plants the shape and runs the check; it skips itself on an engine without the defect (`parseAdoptsPlantedKey`).
+- `packages/sources/tests/property/canonicalJson.properties.ts` and `packages/ssr-utils/tests/property/serializeRouterState.properties.ts` test re-parse stability and transport, so the parse stays and the files generate no key holding a backslash — every key, not only the parsed ones, because an unparsed object plants as well. A pin per file checks the domain: no backslash key, and keys that must be unescaped still present.
+
+`packages/angular/tests/property/scrollRestoration.properties.ts` also parses keys that carry generated values, backslashes included, and is left as it is: its assertions count keys, and a substitution keeps the count.
+
+**Why the text form for `RouterError`.** The text is what `RouterError` owns, and it also checks the fields the parsed comparison skipped: any value holding something JSON cannot carry (`undefined`, `NaN`, `-0`, …) at any depth. Generated values hold a nested `undefined` in about 43 % of object fields, so the parsed comparison skipped 31 % of all fields. ⚠ The price: the text pins the ORDER of `toJSON`'s output — the order the wiki's `RouterError` example already prints.
+
+⚠ **The `ssr-utils` site is dormant, not safe.** Its escaped key is the first key of a one-key object. A shape planted at that root renamed the key when the probe ran as `node -e` and did not when the same code ran from a file, so whether it fires depends on what ran before; inside a vitest worker it was not measured.
+
+⚠ **Remove with the Node upgrade that carries `93cd21e8254b` — and check for it explicitly.** `JSON.parse('{"":0,"\\\\":0}'); Object.keys(JSON.parse('{"":{},"\\"":{}}'))` prints `[ '', '\\' ]` on an affected engine and must print `[ '', '"' ]` on a fixed one. The core cell's skip is no signal: `test:properties` logs errors only, and `turbo.json` keys no task on the Node version, so a cached pass can outlive the upgrade. The generator filters go together with their pins; the text comparison is worth keeping regardless.
+
 ## A red CI gets its own Sonar verdict, on both paths (#2441, 2026-09-20)
 
 **Problem.** The `SonarCloud` status had four verdicts and none of them fitted a failed run. Reproduced against the predicate as it stood, with fixture inputs:

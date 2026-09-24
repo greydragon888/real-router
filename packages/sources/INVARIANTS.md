@@ -228,6 +228,8 @@
 
 ## canonicalJson — Cache-Key Stability
 
+The property file draws every object key without a backslash: rows 3 and 5 hand values to `JSON.parse`, and an earlier object holding such a key can corrupt that parse (#1709).
+
 | #   | Invariant                                                     | Description                                                                                                                                                  |
 | --- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1   | Key-order invariance                                          | `canonicalJson(x) === canonicalJson(reorder(x))` for any deep reordering of object keys.                                                                     |

@@ -716,7 +716,7 @@ warning. Both arms are pinned in `query-strategy-formats-1796.test.ts`.
 | 4   | toJSON includes arbitrary fields                  | Custom fields set via constructor or `setAdditionalFields()` appear in `toJSON()` output.                                            |
 | 5   | toJSON is deterministic                           | Multiple calls to `err.toJSON()` return structurally equal objects. Each call returns a new object (not the same reference).         |
 | 6   | Identical errors serialize identically            | Two `RouterError` instances created with the same arguments produce identical `toJSON()` output.                                     |
-| 7   | JSON.stringify round-trip                         | `JSON.parse(JSON.stringify(err))` preserves `code`, `message`, `segment`, `path`, and serializable custom fields. Stack is excluded. |
+| 7   | JSON.stringify prints the expected record         | `JSON.stringify(err)` equals `JSON.stringify` of `{ code, message, segment, path, ...customFields }` in `toJSON`'s insertion order; `stack` and `name` stay out. Compared as text, not after `JSON.parse` (#1709). |
 | 8   | toJSON returns plain object                       | `toJSON()` returns a plain `Object` (not an `Error` or `RouterError` instance) with no methods in its values.                        |
 
 ## RouterError (message formatting)
@@ -767,7 +767,7 @@ it is the record, not a claim about core's surface.
 | 4   | XSS-sensitive characters escaped     | The output string contains no raw `<`, `>`, or `&` — they are unicode-escaped to prevent `</script>` and HTML-entity injection inside `<script>` blocks. |
 | 5   | Determinism                          | `serializeRouterState(state)` returns the same string when called twice on the same input.                                                               |
 | 6   | Transition-mutation invisibility     | Mutating `state.transition` to any other valid TransitionMeta does not change the output — the transition is fully erased from the serialized form.      |
-| 7   | Plugin context namespaces transit OK | Arbitrary `state.context.<namespace>` payloads (e.g. `data` from `ssr-data-plugin`) survive transport with identical values after serialize → parse.     |
+| 7   | Plugin context namespaces transit OK | Arbitrary `state.context.<namespace>` payloads (e.g. `data` from `ssr-data-plugin`) survive transport with identical values after serialize → parse. The property draws namespace keys without a backslash (#1709). |
 
 ## errorCodes (constants)
 
@@ -883,7 +883,7 @@ discriminating power.
 | `tests/property/pluginApi.properties.ts`                        | 22         | Plugin infrastructure (getPluginApi)                                                                                                                                            |
 | `tests/property/error/constructor.properties.ts`                | 9          | RouterError construction invariants                                                                                                                                             |
 | `tests/property/error/methods.properties.ts`                    | 13         | RouterError method invariants                                                                                                                                                   |
-| `tests/property/error/serialization.properties.ts`              | 11         | RouterError toJSON and JSON.stringify                                                                                                                                           |
+| `tests/property/error/serialization.properties.ts`              | 12         | RouterError toJSON and JSON.stringify                                                                                                                                           |
 | `tests/property/error/message-formatting.properties.ts`         | 22         | RouterError message formatting                                                                                                                                                  |
 | `tests/property/error/constants.properties.ts`                  | 15         | errorCodes object invariants                                                                                                                                                    |
 | `tests/property/tree-changed.properties.ts`                     | 6          | TREE_CHANGED atomicity, op discriminator, replace diff, nested-subtree flatten, update conditional emit                                                                         |
