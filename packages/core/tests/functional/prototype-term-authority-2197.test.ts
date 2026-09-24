@@ -55,17 +55,12 @@ import { describe, expect, it } from "vitest";
 
 const REPO_ROOT = path.resolve(__dirname, "../../../..");
 
-/**
- * `packages/angular/src/dom-utils` is a git-tracked COPY of `shared/dom-utils`,
- * so counting both would double any site added there.
- */
 const scannedFiles = (): string[] =>
   [
     ...globSync("packages/*/src/**/*.{ts,tsx,svelte}", { cwd: REPO_ROOT }),
     ...globSync("shared/*/**/*.ts", { cwd: REPO_ROOT }),
   ]
     .map((file) => file.split(path.sep).join("/"))
-    .filter((file) => !file.startsWith("packages/angular/src/dom-utils/"))
     .filter((file) => !file.includes("/node_modules/"))
     .toSorted((left, right) => left.localeCompare(right));
 

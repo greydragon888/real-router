@@ -34,7 +34,7 @@ async function makeRouter(): Promise<Router> {
   return router;
 }
 
-describe("createDirectionTracker (Angular dom-utils copy)", () => {
+describe("createDirectionTracker (Angular dom-utils)", () => {
   afterEach(() => {
     delete document.documentElement.dataset.navDirection;
     vi.restoreAllMocks();

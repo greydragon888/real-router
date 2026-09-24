@@ -2,7 +2,7 @@
 
 > Simple, powerful, view-agnostic, modular and extensible router
 
-pnpm monorepo with 23 packages + `benchmarks/` + bare `shared/` sources (symlinked into consumers' `src/dom-utils`, `src/browser-env`, and `src/shared-ssr`, except `packages/angular` which uses a git-tracked copy of `dom-utils`) + 87 top-level example applications across `examples/web/<framework>/*`, `examples/desktop/{electron,tauri}/*`, and `examples/console/*` (+52 subgroup sub-examples in `web/<framework>/{animation,ssr,hash}-examples/*` → 139 runnable; 145 example workspace packages incl. 6 framework aggregators — see [Desktop Integration](https://github.com/greydragon888/real-router/wiki/Desktop-Integration)). Run `pnpm install` after cloning.
+pnpm monorepo with 23 packages + `benchmarks/` + bare `shared/` sources (symlinked into consumers' `src/dom-utils`, `src/browser-env`, and `src/shared-ssr`) + 87 top-level example applications across `examples/web/<framework>/*`, `examples/desktop/{electron,tauri}/*`, and `examples/console/*` (+52 subgroup sub-examples in `web/<framework>/{animation,ssr,hash}-examples/*` → 139 runnable; 145 example workspace packages incl. 6 framework aggregators — see [Desktop Integration](https://github.com/greydragon888/real-router/wiki/Desktop-Integration)). Run `pnpm install` after cloning.
 
 `shared/` is a minimal workspace entry (name, type, devDeps) with no `src/` of its own — it owns sibling directories `shared/browser-env/`, `shared/dom-utils/`, and `shared/ssr/` that are git-tracked symlink targets. This entry exists so the symlinked shared sources resolve their workspace imports (`@real-router/core` — including its `/types` subpath — and `@real-router/sources`) from `shared/`'s own filesystem location during type-check and bundling. (Before wave-2 it also anchored the runtime `type-guards` import that `shared/browser-env` inlined via `alwaysBundle` and a direct `@real-router/types` dep; `type-guards` is now dissolved with `isStateStrict` local in `shared/browser-env/state-guard.ts`, and `@real-router/types` folded into `@real-router/core` so the shared sources import types from `@real-router/core`.) See IMPLEMENTATION_NOTES.md section "Shared Sources via Symlinks" for details.
 
@@ -19,15 +19,13 @@ shared/
 
 ### Symlink Consumers
 
-| Shared path           | Symlink alias in consumer | Consumer packages                                    |
-| --------------------- | ------------------------- | ---------------------------------------------------- |
-| `shared/browser-env/` | `src/browser-env`         | `browser-plugin`, `hash-plugin`, `navigation-plugin` |
-| `shared/dom-utils/`   | `src/dom-utils`           | `preact`, `react`, `solid`, `svelte`, `vue`          |
-| `shared/ssr/`         | `src/shared-ssr`          | `ssr-data-plugin`, `rsc-server-plugin`               |
+| Shared path           | Symlink alias in consumer | Consumer packages                                      |
+| --------------------- | ------------------------- | ------------------------------------------------------ |
+| `shared/browser-env/` | `src/browser-env`         | `browser-plugin`, `hash-plugin`, `navigation-plugin`   |
+| `shared/dom-utils/`   | `src/dom-utils`           | `angular`, `preact`, `react`, `solid`, `svelte`, `vue` |
+| `shared/ssr/`         | `src/shared-ssr`          | `ssr-data-plugin`, `rsc-server-plugin`                 |
 
 **Any edit to `shared/browser-env/utils.ts`, `shared/dom-utils/link-utils.ts`, or `shared/ssr/createSsrLoaderPlugin.ts` propagates instantly to every consumer via its symlink** — verify with `pnpm build` across all affected packages. For `shared/ssr/` specifically, both `ssr-data-plugin` and `rsc-server-plugin` consume the same generic factory `createSsrLoaderPlugin<T>` with different type parameters (`unknown` vs `ReactNode`) and namespaces (`"data"` vs `"rsc"`) — one source of truth, two plugins; an edit that breaks one breaks the other.
-
-`packages/angular/src/dom-utils` is **not** a symlink — it is a git-tracked copy, re-materialized from `shared/dom-utils/` by the `prebundle` npm script before every build (ng-packagr does not follow symlinks the same way tsdown does). **When editing `shared/dom-utils/*.ts`, also update `packages/angular/src/dom-utils/*.ts`** — or run `pnpm -F @real-router/angular bundle` to sync the copy. Verify with `readlink packages/angular/src/dom-utils`; returns empty.
 
 ## Toolchain Versions
 
@@ -117,7 +115,7 @@ pnpm resolve:dependabot <PR#>  # Rebase+dedupe a Dependabot PR — conflicting O
 
 ## Searching the Code
 
-- **A plain search of a consumer package skips its shared sources.** `rg`, `git grep` and `ast-grep` do not descend into symlinked directories, so searching `packages/react/src` omits `src/dom-utils` without saying so. Search `shared/` itself, or pass `rg -L` / `ast-grep --follow`. `packages/angular/src/dom-utils` is a real copy, so a search over all of `packages/` finds dom-utils code twice.
+- **A plain search of a consumer package skips its shared sources.** `rg`, `git grep` and `ast-grep` do not descend into symlinked directories, so searching `packages/react/src` omits `src/dom-utils` without saying so. Search `shared/` itself, or pass `rg -L` / `ast-grep --follow`.
 - **`rg` and `ast-grep` skip dot-directories**, and this repository's CI, hooks, changesets and prompts live in `.github/`, `.husky/`, `.changeset/` and `.claude/`. Use `rg --hidden -g '!.git'` / `ast-grep --no-ignore hidden`, or `git grep` when the scope must be exactly the tracked files.
 - **Count call sites with the type checker, not a pattern.** A text or syntax pattern misses generic calls (`f<T>(…)`), renamed imports and re-exports, and the count comes back smaller rather than empty. LSP `findReferences` / `incomingCalls` resolves them; an alias shows up as a `read` of the function that is not a call — follow it from there.
 

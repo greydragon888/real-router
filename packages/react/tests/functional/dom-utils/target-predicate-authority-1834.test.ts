@@ -21,12 +21,10 @@ import { describe, expect, it } from "vitest";
 
 const REPO_ROOT = path.resolve(__dirname, "../../../../..");
 
-/** Call sites, by form. The angular copy of `shared/dom-utils` is the same
- *  source twice and would double every count. */
+/** Call sites, by form. */
 const callSites = (callee: string): string[] =>
   globSync("packages/*/src/**/*.{ts,tsx,svelte}", { cwd: REPO_ROOT })
     .map((file) => file.split(path.sep).join("/"))
-    .filter((file) => !file.startsWith("packages/angular/src/dom-utils/"))
     .filter((file) =>
       readFileSync(path.join(REPO_ROOT, file), "utf8")
         .split("\n")

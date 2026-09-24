@@ -256,8 +256,7 @@ export const PRE_COMMIT_ONLY = new Map();
  *
  * ⚠ It pairs by {@link checkId}, so it sees what the first axis sees and no
  * more. `pnpm turbo run …` and a writer such as `pnpm dedupe` are not checks,
- * and a check written as a bare `node scripts/…` is invisible — the angular copy
- * check runs as `pnpm lint:angular-sync` in both hooks for that reason.
+ * and a check written as a bare `node scripts/…` is invisible.
  *
  * @param {Record<string, string>} hooks
  * @returns {{ missing: string[], staleAllowed: string[], twinned: string[] }}
@@ -450,7 +449,7 @@ const PRE_COMMIT = `#!/bin/sh
 pnpm lint:deps
 pnpm lint:repo-scans
 if git diff --cached --name-only | grep -q shared/; then
-  pnpm lint:angular-sync
+  pnpm lint:conditional
 fi
 pnpm dedupe
 pnpm turbo run test lint --filter='!./examples/**'
@@ -459,7 +458,7 @@ pnpm turbo run test lint --filter='!./examples/**'
 const PRE_PUSH = `#!/bin/sh
 pnpm lint:deps
 pnpm lint:repo-scans
-pnpm lint:angular-sync
+pnpm lint:conditional
 `;
 
 const noAllowlist = { preCommitOnly: new Map() };
@@ -472,7 +471,7 @@ test("fixture: every pre-commit check with a pre-push twin — no gap, and the w
 
   assert.deepEqual(found.missing, []);
   assert.deepEqual(found.twinned, [
-    "lint:angular-sync",
+    "lint:conditional",
     "lint:deps",
     "lint:repo-scans",
   ]);
@@ -494,12 +493,12 @@ test("fixture: a check inside a pre-commit conditional needs its twin too", () =
   const found = findPrePushGaps(
     {
       "pre-commit": PRE_COMMIT,
-      "pre-push": PRE_PUSH.replace("pnpm lint:angular-sync\n", ""),
+      "pre-push": PRE_PUSH.replace("pnpm lint:conditional\n", ""),
     },
     noAllowlist,
   );
 
-  assert.deepEqual(found.missing, ["lint:angular-sync"]);
+  assert.deepEqual(found.missing, ["lint:conditional"]);
 });
 
 test("fixture: an allowlisted pre-commit-only check is not a gap, and going stale is", () => {

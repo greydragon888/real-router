@@ -8,12 +8,9 @@ import { commonConfig } from "./vitest.config.common.mjs";
  * The `src/<alias>` directories of the package being tested that are SYMLINKS
  * into `shared/`, as coverage-exclude globs.
  *
- * ⚠ Computed from the filesystem rather than listed, because the aliases are
- * not interchangeable: `src/dom-utils` is a symlink in `preact`/`solid`/
- * `svelte`/`vue` and a git-tracked COPY in `angular` (ng-packagr does not follow
- * symlinks — see CLAUDE.md). A hard-coded `src/dom-utils/**` therefore deletes
- * 606 statements of Angular's OWN source from its report; measured, that took it
- * from 1027 statements at 99.02 % to 421 at 97.86 % and failed its thresholds.
+ * ⚠ Computed from the filesystem rather than listed: a directory is excluded
+ * because it IS a symlink, so a package whose `src/<alias>` is a real directory
+ * keeps it in its own report.
  *
  * Why exclude them at all: each shared dir is measured once, by the owner
  * package that re-includes it through its real `shared/<dir>/**` path under

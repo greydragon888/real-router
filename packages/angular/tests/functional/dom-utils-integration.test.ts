@@ -29,10 +29,8 @@ describe("dom-utils integration (copy from shared/)", () => {
     spy.mockRestore();
   });
 
-  // ⚑ The copy needs its OWN cells for #2294, not the shared suite's. Angular
-  // ships a git-tracked COPY of `shared/dom-utils`, and this package carries a
-  // phantom coverage allowance for compiler-generated code — so the two lines
-  // below were uncovered at `exit 0`, and Codecov on the PR is what showed it.
+  // These cells reach `shared/dom-utils` through angular's `src/dom-utils`
+  // symlink, the path angular's own code imports it by (#2552).
   it("a router core cannot read gets a warning, and the literal href (#2294)", async () => {
     const router = createRouter([
       { name: "home", path: "/" },
@@ -84,7 +82,7 @@ describe("dom-utils integration (copy from shared/)", () => {
     router.stop();
   });
 
-  it("anchorTargetsAnotherContext narrows by tagName after the prebundle copy", () => {
+  it("anchorTargetsAnotherContext narrows by tagName through the dom-utils symlink", () => {
     const anchor = document.createElement("a");
 
     anchor.setAttribute("target", "_blank");
@@ -115,7 +113,7 @@ describe("dom-utils integration (copy from shared/)", () => {
     frame.remove();
   });
 
-  it("buildHref returns correct path after prebundle copy", async () => {
+  it("buildHref returns correct path through the dom-utils symlink", async () => {
     const router = createRouter([
       { name: "home", path: "/" },
       { name: "users", path: "/users" },

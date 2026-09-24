@@ -39,9 +39,7 @@
  * up.
  *
  * ⚑ Files come from `git ls-files`, so each shared source is visited ONCE: git
- * stores `packages/react/src/dom-utils` as a symlink entry, not as its
- * contents. `packages/angular/src/dom-utils` is a real tracked copy and is
- * visited on its own — correctly, since it is the code ng-packagr ships.
+ * stores a consumer's `src/dom-utils` as a symlink entry, not as its contents.
  */
 
 import { execFileSync } from "node:child_process";

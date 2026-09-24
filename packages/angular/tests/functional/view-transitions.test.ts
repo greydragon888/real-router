@@ -173,7 +173,7 @@ function track<T extends { destroy: () => void }>(instance: T): T {
   return instance;
 }
 
-describe("createViewTransitions (Angular copy)", () => {
+describe("createViewTransitions (Angular dom-utils)", () => {
   beforeEach(() => {
     // The utility uses setTimeout(0) (not rAF) to resolve the deferred —
     // rAF is blocked by Chromium's rendering suppression while a VT is in

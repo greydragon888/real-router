@@ -3,8 +3,8 @@
 
 /**
  * Property-based tests for `createScrollRestoration` from
- * `packages/angular/src/dom-utils/scroll-restore.ts` (git-tracked copy of the
- * shared source).
+ * `packages/angular/src/dom-utils/scroll-restore.ts` (the `shared/dom-utils`
+ * symlink).
  *
  * Closes audit-2026-05-16 §6.2 invariant 6 (HIGH): two param sets that name one
  * location must land in ONE sessionStorage slot. Since #1923 that holds because
