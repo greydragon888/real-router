@@ -18,13 +18,20 @@
 //
 // Runs in the repo-lints CI job via `node --test scripts/*.test.mjs`.
 
+import { spawnSync } from "node:child_process";
 import {
   existsSync,
   lstatSync,
+  mkdirSync,
+  mkdtempSync,
   readFileSync,
   readdirSync,
   readlinkSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
 } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -239,4 +246,317 @@ test("the CLI script delegates to this predicate", () => {
 
   assert.match(script, /from "\.\/coverage-owner\.mjs"/);
   assert.match(script, /declaresSharedOwner\(/);
+});
+
+// ── The script, run the way its callers run it (#2541) ──────────────────────
+//
+// The cells above hold the owner predicate and read the script's text; none of
+// them runs it. `pnpm lint:coverage-scope` (both hooks, Repo Lints) and
+// `--emit` (the Sonar scope in CI) run the FILE, so these cells do: the real
+// script, with `cwd` at a fixture tree, because it takes its root from the
+// working directory and `pnpm` hands it the repository root. Each drift cell
+// plants ONE departure from a tree the script accepts and expects the one line
+// that names it.
+//
+// ⚠ The fixture carries a public `svelte` package because the script's
+// `SIZE_LIMIT_EXCEPTIONS` names it; renaming that exception reds the control.
+
+const SCRIPT = join(ROOT, "scripts/check-coverage-scope.mjs");
+
+/**
+ * A tree the script accepts: `a` produces coverage; `b` (private) and `svelte`
+ * have no tests and are excluded from Sonar coverage; `owner` measures
+ * `shared/dx` and lints it through the `src/dx-alias` symlink.
+ */
+const acceptedTree = () => ({
+  "packages/a/package.json": JSON.stringify({ name: "@fx/a" }),
+  "packages/a/src/index.ts": "export const a = 1;\n",
+  "packages/a/tests/a.test.ts": "\n",
+  "packages/a/vitest.config.mts":
+    "thresholds: { statements: 100, branches: 100, functions: 100, lines: 100 }\n",
+  "packages/b/package.json": JSON.stringify({ name: "@fx/b", private: true }),
+  "packages/b/src/index.ts": "export const b = 1;\n",
+  "packages/svelte/package.json": JSON.stringify({ name: "@fx/svelte" }),
+  "packages/svelte/src/index.ts": "export const svelte = 1;\n",
+  "packages/owner/package.json": JSON.stringify({
+    name: "@fx/owner",
+    scripts: {
+      lint: "eslint src/ src/dx-alias/",
+      "lint:fix": "eslint --fix src/ src/dx-alias/",
+    },
+  }),
+  "packages/owner/src/index.ts": "export const owner = 1;\n",
+  "packages/owner/tests/owner.test.ts": "\n",
+  "packages/owner/vitest.config.mts":
+    "config.test.coverage.allowExternal = true;\n" +
+    'config.test.coverage.include = ["src/**/*.ts", "../../shared/dx/**/*.ts"];\n',
+  "shared/dx/index.ts": "export const dx = 1;\n",
+  "codecov.yml": [
+    "component_management:",
+    "  individual_components:",
+    "    - component_id: a",
+    "      paths:",
+    "        - packages/a/**",
+    "    - component_id: owner",
+    "      paths:",
+    "        - packages/owner/**",
+    "    - component_id: dx",
+    "      paths:",
+    "        - shared/dx/**",
+    "",
+  ].join("\n"),
+  "sonar-project.properties":
+    "sonar.coverage.exclusions=packages/b/src/**,packages/svelte/src/**\n",
+  ".size-limit.js":
+    'export default [esm("a", "1 kB"), esm("owner", "1 kB")];\n',
+});
+
+const ALIAS_PATH = "packages/owner/src/dx-alias";
+const ALIAS_TARGET = "../../../shared/dx";
+const LCOV = "TN:\nend_of_record\n";
+
+/**
+ * Builds the accepted tree, lets `plant` depart from it, and runs the script
+ * there. `alias` is the symlink's target, or `null` for no symlink.
+ */
+function runScript({ plant = () => {}, alias = ALIAS_TARGET, args = [] } = {}) {
+  const root = mkdtempSync(join(tmpdir(), "coverage-scope-"));
+
+  try {
+    const tree = acceptedTree();
+
+    plant(tree);
+
+    for (const [file, text] of Object.entries(tree)) {
+      mkdirSync(dirname(join(root, file)), { recursive: true });
+      writeFileSync(join(root, file), text);
+    }
+
+    if (alias !== null) {
+      symlinkSync(alias, join(root, ALIAS_PATH));
+    }
+
+    const run = spawnSync(process.execPath, [SCRIPT, ...args], {
+      cwd: root,
+      encoding: "utf8",
+    });
+
+    return { status: run.status, stdout: run.stdout, stderr: run.stderr };
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+/** The report's drift lines: `  - <what drifted>`. */
+const driftLines = (stderr) =>
+  stderr.split("\n").filter((line) => line.startsWith("  - "));
+
+test("CONTROL — the script accepts the tree every drift cell departs from", () => {
+  const run = runScript();
+
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(
+    run.stderr,
+    /✓ Coverage scope in sync: 2 components, 2 Sonar coverage-exclusions \(b, svelte\); 3 public packages size-tracked \(exceptions: svelte\)\./,
+  );
+});
+
+const withoutLine = (text, line) => {
+  assert.ok(text.includes(line), `fixture has no line ${JSON.stringify(line)}`);
+
+  return text.replace(line, "");
+};
+
+/** One planted departure per line the report can print. */
+const DRIFTS = [
+  {
+    name: "a package with tests but no codecov component",
+    plant: (tree) => {
+      tree["codecov.yml"] = withoutLine(
+        tree["codecov.yml"],
+        "    - component_id: a\n      paths:\n        - packages/a/**\n",
+      );
+    },
+    line: /codecov\.yml: package "a" has tests\/ \(produces coverage\) but has no entry/,
+  },
+  {
+    name: "a codecov component nothing produces coverage for",
+    plant: (tree) => {
+      tree["codecov.yml"] +=
+        "    - component_id: ghost\n      paths:\n        - packages/ghost/**\n";
+    },
+    line: /codecov\.yml: component "ghost" has no coverage-producing package/,
+  },
+  {
+    name: "a package without tests missing from the Sonar coverage exclusions",
+    plant: (tree) => {
+      tree["sonar-project.properties"] =
+        "sonar.coverage.exclusions=packages/svelte/src/**\n";
+    },
+    line: /"packages\/b\/src\/\*\*" missing from sonar\.coverage\.exclusions \(no tests\/ → no lcov\)/,
+  },
+  {
+    name: "a package below 100 % thresholds missing from the Sonar coverage exclusions",
+    plant: (tree) => {
+      tree["packages/a/vitest.config.mts"] =
+        "thresholds: { statements: 100, branches: 90, functions: 100, lines: 100 }\n";
+    },
+    line: /"packages\/a\/src\/\*\*" missing from sonar\.coverage\.exclusions \(phantom code \(lowered vitest threshold\)\)/,
+  },
+  {
+    name: "a Sonar coverage exclusion of a package that measures clean",
+    plant: (tree) => {
+      tree["sonar-project.properties"] =
+        "sonar.coverage.exclusions=packages/b/src/**,packages/svelte/src/**,packages/a/src/**\n";
+    },
+    line: /stale coverage exclusion "packages\/a\/src\/\*\*" — "a" has tests and 100% vitest thresholds/,
+  },
+  {
+    name: "a Sonar coverage exclusion of shared sources",
+    plant: (tree) => {
+      tree["sonar-project.properties"] =
+        "sonar.coverage.exclusions=packages/b/src/**,packages/svelte/src/**,shared/dx/**\n";
+    },
+    line: /stale coverage exclusion "shared\/dx\/\*\*" — shared sources are owner-measured/,
+  },
+  {
+    // The #1838 shape through the CLI: the include glob survives only in a
+    // comment, which is what the text match this script delegates away from
+    // would have accepted.
+    name: "an owner that names the shared dir only in a comment",
+    plant: (tree) => {
+      tree["packages/owner/vitest.config.mts"] =
+        "config.test.coverage.allowExternal = true;\n" +
+        '// "../../shared/dx/**/*.ts" is measured here\n' +
+        'config.test.coverage.include = ["src/**/*.ts"];\n';
+    },
+    line: /shared\/dx: no measuring owner/,
+  },
+  {
+    name: "a shared dir no codecov component path routes",
+    plant: (tree) => {
+      tree["codecov.yml"] = tree["codecov.yml"].replace(
+        "        - shared/dx/**\n",
+        "        - shared/other/**\n",
+      );
+    },
+    line: /codecov\.yml: no component path "shared\/dx\/\*\*"/,
+  },
+  {
+    name: "an owner with no src/* symlink",
+    alias: null,
+    line: /packages\/owner: measures shared\/dx for coverage but has no src\/\* symlink pointing at it/,
+  },
+  {
+    name: "an owner whose src/* symlink points at another dir",
+    alias: "../../../shared/other",
+    line: /packages\/owner: measures shared\/dx for coverage but has no src\/\* symlink pointing at it/,
+  },
+  {
+    name: "an owner whose lint script does not pass the alias",
+    plant: (tree) => {
+      const pkg = JSON.parse(tree["packages/owner/package.json"]);
+
+      pkg.scripts.lint = "eslint src/";
+      tree["packages/owner/package.json"] = JSON.stringify(pkg);
+    },
+    line: /packages\/owner: "lint" does not pass src\/dx-alias\//,
+  },
+  {
+    name: "an owner whose lint:fix script does not pass the alias",
+    plant: (tree) => {
+      const pkg = JSON.parse(tree["packages/owner/package.json"]);
+
+      pkg.scripts["lint:fix"] = "eslint --fix src/";
+      tree["packages/owner/package.json"] = JSON.stringify(pkg);
+    },
+    line: /packages\/owner: "lint:fix" does not pass src\/dx-alias\//,
+  },
+  {
+    name: "a package with tests but no vitest.config.mts",
+    plant: (tree) => {
+      delete tree["packages/a/vitest.config.mts"];
+    },
+    line: /packages\/a: has tests\/ but no vitest\.config\.mts/,
+  },
+  {
+    name: "a public package with no bundle-size entry",
+    plant: (tree) => {
+      tree[".size-limit.js"] = 'export default [esm("owner", "1 kB")];\n';
+    },
+    line: /\.size-limit\.js: npm-public package "a" has no bundle-size entry/,
+  },
+  {
+    name: "a size-limit exception that also has a size entry",
+    plant: (tree) => {
+      tree[".size-limit.js"] =
+        'export default [esm("a", "1 kB"), esm("owner", "1 kB"), esm("svelte", "1 kB")];\n';
+    },
+    line: /\.size-limit\.js: "svelte" has a size entry yet is also in SIZE_LIMIT_EXCEPTIONS/,
+  },
+  {
+    name: "a size-limit exception that is not a package",
+    plant: (tree) => {
+      delete tree["packages/svelte/package.json"];
+      delete tree["packages/svelte/src/index.ts"];
+      tree["sonar-project.properties"] =
+        "sonar.coverage.exclusions=packages/b/src/**\n";
+    },
+    line: /SIZE_LIMIT_EXCEPTIONS lists "svelte" which is not a package/,
+  },
+  {
+    name: "a size-limit exception that is private",
+    plant: (tree) => {
+      tree["packages/svelte/package.json"] = JSON.stringify({
+        name: "@fx/svelte",
+        private: true,
+      });
+    },
+    line: /SIZE_LIMIT_EXCEPTIONS lists "svelte" which is private/,
+  },
+];
+
+for (const drift of DRIFTS) {
+  test(`drift: ${drift.name} — exit 1, and that one line names it`, () => {
+    const run = runScript({ plant: drift.plant, alias: drift.alias });
+
+    assert.equal(run.status, 1, run.stderr);
+    assert.match(run.stderr, /✖ Coverage-scope drift detected/);
+    assert.match(run.stderr, drift.line);
+    // ONE departure, ONE line: a second would mean the plant drifted the tree
+    // in a way the cell does not name.
+    assert.equal(driftLines(run.stderr).length, 1, run.stderr);
+    // `process.exitCode = 1` in place of `process.exit(1)` reports AND then
+    // prints the success line.
+    assert.doesNotMatch(run.stderr, /✓/);
+  });
+}
+
+test("--emit refuses a run that found no coverage report, and emits nothing", () => {
+  const run = runScript({ args: ["--emit"] });
+
+  assert.equal(run.status, 1, run.stderr);
+  assert.match(
+    run.stderr,
+    /✖ --emit: no coverage lcov\.info files found — coverage artifacts missing\?/,
+  );
+  // The step appends stdout to `$GITHUB_OUTPUT`: a refused run leaves it empty.
+  assert.equal(run.stdout, "");
+});
+
+test("--emit prints the three lines CI reads into $GITHUB_OUTPUT", () => {
+  const run = runScript({
+    args: ["--emit"],
+    plant: (tree) => {
+      tree["packages/a/coverage/lcov.info"] = LCOV;
+      tree["packages/owner/coverage/lcov.info"] = LCOV;
+    },
+  });
+
+  assert.equal(run.status, 0, run.stderr);
+  assert.deepEqual(run.stdout.trimEnd().split("\n"), [
+    "sources=packages/a/src,packages/b/src,packages/owner/src,packages/svelte/src,shared/dx",
+    "tests=packages/a/tests,packages/owner/tests",
+    "reports=packages/a/coverage/lcov.info,packages/owner/coverage/lcov.info",
+  ]);
 });
