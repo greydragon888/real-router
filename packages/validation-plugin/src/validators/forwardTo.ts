@@ -107,11 +107,21 @@ export function validateRouteProperties<
   // predicate must not be shared (#1787).
   assertPlainBag(route.defaultSearch, "defaultSearch", fullName);
 
-  if (route.decodeParams?.constructor.name === "AsyncFunction") {
+  // A codec that is not a function is `validateRoute`'s to refuse; reading its
+  // `constructor` here would throw first on one that has none.
+  const { decodeParams, encodeParams } = route;
+
+  if (
+    typeof decodeParams === "function" &&
+    decodeParams.constructor.name === "AsyncFunction"
+  ) {
     throw atAddRoute.type`decodeParams cannot be async for route "${fullName}". Async functions break matchPath/buildPath.`;
   }
 
-  if (route.encodeParams?.constructor.name === "AsyncFunction") {
+  if (
+    typeof encodeParams === "function" &&
+    encodeParams.constructor.name === "AsyncFunction"
+  ) {
     throw atAddRoute.type`encodeParams cannot be async for route "${fullName}". Async functions break matchPath/buildPath.`;
   }
 

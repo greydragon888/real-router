@@ -47,7 +47,11 @@ export {
   assertRouteNameNotEmpty,
 } from "./validation/route-name";
 
-export { validateRoute, validateRouteType } from "./validation/route-batch";
+export {
+  assertRouteCodecIsFunction,
+  validateRoute,
+  validateRouteType,
+} from "./validation/route-batch";
 
 // =============================================================================
 // Types

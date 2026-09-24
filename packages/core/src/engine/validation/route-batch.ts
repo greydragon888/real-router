@@ -131,44 +131,37 @@ export function validateRouteType(
 }
 
 /**
- * Validates that encodeParams is a function if provided.
+ * Refuses a route codec — `encodeParams` / `decodeParams` — that is not a
+ * function.
  *
- * @param route - Route configuration
- * @param methodName - Calling method for error context
- * @throws {TypeError} If encodeParams is not a function
+ * Both layers call it, and each decides which values count as absent:
+ * {@link validateRoute} passes every value but `undefined`, bare-core
+ * registration (`namespaces/RoutesNamespace/routesStore.ts`) only a truthy one,
+ * because core drops a falsy structural field (#1797). The message has one
+ * owner, as in `./route-name` (#2035).
  */
-function validateEncodeParams(
-  route: Record<string, unknown>,
-  methodName: string,
+export function assertRouteCodecIsFunction(
+  field: "decodeParams" | "encodeParams",
+  codec: unknown,
+  routeName: string,
+  methodName: string | undefined,
 ): void {
-  if (
-    route.encodeParams !== undefined &&
-    typeof route.encodeParams !== "function"
-  ) {
+  if (typeof codec !== "function") {
     const at = raiser("router", methodName);
 
-    throw at.type`Route "${String(route.name)}" encodeParams must be a function`;
+    throw at.type`Route "${routeName}" ${field} must be a function`;
   }
 }
 
-/**
- * Validates that decodeParams is a function if provided.
- *
- * @param route - Route configuration
- * @param methodName - Calling method for error context
- * @throws {TypeError} If decodeParams is not a function
- */
-function validateDecodeParams(
-  route: Record<string, unknown>,
+/** {@link assertRouteCodecIsFunction} on a codec the definition provides. */
+function validateCodec(
+  field: "decodeParams" | "encodeParams",
+  codec: unknown,
+  fullName: string,
   methodName: string,
 ): void {
-  if (
-    route.decodeParams !== undefined &&
-    typeof route.decodeParams !== "function"
-  ) {
-    const at = raiser("router", methodName);
-
-    throw at.type`Route "${String(route.name)}" decodeParams must be a function`;
+  if (codec !== undefined) {
+    assertRouteCodecIsFunction(field, codec, fullName, methodName);
   }
 }
 
@@ -398,12 +391,12 @@ export function validateRoute(
   // Validate path structure
   validateRoutePath(routeDef.path, routeDef.name, methodName, rootNode);
 
-  // Validate optional function properties
-  validateEncodeParams(routeDef, methodName);
-  validateDecodeParams(routeDef, methodName);
-
   const routeName = routeDef.name;
   const fullName = parentName ? `${parentName}.${routeName}` : routeName;
+
+  // Validate optional function properties, naming the route in full as core does
+  validateCodec("encodeParams", routeDef.encodeParams, fullName, methodName);
+  validateCodec("decodeParams", routeDef.decodeParams, fullName, methodName);
 
   // Check for duplicate name in existing tree
   if (rootNode && fullName) {

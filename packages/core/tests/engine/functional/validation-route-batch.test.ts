@@ -642,6 +642,37 @@ describe("validateRoute", () => {
       }).toThrow('[router.add] Route "test" decodeParams must be a function');
     });
 
+    it("refuses a null codec: only an undefined one is absent here", () => {
+      expect(() => {
+        validateRoute(
+          { name: "test", path: "/test", decodeParams: null },
+          methodName,
+        );
+      }).toThrow('[router.add] Route "test" decodeParams must be a function');
+    });
+
+    it("names a nested route's codec by its full dotted name", () => {
+      expect(() => {
+        validateRoute(
+          {
+            name: "p",
+            path: "/p",
+            children: [{ name: "c", path: "/c", decodeParams: 42 }],
+          },
+          methodName,
+        );
+      }).toThrow('[router.add] Route "p.c" decodeParams must be a function');
+    });
+
+    it("checks the encoder first when both codecs are wrong", () => {
+      expect(() => {
+        validateRoute(
+          { name: "test", path: "/test", decodeParams: 42, encodeParams: 42 },
+          methodName,
+        );
+      }).toThrow('[router.add] Route "test" encodeParams must be a function');
+    });
+
     it("should accept valid encode/decode functions", () => {
       expect(() => {
         validateRoute(
