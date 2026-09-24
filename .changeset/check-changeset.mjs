@@ -38,7 +38,6 @@
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 
 const ROOT = process.cwd();
 const CHANGESET_DIR = join(ROOT, ".changeset");
@@ -234,6 +233,6 @@ function main() {
 }
 
 // Run only as a CLI — `import` must not trigger validation.
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (import.meta.main) {
   main();
 }

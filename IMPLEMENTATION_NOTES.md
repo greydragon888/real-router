@@ -11669,3 +11669,32 @@ Turbo keys a package's `test` task on `tests/**/*.{ts,tsx}`, so inside core the 
 **Solution.** `src/dom-utils` is a symlink to `../../../shared/dom-utils`, as in preact, react, solid, svelte and vue. `prebundle`, `packages/angular/scripts/sync-dom-utils.mjs`, `scripts/check-angular-dom-utils-sync.mjs`, its test, `pnpm lint:angular-sync` and its hook and CI steps are removed. CodeQL lists `shared/dom-utils/**` by its real path, because its extractor does not follow symlinked directories, and Sonar drops its exclusion of the copy's path. Angular's coverage thresholds are its own code's: 96 / 86 / 98 / 97. The scanners and ledgers that counted or filtered the copy (#2092 claim census, comment historiography, read counts, the #2250 URL-door census, and the #1971, #1852, #2197 and #1834 authorities) no longer name it.
 
 **Why.** Measured on ng-packagr 22.1.1: the package built through the symlink is byte-identical to the one built from the copy (`diff -rq` over `dist`, sourcemaps and `.d.ts` included), and so is a build from a plain copy without the sync's two transforms. Type-check passes, and the unit and property suites run the same 437 and 193 tests. The thresholds move because `vitest.config.unit.mts` excludes a symlinked `src/*` from coverage: the copy was 328 of the 444 branches angular measured, all of them covered, and react already measures `shared/dom-utils` as its owner. Angular's own code measures 86.21 % of branches. ESLint does not walk into the symlink, as for preact, solid, svelte and vue; react lints `src/dom-utils/` by name. The sync and the gate had to go before the symlink: both ran the sync, which would have written through the link into `shared/dom-utils`.
+
+## Every CLI decides it was run with `import.meta.main` (#2539, 2026-09-24)
+
+**Problem.** Twelve CLIs in `scripts/` and `.changeset/` decided "was I run?" by comparing `process.argv[1]` with their own URL, in three spellings, and two more (`scripts/check-issue-refs.mjs`, `benchmarks/plugin-seam/bench.mts`) compared it with their file name through `endsWith`. Node resolves a main module's symlinks and escapes a space in its URL, so through a symlinked or space-carrying path the comparison was false, main() never ran, and the script exited 0 without a word. Measured on `4900d489f`: all twelve were silent through a directory symlink whose name holds a space, and each was observable when run directly. Every caller reads a silent exit 0 as "nothing to do": no source in the diff, no examples to lint, no benchmark to run. Hooks and workflows call these scripts by relative path, so CI never reached the defect; a test that ran a copy from the macOS temp directory did (#2543).
+
+**Solution.** All fourteen use `import.meta.main`, as `raiser-text-equality.mjs` and `refusal-census.mjs` already did (#2547). `scripts/cli-entry.test.mjs` holds the class:
+
+- a scan refuses any hand-written `argv[1]` comparison in the tracked `scripts/`, `.changeset/` and `benchmarks/` sources;
+- every file that asks `import.meta.main` must be in its `CLIS` registry;
+- every registered CLI runs through a symlinked directory whose name holds a space, in an environment without `GITHUB_*` and with a `gh` that fails, and must print a line only its main() prints;
+- importing a registered CLI must print nothing.
+
+The scan alone holds `benchmarks/plugin-seam/bench.mts`: running or importing it needs built dist and runs the whole benchmark.
+
+**Why.** `import.meta.main` is Node's own answer (added in v24.2.0; the repository's floor is 24.15). It was measured on 24.18.1 in eight invocation shapes and under `tsx`:
+
+- true for an absolute, relative, symlinked (file or directory), space-carrying and `--preserve-symlinks-main` path;
+- false when imported, under `node --test`, and through a dynamic import.
+
+Node marks it "Stability: 1.0 - Early development". If its semantics change, the registry turns that into a red test on every pre-push and Repo Lints run instead of silent CLIs.
+
+Measured: 23 mutants, all killed, each by the cells expected for it:
+
+- each guard reverted;
+- `if (true)` in place of the guard;
+- a registry entry dropped;
+- the detector made blind to `endsWith`, or made to read comments.
+
+The membership CLI's fixture no longer sits at the temp directory's real path: its copy now runs through the macOS temp symlink as well.

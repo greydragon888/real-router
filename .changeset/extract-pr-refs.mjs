@@ -13,7 +13,6 @@
  */
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 
 const CHANGESET_DIR = join(process.cwd(), ".changeset");
 
@@ -73,6 +72,6 @@ function formatRefs(refs) {
   return refs.length > 0 ? ` (${refs.join(" ")})` : "";
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (import.meta.main) {
   process.stdout.write(formatRefs(extractRefs()));
 }

@@ -173,7 +173,7 @@ export async function run(): Promise<void> {
   console.table(bench.table());
 }
 
-if (process.argv[1]?.endsWith("bench.mts")) {
+if (import.meta.main) {
   run().catch((error: unknown) => {
     console.error(error);
     process.exitCode = 1;

@@ -20,7 +20,6 @@
  *   --has-own-changes  → exit 0 if the version has a non-dependency bullet, else 1
  */
 import { readFileSync, existsSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 
 /**
  * The lines of the `## <version>` section, up to (not including) the next
@@ -61,7 +60,7 @@ function versionHasOwnChanges(changelogContent, version) {
     .some((l) => !l.includes("Updated dependencies"));
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (import.meta.main) {
   const [path, version, flag] = process.argv.slice(2);
   if (!path || !version) {
     process.stderr.write("usage: changelog-notes.mjs <changelog> <version> [--has-own-changes]\n");

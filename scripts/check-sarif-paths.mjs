@@ -174,6 +174,6 @@ async function main(argv) {
   return 0;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.main) {
   process.exit(await main(process.argv.slice(2)));
 }

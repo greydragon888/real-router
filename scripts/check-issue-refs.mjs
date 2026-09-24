@@ -314,6 +314,6 @@ function main() {
 }
 
 // Importing this file (the test does) must not fire a network scan.
-if (process.argv[1] && process.argv[1].endsWith("check-issue-refs.mjs")) {
+if (import.meta.main) {
   process.exit(main());
 }

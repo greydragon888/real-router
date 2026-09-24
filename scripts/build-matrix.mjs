@@ -548,6 +548,6 @@ export function main() {
 
 // Run main() only when invoked directly (`node scripts/build-matrix.mjs`),
 // not when imported by the test file.
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.main) {
   main();
 }

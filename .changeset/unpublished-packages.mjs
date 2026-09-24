@@ -44,7 +44,6 @@ import { execFile } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
@@ -178,7 +177,7 @@ export async function classifyAll(root = process.cwd()) {
   }));
 }
 
-const CLI = process.argv[1] === fileURLToPath(import.meta.url);
+const CLI = import.meta.main;
 const SPEC =
   process.argv[2] === "--published-version" ? (process.argv[3] ?? "") : null;
 

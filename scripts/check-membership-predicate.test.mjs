@@ -24,7 +24,6 @@ import {
   lstatSync,
   mkdirSync,
   mkdtempSync,
-  realpathSync,
   rmSync,
   symlinkSync,
   unlinkSync,
@@ -232,11 +231,6 @@ test("the scan reaches shared/ — the half a package-rooted scan cannot", () =>
 // `packages/`. It runs from `packages/`, not from the fixture root, so a copy
 // that took its root from the working directory fails here. `node_modules` is
 // linked in so the copy resolves `typescript`.
-//
-// ⚠ The fixture sits at the REAL path of the temp directory. The CLI arm runs
-// only when `process.argv[1] === fileURLToPath(import.meta.url)`, and on macOS
-// the path `os.tmpdir()` returns runs through a symlink: a copy started through
-// it never enters the arm and exits 0 without a word (#2539).
 // --------------------------------------------------------------------------
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -273,7 +267,7 @@ const gitEnv = {
  * @returns {string} the fixture root
  */
 function cliFixture(source) {
-  const root = mkdtempSync(join(realpathSync(tmpdir()), "membership-"));
+  const root = mkdtempSync(join(tmpdir(), "membership-"));
   fixtures.push(root);
 
   mkdirSync(join(root, "scripts"));

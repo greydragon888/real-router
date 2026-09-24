@@ -97,6 +97,6 @@ export function main(argv) {
   process.stdout.write(`examples_lint_reasons=${counts}\n`);
 }
 
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.main) {
   main(process.argv.slice(2));
 }

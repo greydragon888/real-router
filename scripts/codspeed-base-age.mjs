@@ -190,6 +190,6 @@ export async function main() {
   return 0;
 }
 
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.main) {
   process.exit(await main());
 }

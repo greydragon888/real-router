@@ -77,7 +77,7 @@ export function main(stdin) {
   return 1;
 }
 
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.main) {
   const chunks = [];
   for await (const chunk of process.stdin) chunks.push(chunk);
   process.exit(main(Buffer.concat(chunks).toString("utf8")));
