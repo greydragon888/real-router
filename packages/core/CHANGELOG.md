@@ -1,5 +1,23 @@
 # @real-router/core
 
+## 0.148.0
+
+### Minor Changes
+
+- [#2573](https://github.com/greydragon888/real-router/pull/2573) [`343b6f0`](https://github.com/greydragon888/real-router/commit/343b6f029960b38fd371019dc0a8375dda10e97d) Thanks [@greydragon888](https://github.com/greydragon888)! - `@real-router/core/validation` exports `buildParamMeta` ([#2569](https://github.com/greydragon888/real-router/issues/2569))
+
+  `buildParamMeta(path)` returns the params a route path declares: `urlParams`
+  for its `:param` and `*splat` slots and `queryParams` for its `?query`
+  declarations, beside `paramTypeMap` and `pathPattern`. Core builds each
+  registered route's param metadata with it, from the path with a leading `~`
+  removed, and `getUrlParams` answers from that. A segment the path grammar
+  refuses (a fused marker such as `a:b`) contributes nothing, so read a path
+  `validateRoute` accepts.
+
+  `@real-router/validation-plugin` reads a route it has not registered yet with
+  it, so a forward's two ends are read by one grammar. The subpath carries it for
+  the reason it carries `findMisChanneledKey`: a second copy of the rule drifts.
+
 ## 0.147.9
 
 ### Patch Changes

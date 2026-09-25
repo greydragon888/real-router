@@ -1,5 +1,95 @@
 # @real-router/validation-plugin
 
+## 0.30.0
+
+### Minor Changes
+
+- [#2573](https://github.com/greydragon888/real-router/pull/2573) [`343b6f0`](https://github.com/greydragon888/real-router/commit/343b6f029960b38fd371019dc0a8375dda10e97d) Thanks [@greydragon888](https://github.com/greydragon888)! - A forward's param check reads a batch route's params as core does ([#2569](https://github.com/greydragon888/real-router/issues/2569))
+
+  The check refuses a forward whose target needs a path param its source does
+  not hold. It read a route of the table through core, and a route of the batch
+  through a pattern of its own that reads a name as a letter or `_` followed by
+  word characters, anywhere in the path. So the two ends of a forward were read
+  by two grammars wherever a path held a param name that is not a word
+  (`:user-id`, `:ид`, `:1d`, `*rest-of`) or a marker in its query (`?:x`). A
+  batch route is now read with core's own reading, as the `update` door and the
+  check the plugin runs at `usePlugin` already read both ends. Measured with the
+  plugin installed:
+
+  | Batch                                                                                            | 0.29.0                                             | now                                                |
+  | ------------------------------------------------------------------------------------------------ | -------------------------------------------------- | -------------------------------------------------- |
+  | `c /c/:user-id → "q"`, with `q /q/:user-id` in the table                                         | `forwardTo target "q" requires params [user-id] …` | accepted                                           |
+  | the same with `:ид`, `:1d` or `*rest-of`                                                         | refused the same way                               | accepted                                           |
+  | `p /p/:user-id` with a child `c /c → "q"`, and `q /q/:user-id` in the table                      | refused the same way                               | accepted                                           |
+  | under `{ parent: "users" }`, `legacy /legacy/:user-id → "users.profile"`, a child at `/:user-id` | refused the same way                               | accepted                                           |
+  | `c /c → "d"`, `d /d?:x`                                                                          | `… requires params [x] …`                          | accepted                                           |
+  | `c /c/:user → "d"`, `d /d/:user-id`                                                              | accepted                                           | `forwardTo target "d" requires params [user-id] …` |
+  | `c /c/:user-name → "d"`, `d /d/:user-id`                                                         | accepted                                           | `… requires params [user-id] …`                    |
+  | `c /c/:user-id → "q"`, with `q /q/:user` in the table                                            | accepted                                           | `… requires params [user] …`                       |
+  | `c /c → "d"`, `d /d/:ид`                                                                         | accepted                                           | `… requires params [ид] …`                         |
+  | `c /c/:rest → "d"`, `d /d/*rest-of`                                                              | accepted                                           | `… requires params [rest-of] …`                    |
+  | `c /c?:x → "d"` or `c /c?q&:r → "d"`, with `d` needing `:x` or `:r`                              | accepted                                           | `… requires params [x] …`, or `[r]`                |
+
+  Bare core accepts every row: it checks no params.
+
+  The new refusals are forwards whose target needs a path param the source's
+  path does not declare, which the pattern missed: it read a name the two ends
+  share only in part as one they share, could not read a name that does not
+  start with a letter or `_`, and read a marker in a query as a path param. A
+  `replace` batch refuses them too, under the `addRoute` head both batch doors
+  print. A refusal names params as core reads them: `[user-id]` where it said
+  `[user]`.
+
+  ⚠ The check leaves a route's `defaultParams` out, on every door. A forward to
+  `d /d/:ид` whose `defaultParams` fill `ид` is now refused by `add` and
+  `replace` as well; the `update` door and the check at `usePlugin` refused it
+  in 0.29.0 already.
+
+  The plugin reads the batch side with `buildParamMeta`, which
+  `@real-router/core/validation` now exports.
+
+### Patch Changes
+
+- [#2573](https://github.com/greydragon888/real-router/pull/2573) [`343b6f0`](https://github.com/greydragon888/real-router/commit/343b6f029960b38fd371019dc0a8375dda10e97d) Thanks [@greydragon888](https://github.com/greydragon888)! - `add(batch, { parent })` judges the batch in the table's name space ([#2566](https://github.com/greydragon888/real-router/issues/2566))
+
+  Under `{ parent: "p" }`, a batch route `c` is the table's `p.c`, and a
+  `forwardTo` names routes by that full name. The plugin checked a forward
+  target's existence by full name, but walked the batch for its params and keyed
+  its forwards by the short name. Measured with the plugin installed:
+
+  | `add(batch, { parent: "p" })`                                                           | 0.29.0                                                                                         | now                                                         |
+  | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+  | forwards to a batch sibling, a route nested in the batch, or through one into the table | `Internal error (please report): collectPathsToRoute: route "…" not found`, naming the target  | accepted                                                    |
+  | forwards in a cycle inside the batch                                                    | the same internal error                                                                        | `[router] Circular forwardTo: p.c → p.d → p.c`              |
+  | forwards to a batch sibling that needs a param the source lacks                         | the same internal error                                                                        | `forwardTo target "p.d" requires params [id] … route "p.c"` |
+  | holds a short name a top-level route holds, when that route closes a forward chain      | `[router] Circular forwardTo: d → c → d`, a cycle the table does not have                      | accepted                                                    |
+  | holds a short name a top-level route holds, when that route ends a long forward chain   | `[router] forwardTo chain exceeds maximum depth (100): …`, for a chain the table does not have | accepted                                                    |
+
+  Bare core accepts every row except the cycle, which is its own refusal.
+
+  Refusals of a batch route under `{ parent }` now name it `"p.c"` where they
+  named `"c"`: a `forwardTo` target that does not exist, or that needs a param
+  the route lacks; a forward chain past the depth limit that starts at the
+  route; a `defaultParams` or `defaultSearch` that is not an object; a
+  `forwardTo` that is neither a string nor a function; and an async
+  `decodeParams`, `encodeParams` or `forwardTo` callback.
+
+  In any `add` or `replace` batch, an async callback on a nested route now names
+  it in full (`"parent.child"` where it named `"child"`), as the plugin's
+  `defaultParams`, `defaultSearch` and `forwardTo` refusals of that route already
+  did.
+
+  A nested route whose `name` is a `Symbol`, or an object with no way to become
+  a string, got a raw `TypeError` from the plugin (`Cannot convert a Symbol value
+to a string`, `Cannot convert object to primitive value`), in `add` with or
+  without `{ parent }` and in `replace`. It now gets core's `[router.addRoute]
+Route name must be a string, got …`. A name that is not a string is no longer
+  joined into a route's name at all: a refusal that printed `"a.5"` now prints
+  `"5"`.
+
+- Updated dependencies [[`343b6f0`](https://github.com/greydragon888/real-router/commit/343b6f029960b38fd371019dc0a8375dda10e97d)]:
+  - @real-router/core@0.148.0
+
 ## 0.29.0
 
 ### Minor Changes
