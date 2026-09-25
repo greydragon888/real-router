@@ -5,19 +5,47 @@
 // here — a document that MUST red — plus a positive control that must stay
 // green. If a future edit makes a check inert, the matching case flips.
 //
+// The script resolves an anchor against the files under its cwd, so each case
+// runs it with the cwd at a fixture tree under os.tmpdir(), never at the
+// checkout (#2563): the suite runs its files concurrently, and a fixture in the
+// live tree is one a sibling's walk can list and then find gone. The tree holds
+// the `helpers.ts` files the ambiguity cases need, so they do not depend on how
+// many the repository has, and it keeps the target and the doc in directories
+// of their own, as they were in the checkout.
+//
 // Runs in the repo-lints CI job via `node --test scripts/tests/*.test.mjs`.
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test, before, after } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const FIXTURE_DIR = join(ROOT, "tmp-anchor-fixture");
-const TARGET = join(FIXTURE_DIR, "zzAnchorFixtureTarget.ts");
-const DOC = join(FIXTURE_DIR, "doc.md");
+const FIXTURE_DIR = realpathSync(
+  mkdtempSync(join(tmpdir(), "anchor-fixture-")),
+);
+const TARGET = join(FIXTURE_DIR, "src", "zzAnchorFixtureTarget.ts");
+const DOC = join(FIXTURE_DIR, "docs", "doc.md");
+
+/**
+ * Files one basename names. Two sit under the root a doc can declare, one of
+ * them AT it, so the root case needs the exact hit at the root to win over a
+ * deeper one.
+ */
+const HELPERS = [
+  "packages/core/src/helpers.ts",
+  "packages/core/src/api/helpers.ts",
+  "packages/react/src/helpers.ts",
+];
 
 // 5 lines, line 3 blank, line 5 a bare closer.
 const TARGET_SRC = [
@@ -29,8 +57,13 @@ const TARGET_SRC = [
 ].join("\n");
 
 before(() => {
-  mkdirSync(FIXTURE_DIR, { recursive: true });
+  mkdirSync(dirname(TARGET), { recursive: true });
+  mkdirSync(dirname(DOC), { recursive: true });
   writeFileSync(TARGET, TARGET_SRC);
+  for (const helper of HELPERS) {
+    mkdirSync(dirname(join(FIXTURE_DIR, helper)), { recursive: true });
+    writeFileSync(join(FIXTURE_DIR, helper), "export const help = 1;\n");
+  }
 });
 
 after(() => rmSync(FIXTURE_DIR, { recursive: true, force: true }));
@@ -48,7 +81,7 @@ function run(markdown) {
   const r = spawnSync(
     process.execPath,
     [join(ROOT, "scripts", "check-doc-anchors.mjs"), DOC],
-    { cwd: ROOT, encoding: "utf8" },
+    { cwd: FIXTURE_DIR, encoding: "utf8" },
   );
   return { code: r.status, out: `${r.stdout}${r.stderr}` };
 }
@@ -61,7 +94,7 @@ test("positive control: a resolvable anchor passes", () => {
 test("a name that matches no file is an error", () => {
   const { code, out } = run("Text `zzNoSuchFixture.ts:2`.");
   assert.equal(code, 1);
-  assert.match(out, /no such file/);
+  assert.match(out, /— no such file: zzNoSuchFixture\.ts/);
 });
 
 test("a line past the end of the file is an error", () => {
@@ -83,10 +116,11 @@ test("an ambiguous basename is an error", () => {
 });
 
 test("a doc root resolves an otherwise ambiguous basename", () => {
-  const { code } = run(
+  const { code, out } = run(
     "<!-- anchors-root: packages/core/src -->\n\nText `helpers.ts:1`.",
   );
-  assert.equal(code, 0);
+  assert.equal(code, 0, out);
+  assert.match(out, /✓ 1 anchors resolve/);
 });
 
 test("a bare :NNN inherits the file named in the same paragraph", () => {
@@ -114,7 +148,7 @@ test("an anchor landing on a bare closer warns but does not fail", () => {
 
 test("anchors inside a fenced code block are ignored", () => {
   const { code } = run(
-    ["```", "zzNoSuchFixture.ts:99", "  policy.keys(src)", "```"].join("\n"),
+    ["```", "`zzNoSuchFixture.ts:99`", "  policy.keys(src)", "```"].join("\n"),
   );
   assert.equal(code, 0);
 });

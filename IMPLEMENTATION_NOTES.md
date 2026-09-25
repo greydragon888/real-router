@@ -11923,3 +11923,41 @@ The two periods built different trees, so this is not an A/B. Nothing in it pays
 - `--with-deps` runs `apt-get update` and `apt-get install` as root on every call (`installDependenciesLinux` in playwright-core 1.63.0), and this is a co-tenant production host.
 
 **Accepted: the cross-router bench's Chromium temp files.** The job leaves `.org.chromium.*` entries in the host's `/tmp`: 185 over four runs, within 14 MB for all such entries. The host's tmpfiles rule removes them after 30 days. A first step `echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"` would keep them inside the job. Chromium's `base::GetTempDir` reads `TMPDIR` on Linux, and the runner empties `$RUNNER_TEMP` when a job starts and when it ends. By owner decision the job does not take the step.
+
+## Scripts tests keep their fixtures out of the checkout (#2563, 2026-09-25)
+
+**Problem.** `node --test scripts/tests/*.test.mjs` runs its files concurrently, one process per file, and some of them read the live tree while others wrote fixtures into it. `no-cycle-guard.test.mjs` wrote a two-file cycle into `packages/core/src` and removed it in `finally`. Meanwhile `refusal-census.mjs`, which `cli-entry.test.mjs` and `refusal-census.test.mjs` run, globbed that directory and then read each file it had listed. A file removed between the two reads was `ENOENT`, and a pre-push of a clean commit went red.
+
+- **Reproduction.** A loop that writes and removes the same two files failed 4 of 36 census runs with the issue's error. The test itself removes its fixture once per 5.6 s run, so the timing rarely lines up.
+- **Census.** A filesystem watcher over one full run of the suite found three tests writing fixtures into the checkout:
+  - `no-cycle-guard.test.mjs`: `packages/core/src/__no_cycle_guard_fixture_{a,b}.ts`;
+  - `check-doc-anchors.test.mjs`: `tmp-anchor-fixture/` at the repository root;
+  - `check-doc-duplication.test.mjs`: `tmp-doc-dup-fixture/` at the repository root.
+- **pnpm's own files.** The watcher also saw `_tmp_<pid>_…` files, which pnpm drops into its cwd; every pnpm command tried (`--version`, `ls`, `exec`, `turbo`) did. They came from the `pnpm exec` calls in `no-cycle-guard.test.mjs` and `examples-lint-filter.test.mjs`, and in the `build-matrix.mjs` run that `cli-entry.test.mjs` makes.
+- **Leftovers.** None of the three fixture paths is ignored, so a run interrupted before its cleanup leaves files that `git add -A` commits.
+
+**Solution.**
+
+- **`no-cycle-guard.test.mjs`.** It builds the cycle in a mirror of `packages/core/src` under `os.tmpdir()` and lints it through ESLint's API.
+  - The config is the one ESLint's own lookup finds for a file in `packages/core/src` (`findConfigFile`), and the mirror is linted from that config's directory. The test asserts that the mirror's file gets the same rules, settings and parser options as the real path.
+  - The mirror's path is physical. On macOS `os.tmpdir()` is a symlink, and import-x keys its module graph by the resolved path, so a cycle between `/var/…` files is never closed (measured).
+  - A report counts only as `import-x/no-cycle` at error level with a message that starts `Dependency cycle`. The old substring checks passed on a resolver error too, because ESLint files it under the rule's id: with an unusable `import-x/resolver-next`, the old test stayed green and the new one goes red.
+  - The run takes about 2 s, down from 5.6 s.
+- **`check-doc-anchors.test.mjs`.** It runs the script with its cwd at a fixture tree under `os.tmpdir()`.
+  - The tree holds three `helpers.ts` files, two of them under the root a doc declares and one of them at it. With only one under that root, the rule that an exact hit at the root wins went untested.
+  - The target and the doc sit in directories of their own, as they did in the checkout.
+  - Three cases that could not fail now can: the no-such-file case matched Node's own `ENOENT` text, the doc-root case asserted only the exit code, and the fenced block held no inline-code anchor to skip.
+- **`check-doc-duplication.test.mjs`.** It passes a fixture under `os.tmpdir()` to `--root=`.
+- **`scripts/tests/fixture-isolation.test.mjs`.** It reads every test's source, finds each filesystem write, and traces the path it writes to back to where it starts: `os.tmpdir()`, or the checkout (`import.meta.*`, `__dirname`, `process.cwd()`, a relative path).
+  - A file fails when a write starts in the checkout, and when it writes but the trace places none of its writes.
+  - The trace follows a name to the last value it was given before the use. It also follows `??`, `||`, `?:`, `await`, URL and `.path` properties, aliases, and the returns of the file's own functions.
+  - Every function `node:fs` and `node:fs/promises` export is classified as a write or not, and a new one fails the test until it is classified.
+  - Before the fix, it named exactly the three files the watcher found.
+
+**What it does not trace.** A path that arrives as a function parameter or as an object's property. A name imported from another module. Scope and branches: a name reads its last value before the use, by position in the file. Writes by a spawned process.
+
+**Found on the way.**
+
+- `check-doc-anchors.mjs` already skips a directory that vanishes mid-walk; its comment records 3 crashes in 100 walks under churn. That tolerance suits a script that runs beside anything. `refusal-census.mjs` has none, and the tests no longer need it to have one.
+- With today's import-x, dropping only `import-x/extensions` does not make `import-x/no-cycle` inert. import-x takes its valid extensions from that setting and adds every extension `import-x/parsers` names. The old guard and the new one both stay green, and both go red once `import-x/parsers` is dropped too.
+- A runtime guard was tried and set aside: wrapping `node:fs` in each test process through `--import`. A named import from `node:fs/promises` kept the original function after `syncBuiltinESMExports()` (measured).

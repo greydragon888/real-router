@@ -9,14 +9,18 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test, afterEach } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SCRIPT = join(ROOT, "scripts", "check-doc-duplication.mjs");
-const FIXTURE = join(ROOT, "tmp-doc-dup-fixture");
+// Under os.tmpdir(), never the checkout (#2563): the suite runs its files
+// concurrently, and a fixture in the live tree is one a sibling can read and
+// then find gone.
+const FIXTURE = mkdtempSync(join(tmpdir(), "doc-dup-fixture-"));
 
 /** 12 distinctive tokens — comfortably over MIN_TOKENS, so the gate is the score. */
 const DUP =
