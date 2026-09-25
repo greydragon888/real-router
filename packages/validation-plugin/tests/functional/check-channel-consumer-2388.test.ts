@@ -183,10 +183,12 @@ describe("the validation plugin refuses through the check channel (#2388)", () =
     // would keep every behavioural test green.
     //
     // ⚠ An async `decodeParams`, and the choice is what makes the cell
-    // discriminate: bare core admits it, and no always-on guard refuses it, so
-    // the ONLY thing that can throw here is this plugin's per-route walk
-    // reaching the child. A `canActivate` was tried first and was useless —
-    // core's own factory-shape guard refuses that whether the walk runs or not.
+    // discriminate: bare core admits it, and no always-on guard refuses it. A
+    // `canActivate` was tried first and was useless — core's own factory-shape
+    // guard refuses that whether the walk runs or not.
+    //
+    // ⚠ The plugin's property check refuses the same child a step later, with
+    // a sentence appended, so the cell pins the walk's message to its end.
     const router = createRouter([]);
 
     router.usePlugin(validationPlugin());
@@ -205,7 +207,7 @@ describe("the validation plugin refuses through the check channel (#2388)", () =
           ],
         },
       ] as never);
-    }).toThrow('decodeParams cannot be async for route "child"');
+    }).toThrow(/decodeParams cannot be async for route "parent\.child"$/);
   });
 
   it("the lifecycle doors refuse a bad route name, add and remove alike", () => {

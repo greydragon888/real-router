@@ -19,7 +19,11 @@ import {
   isParams,
   getTypeDescription,
 } from "../type-guards";
-import { validateForwardToTargets, validateRouteProperties } from "./forwardTo";
+import {
+  nameInTable,
+  validateForwardToTargets,
+  validateRouteProperties,
+} from "./forwardTo";
 import { validateNavigateParamsShape } from "./navigation";
 
 import type { RouteLookup } from "./forwardTo";
@@ -108,14 +112,12 @@ export function guardRouteCallbacks(route: unknown): void {
   }
 }
 
-export function guardNoAsyncCallbacks(route: unknown): void {
+export function guardNoAsyncCallbacks(route: unknown, fullName: unknown): void {
   const routeObj = route as {
     decodeParams?: unknown;
     encodeParams?: unknown;
     forwardTo?: unknown;
-    name?: unknown;
   };
-  const routeName = routeObj.name;
 
   // Only a function is asked whether it is async: any other codec is
   // `validateRoute`'s to refuse, and `isAsyncFunction` reads its `constructor`.
@@ -123,21 +125,21 @@ export function guardNoAsyncCallbacks(route: unknown): void {
     typeof routeObj.decodeParams === "function" &&
     isAsyncFunction(routeObj.decodeParams)
   ) {
-    throw atAddRoute.type`decodeParams cannot be async for route "${String(routeName)}"`;
+    throw atAddRoute.type`decodeParams cannot be async for route "${String(fullName)}"`;
   }
 
   if (
     typeof routeObj.encodeParams === "function" &&
     isAsyncFunction(routeObj.encodeParams)
   ) {
-    throw atAddRoute.type`encodeParams cannot be async for route "${String(routeName)}"`;
+    throw atAddRoute.type`encodeParams cannot be async for route "${String(fullName)}"`;
   }
 
   if (
     typeof routeObj.forwardTo === "function" &&
     isAsyncFunction(routeObj.forwardTo)
   ) {
-    throw atAddRoute.type`forwardTo callback cannot be async for route "${String(routeName)}"`;
+    throw atAddRoute.type`forwardTo callback cannot be async for route "${String(fullName)}"`;
   }
 }
 
@@ -145,8 +147,11 @@ export function guardNoAsyncCallbacks(route: unknown): void {
  * Validates addRoute arguments (route structure and properties).
  * State-dependent validation (duplicates, tree) happens in instance method.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts any Route type
-export function validateAddRouteArgs(routes: readonly Route<any>[]): void {
+export function validateAddRouteArgs(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts any Route type
+  routes: readonly Route<any>[],
+  parentName?: string,
+): void {
   for (const route of routes) {
     // First check if route is an object (before accessing route.name)
     // Runtime check for invalid types passed via `as any`
@@ -157,7 +162,7 @@ export function validateAddRouteArgs(routes: readonly Route<any>[]): void {
 
     // Validate route properties (canActivate, canDeactivate, defaultParams, async checks)
     // Note: validateRouteProperties handles children recursively
-    validateRouteProperties(route, route.name);
+    validateRouteProperties(route, nameInTable(parentName, route.name));
   }
 }
 

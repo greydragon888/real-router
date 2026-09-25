@@ -98,6 +98,18 @@ lists that used to stand here could never fire.
 
 The one refusal that names a different door is outside the property's name pool: a reserved `@@` name is refused as `[router.replaceRoutes]` on `replace`, the door the caller called (`validator-boundary-authority-2322.test.ts`).
 
+## Route batches — `add` under `{ parent }`
+
+Under `{ parent: "p" }`, a batch route `c` is the table's `p.c` (#2566). Tested in `parent-batch.properties.ts`.
+
+| #   | Invariant | Runs |
+| --- | --------- | ---- |
+| 1   | The route checks judge `add(batch, { parent: "p" })` as they judge `p` declared again with its children and the batch appended, over the table without `p` — the same message, or both accepted | 300  |
+
+The property's tables never forward to `p`, whose removal would leave no table to compare against, and its batches never re-declare a child of `p`. That batch is refused both ways, with different messages: `Route "p.d0" already exists` under `{ parent }`, and `Duplicate route "p.d0" in batch` when declared again with `p`.
+
+Its param names are words (`:id`). The plugin reads a batch's param names with a narrower pattern than core's parser, which it asks about the table's routes, so a name such as `:user-id` can move the verdict between the two spellings (#2569).
+
 ## State namespace
 
 | #   | Invariant                                                                  | Runs |
