@@ -226,7 +226,12 @@ describe("reachability census (#2303)", () => {
 
   it("/validation — the plugin-facing surface", () => {
     expect(exportsOf(SUBPATHS[4].file)).toStrictEqual({
-      values: ["findMisChanneledKey", "getInternals", "validateRoute"],
+      values: [
+        "buildParamMeta",
+        "findMisChanneledKey",
+        "getInternals",
+        "validateRoute",
+      ],
       types: ["Matcher", "RouterInternals", "RouterValidator", "RouteTree"],
       stars: [],
     });

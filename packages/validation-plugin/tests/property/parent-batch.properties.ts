@@ -24,6 +24,14 @@ import type { Route, Router } from "@real-router/core";
  * — and small pools make each of them common. The reach anchor at the bottom
  * counts them. The generator draws no shape defects (a bag, a callback, a name
  * that is not a string): the functional table holds those.
+ *
+ * Each case names its params either as words (`:id`, `:pid`) or not
+ * (`:user-id`, `:p-id`). When `k` or `p` carries a name that is not a word, the
+ * two spellings read it through different doors — `k` is the table's under
+ * `{ parent }` and the batch's in the nested spelling — and both doors read it
+ * as core does (#2569). The reach anchor counts the inputs that reach a forward
+ * read through both doors: to a `k` carrying the routes' param, or from under a
+ * `p` carrying the one a top-level target needs.
  */
 
 const ACCEPTED = "accepted";
@@ -31,11 +39,11 @@ const ACCEPTED = "accepted";
 const TOP_NAMES = ["c", "d", "q"] as const;
 const BATCH_NAMES = ["c", "d", "e"] as const;
 
-/** A path for `name`, with a param one time in three. */
-const pathFor = (name: string): fc.Arbitrary<string> =>
+/** A path for `name`, with the case's param one time in three. */
+const pathFor = (name: string, param: string): fc.Arbitrary<string> =>
   fc.oneof(
     { arbitrary: fc.constant(`/${name}`), weight: 2 },
-    { arbitrary: fc.constant(`/${name}/:id`), weight: 1 },
+    { arbitrary: fc.constant(`/${name}/:${param}`), weight: 1 },
   );
 
 /** Gives each route, maybe, a forward to a target outside its own subtree. */
@@ -64,17 +72,25 @@ const withForwards = (
     );
 
 /**
- * `p`, maybe with a param, and its child `k`. A batch route that forwards to
- * `k` needs any param `p` has, which it holds only by inheriting it; the batch
- * never re-declares `k`, since its names come from another pool.
+ * `p` and its child `k`. `p` may carry a param of its own or the one the routes
+ * carry, and `k` the routes' one: a batch route that forwards to `k` needs what
+ * the two declare, and it holds `p`'s only by inheriting it. The batch never
+ * re-declares `k`, since its names come from another pool.
  */
-const parentArbitrary: fc.Arbitrary<Route> = fc
-  .constantFrom("/p", "/p/:pid")
-  .map((path) => ({
-    name: "p",
-    path,
-    children: [{ name: "k", path: "/k" }],
-  }));
+const parentFor = (param: string, parentParam: string): fc.Arbitrary<Route> =>
+  fc
+    .constantFrom(
+      ["/p", "/k"],
+      ["/p", `/k/:${param}`],
+      [`/p/:${parentParam}`, "/k"],
+      [`/p/:${parentParam}`, `/k/:${param}`],
+      [`/p/:${param}`, "/k"],
+    )
+    .map(([path, childPath]) => ({
+      name: "p",
+      path,
+      children: [{ name: "k", path: childPath }],
+    }));
 
 /**
  * The table the batch joins: `p`, and two or three top-level routes, each
@@ -82,36 +98,37 @@ const parentArbitrary: fc.Arbitrary<Route> = fc
  * and it never forwards to `p`, so the oracle's table without `p` still holds
  * every target.
  */
-const tableArbitrary: fc.Arbitrary<Route[]> = fc
-  .tuple(
-    parentArbitrary,
-    fc
-      .subarray([...TOP_NAMES], { minLength: 2 })
-      .chain((names) =>
-        fc.tuple(
-          ...names.map((name, index) =>
-            fc
-              .tuple(
-                pathFor(name),
-                fc.constantFrom(undefined, ...names.slice(index + 1)),
-              )
-              .map(([path, forwardTo]): Route =>
-                forwardTo === undefined
-                  ? { name, path }
-                  : { name, path, forwardTo },
-              ),
+const tableFor = (param: string, parentParam: string): fc.Arbitrary<Route[]> =>
+  fc
+    .tuple(
+      parentFor(param, parentParam),
+      fc
+        .subarray([...TOP_NAMES], { minLength: 2 })
+        .chain((names) =>
+          fc.tuple(
+            ...names.map((name, index) =>
+              fc
+                .tuple(
+                  pathFor(name, param),
+                  fc.constantFrom(undefined, ...names.slice(index + 1)),
+                )
+                .map(([path, forwardTo]): Route =>
+                  forwardTo === undefined
+                    ? { name, path }
+                    : { name, path, forwardTo },
+                ),
+            ),
           ),
         ),
-      ),
-  )
-  .map(([parent, top]) => [parent, ...top]);
+    )
+    .map(([parent, top]) => [parent, ...top]);
 
 /** A batch route from the pool; `c` may carry a child `x`. */
-const batchRouteFor = (name: string): fc.Arbitrary<Route> =>
+const batchRouteFor = (name: string, param: string): fc.Arbitrary<Route> =>
   fc.record(
     {
       name: fc.constant(name),
-      path: pathFor(name),
+      path: pathFor(name, param),
       children: fc.constant(name === "c" ? [{ name: "x", path: "/x" }] : []),
     },
     { requiredKeys: ["name", "path"] },
@@ -129,11 +146,16 @@ const fullNames = (routes: readonly Route[], prefix: string): string[] =>
  * own routes, to the table's, or to one no table holds.
  */
 const caseArbitrary: fc.Arbitrary<readonly [Route[], Route[]]> = fc
-  .tuple(
-    tableArbitrary,
-    fc
-      .shuffledSubarray([...BATCH_NAMES])
-      .chain((names) => fc.tuple(...names.map((name) => batchRouteFor(name)))),
+  .tuple(fc.constantFrom("id", "user-id"), fc.constantFrom("pid", "p-id"))
+  .chain(([param, parentParam]) =>
+    fc.tuple(
+      tableFor(param, parentParam),
+      fc
+        .shuffledSubarray([...BATCH_NAMES])
+        .chain((names) =>
+          fc.tuple(...names.map((name) => batchRouteFor(name, param))),
+        ),
+    ),
   )
   .chain(([table, routes]) =>
     withForwards(
@@ -226,16 +248,14 @@ describe("add(batch, { parent }) judges the batch in the table's name space (#25
     );
   });
 
-  it("the generator reaches all four ways a batch meets the name space", () => {
-    // Each count is of inputs on which a plugin that got that way wrong would
-    // answer differently: the verdict it gets is part of the witness, since a
-    // batch refused for another reason first never reaches the check at fault.
+  it("the generator reaches all four ways, and a non-word name read through both doors", () => {
     const SAMPLES = 500;
-    const reached = {
+    const reached: Record<Way, number> = {
       forwardsIntoBatch: 0,
       shortNameClosesAChain: 0,
       inheritsTheParentParam: 0,
       refusedByFullName: 0,
+      nonWordAcrossDoors: 0,
     };
     let kept = 0;
 
@@ -253,35 +273,12 @@ describe("add(batch, { parent }) judges the batch in the table's name space (#25
 
       kept++;
 
-      const answer = underParent(router, batch);
-      const forwards = batch.flatMap((route) => forwardOf(route));
-      const own = new Set(fullNames(batch, "p."));
+      const met = waysMet(table, batch, underParent(router, batch));
 
-      if (answer === ACCEPTED && forwards.some(([, to]) => own.has(to))) {
-        reached.forwardsIntoBatch++;
-      }
-
-      // Keyed by its short name, a batch route's forward would stand in for the
-      // top-level route of that name, and the table's forwards carry on from it.
-      if (
-        answer === ACCEPTED &&
-        closesACycle(
-          new Map([...table.flatMap((route) => forwardOf(route)), ...forwards]),
-        )
-      ) {
-        reached.shortNameClosesAChain++;
-      }
-
-      if (
-        answer === ACCEPTED &&
-        table[0].path === "/p/:pid" &&
-        forwards.some(([, to]) => to === "p.k")
-      ) {
-        reached.inheritsTheParentParam++;
-      }
-
-      if (/(?:for|source) route "p\./u.test(answer)) {
-        reached.refusedByFullName++;
+      for (const way of Object.keys(reached) as Way[]) {
+        if (met[way]) {
+          reached[way]++;
+        }
       }
     }
 
@@ -290,6 +287,67 @@ describe("add(batch, { parent }) judges the batch in the table's name space (#25
     }
   });
 });
+
+type Way =
+  | "forwardsIntoBatch"
+  | "shortNameClosesAChain"
+  | "inheritsTheParentParam"
+  | "refusedByFullName"
+  | "nonWordAcrossDoors";
+
+const isNonWord = (path: string | undefined): boolean =>
+  path?.includes(":user-id") ?? false;
+
+/**
+ * The ways an input meets, each counted only where the verdict shows the check
+ * at fault was reached: a batch refused for another reason first never reaches
+ * it.
+ *
+ * ⚠ A witness is reach, not a guaranteed catch. A plugin that got one of the
+ * first four ways wrong answers differently on every counted input, since only
+ * the `{ parent }` spelling depends on them; a misreading of names affects both
+ * spellings, and an earlier forward misread alike in both can hide the one the
+ * witness counts.
+ */
+function waysMet(
+  table: readonly Route[],
+  batch: readonly Route[],
+  answer: string,
+): Record<Way, boolean> {
+  const accepted = answer === ACCEPTED;
+  const forwards = batch.flatMap((route) => forwardOf(route));
+  const own = new Set(fullNames(batch, "p."));
+  const [parent, ...top] = table;
+  const kIsNonWord = isNonWord(parent.children?.[0]?.path);
+
+  return {
+    forwardsIntoBatch: accepted && forwards.some(([, to]) => own.has(to)),
+    // Keyed by its short name, a batch route's forward would stand in for the
+    // top-level route of that name, and the table's forwards carry on from it.
+    shortNameClosesAChain:
+      accepted &&
+      closesACycle(
+        new Map([...table.flatMap((route) => forwardOf(route)), ...forwards]),
+      ),
+    inheritsTheParentParam:
+      accepted &&
+      parent.path !== "/p" &&
+      forwards.some(([, to]) => to === "p.k"),
+    refusedByFullName: /(?:for|source) route "p\./u.test(answer),
+    // A non-word name read through both doors: `k` is the table's under
+    // `{ parent }` and the batch's when `p` is declared again, and so is the
+    // param `p` hands down. Either verdict names what each door read.
+    nonWordAcrossDoors:
+      (accepted &&
+        forwards.some(
+          ([, to]) =>
+            (to === "p.k" && kIsNonWord) ||
+            (isNonWord(parent.path) &&
+              top.some((route) => route.name === to && isNonWord(route.path))),
+        )) ||
+      (kIsNonWord && answer.includes('forwardTo target "p.k" requires params')),
+  };
+}
 
 /** A route's forward to a named target, as `[name, target]`. */
 function forwardOf({ name, forwardTo }: Route): [string, string][] {

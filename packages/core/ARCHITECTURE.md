@@ -179,9 +179,9 @@ carries one validator: a registration that finds the slot occupied throws
 `VALIDATION_PLUGIN_ALREADY_INSTALLED` instead of overwriting it.
 
 **`@real-router/core/validation` is the plugin's ONLY door to the engine.** It
-re-exports `validateRoute` plus the `Matcher` / `RouteTree` types, so the plugin
-never imports `src/engine` directly. A guard test in the plugin blocks
-re-coupling.
+re-exports `validateRoute`, the path reader `buildParamMeta` (#2569) and the
+`Matcher` / `RouteTree` types, so the plugin never imports `src/engine`
+directly. A guard test in the plugin blocks a `route-tree` import.
 
 **Validation runs on the RAW argument, before interceptors** — which is why
 `validateStartArgs` deliberately permits `undefined`: a browser-plugin

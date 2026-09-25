@@ -2,6 +2,7 @@
 
 import { resolveForwardChain } from "@real-router/core";
 import { internalDefect, raiser, putField } from "@real-router/core/utils";
+import { buildParamMeta } from "@real-router/core/validation";
 
 import { getTypeDescription } from "../type-guards";
 
@@ -160,23 +161,16 @@ export function validateRouteProperties<
 // ForwardTo Validation
 // ============================================================================
 
-function extractParamsFromPath(path: string): Set<string> {
-  const params = new Set<string>();
-  const paramRegex = /[*:]([A-Z_a-z]\w*)/g;
-  let match;
-
-  while ((match = paramRegex.exec(path)) !== null) {
-    params.add(match[1]);
-  }
-
-  return params;
-}
-
+/**
+ * The URL params a batch route's paths declare, read with core's
+ * `buildParamMeta` — what `getUrlParams` is built from for a route the table
+ * holds (#2569).
+ */
 function extractParamsFromPaths(paths: readonly string[]): Set<string> {
   const params = new Set<string>();
 
   for (const path of paths) {
-    for (const param of extractParamsFromPath(path)) {
+    for (const param of buildParamMeta(path).urlParams) {
       params.add(param);
     }
   }

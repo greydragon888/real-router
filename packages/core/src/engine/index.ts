@@ -32,6 +32,12 @@ export { createMatcher } from "./createMatcher";
 
 export { DEFAULT_QUERY_PARAMS } from "./search-params";
 
+// =============================================================================
+// Path grammar
+// =============================================================================
+
+export { buildParamMeta } from "./path-matcher";
+
 export type {
   CreateMatcherOptions,
   Matcher,

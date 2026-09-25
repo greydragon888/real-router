@@ -138,7 +138,7 @@ describe("forwardTo validators — coverage via router.addRoute", () => {
     }).not.toThrow();
   });
 
-  it("add route with params forwarding to param route — covers extractParamsFromPath", () => {
+  it("add route with params forwarding to param route — covers extractParamsFromPaths", () => {
     expect(() => {
       routes.add([
         { name: "newItems", path: "/new-items/:id", forwardTo: "items" },

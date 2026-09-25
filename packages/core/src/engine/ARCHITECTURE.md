@@ -340,6 +340,7 @@ graph TD
         CRT[createRouteTree]
         CM[createMatcher]
         VR[validateRoute]
+        BPM2[buildParamMeta]
         RTD[routeTreeToDefinitions]
         NTD[nodeToDefinition]
     end
@@ -348,6 +349,7 @@ graph TD
     RS -->|creates| CM
     RS -->|converts| RTD
     VAL -->|re-exports| VR
+    VAL -->|re-exports| BPM2
     RN -->|delegates to| CM
     CR -->|converts| RTD
     GR -->|converts| NTD
@@ -397,7 +399,7 @@ Tree is read synchronously — no concurrency concerns in single-threaded JS.
 | -------------------- | --------------------------------------------------------------------------------- |
 | `routesStore.ts`     | `createMatcher`, `createRouteTree`, `routeTreeToDefinitions`, types               |
 | `RoutesNamespace.ts` | Types only (`CreateMatcherOptions`, `RouteParams`, `RouteTree`, `RouteTreeState`) |
-| `validation.ts`      | `validateRoute`, `Matcher`, `RouteTree` types (re-exported for the plugin, #1301) |
+| `validation.ts`      | `validateRoute`, `buildParamMeta`, `Matcher`, `RouteTree` types (re-exported for the plugin, #1301, #2569) |
 | `cloneRouter.ts`     | `routeTreeToDefinitions`                                                          |
 | `getRoutesApi.ts`    | `nodeToDefinition`, `RouteDefinition`, `RouteTree` types                          |
 | `Router.ts`          | `CreateMatcherOptions` type                                                       |
