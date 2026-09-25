@@ -789,13 +789,22 @@ describe("consumer census (#2303)", () => {
         src: ["maxDependencies"],
         tests: [],
       },
-      "getPluginApi.getUrlParams()": { src: [], tests: ["length"] },
+      "getPluginApi.getUrlParams()": {
+        src: [],
+        tests: ["filter", "length", "map"],
+      },
       "getPluginApi.makeState()": {
         src: [],
         tests: ["name", "params", "path"],
       },
-      "getPluginApi.matchPath()": { src: [], tests: ["params", "search"] },
-      "getRoutesApi.get()": { src: [], tests: ["forwardTo"] },
+      "getPluginApi.matchPath()": {
+        src: [],
+        tests: ["name", "params", "search"],
+      },
+      "getRoutesApi.get()": {
+        src: [],
+        tests: ["defaultParams", "forwardTo", "path"],
+      },
     });
   });
 

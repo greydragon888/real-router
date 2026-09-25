@@ -118,6 +118,16 @@ A forward is refused when its target needs a param its source does not hold (#25
 | --- | --------- | ---- |
 | 1   | A forward from `c` to `d`, each declaring one name as a path param or as a query param (plain or `?:name`), is refused exactly when `d`'s path declares a path param `c`'s path does not — for a target in the table and one in the batch, over names core reads as one param each | 100  |
 
+## Route tables — the plugin against bare core
+
+The plugin's verdict on a route table is held to what bare core's resulting table runs (#2577). Tested in `route-table-oracle.properties.ts`.
+
+| #   | Invariant | Runs |
+| --- | --------- | ---- |
+| 1   | One operation at one of five doors (`createRouter`, `add`, `add` under `{ parent }`, `replace`, `update`): where the plugin's verdict differs from bare core's table — every route builds with its own URL params and matches back to itself — the difference is a mechanism `KNOWN_DIVERGENCES` registers, with the issue that removes it | 500  |
+
+A registered mechanism that the anchor's sample no longer reaches fails the anchor, so the register only shrinks.
+
 ## State namespace
 
 | #   | Invariant                                                                  | Runs |
