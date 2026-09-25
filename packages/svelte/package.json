@@ -77,7 +77,7 @@
     "svelte-check": "4.7.6"
   },
   "peerDependencies": {
-    "@real-router/core": "workspace:>=0.147.0",
+    "@real-router/core": "workspace:>=0.148.0",
     "svelte": ">=5.7.0"
   }
 }
