@@ -92,7 +92,7 @@ name: CodSpeed
 # change that ships no code, yet every run costs the SINGLE self-hosted runner
 # minutes of EXCLUSIVE time — measured on d766588af (a one-file `.claude/`
 # commit): core 166 s + adapters 264 s = 430 s, on a runner shared with
-# examples.yml and the weekly cross-router bench. Over the 30 days to 2026-08-01,
+# the weekly cross-router bench. Over the 30 days to 2026-08-01,
 # 163 of 517 master commits touched no packages/shared/examples/benchmarks file
 # at all; `.claude/` (97) and `.github/` (52) dominate. Skipping at the `on:`
 # level is safe HERE precisely because CodSpeed is not a required status check

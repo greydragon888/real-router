@@ -24,19 +24,12 @@ env:
 jobs:
   examples:
     name: Build & Test Examples
-    # Build-only job on the self-hosted VPS runner. examples.yml triggers on
-    # schedule + workflow_dispatch ONLY (no fork-PR) → no self-hosted RCE surface.
-    # E2E + notify-failure stay on ubuntu-latest: E2E's Playwright/Electron
-    # downloads need a one-time VPS pre-install (RU-network DPI), and notify must
-    # run even if the VPS is offline.
-    runs-on: self-hosted
-    # Bound the hold on the SINGLE self-hosted runner. Healthy runs are 4-7 min;
-    # 90 keeps ~13× headroom for a cold-cache build of all 139 examples while
-    # cutting the observed worst case by two thirds — run 29875788664 (schedule,
-    # 2026-07-21, the co-tenant OOM evening) sat wedged for **256 minutes** before
-    # anything cancelled it, blocking every other self-hosted workflow behind it.
-    # Without this the ceiling is the invisible 360-minute job default.
-    # (2026-08-01 CI/CD audit §4.8.)
+    # Not on the self-hosted VPS: the build ran no faster there and held the
+    # runner's single job slot (IMPLEMENTATION_NOTES "The examples build runs on
+    # GitHub-hosted runners").
+    runs-on: ubuntu-latest
+    # A hang fails as a named timeout long before the 360-minute job default,
+    # and notify-failure below files it.
     timeout-minutes: 90
     steps:
       - name: Checkout

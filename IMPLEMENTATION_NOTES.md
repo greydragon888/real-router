@@ -8065,6 +8065,8 @@ The deck already renders every scenario the REPORTs did, from the same `results/
 
 ## Cross-router benchmarks in CI — scheduled Playwright snapshot (`cross-router-bench.yml`)
 
+> **Superseded in part (#2560, 2026-09-25).** Gotcha 6's reasons for dropping `--with-deps` are replaced, and `examples.yml` runs nothing on the VPS. See "The examples build runs on GitHub-hosted runners" below.
+
 **Problem.** `benchmarks/cross-router/` (Playwright + CDP, real Chromium, 5 cohorts × 12 scenarios) ran only locally, by hand — no public, reproducible, linkable snapshot of the competitive perf story. But GHA runners are shared, noisy VMs, so a naive port would either publish untrustworthy absolutes or try (and fail) to gate wall-clock regressions across machines that differ every week.
 
 **Solution.** A weekly `schedule` + `workflow_dispatch` workflow runs the full matrix in ONE unsharded job and publishes an HONEST SNAPSHOT (Pages dashboard + step-summary + 30-day artifact), never a regression gate. The pipeline is fail-fast then salvageable: spec-parity preflight (`lint:bench-apps`, ~2 s) → `pnpm turbo run bundle` (the harness measures production `dist`) → `playwright install chromium` (browser from the persistent VPS store, pre-provisioned once — gotcha 6) → isolated matcher-bench (its `results.json` is gitignored → regenerate) → `run-all.mjs` (exit code = "0 failed cells" completeness gate) → rebuild the deck in the workspace → `rme-gate` (S2=B: blocks only when a consistent runner or `N ≥ 50` tames the noise, else report-only) → `ci-summary.mjs` → one artifact → Pages. It runs on the dedicated **self-hosted VPS** (the consistent-hardware runner shared with `codspeed.yml`/`examples.yml` — Q1 escalation), so `CONSISTENT_RUNNER=1` **arms** the rme-gate (a stable-RME breach reddens the job) **[⚠ Superseded 2026-07-19: the rme-gate is now REPORT-ONLY (`continue-on-error: true`, arming logic + env vars removed). The 07-18/19 audit showed the armed gate mostly flagged TRANSIENT co-tenancy flares on the shared VM (medians healthy across sessions), not regressions — real breakage is already caught by the completeness gate (`run-all` exit code). So an RME breach no longer reds the run; it's a watch (offenders in the step log + the step-summary RME watch), and the workflow indicator stays green.]**; `node-cache: ""` skips the pnpm-store tarball on the persistent runner; and schedule/workflow_dispatch-only triggers keep it off the self-hosted fork-PR RCE surface. The published snapshot is honest about its machine: `run.mjs`/`run-all.mjs` stamp `env.cpu` (`os.cpus()[0].model`) + `env.runner` (`BENCH_RUNNER ?? "local"`) into each cell (O-10), `deck-extract` folds the first stamped cell into a `META` block, and `build-deck`/`ci-summary` render a header stamp plus a disclaimer that the cards are this run's CI snapshot while the curated WHY blurbs stay anchored to the quiet-machine reference. The committed deck is NEVER overwritten — CI's rebuilt deck lives only in the artifact/Pages (O-3). **⚠ Superseded 2026-07-19:** `deck.html`/`deck-data.json` are no longer committed at all — they are gitignored generated artifacts (tracked source: `deck-shell.html` + `deck-config.js`), so "never overwritten" is moot and gotchas (4)/(5) below describe a committed-reference fallback that no longer exists; see "Cross-router deck untracked" below.
@@ -11893,3 +11895,31 @@ The next PR run confirms it. Recreating the container reset the accumulator, so 
 **What did not.** Two comments inside shipped source still name the old paths: `shared/browser-env/state-guard.ts` names `scripts/twin-lockstep.test.mjs`, and `packages/core/src/utils/fsm/ARCHITECTURE.md` names `scripts/fsm-diagram-parity.test.mjs`. `changeset-check.yml` counts every file under a public package's `src/`, and every `shared/**/*.ts`, as source, so repointing either one is a change that needs a changeset.
 
 **Measured.** The suite lists the same 432 tests with the same verdicts before and after the move. knip's report did not change. Its root entry `scripts/*.{sh,mjs,ts}` no longer matches the tests, and nothing depended on that: the tests' only package imports are `typescript` and `eslint`, which other entries import too, and no file under `scripts/` is a knip project file.
+
+## The examples build runs on GitHub-hosted runners (#2560, 2026-09-25)
+
+**Problem.** `Build & Test Examples` moved to the self-hosted VPS on 2026-07-16 (`bf8a189f7`), on the expectation that five vCPUs and a warm pnpm/turbo cache would offset the slower cores. Over the workflow's last 40 runs they did not:
+
+| Runner                               | Successful runs |  Median | Range        |
+| ------------------------------------ | --------------: | ------: | ------------ |
+| `ubuntu-latest`, 2026-05-20 to 07-12 |              21 | 3.8 min | 0.8–6.0 min  |
+| self-hosted, 2026-07-15 to 09-23     |              13 | 4.8 min | 1.4–10.7 min |
+
+The two periods built different trees, so this is not an A/B. Nothing in it pays for the VPS, though, and the VPS cost something:
+
+- the job held the runner's single slot in front of CodSpeed and the cross-router bench;
+- run 29875788664 sat wedged in that slot for 256 minutes on 2026-07-21.
+
+**Solution.** By owner decision the job runs on `ubuntu-latest`, like the workflow's other two jobs. `timeout-minutes: 90` stays. There is no shared slot to protect now, so what it buys is a named failure well before the 360-minute default. The lines that named `examples.yml` as a self-hosted job no longer do:
+
+- `benchmarks/CLAUDE.md`;
+- `codspeed.yml`;
+- `cross-router-bench.yml`;
+- `scripts/tests/release-workflow.test.mjs`. It counted the self-hosted jobs, and now points at the `rg` that lists them.
+
+**The `--with-deps` comment in `cross-router-bench.yml`.** It gave two reasons for provisioning Chromium out of band. The second was the runner user's sudo rights, a host setting the repository cannot see. The comment and `benchmarks/CLAUDE.md` now rest on reasons that hold whatever that setting is:
+
+- the Playwright CDN is DPI-throttled from the VPS;
+- `--with-deps` runs `apt-get update` and `apt-get install` as root on every call (`installDependenciesLinux` in playwright-core 1.63.0), and this is a co-tenant production host.
+
+**Accepted: the cross-router bench's Chromium temp files.** The job leaves `.org.chromium.*` entries in the host's `/tmp`: 185 over four runs, within 14 MB for all such entries. The host's tmpfiles rule removes them after 30 days. A first step `echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"` would keep them inside the job. Chromium's `base::GetTempDir` reads `TMPDIR` on Linux, and the runner empties `$RUNNER_TEMP` when a job starts and when it ends. By owner decision the job does not take the step.
