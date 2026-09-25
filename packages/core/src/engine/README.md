@@ -18,10 +18,11 @@ import path.
 - **Do not import from `@real-router/core/engine` or a deep `src/engine/*` path.** There is no such
   public entry point. Application code uses the router through `@real-router/core` (and its
   `/api`, `/types`, `/validation` subpaths).
-- The **only** in-repo consumer is core itself. `@real-router/validation-plugin` reaches the one
-  engine function it needs (`validateRoute`) through core's `@real-router/core/validation`
-  subpath — never by importing this directory ([#1301](https://github.com/greydragon888/real-router/issues/1301),
-  enforced by a plugin-level guard test).
+- The **only** in-repo consumer is core itself. `@real-router/validation-plugin` reaches the two
+  engine functions it needs (`validateRoute`, `buildParamMeta`) through core's
+  `@real-router/core/validation` subpath — never by importing this directory
+  ([#1301](https://github.com/greydragon888/real-router/issues/1301)); a plugin-level test blocks a
+  `route-tree` import.
 
 Everything below documents this subsystem for **core contributors**.
 
@@ -52,6 +53,7 @@ Core imports only from the engine **barrel** (`index.ts`):
 | `createRouteTree(name, path, routes)`                                                                        | Build an immutable `RouteTree` from route definitions (always frozen) |
 | `createMatcher(options?)`                                                                                    | Create a `Matcher` with search-params DI baked in                     |
 | `validateRoute(route, method, …)`                                                                            | Batch route validation with cross-batch duplicate detection           |
+| `buildParamMeta(path)`                                                                                       | The params a path declares; re-exported for the plugin (#2569)        |
 | `getSegmentsByName(tree, routeName)`                                                                         | O(1)-per-level lookup of route nodes by dot-notation name             |
 | `routeTreeToDefinitions(tree)` / `nodeToDefinition(node)`                                                    | `RouteTree` → `RouteDefinition[]` (serialization / cloning)           |
 | `DEFAULT_QUERY_PARAMS`                                                                                       | Default query-string options                                          |

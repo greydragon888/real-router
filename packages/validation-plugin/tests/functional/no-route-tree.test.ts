@@ -9,9 +9,10 @@ import { describe, it, expect } from "vitest";
  * by importing the foundation package `route-tree` directly. Core is the sole
  * consumer of the engine; a plugin importing `route-tree` violates the
  * "integrations use only core's public plugin-api" boundary (see CLAUDE.md
- * "no private API"). The `validateRoute` value comes from `@real-router/core/validation`,
- * segment lookup + existence from the matcher (`getSegmentsByName` / `hasRoute`),
- * and the `RouteTree` type from `@real-router/core`.
+ * "no private API"). The `validateRoute` and `buildParamMeta` values and the
+ * `RouteTree` type come from `@real-router/core/validation`; existence and a
+ * registered route's path slots come from `PluginApi.getTree()` and
+ * `getUrlParams`.
  *
  * The test scans every `.ts` file under `packages/validation-plugin/src/` for a
  * static / dynamic `route-tree` import. A regression re-couples the plugin to a

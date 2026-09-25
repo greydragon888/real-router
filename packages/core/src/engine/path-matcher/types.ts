@@ -13,7 +13,7 @@ export interface ParamMeta {
   /**
    * URL parameter names extracted from the path pattern.
    *
-   * @example [":id", ":postId"] from "/users/:id/posts/:postId"
+   * @example ["id", "postId"] from "/users/:id/posts/:postId"
    */
   readonly urlParams: readonly string[];
 

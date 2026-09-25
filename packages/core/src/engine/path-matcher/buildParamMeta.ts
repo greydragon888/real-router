@@ -63,28 +63,6 @@ function findQuerySeparator(path: string): number {
   return -1;
 }
 
-/**
- * Builds parameter metadata from a route path pattern.
- *
- * Extracts URL parameters, query parameters, and splat parameters
- * from the path pattern string.
- *
- * @param path - Route path pattern (e.g., "/users/:id/posts/:postId?q")
- * @returns Parameter metadata object
- *
- * @example
- * ```typescript
- * buildParamMeta("/users/:id")
- * // → { urlParams: ["id"], queryParams: [], paramTypeMap: { id: "url" } }
- *
- * buildParamMeta("/search?q&page")
- * // → { urlParams: [], queryParams: ["q", "page"],
- * //     paramTypeMap: { q: "query", page: "query" } }
- *
- * buildParamMeta("/files/*path")
- * // → { urlParams: ["path"], queryParams: [], paramTypeMap: { path: "url" } }
- * ```
- */
 // Shared frozen sentinels for the common no-params case — avoid a fresh empty
 // array/object per route (#1009). ParamMeta fields are Readonly*; match/build
 // only read them, and computeCaches' Object.freeze on the arrays/object is a
@@ -136,6 +114,32 @@ function collectUrlParams(
   }
 }
 
+/**
+ * Builds parameter metadata from a route path pattern: the URL params its
+ * `:param` and `*splat` slots declare, the query params its `?name`
+ * declarations declare, each one's type, and the path without its query.
+ *
+ * A segment the path grammar refuses (a fused marker such as `a:b`) contributes
+ * nothing, so read a path `validateRoute` accepts.
+ *
+ * @param path - Route path pattern (e.g., "/users/:id/posts/:postId?q")
+ * @returns Parameter metadata object
+ *
+ * @example
+ * ```typescript
+ * buildParamMeta("/users/:id")
+ * // → { urlParams: ["id"], queryParams: [], paramTypeMap: { id: "url" },
+ * //     pathPattern: "/users/:id" }
+ *
+ * buildParamMeta("/search?q&page")
+ * // → { urlParams: [], queryParams: ["q", "page"],
+ * //     paramTypeMap: { q: "query", page: "query" }, pathPattern: "/search" }
+ *
+ * buildParamMeta("/files/*path")
+ * // → { urlParams: ["path"], queryParams: [], paramTypeMap: { path: "url" },
+ * //     pathPattern: "/files/*path" }
+ * ```
+ */
 export function buildParamMeta(path: string): ParamMeta {
   const urlParams: string[] = [];
   const queryParams: string[] = [];

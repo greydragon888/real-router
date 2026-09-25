@@ -98,6 +98,26 @@ lists that used to stand here could never fire.
 
 The one refusal that names a different door is outside the property's name pool: a reserved `@@` name is refused as `[router.replaceRoutes]` on `replace`, the door the caller called (`validator-boundary-authority-2322.test.ts`).
 
+## Route batches — `add` under `{ parent }`
+
+Under `{ parent: "p" }`, a batch route `c` is the table's `p.c` (#2566). Tested in `parent-batch.properties.ts`.
+
+| #   | Invariant | Runs |
+| --- | --------- | ---- |
+| 1   | The route checks judge `add(batch, { parent: "p" })` as they judge `p` declared again with its children and the batch appended, over the table without `p` — the same message, or both accepted | 300  |
+
+The property's tables never forward to `p`, whose removal would leave no table to compare against, and its batches never re-declare a child of `p`. That batch is refused both ways, with different messages: `Route "p.d0" already exists` under `{ parent }`, and `Duplicate route "p.d0" in batch` when declared again with `p`.
+
+Its params are named as words (`:id`) or not (`:user-id`): a route is read by core's grammar whether it is the table's or the batch's (#2569).
+
+## Route batches — forward params
+
+A forward is refused when its target needs a param its source does not hold (#2569). Tested in `param-names.properties.ts`.
+
+| #   | Invariant | Runs |
+| --- | --------- | ---- |
+| 1   | A forward from `c` to `d`, each declaring one name as a path param or as a query param (plain or `?:name`), is refused exactly when `d`'s path declares a path param `c`'s path does not — for a target in the table and one in the batch, over names core reads as one param each | 100  |
+
 ## State namespace
 
 | #   | Invariant                                                                  | Runs |

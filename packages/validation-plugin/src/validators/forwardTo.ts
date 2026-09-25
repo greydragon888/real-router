@@ -2,6 +2,7 @@
 
 import { resolveForwardChain } from "@real-router/core";
 import { internalDefect, raiser, putField } from "@real-router/core/utils";
+import { buildParamMeta } from "@real-router/core/validation";
 
 import { getTypeDescription } from "../type-guards";
 
@@ -41,6 +42,25 @@ const objectKeys = Object.keys;
 // ============================================================================
 // Route Property Validation
 // ============================================================================
+
+/**
+ * A batch route's name as the table holds it: `${parent}.${name}` under
+ * `{ parent }` (#2566), which is also how a nested route is named.
+ *
+ * ⚠ Built from strings only, joined as core joins them (an empty parent adds
+ * nothing). Both batch walks run before the names are judged, so either part
+ * may still be anything; a name that is not a string is passed on as it is.
+ */
+export function nameInTable<Name>(
+  parentName: unknown,
+  name: Name,
+): Name | string {
+  return typeof parentName === "string" &&
+    parentName !== "" &&
+    typeof name === "string"
+    ? `${parentName}.${name}`
+    : name;
+}
 
 function validateForwardToProperty(forwardTo: unknown, fullName: string): void {
   if (forwardTo === undefined) {
@@ -130,7 +150,7 @@ export function validateRouteProperties<
 
   if (route.children) {
     for (const child of route.children) {
-      const childFullName = `${fullName}.${child.name}`;
+      const childFullName = nameInTable(fullName, child.name);
 
       validateRouteProperties(child, childFullName);
     }
@@ -141,23 +161,16 @@ export function validateRouteProperties<
 // ForwardTo Validation
 // ============================================================================
 
-function extractParamsFromPath(path: string): Set<string> {
-  const params = new Set<string>();
-  const paramRegex = /[*:]([A-Z_a-z]\w*)/g;
-  let match;
-
-  while ((match = paramRegex.exec(path)) !== null) {
-    params.add(match[1]);
-  }
-
-  return params;
-}
-
+/**
+ * The URL params a batch route's paths declare, read with core's
+ * `buildParamMeta` — what `getUrlParams` is built from for a route the table
+ * holds (#2569).
+ */
 function extractParamsFromPaths(paths: readonly string[]): Set<string> {
   const params = new Set<string>();
 
   for (const path of paths) {
-    for (const param of extractParamsFromPath(path)) {
+    for (const param of buildParamMeta(path).urlParams) {
       params.add(param);
     }
   }
@@ -241,25 +254,28 @@ function collectForwardMappings<Dependencies extends DefaultDependencies>(
   return mappings;
 }
 
-function getTargetParams<Dependencies extends DefaultDependencies>(
+/** The paths from the parent down to a batch route, found by its full name. */
+type BatchPaths = (fullName: string) => string[];
+
+function getTargetParams(
   targetRoute: string,
   exists: boolean,
   lookup: RouteLookup,
-  routes: readonly Route<Dependencies>[],
+  pathsTo: BatchPaths,
 ): Set<string> {
   if (exists) {
     return new Set(lookup.getUrlParams(targetRoute));
   }
 
-  return extractParamsFromPaths(collectPathsToRoute(routes, targetRoute));
+  return extractParamsFromPaths(pathsTo(targetRoute));
 }
 
 const EMPTY_PARENT_PARAMS: ReadonlySet<string> = new Set();
 
-function validateSingleForward<Dependencies extends DefaultDependencies>(
+function validateSingleForward(
   fromRoute: string,
   targetRoute: string,
-  routes: readonly Route<Dependencies>[],
+  pathsTo: BatchPaths,
   batchNames: Set<string>,
   lookup: RouteLookup,
   parentParams: ReadonlySet<string>,
@@ -275,10 +291,10 @@ function validateSingleForward<Dependencies extends DefaultDependencies>(
   // the forward source's available params are the parent's plus its own (#1224).
   const fromParams = new Set<string>([
     ...parentParams,
-    ...extractParamsFromPaths(collectPathsToRoute(routes, fromRoute)),
+    ...extractParamsFromPaths(pathsTo(fromRoute)),
   ]);
 
-  const toParams = getTargetParams(targetRoute, exists, lookup, routes);
+  const toParams = getTargetParams(targetRoute, exists, lookup, pathsTo);
 
   const missingParams = [...toParams].filter((param) => !fromParams.has(param));
 
@@ -295,12 +311,19 @@ export function validateForwardToTargets<
   lookup: RouteLookup,
   parentName?: string,
 ): void {
-  const batchNames = collectRouteNames(routes);
-  // Added under { parent }, a batch route's full name is `${parent}.${short}` and
-  // it inherits the parent's path params — resolve both from the parent (#1224).
-  const batchFullNames = parentName
-    ? new Set([...batchNames].map((name) => `${parentName}.${name}`))
-    : batchNames;
+  // ⚑ Added under { parent }, a batch route is the table's
+  // `${parent}.${short}`, and a `forwardTo` names routes by those full names.
+  // So every question about the batch — which names it holds, the paths down
+  // to one of them, the key its forward sits under — starts from the parent
+  // (#1224, #2566).
+  const batchNames = collectRouteNames(routes, parentName);
+  // The paths walk starts inside the batch, so the parent is cut off the name
+  // once here rather than joined to every name the walk compares.
+  const pathsTo: BatchPaths = (fullName) =>
+    collectPathsToRoute(
+      routes,
+      parentName ? fullName.slice(parentName.length + 1) : fullName,
+    );
   // `validateRoutes` throws on a missing parent before forwardTo validation runs,
   // so these are the parent's own slots, never the empty answer `getUrlParams`
   // gives for a route the tree does not hold.
@@ -308,7 +331,7 @@ export function validateForwardToTargets<
     ? new Set(lookup.getUrlParams(parentName))
     : EMPTY_PARENT_PARAMS;
 
-  const batchForwards = collectForwardMappings(routes);
+  const batchForwards = collectForwardMappings(routes, parentName);
 
   const combinedForwardMap: Record<string, string> = { ...existingForwardMap };
 
@@ -323,8 +346,8 @@ export function validateForwardToTargets<
     validateSingleForward(
       fromRoute,
       targetRoute,
-      routes,
-      batchFullNames,
+      pathsTo,
+      batchNames,
       lookup,
       parentParams,
     );

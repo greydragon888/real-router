@@ -28,6 +28,7 @@ import {
   validateListenerArgs,
   validateListenerCountThresholds,
 } from "./validators/eventBus";
+import { nameInTable } from "./validators/forwardTo";
 import {
   validateHandler,
   validateHandlerLimit,
@@ -591,13 +592,18 @@ export function validationPlugin<
     // ⚠ The callback walk runs FIRST at both batch positions, because that is
     // where core ran it: a route whose `canActivate` is not a function is
     // refused before anything asks about names or paths.
-    const walkRouteCallbacks = (batch: readonly Route[]): void => {
+    const walkRouteCallbacks = (
+      batch: readonly Route[],
+      parentName: unknown,
+    ): void => {
       for (const route of batch) {
+        const fullName = nameInTable(parentName, route.name);
+
         guardRouteCallbacks(route);
-        guardNoAsyncCallbacks(route);
+        guardNoAsyncCallbacks(route, fullName);
 
         if (route.children !== undefined) {
-          walkRouteCallbacks(route.children);
+          walkRouteCallbacks(route.children, fullName);
         }
       }
     };
@@ -608,7 +614,15 @@ export function validationPlugin<
       parentName: string | undefined,
       readTable: () => JoinedTable,
     ): void => {
-      walkRouteCallbacks(batch);
+      // ⚠ The parent option is judged below the walk, so the walk joins it to
+      // a name only once the table holds it: joined to an option about to be
+      // refused, the name is one no route can have.
+      walkRouteCallbacks(
+        batch,
+        typeof parentName === "string" && lookup.hasRoute(parentName)
+          ? parentName
+          : undefined,
+      );
 
       if (parentName !== undefined) {
         validateParentOptionRaw(parentName);
@@ -619,7 +633,7 @@ export function validationPlugin<
       }
 
       throwIfInternalRouteInArray(batch, caller);
-      validateAddRouteArgs(batch);
+      validateAddRouteArgs(batch, parentName);
 
       // ⚠ Read HERE, not at the door: the walk and the argument checks above
       // run application code (a route function's own `toString`), and a table

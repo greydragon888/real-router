@@ -1174,62 +1174,65 @@ describe("Phase 2 routes validators", () => {
   describe("guardNoAsyncCallbacks", () => {
     it("accepts route with no callbacks", () => {
       expect(() => {
-        guardNoAsyncCallbacks({});
+        guardNoAsyncCallbacks({}, "r");
       }).not.toThrow();
     });
 
     it("accepts route with sync function callbacks", () => {
       expect(() => {
-        guardNoAsyncCallbacks({
-          decodeParams: (p: Record<string, unknown>) => p,
-          encodeParams: (p: Record<string, unknown>) => p,
-          forwardTo: () => "route",
-        });
+        guardNoAsyncCallbacks(
+          {
+            decodeParams: (p: Record<string, unknown>) => p,
+            encodeParams: (p: Record<string, unknown>) => p,
+            forwardTo: () => "route",
+          },
+          "r",
+        );
       }).not.toThrow();
     });
 
     it("throws when decodeParams is async", () => {
       expect(() => {
-        guardNoAsyncCallbacks({ decodeParams: async () => ({}) });
+        guardNoAsyncCallbacks({ decodeParams: async () => ({}) }, "r");
       }).toThrow(TypeError);
 
       expect(() => {
-        guardNoAsyncCallbacks({ decodeParams: async () => ({}) });
+        guardNoAsyncCallbacks({ decodeParams: async () => ({}) }, "r");
       }).toThrow("decodeParams cannot be async");
     });
 
     it("throws when encodeParams is async", () => {
       expect(() => {
-        guardNoAsyncCallbacks({ encodeParams: async () => ({}) });
+        guardNoAsyncCallbacks({ encodeParams: async () => ({}) }, "r");
       }).toThrow(TypeError);
 
       expect(() => {
-        guardNoAsyncCallbacks({ encodeParams: async () => ({}) });
+        guardNoAsyncCallbacks({ encodeParams: async () => ({}) }, "r");
       }).toThrow("encodeParams cannot be async");
     });
 
     it("throws when forwardTo is async function", () => {
       expect(() => {
-        guardNoAsyncCallbacks({ forwardTo: async () => "route" });
+        guardNoAsyncCallbacks({ forwardTo: async () => "route" }, "r");
       }).toThrow(TypeError);
 
       expect(() => {
-        guardNoAsyncCallbacks({ forwardTo: async () => "route" });
+        guardNoAsyncCallbacks({ forwardTo: async () => "route" }, "r");
       }).toThrow("forwardTo callback cannot be async");
     });
 
     it("accepts undefined callbacks (skips checks)", () => {
       expect(() => {
-        guardNoAsyncCallbacks({ decodeParams: undefined });
+        guardNoAsyncCallbacks({ decodeParams: undefined }, "r");
       }).not.toThrow();
       expect(() => {
-        guardNoAsyncCallbacks({ encodeParams: undefined });
+        guardNoAsyncCallbacks({ encodeParams: undefined }, "r");
       }).not.toThrow();
     });
 
     it("skips forwardTo if it is a string (not a function)", () => {
       expect(() => {
-        guardNoAsyncCallbacks({ forwardTo: "some.route" });
+        guardNoAsyncCallbacks({ forwardTo: "some.route" }, "r");
       }).not.toThrow();
     });
 
@@ -1241,11 +1244,11 @@ describe("Phase 2 routes validators", () => {
       }
 
       expect(() => {
-        guardNoAsyncCallbacks({ decodeParams: transpiledDecoder });
+        guardNoAsyncCallbacks({ decodeParams: transpiledDecoder }, "r");
       }).toThrow(TypeError);
 
       expect(() => {
-        guardNoAsyncCallbacks({ decodeParams: transpiledDecoder });
+        guardNoAsyncCallbacks({ decodeParams: transpiledDecoder }, "r");
       }).toThrow("decodeParams cannot be async");
     });
   });

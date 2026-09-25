@@ -789,6 +789,7 @@ describe("consumer census (#2303)", () => {
         src: ["maxDependencies"],
         tests: [],
       },
+      "getPluginApi.getUrlParams()": { src: [], tests: ["length"] },
       "getPluginApi.makeState()": {
         src: [],
         tests: ["name", "params", "path"],
