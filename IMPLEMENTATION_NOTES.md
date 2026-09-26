@@ -10879,6 +10879,145 @@ the config and comparing the task hash:
   turbo's `test` inputs carry `../../shared/**/*.ts` and now `rollup.*`, so a new
   import in `dom-utils` or an edit to the rollup config re-runs it.
 
+## Solid builds both entries from one input, and publishes its source under `solid` (#2583, 2026-09-26)
+
+### Problem
+
+Two defects in what `@real-router/solid` published, both invisible inside the
+monorepo, both in `packages/solid/rollup.config.mjs`.
+
+**`/ssr` carried its own router contexts.** The config built `src/index.tsx` and
+`src/ssr.tsx` as two independent rollup inputs. Rollup bundles each input's
+module graph on its own, so every module both entries reach was inlined into
+both — measured on the old config, `src/context.ts` and `src/hooks/useRoute.tsx`,
+in `dist/esm` and in `dist/cjs`. Each copy of `context.ts` runs its own
+`createContext`, so `useDeferred` and `<Await>` from `/ssr` read a `RouteContext`
+the main entry's `RouterProvider` never provides. On the published `0.24.0`,
+rendered inside a live `RouterProvider`, they threw
+`useRoute must be used within a RouterProvider`, through `import` and through
+`require` alike. The layout came with the `/ssr` entry (#643).
+
+**An SSR build could not load the package.** `dist` was compiled by
+`babel-preset-solid` with its defaults — DOM output, not hydratable. A
+`vite-plugin-solid({ ssr: true })` build of an app importing the package from npm
+threw `Client-only API called on the server side` at module load, from a
+top-level `template()` call. The Solid SSR examples never saw it: they resolved
+the adapter to `src/*.tsx` through `@real-router/internal-source`, a condition
+that points at files npm consumers do not get. A hydrating client loaded the same
+DOM build: in a jsdom probe hydrating server HTML, the `<a>` elements `<Link>`
+renders were replaced rather than claimed.
+
+### Solution
+
+**One input, two builds, three outputs.** Both entries sit in one `input`
+object, and each build emits it with `output.dir` + `entryFileNames` /
+`chunkFileNames`:
+
+```js
+// Before — an input per entry
+const indexJs = { input: "src/index.tsx", output: [{ file: "dist/esm/index.mjs", … }, …] };
+const ssrJs = { input: "src/ssr.tsx", output: [{ file: "dist/esm/ssr.mjs", … }, …] };
+
+// After — one input; rollup emits the shared modules once, in a chunk both entries import
+const input = { index: "src/index.tsx", ssr: "src/ssr.tsx" };
+const compiledJs = { input, output: [{ dir: "dist/esm", entryFileNames: "[name].mjs", … }, { dir: "dist/cjs", … }], … };
+const sourceJsx = { input, jsx: "preserve", output: { dir: "dist/source", entryFileNames: "[name].jsx", … }, … };
+```
+
+The entry files keep their paths, so the `import` / `require` targets did not
+move. `createContext(` now appears twice in the shared chunk and once in
+`ssr.mjs` (`HttpStatusContext`), per format.
+
+**A `solid` export condition.** `dist/source` is the same input through babel
+with `@babel/preset-typescript` only and rollup's `jsx: "preserve"`: types
+stripped, JSX kept. It is published as `"solid"` on `.` and `./ssr`, after
+`@real-router/internal-source` and `types`, ahead of `import` / `require`.
+`vite-plugin-solid` finds dependencies whose `exports` contain `solid`, marks
+them `ssr.noExternal`, adds `solid` to the resolve conditions, and compiles
+their source for the app's own target. The four Solid SSR examples dropped
+`internal-source` and `ssr.resolve.conditions`; the three with a dev server
+keep an `ssr.noExternal` entry for a reason of their own (see Why).
+
+**The guard.** `tests/functional/rollup-chunks-2583.test.ts` loads
+`rollup.config.mjs` with rollup's own `loadConfigFile`, generates every build
+whose input lies outside `dist` in memory, and reads the result the way a
+consumer resolves it:
+
+- per runtime condition, the targets of both subpaths plus every chunk they
+  import load no module twice — a count keyed by what a consumer loads, so a
+  per-entry build written to a directory of its own still counts;
+- each target is its own subpath's entry (`facadeModuleId` against the
+  subpath's `internal-source` file), built in its condition's format, and every
+  chunk it loads carries its file extension (`"type": "commonjs"` makes an ES
+  chunk named `.js` a CommonJS file);
+- `solid` is each subpath's first runtime condition, behind
+  `@real-router/internal-source`, and only what `solid` loads holds JSX;
+- no two builds write one file, and every bundled module is the package's own
+  source, which pins #2300's rule on the graph rollup builds;
+- controls: every condition loads `context.ts`, and rebuilding each entry on
+  its own makes the census see it twice.
+
+Reverting the fix makes the census name `context.ts` and `useRoute.tsx` for
+`import` and `require`. `loadConfigFile` imports the config through Node, so
+`import.meta.url` is a file URL and the jsdom trap #2300 recorded does not
+arise; the file runs under `@vitest-environment node` all the same.
+
+Measured on packed tarballs installed with `npm`, against `0.24.0` from npm:
+
+| probe                                            | `0.24.0`       | this build                   |
+| ------------------------------------------------ | -------------- | ---------------------------- |
+| `useDeferred` inside `RouterProvider`, ESM / CJS | throws         | resolves                     |
+| same, no provider (control)                      | throws         | throws                       |
+| `vite build --ssr` + `renderToString`            | throws at load | renders, with `data-hk` keys |
+| hydrating client, `<Link>` anchors               | replaced       | claimed                      |
+| main entry, rolldown + brotli, same instrument   | 6 162 B        | 6 164 B                      |
+
+No `turbo.json` change was needed: with `turbo run --dry=json`, reordering the
+`exports` keys moves the `bundle`, `test` and `type-check` hashes of
+`@real-router/solid`.
+
+### Why
+
+- **One input rather than a package-name import from `/ssr`** (Angular's
+  shape). It needs no `src` change and is what tsdown does for the adapters it
+  builds (react, preact, vue): one build per package, shared chunks by
+  construction. A sourcemap census over the 40 tsdown output directories found
+  no source module in two chunks of one directory.
+- **Source under `solid` rather than separate server and browser builds.** The
+  compile a Solid consumer needs depends on the consumer — DOM, hydratable DOM
+  or SSR, set by its own `vite-plugin-solid` options — so a prebuilt artifact
+  fits one of them. Publishing source under `solid` is the ecosystem convention:
+  `@solidjs/router` ships `"solid": "./dist/index.jsx"`, and
+  `@tanstack/solid-router` a `solid` condition over `dist/source`.
+- ⚠ **The source build must keep the single input.** Two inputs there
+  reproduce the context split on the path vite users resolve by default.
+- ⚠ **Key order is load-bearing.** A bundler takes the first `exports` key its
+  conditions match. `import` ahead of `solid` hands vite-plugin-solid the DOM
+  build again; `solid` ahead of `@real-router/internal-source` sends the
+  monorepo's own vite-plugin-solid builds — `benchmarks/adapter-bench` — to
+  `dist` instead of `src`.
+- ⚠ **In dev, vitefu externalizes a framework package's own dependencies.**
+  With the `solid` key, `@real-router/solid` is such a package, so
+  `vite.createServer` lists `@real-router/sources` and `@real-router/route-utils`
+  as SSR externals, and Node loads them itself. In the monorepo
+  `@real-router/core` is workspace-linked and inlined, so they got a second
+  core: `useRouterTransition` rendered through `ssrLoadModule` threw the
+  foreign-router refusal. `ssr.noExternal: [/^@real-router\//]` in the three
+  Solid SSR examples with a dev server keeps one core. An npm consumer probed
+  the same way lists the same externals and renders: its core is external too.
+  The Svelte SSR example's dev server lists the same two externals through
+  vite-plugin-svelte, with no `solid` key involved; a refusal there was not
+  reproduced.
+- Every Solid consumer in the repo that resolves the published `exports`
+  through `vite-plugin-solid` now compiles the adapter from `dist/source`
+  (`adapter-bench` resolves `src`): the 19 non-SSR examples, which all build
+  and whose 13 e2e suites pass; the four SSR ones, built and e2e-tested; and the
+  Solid cohort of `benchmarks/cross-router`, whose bundle and numbers move once.
+- ⚠ **Nothing in the repo runs `dist/esm` or `dist/cjs` any more.** Every
+  vite-plugin-solid consumer loads `dist/source`, and
+  `scripts/smoke-test-packages.sh` skips importing solid. The guard pins their
+  shape, not that they execute.
+
 ## One refusal, three causes — core says which (#2294, 2026-09-13)
 
 Core identifies a router by object IDENTITY in a module-level `WeakMap`

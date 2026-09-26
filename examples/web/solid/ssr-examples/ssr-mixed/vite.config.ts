@@ -4,17 +4,16 @@ import solid from "vite-plugin-solid";
 export default defineConfig({
   plugins: [solid({ ssr: true })],
   resolve: {
-    // See ../ssr/vite.config.ts for the rationale on these conditions:
-    // resolves @real-router/solid to its src/*.tsx so the SSR build
-    // recompiles the adapter with SSR codegen instead of pulling in the
-    // pre-compiled DOM bundle.
-    conditions: ["@real-router/internal-source", "development"],
+    conditions: ["development"],
     dedupe: ["solid-js"],
   },
   ssr: {
-    resolve: {
-      conditions: ["@real-router/internal-source", "development"],
-    },
-    noExternal: ["@real-router/solid"],
+    // In dev, vite-plugin-solid externalizes the adapter's own dependencies
+    // (@real-router/sources, @real-router/route-utils), and Node loads them
+    // with a second copy of the workspace-linked @real-router/core, which
+    // refuses routers the inlined copy built. Inlining every @real-router
+    // package keeps one core. An app that installs the packages from npm
+    // needs no such entry: its @real-router/core is external as well.
+    noExternal: [/^@real-router\//],
   },
 });

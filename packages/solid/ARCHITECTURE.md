@@ -24,21 +24,16 @@ Two subpath exports — the main client-only entry plus a dedicated `/ssr` subpa
 
 **Why split `/ssr`?** Type isolation — server-only prop types stay out of the client TS context for apps that don't render on the server. DX clarity — `from "@real-router/solid/ssr"` self-documents SSR intent. Bundle cost is ≈ 0 (`"sideEffects": false` + tree-shaking).
 
-**Build output** (rollup + babel-preset-solid, dual-entry):
+**Build output** (rollup + babel; both entries in one input, so they share one copy of every module):
 
 ```
 dist/
-├── esm/
-│   ├── index.mjs
-│   ├── index.d.mts
-│   ├── ssr.mjs
-│   └── ssr.d.mts
-└── cjs/
-    ├── index.js
-    ├── index.d.ts
-    ├── ssr.js
-    └── ssr.d.ts
+├── esm/      index.mjs · ssr.mjs · <shared>-[hash].mjs · index.d.mts · ssr.d.mts   ← import (DOM)
+├── cjs/      index.js  · ssr.js  · <shared>-[hash].js  · index.d.ts  · ssr.d.ts    ← require (DOM)
+└── source/   index.jsx · ssr.jsx · <shared>-[hash].jsx                              ← solid (JSX kept)
 ```
+
+The `solid` condition carries source for bundlers that compile Solid themselves (vite-plugin-solid): they compile it for their own target — DOM, hydratable or SSR. The precompiled output serves only the plain DOM target.
 
 ## Source Structure
 

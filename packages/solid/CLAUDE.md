@@ -94,23 +94,20 @@ src/
 └── constants.ts
 ```
 
-### Build (rollup + babel-preset-solid)
+### Build (rollup + babel)
 
-Dual-entry config — main + `/ssr` produce isomorphic ESM/CJS bundles:
+One `input` holds both entries (main + `/ssr`); two builds emit it into three directories:
 
 ```
 dist/
-├── esm/
-│   ├── index.mjs
-│   ├── index.d.mts
-│   ├── ssr.mjs
-│   └── ssr.d.mts
-└── cjs/
-    ├── index.js
-    ├── index.d.ts
-    ├── ssr.js
-    └── ssr.d.ts
+├── esm/      index.mjs · ssr.mjs · <shared>-[hash].mjs · index.d.mts · ssr.d.mts
+├── cjs/      index.js  · ssr.js  · <shared>-[hash].js  · index.d.ts  · ssr.d.ts
+└── source/   index.jsx · ssr.jsx · <shared>-[hash].jsx   (types stripped, JSX kept)
 ```
+
+**Both entries in one `input`, in every build.** Rollup bundles each build's module graph on its own, so an input per entry copies every shared module into both entries — `context.ts` included — and `/ssr`'s `useDeferred` / `<Await>` then read contexts the main entry's `RouterProvider` never provides (#2583). `tests/functional/rollup-chunks-2583.test.ts` loads `rollup.config.mjs` the way `rollup -c` does, generates in memory, and requires that no module loads twice when both subpaths resolve through one condition — the targets plus every chunk they import.
+
+**The `solid` export condition.** `esm` / `cjs` are compiled by `babel-preset-solid` for the DOM, not hydratable; an SSR build that loads them throws "Client-only API called on the server side" at module load. `dist/source` (`@babel/preset-typescript` only, rollup `jsx: "preserve"`) is published under `solid`: vite-plugin-solid resolves it, bundles the package into SSR builds, and compiles it for the consumer's target (DOM, hydratable or SSR). The key sits after `@real-router/internal-source` and `types` and ahead of `import` / `require` — a bundler takes the first key its conditions match. The same test pins that order, which file and format each target is, and that only what `solid` loads holds JSX.
 
 **Externals are derived, not listed.** `externalFrom` in `rollup.external.mjs` builds the rule from `package.json`: every `dependencies` and `peerDependencies` entry, with its subpaths, stays an import — the rule tsdown applies to the other adapters. Rollup copies anything else into `dist` without a warning. `tests/functional/rollup-external-2300.test.ts` walks `src/`, the `dom-utils` symlink included, requires every bare specifier to be external, and requires every entry in `rollup.config.mjs` to pass that rule.
 
@@ -660,7 +657,7 @@ Verified end-to-end across three example apps:
 
 - **`generateHydrationScript()` is mandatory** — Solid's only adapter-level constraint that differs from React/Vue. The function returns the inline `<script>` that bootstraps `window._$HY`, the runtime that Solid's hydration markers (`data-hk`) and OOO splice scripts (`$df(...)`) require. The server returns it as a separate `RenderResult` field; the Express layer injects it via a `<!--ssr-hydration-script-->` placeholder ahead of the body
 - **`vite-plugin-solid({ ssr: true })` is mandatory** — flips `hydratable: true` for both client and server bundles and `generate: 'ssr'` for the server. Without it, the client bundle has no hydration markers and the first render mismatches
-- **Resolve `@real-router/internal-source` via `ssr.resolve.conditions`** — Solid adapter ships compiled DOM output in `dist/` (uses `solid-js/web.template()` at module init). The SSR build crashes with "Client-only API called on the server side" if the dist bundle is loaded. Setting both `resolve.conditions` and `ssr.resolve.conditions` to `["@real-router/internal-source", "development"]` plus `ssr.noExternal: ["@real-router/solid"]` routes the SSR build to the source `.tsx` so `vite-plugin-solid` recompiles it for the SSR codegen
+- **No adapter-specific Vite resolution** — vite-plugin-solid resolves the package's `solid` export condition (see Build) and compiles the adapter with the app's own `ssr: true` settings. The SSR examples carry no `@real-router/internal-source` or `ssr.resolve.conditions`. The ones with a dev server keep `ssr.noExternal: [/^@real-router\//]`, a monorepo-only need: in dev, vite-plugin-solid externalizes the adapter's dependencies (`sources`, `route-utils`), and Node would load them with a second copy of the workspace-linked `@real-router/core`
 - **`hydrate` and `render` are different functions** — both live in `solid-js/web`. `render(fn, node)` mounts fresh; `hydrate(fn, node)` claims existing DOM. Mixing them silently produces flicker. SSG dual-mode mount: `const factory = rootElement.firstElementChild ? hydrate : render; factory(() => <RouterProvider>…</RouterProvider>, root)`
 - **`onMount` is SSR-safe** — Solid guarantees that `onMount` callbacks never fire during `renderToString`/`renderToStream`. The adapter's `RouterProvider` uses `onMount` for `announceNavigation` / `scrollRestoration` / `scrollSpy` / `viewTransitions` setup; all are correctly client-only by Solid runtime contract, no manual `isServer` branching needed
 - **Top-level `<Show>` for UNKNOWN_ROUTE**, not `<RouteView.NotFound>` — `<RouteView.NotFound>` as a sibling to multiple `<RouteView.Match>` blocks triggers a hydration mismatch in vite-plugin-solid 2.11.x ("Hydration Mismatch. Unable to find DOM nodes for hydration key"). The server allocates hk only for the rendered branch, the client allocates hk for every Match marker — counters drift and the first paint dies. App-level `<Show when={routeState().route.name !== UNKNOWN_ROUTE} fallback={<NotFound />}>` keeps RouteView free of conditional siblings and matches the React/Vue pattern. Issue scope: example-side workaround; root-cause investigation in vite-plugin-solid is tracked separately

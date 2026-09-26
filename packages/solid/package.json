@@ -20,6 +20,7 @@
         "import": "./dist/esm/index.d.mts",
         "require": "./dist/cjs/index.d.ts"
       },
+      "solid": "./dist/source/index.jsx",
       "import": "./dist/esm/index.mjs",
       "require": "./dist/cjs/index.js"
     },
@@ -29,6 +30,7 @@
         "import": "./dist/esm/ssr.d.mts",
         "require": "./dist/cjs/ssr.d.ts"
       },
+      "solid": "./dist/source/ssr.jsx",
       "import": "./dist/esm/ssr.mjs",
       "require": "./dist/cjs/ssr.js"
     }

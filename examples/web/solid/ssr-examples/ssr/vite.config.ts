@@ -4,26 +4,16 @@ import solid from "vite-plugin-solid";
 export default defineConfig({
   plugins: [solid({ ssr: true })],
   resolve: {
-    // `@real-router/internal-source` resolves @real-router/solid (and other
-    // adapter packages) to their ./src/*.tsx source instead of the
-    // published dist/ output. Without it, the dist bundle compiled with
-    // `generate: 'dom'` is picked up — its module init calls
-    // `solid-js/web.template()` (a client-only API) and the SSR build
-    // crashes with "Client-only API called on the server side" before the
-    // first request.
-    conditions: ["@real-router/internal-source", "development"],
+    conditions: ["development"],
     dedupe: ["solid-js"],
   },
   ssr: {
-    // Vite resolves SSR builds through ssr.resolve.conditions, not
-    // resolve.conditions. We need internal-source on both so the SSR
-    // bundle picks up source .tsx (recompiled via vite-plugin-solid with
-    // SSR codegen) instead of the dist DOM bundle.
-    resolve: {
-      conditions: ["@real-router/internal-source", "development"],
-    },
-    // Force Vite to traverse the adapter source through vite-plugin-solid
-    // instead of leaving it as an external Node import.
-    noExternal: ["@real-router/solid"],
+    // In dev, vite-plugin-solid externalizes the adapter's own dependencies
+    // (@real-router/sources, @real-router/route-utils), and Node loads them
+    // with a second copy of the workspace-linked @real-router/core, which
+    // refuses routers the inlined copy built. Inlining every @real-router
+    // package keeps one core. An app that installs the packages from npm
+    // needs no such entry: its @real-router/core is external as well.
+    noExternal: [/^@real-router\//],
   },
 });

@@ -12,38 +12,71 @@ const external = externalFrom(
   JSON.parse(readFileSync(new URL("package.json", import.meta.url), "utf8")),
 );
 
-const sharedPlugins = [
-  nodeResolve({ extensions }),
+/**
+ * Both entries in ONE input, in every build: rollup then emits each module
+ * once, in a chunk both entries import. An input per entry would inline
+ * `context.ts` into each of them, and `/ssr`'s hooks would read contexts the
+ * main entry's `RouterProvider` never provides (#2583).
+ */
+const input = { index: "src/index.tsx", ssr: "src/ssr.tsx" };
+
+const babelPlugin = (presets) =>
   babel({
     extensions,
     babelHelpers: "bundled",
     babelrc: false,
-    presets: ["babel-preset-solid", "@babel/preset-typescript"],
+    presets,
     exclude: "node_modules/**",
-  }),
-];
+  });
 
 /**
- * JS bundles (ESM + CJS) — compiled via babel-preset-solid
+ * JS bundles (ESM + CJS) — compiled via babel-preset-solid for the DOM, for
+ * consumers whose bundler does not compile Solid.
  */
-const indexJs = {
-  input: "src/index.tsx",
+const compiledJs = {
+  input,
   output: [
-    { file: "dist/esm/index.mjs", format: "es" },
-    { file: "dist/cjs/index.js", format: "cjs", exports: "named" },
+    {
+      dir: "dist/esm",
+      format: "es",
+      entryFileNames: "[name].mjs",
+      chunkFileNames: "[name]-[hash].mjs",
+    },
+    {
+      dir: "dist/cjs",
+      format: "cjs",
+      exports: "named",
+      entryFileNames: "[name].js",
+      chunkFileNames: "[name]-[hash].js",
+    },
   ],
   external,
-  plugins: sharedPlugins,
+  plugins: [
+    nodeResolve({ extensions }),
+    babelPlugin(["babel-preset-solid", "@babel/preset-typescript"]),
+  ],
 };
 
-const ssrJs = {
-  input: "src/ssr.tsx",
-  output: [
-    { file: "dist/esm/ssr.mjs", format: "es" },
-    { file: "dist/cjs/ssr.js", format: "cjs", exports: "named" },
-  ],
+/**
+ * Source bundle — types stripped, JSX kept, published under the `solid`
+ * export condition. vite-plugin-solid compiles a dependency that declares it
+ * for the consumer's own target (DOM, hydratable or SSR), which is what an SSR
+ * build needs: the DOM output above calls `template()` at module load (#2583).
+ */
+const sourceJsx = {
+  input,
+  jsx: "preserve",
+  output: {
+    dir: "dist/source",
+    format: "es",
+    entryFileNames: "[name].jsx",
+    chunkFileNames: "[name]-[hash].jsx",
+  },
   external,
-  plugins: sharedPlugins,
+  plugins: [
+    nodeResolve({ extensions }),
+    babelPlugin(["@babel/preset-typescript"]),
+  ],
 };
 
 /**
@@ -77,4 +110,4 @@ const dtsBundles = [
   },
 ];
 
-export default [indexJs, ssrJs, ...dtsBundles];
+export default [compiledJs, sourceJsx, ...dtsBundles];
