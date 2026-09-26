@@ -81,7 +81,7 @@
     "@real-router/browser-plugin": "workspace:^",
     "@real-router/core": "workspace:^",
     "@testing-library/jest-dom": "~7.0.1",
-    "@vue/test-utils": "2.5.0",
+    "@vue/test-utils": "2.5.1",
     "vue": "~3.5.39"
   },
   "peerDependencies": {
