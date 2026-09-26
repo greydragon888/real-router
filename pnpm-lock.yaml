@@ -239,15 +239,6 @@ importers:
       '@mateothegreat/svelte5-router':
         specifier: ~2.16.19
         version: 2.16.19(svelte@5.57.0(@typescript-eslint/types@8.70.0))
-      '@nanostores/react':
-        specifier: 0.8.4
-        version: 0.8.4(nanostores@0.11.4)(react@19.3.0)
-      '@nanostores/solid':
-        specifier: 1.1.1
-        version: 1.1.1(nanostores@0.11.4)(solid-js@1.9.14)
-      '@nanostores/vue':
-        specifier: 1.1.0
-        version: 1.1.0(@vue/devtools-api@8.1.5)(nanostores@0.11.4)(vue@3.5.39(typescript@6.0.3))
       '@real-router/angular':
         specifier: workspace:^
         version: link:../packages/angular
@@ -293,9 +284,6 @@ importers:
       '@tanstack/vue-router':
         specifier: ~1.170.16
         version: 1.170.16(vue@3.5.39(typescript@6.0.3))
-      nanostores:
-        specifier: 0.11.4
-        version: 0.11.4
       preact:
         specifier: ~10.29.7
         version: 10.29.7(preact-render-to-string@6.7.0)
@@ -323,9 +311,6 @@ importers:
       vue-router:
         specifier: ~5.3.1
         version: 5.3.1(@vue/compiler-sfc@3.5.39)(esbuild@0.28.2)(rolldown@1.2.7)(rollup@4.63.2)(vite@8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
-      wouter:
-        specifier: ~3.11.0
-        version: 3.11.0(react@19.3.0)
       zod:
         specifier: 4.6.5
         version: 4.6.5
@@ -8107,33 +8092,6 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@nanostores/react@0.8.4':
-    resolution: {integrity: sha512-EciHSzDXg7GmGODjegGG1VldPEinbAK+12/Uz5+MAdHmxf082Rl6eXqKFxAAu4pZAcr5dNTpv6wMfEe7XacjkQ==}
-    engines: {node: ^18.0.0 || >=20.0.0}
-    peerDependencies:
-      nanostores: ^0.9.0 || ^0.10.0 || ^0.11.0
-      react: '>=18.0.0'
-
-  '@nanostores/solid@1.1.1':
-    resolution: {integrity: sha512-gF0Eat1/c3hOaklBMSVoEjcNzJc5zGk4VSg94H9LPmXYww1pxgr7zylpi3jjyxRu24c8+aYNkmRWzolAwzSA1A==}
-    peerDependencies:
-      nanostores: '>=0.9.0 <2.0.0'
-      solid-js: ^1.6.0
-
-  '@nanostores/vue@1.1.0':
-    resolution: {integrity: sha512-14eY8/YA0AbtWkAjk8zHKxbjcuPubF+M7y9afQzg2b5VqRJcashwA0100vprau13BTBSynUmU6ZsU6x03YidjA==}
-    engines: {node: ^20.0.0 || >=22.0.0}
-    peerDependencies:
-      '@nanostores/logger': ^0.4.0 || ^1.0.0
-      '@vue/devtools-api': '>=7.6.2'
-      nanostores: ^0.11.3 || ^1.0.0
-      vue: '>=3.3.1'
-    peerDependenciesMeta:
-      '@nanostores/logger':
-        optional: true
-      '@vue/devtools-api':
-        optional: true
-
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     resolution: {integrity: sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ==}
     engines: {node: ^22.20 || ^24.12 || >=25}
@@ -13169,10 +13127,6 @@ packages:
   nanospinner@1.2.2:
     resolution: {integrity: sha512-Zt/AmG6qRU3e+WnzGGLuMCEAO/dAu45stNbHY223tUxldaDAeE+FxSPsd9Q+j+paejmm0ZbrNVs5Sraqy3dRxA==}
 
-  nanostores@0.11.4:
-    resolution: {integrity: sha512-k1oiVNN4hDK8NcNERSZLQiMfRzEGtfnvZvdBvey3SQbgn8Dcrk0h1I6vpxApjb10PFUflZrgJ2WEZyJQ+5v7YQ==}
-    engines: {node: ^18.0.0 || >=20.0.0}
-
   napi-postinstall@0.3.4:
     resolution: {integrity: sha512-PHI5f1O0EP5xJ9gQmFGMS6IZcrVvTjpXjz7Na41gTE7eE2hK11lg04CECCYEEjdc17EV4DO+fkGEtt7TpTaTiQ==}
     engines: {node: ^12.20.0 || ^14.18.0 || >=16.0.0}
@@ -13797,10 +13751,6 @@ packages:
   regexp.prototype.flags@1.5.4:
     resolution: {integrity: sha512-dYqgNSZbDwkaJ2ceRd9ojCGjBq+mOm9LmtXnAnEGyHhN/5R7iDW2TRw3h+o/jCFxus3P2LfWIIiwowAjANm7IA==}
     engines: {node: '>= 0.4'}
-
-  regexparam@3.0.0:
-    resolution: {integrity: sha512-RSYAtP31mvYLkAHrOlh25pCNQ5hWnT106VukGaaFfuJrZFkGRX5GhUAdPqpSDXxOhA2c4akmRuplv1mRqnBn6Q==}
-    engines: {node: '>=8'}
 
   regjsparser@0.13.2:
     resolution: {integrity: sha512-NgRBy2Nx/bE+9F27nVHnqcN5HjyLmecqsqx2PJHu3/IEtADD4WuxuXIVExD5PoSDFVrl78dOonfcOe5O+5nbzQ==}
@@ -14973,11 +14923,6 @@ packages:
 
   workerpool@9.3.4:
     resolution: {integrity: sha512-TmPRQYYSAnnDiEB0P/Ytip7bFGvqnSU6I2BcuSw7Hx+JSg/DsUi5ebYfc8GYaSdpuvOcEs6dXxPurOYpe9QFwg==}
-
-  wouter@3.11.0:
-    resolution: {integrity: sha512-xyMLHhytdGhIjXVRcSjeYbXd7TR1lrxVTPLGBWmmyW52ZuWVQ1jXmsgoJ4G5s4tjloJCq7h4i2eREljWUQ4+/A==}
-    peerDependencies:
-      react: '>=16.8.0'
 
   wrap-ansi@10.0.0:
     resolution: {integrity: sha512-SGcvg80f0wUy2/fXES19feHMz8E0JoXv2uNgHOu4Dgi2OrCy1lqwFYEJz1BLbDI0exjPMe/ZdzZ/YpGECBG/aQ==}
@@ -16848,23 +16793,6 @@ snapshots:
 
   '@msgpackr-extract/msgpackr-extract-win32-x64@3.0.4':
     optional: true
-
-  '@nanostores/react@0.8.4(nanostores@0.11.4)(react@19.3.0)':
-    dependencies:
-      nanostores: 0.11.4
-      react: 19.3.0
-
-  '@nanostores/solid@1.1.1(nanostores@0.11.4)(solid-js@1.9.14)':
-    dependencies:
-      nanostores: 0.11.4
-      solid-js: 1.9.14
-
-  '@nanostores/vue@1.1.0(@vue/devtools-api@8.1.5)(nanostores@0.11.4)(vue@3.5.39(typescript@6.0.3))':
-    dependencies:
-      nanostores: 0.11.4
-      vue: 3.5.39(typescript@6.0.3)
-    optionalDependencies:
-      '@vue/devtools-api': 8.1.5
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     optional: true
@@ -21731,8 +21659,6 @@ snapshots:
     dependencies:
       picocolors: 1.1.1
 
-  nanostores@0.11.4: {}
-
   napi-postinstall@0.3.4: {}
 
   natural-compare@1.4.0: {}
@@ -22406,8 +22332,6 @@ snapshots:
       get-proto: 1.0.1
       gopd: 1.2.0
       set-function-name: 2.0.2
-
-  regexparam@3.0.0: {}
 
   regjsparser@0.13.2:
     dependencies:
@@ -23720,12 +23644,6 @@ snapshots:
   word-wrap@1.2.5: {}
 
   workerpool@9.3.4: {}
-
-  wouter@3.11.0(react@19.3.0):
-    dependencies:
-      react: 19.3.0
-      regexparam: 3.0.0
-      use-sync-external-store: 1.6.0(react@19.3.0)
 
   wrap-ansi@10.0.0:
     dependencies:

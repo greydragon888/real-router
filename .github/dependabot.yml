@@ -97,18 +97,6 @@ updates:
       # bump TS manually.
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
-      # nanostores state-lib set — benchmark-only (benchmarks/package.json), used to
-      # compare state libraries. The @nanostores/* adapters are version-COUPLED to
-      # `nanostores` via strict peer ranges (@nanostores/react@0.8.x peers nanostores
-      # ^0.9||^0.10||^0.11; @1.x peers ^1.2). Dependabot bumps each dep INDIVIDUALLY,
-      # which breaks the other's peer range → with `strictPeerDependencies: true`
-      # (pnpm-workspace.yaml) the `pnpm install --lockfile-only` re-resolve fails
-      # (ERR_PNPM_PEER_DEP_ISSUES) and ERRORS THE ENTIRE npm job (observed: run
-      # 28643677860, "3 error(s)"), risking a repo-wide Dependabot halt — same class
-      # as the transitive block above. Pinned to the libs' recommended pairing; bump
-      # the set manually + together if a benchmark refresh needs it.
-      - dependency-name: "nanostores"
-      - dependency-name: "@nanostores/*"
       # vite is a direct dev-dep across 127 example workspaces (all pinned 7.3.6),
       # so Dependabot bumps it INDIVIDUALLY ahead of its ecosystem. On a new MAJOR
       # (vite 8) the whole plugin/test stack still peers `vite >=7.3.5 <8` —
@@ -116,10 +104,10 @@ updates:
       # @analogjs/vite-plugin-angular, vite-tsconfig-paths, @testing-library/svelte,
       # vitefu — so the `pnpm install --lockfile-only` re-resolve fails with
       # ERR_PNPM_PEER_DEP_ISSUES (strictPeerDependencies: true) and ERRORS THE ENTIRE
-      # npm job (observed: run 28767218145, vite 8.1.3), risking a repo-wide halt —
-      # same coupled-peer class as nanostores above. Block the major only; 7.x
-      # patch/minor keep flowing. Lift this when vitest peers vite 8, then bump the
-      # vite major manually + together across the ecosystem.
+      # npm job (observed: run 28767218145, vite 8.1.3), risking a repo-wide halt.
+      # Block the major only; 7.x patch/minor keep flowing. Lift this when vitest
+      # peers vite 8, then bump the vite major manually + together across the
+      # ecosystem.
       - dependency-name: "vite"
         update-types: ["version-update:semver-major"]
       # --- Patch-float set: UI frameworks, 3rd-party routers, testing libs ------
@@ -149,8 +137,6 @@ updates:
         update-types: ["version-update:semver-patch"]
       - dependency-name: "vue-router"
         update-types: ["version-update:semver-patch"]
-      - dependency-name: "wouter"
-        update-types: ["version-update:semver-patch"]
       - dependency-name: "sv-router"
         update-types: ["version-update:semver-patch"]
       - dependency-name: "@mateothegreat/svelte5-router"
@@ -163,9 +149,9 @@ updates:
         update-types: ["version-update:semver-patch"]
       # @angular/* — EXACT cross-peer coupling (router@x requires core@x exactly),
       # so ANY single-package bump (patch/minor/major) breaks strictPeerDependencies
-      # and can halt the whole npm job (same coupled-peer class as nanostores/vite
-      # above). The framework only moves via a manual, coordinated `pnpm update`
-      # across all @angular/* at once; the `~22.0.x` ranges then absorb the patch.
+      # and can halt the whole npm job (same coupled-peer class as vite above).
+      # The framework only moves via a manual, coordinated `pnpm update` across
+      # all @angular/* at once; the `~22.0.x` ranges then absorb the patch.
       # Ignore the namespace entirely (this replaced the `@angular/router` override).
       - dependency-name: "@angular/*"
 

@@ -74,7 +74,6 @@ export default {
         "react-router",
         "react-router-dom",
         "vue-router",
-        "wouter",
         "sv-router",
         "@mateothegreat/svelte5-router",
       ],

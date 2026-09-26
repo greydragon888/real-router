@@ -17,8 +17,7 @@
       "tsdown.base.*",
       "eslint.config.*",
       "vitest.config.*"
-    ],
-    "env": ["BENCH_ROUTER", "BENCH_NO_VALIDATE", "BENCH_SECTIONS"]
+    ]
   },
   "tasks": {
     "bundle": {

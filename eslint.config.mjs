@@ -1541,21 +1541,11 @@ const blocks = tsEslint.config(
   // ============================================
   // 16. TURBO CONFIGURATION (must be last)
   // ============================================
-  // eslint-config-turbo — co-versioned with the turbo CLI, so it moves with it
+  // eslint-config-turbo — co-versioned with the turbo CLI, so it moves with it.
+  // ⚠ Its `turbo/no-undeclared-env-vars` does not read `global.env` from
+  // turbo.json under `futureFlags.globalConfiguration`: a variable declared
+  // there is still reported, so it also needs an `allowList` entry here.
   ...turboConfig,
-  {
-    // eslint-config-turbo does not read global.env from turbo.json when
-    // futureFlags.globalConfiguration is enabled, so the rule reports vars that
-    // ARE declared — allowList them here. Still true on 2.10.13: a probe reading
-    // `process.env.BENCH_ROUTER` is reported even though turbo.json declares it,
-    // while an undeclared name is reported too (the rule itself works).
-    rules: {
-      "turbo/no-undeclared-env-vars": [
-        "error",
-        { allowList: ["BENCH_ROUTER", "BENCH_NO_VALIDATE", "BENCH_SECTIONS"] },
-      ],
-    },
-  },
 );
 
 export default withComponentFiles(blocks);

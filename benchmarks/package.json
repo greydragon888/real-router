@@ -17,9 +17,6 @@
     "@angular/platform-browser": "~22.1.6",
     "@angular/router": "~22.1.6",
     "@mateothegreat/svelte5-router": "~2.16.19",
-    "@nanostores/react": "0.8.4",
-    "@nanostores/solid": "1.1.1",
-    "@nanostores/vue": "1.1.0",
     "@real-router/angular": "workspace:^",
     "@real-router/browser-plugin": "workspace:^",
     "@real-router/core": "workspace:^",
@@ -35,7 +32,6 @@
     "@tanstack/react-router": "~1.170.17",
     "@tanstack/solid-router": "~1.170.17",
     "@tanstack/vue-router": "~1.170.16",
-    "nanostores": "0.11.4",
     "preact": "~10.29.7",
     "react": "~19.3.0",
     "react-dom": "~19.3.0",
@@ -45,7 +41,6 @@
     "svelte": "~5.57.0",
     "vue": "~3.5.39",
     "vue-router": "~5.3.1",
-    "wouter": "~3.11.0",
     "zod": "4.6.5"
   },
   "devDependencies": {

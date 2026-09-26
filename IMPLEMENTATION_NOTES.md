@@ -3657,7 +3657,7 @@ Uses turbo v2.9.6.
 
 `global.inputs` defines config-level inputs that affect all tasks (e.g., `tsconfig.json`, `pnpm-lock.yaml`, `eslint.config.*`).
 
-`global.env` passes `BENCH_ROUTER`, `BENCH_NO_VALIDATE`, `BENCH_SECTIONS` for benchmark configuration.
+`global.env` is unset: no task reads a variable that should key the cache globally (see "Dead benchmark dependencies and `BENCH_*` leave the root config", 2026-09-26).
 
 **v2.8.11 migration (historical):** Removed `"daemon": false` from `turbo.json` — daemon was removed from `turbo run` in v2.8.11 (option deprecated, daemon only used for `turbo watch`).
 
@@ -3682,13 +3682,12 @@ Uses turbo v2.9.6.
 ```json
 {
   "global": {
-    "passThroughEnv": ["CI", "GITHUB_ACTIONS"],
-    "env": ["BENCH_ROUTER", "BENCH_NO_VALIDATE", "BENCH_SECTIONS"]
+    "passThroughEnv": ["CI", "GITHUB_ACTIONS"]
   }
 }
 ```
 
-`CI` and `GITHUB_ACTIONS` are passed through globally. `BENCH_*` variables are declared as global env inputs for cache invalidation. Test task uses additional `passThroughEnv` for `CI`.
+`CI` and `GITHUB_ACTIONS` are passed through globally. Test task uses additional `passThroughEnv` for `CI`.
 
 ### Task Renames
 
@@ -11961,3 +11960,18 @@ The two periods built different trees, so this is not an A/B. Nothing in it pays
 - `check-doc-anchors.mjs` already skips a directory that vanishes mid-walk; its comment records 3 crashes in 100 walks under churn. That tolerance suits a script that runs beside anything. `refusal-census.mjs` has none, and the tests no longer need it to have one.
 - With today's import-x, dropping only `import-x/extensions` does not make `import-x/no-cycle` inert. import-x takes its valid extensions from that setting and adds every extension `import-x/parsers` names. The old guard and the new one both stay green, and both go red once `import-x/parsers` is dropped too.
 - A runtime guard was tried and set aside: wrapping `node:fs` in each test process through `--import`. A named import from `node:fs/promises` kept the original function after `syncBuiltinESMExports()` (measured).
+
+## Dead benchmark dependencies and `BENCH_*` leave the root config (2026-09-26)
+
+**Problem.** Two pieces of root configuration served code that no longer exists.
+
+- `benchmarks/package.json` declared `nanostores`, `@nanostores/react`, `@nanostores/solid`, `@nanostores/vue` and `wouter`, and no file under `benchmarks/` imports any of them. The nanostores imports left with the mitata and jsdom suites in `fcd6c86d1` (2026-07-05); `wouter` is not in the cross-router roster. knip ignores the `benchmarks` workspace, so nothing reported them. They kept six packages in the lockfile that no other importer reaches, a nanostores `ignore` block in `.github/dependabot.yml`, and a `wouter` entry both in Dependabot's patch-float list and in syncpack's `~` group.
+- `turbo.json` declared `BENCH_ROUTER`, `BENCH_NO_VALIDATE` and `BENCH_SECTIONS` in `global.env`, and `eslint.config.mjs` allow-listed the same three for `turbo/no-undeclared-env-vars`. `git grep` finds no reader of any of them outside those two files and this one.
+
+**Solution.** The five dependencies, their Dependabot and syncpack entries, `global.env` and the ESLint override are gone. The lockfile lost exactly the six packages above (`@nanostores/*` ×3, `nanostores`, `wouter`, `regexparam`).
+
+**Why nothing else moves.**
+
+- The trap the ESLint override documented still holds and still matters to the next global variable: the rule does not read `global.env` under `futureFlags.globalConfiguration`. It stays as a warning comment beside `...turboConfig`.
+- The coupled-peer class the nanostores block described in `dependabot.yml` keeps its record in the section "Dependabot npm job errors when it bumps ONE member of a peer-coupled set", and its live instances (`vite` major, `@angular/*`) keep their own comments.
+- Dropping `global.env` changes turbo's global hash, so every task misses the cache once.
