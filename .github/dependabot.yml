@@ -80,10 +80,9 @@ updates:
       # in pnpm-workspace.yaml, add the dep here too, or Dependabot will re-halt.
       - dependency-name: "piscina" # override: piscina '>=5.2.0 <6.0.0'
       - dependency-name: "js-yaml" # override: read-yaml-file '>=2.1.0' (GHSA-h67p-54hq-rp68)
-      # undici is no override in the root: the root declares a 7.x copy, the
-      # provider of danger's optional peer, and jsdom takes 8.x on its own range
-      # (#2605). Bumped by hand — Dependabot would also offer 8.x, which danger's
-      # peer range (`^6.28.0 || ^7`) excludes.
+      # undici is no dependency of the root: danger installs a 7.x of its own
+      # (`.pnpmfile.mjs`), and jsdom takes 8.x on its own range (#2605). Each
+      # parent's range moves its copy; Dependabot would offer 8.x to both.
       - dependency-name: "undici"
       # @types/node is pinned to the Node.js runtime major (Node 24 — `.nvmrc` is
       # the source of truth; see the CLAUDE.md toolchain table). Block semver-major:

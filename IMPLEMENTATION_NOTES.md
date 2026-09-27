@@ -12339,6 +12339,10 @@ Two edges outside their range are the entry's purpose, and their comments say so
 
 ## undici: the root provides danger's peer, the examples floor each major (#2605, 2026-09-27)
 
+> ⚠ Superseded on 2026-09-28 for the root: the devDependency is gone, and
+> `.pnpmfile.mjs` makes undici danger's own dependency. See "undici: danger
+> installs its own copy".
+
 **Problem.** `undici: '>=7.29.0 <8.0.0'` in both workspaces replaced every undici edge. jsdom 30 declares `^8.10.2` and got 7.29.0, and on it jsdom's XHR, an XHR of a gzip body and `JSDOM.fromURL` hang with neither `load` nor `error`, while WebSocket works; on undici 8.11.2 all four pass (one probe against a local server, in both installs). In the examples, node-gyp declares `^6.25.0` and got 7.29.0 too. No parent upgrade removes the conflict: the latest danger (14.0.7) takes 7, the latest `@electron/rebuild` (4.2.0) keeps node-gyp 12, which takes 6, and the latest jsdom (30.1.1) takes 8.
 
 **Solution.**
@@ -12469,3 +12473,17 @@ The `@angular/build>vite` comments of all three workspaces stop naming the vite 
 - ⚠ **The update takes `pnpm update -r --no-save "@angular/*"` after the manifests move.** A plain install kept `@angular/platform-server` 22.1.6 as the optional peer that `@angular/build` and `@angular/ssr` 22.2.0 resolve, and `strictPeerDependencies` refused it. The update re-resolves the peer; `--no-save` keeps the manifests' `~22.2.0`.
 - The lockfile holds one devkit generation (0.2202.0 / 22.2.0) and one vite (8.3.1). Of the 144 importers, no direct dependency outside `@angular/*` moved; the other changes are the Angular toolchain's own dependencies. `lint:audit` finds no issue in any lockfile.
 - All 15 Angular examples build (`build`, and `build:app` for the four SSR ones), the three with unit tests pass (18, 9, 14), all 16 Angular packages pass `lint:example`, and the e2e suites of `combined` and `ssr-examples/ssr` pass (41 and 49).
+
+## undici: danger installs its own copy (2026-09-28)
+
+**Problem.** The root declared `undici` 7.29.0 as a devDependency only to provide danger's optional peer (#2605). The root imports nothing from it, and `pnpm outdated` listed it behind 8.x on every run.
+
+**Solution.** The root `.pnpmfile.mjs` drops `undici` from danger's `peerDependencies` and `peerDependenciesMeta`, so the `^7.16.0` danger also declares as a dependency is installed as its own; the devDependency goes. The lockfile records `pnpmfileChecksum`, so an edit to the hook ships with a lockfile.
+
+**Why — measured.**
+
+- ⚠ **Removing the devDependency alone only looks safe.** The lockfile kept danger's old resolution through `pnpm remove`, `pnpm update danger` and `dedupe --check`, and danger still got 7.29.0. A fresh resolution — danger 14.0.7 and jsdom 30.1.1 in an empty project, the root's peer settings, no lockfile — left danger without an undici of its own: its `require("undici")` falls through to the hoisted 8.11.2, outside both of danger's ranges.
+- A `packageExtensions` entry that makes the peer required does not help: under `autoInstallPeers` the fresh resolution still gave danger no undici.
+- With the hook, the fresh resolution gives danger undici 7.30.0 as a dependency. In the repository, after `pnpm dedupe`, danger holds 7.29.0 under `dependencies` and jsdom keeps 8.11.2; `dedupe --check`, the frozen install and knip pass, and `pnpm outdated` no longer lists undici.
+- `update.ignoreDeps: [undici]` hid it from `pnpm outdated` as well, but kept the devDependency.
+- Dependabot runs with a pnpmfile present: its commits to the examples lockfile (#2607, #2611) keep that workspace's `pnpmfileChecksum`.
