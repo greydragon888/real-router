@@ -17,7 +17,7 @@
     "@real-router/ssr-data-plugin": "0.6.0",
     "@real-router/ssr-utils": "0.3.0",
     "@real-router/vue": "0.25.0",
-    "express": "5.1.0",
+    "express": "5.2.1",
     "vue": "~3.5.39"
   },
   "devDependencies": {

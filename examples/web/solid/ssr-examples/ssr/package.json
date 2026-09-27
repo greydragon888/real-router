@@ -18,7 +18,7 @@
     "@real-router/ssr-data-plugin": "0.6.0",
     "@real-router/ssr-utils": "0.3.0",
     "@solidjs/meta": "~0.29.4",
-    "express": "5.1.0",
+    "express": "5.2.1",
     "solid-js": "~1.9.14"
   },
   "devDependencies": {
