@@ -10,8 +10,6 @@ export type {
   RequestPluginsFactory,
 } from "./providersFactory";
 
-export { sourceToSignal } from "./sourceToSignal";
-
 // Note: SSR-feature exports (`ClientOnly`, `ServerOnly`, `injectDeferred`)
 // have moved to the `/ssr` subpath — import them from
 // `@real-router/angular/ssr` to opt into the SSR-feature surface.
