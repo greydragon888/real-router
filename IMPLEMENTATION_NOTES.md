@@ -773,8 +773,9 @@ did before.
 ## benchmarks/ is linted in pre-push, and no lint fix may change a bundle the results were measured on (#2390, 2026-09-17)
 
 > **Superseded in part (2026-09-27).** `lint:bench` no longer reaches
-> `cross-router/`, a pnpm workspace of its own. See "`benchmarks/cross-router`
-> is a pnpm workspace of its own".
+> `cross-router/`, a pnpm workspace of its own, and depends on `^type-check`
+> rather than `^bundle`. See "`benchmarks/cross-router` is a pnpm workspace of
+> its own" and "The root drops what only the cross-router bench needed".
 
 **Problem.** No gate read `benchmarks/`: the package declared no lint script, and
 turbo runs only package scripts. Linting it once surfaced three things.
@@ -2748,6 +2749,11 @@ refused — this workflow only removes the dedupe-only chore.
 > the fix. The loop argument above still holds, for a different reason (see there).
 
 #### UI frameworks / third-party routers / testing libs float latest patch (`~`)
+
+> **Superseded in part (2026-09-27).** No root manifest declares a competitor
+> router: they live in `benchmarks/cross-router`, and the syncpack group and the
+> root Dependabot entry no longer name them. See "The root drops what only the
+> cross-router bench needed".
 
 **Problem:** every UI-framework, competitor-router, and testing-library dependency
 is a `devDependency` of an adapter or a `dependency` of a benchmark/example — none
@@ -12383,3 +12389,19 @@ Two edges outside their range are the entry's purpose, and their comments say so
 - `lint:dedupe` checks the third lockfile, the pre-commit hook dedupes it when it is staged, `dependabot-dedupe.yml` runs on it, and `resolve:dependabot` regenerates it and validates the workspace with an n=1 smoke of the whole matrix (`BENCH_SMOKE=1 node run-all.mjs 1`), which builds and drives every app and writes nothing to `results/`.
 
 **Why monthly, in one group.** A bump here moves the bench's numbers, not a shipped package: one pull request a month keeps the competitors' releases moving without a review per patch.
+
+## The root drops what only the cross-router bench needed (2026-09-27)
+
+**Problem.** With `benchmarks/cross-router` a workspace of its own, four entries in the root configuration kept a reason that had left with it:
+
+- `allowBuilds` approved `vue-demi`, which the root lockfile no longer holds.
+- The syncpack `~` group and the root Dependabot entry's patch `ignore` named `@tanstack/*`, `react-router`, `react-router-dom`, `vue-router`, `sv-router` and `@mateothegreat/svelte5-router`, which no root manifest declares.
+- `lint:bench` depended on `^bundle` because the cross-router Angular apps resolved `@real-router/*` through `dist/` (#2390); `benchmarks/CLAUDE.md` gave that as the reason to run it through turbo.
+
+**Solution.** The `vue-demi` approval and the six router names go. `lint:bench` depends on `^type-check`, as the packages' `lint` does.
+
+**Why `^type-check`, not no dependency — measured.**
+
+- Every tsconfig left in `benchmarks/` resolves `@real-router/*` to `packages/*/src`: `tsc --listFiles` over the five of them reads 0 files from any `dist/`. In a checkout with no `packages/*/dist`, `lint:bench` passes, and a planted `any` fails it with three typed-rule errors, so the run is not vacuous.
+- A turbo task's hash covers upstream packages only through `dependsOn`. With none, an edit to `packages/core/src` left the `lint:bench` hash unchanged, so its cache would replay a verdict computed against the old core; with `^type-check` the hash moved. Both variants plan 15 upstream tasks over the same packages.
+- `@solidjs/*` stays in both lists: `packages/solid` declares `@solidjs/testing-library`. knip's `ignoreBinaries` keeps `playwright`: removed, knip reports the binary as unlisted in `cross-router-bench.yml`, whose `working-directory` it does not read.

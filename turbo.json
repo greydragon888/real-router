@@ -102,7 +102,7 @@
       "cache": true
     },
     "lint:bench": {
-      "dependsOn": ["^bundle"],
+      "dependsOn": ["^type-check"],
       "outputs": [],
       "inputs": [
         "**/*.{ts,tsx,mts,cts,js,jsx,cjs,svelte}",

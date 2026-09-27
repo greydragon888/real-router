@@ -209,4 +209,3 @@ allowBuilds:
   lmdb: true
   msgpackr-extract: true
   unrs-resolver: true
-  vue-demi: true

@@ -26,8 +26,8 @@
 #               packages/, its own ESLint config lints each tracked file
 #               of code its lint command names (#2407)
 # - build: Final build to ensure compilation
-# - lint:bench: ESLint over benchmarks/, after build — the Angular
-#               benchmark apps resolve @real-router/* through its dist/
+# - lint:bench: ESLint over benchmarks/ but cross-router/, a workspace of
+#               its own
 # - test:stress: Heap/timing stress suites, isolated at --concurrency=1 so
 #                heap measurements are free of build contention (#1423)
 # - lint:types: Validate TypeScript types in dist (arethetypeswrong)
@@ -141,10 +141,9 @@ pnpm lint:reach
 echo "📦 Building packages..."
 pnpm turbo run build lint:package lint:types
 
-# The Angular benchmark apps resolve @real-router/* through dist/, so they are
-# linted after the build above; the task depends on `^bundle` for a run from
-# zero dists. The examples are a workspace of their own and lint only in the
-# weekly examples.yml.
+# The task depends on `^type-check`, not on a build: every tsconfig it reads
+# resolves @real-router/* to src. The examples are a workspace of their own and
+# lint only in the weekly examples.yml.
 echo "🧹 Linting the benchmarks..."
 pnpm turbo run lint:bench --filter=router-benchmarks
 

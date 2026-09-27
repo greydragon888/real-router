@@ -114,16 +114,17 @@ updates:
       # ecosystem.
       - dependency-name: "vite"
         update-types: ["version-update:semver-major"]
-      # --- Patch-float set: UI frameworks, 3rd-party routers, testing libs ------
-      # Dev/test/example-only deps (never shipped — published adapters expose them
-      # as peerDependency ranges). Declared with `~` patch-float ranges in every
+      # --- Patch-float set: UI frameworks, testing libs --------------------------
+      # Dev/test-only deps (never shipped — published adapters expose them as
+      # peerDependency ranges). Declared with `~` patch-float ranges in every
       # manifest + a syncpack semverGroup (syncpack.config.mjs). `pnpm update`
       # pulls the latest patch; Dependabot stays quiet on PATCH so it stops the
       # per-patch PR churn these spread across the adapter and benchmark
       # manifests (e.g. the @angular/ssr #1368 / @angular/router #1371 noise).
-      # The examples carry the same rules in their own block below.
-      # MINOR/major still flow as PRs (reviewed). Add new UI-framework/router/
-      # testing deps here (and to the syncpack group) when introduced.
+      # The examples carry the same rules in their own block below; the
+      # competitor routers live in the cross-router block alone.
+      # MINOR/major still flow as PRs (reviewed). Add new UI-framework/testing
+      # deps here (and to the syncpack group) when introduced.
       - dependency-name: "react"
         update-types: ["version-update:semver-patch"]
       - dependency-name: "react-dom"
@@ -138,17 +139,7 @@ updates:
         update-types: ["version-update:semver-patch"]
       - dependency-name: "vue"
         update-types: ["version-update:semver-patch"]
-      - dependency-name: "react-router"
-        update-types: ["version-update:semver-patch"]
-      - dependency-name: "vue-router"
-        update-types: ["version-update:semver-patch"]
-      - dependency-name: "sv-router"
-        update-types: ["version-update:semver-patch"]
-      - dependency-name: "@mateothegreat/svelte5-router"
-        update-types: ["version-update:semver-patch"]
       - dependency-name: "@testing-library/*"
-        update-types: ["version-update:semver-patch"]
-      - dependency-name: "@tanstack/*"
         update-types: ["version-update:semver-patch"]
       - dependency-name: "@solidjs/*"
         update-types: ["version-update:semver-patch"]

@@ -101,7 +101,7 @@ pnpm cpu                # Check CPU load before benchmarking (run from benchmark
 `lint:bench` is ESLint over this tree except `cross-router/`, a workspace of
 its own whose dependencies this package does not install; the adapter-bench
 `.svelte` components are included, and pre-push runs it after its build. CI runs it too when a lockfile or global-input change reaches the tree,
-such as an ESLint bump (#2402). Run it through turbo — `pnpm turbo run lint:bench --filter=router-benchmarks`.
+such as an ESLint bump (#2402). Run it through turbo — `pnpm turbo run lint:bench --filter=router-benchmarks`: it builds no package, and its `^type-check` puts the packages' `src` into its cache key.
 
 ⚠ **A lint fix in `cross-router/apps` or `adapter-bench/apps` must leave the
 built bundle byte-identical.** The results were measured on those bytes. The
