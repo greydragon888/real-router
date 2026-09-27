@@ -1,5 +1,13 @@
 # @real-router/solid
 
+## 0.26.0
+
+### Minor Changes
+
+- [#2596](https://github.com/greydragon888/real-router/pull/2596) [`ad392c3`](https://github.com/greydragon888/real-router/commit/ad392c326af936a61f7e66afbc7b33cae1151802) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `createSignalFromSource` and `createStoreFromSource` from the public entry ([#2590](https://github.com/greydragon888/real-router/issues/2590))
+
+  Both took a `RouterSource<T>`, so calling them meant importing `@real-router/sources` — the package the adapters are built on, not one an application uses. Read router state through the adapter's hooks: `useRoute`, `useRouteNode`, `useRouteStore`, `useRouteNodeStore`, `useRouterTransition`. They are built on the same two bridges, which stay internal. A custom binding over `@real-router/sources` is adapter-author work.
+
 ## 0.25.1
 
 ### Patch Changes
