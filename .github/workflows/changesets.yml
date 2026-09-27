@@ -107,7 +107,7 @@ jobs:
       # `allowBuilds` allowlist already narrows who may run scripts at all, but
       # the release job has no need for any of them: verified by running exactly
       # this job's sequence in a clean clone — `pnpm install --frozen-lockfile
-      # --ignore-scripts` followed by `turbo run bundle --filter='!./examples/**'`
+      # --ignore-scripts` followed by `turbo run bundle`
       # completed 23/23 tasks with 0 cache hits (i.e. every bundler really
       # executed: tsdown, ng-packagr/esbuild for angular, rollup+babel for solid,
       # svelte-package). Publishing is unaffected — `--ignore-scripts` here skips
@@ -223,7 +223,7 @@ jobs:
       # the same commit.
       - name: Bundle packages for publish
         if: steps.unpublished.outputs.has_unpublished == 'true'
-        run: pnpm turbo run bundle --filter='!./examples/**'
+        run: pnpm turbo run bundle
 
       # Validate what is ABOUT TO BE PUBLISHED, not the tree that produced it.
       # Only `angular`, `solid` and `svelte` declare these scripts, and they are
@@ -247,7 +247,6 @@ jobs:
         if: steps.unpublished.outputs.has_unpublished == 'true'
         run: >-
           pnpm turbo run lint:package lint:types
-          --filter='!./examples/**'
           --filter='!./benchmarks'
 
       # Publish with OIDC Trusted Publishing

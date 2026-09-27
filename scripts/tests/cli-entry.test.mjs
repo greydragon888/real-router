@@ -79,6 +79,10 @@ const CLIS = {
     args: [],
     ran: /usage: examples-lint-filter\.mjs <base> <head>/,
   },
+  "scripts/examples-plan.mjs": {
+    args: [],
+    ran: /usage: examples-plan\.mjs <base> <head>/,
+  },
   // Any of three proves main() ran: the comparison, its refusal of an empty
   // file set, or a throw from inside main() where no `origin/master` exists
   // (a shallow CI checkout). Which one depends on the branch and the clone.

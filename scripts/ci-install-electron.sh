@@ -25,8 +25,10 @@ if [ "$(uname -s)/$(uname -m)" != "Linux/x86_64" ]; then
 fi
 
 # All three desktop/electron/* examples share one .pnpm/electron@X, so resolving
-# via one example materialises the binary for all.
-electron_dir="$(pnpm --filter electron-react-example exec node -p "path.dirname(require.resolve('electron/package.json'))" | tail -n1)"
+# via one example materialises the binary for all. They live in the examples
+# workspace, which this script reaches from its own location, not the cwd.
+examples_dir="$(cd "$(dirname "$0")/../examples" && pwd)"
+electron_dir="$(pnpm --dir "${examples_dir}" --filter electron-react-example exec node -p "path.dirname(require.resolve('electron/package.json'))" | tail -n1)"
 version="$(node -p "require('${electron_dir}/package.json').version")"
 zipname="electron-v${version}-linux-x64.zip"
 url="https://github.com/electron/electron/releases/download/v${version}/${zipname}"

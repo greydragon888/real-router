@@ -86,7 +86,6 @@ jobs:
       - name: Build
         run: >-
           pnpm turbo run bundle test test:properties lint
-          --filter='!./examples/**'
           --summarize
 
       # Per-task timings of master's own build (.turbo/runs/*.json). A direct

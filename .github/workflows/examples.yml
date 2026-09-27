@@ -9,19 +9,47 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Least-privilege default; the `notify-failure` job declares its own
+# Least-privilege default; the two notify jobs declare their own
 # `issues: write`, which overrides this. No-op today (repo default is `read`) —
 # insurance against a future flip of default_workflow_permissions.
 permissions:
   contents: read
 
-# Self-hosted ducktors/turborepo-remote-cache on Cloud Run + Cloudflare R2 (#490)
+# Self-hosted ducktors/turborepo-remote-cache on Cloud Run + Cloudflare R2 (#490).
+# The examples build with `pnpm -r`; turbo only bundles the packages they get
+# as tarballs.
 env:
   TURBO_API: ${{ vars.TURBO_API }}
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
 
 jobs:
+  # The only place the examples are linted. Nothing waits on it: a red lint
+  # leaves the build and e2e below running and files its own issue
+  # (`notify-lint-failure`), so it never reads as a broken example.
+  lint:
+    name: Lint Examples
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup (pnpm + Node + install)
+        uses: ./.github/actions/setup
+
+      # The manifests pin npm releases; the lint reads this checkout's packages
+      # — the types typed rules resolve are master's, not the last release's.
+      - name: Install the examples with this checkout's packages
+        run: node scripts/checkout-tarballs.mjs examples
+
+      # `pnpm -r run lint:example` skips a package without the script silently.
+      - name: Every examples package declares lint:example
+        run: node scripts/examples-plan.mjs --missing-lint
+
+      - name: Lint
+        run: pnpm --dir examples -r --no-bail run lint:example
+
   examples:
     name: Build & Test Examples
     # Not on the self-hosted VPS: the build ran no faster there and held the
@@ -30,71 +58,31 @@ jobs:
     runs-on: ubuntu-latest
     # A hang fails as a named timeout long before the 360-minute job default,
     # and notify-failure below files it.
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6.1.0
+      - name: Setup (pnpm + Node + install)
+        uses: ./.github/actions/setup
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      # turbo dependency chain: build → ^bundle (the @real-router libs each
-      # example depends on, transitively down to core) + the example's own
-      # test/lint/type-check. The ^bundle edge makes this job self-sufficient
-      # from a clean runner — examples resolve @real-router/* via package
-      # exports → dist/ (consumer-style tsconfigs, no internal-source), so
-      # without it the job only worked off self-hosted runner residue /
-      # remote-cache leftovers (#499 was this exact class).
-      - name: Build (includes lib bundles + lint, type-check, test via turbo deps)
-        run: pnpm turbo run build --filter='./examples/**'
-
-      # `build` reaches every example's `lint:example` through `dependsOn`, so
-      # the line above already lints all of them. `router-benchmarks` is not
-      # under `examples/`, and its `lint:bench` has no other weekly home — the
-      # same run it belongs to is the one `notify-failure` watches.
-      - name: Lint the benchmark apps
-        run: pnpm turbo run lint:bench --filter=router-benchmarks
-
-  e2e:
-    name: E2E Tests
-    runs-on: ubuntu-latest
-    needs: [examples]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6.1.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      # Bundles and packs every public package of this checkout and installs
+      # the tarballs in place of the npm releases the manifests pin — a library
+      # change that breaks an example surfaces here, before it is published.
+      - name: Install the examples with this checkout's packages
+        run: node scripts/checkout-tarballs.mjs examples
 
       - name: Install Playwright browsers
-        run: pnpm --filter react-combined-example exec playwright install chromium --with-deps
+        run: pnpm --dir examples --filter react-combined-example exec playwright install chromium --with-deps
 
       # Persist the downloaded Electron zip across runs (~128 MB), keyed by the
       # electron examples' manifests — the only place the electron version is
-      # pinned — so only an electron bump rotates the key. (Keying by
-      # pnpm-lock.yaml minted a new immutable ~128 MB cache entry on every
-      # lockfile change — weekly dependabot churn that pressures the 10 GB LRU
-      # quota shared with the pnpm store cache.) The installer self-heals on a
-      # stale/corrupt cache (checksum re-verify → re-download) and prunes zips
-      # of other versions restored via restore-keys.
+      # pinned — so only an electron bump rotates the key. (Keying by a lockfile
+      # minted a new immutable ~128 MB cache entry on every lockfile change —
+      # weekly dependabot churn that pressures the 10 GB LRU quota shared with
+      # the pnpm store cache.) The installer self-heals on a stale/corrupt cache
+      # (checksum re-verify → re-download) and prunes zips of other versions
+      # restored via restore-keys.
       - name: Cache Electron binary
         uses: actions/cache@v6
         with:
@@ -104,7 +92,7 @@ jobs:
 
       # The desktop/electron/* examples launch the real Electron binary via
       # Playwright's `_electron.launch`, which reads `node_modules/electron/path.txt`.
-      # pnpm 10 records a "built" flag in the cached store, so on a warm-store
+      # pnpm records a "built" flag in the cached store, so on a warm-store
       # runner it skips electron's postinstall, leaving `path.txt` absent. Both
       # `node install.js` and a Node wrapper around @electron/get exit 0 *at the
       # await* on this runner (the download never keeps the event loop alive),
@@ -114,21 +102,22 @@ jobs:
       - name: Install Electron binary
         run: bash scripts/ci-install-electron.sh
 
-      # Build results cached from examples job via Turbo Remote Cache.
-      # --continue=dependencies-successful: a failing example's e2e must not
-      # cancel the others — run every example's specs, so one CI run yields the
-      # complete list of failing e2e tests instead of stopping at the first.
-      #
+      # `--no-bail`: a failing example must not stop the others, so one run
+      # yields the complete list. The SSR examples have `build:app` instead,
+      # which their Playwright `webServer` runs itself.
+      - name: Build
+        run: pnpm --dir examples -r --no-bail run --if-present build
+
       # xvfb-run: the desktop/electron/* examples launch a real Electron (a GUI
       # app) via `_electron.launch`. The runner is headless, so without a virtual
       # display Electron dies on platform init ("Missing X server or $DISPLAY" →
       # SIGSEGV). Xvfb is preinstalled on ubuntu-latest; depth 24 (Chromium
       # dislikes the 8-bit default). Web examples run headless Chromium and ignore
-      # the display. (#812)
+      # the display. (#812) One example at a time: the suites share ports.
       - name: Run E2E tests
         run: >-
           xvfb-run -a --server-args="-screen 0 1280x1024x24"
-          pnpm turbo run test:e2e --filter='./examples/**' --concurrency=1 --continue=dependencies-successful
+          pnpm --dir examples -r --workspace-concurrency=1 --no-bail run --if-present test:e2e
 
       - name: Upload Playwright report
         if: failure()
@@ -144,6 +133,22 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  # `router-benchmarks` stays in the root workspace, and its `lint:bench` has
+  # no other weekly home.
+  bench-lint:
+    name: Lint the benchmark apps
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup (pnpm + Node + install)
+        uses: ./.github/actions/setup
+
+      - name: Lint the benchmark apps
+        run: pnpm turbo run lint:bench --filter=router-benchmarks
+
   # Open/refresh a tracking issue when the scheduled suite fails, so chronic
   # redness can't live unnoticed (the only other signal is an email to the
   # workflow-file author). Skipped on workflow_dispatch to avoid noise during
@@ -151,7 +156,7 @@ jobs:
   notify-failure:
     name: Open issue on failure
     runs-on: ubuntu-latest
-    needs: [examples, e2e]
+    needs: [examples, bench-lint]
     # `!success()`, not `failure()`: a job killed by `timeout-minutes` ends as
     # CANCELLED, which `failure()` does not match — so the timeout added above would
     # otherwise free the runner SILENTLY, and the class this job exists to surface
@@ -176,6 +181,59 @@ jobs:
             const body = [
               marker,
               `The scheduled **Examples** workflow failed.`,
+              '',
+              `- Run: ${runUrl}`,
+              `- Commit: ${context.sha}`,
+              '',
+              '_Auto-filed by `examples.yml`. This comment updates on each subsequent failure; close the issue once green._',
+            ].join('\n');
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'area: ci/cd',
+              per_page: 100,
+            });
+            const existing = issues.find(i => (i.body || '').includes(marker));
+
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body: `Still failing — ${runUrl}`,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['bug', 'area: ci/cd'],
+              });
+            }
+
+  # The lint's own tracker — a separate marker, so a lint finding and a broken
+  # example never share an issue. Same `!success()` and `schedule` rules as above.
+  notify-lint-failure:
+    name: Open issue on lint failure
+    runs-on: ubuntu-latest
+    needs: [lint]
+    if: "!success() && github.event_name == 'schedule'"
+    permissions:
+      issues: write
+    steps:
+      - name: Create or update tracking issue
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const marker = '<!-- examples-lint-failure-tracker -->';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const title = '🟡 Examples lint failing';
+            const body = [
+              marker,
+              `The scheduled **Examples** workflow's lint failed. The build and e2e ran regardless.`,
               '',
               `- Run: ${runUrl}`,
               `- Commit: ${context.sha}`,

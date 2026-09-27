@@ -44,8 +44,8 @@ jobs:
       mode: ${{ steps.plan.outputs.mode }} # 'leaf' | 'sharded'; empty for docs/CI-only PRs
       matrix: ${{ steps.plan.outputs.matrix }} # always-valid JSON; {"include":[]} for leaf
       leaf_filter: ${{ steps.plan.outputs.leaf_filter }} # explicit --filter set for pipeline-leaf; empty on a zero-package leaf
-      examples_filter: ${{ steps.plan.outputs.examples_filter }} # explicit --filter set for examples-build; empty when no example is affected
-      examples_lint_filter: ${{ steps.examples_lint.outputs.examples_lint_filter }} # explicit --filter set for examples-lint; empty when no change reaches an example from outside
+      examples_filter: ${{ steps.examples_plan.outputs.examples_filter }} # explicit --filter set for examples-build; empty when the PR edits no example
+      examples_lint_filter: ${{ steps.examples_lint.outputs.examples_lint_filter }} # explicit --filter set for examples-lint; empty when no change reaches the benchmarks from outside
       examples_lint_reasons: ${{ steps.examples_lint.outputs.examples_lint_reasons }}
       no_source: ${{ steps.source.outputs.no_source }} # 'true' when the diff holds no code a check could read
     steps:
@@ -162,13 +162,20 @@ jobs:
         if: steps.changes.outputs.should_run == 'true'
         run: node scripts/build-matrix.mjs >> "$GITHUB_OUTPUT"
 
-      # The examples and benchmarks this PR reaches from OUTSIDE them (#2402).
+      # The benchmarks this PR reaches from OUTSIDE them (#2402). The examples
+      # are a workspace of their own and lint only in the weekly examples.yml.
       # The checkout is the PR's merge commit, so `HEAD^1` is the base it is
       # built on.
       - name: Plan examples lint
         id: examples_lint
         if: steps.changes.outputs.should_run == 'true'
         run: node scripts/examples-lint-filter.mjs HEAD^1 HEAD >> "$GITHUB_OUTPUT"
+
+      # The examples this PR edits, for "Examples (affected)". Same base as above.
+      - name: Plan examples
+        id: examples_plan
+        if: steps.changes.outputs.should_run == 'true'
+        run: node scripts/examples-plan.mjs HEAD^1 HEAD >> "$GITHUB_OUTPUT"
 
       # ⚠ The PR number and head SHA, written to an artifact because a
       # `workflow_run` workflow cannot obtain them for a FORK: GitHub leaves
@@ -277,7 +284,6 @@ jobs:
         run: >-
           pnpm turbo run test test:properties lint
           $LEAF_FILTER
-          --filter='!./examples/**'
           --filter='!./benchmarks'
           --summarize
 
@@ -288,7 +294,6 @@ jobs:
         run: >-
           pnpm turbo run bundle
           $LEAF_FILTER
-          --filter='!./examples/**'
           --filter='!./benchmarks'
           --summarize
 
@@ -352,7 +357,6 @@ jobs:
         run: >-
           pnpm turbo run lint:package lint:types
           $LEAF_FILTER
-          --filter='!./examples/**'
           --filter='!./benchmarks'
 
       - name: Fix coverage paths
@@ -967,12 +971,12 @@ jobs:
       - name: Test shard
         env:
           SHARD_FILTER: ${{ matrix.filter }}
-        run: pnpm turbo run test test:properties lint $SHARD_FILTER --filter='!./examples/**' --summarize
+        run: pnpm turbo run test test:properties lint $SHARD_FILTER --summarize
 
       - name: Bundle shard
         env:
           SHARD_FILTER: ${{ matrix.filter }}
-        run: pnpm turbo run bundle $SHARD_FILTER --filter='!./examples/**' --summarize
+        run: pnpm turbo run bundle $SHARD_FILTER --summarize
 
       # Per-task execution timings (.turbo/runs/*.json) — perf diagnostics to
       # localize which shard task dominates (e.g. solid#test vs react#test under
@@ -995,7 +999,7 @@ jobs:
       - name: Validate shard published artifacts (publint + attw)
         env:
           SHARD_FILTER: ${{ matrix.filter }}
-        run: pnpm turbo run lint:package lint:types $SHARD_FILTER --filter='!./examples/**'
+        run: pnpm turbo run lint:package lint:types $SHARD_FILTER
 
       - name: Fix coverage paths
         run: bash scripts/fix-lcov-paths.sh
@@ -1022,25 +1026,19 @@ jobs:
           retention-days: 1
 
   # ============================================
-  # EXAMPLES: the dogfooding surface, previously validated by NOTHING on a PR.
-  # `deriveAffected` drops example workspaces (they are not shardable and every
-  # pipeline filters them out with `!./examples/**`), so an examples-only PR
-  # produced `affected = []` → mode=leaf → a leaf filter resolving to zero tasks,
-  # `built=false`, downstream skipped, gate green. pre-push and post-merge filter
-  # them out too, so 139 runnable apps were covered only by the weekly
-  # examples.yml — a break surfaced up to seven days late. This job closes that
-  # with explicit `--filter=<pkg>` tokens for the examples the diff actually
-  # EDITS — the planner intersects the routing query with `git diff --name-only`,
-  # because the query set carries DEPENDENTS and every example depends on core.
-  # Measured on PR #1642 before that intersection landed: 36 changed files under
-  # packages/core, zero under examples/, and this job still ran 156 turbo tasks
-  # for 5m23s — displacing base-test as the gate's critical path and pushing
-  # CI Result out by ~2 minutes. `build` pulls `^bundle`, so the libs an example
-  # resolves through dist arrive as Remote-Cache hits. Skipped — and
-  # `ok()`-tolerated by the gate — whenever the diff touches no example, which is
-  # most PRs. A library change that breaks an example stays the weekly
-  # examples.yml's job, as before. (2026-08-01 CI/CD audit §4.2.) A change
-  # outside the examples that is not a library change is `examples-lint`'s.
+  # EXAMPLES: the dogfooding surface. The examples are a pnpm workspace of their
+  # own that pins npm releases of @real-router/*; this job installs THIS PR's
+  # packages in their place (scripts/checkout-tarballs.mjs) and builds the
+  # examples the diff edits, so a PR that adds an API together with its example
+  # is checked as one. `scripts/examples-plan.mjs` picks the set: an example
+  # whose directory the diff touches, or every example when a file of the
+  # workspace itself changes (its lockfile, settings, pnpmfile, lint configs).
+  # Dependents are not followed — measured on PR #1642, a core-only diff put
+  # 156 tasks and 5m23s on the gate's critical path — so a library change that
+  # breaks an example stays the weekly examples.yml's job. No lint here: the
+  # examples lint only in examples.yml. Skipped — and `ok()`-tolerated by the
+  # gate — whenever the diff touches no example, which is most PRs.
+  # (2026-08-01 CI/CD audit §4.2.)
   # ============================================
   examples-build:
     name: Examples (affected)
@@ -1054,28 +1052,32 @@ jobs:
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
 
+      - name: Install the examples with this PR's packages
+        run: node scripts/checkout-tarballs.mjs examples
+
       # Unquoted on purpose: the filter carries one `--filter=<pkg>` token per
       # affected example and must word-split, same pattern as $SHARD_FILTER.
+      # `build:app` is the SSR examples' build.
       - name: Build affected examples
         env:
           EXAMPLES_FILTER: ${{ needs.check.outputs.examples_filter }}
-        run: pnpm turbo run build $EXAMPLES_FILTER
+        run: |
+          pnpm --dir examples $EXAMPLES_FILTER --no-bail run --if-present build
+          pnpm --dir examples $EXAMPLES_FILTER --no-bail run --if-present build:app
 
   # ============================================
-  # EXAMPLES LINT: what "Examples (affected)" cannot see (#2402). A change
-  # OUTSIDE the examples and benchmarks/ — an ESLint bump in the lockfile, the
-  # root eslint.config.mjs, turbo.json — edits none of them, so that job was
-  # skipped while every one of their lints moved: #2395 merged green on a base
-  # whose `lint:example` was red. `scripts/examples-lint-filter.mjs` takes the
-  # set from turbo's own attribution and leaves out what the job above and
-  # examples.yml cover.
+  # BENCHMARKS LINT: what the pipeline cannot see (#2402). A change OUTSIDE
+  # benchmarks/ — an ESLint bump in the lockfile, the root eslint.config.mjs,
+  # turbo.json — edits none of it, while `lint:bench` imports the root config:
+  # #2395 merged green on a base whose lint was red. `scripts/examples-lint-filter.mjs`
+  # takes the set from turbo's own attribution.
   #
   # ⚠ This is the only arm that runs BEFORE a merge, and it has no Dependabot
   # skip on purpose: the incident is an ESLint bump going green here and then
-  # failing every branch's pre-push, which lints the examples too.
+  # failing every branch's pre-push, which lints the benchmarks too.
   # ============================================
   examples-lint:
-    name: Examples lint (outside changes)
+    name: Benchmarks lint (outside changes)
     runs-on: ubuntu-latest
     needs: [check]
     if: needs.check.outputs.examples_lint_filter != ''
@@ -1088,13 +1090,13 @@ jobs:
 
       # Unquoted on purpose: one `--filter=<pkg>` token per workspace, word-split
       # like $EXAMPLES_FILTER above.
-      - name: Lint examples and benchmarks
+      - name: Lint the benchmarks
         env:
           EXAMPLES_LINT_FILTER: ${{ needs.check.outputs.examples_lint_filter }}
           EXAMPLES_LINT_REASONS: ${{ needs.check.outputs.examples_lint_reasons }}
         run: |
           echo "Reached from outside — turbo's reasons: $EXAMPLES_LINT_REASONS"
-          pnpm turbo run lint:example lint:bench $EXAMPLES_LINT_FILTER
+          pnpm turbo run lint:bench $EXAMPLES_LINT_FILTER
 
   # ============================================
   # DOWNSTREAM: Smoke, Coverage, Bundle Size
@@ -1910,7 +1912,7 @@ jobs:
           # examples-build is ok()-skippable: it runs only when a PR touches an
           # example, which most PRs do not. When it DOES run, a failure is hard.
           # examples-lint likewise: it runs only when a change reaches the
-          # examples or benchmarks from outside them (#2402).
+          # benchmarks from outside them (#2402).
           if [[ "$PATH_OK" == "1" ]] && [[ "$LINTS" == "success" ]] && ok "$SMOKE" && ok "$COVERAGE" && ok "$EXAMPLES" && ok "$EXAMPLES_LINT"; then
             echo "✅ All checks passed"
             exit 0

@@ -98,10 +98,10 @@ pnpm lint:repo-scans
 # runs in parallel with the tests instead of gating them. Dropping it from this
 # line would silently stop linting on commit.
 #
-# Examples stay out: their lint resolves @real-router/* through dist/, and this
-# hook builds none. pre-push lints them after its build (`lint:example`).
+# The examples are a workspace of their own (examples/) and lint only in the
+# weekly examples.yml.
 echo "🧪 Running tests + lint (type-check rides along via turbo)..."
-pnpm turbo run test lint --filter='!./examples/**'
+pnpm turbo run test lint
 
 # Check that e2e directories have specs
 # Cheap static check (find + wc) — catches forgotten e2e/ during scaffolding.
