@@ -118,9 +118,9 @@ Closes #808
      - ⚠ **Pre-push упал на тесте, к ветке НЕ относящемся, — не повторяй пуш вслепую.** Сначала докажи несвязанность: дифф ветки по упавшему пакету и его shared-источникам пуст, а сбой воспроизводится детерминированно на `master` (для property — контрпример из лога прямым вызовом, без seed). Затем заведи задачу (`/create-issue`) и только потом повторяй: повтор на случайном seed — бросок костей, и зелёная вторая попытка молча прячет живой контрпример. В тело PR — строка про эту задачу: CI гоняет то же свойство со своим seed. (Прогон #2547: solid `Invariant 7b` на seed `1781127774` → #2546; второй пуш прошёл.)
    - **Remote ушёл вперёд** (`[behind N]` / `[ahead N, behind M]`) — **НЕ форс-пушь**: подтяни линейно (`git pull --rebase`), затем `git push`.
    - ⚠ **Upstream ветки — `origin/master`**, если её создали от него (`git switch -c <branch> origin/master`, `git worktree add -b <branch> <path> origin/master`): тогда `[ahead N, behind M]` описывает `master`, а не remote ветки, и строка подходит сразу под «нет upstream» и под «remote ушёл вперёд». Есть ли ветка на remote — `git ls-remote --heads origin <branch>`; `behind` здесь — вопрос Фазы 0 п. 5 (merge-tree), а не `git pull --rebase`. (Прогон #2308: `...origin/master [ahead 1, behind 1]`, ветки на remote нет, merge-tree чистый → `git push -u origin HEAD`.)
-3. Создай PR в базовую ветку:
+3. Создай PR в базовую ветку. Тело — в ФАЙЛ, и передавай его `--body-file`, а не `--body`: тело PR — многострочный markdown с фенсами и inline-кодом, а zsh разбирает подстановку `$(…)` раньше heredoc, и backticks внутри ломают вызов (та же причина, что в `/create-issue` Шаг 7). Файл понадобится и для `gh pr edit --body-file`, когда тело правят после публикации:
    ```bash
-   gh pr create --base master --head "$(git branch --show-current)" --title "<title>" --body "<body>"
+   gh pr create --base master --head "$(git branch --show-current)" --title "<title>" --body-file "$BODY"
    ```
    Добавь `--draft`, если он был передан в аргументах.
 4. Выведи URL созданного PR.
