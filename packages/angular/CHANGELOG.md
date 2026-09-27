@@ -1,5 +1,13 @@
 # @real-router/angular
 
+## 0.24.0
+
+### Minor Changes
+
+- [#2596](https://github.com/greydragon888/real-router/pull/2596) [`ad392c3`](https://github.com/greydragon888/real-router/commit/ad392c326af936a61f7e66afbc7b33cae1151802) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `sourceToSignal` from the public entry ([#2590](https://github.com/greydragon888/real-router/issues/2590))
+
+  It took a `RouterSource<T>`, so calling it meant importing `@real-router/sources` — the package the adapters are built on, not one an application uses. Read router state through the adapter's functions: `injectRoute`, `injectRouteNode`, `injectRouterTransition`, `injectIsActiveRoute`. They are built on the same bridge, which stays internal. A custom binding over `@real-router/sources` is adapter-author work.
+
 ## 0.23.0
 
 ### Minor Changes

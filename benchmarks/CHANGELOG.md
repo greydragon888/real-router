@@ -1,5 +1,14 @@
 # router-benchmarks
 
+## 0.3.174
+
+### Patch Changes
+
+- Updated dependencies [[`ad392c3`](https://github.com/greydragon888/real-router/commit/ad392c326af936a61f7e66afbc7b33cae1151802), [`ad392c3`](https://github.com/greydragon888/real-router/commit/ad392c326af936a61f7e66afbc7b33cae1151802), [`ad392c3`](https://github.com/greydragon888/real-router/commit/ad392c326af936a61f7e66afbc7b33cae1151802)]:
+  - @real-router/angular@0.24.0
+  - @real-router/solid@0.26.0
+  - @real-router/svelte@0.24.0
+
 ## 0.3.173
 
 ### Patch Changes
