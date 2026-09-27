@@ -98,7 +98,7 @@ overrides:
   devalue: '>=5.9.2'
   esbuild: '>=0.28.1'
   # @angular/build depends on an exact `vite: 8.1.5`; this collapses that edge
-  # onto the exact 8.2.2 the example manifests declare, so the tree holds one
+  # onto the exact vite the example manifests declare, so the tree holds one
   # vite. Scoped to that edge rather than global, for the reason the root
   # pnpm-workspace.yaml gives under its `vite` entry.
   '@angular/build>vite': '>=8.2.2 <9'

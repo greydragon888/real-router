@@ -106,7 +106,7 @@ overrides:
   devalue: '>=5.9.2'
   esbuild: '>=0.28.1'
   # @angular/build depends on an exact `vite: 8.1.5`; this collapses that edge
-  # onto the exact 8.2.2 `benchmarks/package.json` pins, so the tree holds one
+  # onto the exact vite `benchmarks/package.json` pins, so the tree holds one
   # vite. A DEDUPE pin, not a security floor; the ceiling keeps it inside the
   # major @angular/build declares.
   # ⚠ Scoped to that edge, not global. An override that reaches a direct

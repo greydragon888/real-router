@@ -11,7 +11,7 @@ overrides:
   # the entry is scoped to the consumer rather than global.
   'vite-plugin-solid>@babel/core': '>=7.29.6 <8'
   # @angular/build depends on an exact `vite: 8.1.5`; this collapses that edge
-  # onto the exact 8.2.2 the manifest declares, so the tree holds one vite.
+  # onto the exact vite the manifest declares, so the tree holds one vite.
   # Scoped to that edge rather than global, for the reason the root
   # pnpm-workspace.yaml gives under its `vite` entry.
   '@angular/build>vite': '>=8.2.2 <9'
