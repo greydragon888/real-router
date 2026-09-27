@@ -44,7 +44,8 @@ overrides:
   # below its range could hold it there (#2605).
   undici@6: '>=6.28.0 <7'
   undici@7: '>=7.29.0 <8'
-  piscina: '>=5.2.0 <6.0.0'
+  # At the version @angular/build pins exactly; ng-packagr's `^5.0.0` admits it.
+  piscina: '>=5.3.2 <6.0.0'
   path-to-regexp: '>=8.4.0'
   # ReDoS in brace-expansion (GHSA-3jxr-9vmj-r5cp, High). All three major lines are in the tree
   # via assorted dev/tooling deps — pin each to its patched release. EXACT (not '>=') because the
@@ -97,22 +98,12 @@ overrides:
   # which leaves the examples' builds and this audit gate as the exposure.
   devalue: '>=5.9.2'
   esbuild: '>=0.28.1'
-  # @angular/build depends on an exact `vite: 8.1.5`; this collapses that edge
-  # onto the exact vite the example manifests declare, so the tree holds one
-  # vite. Scoped to that edge rather than global, for the reason the root
+  # @angular/build depends on an exact vite of its own; this collapses that
+  # edge onto the exact vite the example manifests declare, so the tree holds
+  # one vite. Scoped to that edge rather than global, for the reason the root
   # pnpm-workspace.yaml gives under its `vite` entry.
   '@angular/build>vite': '>=8.2.2 <9'
   fast-uri: '>=3.1.6 <4'
-  # Floor at 4.13.5 for GHSA-crvj-82cr-hjcx, GHSA-gqvv-2mrq-wpjv and
-  # GHSA-g6gw-c38x-mqfc (Medium; 5.9 / 6.5 / 5.3), all fixed in that one release.
-  # Transitive via the Angular dev/build toolchain, as the entry below says.
-  hono: '>=4.13.5'
-  # @hono/node-server: GHSA-frvp-7c67-39w9 (Medium) has no v1 fix — the patch is v2-only, so a
-  # bounded major bump. Like hono above, it arrives through @angular/cli's MCP server
-  # (@modelcontextprotocol/sdk), in the angular examples only — not in any published
-  # @real-router/* package. Bump/drop when the toolchain moves off these floors.
-  '@hono/node-server': '>=2.0.5 <3'
-  ip-address: '>=10.3.1'
   # @xmldom/xmldom < 0.8.15 (GHSA-6gmq-8vp8-gcm6, Medium). Its one parent is `plist`, pulled
   # by electron-builder for the desktop EXAMPLES — not in any published @real-router/* package,
   # and it parses our own Info.plist rather than untrusted input. Same-line patch, so a floor

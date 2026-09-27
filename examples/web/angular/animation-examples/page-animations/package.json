@@ -11,9 +11,9 @@
     "lint:example": "eslint --cache . --max-warnings 0"
   },
   "dependencies": {
-    "@angular/common": "~22.1.6",
-    "@angular/core": "~22.1.6",
-    "@angular/platform-browser": "~22.1.6",
+    "@angular/common": "~22.2.0",
+    "@angular/core": "~22.2.0",
+    "@angular/platform-browser": "~22.2.0",
     "@real-router/angular": "*",
     "@real-router/browser-plugin": "*",
     "@real-router/core": "*",
@@ -23,10 +23,10 @@
   "devDependencies": {
     "@angular-devkit/architect": "0.2202.0",
     "@angular-devkit/schematics": "22.2.0",
-    "@angular/build": "~22.1.8",
-    "@angular/cli": "~22.1.8",
-    "@angular/compiler": "~22.1.6",
-    "@angular/compiler-cli": "~22.1.6",
+    "@angular/build": "~22.2.0",
+    "@angular/cli": "~22.2.0",
+    "@angular/compiler": "~22.2.0",
+    "@angular/compiler-cli": "~22.2.0",
     "@playwright/test": "1.63.0",
     "sirv-cli": "3.0.1",
     "typescript": "6.0.3"

@@ -10,8 +10,8 @@ overrides:
   # vite-plugin-solid supports babel 8. The root pnpm-workspace.yaml records why
   # the entry is scoped to the consumer rather than global.
   'vite-plugin-solid>@babel/core': '>=7.29.6 <8'
-  # @angular/build depends on an exact `vite: 8.1.5`; this collapses that edge
-  # onto the exact vite the manifest declares, so the tree holds one vite.
+  # @angular/build depends on an exact vite of its own; this collapses that
+  # edge onto the exact vite the manifest declares, so the tree holds one vite.
   # Scoped to that edge rather than global, for the reason the root
   # pnpm-workspace.yaml gives under its `vite` entry.
   '@angular/build>vite': '>=8.2.2 <9'

@@ -12449,6 +12449,23 @@ Two edges outside their range are the entry's purpose, and their comments say so
 
 **Problem.** The `/examples` entry of `.github/dependabot.yml` ignores `@angular/*`: those packages peer each other exactly and move together through `pnpm update`. `@angular-devkit/*` is released in lockstep with `@angular/cli` and `@angular/build` but lies outside that pattern, so #2611 bumped `@angular-devkit/architect` 0.2201.8 → 0.2202.0 and `@angular-devkit/schematics` 22.1.8 → 22.2.0 on their own, in the seven Angular examples that declare them. The examples lockfile now holds two devkit generations: 22.1.8 under `@angular/build` and `@angular/cli`, and 22.2.0 under the examples' own declarations, which `@analogjs/vitest-angular` peers on.
 
-**Solution.** The entry ignores `@angular-devkit/*` beside `@angular/*`. The two generations stay until the next coordinated Angular update moves both.
+**Solution.** The entry ignores `@angular-devkit/*` beside `@angular/*`. The coordinated update that moves both followed the same day — see "The examples' Angular stack moves to 22.2 as one".
 
 **Why — measured on #2611 merged with `master`.** Nothing breaks today, which is why this is a guard rather than a revert. `ng build` goes through `@angular/build` and its own devkit, and `Examples (affected)` built every Angular example. The 22.2 copies are read only through `@analogjs/vitest-angular`, by `test:unit`, which CI does not run; the three examples that have one pass (18, 9 and 14 tests).
+
+## The examples' Angular stack moves to 22.2 as one (2026-09-28)
+
+**Problem.** After #2611 the examples lockfile held two Angular devkit generations — 22.1.8 under `@angular/build` and `@angular/cli`, 22.2.0 where seven examples declare it — and Dependabot now leaves the whole Angular toolchain to a coordinated update (entry above).
+
+**Solution.** Every `@angular/*` range in the 16 Angular manifests moves from `~22.1.x` to `~22.2.0`; the devkit pins were already on the 22.2 line. Two overrides of `examples/pnpm-workspace.yaml` follow the new tree:
+
+- `piscina` rises to `>=5.3.2 <6.0.0`. `@angular/build` 22.2.0 pins 5.3.2 exactly, and the old `>=5.2.0` floor held it at 5.3.0, below its pin.
+- `hono`, `@hono/node-server` and `ip-address` go. They arrived through `@modelcontextprotocol/sdk`, the MCP server of `@angular/cli` 22.1.8; 22.2.0 depends on `@modelcontextprotocol/server` instead, and none of the three is left in the tree.
+
+The `@angular/build>vite` comments of all three workspaces stop naming the vite `@angular/build` pins (8.1.5 in 22.1, 8.3.0 in 22.2): the edge they describe holds in every version.
+
+**Why — measured.**
+
+- ⚠ **The update takes `pnpm update -r --no-save "@angular/*"` after the manifests move.** A plain install kept `@angular/platform-server` 22.1.6 as the optional peer that `@angular/build` and `@angular/ssr` 22.2.0 resolve, and `strictPeerDependencies` refused it. The update re-resolves the peer; `--no-save` keeps the manifests' `~22.2.0`.
+- The lockfile holds one devkit generation (0.2202.0 / 22.2.0) and one vite (8.3.1). Of the 144 importers, no direct dependency outside `@angular/*` moved; the other changes are the Angular toolchain's own dependencies. `lint:audit` finds no issue in any lockfile.
+- All 15 Angular examples build (`build`, and `build:app` for the four SSR ones), the three with unit tests pass (18, 9, 14), all 16 Angular packages pass `lint:example`, and the e2e suites of `combined` and `ssr-examples/ssr` pass (41 and 49).
