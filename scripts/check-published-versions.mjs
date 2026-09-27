@@ -9,6 +9,11 @@
  * its own `CHANGELOG.md` section. No npm release, no git tag. A reader who
  * follows the file to `npm i @real-router/core@0.118.0` gets a 404 (#2057).
  *
+ * The same end state has a second path, with every run green: a release PR
+ * merged while `master` carries changesets it does not include. The
+ * `Changesets` run on its commit finds them pending and opens the next release
+ * PR instead of publishing (`@real-router/solid@0.25.1`).
+ *
  * ⚠ **The existing detector cannot see this after the fact.**
  * `.changeset/unpublished-packages.mjs` asks "is the CURRENT `package.json`
  * version published", which is true again the moment the next release succeeds.
@@ -249,11 +254,16 @@ if (fresh.length > 0) {
   console.error(
     `\n❌ ${fresh.length} version(s) exist in a CHANGELOG and nowhere else:\n  ` +
       fresh.join("\n  ") +
-      "\n\nA release was allocated and never published — most likely its " +
+      "\n\nA release was allocated and never published. Either its " +
       "`Post-Merge Build` was cancelled by the next push, so `Changesets` " +
-      "never fired (#2057). Recovery is `workflow_dispatch` on `changesets.yml` " +
-      "WHILE the version is still current; once the next release lands, the " +
-      "number is unrecoverable and only the record can be repaired.",
+      "never fired (#2057), or the release PR was merged while `master` " +
+      "carried changesets it did not include, so the `Changesets` run on its " +
+      "commit opened the next release PR instead of publishing. For the first, " +
+      "recovery is `workflow_dispatch` on `changesets.yml` WHILE the version " +
+      "is still current; `Changesets` does not publish while changesets are " +
+      "pending, and once the next release lands the number is unrecoverable " +
+      "either way. Then only the record can be repaired: a `Never published` " +
+      "line in the CHANGELOG section, and the version in the baseline.",
   );
 }
 

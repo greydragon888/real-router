@@ -20,7 +20,8 @@
   ],
   "@real-router/solid": [
     "0.19.25",
-    "0.19.40"
+    "0.19.40",
+    "0.25.1"
   ],
   "@real-router/search-schema-plugin": [
     "0.5.24",

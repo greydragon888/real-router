@@ -10,6 +10,8 @@
 
 ## 0.25.1
 
+> ⚠ **Never published** — there is no `0.25.1` on npm and no git tag for it. The release run that allocated this number never reached the registry; the entries below ship in **0.26.0**.
+
 ### Patch Changes
 
 - [`72f9116`](https://github.com/greydragon888/real-router/commit/72f91160d53bb59a4e62447e23de4e1e66847dc6) Thanks [@greydragon888](https://github.com/greydragon888)! - Share one copy of the router contexts between `.` and `/ssr`, and publish the source under a `solid` export condition so SSR builds can import the package ([#2583](https://github.com/greydragon888/real-router/issues/2583))
