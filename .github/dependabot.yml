@@ -113,6 +113,28 @@ updates:
       # ecosystem.
       - dependency-name: "vite"
         update-types: ["version-update:semver-major"]
+      # vitest and its two plugins peer each other's exact version, so any one of
+      # them bumped alone fails the re-resolve (measured 2026-09-27: vitest 5.0.1
+      # beside @vitest/coverage-v8 and @vitest/ui 4.1.11), and the Vitest 5
+      # migration is blocked on its own. Majors move by hand, as one.
+      - dependency-name: "vitest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitest/coverage-v8"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitest/ui"
+        update-types: ["version-update:semver-major"]
+      # babel 8: babel-preset-solid, @rollup/plugin-babel and the babel 7 plugins
+      # of the Solid build peer `@babel/core ^7`, and @babel/preset-typescript 8
+      # peers `^8` — a major of either fails the re-resolve. Majors move by hand
+      # once the Solid chain takes babel 8.
+      - dependency-name: "@babel/*"
+        update-types: ["version-update:semver-major"]
+      # babel-preset-solid releases in step with solid-js and peers `solid-js` at
+      # its own version, while solid-js patches arrive through `pnpm update`, not
+      # here: its patch alone cannot install (1.9.15 wants solid-js ^1.9.15 beside
+      # 1.9.14). It moves by hand with solid-js; minor/major still come as PRs.
+      - dependency-name: "babel-preset-solid"
+        update-types: ["version-update:semver-patch"]
       # --- Patch-float set: UI frameworks, testing libs --------------------------
       # Dev/test-only deps (never shipped — published adapters expose them as
       # peerDependency ranges). Declared with `~` patch-float ranges in every
@@ -207,6 +229,10 @@ updates:
       # of the plugin stack that peers on it; a new MAJOR fails the re-resolve
       # under strictPeerDependencies and errors the whole job. Majors move by hand.
       - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      # vitest 5 peers @vitest/* at its own exact version and fails the
+      # re-resolve beside their 4.x — the root block has the measurement.
+      - dependency-name: "vitest"
         update-types: ["version-update:semver-major"]
       # Patch-float set: declared with `~` in the manifests, so `pnpm update`
       # takes the latest patch and Dependabot stays quiet on PATCH.

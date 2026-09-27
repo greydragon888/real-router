@@ -12487,3 +12487,15 @@ The `@angular/build>vite` comments of all three workspaces stop naming the vite 
 - With the hook, the fresh resolution gives danger undici 7.30.0 as a dependency. In the repository, after `pnpm dedupe`, danger holds 7.29.0 under `dependencies` and jsdom keeps 8.11.2; `dedupe --check`, the frozen install and knip pass, and `pnpm outdated` no longer lists undici.
 - `update.ignoreDeps: [undici]` hid it from `pnpm outdated` as well, but kept the devDependency.
 - Dependabot runs with a pnpmfile present: its commits to the examples lockfile (#2607, #2611) keep that workspace's `pnpmfileChecksum`.
+
+## Dependabot stops retrying the bumps it cannot install (2026-09-28)
+
+**Problem.** Every run of the Dependabot `/` entry ended in failure, and every run of `/examples` since 27.09 23:00: pnpm refused an update with `ERR_PNPM_PEER_DEP_ISSUES`, Dependabot recorded `dependency_file_not_resolvable` and marked the run failed, although it still opened the updates that resolved.
+
+**Solution.** The root entry ignores the majors of `vitest`, `@vitest/coverage-v8`, `@vitest/ui` and `@babel/*`, and the patches of `babel-preset-solid`; the examples entry ignores the majors of `vitest`.
+
+**Why — measured in the runs of 27.09 23:21.**
+
+- vitest and its two plugins peer each other's exact version: `vitest` 5.0.1 alone met `@vitest/coverage-v8` and `@vitest/ui` 4.1.11, and each plugin alone met `vitest` 4.1.11. The Vitest 5 migration is blocked on its own, so these move by hand, as one.
+- `@babel/core` 8 fails against `babel-preset-solid`, `@rollup/plugin-babel` and the babel 7 plugins of the Solid build, all of which peer `^7.0.0`; `@babel/preset-typescript` 8 peers `@babel/core ^8`.
+- `babel-preset-solid` failed on a PATCH, not a major: 1.9.15 peers `solid-js ^1.9.15`, the tree holds 1.9.14, and solid-js patches arrive through `pnpm update` (the patch-float set), never from Dependabot. Its patch can only move with solid-js, by hand; its minors and majors still come as pull requests.
