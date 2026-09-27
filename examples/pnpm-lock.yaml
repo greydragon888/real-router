@@ -21,7 +21,6 @@ overrides:
   brace-expansion@1: 1.1.18
   brace-expansion@2: 2.1.4
   brace-expansion@5: 5.0.9
-  shell-quote: '>=1.9.0'
   body-parser: '>=2.3.0'
   picomatch@2: 2.3.2
   picomatch@4: 4.0.4
@@ -29,7 +28,7 @@ overrides:
   yaml@2: 2.9.0
   devalue: '>=5.9.2'
   esbuild: '>=0.28.1'
-  vite: '>=8.2.2 <9'
+  '@angular/build>vite': '>=8.2.2 <9'
   fast-uri: '>=3.1.6 <4'
   hono: '>=4.13.5'
   '@hono/node-server': '>=2.0.5 <3'
@@ -37,7 +36,6 @@ overrides:
   '@xmldom/xmldom': '>=0.8.15 <0.9'
   postcss: '>=8.5.23'
   nanoid@3: '>=3.3.17 <4'
-  js-cookie: '>=3.0.7'
   tmp: '>=0.2.6'
   fflate: '>=0.8.3 <0.9'
   js-yaml: '>=4.3.2 <5'
@@ -187,7 +185,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       wait-on:
         specifier: 9.1.0
@@ -239,7 +237,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       wait-on:
         specifier: 9.1.0
@@ -291,7 +289,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       wait-on:
         specifier: 9.1.0
@@ -334,7 +332,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   desktop/tauri/react-navigation:
@@ -374,7 +372,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/angular:
@@ -746,7 +744,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -816,7 +814,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -981,7 +979,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -1353,7 +1351,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/preact/animation-examples/page-animations:
@@ -1381,7 +1379,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/preact/animation-examples/route-animations:
@@ -1409,7 +1407,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/preact/animation-examples/view-transitions:
@@ -1437,7 +1435,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/preact/async-guards:
@@ -1477,7 +1475,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -1520,7 +1518,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -1548,7 +1546,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/preact/combined:
@@ -1606,7 +1604,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -1643,7 +1641,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/preact/dynamic-routes:
@@ -1683,7 +1681,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -1726,7 +1724,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -1757,7 +1755,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/preact/lazy-loading:
@@ -1782,7 +1780,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/preact/nested-routes:
@@ -1822,7 +1820,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -1853,7 +1851,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/preact/search-schema:
@@ -1887,7 +1885,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/preact/ssr-examples/ssg:
@@ -1930,7 +1928,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/preact/ssr-examples/ssr:
@@ -1979,7 +1977,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/preact/ssr-examples/ssr-mixed:
@@ -2028,7 +2026,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/preact/ssr-examples/ssr-streaming:
@@ -2074,7 +2072,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/react:
@@ -2127,7 +2125,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/react/animation-examples/page-animations:
@@ -2164,7 +2162,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/react/animation-examples/route-animations:
@@ -2201,7 +2199,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/react/animation-examples/view-transitions:
@@ -2247,7 +2245,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/react/async-guards:
@@ -2296,7 +2294,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -2348,7 +2346,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -2385,7 +2383,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/react/combined:
@@ -2452,7 +2450,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -2498,7 +2496,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/react/dynamic-routes:
@@ -2547,7 +2545,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -2599,7 +2597,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -2642,7 +2640,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/react/hash-examples/scroll-restoration:
@@ -2679,7 +2677,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/react/hash-examples/scroll-spy:
@@ -2719,7 +2717,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/react/hash-routing:
@@ -2756,7 +2754,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/react/hmr:
@@ -2790,7 +2788,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/react/keepAlive:
@@ -2827,7 +2825,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/react/lazy-loading:
@@ -2861,7 +2859,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/react/legacy-entry:
@@ -2895,7 +2893,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/react/navigation-api:
@@ -2932,7 +2930,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/react/nested-routes:
@@ -2981,7 +2979,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -3021,7 +3019,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/react/search-schema:
@@ -3064,7 +3062,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/react/ssr-examples/ssg:
@@ -3113,7 +3111,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/react/ssr-examples/ssr:
@@ -3168,7 +3166,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/react/ssr-examples/ssr-mixed:
@@ -3223,7 +3221,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/react/ssr-examples/ssr-rsc:
@@ -3281,7 +3279,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/react/ssr-examples/ssr-streaming:
@@ -3333,7 +3331,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/solid:
@@ -3370,7 +3368,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
@@ -3398,7 +3396,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
@@ -3426,7 +3424,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
@@ -3454,7 +3452,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
@@ -3494,7 +3492,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
@@ -3537,7 +3535,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
@@ -3565,7 +3563,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
@@ -3623,7 +3621,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
@@ -3660,7 +3658,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
@@ -3700,7 +3698,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
@@ -3743,7 +3741,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
@@ -3774,7 +3772,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
@@ -3799,7 +3797,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
@@ -3839,7 +3837,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
@@ -3870,7 +3868,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
@@ -3904,7 +3902,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
@@ -3944,7 +3942,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
@@ -3993,7 +3991,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
@@ -4039,7 +4037,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
@@ -4082,7 +4080,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
@@ -4107,7 +4105,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
@@ -4132,7 +4130,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
@@ -4172,7 +4170,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/svelte/animation-examples/page-animations:
@@ -4200,7 +4198,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/svelte/animation-examples/route-animations:
@@ -4228,7 +4226,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/svelte/animation-examples/view-transitions:
@@ -4256,7 +4254,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/svelte/async-guards:
@@ -4296,7 +4294,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -4339,7 +4337,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -4367,7 +4365,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/svelte/combined:
@@ -4425,7 +4423,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -4462,7 +4460,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/svelte/dynamic-routes:
@@ -4502,7 +4500,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -4545,7 +4543,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -4576,7 +4574,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/svelte/lazy-loading:
@@ -4601,7 +4599,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/svelte/lazy-loading-svelte:
@@ -4626,7 +4624,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/svelte/link-action:
@@ -4651,7 +4649,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/svelte/nested-routes:
@@ -4691,7 +4689,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -4722,7 +4720,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/svelte/search-schema:
@@ -4756,7 +4754,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/svelte/snippets-routing:
@@ -4781,7 +4779,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/svelte/ssr-examples/ssg:
@@ -4824,7 +4822,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/svelte/ssr-examples/ssr:
@@ -4873,7 +4871,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/svelte/ssr-examples/ssr-mixed:
@@ -4922,7 +4920,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/svelte/ssr-examples/ssr-streaming:
@@ -4968,7 +4966,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
 
   web/vue:
@@ -5005,7 +5003,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vue-tsc:
         specifier: 3.3.11
@@ -5036,7 +5034,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vue-tsc:
         specifier: 3.3.11
@@ -5067,7 +5065,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vue-tsc:
         specifier: 3.3.11
@@ -5098,7 +5096,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vue-tsc:
         specifier: 3.3.11
@@ -5141,7 +5139,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -5187,7 +5185,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -5218,7 +5216,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vue-tsc:
         specifier: 3.3.11
@@ -5279,7 +5277,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -5319,7 +5317,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vue-tsc:
         specifier: 3.3.11
@@ -5362,7 +5360,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -5408,7 +5406,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -5442,7 +5440,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vue-tsc:
         specifier: 3.3.11
@@ -5473,7 +5471,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vue-tsc:
         specifier: 3.3.11
@@ -5501,7 +5499,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vue-tsc:
         specifier: 3.3.11
@@ -5544,7 +5542,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
@@ -5578,7 +5576,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vue-tsc:
         specifier: 3.3.11
@@ -5606,7 +5604,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vue-tsc:
         specifier: 3.3.11
@@ -5643,7 +5641,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vue-tsc:
         specifier: 3.3.11
@@ -5686,7 +5684,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vue-tsc:
         specifier: 3.3.11
@@ -5735,7 +5733,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vue-tsc:
         specifier: 3.3.11
@@ -5784,7 +5782,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vue-tsc:
         specifier: 3.3.11
@@ -5830,7 +5828,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vue-tsc:
         specifier: 3.3.11
@@ -5858,7 +5856,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vite:
-        specifier: '>=8.2.2 <9'
+        specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.15)(yaml@2.9.0)
       vue-tsc:
         specifier: 3.3.11
@@ -5882,7 +5880,7 @@ packages:
     peerDependencies:
       '@angular-devkit/build-angular': ^17.0.0 || ^18.0.0 || ^19.0.0 || ^20.0.0 || ^21.0.0 || ^22.0.0
       '@angular/build': ^18.0.0 || ^19.0.0 || ^20.0.0 || ^21.0.0 || ^22.0.0
-      vite: '>=8.2.2 <9'
+      vite: ^6.0.0 || ^7.0.0 || ^8.0.0
     peerDependenciesMeta:
       '@angular-devkit/build-angular':
         optional: true
@@ -7425,7 +7423,7 @@ packages:
     resolution: {integrity: sha512-ZZ5RIT2ZVXg8UxRA8VZpoT8CdpDG7RFIqOT4bELqNBp85+HKvQBbgmh3gsoW1UOQXx26TLe+ZRNKI7q281Kckw==}
     peerDependencies:
       '@babel/core': 7.x
-      vite: '>=8.2.2 <9'
+      vite: 2.x || 3.x || 4.x || 5.x || 6.x || 7.x || 8.x
 
   '@prefresh/babel-plugin@0.5.3':
     resolution: {integrity: sha512-57LX2SHs4BX2s1IwCjNzTE2OJeEepRCNf1VTEpbNcUyHfMO68eeOWGDIt4ob9aYlW6PEWZ1SuwNikuoIXANDtQ==}
@@ -7442,7 +7440,7 @@ packages:
     resolution: {integrity: sha512-FY1fzXpUjiuosznMV0YM7XAOPZjB5FIdWS0W24+XnlxYkt9hNAwwsiKYn+cuTEoMtD/ZVazS5QVssBr9YhpCQA==}
     peerDependencies:
       preact: ^10.4.0 || ^11.0.0-0
-      vite: '>=8.2.2 <9'
+      vite: '>=2.0.0'
 
   '@real-router/angular@0.24.0':
     resolution: {integrity: sha512-eABmxIquKjBzjO9tIRXHoySNaZJnEnfNevk9xWVxBHcHizsuoDKAwsxVELLu/Hw3HKizJdgMU0qVcaNIaaiWUA==}
@@ -7999,7 +7997,7 @@ packages:
     engines: {node: ^20.19 || ^22.12 || >=24}
     peerDependencies:
       svelte: ^5.46.4
-      vite: '>=8.2.2 <9'
+      vite: ^8.0.0-beta.7 || ^8.0.0
 
   '@szmarczak/http-timer@4.0.6':
     resolution: {integrity: sha512-4BAffykYOgO+5nzBWYwE3W90sBgLJoUPRWWcL8wlyiM8IB8ipJz3UMJ9KXQd1RKQXpKp8Tutn80HZtWsu2u76w==}
@@ -8139,7 +8137,7 @@ packages:
     engines: {node: '>= 10'}
     peerDependencies:
       svelte: ^3 || ^4 || ^5 || ^5.0.0-next.0
-      vite: '>=8.2.2 <9'
+      vite: '*'
       vitest: '*'
     peerDependenciesMeta:
       vite:
@@ -8451,7 +8449,7 @@ packages:
     resolution: {integrity: sha512-bdyo8rB3NnQbikdMpHaML9Z1OZPBu6fFOBo+OtxsBlvMJtysWskmBcnbIDhUqgC8tcxNv/a+BcV5U+2nQMm1OQ==}
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
     peerDependencies:
-      vite: '>=8.2.2 <9'
+      vite: ^6.0.0 || ^7.0.0 || ^8.0.0
 
   '@vitejs/plugin-react@6.1.1':
     resolution: {integrity: sha512-yxLaQV9gkhS8ezJqCM6+ndU7mDY6gqAg75NQ+0IjwEI8IYOmQCgkRwHKVSfWXW076DsqMo0Dk+0FK1U+M5RgFw==}
@@ -8460,7 +8458,7 @@ packages:
       '@rolldown/plugin-babel': ^0.1.7 || ^0.2.0
       babel-plugin-react-compiler: ^1.0.0
       oxc-transform-react: ^0.145.0
-      vite: '>=8.2.2 <9'
+      vite: ^8.0.0
     peerDependenciesMeta:
       '@rolldown/plugin-babel':
         optional: true
@@ -8475,7 +8473,7 @@ packages:
       react: '*'
       react-dom: '*'
       react-server-dom-webpack: '*'
-      vite: '>=8.2.2 <9'
+      vite: '*'
     peerDependenciesMeta:
       react-server-dom-webpack:
         optional: true
@@ -8484,7 +8482,7 @@ packages:
     resolution: {integrity: sha512-0ZjgOg7oO6farnNGup7yvoM/YXZV84OZxHAwtflItNa/6zzQyVb5LNxyea3FEKEX2XlagIKzrlH7wwxkKgtiew==}
     engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
-      vite: '>=8.2.2 <9'
+      vite: ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0
       vue: ^3.2.25
 
   '@vitest/coverage-v8@4.1.11':
@@ -8519,7 +8517,7 @@ packages:
     resolution: {integrity: sha512-2XJVD55d1o5AZous5CCGKS74g/riOj9odEt2bQpCVZeblHyHdnMeFl4jl0XjU21stf4mbjUkew2eXQZt65g5CQ==}
     peerDependencies:
       msw: ^2.4.9
-      vite: '>=8.2.2 <9'
+      vite: ^6.0.0 || ^7.0.0 || ^8.0.0
     peerDependenciesMeta:
       msw:
         optional: true
@@ -10119,9 +10117,8 @@ packages:
     engines: {node: '>=14'}
     hasBin: true
 
-  js-cookie@3.0.7:
-    resolution: {integrity: sha512-z/wZZgDrkNV1eA0ULjM/F9/50Ya8fbzgKneSpoPsXSGd0KnpdtHfOZWK+GcwLk+EZbS4F9RBhU+K2RgzuDaItw==}
-    engines: {node: '>=20'}
+  js-cookie@3.0.8:
+    resolution: {integrity: sha512-yeJd4aNAdYZQjaon2bpD/Gb0B/omw7HQOsynXXcOiWVCacbBcPlgn8S/d1X6blFSaHao7ozqtW7NZW19xpCtIw==}
 
   js-tokens@10.0.0:
     resolution: {integrity: sha512-lM/UBzQmfJRo9ABXbPWemivdCW8V2G8FHaHdypQaIy523snUjog0W71ayWXTjiR+ixeMyVHN2XcpnTd/liPg/Q==}
@@ -11189,8 +11186,8 @@ packages:
     resolution: {integrity: sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A==}
     engines: {node: '>=8'}
 
-  shell-quote@1.10.0:
-    resolution: {integrity: sha512-w1aiOKwKuRgtwAReIIj89puqg+I7GvX4IbLrvmhXbzQsj1+Zwi4VO3+fa6ZF91TWSjIxoEkKnMeHcLEODK5ZXA==}
+  shell-quote@1.9.0:
+    resolution: {integrity: sha512-Iov+JwFv/2HcTpcwNMKd8+IWNb8tboQJNQTkAY/LLVK7gGH9jy+LGkVqPxfekHl+yMmiqXszdGWXgkfml7hjqA==}
     engines: {node: '>= 0.4'}
 
   side-channel-list@1.0.1:
@@ -11569,7 +11566,7 @@ packages:
     peerDependencies:
       '@testing-library/jest-dom': ^5.16.6 || ^5.17.0 || ^6.0.0 || ^7.0.0
       solid-js: ^1.7.2
-      vite: '>=8.2.2 <9'
+      vite: ^3.0.0 || ^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0 || ^9.0.0
     peerDependenciesMeta:
       '@testing-library/jest-dom':
         optional: true
@@ -11577,7 +11574,7 @@ packages:
   vite-prerender-plugin@0.5.13:
     resolution: {integrity: sha512-IKSpYkzDBsKAxa05naRbj7GvNVMSdww/Z/E89oO3xndz+gWnOBOKOAbEXv7qDhktY/j3vHgJmoV1pPzqU2tx9g==}
     peerDependencies:
-      vite: '>=8.2.2 <9'
+      vite: 5.x || 6.x || 7.x || 8.x
 
   vite@8.2.2:
     resolution: {integrity: sha512-cFKLV/PRgAUlIRm5WjMjJ86jrftzpqcgH+Us+DS8mI3CDNiH30Whrz8uHL3+MOLPAgqbMBAqWdAHAphOAM+z/Q==}
@@ -11625,7 +11622,7 @@ packages:
   vitefu@1.1.3:
     resolution: {integrity: sha512-ub4okH7Z5KLjb6hDyjqrGXqWtWvoYdU3IGm/NorpgHncKoLTCfRIbvlhBm7r0YstIaQRYlp4yEbFqDcKSzXSSg==}
     peerDependencies:
-      vite: '>=8.2.2 <9'
+      vite: ^3.0.0 || ^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0
     peerDependenciesMeta:
       vite:
         optional: true
@@ -11646,7 +11643,7 @@ packages:
       '@vitest/ui': 4.1.11
       happy-dom: '*'
       jsdom: '*'
-      vite: '>=8.2.2 <9'
+      vite: ^6.0.0 || ^7.0.0 || ^8.0.0
     peerDependenciesMeta:
       '@edge-runtime/vm':
         optional: true
@@ -14846,7 +14843,7 @@ snapshots:
     dependencies:
       chalk: 5.6.2
       rxjs: 7.8.2
-      shell-quote: 1.10.0
+      shell-quote: 1.9.0
       supports-color: 10.2.2
       tree-kill: 1.2.2
       yargs: 18.0.0
@@ -16141,10 +16138,10 @@ snapshots:
       config-chain: 1.1.13
       editorconfig: 3.0.2
       glob: 13.0.6
-      js-cookie: 3.0.7
+      js-cookie: 3.0.8
       nopt: 10.0.1
 
-  js-cookie@3.0.7: {}
+  js-cookie@3.0.8: {}
 
   js-tokens@10.0.0: {}
 
@@ -17294,7 +17291,7 @@ snapshots:
 
   shebang-regex@3.0.0: {}
 
-  shell-quote@1.10.0: {}
+  shell-quote@1.9.0: {}
 
   side-channel-list@1.0.1:
     dependencies:

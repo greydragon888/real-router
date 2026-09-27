@@ -25,34 +25,28 @@ overrides:
   # vite-plugin-solid (`^7.23.3`), babel-preset-solid and @rollup/plugin-babel (peer
   # `^7.0.0`) all declare carets that semver cannot resolve to 8 anyway.
   'vite-plugin-solid>@babel/core': '>=7.29.6 <8'
-  axios: '>=1.16.0'
-  follow-redirects: '>=1.16.0'
+  # Floor for the axios advisories fixed in 1.16.0 and 1.18.0 — GHSA-35jp-ww65-95wh
+  # and GHSA-mmx7-hfxf-jppx among them. Scoped to @codspeed/core, whose `^1.4.0`
+  # admits the affected releases: @sonar/scan pins an exact 1.20.0, and an
+  # unscoped floor would replace that pin too.
+  '@codspeed/core>axios': '>=1.18.0'
   # Floor raised for GHSA-4mjr-xmp4-gh2g + GHSA-x5fp-wj9c-mxmx (both Medium, 6.16.0).
   # Parents are @gitbeaker and typed-rest-client — CI tooling, never a published
-  # @real-router/* package.
+  # @real-router/* package. typed-rest-client pins an exact 6.15.1, an affected
+  # release, so this floor overrides that pin on purpose.
   qs: '>=6.16.0'
-  # Force adm-zip past the path-traversal fix (GHSA-xcpc-8h2w-3j85, High) and the
-  # uncompressed-size allocation fix (GHSA-7q85-xj36-vmfc, High; 0.6.1). Its only consumer is
-  # @sonar/scan (root devDep, NOT shipped), which pins adm-zip EXACTLY at 0.5.17 in both 4.3.8 and
-  # the latest 4.4.0 — so an override is the only bump path. Dev-only + trusted-input (the scanner
-  # extracts SonarSource's own zip), so the stricter extract can't break it. Drop when a
-  # @sonar/scan release moves off 0.5.x. (Override, not an osv-scanner.toml allowlist, so a future
-  # regression that drops it re-fails the gate instead of being silently masked.)
-  adm-zip: '>=0.6.1'
   # Floor raised for GHSA-mw96-cpmx-2vgc (arbitrary file write via path traversal,
-  # High, fixed in 4.59.0). Written as a FLOOR, not the exact pin it started as:
-  # an exact override silently overrides the consumer's own version too, so
-  # `packages/solid` could raise its pin and get the old rollup anyway — install
-  # green, lockfile untouched, manifest and tree disagreeing with nobody told.
-  rollup: '>=4.59.0'
+  # High, fixed in 4.59.0). Of the installed packages, only ng-packagr depends on
+  # rollup (`^4.24.0`, optional); the rest take it as a peer. Scoped to that
+  # edge so it does not reach the pin in `packages/solid` — the `vite` entry
+  # says what an override does to a direct dependency.
+  'ng-packagr>rollup': '>=4.59.0'
   minimatch@9: ~9.0.7
   minimatch@10: ~10.2.3
   ajv@6: ~6.14.0
   ajv@8: ~8.18.0
-  underscore: '>=1.13.8'
   undici: '>=7.29.0 <8.0.0'
   piscina: '>=5.2.0 <6.0.0'
-  flatted: '>=3.4.2'
   # ReDoS in brace-expansion (GHSA-3jxr-9vmj-r5cp, High). Two major lines, @2 and @5, are in the tree
   # via assorted dev/tooling deps — pin each to its patched release. EXACT (not '>=') because the
   # '@N' selector value can't be an open range without risking a cross-major jump (a '>=1.1.16' on
@@ -86,7 +80,6 @@ overrides:
   # shell-quote < 1.9.0 (GHSA-395f-4hp3-45gv, High) — dev-only (launch-editor → shell-quote), never
   # in a published @real-router/* package. Drop when launch-editor pulls >=1.9.0 transitively.
   shell-quote: '>=1.9.0'
-  node-forge: '>=1.4.0'
   picomatch@2: 2.3.2
   picomatch@4: 4.0.4
   yaml@1: 1.10.3
@@ -96,12 +89,6 @@ overrides:
   # downgraded @changesets/parse@1, which declares ^2.9.0 and parses every changeset
   # on the release path. Raise this line with the highest declared range, never below.
   yaml@2: 2.9.0
-  # Floor at 1.7.1 for GHSA-7w5x-hrqm-74c2 (High; 8.2) — denial of service via a
-  # malformed TOML document. Transitive via `knip`, which is dev-only and reads
-  # no untrusted TOML here, so the exposure is the audit gate rather than the
-  # shipped surface; the floor is still the cheaper answer than an ignore entry.
-  smol-toml: '>=1.7.1'
-  defu: '>=6.1.5'
   # Floor at 5.9.2 for GHSA-9rgm-9g3h-6x36 (Medium; 5.3) — denial of service via
   # malformed input. Transitive via `svelte`, which declares `^5.8.1`, so the floor
   # holds; `svelte` is a peer of `@real-router/svelte` and is never bundled into it,
@@ -109,12 +96,16 @@ overrides:
   # as the exposure.
   devalue: '>=5.9.2'
   esbuild: '>=0.28.1'
-  # Collapses every transitive vite copy onto the exact 8.2.2 that its one direct
-  # declaration, `benchmarks/package.json`, pins (`vite` is not in syncpack's
-  # `~`-float group). This is a DEDUPE pin, not a security floor — the ceiling
-  # keeps the collapse inside the major so a transitive cannot drag the tree onto
-  # a vite the plugins have not met.
-  vite: '>=8.2.2 <9'
+  # @angular/build depends on an exact `vite: 8.1.5`; this collapses that edge
+  # onto the exact 8.2.2 `benchmarks/package.json` pins, so the tree holds one
+  # vite. A DEDUPE pin, not a security floor; the ceiling keeps it inside the
+  # major @angular/build declares.
+  # ⚠ Scoped to that edge, not global. An override that reaches a direct
+  # dependency becomes its recorded specifier: a raised pin then installs
+  # nothing, with the install green and the lockfile untouched, and
+  # `pnpm update --no-save` rewrites the specifier into a lockfile that
+  # `install --frozen-lockfile` refuses.
+  '@angular/build>vite': '>=8.2.2 <9'
   fast-uri: '>=3.1.6 <4'
   # postcss < 8.5.23 (GHSA-fxqj-rqcc-2cmp, Medium). Every parent is build- or lint-time:
   # vite, @angular/build, ng-packagr, @vue/compiler-sfc, beasties, postcss-scss /
@@ -133,7 +124,6 @@ overrides:
   # onto that newer line, which postcss does not declare. Drop when the toolchain
   # pulls >=3.3.17 on its own.
   nanoid@3: '>=3.3.17 <4'
-  js-cookie: '>=3.0.7'
   # fflate < 0.8.3: `unzipSync` can loop forever on a malformed ZIP64 archive
   # (GHSA-px8p-9vwx-vf98, 7.5). `@arethetypeswrong/core` (via its CLI and tsdown)
   # declares `^0.8.3`, but `@vitest/ui` declares `^0.8.2`, a range that admits

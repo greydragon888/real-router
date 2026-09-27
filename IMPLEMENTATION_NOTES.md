@@ -12205,6 +12205,10 @@ The two periods built different trees, so this is not an A/B. Nothing in it pays
 
 ## The examples declare `@real-router/*` as `*` (2026-09-27)
 
+> ⚠ Superseded later on 2026-09-27 in one respect: the `vite` override no
+> longer reaches the manifests, and `pnpm update -r --no-save "@real-router/*"`
+> refreshes the releases cleanly. See "Overrides stop at the edges that need them".
+
 **Problem.** The manifests pinned exact `@real-router/*` releases, and each release left them behind until a bump rewrote all of them. In between, an example copied out of `master` could install a release older than the API it uses — measured on solid 0.25.0, published without #2583: the Solid SSG example failed `build:app` and the three Solid SSR production servers died at start with `Client-only API called on the server side`. CI never read the pins: both examples jobs install this checkout's tarballs over them.
 
 **Solution.** Every `@real-router/*` dependency of an example is `*`. The lockfile records the release, so a frozen install stays reproducible; an example copied out of the repository installs the latest release. `scripts/tests/examples-plan.test.mjs` fails on any other specifier, naming the example.
@@ -12218,6 +12222,10 @@ The two periods built different trees, so this is not an A/B. Nothing in it pays
 - Dependabot reads `*` as `>= 0` (dependabot-core's constraint converter), so a new release already satisfies the manifest and its `/examples` PRs should touch the lockfile alone — to be confirmed on its first `@real-router/*` run.
 
 ## Each `pnpm-workspace.yaml` describes its own tree (2026-09-27)
+
+> ⚠ Superseded later on 2026-09-27: the findings this entry left for a decision
+> were acted on, and its "three of them" undercounted the class. See
+> "Overrides stop at the edges that need them".
 
 **Problem.** The override comments of `examples/pnpm-workspace.yaml` were copied from the root file when the examples became a workspace of their own, and they kept describing the root tree: Stryker and `packages/solid` under `@babel/core`, `@gitbeaker` and `typed-rest-client` as `qs` parents, `@changesets/parse` under `yaml@2`, `@arethetypeswrong/core` under `fflate`, `@commitlint/load` under `js-yaml`. The root comments still named parents that had left with the examples — express, body-parser, `concurrently`, electron-builder — and listed `vue-router`, which declares no `yaml`, as a `yaml@2` consumer. One root override, `@isaacs/brace-expansion`, has no target in the root lockfile. Three examples overrides, `axios`, `follow-redirects` and `flatted`, set floors that every parent's declared range already clears.
 
@@ -12234,3 +12242,39 @@ The two periods built different trees, so this is not an A/B. Nothing in it pays
 The root also keeps floors its parents' ranges already clear: `adm-zip`, `underscore`, `node-forge`, `smol-toml`, `defu`, `flatted`, `follow-redirects`.
 
 The `fflate` record in "Third shape — the override WAS the vulnerability" says both parents declare `^0.8.3`. `@vitest/ui@4.1.11` declares `^0.8.2`, so for that parent the floor, not the declared range, is what excludes the affected release.
+
+## Overrides stop at the edges that need them (2026-09-27)
+
+**Problem.** An override replaces every edge it matches. Two consequences of that were measured on 2026-09-27.
+
+- ⚠ **An override that matches a direct dependency becomes that dependency's recorded specifier.** The lockfiles recorded `>=8.2.2 <9` as the `vite` of the 124 example manifests and of `benchmarks/package.json`, and `>=4.59.0` as the `rollup` of `packages/solid`. A raised pin then installs nothing. Raising `vite` to 8.3.1 in one example, or `rollup` to 4.63.5 in `packages/solid`, left the lockfile untouched with `pnpm install --lockfile-only` green. In the examples, `pnpm update -r --no-save "@real-router/*"` rewrote the 124 specifiers to `8.2.2`, and `install --frozen-lockfile` then refused the lockfile with `ERR_PNPM_OUTDATED_LOCKFILE`.
+- ⚠ **An override keeps the version the lockfile holds, even where a parent declares a range above it.** `js-cookie: '>=3.0.7'` kept 3.0.7 under js-beautify's `^3.0.8`, and the root `axios: '>=1.16.0'` kept 1.18.1 under the exact 1.20.0 of `@sonar/scan`. In the other direction, the examples `shell-quote` floor lifted the exact 1.9.0 of `concurrently` to 1.10.0.
+
+**Solution.**
+
+- `vite` becomes `'@angular/build>vite': '>=8.2.2 <9'` in both files. `@angular/build` depends on an exact `vite: 8.1.5`; with no `vite` override at all, the examples tree carries 8.1.5 and 8.2.2. vitest's `^6.0.0 || ^7.0.0 || ^8.0.0` and the peer range of every plugin admit 8.2.2 on their own.
+- The root `rollup` floor becomes `'ng-packagr>rollup': '>=4.59.0'`. Of the installed packages, only ng-packagr depends on rollup (`^4.24.0`, optional); the other eight parents take it as a peer. The examples keep the unscoped floor, because no example declares rollup.
+- `js-cookie` leaves both files: js-beautify's `^3.0.8` is above the floor.
+- The root `axios` floor becomes `'@codspeed/core>axios': '>=1.18.0'`, for the one parent whose `^1.4.0` admits affected releases. It rises from 1.16.0 because OSV lists ten advisories against 1.16.0 that 1.18.0 fixes.
+- The examples `shell-quote` floor goes: `concurrently` pins 1.9.0, the fixed release. The root keeps its floor for launch-editor's `^1.8.4`.
+- The root floors every parent already clears go: `adm-zip`, `underscore`, `node-forge`, `smol-toml`, `defu`, `flatted`, `follow-redirects`. Measured on the final tree, each parent's declared range still excludes the affected releases.
+- `scripts/osv-scanner.toml` and the mirrored `allow-ghsas:` of `codeql.yml` lose three ids that match nothing in the lockfiles. GHSA-vwc7-r8mq-g2x9 affects adm-zip through 0.6.0, and the tree has 0.6.1. OSV and GitHub scope the image-size pair, GHSA-5p2g-fcmc-qvqq and GHSA-w3rx-r6r6-pgpr, to `>=1.2.0` and `>=0.6.3` with a fix in 2.0.3, and the tree has 0.5.5.
+- `examples/CLAUDE.md` § Workspace gives the refresh as `pnpm update -r --no-save "@real-router/*"`.
+
+**Why — measured.**
+
+- Control and treatment on one tree. With the global `vite` override, the update rewrote 124 specifiers and the frozen install failed. With the scoped one, the lockfile stayed byte-identical, and the frozen install and `dedupe --check` pass. A raised pin now moves the lockfile: `vite@8.3.1` and `rollup@4.63.5` appear in it.
+- The refresh round-trips. `pnpm update -r --no-save "@real-router/solid@0.25.0"` recorded 0.25.0 without touching a manifest, and `pnpm update -r --no-save "@real-router/*"` brought back a byte-identical lockfile.
+- The scoped entries moved no version. Both lockfiles changed in the importer specifiers, which now equal the manifests, and in the peer ranges of `packages:` entries, which are now the ranges those packages declare.
+- The rest moved exactly four versions: in the root, axios 1.18.1 → 1.20.0 (one copy after `pnpm dedupe`) and js-cookie 3.0.7 → 3.0.8; in the examples, js-cookie 3.0.7 → 3.0.8 and shell-quote 1.10.0 → 1.9.0. OSV lists no advisory for any of them.
+
+**Still outside the range a parent declares, left for a decision.** Measured per edge with semver on the final trees:
+
+- `ajv@8: ~8.18.0`: `@angular-devkit/core` declares 8.20.0, and in the root `@stryker-mutator/core` declares `~8.20.0`; both get 8.18.0.
+- `picomatch@4: 4.0.4`: `@angular-devkit/core` and `@angular/build` pin 4.0.5, and vite declares `^4.0.5`. In the root, `@changesets/config`, knip and tsdown also declare `^4.0.7`, and vue-router `^4.0.5`. All of them get 4.0.4.
+- `undici: '>=7.29.0 <8.0.0'`: jsdom declares `^8.10.2` and gets 7.29.0. In the examples, node-gyp declares `^6.25.0` and also gets 7.29.0.
+- `yaml@2: 2.9.0`: in the root, knip declares `^2.9.1`.
+- `postcss: '>=8.5.23'`: vite declares `^8.5.26` and gets 8.5.25.
+- `piscina: '>=5.2.0 <6.0.0'`: `@angular/build` pins 5.2.0 and gets 5.3.0.
+
+Two edges outside their range are the entry's purpose, and their comments say so: `qs` lifts the exact 6.15.1 of typed-rest-client, an affected release, and `'@angular/build>vite'` lifts its exact 8.1.5.

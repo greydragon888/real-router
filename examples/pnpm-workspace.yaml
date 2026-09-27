@@ -25,10 +25,9 @@ overrides:
   # published @real-router/* package.
   qs: '>=6.16.0'
   # Floor raised for GHSA-mw96-cpmx-2vgc (arbitrary file write via path traversal,
-  # High, fixed in 4.59.0). Written as a FLOOR, not the exact pin it started as:
-  # an exact override silently overrides the consumer's own version too, so
-  # a consumer could raise its own pin and get the old rollup anyway — install
-  # green, lockfile untouched, manifest and tree disagreeing with nobody told.
+  # High, fixed in 4.59.0). Unscoped because no example declares rollup itself;
+  # the root pnpm-workspace.yaml says, under its `vite` entry, what an override
+  # does to a direct dependency.
   rollup: '>=4.59.0'
   minimatch@3: ~3.1.4
   minimatch@9: ~9.0.7
@@ -70,9 +69,6 @@ overrides:
   brace-expansion@1: 1.1.18
   brace-expansion@2: 2.1.4
   brace-expansion@5: 5.0.9
-  # shell-quote < 1.9.0 (GHSA-395f-4hp3-45gv, High) — dev-only (concurrently → shell-quote), never
-  # in a published @real-router/* package. Drop when concurrently pulls >=1.9.0 transitively.
-  shell-quote: '>=1.9.0'
   # body-parser < 2.3.0 (GHSA-v422-hmwv-36x6, Low) — example-only (express@5), not shipped. Drop
   # when express pulls >=2.3.0.
   body-parser: '>=2.3.0'
@@ -91,11 +87,11 @@ overrides:
   # which leaves the examples' builds and this audit gate as the exposure.
   devalue: '>=5.9.2'
   esbuild: '>=0.28.1'
-  # Collapses every transitive vite copy onto the exact 8.2.2 the example manifests
-  # declare. This is a DEDUPE pin, not a security floor — the ceiling keeps the
-  # collapse inside the major so a transitive cannot drag the tree onto a vite the
-  # plugins have not met.
-  vite: '>=8.2.2 <9'
+  # @angular/build depends on an exact `vite: 8.1.5`; this collapses that edge
+  # onto the exact 8.2.2 the example manifests declare, so the tree holds one
+  # vite. Scoped to that edge rather than global, for the reason the root
+  # pnpm-workspace.yaml gives under its `vite` entry.
+  '@angular/build>vite': '>=8.2.2 <9'
   fast-uri: '>=3.1.6 <4'
   # Floor at 4.13.5 for GHSA-crvj-82cr-hjcx, GHSA-gqvv-2mrq-wpjv and
   # GHSA-g6gw-c38x-mqfc (Medium; 5.9 / 6.5 / 5.3), all fixed in that one release.
@@ -131,7 +127,6 @@ overrides:
   # onto that newer line, which postcss does not declare. Drop when the toolchain
   # pulls >=3.3.17 on its own.
   nanoid@3: '>=3.3.17 <4'
-  js-cookie: '>=3.0.7'
   tmp: '>=0.2.6'
   # fflate < 0.8.3: `unzipSync` can loop forever on a malformed ZIP64 archive
   # (GHSA-px8p-9vwx-vf98, 7.5). Its one parent here, `@vitest/ui`, declares

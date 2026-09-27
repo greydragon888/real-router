@@ -108,9 +108,9 @@ The glob `web/*/*/*` in `examples/pnpm-workspace.yaml` registers subgrouped pack
 `examples/` is a pnpm workspace of its own, with its own `pnpm-lock.yaml`, `eslint.config.mjs` and `prettier.config.mjs`. The root workspace does not list it, so a root `pnpm install` leaves it alone.
 
 - Every manifest declares its `@real-router/*` dependencies as `*`. The lockfile records which release that is, and `pnpm install` here installs it; an example copied out of the repository installs the latest release. Dependabot's `/examples` entry moves the recorded releases.
-- To move them by hand, switch the specifiers to `latest`, run `pnpm install`, switch them back to `*` and run `pnpm install` again. The changed specifier makes pnpm resolve `@real-router/*` afresh, and nothing else moves.
+- To move them by hand, run `pnpm update -r --no-save "@real-router/*"` here. It records the latest releases, keeps `*` in the manifests, and moves nothing else.
 - ⚠ `pnpm update -r` without `--no-save` rewrites `*` into `^x.y.z`, and on 0.x that caret refuses the next minor.
-- ⚠ `pnpm update -r --no-save "@real-router/*"` keeps `*`, but pnpm 12.4 also rewrites the `vite` specifier the `vite` override put in the lockfile: `install --frozen-lockfile` and `dedupe --check` then refuse the lockfile.
+- ⚠ An override in `pnpm-workspace.yaml` that names a package these manifests declare becomes that dependency's recorded specifier: a raised pin then installs nothing, and the command above rewrites the specifier into a lockfile `install --frozen-lockfile` refuses. Scope such an override to the edge that needs it, as `@angular/build>vite` is.
 - `pnpm dev` in an example first runs `predev` → `pnpm -w run use-checkout` → `scripts/checkout-tarballs.mjs`. It bundles and packs every public package of this checkout, installs the tarballs over the recorded releases, and leaves `pnpm-lock.yaml` as it found it. `pnpm install --frozen-lockfile` here goes back to the releases.
 - ⚠ `verifyDepsBeforeRun: false` in `pnpm-workspace.yaml` is load-bearing. With pnpm's default, the next `pnpm run` finds `node_modules` out of step with the lockfile and reinstalls the releases over the tarballs.
 - `pnpm -r` orchestrates here, not turbo: `pnpm --dir examples -r --no-bail run --if-present build`.
