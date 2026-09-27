@@ -62,6 +62,10 @@ const CLIS = {
     args: [],
     ran: /usage: check-sarif-paths\.mjs/,
   },
+  "scripts/checkout-tarballs.mjs": {
+    args: [],
+    ran: /usage: checkout-tarballs\.mjs <workspace>/,
+  },
   "scripts/codspeed-base-age.mjs": {
     args: [],
     ran: /GITHUB_REPOSITORY is unset/,

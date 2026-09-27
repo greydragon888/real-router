@@ -1,11 +1,6 @@
 packages:
   - "packages/*"
   - "shared"
-  - "examples/web/*"
-  - "examples/web/*/*"
-  - "examples/web/*/*/*" # subgroups (e.g. examples/web/react/animation-examples/)
-  - "examples/desktop/*/*"
-  - "examples/console/*"
   - "benchmarks"
 peerDependencyRules:
   allowedVersions:
@@ -51,18 +46,15 @@ overrides:
   # `packages/solid` could raise its pin and get the old rollup anyway — install
   # green, lockfile untouched, manifest and tree disagreeing with nobody told.
   rollup: '>=4.59.0'
-  minimatch@3: ~3.1.4
   minimatch@9: ~9.0.7
   minimatch@10: ~10.2.3
   ajv@6: ~6.14.0
   ajv@8: ~8.18.0
   underscore: '>=1.13.8'
-  http-proxy-agent: 7.0.2
   undici: '>=7.29.0 <8.0.0'
   piscina: '>=5.2.0 <6.0.0'
   flatted: '>=3.4.2'
-  path-to-regexp: '>=8.4.0'
-  # ReDoS in brace-expansion (GHSA-3jxr-9vmj-r5cp, High). All three major lines are in the tree
+  # ReDoS in brace-expansion (GHSA-3jxr-9vmj-r5cp, High). Two major lines, @2 and @5, are in the tree
   # via assorted dev/tooling deps — pin each to its patched release. EXACT (not '>=') because the
   # '@N' selector value can't be an open range without risking a cross-major jump (a '>=1.1.16' on
   # the @1-selected dep could resolve up to 5.x). Bump each line when its next patch lands.
@@ -73,7 +65,7 @@ overrides:
   # ⛔ Collapsing all three onto 5.0.8 is NOT the fix, and this is measured rather than assumed:
   # v1 and v2 both end in `module.exports = expandTop` (the function IS the export), while 5.x's
   # CJS build emits `exports.expand = expand` — a NAMED export with no default. Every consumer of
-  # the older lines is `minimatch` (3.1.5 → @1, 5.1.9 and 9.0.9 → @2, 10.2.5 → @5) doing
+  # the older lines is `minimatch` (5.1.9 and 9.0.9 → @2, 10.2.5 → @5) doing
   # `require('brace-expansion')` and calling the result, so the override would hand it an object
   # and break glob matching across the tooling — which is why each line is pinned separately
   # rather than collapsed onto @5.
@@ -90,15 +82,11 @@ overrides:
   # one shipped a fix per line on day one (1.1.18 / 2.1.4 / 5.0.9), so all three pins move together
   # and no allowlist is needed. The split-by-major structure above is what made that a three-line
   # edit; keep it.
-  brace-expansion@1: 1.1.18
   brace-expansion@2: 2.1.4
   brace-expansion@5: 5.0.9
   # shell-quote < 1.9.0 (GHSA-395f-4hp3-45gv, High) — dev-only (concurrently → shell-quote), never
   # in a published @real-router/* package. Drop when concurrently pulls >=1.9.0 transitively.
   shell-quote: '>=1.9.0'
-  # body-parser < 2.3.0 (GHSA-v422-hmwv-36x6, Low) — example-only (express@5), not shipped. Drop
-  # when express pulls >=2.3.0.
-  body-parser: '>=2.3.0'
   node-forge: '>=1.4.0'
   picomatch@2: 2.3.2
   picomatch@4: 4.0.4
@@ -127,23 +115,6 @@ overrides:
   # major so a transitive cannot drag the tree onto a vite the plugins have not met.
   vite: '>=8.2.2 <9'
   fast-uri: '>=3.1.6 <4'
-  # Floor at 4.13.5 for GHSA-crvj-82cr-hjcx, GHSA-gqvv-2mrq-wpjv and
-  # GHSA-g6gw-c38x-mqfc (Medium; 5.9 / 6.5 / 5.3), all fixed in that one release.
-  # Transitive via the Angular dev/build toolchain, as the entry below says.
-  hono: '>=4.13.5'
-  # @hono/node-server: GHSA-frvp-7c67-39w9 (Medium) has no v1 fix — the patch is v2-only, so a
-  # bounded major bump. Like hono / fast-uri above, it's transitive via the Angular dev/build
-  # toolchain (@angular/build SSR dev server; ajv -> fast-uri) in angular examples only — not in
-  # any published @real-router/* package. Bump/drop when the toolchain moves off these floors.
-  '@hono/node-server': '>=2.0.5 <3'
-  ip-address: '>=10.3.1'
-  # @xmldom/xmldom < 0.8.15 (GHSA-6gmq-8vp8-gcm6, Medium). Its one parent is `plist`, pulled
-  # by electron-builder for the desktop EXAMPLES — not in any published @real-router/* package,
-  # and it parses our own Info.plist rather than untrusted input. Same-line patch, so a floor
-  # rather than an allowlist entry.
-  # Bounded `<0.9` deliberately: on a 0.x line the minor IS the major, and an open floor
-  # jumps `plist` onto 0.9 — an unvetted parser change for a bump whose fix is same-line.
-  '@xmldom/xmldom': '>=0.8.15 <0.9'
   # postcss < 8.5.23 (GHSA-fxqj-rqcc-2cmp, Medium). Eleven parents, every one of them build- or
   # lint-time: vite, @angular/build, ng-packagr, @vue/compiler-sfc, beasties, postcss-scss /
   # -safe-parser / -load-config, eslint-plugin-svelte, svelte-eslint-parser. Not in any published
@@ -164,7 +135,6 @@ overrides:
   # pulls >=3.3.17 on its own.
   nanoid@3: '>=3.3.17 <4'
   js-cookie: '>=3.0.7'
-  tmp: '>=0.2.6'
   # fflate < 0.8.3: `unzipSync` can loop forever on a malformed ZIP64 archive
   # (GHSA-px8p-9vwx-vf98, 7.5). This entry already existed as an exact `0.8.2` to
   # collapse two copies — and that pin is what held the tree BELOW the fix, since
@@ -185,12 +155,6 @@ overrides:
   # Bounded `<5` deliberately: 5.x is a separate major these consumers don't declare, and an
   # open floor would let dedupe jump the whole tree onto it. Drop when the tooling pulls >=4.3.2.
   js-yaml: '>=4.3.2 <5'
-  # joi < 18.2.5 — GHSA-gg4h-3hg2-grpc and GHSA-6w3j-5fw6-r9vr (both Low, 3.7),
-  # fixed in 18.2.4 and 18.2.5 respectively, so one floor at 18.2.5 clears both.
-  # Its only consumer is `wait-on`, which the example e2e suites use to block on a
-  # dev server — dev tooling, never a published @real-router/* package. Unbounded
-  # above like the other 18.x floors here: joi is on a stable major.
-  joi: '>=18.2.5'
 # --- pnpm settings (migrated from .npmrc during the pnpm 11 upgrade) ---
 updateNotifier: false
 saveExact: true
@@ -242,11 +206,9 @@ minimumReleaseAge: 0
 allowBuilds:
   '@parcel/watcher': true
   core-js: true
-  electron: true
   esbuild: true
   fsevents: true
   lmdb: true
   msgpackr-extract: true
   unrs-resolver: true
   vue-demi: true
-  electron-winstaller: false

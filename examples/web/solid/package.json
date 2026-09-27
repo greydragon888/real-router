@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "dependencies": {
-    "@real-router/solid": "workspace:^",
+    "@real-router/solid": "0.25.0",
     "solid-js": "~1.9.14"
   },
   "scripts": {

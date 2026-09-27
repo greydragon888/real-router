@@ -21,9 +21,7 @@ export interface PageMeta {
   ogDescription: string;
 }
 
-const SITE_ORIGIN =
-  // eslint-disable-next-line turbo/no-undeclared-env-vars
-  process.env.SITE_ORIGIN ?? "https://example.com";
+const SITE_ORIGIN = process.env.SITE_ORIGIN ?? "https://example.com";
 
 function abs(path: string): string {
   return `${SITE_ORIGIN}${path}`;

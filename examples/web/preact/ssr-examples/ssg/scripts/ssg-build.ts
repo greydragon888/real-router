@@ -6,9 +6,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 const dist = path.resolve(root, "dist");
 
-const SITE_ORIGIN =
-  // eslint-disable-next-line turbo/no-undeclared-env-vars
-  process.env.SITE_ORIGIN ?? "https://example.com";
+const SITE_ORIGIN = process.env.SITE_ORIGIN ?? "https://example.com";
 
 const template = readFileSync(path.resolve(dist, "index.html"), "utf8");
 

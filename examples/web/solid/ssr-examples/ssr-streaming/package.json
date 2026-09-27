@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "pnpm turbo run bundle --filter=...ssr-streaming-solid-example",
+    "predev": "pnpm -w run use-checkout",
     "dev": "tsx server/dev.ts",
     "build:app": "tsc -b && vite build --outDir dist/client && vite build --ssr src/entry-server.tsx --outDir dist/server",
     "preview": "NODE_ENV=production tsx server/index.ts",
@@ -12,10 +12,10 @@
     "lint:example": "eslint --cache . --max-warnings 0"
   },
   "dependencies": {
-    "@real-router/core": "workspace:^",
-    "@real-router/solid": "workspace:^",
-    "@real-router/ssr-data-plugin": "workspace:^",
-    "@real-router/ssr-utils": "workspace:^",
+    "@real-router/core": "0.148.0",
+    "@real-router/solid": "0.25.0",
+    "@real-router/ssr-data-plugin": "0.6.0",
+    "@real-router/ssr-utils": "0.3.0",
     "express": "5.1.0",
     "solid-js": "~1.9.14"
   },

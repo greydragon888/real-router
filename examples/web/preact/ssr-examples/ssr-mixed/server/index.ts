@@ -48,7 +48,6 @@ async function startServer(): Promise<void> {
       .send(page);
   });
 
-  // eslint-disable-next-line turbo/no-undeclared-env-vars
   const port = Number(process.env.PORT) || 3000;
 
   app.listen(port, () => {

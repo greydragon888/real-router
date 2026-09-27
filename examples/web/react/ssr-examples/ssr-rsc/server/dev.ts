@@ -75,7 +75,6 @@ async function startDevServer(): Promise<void> {
     }
   });
 
-  // eslint-disable-next-line turbo/no-undeclared-env-vars -- PORT is conventional Express override, not turbo task input
   const port = Number(process.env.PORT) || 3000;
 
   app.listen(port, () => {

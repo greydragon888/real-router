@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "dependencies": {
-    "@real-router/preact": "workspace:^",
+    "@real-router/preact": "0.24.0",
     "preact": "~10.29.7"
   },
   "scripts": {

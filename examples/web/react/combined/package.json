@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "pnpm turbo run bundle --filter=...react-combined-example",
+    "predev": "pnpm -w run use-checkout",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
@@ -13,14 +13,14 @@
     "lint:example": "eslint --cache . --max-warnings 0"
   },
   "dependencies": {
-    "@real-router/browser-plugin": "workspace:^",
-    "@real-router/core": "workspace:^",
-    "@real-router/lifecycle-plugin": "workspace:^",
-    "@real-router/logger-plugin": "workspace:^",
-    "@real-router/persistent-params-plugin": "workspace:^",
-    "@real-router/preload-plugin": "workspace:^",
-    "@real-router/react": "workspace:^",
-    "@real-router/search-schema-plugin": "workspace:^",
+    "@real-router/browser-plugin": "0.25.0",
+    "@real-router/core": "0.148.0",
+    "@real-router/lifecycle-plugin": "0.8.0",
+    "@real-router/logger-plugin": "0.7.0",
+    "@real-router/persistent-params-plugin": "0.7.0",
+    "@real-router/preload-plugin": "0.8.0",
+    "@real-router/react": "0.37.0",
+    "@real-router/search-schema-plugin": "0.7.0",
     "react": "~19.3.0",
     "react-dom": "~19.3.0",
     "zod": "4.6.5"

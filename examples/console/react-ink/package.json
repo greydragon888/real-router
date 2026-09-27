@@ -5,15 +5,15 @@
   "type": "module",
   "bin": "./src/main.tsx",
   "scripts": {
-    "predev": "pnpm turbo run bundle --filter=...react-ink-demo-example",
+    "predev": "pnpm -w run use-checkout",
     "dev": "tsx src/main.tsx",
     "build": "tsc --noEmit",
     "lint:example": "eslint --cache . --max-warnings 0"
   },
   "dependencies": {
-    "@real-router/core": "workspace:^",
-    "@real-router/memory-plugin": "workspace:^",
-    "@real-router/react": "workspace:^",
+    "@real-router/core": "0.148.0",
+    "@real-router/memory-plugin": "0.5.0",
+    "@real-router/react": "0.37.0",
     "ink": "7.1.1",
     "react": "~19.3.0"
   },

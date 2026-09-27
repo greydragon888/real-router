@@ -31,9 +31,7 @@ const root = path.resolve(__dirname, "..");
 const browserDist = path.resolve(root, "dist/ssg-angular-example/browser");
 const serverDist = path.resolve(root, "dist/ssg-angular-example/server");
 
-const SITE_ORIGIN =
-  // eslint-disable-next-line turbo/no-undeclared-env-vars
-  process.env.SITE_ORIGIN ?? "https://example.com";
+const SITE_ORIGIN = process.env.SITE_ORIGIN ?? "https://example.com";
 
 interface ServerModule {
   app: { listen: (port: number, cb: () => void) => unknown };

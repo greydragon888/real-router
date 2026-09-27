@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "pnpm turbo run bundle --filter=...vue-page-animations-example",
+    "predev": "pnpm -w run use-checkout",
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
@@ -12,9 +12,9 @@
     "lint:example": "eslint --cache . --max-warnings 0"
   },
   "dependencies": {
-    "@real-router/browser-plugin": "workspace:^",
-    "@real-router/core": "workspace:^",
-    "@real-router/vue": "workspace:^",
+    "@real-router/browser-plugin": "0.25.0",
+    "@real-router/core": "0.148.0",
+    "@real-router/vue": "0.25.0",
     "vue": "~3.5.39"
   },
   "devDependencies": {
