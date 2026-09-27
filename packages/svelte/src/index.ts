@@ -7,9 +7,6 @@ export { default as Lazy } from "./components/Lazy.svelte";
 
 export { default as RouterErrorBoundary } from "./components/RouterErrorBoundary.svelte";
 
-// Reactive Primitives
-export { createReactiveSource } from "./createReactiveSource.svelte";
-
 // Composables
 export { useRouter } from "./composables/useRouter.svelte";
 

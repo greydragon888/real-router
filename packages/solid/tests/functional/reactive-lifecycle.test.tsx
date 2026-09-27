@@ -3,12 +3,9 @@ import { render, screen } from "@solidjs/testing-library";
 import { createSignal, Show } from "solid-js";
 import { describe, afterEach, it, expect } from "vitest";
 
-import {
-  createSignalFromSource,
-  RouterErrorBoundary,
-  RouterProvider,
-} from "@real-router/solid";
+import { RouterErrorBoundary, RouterProvider } from "@real-router/solid";
 
+import { createSignalFromSource } from "../../src/createSignalFromSource";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";

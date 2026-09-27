@@ -32,10 +32,6 @@ export { RouterContext, RouteContext } from "./context";
 
 export type { RouterContextValue } from "./context";
 
-export { createSignalFromSource } from "./createSignalFromSource";
-
-export { createStoreFromSource } from "./createStoreFromSource";
-
 export { createDirectionTracker } from "./dom-utils";
 
 export type { LinkProps, RouteState } from "./types";

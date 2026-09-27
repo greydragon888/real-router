@@ -968,6 +968,10 @@ describe("door total (#2303)", () => {
    * is excluded by a decision recorded above. And a SECOND NAME for a bag
    * already counted adds no field. Anything else is a bag the application
    * fills, and the verdict on it is wrong.
+   *
+   * ⚠ `RouterSource` is absent on purpose: no published signature may take one.
+   * `@real-router/sources` is the adapter authors' package, and an application
+   * that could hand a source back would have to import it (#2590).
    */
   const ACCEPTED_ANYWAY: Record<string, string> = {
     LeaveState: "callback — `LeaveFn` is written by the application",
@@ -979,7 +983,6 @@ describe("door total (#2303)", () => {
     State: "round-trip — handed back to `serializeRouterState`",
     HttpStatusSink: "round-trip — `createHttpStatusSink()` mints it",
     Router: "round-trip — the instance core built, handed back",
-    RouterSource: "round-trip — a source core built",
     RouteTree: "round-trip — the tree core built",
     InterceptableMethodMap: "callback — `InterceptorFn`",
     CheckPositionMap: "callback — `CheckFn`",

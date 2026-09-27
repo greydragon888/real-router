@@ -145,7 +145,6 @@ dist/
 | `useRouteExit(handler, options?)`                                | Composable | Subscribe to `subscribeLeave` with abort + same-route guards |
 | `useRouteEnter(handler, options?)`                               | Composable | Fire once on nav-driven mount via `$effect`                  |
 | `createLinkAction`                                               | Factory    | Create navigation action (`use:link`)                        |
-| `createReactiveSource`                                           | Primitive  | Bridge `RouterSource<T>` → reactive `{ current: T }`         |
 | `ROUTER_KEY`, `NAVIGATOR_KEY`, `ROUTE_KEY`                       | Constants  | Svelte context keys (re-exported for advanced patterns)      |
 | `LinkProps`, `RouteContext`, `LinkActionParams`                  | Types      | Adapter-specific public types                                |
 | `RouteExitContext`, `RouteExitHandler`, `UseRouteExitOptions`    | Types      | `useRouteExit` API surface                                   |

@@ -760,11 +760,9 @@ export class MyComponent {
 }
 ```
 
-`sourceToSignal` follows the same rule — it calls `inject(DestroyRef)` internally.
-
 ### DestroyRef for Cleanup
 
-Subscriptions created by `sourceToSignal` and the directives clean up automatically via `DestroyRef.onDestroy`. No manual unsubscribe needed.
+Router subscriptions the adapter creates — in its `inject*` functions, providers and directives — clean up automatically via `DestroyRef.onDestroy`. No manual unsubscribe needed.
 
 ### Zoneless Compatibility
 
@@ -775,19 +773,6 @@ The adapter is signal-first and does not depend on Zone.js. It works with `provi
 `RealLink`, `RealLinkActive`, and `RouteView` create their subscription sources inside `effect(...)` blocks scheduled from the **constructor** (not `ngOnInit`). Reading signal inputs inside `effect()` makes the source-creation REACTIVE — when `[realLink]`, `[routeParams]`, `[routeSearch]`, `[hash]`, `[realLinkActive]`, or `[routeNode]` change in AOT, the effect tears down the previous source via `onCleanup` and creates a new one with the current input values. The legacy `ngOnInit` setup captured inputs once at mount and produced a real AOT bug (#630). Effect cleanup is bound automatically to the host directive's injection-context `DestroyRef`.
 
 In `RealLink` / `RealLinkActive`, `[routeParams]` is routed through `shallowEqual` content-stabilization before the effect reads it, so an inline-literal binding re-allocated on every change detection only re-creates the source on real content change (see [Object `routeParams`](#object-routeparams--content-stabilized), #988).
-
-## Signal Bridge
-
-### `sourceToSignal(source)`
-
-Bridges any `RouterSource<T>` (from `@real-router/sources`) into an Angular `Signal<T>`. Cleanup wires through `inject(DestroyRef)` — must be called in an injection context. Used internally by `RouterErrorBoundary`; exposed for custom composables that need to bridge router sources into reactive signals.
-
-```typescript
-import { sourceToSignal } from "@real-router/angular";
-import { createTransitionSource } from "@real-router/sources";
-
-const transitionSignal = sourceToSignal(createTransitionSource(router));
-```
 
 ## Documentation
 
