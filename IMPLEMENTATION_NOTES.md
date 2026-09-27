@@ -12444,3 +12444,11 @@ Two edges outside their range are the entry's purpose, and their comments say so
 - The weekly lint leaves `examples.yml` for `cross-router-bench.yml`: two jobs on GitHub-hosted runners, one per workspace, and a failure tracker with a marker of its own. Nothing of the snapshot waits on them.
 
 **Why.** turbo does not see the cross-router workspace, so no affected-package plan can reach it; an edit under its directory is the only change that can move what its lint reports, since it installs its own config and plugins. `ci-hook-parity.test.mjs` pairs the `pnpm lint:cross-router` of both workflows with the pre-push line, and `ci-gate-completeness.test.mjs` finds the new job in the gate.
+
+## Dependabot leaves `@angular-devkit/*` to the coordinated Angular update (2026-09-28)
+
+**Problem.** The `/examples` entry of `.github/dependabot.yml` ignores `@angular/*`: those packages peer each other exactly and move together through `pnpm update`. `@angular-devkit/*` is released in lockstep with `@angular/cli` and `@angular/build` but lies outside that pattern, so #2611 bumped `@angular-devkit/architect` 0.2201.8 → 0.2202.0 and `@angular-devkit/schematics` 22.1.8 → 22.2.0 on their own, in the seven Angular examples that declare them. The examples lockfile now holds two devkit generations: 22.1.8 under `@angular/build` and `@angular/cli`, and 22.2.0 under the examples' own declarations, which `@analogjs/vitest-angular` peers on.
+
+**Solution.** The entry ignores `@angular-devkit/*` beside `@angular/*`. The two generations stay until the next coordinated Angular update moves both.
+
+**Why — measured on #2611 merged with `master`.** Nothing breaks today, which is why this is a guard rather than a revert. `ng build` goes through `@angular/build` and its own devkit, and `Examples (affected)` built every Angular example. The 22.2 copies are read only through `@analogjs/vitest-angular`, by `test:unit`, which CI does not run; the three examples that have one pass (18, 9 and 14 tests).

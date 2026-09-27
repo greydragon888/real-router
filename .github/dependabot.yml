@@ -232,6 +232,11 @@ updates:
       # @angular/* peers each other EXACTLY, so any single-package bump breaks
       # strictPeerDependencies; it moves only by a coordinated `pnpm update`.
       - dependency-name: "@angular/*"
+      # @angular-devkit/* is released in lockstep with @angular/cli and
+      # @angular/build, which the entry above holds back. Bumped alone it gives
+      # the tree two devkit generations (#2611: 22.2.0 beside the 22.1.8 of
+      # @angular/build), so it moves with them.
+      - dependency-name: "@angular-devkit/*"
 
   # The cross-router bench — its own lockfile, so its own block. A bump here
   # moves the bench's numbers rather than a shipped package, so it comes
