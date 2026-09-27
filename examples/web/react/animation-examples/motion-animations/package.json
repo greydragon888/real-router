@@ -15,7 +15,7 @@
     "@real-router/browser-plugin": "*",
     "@real-router/core": "*",
     "@real-router/react": "*",
-    "motion": "13.4.2",
+    "motion": "13.4.3",
     "react": "~19.3.0",
     "react-dom": "~19.3.0"
   },
