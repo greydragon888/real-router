@@ -3,6 +3,7 @@
 // Run:  node --test scripts/tests/examples-plan.test.mjs
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -100,6 +101,31 @@ test("examplePackages finds the real workspace, aggregators included", () => {
 test("every package of the real workspace declares lint:example", () => {
   assert.deepEqual(
     missingLintScript(examplePackages(path.join(repoRoot, "examples"))),
+    [],
+  );
+});
+
+test("no example depends on @real-router/sources — the adapter authors' package (#2590)", () => {
+  // An example is application code, and pnpm resolves only what a package
+  // declares, so a manifest without the dependency cannot import it either.
+  const packages = examplePackages(path.join(repoRoot, "examples"));
+  const offenders = packages.filter(({ dir }) => {
+    const manifest = JSON.parse(
+      readFileSync(path.join(repoRoot, dir, "package.json"), "utf8"),
+    );
+
+    return (
+      "@real-router/sources" in
+      {
+        ...manifest.dependencies,
+        ...manifest.devDependencies,
+      }
+    );
+  });
+
+  assert.ok(packages.length > 0, "the workspace has packages");
+  assert.deepEqual(
+    offenders.map((pkg) => pkg.name),
     [],
   );
 });
