@@ -1,5 +1,15 @@
 # @real-router/solid
 
+## 0.25.1
+
+### Patch Changes
+
+- [`72f9116`](https://github.com/greydragon888/real-router/commit/72f91160d53bb59a4e62447e23de4e1e66847dc6) Thanks [@greydragon888](https://github.com/greydragon888)! - Share one copy of the router contexts between `.` and `/ssr`, and publish the source under a `solid` export condition so SSR builds can import the package ([#2583](https://github.com/greydragon888/real-router/issues/2583))
+
+  - `useDeferred` and `<Await>` from `@real-router/solid/ssr` threw `useRoute must be used within a RouterProvider` inside a `RouterProvider`, through `import` and `require` alike: the two entries were bundled separately, and `/ssr` carried its own copy of the contexts. Both entries are now built together and share one chunk.
+  - An SSR build with `vite-plugin-solid({ ssr: true })` that imported the package threw `Client-only API called on the server side` at module load, because the published code is compiled for the DOM. The package now also publishes its JSX source under the `solid` export condition; `vite-plugin-solid` resolves it, bundles it into the SSR build and compiles it for the app's own target — server, hydrating client or plain DOM. No `resolve.conditions` or `ssr.noExternal` entry is needed for the adapter.
+  - Bundlers without a Solid compiler keep resolving `import` / `require`, whose entry files keep their paths. No API change.
+
 ## 0.25.0
 
 ### Minor Changes
