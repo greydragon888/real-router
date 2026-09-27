@@ -37,7 +37,13 @@ overrides:
   # parent's range admits it.
   ajv@8: ~8.20.0
   http-proxy-agent: 7.0.2
-  undici: '>=7.29.0 <8.0.0'
+  # undici, split by major: every parent here takes it as a regular dependency,
+  # so a floor per line holds — 7.29.0 on @electron/get's 7.x, 6.28.0 on node-gyp's
+  # 6.x, each the release that fixes that line's advisories. No entry for 8:
+  # jsdom's `^8.10.2` is above 8.9.0, where that line fixed them, and a floor
+  # below its range could hold it there (#2605).
+  undici@6: '>=6.28.0 <7'
+  undici@7: '>=7.29.0 <8'
   piscina: '>=5.2.0 <6.0.0'
   path-to-regexp: '>=8.4.0'
   # ReDoS in brace-expansion (GHSA-3jxr-9vmj-r5cp, High). All three major lines are in the tree

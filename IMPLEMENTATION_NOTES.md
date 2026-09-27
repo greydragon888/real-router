@@ -12285,6 +12285,9 @@ Two edges outside their range are the entry's purpose, and their comments say so
 
 ## Override values rise to the ranges their parents declare (2026-09-27)
 
+> ⚠ Superseded later on 2026-09-27 in one respect: `undici` no longer holds a
+> parent below its range. See "undici: the root provides danger's peer, the examples floor each major".
+
 **Problem.** An override outranks semver, and four values sat below a range some parent declares, each holding that parent on an older release:
 
 - `ajv@8: ~8.18.0` under the exact 8.20.0 of `@angular-devkit/core` and, in the root, the `~8.20.0` of `@stryker-mutator/core`.
@@ -12313,3 +12316,20 @@ Two edges outside their range are the entry's purpose, and their comments say so
 **Solution.** The record is repaired the way #2057's 51 versions were (`e4ada4960`): the 0.25.1 section carries a `Never published` line naming 0.26.0, and `--update` added `@real-router/solid@0.25.1` to `scripts/published-versions-baseline.json`, the only change it made. The watch's header and failure message name the second path and say that `workflow_dispatch` recovers only the first: `Changesets` does not publish while changesets are pending.
 
 **Why.** changesets/action publishes only when no changeset is left, so a release PR merged behind a newer changeset leaves its versions allocated and unpublished — the end state of a cancelled build, reached with every run green. Preventing it would take a check on the release PR that fails while `master` carries changesets the PR does not include; that is left for a decision.
+
+## undici: the root provides danger's peer, the examples floor each major (#2605, 2026-09-27)
+
+**Problem.** `undici: '>=7.29.0 <8.0.0'` in both workspaces replaced every undici edge. jsdom 30 declares `^8.10.2` and got 7.29.0, and on it jsdom's XHR, an XHR of a gzip body and `JSDOM.fromURL` hang with neither `load` nor `error`, while WebSocket works; on undici 8.11.2 all four pass (one probe against a local server, in both installs). In the examples, node-gyp declares `^6.25.0` and got 7.29.0 too. No parent upgrade removes the conflict: the latest danger (14.0.7) takes 7, the latest `@electron/rebuild` (4.2.0) keeps node-gyp 12, which takes 6, and the latest jsdom (30.1.1) takes 8.
+
+**Solution.**
+
+- The root declares `undici` 7.29.0 as a devDependency and carries no undici override. danger 14 declares undici both as a dependency (`^7.16.0`) and as an optional peer (`^6.28.0 || ^7`); pnpm resolves it as the peer, which nothing installs by itself, and the root's own copy is its provider.
+- The examples split the entry by major: `undici@6: '>=6.28.0 <7'` for node-gyp and `undici@7: '>=7.29.0 <8'` for `@electron/get`, both of which take undici as a regular dependency. There is no entry for 8: jsdom's range is above 8.9.0, where the 8.x line fixed the advisories 7.29.0 fixes.
+- `.github/dependabot.yml` keeps ignoring undici in both entries. The root one now says why: Dependabot would also offer 8.x, which danger's peer range excludes, so the root copy is bumped by hand.
+
+**Why — measured.**
+
+- ⚠ **An override cannot provide an optional peer.** Once jsdom takes 8.x, a floor keeps danger on 7.x only through the lockfile. With `undici@7: '>=7.29.0 <8'` in the root, raising the floor to `>=7.30.0 <8` and installing left danger without an undici of its own, and its `require("undici")` resolved the hoisted 8.11.2. `'danger>undici'` did the same (lockfile-only). With the root's own copy, raising it to 7.30.0 moved danger to 7.30.0.
+- knip counts the root's undici as used. The control holds: an unused devDependency added beside it is reported.
+- Every parent gets a version inside its declared range: in the root danger 7.29.0 and jsdom 8.11.2; in the examples `@electron/get` 7.29.0, jsdom 8.11.2 and node-gyp 6.29.0. Raising the examples' 7.x floor moved `@electron/get` alone.
+- Both frozen installs, `lint:dedupe`, `lint:deps`, `lint:audit` and knip pass.
