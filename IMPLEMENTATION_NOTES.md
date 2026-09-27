@@ -12499,3 +12499,11 @@ The `@angular/build>vite` comments of all three workspaces stop naming the vite 
 - vitest and its two plugins peer each other's exact version: `vitest` 5.0.1 alone met `@vitest/coverage-v8` and `@vitest/ui` 4.1.11, and each plugin alone met `vitest` 4.1.11. The Vitest 5 migration is blocked on its own, so these move by hand, as one.
 - `@babel/core` 8 fails against `babel-preset-solid`, `@rollup/plugin-babel` and the babel 7 plugins of the Solid build, all of which peer `^7.0.0`; `@babel/preset-typescript` 8 peers `@babel/core ^8`.
 - `babel-preset-solid` failed on a PATCH, not a major: 1.9.15 peers `solid-js ^1.9.15`, the tree holds 1.9.14, and solid-js patches arrive through `pnpm update` (the patch-float set), never from Dependabot. Its patch can only move with solid-js, by hand; its minors and majors still come as pull requests.
+
+## The `nanoid@3` floors are dropped: postcss pulls the fix on its own (2026-09-28)
+
+**Problem.** The root and the examples carried `nanoid@3: '>=3.3.17 <4'` for GHSA-2v37-7h3g-55p8, with the condition to drop it once the toolchain pulls `>=3.3.17` itself. Its only parent is postcss, and the postcss floor both workspaces carry (`>=8.5.26`) had met that condition.
+
+**Solution.** Both entries go, with their comments.
+
+**Why — measured.** Every postcss the floor admits declares a fixed nanoid: 8.5.26 `^3.3.17`, 8.5.27 and 8.5.28 `^3.3.18`. Removing the entries changed each lockfile by its override line alone; nanoid stays 3.3.18, and `dedupe --check`, the frozen installs and `lint:audit` pass.

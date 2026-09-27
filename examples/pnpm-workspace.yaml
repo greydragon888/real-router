@@ -119,17 +119,6 @@ overrides:
   # semver, so a lower floor can keep vite on an older release. Drop when the toolchain pulls
   # >=8.5.23 on its own.
   postcss: '>=8.5.26'
-  # nanoid 3.x < 3.3.17 (GHSA-2v37-7h3g-55p8, High). Its ONLY parent is `postcss`
-  # (declared `^3.3.16`, i.e. the fix is already inside the range) — build-time
-  # only, exactly like the entry above, and never in a published @real-router/*
-  # package. An override rather than a plain update because the lockfile pinned
-  # 3.3.16 before the advisory existed and `pnpm update` does not reach that
-  # depth. No other nanoid line is in the tree.
-  # Selector-scoped with an upper bound deliberately, per the brace-expansion
-  # note above: an unqualified '>=3.3.17' would let dedupe pull the whole tree
-  # onto that newer line, which postcss does not declare. Drop when the toolchain
-  # pulls >=3.3.17 on its own.
-  nanoid@3: '>=3.3.17 <4'
   tmp: '>=0.2.6'
   # fflate < 0.8.3: `unzipSync` can loop forever on a malformed ZIP64 archive
   # (GHSA-px8p-9vwx-vf98, 7.5). Its one parent here, `@vitest/ui`, declares
