@@ -1,5 +1,13 @@
 # @real-router/react
 
+## 0.37.0
+
+### Minor Changes
+
+- [#2588](https://github.com/greydragon888/real-router/pull/2588) [`6868ada`](https://github.com/greydragon888/real-router/commit/6868adacfd7d7deee8467ea662f21db5251d9543) Thanks [@greydragon888](https://github.com/greydragon888)! - Export `createDirectionTracker` from the package entry ([#2587](https://github.com/greydragon888/real-router/issues/2587))
+
+  `createDirectionTracker(router)` writes `data-nav-direction="forward" | "back"` on `<html>` on every leave, so exit and entry animations can key off the navigation direction. Install it before `router.usePlugin(browserPluginFactory())`: both listen to `popstate`, and the tracker has to see the event first. `destroy()` removes the listener and the attribute; without a `document` (SSR) it returns a no-op instance. The `DirectionTracker` type is exported alongside. The API is unstable — it may change in a minor release.
+
 ## 0.36.0
 
 ### Minor Changes
