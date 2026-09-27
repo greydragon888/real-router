@@ -1,7 +1,9 @@
 name: Cross Routers Benchmarks
 
 # Scheduled snapshot of the cross-router Playwright + CDP benchmark matrix (5 cohorts ×
-# 12 scenarios) → Pages dashboard + step-summary + artifact. GHA runners are shared/noisy,
+# 12 scenarios) → Pages dashboard + step-summary + artifact. It measures the latest npm
+# release of @real-router/* against the competitors' releases, installed in the
+# benchmarks/cross-router workspace; this checkout's packages/ are not built. GHA runners are shared/noisy,
 # so this is an HONEST SNAPSHOT with RME annotation, NOT a regression gate. Action majors
 # pinned to the current majors (checkout v7 · upload-artifact v7 · download-artifact v8 · pages v5).
 
@@ -20,11 +22,6 @@ permissions:
 concurrency:
   group: cross-router-bench
   cancel-in-progress: false
-
-env:
-  TURBO_API: ${{ vars.TURBO_API }} # Remote Cache → bundle ≈ cache-HIT (falls back to full bundle if unavailable)
-  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
 
 jobs:
   bench:
@@ -50,22 +47,30 @@ jobs:
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup # pnpm + Node 24 + pnpm install --frozen-lockfile
+      # pnpm + Node 24 + `pnpm install --frozen-lockfile` of benchmarks/cross-router ONLY: it is
+      # a pnpm workspace of its own, and nothing it runs reads the root's node_modules.
+      - uses: ./.github/actions/setup
         with:
           node-cache: "" # persistent self-hosted store survives between runs → skip the ~200 MB cache tarball (as codspeed.yml)
+          working-directory: benchmarks/cross-router
 
-      # spec-parity preflight — ~2 s static scan, fail-fast BEFORE the ~2.8h build+matrix.
+      # spec-parity preflight — ~2 s static scan, fail-fast BEFORE the ~2.8h matrix.
       # A drifted sweep constant silently drops an @N point per cohort (jagged snapshot); catch it in seconds.
       - name: Spec-parity preflight
-        run: pnpm lint:bench-apps
+        run: pnpm lint:spec-parity
+        working-directory: benchmarks/cross-router
 
-      # the harness measures PRODUCTION dist (vite resolves @real-router/* → packages/*/dist/esm).
-      # Remote Cache restore writes FRESH mtime → the provenance freshness gate does not false-fire (verified 07-18).
-      - name: Build packages to dist
-        run: pnpm turbo run bundle --filter='./packages/*'
+      # The snapshot measures the LATEST npm release of @real-router/*, as it measures the
+      # competitors' published releases. The lockfile records whichever release was current when
+      # it was written; this moves every @real-router/* to the newest, in this checkout only.
+      # `--no-save` keeps the manifest's `*` (without it pnpm writes `^x.y.z`, which on 0.x
+      # admits patches only).
+      - name: Update @real-router/* to the latest release
+        run: pnpm update --no-save "@real-router/*"
+        working-directory: benchmarks/cross-router
 
       # playwright ships NO install script → browsers don't arrive with `pnpm install` (by design);
-      # `pnpm exec` resolves playwright only inside benchmarks/ (its dep) → working-directory. On the persistent
+      # `pnpm exec` resolves playwright only inside benchmarks/cross-router (its dep) → working-directory. On the persistent
       # self-hosted store (node-cache:"") the pinned Chromium survives between runs, so this is a fast no-op AFTER the
       # one-time VPS pre-install. The browser revision is seeded out-of-band ONCE, because this VPS's network
       # DPI-throttles the Playwright CDN. So are its system libs: NO --with-deps, which runs `apt-get update` +
@@ -73,14 +78,14 @@ jobs:
       # benchmarks/CLAUDE.md carries the revision to seed, so it is not restated here.
       - name: Install Chromium (expects the one-time VPS pre-install)
         run: pnpm exec playwright install chromium
-        working-directory: benchmarks
+        working-directory: benchmarks/cross-router
 
       # matcher-bench/results.json is gitignored → it is deck-extract's input and absent on a fresh checkout.
-      # Regenerate it (pure Node; after bundle so engines load from dist). µs absolutes are noisier on a shared VM,
-      # but the O(1)-vs-O(N) matcher-curve SHAPE is hardware-invariant.
+      # Regenerate it (pure Node; after the update, so the engines load the release the matrix builds). µs absolutes
+      # are noisier on a shared VM, but the O(1)-vs-O(N) matcher-curve SHAPE is hardware-invariant.
       - name: Isolated matcher microbench
-        run: node --expose-gc cross-router/matcher-bench/run.mjs
-        working-directory: benchmarks
+        run: node --expose-gc matcher-bench/run.mjs
+        working-directory: benchmarks/cross-router
 
       # Same cgroup sampler as the CodSpeed jobs (#2376) — same host, same unit,
       # same `MemoryMax=5G` ceiling, so the same exposure. The rationale is
@@ -118,7 +123,7 @@ jobs:
         # It also removes the memory-pressure (GC pauses / swap) the LAST scenarios measured
         # under in the fat process.
         # Provenance is identical across processes on the same machine (commit/cpu/runner/
-        # dirty/distMtime) and env.date was already per-cell → deck-data unaffected.
+        # dirty/realRouterCore) and env.date was already per-cell → deck-data unaffected.
         #
         # FAIL-FAST across cohorts too (#1746). The loop used to carry on "for a
         # full-as-possible snapshot in the log", and that trade no longer holds: `publish` is
@@ -131,7 +136,7 @@ jobs:
           rc=0
           for cohort in react vue solid svelte angular; do
             echo "::group::cohort ${cohort}"
-            node cross-router/run-all.mjs "$RUNS" "${cohort}" || rc=$?
+            node run-all.mjs "$RUNS" "${cohort}" || rc=$?
             echo "::endgroup::"
             if [ "$rc" -ne 0 ]; then
               echo "::error::cohort ${cohort} failed (exit ${rc}) — stopping the run; a partial matrix publishes nothing"
@@ -139,7 +144,7 @@ jobs:
             fi
           done
           exit $rc
-        working-directory: benchmarks
+        working-directory: benchmarks/cross-router
         # 300 min covers all five cohorts (~2.8 h measured) with ~1.8× headroom,
         # and — unlike the previous 600 — it is REACHABLE: `timeout-minutes`
         # defaults to 360 at the JOB level, so a 600-minute step cap could never
@@ -172,8 +177,8 @@ jobs:
       # read-only — build-deck never mutates it.
       - name: Rebuild deck snapshot
         id: deck
-        run: node cross-router/deck/deck-extract.mjs && node cross-router/deck/build-deck.mjs
-        working-directory: benchmarks
+        run: node deck/deck-extract.mjs && node deck/build-deck.mjs
+        working-directory: benchmarks/cross-router
 
       # render the print/PDF edition (deck/print.html) → cross-router-report.pdf via Playwright's
       # Chromium page.pdf (the same browser the matrix already drives). Non-fatal: a PDF failure
@@ -182,8 +187,8 @@ jobs:
         id: pdf
         if: ${{ !cancelled() && steps.deck.outcome == 'success' }}
         continue-on-error: true
-        run: node cross-router/deck/render-pdf.mjs
-        working-directory: benchmarks
+        run: node deck/render-pdf.mjs
+        working-directory: benchmarks/cross-router
 
       # RME watch — REPORT-ONLY, never fails the run. Breaches surface here (the offenders in
       # this step's log) and in the step summary's RME watch section, but the workflow indicator
@@ -196,8 +201,8 @@ jobs:
       # failure, the run stays green.
       - name: RME watch (report-only)
         continue-on-error: true
-        working-directory: benchmarks
-        run: node cross-router/harness/rme-gate.mjs 15 40
+        working-directory: benchmarks/cross-router
+        run: node harness/rme-gate.mjs 15 40
 
       # stamp + win/loss/parity grid (advisory competitive-ratio) + RME watch, from the fresh deck-data.json.
       - name: Step summary
@@ -206,8 +211,8 @@ jobs:
         # absent on a fresh checkout, or a stale partial from this attempt. The success gate keeps
         # ci-summary from rendering a broken/empty snapshot.
         if: ${{ !cancelled() && steps.deck.outcome == 'success' }}
-        run: node cross-router/harness/ci-summary.mjs >> "$GITHUB_STEP_SUMMARY"
-        working-directory: benchmarks
+        run: node harness/ci-summary.mjs >> "$GITHUB_STEP_SUMMARY"
+        working-directory: benchmarks/cross-router
 
       # ONE artifact — raw numbers + matcher input + the rebuilt CI deck.
       - name: Upload results + CI deck

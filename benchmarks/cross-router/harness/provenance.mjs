@@ -1,83 +1,28 @@
-// Provenance + dist-freshness gate (#1459). Engines resolve to `packages/*/dist` (fair,
-// but STALE if `src` was edited without a rebuild — the 07-11 vue matrix silently
-// measured a pre-#1424 dist). This module (a) refuses to run when any `packages/*/src`
-// is newer than the built `dist`, and (b) returns the git provenance stamp for the
-// results `env` block so a mixed-epoch matrix leaves a trace. Shared by run.mjs (single
-// cell) and run-all.mjs (interleaved matrix) so the guard can't be bypassed by either.
+// Provenance stamp for the results `env` block. The workspace installs @real-router/*
+// from npm, so a cell records which release it measured — the core version here, each
+// engine's own version in its cell (engine-versions.mjs) — and the git state of the
+// harness at measurement time, so a mixed-epoch matrix leaves a trace. Shared by every
+// results writer so none of them can drop it.
 import { execSync } from "node:child_process";
-import { readdirSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { cpus } from "node:os";
 import { join } from "node:path";
 
-const newestMtime = (root, exts) => {
-  let max = 0;
-  const stack = [root];
-  while (stack.length) {
-    const dir = stack.pop();
-    let entries;
-    try {
-      entries = readdirSync(dir, { withFileTypes: true });
-    } catch {
-      continue; // dir absent (e.g. a package with no src, or no dist yet)
-    }
-    for (const e of entries) {
-      const p = join(dir, e.name);
-      if (e.isDirectory()) {
-        // symlinks are not dirs → the walk never descends them; the shared/ TREE those
-        // symlinks point at is scanned directly by the gate below (audit 07-18 K3).
-        if (e.name !== "node_modules") stack.push(p);
-      } else if (!exts || exts.some((x) => e.name.endsWith(x))) {
-        try {
-          max = Math.max(max, statSync(p).mtimeMs);
-        } catch {
-          /* raced away */
-        }
-      }
-    }
-  }
-  return max;
-};
-
-// Run the freshness gate (exits 3 if stale, unless BENCH_ALLOW_STALE_DIST=1) and return
-// { commit, dirty, distNewestMtime } for the env block. Call ONCE per process, before
-// building. `here` = the cross-router dir (repo root is here/../..).
-export function freshnessGateAndProvenance(here) {
-  const pkgs = join(here, "..", "..", "packages");
-  let srcMtime = 0;
-  let distMtime = 0;
+// The @real-router/core release installed in this workspace, or null outside it. The
+// adapters take core as a peer, so an adapter's version alone does not say which core ran.
+function coreVersion(here) {
   try {
-    for (const pkg of readdirSync(pkgs, { withFileTypes: true })) {
-      if (!pkg.isDirectory()) continue;
-      srcMtime = Math.max(
-        srcMtime,
-        newestMtime(join(pkgs, pkg.name, "src"), [".ts", ".tsx"]),
-      );
-      distMtime = Math.max(
-        distMtime,
-        newestMtime(join(pkgs, pkg.name, "dist"), [".mjs", ".cjs", ".js"]),
-      );
-    }
-    // shared/ sources (browser-env / dom-utils / ssr) reach dist only through consumer
-    // symlinks (src/browser-env etc.), and the per-package walk above never descends a
-    // symlink — so an edit to shared/*.ts sailed past the gate un-bundled and silently
-    // measured stale dist across five cohorts' Link/history hot path (audit 07-18 K3).
-    // Scan the real shared/ tree directly.
-    srcMtime = Math.max(
-      srcMtime,
-      newestMtime(join(here, "..", "..", "shared"), [".ts", ".tsx"]),
-    );
+    return JSON.parse(
+      readFileSync(join(here, "node_modules", "@real-router", "core", "package.json"), "utf8"),
+    ).version;
   } catch {
-    /* not a monorepo checkout — no gate, no dist provenance */
+    return null;
   }
-  if (distMtime > 0 && srcMtime > distMtime && !process.env.BENCH_ALLOW_STALE_DIST) {
-    console.error(
-      `provenance: STALE DIST — packages/*/src (${new Date(srcMtime).toISOString()}) is newer ` +
-        `than packages/*/dist (${new Date(distMtime).toISOString()}). Engines resolve to dist/, so ` +
-        `this would measure code that isn't built (#1459). Run \`pnpm bundle\` first, or set ` +
-        `BENCH_ALLOW_STALE_DIST=1 to override.`,
-    );
-    process.exit(3);
-  }
+}
+
+// Return { commit, dirty, dirtyFiles, dirtyCode, realRouterCore } for the env block. Call
+// ONCE per process, before building. `here` = the cross-router dir.
+export function readProvenance(here) {
   let commit = "unknown";
   let dirty = null;
   let dirtyFiles = null;
@@ -104,7 +49,7 @@ export function freshnessGateAndProvenance(here) {
     dirty,
     dirtyFiles,
     dirtyCode,
-    distNewestMtime: distMtime ? new Date(distMtime).toISOString() : null,
+    realRouterCore: coreVersion(here),
   };
 }
 

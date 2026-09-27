@@ -48,8 +48,8 @@ const PACKAGE = {
 };
 
 const BENCH = {
-  component: "benchmarks/cross-router/apps/svelte/real-router/src/App.svelte",
-  module: "benchmarks/cross-router/apps/svelte/real-router/src/main.ts",
+  component: "benchmarks/adapter-bench/apps/svelte/App.svelte",
+  module: "benchmarks/adapter-bench/apps/svelte/index.ts",
 };
 
 /** What differs for a `.svelte` component, and how. */

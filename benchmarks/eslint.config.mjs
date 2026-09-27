@@ -11,6 +11,10 @@ import tsEslint from "typescript-eslint";
 export default tsEslint.config(
   ...eslintConfig,
 
+  // `cross-router/` is a pnpm workspace of its own; its dependencies are not
+  // installed here.
+  { ignores: ["cross-router/**"] },
+
   {
     // Deck TEMPLATES, not JavaScript: build-deck.mjs string-replaces their
     // `__TOKEN__` placeholders before they become valid JS, so a lint run reads

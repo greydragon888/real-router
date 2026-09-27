@@ -20,7 +20,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isKnownNA } from "./harness/known-na.mjs";
-import { freshnessGateAndProvenance } from "./harness/provenance.mjs";
+import { readProvenance } from "./harness/provenance.mjs";
 import { runScenarioCells } from "./harness/scenario-run.mjs";
 import { COHORT_ENGINES, SCENARIOS } from "./harness/scenarios-registry.mjs";
 import { N_MIN } from "./harness/write-cell.mjs";
@@ -41,7 +41,7 @@ if (!Number.isFinite(Number(runs)) || Number(runs) < N_MIN) {
   process.exit(1);
 }
 
-const provenance = freshnessGateAndProvenance(here);
+const provenance = readProvenance(here);
 let ok = 0, failed = 0, skipped = 0;
 
 for (const framework of frameworks) {

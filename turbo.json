@@ -110,7 +110,8 @@
         "eslint.config.*",
         "package.json",
         "!**/dist/**",
-        "!**/node_modules/**"
+        "!**/node_modules/**",
+        "!cross-router/**"
       ],
       "outputLogs": "errors-only",
       "cache": true

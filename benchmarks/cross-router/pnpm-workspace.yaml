@@ -1,0 +1,56 @@
+# The cross-router workspace: its own lockfile, overrides and settings. pnpm reads
+# settings per workspace, so none of the repository root's reach this one.
+#
+# @real-router/* resolve from npm (`*` in the manifest, the lockfile records the
+# release). The weekly snapshot moves them to the latest release before it
+# measures: `pnpm update --no-save "@real-router/*"`.
+overrides:
+  # Bound to <8 for the SOLID CHAIN ONLY: an open upper bound lets `pnpm dedupe`
+  # pull @babel/core 8 into a chain that cannot run it. Lift when
+  # vite-plugin-solid supports babel 8. The root pnpm-workspace.yaml records why
+  # the entry is scoped to the consumer rather than global.
+  'vite-plugin-solid>@babel/core': '>=7.29.6 <8'
+  # @angular/build depends on an exact `vite: 8.1.5`; this collapses that edge
+  # onto the exact 8.2.2 the manifest declares, so the tree holds one vite.
+  # Scoped to that edge rather than global, for the reason the root
+  # pnpm-workspace.yaml gives under its `vite` entry.
+  '@angular/build>vite': '>=8.2.2 <9'
+  # Floors the root and examples carry, on the parents here whose ranges admit
+  # a release below them; the root and examples pnpm-workspace.yaml name the
+  # advisories. Each value satisfies every parent in this tree.
+  # ajv-formats declares ^8.0.0; @angular-devkit/core pins 8.20.0, which ~8.20.0 keeps.
+  ajv@8: ~8.20.0
+  # fdir declares `^3 || ^4`. 4.0.7 is the highest minimum a parent declares (unplugin
+  # `^4.0.7`); it lifts the exact 4.0.5 of @angular-devkit/core and @angular/build two
+  # patches, as the root does.
+  picomatch@4: 4.0.7
+  # ajv declares `^3.0.1`.
+  fast-uri: '>=3.1.6 <4'
+  # @angular/build, beasties and postcss-safe-parser declare ranges below the 8.5.23
+  # fix; the floor sits at 8.5.28, the highest minimum a parent declares
+  # (@vue/compiler-sfc), so it holds no parent below its range.
+  postcss: '>=8.5.28'
+  # esbuild 0.28.0 (GHSA-g7r4-m6w7-qqqr, fixed in 0.28.1): unplugin declares `*` and
+  # vite `^0.27.0 || ^0.28.0`. Scoped to those edges because the manifest declares
+  # esbuild itself, and an override that reaches a direct dependency becomes its
+  # recorded specifier.
+  'unplugin>esbuild': '>=0.28.1 <0.29'
+  'vite>esbuild': '>=0.28.1 <0.29'
+updateNotifier: false
+saveExact: true
+# ⚠ `ignore` keeps pnpm-lock.yaml ONE YAML document: GitHub's dependency graph
+# reads only the first. The root pnpm-workspace.yaml has the measurement.
+pmOnFail: ignore
+loglevel: error
+autoInstallPeers: true
+strictPeerDependencies: true
+strictDepBuilds: true
+scriptShell: bash
+minimumReleaseAge: 0
+allowBuilds:
+  '@parcel/watcher': true
+  esbuild: true
+  fsevents: true
+  lmdb: true
+  msgpackr-extract: true
+  vue-demi: true

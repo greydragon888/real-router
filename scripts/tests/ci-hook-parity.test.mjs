@@ -62,9 +62,9 @@ export const NOT_A_CHECK = new Map([
  */
 export const CI_ONLY = new Map([
   [
-    "lint:bench-apps",
-    "preflight of the scheduled cross-router bench suite, which no hook runs — the " +
-      "harness needs the built apps and a quiet machine (benchmarks/CLAUDE.md)",
+    "lint:spec-parity",
+    "preflight of the scheduled cross-router bench suite, a pnpm workspace of its " +
+      "own that no hook installs (benchmarks/CLAUDE.md)",
   ],
 ]);
 
@@ -397,7 +397,7 @@ jobs:
   bench:
     steps:
       - name: Contract preflight
-        run: pnpm lint:bench-apps
+        run: pnpm lint:spec-parity
 `;
   const found = findViolations(
     { "ci.yml": WORKFLOW, "bench.yml": other },
@@ -405,7 +405,7 @@ jobs:
     opts,
   );
 
-  assert.deepEqual(found.unpaired, ["lint:bench-apps"]);
+  assert.deepEqual(found.unpaired, ["lint:spec-parity"]);
 });
 
 test("fixture: pairing survives the shapes a hook line is written in", () => {

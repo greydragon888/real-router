@@ -8,13 +8,4 @@
 // byte copies of it, supply their own.
 
 /** @type {Map<string, string>} repository path → why its package ignores it */
-export const DELIBERATE = new Map([
-  [
-    "benchmarks/cross-router/deck/deck-config.js",
-    "a deck template, not JavaScript: the build replaces its placeholders (#2390)",
-  ],
-  [
-    "benchmarks/cross-router/deck/deck-render.js",
-    "a deck template, not JavaScript: the build replaces its placeholders (#2390)",
-  ],
-]);
+export const DELIBERATE = new Map();

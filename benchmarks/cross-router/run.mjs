@@ -12,7 +12,7 @@ import { build, preview } from "vite";
 import { resolveEngineVersion } from "./harness/engine-versions.mjs";
 import { isKnownNA } from "./harness/known-na.mjs";
 import { measure } from "./harness/measure.mjs";
-import { envStamp, freshnessGateAndProvenance } from "./harness/provenance.mjs";
+import { envStamp, readProvenance } from "./harness/provenance.mjs";
 import { appRoot, SCENARIOS } from "./harness/scenarios-registry.mjs";
 import { writeCell } from "./harness/write-cell.mjs";
 
@@ -51,8 +51,8 @@ if (!existsSync(configFile)) {
   fail(`no app at ${root} (missing vite.config.ts)`);
 }
 
-// Pre-flight: refuse a stale dist + capture provenance (#1459) before wasting a build.
-const provenance = freshnessGateAndProvenance(here);
+// Capture provenance (#1459) once, before the build.
+const provenance = readProvenance(here);
 
 await build({ root, configFile, logLevel: "warn" });
 

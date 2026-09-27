@@ -7,19 +7,20 @@ Competitive performance benchmarks for `@real-router/*`.
 ```
 benchmarks/
 ├── cross-router/          # ⭐ the live suite — REAL Chromium (Playwright + CDP), all competitors, per-cohort
+│   │                          #    a pnpm workspace of its own: @real-router/* from npm, like the competitors
 │   ├── apps/<fw>/<engine>/    # engine-agnostic cohort shells (only routing differs)
 │   ├── scenarios/*.mjs        # engine-agnostic drivers (11 scenarios)
 │   ├── harness/*.mjs          # cdp · measure · stats · rme-gate · sanity-remeasure
+│   ├── react-router-bug/      # isolated repro for react-router#15249 (surfaced by cross-router deep-config)
 │   └── run.mjs · run-all.mjs  # one cell / full matrix → results/ (gitignored — source for the deck)
-├── react-router-bug/ # isolated repro for react-router#15249 (surfaced by cross-router deep-config)
-└── bench-cross-router.sh  # sudo orchestrator: rebuild → readiness-gate → matrix → rme-gate → sanity
+└── bench-cross-router.sh  # sudo orchestrator: update @real-router/* → readiness-gate → matrix → rme-gate → sanity
 ```
 
 > **2026-07-05:** the old `core/` mitata suite (real-router vs router5 / router6) and the `vs-tanstack/` jsdom suite (speed / memory-churn / bundle-size) were **removed** — both superseded by `cross-router/` (real browser, all current competitors). Git-recoverable; the TanStack stack-overflow finding lives in git history at `vs-tanstack/TANSTACK_STACK_OVERFLOW.md`.
 
 ## Findings & isolated repros
 
-- **react-router #15249 — deep-route match blowup.** The cross-router `deep-config` sweep surfaced a non-monotonic (parabolic) match-cost curve for react-router; [`react-router-bug/`](react-router-bug/) isolates it to a pure-Node `matchRoutes()` repro — the identical URL match is **~10× slower in a 210-deep route tree than a 90-deep one** (routes *below* the match are re-scanned). Live chart (browser-measured, match + render, swept to depth 210): <https://claude.ai/code/artifact/58736d29-e694-4c20-9f0c-3469bbcb6c44>. ⚠ The ms-scale absolutes and "~10×" time the *public per-call* `matchRoutes()` — 54–97% of those figures is its per-call flatten+rank, which a Data-mode router (`createBrowserRouter`) amortizes across navigations; amortized, the per-nav rescan alone still runs ~105× a µs-class matcher and the parabola survives (audit 2026-07-18).
+- **react-router #15249 — deep-route match blowup.** The cross-router `deep-config` sweep surfaced a non-monotonic (parabolic) match-cost curve for react-router; [`react-router-bug/`](cross-router/react-router-bug/) isolates it to a pure-Node `matchRoutes()` repro — the identical URL match is **~10× slower in a 210-deep route tree than a 90-deep one** (routes *below* the match are re-scanned). Live chart (browser-measured, match + render, swept to depth 210): <https://claude.ai/code/artifact/58736d29-e694-4c20-9f0c-3469bbcb6c44>. ⚠ The ms-scale absolutes and "~10×" time the *public per-call* `matchRoutes()` — 54–97% of those figures is its per-call flatten+rank, which a Data-mode router (`createBrowserRouter`) amortizes across navigations; amortized, the per-nav rescan alone still runs ~105× a µs-class matcher and the parabola survives (audit 2026-07-18).
 
 ## Cross-Router — real browser, all competitors
 
@@ -30,6 +31,7 @@ Cohorts (each 2–3 FULL routers): **react** (real-router · react-router@8 · @
 11 scenarios: `cold-start` · `nav-latency` · `param-nav` · `wide-config` · `deep-config` · `search-param-scaling` · `table-heap` · `link-build` · `nav-churn` · `active-links` · `nested-switch`. Metrics: CPU (`script` + Blink → `total`), retained heap, and transient `allocKBPerNav` (GC pressure).
 
 ```bash
+pnpm --dir cross-router install                 # once: the suite is a workspace of its own
 sudo ./bench-cross-router.sh                    # full unattended refresh (all cohorts, sudo orchestrator)
 node cross-router/run-all.mjs 30 angular        # one cohort at n=30 → results/
 ```

@@ -28,7 +28,7 @@ import path from "path";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CROSS_ROOT = path.resolve(HERE, ".."); // benchmarks/cross-router
-const PNPM = path.resolve(HERE, "../../../node_modules/.pnpm"); // repo-root store
+const PNPM = path.resolve(CROSS_ROOT, "node_modules/.pnpm"); // this workspace's store
 const rootReq = createRequire(CROSS_ROOT + "/");
 const impAbs = (p) => import(pathToFileURL(p).href);
 const impPkg = (spec) => impAbs(rootReq.resolve(spec));

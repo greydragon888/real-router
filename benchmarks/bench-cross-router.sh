@@ -3,8 +3,9 @@
 # Cross-Router Benchmark Runner — machine-readiness + full unattended matrix
 # Sibling of bench-compare.sh.bak, but for the cross-router (Playwright + CDP) suite.
 #
-# Rebuilds every package's dist, gates on machine readiness for a ~3 h unattended
-# run, and — on success — runs the full matrix across all cohorts (default n=15;
+# Updates @real-router/* in the cross-router workspace to the latest npm release, gates
+# on machine readiness for a ~3 h unattended run, and — on success — runs the full
+# matrix across all cohorts (default n=15;
 # the REFERENCE results/ — the deck source — is n=50: use --runs 50), writing
 # results/ (the source for the infographic deck; text REPORT-*.md are retired).
 #
@@ -15,19 +16,19 @@
 #     • Playwright's browser cache lives under the user's $HOME
 #       (~/Library/Caches/ms-playwright) — root's $HOME is /var/root → "Executable
 #       doesn't exist".
-#     • every dist / results / .turbo artifact must stay user-owned or subsequent
+#     • every node_modules / results artifact must stay user-owned or subsequent
 #       non-sudo pnpm/node breaks.
 #   So the PRIVILEGED bits (thermal read, purge, Spotlight/Time-Machine toggles,
-#   nice -20 set) stay root, and ALL build/benchmark work is delegated back to the
+#   nice -20 set) stay root, and ALL install/benchmark work is delegated back to the
 #   user via `sudo -u -H`, inheriting the root-set nice -20 across the priv drop.
 #
-# Flow: preflight (power/thermal/apps) → disable distractions → rebuild all
-# package dist (pnpm bundle) → [optional n=1 smoke] → cooldown → per-cohort
-# n=15 matrix → rme-gate → sub-ms sanity re-measure (#1261),
+# Flow: preflight (power/thermal/apps) → disable distractions → update
+# @real-router/* to the latest release → matcher-bench → [optional n=1 smoke] →
+# cooldown → per-cohort n=15 matrix → rme-gate → sub-ms sanity re-measure (#1261),
 # with thermal cooldown + heavy-process recheck between cohorts.
 #
 # NOTE: deliberately NOT `set -e` — a 3 h unattended run must survive a single
-# flaky cell / RME flag and continue to the next cohort. Hard failures (bundle,
+# flaky cell / RME flag and continue to the next cohort. Hard failures (update,
 # smoke) are handled explicitly; per-cohort failures are tallied, not fatal.
 # =============================================================================
 set -o pipefail
@@ -50,7 +51,7 @@ RME_NOISY="${RME_NOISY:-40}"             # RME % threshold — noisy families (b
 SANITY_RUNS="${SANITY_RUNS:-12}"         # post-cohort sub-ms sanity re-measure n (0 = skip)
 SANITY_SHIFT="${SANITY_SHIFT:-20}"       # % median shift (recorded vs fresh) that flags load
 SMOKE=false                              # --smoke: n=1 dry matrix first, abort on any failure
-NO_BUILD=false                           # --no-build: skip pnpm bundle (use existing dist)
+NO_UPDATE=false                          # --no-update: measure the @real-router/* release installed now
 ASSUME_YES=false                         # --yes / -y: skip interactive prompts (unattended)
 ALL_COHORTS="react vue solid svelte angular"
 COHORTS=()
@@ -59,8 +60,9 @@ COHORTS=()
 show_help() {
     echo "Usage: sudo ./bench-cross-router.sh [OPTIONS] [COHORTS...]"
     echo ""
-    echo "Rebuild all package dist, verify machine readiness, then run the full"
-    echo "cross-router (Playwright + CDP) matrix, writing results/ for the deck."
+    echo "Update @real-router/* to the latest npm release, verify machine readiness,"
+    echo "then run the full cross-router (Playwright + CDP) matrix, writing results/"
+    echo "for the deck."
     echo ""
     echo "Arguments:"
     echo "  COHORTS     Subset of: $ALL_COHORTS (default: all)"
@@ -69,7 +71,7 @@ show_help() {
     echo "  --runs N    Samples per (scenario × engine)         (default: ${RUNS})"
     echo "  --smoke     Run an n=1 dry matrix first; abort the run if any app"
     echo "              fails to build/drive (fail-fast before the ~3 h commit)"
-    echo "  --no-build  Skip 'pnpm bundle' (benchmark existing packages/*/dist)"
+    echo "  --no-update Skip the update (benchmark the @real-router/* release installed now)"
     echo "  -y, --yes   Skip interactive prompts (for unattended launch)"
     echo "  -h, --help  Show this help"
     echo ""
@@ -83,16 +85,17 @@ show_help() {
     echo "  SANITY_SHIFT       % shift vs fresh re-measure that flags load inflation (default: 20)"
     echo ""
     echo "Examples:"
-    echo "  sudo ./bench-cross-router.sh                  # rebuild + all 5 cohorts, n=15"
+    echo "  sudo ./bench-cross-router.sh                  # update + all 5 cohorts, n=15"
     echo "  sudo ./bench-cross-router.sh --runs 50        # reference-grade refresh (results/ deck source is n=50)"
     echo "  sudo ./bench-cross-router.sh --smoke          # dry-run first, then the full run"
     echo "  sudo ./bench-cross-router.sh angular          # just the angular cohort"
     echo "  sudo ./bench-cross-router.sh --runs 30 solid  # solid cohort at n=30"
-    echo "  sudo ./bench-cross-router.sh --no-build       # skip rebuild (dist already fresh)"
+    echo "  sudo ./bench-cross-router.sh --no-update      # keep the installed release"
     echo ""
-    echo "The full run measures PRODUCTION dist (fairness-critical) — it always"
-    echo "rebuilds first unless --no-build. Expect ~2.5-3 h for all 5 cohorts"
-    echo "(Angular AOT is the slowest). Chromium runs as \$SUDO_USER, not root."
+    echo "The run measures the published @real-router/* release, as the weekly CI"
+    echo "snapshot does — it updates to the latest first unless --no-update. Expect"
+    echo "~2.5-3 h for all 5 cohorts (Angular AOT is the slowest). Chromium runs as"
+    echo "\$SUDO_USER, not root."
 }
 
 # --- Parse arguments ---------------------------------------------------------
@@ -100,7 +103,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         -h|--help) show_help; exit 0 ;;
         --smoke)   SMOKE=true; shift ;;
-        --no-build) NO_BUILD=true; shift ;;
+        --no-update) NO_UPDATE=true; shift ;;
         -y|--yes)  ASSUME_YES=true; shift ;;
         --runs)
             if [[ -z "${2:-}" ]]; then echo "Error: --runs needs a value"; exit 1; fi
@@ -130,7 +133,7 @@ if [[ "$EUID" -ne 0 ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # benchmarks/
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"                     # monorepo root
+CROSS_DIR="$SCRIPT_DIR/cross-router"                         # the cross-router pnpm workspace
 ORIGINAL_USER="${SUDO_USER:-$USER}"
 
 if [[ "$ORIGINAL_USER" == "root" ]]; then
@@ -153,7 +156,7 @@ echo "Logging this run to: $LOGFILE"
 
 # Reconstruct the invoking user's HOME / shell / PATH: the workload runs as them,
 # but sudo resets the environment, so we must rebuild what their login shell sets
-# (node/pnpm/turbo live on an nvm/homebrew PATH, and Playwright needs the real HOME).
+# (node/pnpm live on an nvm/homebrew PATH, and Playwright needs the real HOME).
 USER_HOME="$(dscl . -read "/Users/$ORIGINAL_USER" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"
 [[ -z "$USER_HOME" ]] && USER_HOME="$(eval echo "~$ORIGINAL_USER")"
 USER_SHELL="$(dscl . -read "/Users/$ORIGINAL_USER" UserShell 2>/dev/null | awk '{print $2}')"
@@ -356,7 +359,7 @@ echo "  Thermal pressure: ${THERMAL_PRESSURE:-unknown}"
 echo "  Workload user: $ORIGINAL_USER (Chromium runs here, not root)"
 echo "  Cohorts: ${COHORTS[*]}"
 echo "  Runs (n): $RUNS"
-echo "  Rebuild: $([[ "$NO_BUILD" == true ]] && echo 'skipped (--no-build)' || echo 'pnpm bundle (all packages)')"
+echo "  Update: $([[ "$NO_UPDATE" == true ]] && echo 'skipped (--no-update)' || echo '@real-router/* to the latest npm release')"
 echo "  Smoke: $([[ "$SMOKE" == true ]] && echo 'yes (n=1 dry matrix first)' || echo 'no')"
 echo "  RME gate: stable ${RME_STABLE}% · noisy ${RME_NOISY}%"
 echo "  Sub-ms sanity: $([[ "$SANITY_RUNS" -gt 0 ]] && echo "nav-latency × real-router re-measure, n=$SANITY_RUNS, flag |shift| > ${SANITY_SHIFT}%" || echo 'disabled (SANITY_RUNS=0)')"
@@ -405,28 +408,30 @@ else
 fi
 
 # -----------------------------------------------------------------------------
-# Step 4: Rebuild all package dist
+# Step 4: Update @real-router/* to the latest npm release
 # -----------------------------------------------------------------------------
 echo ""
-if [[ "$NO_BUILD" == true ]]; then
-    echo -e "${YELLOW}[Step 4] Skipping rebuild (--no-build) — using existing packages/*/dist${NC}"
-    echo -e "${YELLOW}  ⚠ ensure dist is fresh, or the benchmark measures stale code.${NC}"
+if [[ "$NO_UPDATE" == true ]]; then
+    echo -e "${YELLOW}[Step 4] Skipping the update (--no-update) — measuring the installed release${NC}"
 else
-    echo -e "${YELLOW}[Step 4] Rebuilding all package dist (pnpm bundle)...${NC}"
-    echo "  cross-router resolves @real-router/* → packages/*/dist/esm — stale dist = stale benchmark."
-    if as_user "cd '$ROOT_DIR' && pnpm bundle"; then
-        echo -e "${GREEN}  ✓ all package dist rebuilt${NC}"
+    echo -e "${YELLOW}[Step 4] Updating @real-router/* to the latest npm release...${NC}"
+    # The same two commands as cross-router-bench.yml. `--no-save` keeps the manifest's
+    # `*`; the lockfile keeps the new release until it is committed or restored.
+    if as_user "cd '$CROSS_DIR' && pnpm install --frozen-lockfile && pnpm update --no-save '@real-router/*'"; then
+        echo -e "${GREEN}  ✓ @real-router/* at the latest release${NC}"
     else
-        echo -e "${RED}  ✗ 'pnpm bundle' failed — aborting (cannot benchmark broken/stale dist)${NC}"
+        echo -e "${RED}  ✗ install/update of the cross-router workspace failed — aborting${NC}"
         exit 1
     fi
 fi
+CORE_VERSION="$(sed -n 's/^  "version": "\(.*\)",$/\1/p' "$CROSS_DIR/node_modules/@real-router/core/package.json" 2>/dev/null)"
+echo "  @real-router/core under test: ${CORE_VERSION:-not installed}"
 
 # Instrument №2 — isolated matcher microbench (pure Node, minutes). Refreshed HERE so it
-# shares the exact dist epoch of the browser matrix that follows: a deck rebuilt later
+# measures the release the browser matrix that follows builds: a deck rebuilt later
 # from results/ + matcher-bench/results.json then can't pair fresh browser cells with
 # stale matcher curves under one stamp (audit 07-18 G1o/K12 — this step mirrors the CI
-# workflow's bundle → matcher-bench → run-all order).
+# workflow's update → matcher-bench → run-all order).
 echo ""
 echo -e "${YELLOW}[Step 4b] Isolated matcher-bench (wide + deep sweeps, pure Node)...${NC}"
 if as_user "cd '$SCRIPT_DIR' && node --expose-gc cross-router/matcher-bench/run.mjs all"; then
@@ -462,10 +467,10 @@ if [[ "$SMOKE" == true ]]; then
 fi
 
 # -----------------------------------------------------------------------------
-# Step 6: Cooldown after build heat, then run the full matrix per cohort
+# Step 6: Cooldown after the matcher-bench heat, then run the full matrix per cohort
 # -----------------------------------------------------------------------------
 echo ""
-echo -e "${YELLOW}[Step 6] Cooling down after rebuild before the first cohort...${NC}"
+echo -e "${YELLOW}[Step 6] Cooling down before the first cohort...${NC}"
 wait_for_cooldown "$MAX_COOLDOWN_WAIT"
 
 if warn_if_throttling; then confirm_or_abort; fi

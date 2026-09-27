@@ -4,9 +4,8 @@
 // It exists because there were two copies of this sequence — `run-all.mjs` and
 // `run-subset.mjs` each carried their own — and a third was about to appear for the
 // per-scenario worker (#1746). That is the drift `benchmarks/CLAUDE.md` already guards
-// against for the freshness gate, the provenance stamp, the write guard and the scenario
-// registry: one implementation, several schedulers, so the runners cannot disagree about
-// what a cell IS.
+// against for the provenance stamp, the write guard and the scenario registry: one
+// implementation, several schedulers, so the runners cannot disagree about what a cell IS.
 //
 // ⚠ This module does NOT log progress, deliberately. The two callers print different
 // things — `run-all` a `▸` line and a duration, `run-subset` a `===` banner and a `✔` per
@@ -30,7 +29,7 @@ import { writeCell } from "./write-cell.mjs";
  * @param {string} options.scenarioName    key in SCENARIOS
  * @param {string[]} options.engineList    engines to interleave (already KNOWN_NA-filtered)
  * @param {number} options.baseRuns        the run's base n; runsFor() applies the sweep policy
- * @param {object} options.provenance      from freshnessGateAndProvenance()
+ * @param {object} options.provenance      from readProvenance()
  * @param {boolean} [options.persist]      false = BENCH_SMOKE: measure, write nothing, count ok
  * @param {(info: {engines: string[], effRuns: number}) => void} [options.onReady]
  *        called after every app is built and served, BEFORE the measurement starts — the

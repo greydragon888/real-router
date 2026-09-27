@@ -26,6 +26,7 @@ import { DELIBERATE } from "./lint-reach-deliberate.mjs";
 import {
   evaluateReach,
   lintTargets,
+  ownTrackedFiles,
   staleDeliberate,
   unlintedFiles,
 } from "./lint-reach.mjs";
@@ -54,7 +55,9 @@ const packages = JSON.parse(sh("pnpm", ["ls", "-r", "--depth", "-1", "--json"]))
   }))
   .filter(({ dir }) => dir !== "");
 
-const trackedFiles = sh("git", ["ls-files"]).split("\n").filter(Boolean);
+const trackedFiles = ownTrackedFiles(
+  sh("git", ["ls-files"]).split("\n").filter(Boolean),
+);
 
 const sharedDirs = [
   ...new Set(

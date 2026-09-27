@@ -381,7 +381,7 @@ test("sameProgram: a docblock above a private method does not count", () => {
   assert.equal(sameProgram(undefined, after, "ts", esbuild), false);
 });
 
-test("over this repository, the closure reaches what the suites run and stops at the cross-router bench", () => {
+test("over this repository, the closure reaches what the suites run and stops at the tooling", () => {
   const files = execFileSync("git", ["ls-files", "--", ...SUITE_DIRS], {
     cwd: ROOT,
     encoding: "utf8",
@@ -394,16 +394,16 @@ test("over this repository, the closure reaches what the suites run and stops at
 
   roots.add("tsx");
 
-  const names = new Set(
-    [
-      ...runtimeVersions(
-        closure(
-          parseLockfile(readFileSync(join(ROOT, "pnpm-lock.yaml"), "utf8")),
-          roots,
-        ),
-      ),
-    ].map((key) => key.slice(0, key.lastIndexOf("@"))),
+  const lock = parseLockfile(
+    readFileSync(join(ROOT, "pnpm-lock.yaml"), "utf8"),
   );
+  const nameOf = (key) => {
+    const bare = key.replace(/\(.*$/, "");
+
+    return bare.slice(0, bare.lastIndexOf("@"));
+  };
+  const names = new Set([...runtimeVersions(closure(lock, roots))].map(nameOf));
+  const locked = new Set([...lock.snapshots.keys()].map(nameOf));
 
   for (const reached of [
     "react",
@@ -424,13 +424,11 @@ test("over this repository, the closure reaches what the suites run and stops at
     assert.ok(names.has(reached), `expected the closure to reach ${reached}`);
   }
 
-  for (const absent of [
-    "wouter",
-    "vue-router",
-    "sv-router",
-    "playwright",
-    "@types/node",
-  ]) {
+  // Each is in this lockfile, so its absence is the closure's doing. The
+  // routers the cross-router bench measures are not: that bench is a workspace
+  // of its own, with its own lockfile.
+  for (const absent of ["eslint", "prettier", "knip", "@types/node"]) {
+    assert.ok(locked.has(absent), `${absent} is not in this lockfile`);
     assert.ok(
       !names.has(absent),
       `expected the closure to stop before ${absent}`,

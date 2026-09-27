@@ -5,7 +5,7 @@ A self-contained reproduction of the deep-route **match blowup** in `react-route
 route** — routes that are deeper than the URL and therefore *cannot possibly match*,
 but are re-checked anyway.
 
-> **Status:** starting point — surfaced by the [cross-router benchmark](../cross-router/),
+> **Status:** starting point — surfaced by the [cross-router benchmark](../),
 > isolated here to a pure-Node matcher repro. To be developed further (see TODO).
 
 ## The finding
@@ -58,7 +58,7 @@ expensive (amortized 9.95 ms) when 120 more levels sit beneath it.
 ## Run
 
 ```sh
-node run.mjs      # from the monorepo — uses the workspace react-router@8
+node run.mjs      # in the benchmarks/cross-router workspace — uses its react-router@8
 # standalone:   npm i react-router@8 && node run.mjs
 ```
 

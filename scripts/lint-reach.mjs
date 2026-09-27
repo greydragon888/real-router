@@ -143,6 +143,27 @@ export function unreadSharedDirs(sharedDirs, aliases, linted) {
 }
 
 /**
+ * The tracked files of this workspace: every file less those under a
+ * directory that holds a `pnpm-workspace.yaml` of its own. Such a directory
+ * is a separate workspace (`examples/`, `benchmarks/cross-router/`), so no
+ * package of this one owns its files — not even the package whose directory
+ * holds it, and whose lint command names it by path.
+ *
+ * @param {string[]} trackedFiles
+ * @returns {string[]}
+ */
+export function ownTrackedFiles(trackedFiles) {
+  const roots = trackedFiles
+    .filter((file) => path.posix.basename(file) === "pnpm-workspace.yaml")
+    .map((file) => path.posix.dirname(file))
+    .filter((dir) => dir !== ".");
+
+  return trackedFiles.filter(
+    (file) => !roots.some((root) => file.startsWith(`${root}/`)),
+  );
+}
+
+/**
  * Workspace packages whose own tracked files hold no code: every file is of a
  * kind `NOT_CODE` lists. A file under a nested workspace package belongs to
  * that package.

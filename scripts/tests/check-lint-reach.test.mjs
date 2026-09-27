@@ -33,6 +33,7 @@ import {
   isCode,
   lintTargets,
   lintedPackages,
+  ownTrackedFiles,
   packagesWithNothingToRead,
   staleDeliberate,
   turboRuns,
@@ -314,6 +315,27 @@ test("nothing to read: a package holds code unless NOT_CODE lists every file's k
   ]);
 
   assert.deepEqual([...nothing].sort(), ["agg-children-only", "docs-only"]);
+});
+
+test("own tracked files: a nested pnpm-workspace.yaml takes its directory out, the root's takes nothing", () => {
+  assert.deepEqual(
+    ownTrackedFiles([
+      "pnpm-workspace.yaml",
+      "benchmarks/package.json",
+      "benchmarks/adapter-bench/run.mts",
+      "benchmarks/cross-router/pnpm-workspace.yaml",
+      "benchmarks/cross-router/apps/react/main.tsx",
+      "benchmarks/cross-router-notes.md",
+      "examples/pnpm-workspace.yaml",
+      "examples/web/react/basic/src/main.tsx",
+    ]),
+    [
+      "pnpm-workspace.yaml",
+      "benchmarks/package.json",
+      "benchmarks/adapter-bench/run.mts",
+      "benchmarks/cross-router-notes.md",
+    ],
+  );
 });
 
 test("code is every extension NOT_CODE does not list, whatever a config addresses", () => {
@@ -831,6 +853,43 @@ test("#2556: a package outside packages/ is in the file census", () => {
   assert.match(
     result.output,
     /@fx\/x: 1 file\(s\) its lint command reaches, and no block of its ESLint config lints — src\/App\.svelte;/,
+  );
+});
+
+test("a directory with a pnpm-workspace.yaml of its own is outside the census of the package that holds it", () => {
+  const fixture = (separate) =>
+    cliFixture({
+      hook: HOOK,
+      tasks: [
+        ...lints("@fx/a", "@fx/b"),
+        { task: "lint", package: "@fx/bench", command: "eslint ." },
+      ],
+      extraPackages: ["bench"],
+      files: {
+        "bench/cross/src/App.ts": "export const app = 1;\n",
+        ...(separate
+          ? { "bench/cross/pnpm-workspace.yaml": "packages: []\n" }
+          : {}),
+      },
+      configs: {
+        bench:
+          'export default [{ files: ["**/*.ts", "**/*.mjs"] }, { ignores: ["cross/**"] }];',
+      },
+    });
+
+  const result = runCli(fixture(true));
+
+  assert.equal(result.status, 0, result.output);
+  // bench's `package.json` is named and is not code; `cross/` is not counted.
+  assert.match(result.output, censusLine(4, 5, 3));
+
+  // CONTROL — the same tree without the workspace file: `cross/` is the package's.
+  const control = runCli(fixture(false));
+
+  assert.equal(control.status, 1, control.output);
+  assert.match(
+    control.output,
+    /@fx\/bench: 1 file\(s\) its lint command reaches, and no block of its ESLint config lints — cross\/src\/App\.ts;/,
   );
 });
 

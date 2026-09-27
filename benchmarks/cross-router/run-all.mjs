@@ -32,7 +32,6 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isKnownNA } from "./harness/known-na.mjs";
-import { freshnessGateAndProvenance } from "./harness/provenance.mjs";
 import { COHORT_ENGINES, SCENARIOS } from "./harness/scenarios-registry.mjs";
 import { N_MIN } from "./harness/write-cell.mjs";
 
@@ -82,11 +81,6 @@ if (!SMOKE_MODE && (!Number.isFinite(Number(runs)) || Number(runs) < N_MIN)) {
   );
   process.exit(1);
 }
-
-// Gate a stale dist ONCE, before any fork (#1459). Each worker gates again — that call is
-// what stamps its own cells — but gating here is what makes a stale tree cost one process
-// instead of the first scenario of a three-hour run.
-freshnessGateAndProvenance(here);
 
 let ok = 0;
 let failed = 0;

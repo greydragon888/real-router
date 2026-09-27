@@ -21,11 +21,11 @@
 // Methodologically the boundary is free: the #1460 engine interleave lives ENTIRELY inside
 // a single `measureInterleaved` call, which is inside a single scenario, so no comparison
 // is split. Provenance is identical across processes on the same machine (commit/cpu/
-// runner/dirty/distMtime) and env.date was already per-cell.
+// runner/dirty/realRouterCore) and env.date was already per-cell.
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { freshnessGateAndProvenance } from "./harness/provenance.mjs";
+import { readProvenance } from "./harness/provenance.mjs";
 import { runScenarioCells } from "./harness/scenario-run.mjs";
 import { COHORT_ENGINES, SCENARIOS } from "./harness/scenarios-registry.mjs";
 
@@ -61,9 +61,8 @@ if (!Number.isFinite(baseRuns)) {
   process.exit(2);
 }
 
-// Gate a stale dist + capture provenance (#1459). The orchestrator gates too, so a stale
-// tree is refused before any fork; this call is what stamps THIS process's cells.
-const provenance = freshnessGateAndProvenance(here);
+// Capture provenance (#1459): this call is what stamps THIS process's cells.
+const provenance = readProvenance(here);
 
 const started = Date.now();
 const { ok, failed, effRuns } = await runScenarioCells({
