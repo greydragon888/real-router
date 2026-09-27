@@ -12245,6 +12245,10 @@ The `fflate` record in "Third shape — the override WAS the vulnerability" says
 
 ## Overrides stop at the edges that need them (2026-09-27)
 
+> ⚠ Superseded later on 2026-09-27 in one respect: four of the edges it leaves
+> for a decision — `ajv@8`, `picomatch@4`, `yaml@2`, `postcss` — were acted on.
+> See "Override values rise to the ranges their parents declare".
+
 **Problem.** An override replaces every edge it matches. Two consequences of that were measured on 2026-09-27.
 
 - ⚠ **An override that matches a direct dependency becomes that dependency's recorded specifier.** The lockfiles recorded `>=8.2.2 <9` as the `vite` of the 124 example manifests and of `benchmarks/package.json`, and `>=4.59.0` as the `rollup` of `packages/solid`. A raised pin then installs nothing. Raising `vite` to 8.3.1 in one example, or `rollup` to 4.63.5 in `packages/solid`, left the lockfile untouched with `pnpm install --lockfile-only` green. In the examples, `pnpm update -r --no-save "@real-router/*"` rewrote the 124 specifiers to `8.2.2`, and `install --frozen-lockfile` then refused the lockfile with `ERR_PNPM_OUTDATED_LOCKFILE`.
@@ -12278,3 +12282,26 @@ The `fflate` record in "Third shape — the override WAS the vulnerability" says
 - `piscina: '>=5.2.0 <6.0.0'`: `@angular/build` pins 5.2.0 and gets 5.3.0.
 
 Two edges outside their range are the entry's purpose, and their comments say so: `qs` lifts the exact 6.15.1 of typed-rest-client, an affected release, and `'@angular/build>vite'` lifts its exact 8.1.5.
+
+## Override values rise to the ranges their parents declare (2026-09-27)
+
+**Problem.** An override outranks semver, and four values sat below a range some parent declares, each holding that parent on an older release:
+
+- `ajv@8: ~8.18.0` under the exact 8.20.0 of `@angular-devkit/core` and, in the root, the `~8.20.0` of `@stryker-mutator/core`.
+- `picomatch@4: 4.0.4` under the exact 4.0.5 of `@angular-devkit/core` and `@angular/build`, vite's `^4.0.5` and, in the root, the `^4.0.7` of `@changesets/config`, knip and tsdown.
+- `yaml@2: 2.9.0` under knip's `^2.9.1`, in the root.
+- `postcss: '>=8.5.23'`, which let the lockfile keep 8.5.25 under vite's `^8.5.26`.
+
+**Solution.** Each value moves to the highest minimum a parent declares.
+
+- `ajv@8: ~8.20.0` in both files. It resolves to 8.20.0, which every parent admits.
+- `picomatch@4` is 4.0.7 in the root and 4.0.5 in the examples. No value in the root satisfies every parent: the two Angular packages pin 4.0.5 exactly, and three others require `^4.0.7`. The pin lifts the Angular pair two patches rather than hold the other three below their range. In the examples every parent admits 4.0.5.
+- `yaml@2: 2.9.1` in the root. Every examples parent admits 2.9.0, so that pin stays.
+- `postcss: '>=8.5.26'` in both files. It resolves to 8.5.28.
+
+**Why — measured.**
+
+- OSV lists no advisory for any target: ajv 8.20.0, picomatch 4.0.5 and 4.0.7, yaml 2.9.1, postcss 8.5.26 and 8.5.28.
+- The root lockfile moved exactly those four packages, and the examples lockfile three, since its yaml stays. The rest of each diff is peer-variant keys that carry the new yaml or postcss, and peer ranges the overrides rewrite. After `pnpm dedupe`, both frozen installs, `lint:dedupe`, `lint:deps` and `lint:audit` pass.
+- The tools that load the moved packages still run: ng-packagr bundles `@real-router/angular`, `ng build` builds `angular-basic-example`, `changeset status` parses the changesets, and knip passes.
+- Re-measured per edge with semver, only `undici` still holds a parent below its range: jsdom's `^8.10.2` gets 7.29.0. The other edges outside a range are lifts: `qs`, `'@angular/build>vite'`, the root `picomatch@4` over the Angular pair, `piscina` over the exact 5.2.0 of `@angular/build`, and, in the examples, `undici` over node-gyp's `^6.25.0`.

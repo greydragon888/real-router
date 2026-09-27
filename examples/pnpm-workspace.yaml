@@ -33,7 +33,9 @@ overrides:
   minimatch@9: ~9.0.7
   minimatch@10: ~10.2.3
   ajv@6: ~6.14.0
-  ajv@8: ~8.18.0
+  # At the version @angular-devkit/core pins exactly (8.20.0); every other
+  # parent's range admits it.
+  ajv@8: ~8.20.0
   http-proxy-agent: 7.0.2
   undici: '>=7.29.0 <8.0.0'
   piscina: '>=5.2.0 <6.0.0'
@@ -73,7 +75,9 @@ overrides:
   # when express pulls >=2.3.0.
   body-parser: '>=2.3.0'
   picomatch@2: 2.3.2
-  picomatch@4: 4.0.4
+  # At the version @angular-devkit/core and @angular/build pin exactly (4.0.5);
+  # every other parent's range admits it.
+  picomatch@4: 4.0.5
   yaml@1: 1.10.3
   # Collapses every 2.x consumer onto one copy (vite, eslint-plugin-sonarjs,
   # eslint-plugin-unicorn today). An override outranks semver, so a value below a
@@ -113,9 +117,11 @@ overrides:
   # postcss < 8.5.23 (GHSA-fxqj-rqcc-2cmp, Medium). Every parent is build- or lint-time:
   # vite, @angular/build, ng-packagr, @vue/compiler-sfc, beasties, postcss-scss /
   # -safe-parser / -load-config, eslint-plugin-svelte, svelte-eslint-parser. Not in any published
-  # @real-router/* package. Single 8.x line, patch-level fix, so a floor is enough. Drop when the
-  # toolchain pulls >=8.5.23 on its own.
-  postcss: '>=8.5.23'
+  # @real-router/* package. Single 8.x line, patch-level fix, so a floor is enough. It sits at
+  # 8.5.26, the highest minimum a parent declares (vite's `^8.5.26`): an override outranks
+  # semver, so a lower floor can keep vite on an older release. Drop when the toolchain pulls
+  # >=8.5.23 on its own.
+  postcss: '>=8.5.26'
   # nanoid 3.x < 3.3.17 (GHSA-2v37-7h3g-55p8, High). Its ONLY parent is `postcss`
   # (declared `^3.3.16`, i.e. the fix is already inside the range) — build-time
   # only, exactly like the entry above, and never in a published @real-router/*
