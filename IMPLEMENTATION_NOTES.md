@@ -276,6 +276,12 @@ control removed, anchor restored — **6 of 6 green**, which is what #2469 saw.
 
 ## The `Examples lint` tail is accepted, and four ways out of it are closed by measurement (#2429, 2026-09-19)
 
+> ⚠ Superseded on 2026-09-27: no pull request lints the examples. The weekly
+> `examples.yml` is their one lint, and it runs the per-package fan-out measured
+> here through `pnpm -r`. `Examples lint (outside changes)` is now `Benchmarks
+> lint (outside changes)` and runs `lint:bench` alone. See "The examples are a
+> pnpm workspace of their own".
+
 **Problem.** `Examples lint (outside changes)` is the gate's second floor. Over six runs where it was not skipped it took 56, 57, 169, 600, 686 and 689 s, and in run 35417257717 it took **689 s while `Base test` took 307 s** — 671 of those 689 s being the lint itself, against 2 s of checkout and 11 s of install. It fires when a change reaches the examples from outside them, which is 6 of the last 27 runs.
 
 **Decision: accepted as it stands.** The work is real — a lockfile change honestly invalidates all 144 examples and the 22 bundles under them — and every way of removing that work fails a measurement:
@@ -349,6 +355,11 @@ The lever this blocks is concrete. Measured on core, 11-core M3 Pro, two rounds:
 ⚠ **Each job type-checks core separately** — 9.3 s in `base-test`, 12.7 s in `base-lint` — because `lint.dependsOn: ["^type-check"]` (#2432) makes turbo schedule the filtered package's own `type-check` even when that package has no workspace dependency for `^` to reach. Measured by `--dry=json` with and without the edge: two tasks against one. It runs concurrently with the lint, so it costs CPU on the runner rather than wall.
 
 ## The push-to-master examples lint is the weekly run's job (2026-09-19)
+
+> ⚠ Superseded on 2026-09-27 from "What still runs before a merge" on: neither
+> `ci.yml` nor pre-push lints the examples, and a root ESLint bump cannot reach
+> them — they declare their own ESLint config and dependencies. See "The examples
+> are a pnpm workspace of their own".
 
 **Problem.** `examples-lint.yml` ran on every push to `master` and cost 1 m 42 s each time. Measured on run 35442887524: the planner itself takes **1 s**, and the rest is two dependency installs (41 s), two checkouts (10 s), 9 s of queue and setup, and 33 s of remote-cache round-trips for 166 tasks that were **all hits** — `lint:example` declares no outputs, so most of that is latency, not artifacts. Thirty runs, thirty greens.
 
@@ -632,6 +643,12 @@ not just peer floors.
 
 ## CI lints the examples and benchmarks a change reaches from outside them, by turbo's attribution (#2402, 2026-09-17)
 
+> ⚠ Superseded on 2026-09-27 for the examples: they left the root workspace, so
+> `examples-lint-filter.mjs` can name only `router-benchmarks`, and the job is
+> `Benchmarks lint (outside changes)`. A root ESLint change no longer reaches the
+> examples' lint; a library change still does, through the tarballs the weekly
+> lint installs. See "The examples are a pnpm workspace of their own".
+
 **Problem.** The only CI job that linted examples, "Examples (affected)", builds
 the examples a PR edits. `lint:bench` ran in no workflow, and `post-merge.yml`
 filters examples out. A change outside them — an ESLint bump, the root
@@ -825,6 +842,11 @@ registration in one shell reached every other: `tsc` reported the other shells'
 about 40 s cold and replays from cache warm.
 
 ## Examples are linted in pre-push, after the build, and a guard derives which packages any lint step reads (#2370, 2026-09-17)
+
+> ⚠ Superseded on 2026-09-27 for the examples: pre-push lints `router-benchmarks`
+> alone, and the weekly `examples.yml` is the examples' one lint, under
+> `examples/eslint.config.mjs`. The guard stays for the root workspace. See "The
+> examples are a pnpm workspace of their own".
 
 **Problem.** No gate read `examples/**`. None of the example manifests declared a
 lint script, so `turbo run lint` had nothing to run for them, and both hooks
@@ -1185,6 +1207,11 @@ The old matrix's empty "internal" shard — 31s of pure setup per sharded run �
 already been removed with the bucket itself.
 
 ## `build` gained `^bundle` — the examples dist-closure hole; `bundle`'s own `^bundle` re-probed and KEPT
+
+> ⚠ Superseded on 2026-09-27 for the examples: they are outside turbo's graph, and
+> `scripts/checkout-tarballs.mjs` bundles every public package before it packs
+> them. `build` keeps its `^bundle`. See "The examples are a pnpm workspace of
+> their own".
 
 **Problem.** `examples.yml`'s build job ran `turbo run build --filter='./examples/**'`
 with **no graph edge to any library bundle**. Examples resolve `@real-router/*` as
@@ -4690,6 +4717,11 @@ Removed `clearMocks: true` from `vitest.config.common.mts`. `restoreMocks: true`
 
 ### Examples Workspace
 
+> ⚠ Superseded on 2026-09-27: `examples/` is a pnpm workspace of its own, with
+> globs relative to it; its manifests pin npm releases of `@real-router/*`, and
+> knip excludes it through `ignore`. See "The examples are a pnpm workspace of
+> their own".
+
 ~130 example applications across 6 framework adapters (React, Preact, Solid, Vue, Svelte, Angular) plus terminal and desktop runtimes. Organized by runtime:
 
 ```
@@ -6934,6 +6966,11 @@ A hook would require six adapter-specific surfaces; the utility shape requires z
 `hashChanged: true` is symmetric on the bus: every subscriber — `router.subscribe`, `lifecycle-plugin.onStay` / `onNavigate`, `createActiveRouteSource` — sees the spy's emit identically to a user-driven `<Link hash>` click. Consumers who want to ignore hash-only transitions filter at the call site (`if (route.context.url?.hashChanged) return;`). Declarative filtering via a route-config field (`onHashChange`) is a separate plugin scoped to demand evidence; not in this RFC.
 
 ## Example e2e runs to completion despite failures (#694)
+
+> ⚠ Superseded on 2026-09-27: the examples run under `pnpm -r`, where `--no-bail`
+> does this job — `pnpm --dir examples -r --workspace-concurrency=1 --no-bail run
+> --if-present test:e2e` runs every suite and still exits 1 when one fails. See
+> "The examples are a pnpm workspace of their own".
 
 ### Problem
 
@@ -9662,6 +9699,10 @@ The half that is new is `scripts/check-sarif-paths.mjs`, run between the scan an
 
 ## Most of the dependency surface is outside `/bump-dep`'s root gate (#2168, 2026-09-07)
 
+> ⚠ Superseded on 2026-09-27 in one respect: `.github/dependabot.yml` has one npm
+> entry per pnpm workspace, `/` and `/examples`. See "The examples are a pnpm
+> workspace of their own".
+
 **Problem.** `/bump-dep` opens with a hard gate — absent from the ROOT manifest, stop — and the gate is right: it is what structurally guarantees "passed the gate ⇒ devDep ⇒ no changeset". But the refusal ended there, and it turns out to end there for the majority of the repo. Re-derive the split rather than trusting these numbers:
 
 ```bash
@@ -11903,6 +11944,12 @@ Nothing recorded which tasks those were.
 
 ## Components outside `packages/` are linted, and `lint:reach` names code by an explicit list (#2556, 2026-09-24)
 
+> ⚠ Superseded on 2026-09-27 for the examples: `lint:example` is no turbo task,
+> and every `.vue` file is an example's, so the root config and turbo's inputs
+> name `.svelte` alone. `examples/eslint.config.mjs` keeps both component blocks,
+> and `examples/tests/component-lint-config.test.mjs` their cells. See "The
+> examples are a pnpm workspace of their own".
+
 **Problem.** No config under `examples/` or `benchmarks/` addressed `.svelte` or `.vue`, so `lint:example` and `lint:bench` skipped 342 components without a word: 145 `.svelte` and 136 `.vue` files in the examples, and 61 `.svelte` files in the benchmarks. `lint:reach` could not see it. It waived the two aggregators that hold only a layout component, because it counted neither extension as something ESLint reads. The #2407 census covered `packages/` only, and it counted an extension as code only when some config addressed it, so it was blind to `.vue`.
 
 **Solution.**
@@ -12114,3 +12161,40 @@ The two periods built different trees, so this is not an A/B. Nothing in it pays
 - The trap the ESLint override documented still holds and still matters to the next global variable: the rule does not read `global.env` under `futureFlags.globalConfiguration`. It stays as a warning comment beside `...turboConfig`.
 - The coupled-peer class the nanostores block described in `dependabot.yml` keeps its record in the section "Dependabot npm job errors when it bumps ONE member of a peer-coupled set", and its live instances (`vite` major, `@angular/*`) keep their own comments.
 - Dropping `global.env` changes turbo's global hash, so every task misses the cache once.
+
+## The examples are a pnpm workspace of their own (2026-09-27)
+
+**Problem.** The 145 example packages were members of the root workspace and took `@real-router/*` as `workspace:^`, so the root reached into all of them:
+
+- A root lockfile change invalidated every `lint:example`, and the tail it put on a pull request's gate had no way out ("The `Examples lint` tail is accepted…", #2429).
+- A root ESLint change was theirs too: an ESLint bump merged green could fail every branch's pre-push on an example the branch never touched (#2402).
+- The one root install in every CI job carried what only the examples need — electron, the tauri CLI, express.
+- An example resolved `@real-router/*` inside the monorepo, a shape no user can copy. Six `route-animations` examples imported `createDirectionTracker` from `../../../../../../shared/dom-utils`, which no published package exported (#2587).
+
+**Solution.**
+
+- `examples/pnpm-workspace.yaml` makes `examples/` a workspace with its own lockfile, and the root lists none of it. The manifests pin exact npm releases of `@real-router/*`. `examples/CLAUDE.md` § Workspace is the working guide.
+- `scripts/checkout-tarballs.mjs <workspace>` bundles and packs every public package of this checkout and installs the tarballs in place of those releases; `examples/.pnpmfile.mjs` turns `RR_TARBALLS` into `file:` overrides. `pnpm dev` runs it through `predev`, and CI runs it before every examples build and lint.
+- `examples/eslint.config.mjs` is a copy of the root config, not an import of it, and the examples declare their own ESLint dependencies. The weekly `examples.yml` is their only lint: a job nothing waits on, which files its own issue. Owner decision, 2026-09-27 — no pull request lints the examples.
+- `pnpm -r` orchestrates inside `examples/`, and turbo does not see the examples. `ci.yml` builds the examples a pull request edits (`scripts/examples-plan.mjs`) against this checkout's tarballs; a change to a file directly under `examples/` builds them all.
+- Dependabot has an `/examples` entry whose `ignore` mirrors that workspace's `overrides`. `dependabot-dedupe.yml` dedupes the workspace whose lockfile the pull request changed, `resolve:dependabot` regenerates each lockfile a conflict touches, and `lint:dedupe` checks both.
+- The root drops what only the examples read: 11 overrides, the `electron` and `electron-winstaller` build approvals, `vue-eslint-parser` and the `.vue` blocks of its ESLint config, the `test:e2e` and `lint:example` turbo tasks, `*-example` and `*-examples-shared` from `.changeset/config.json`'s `ignore`, and every `--filter='!./examples/**'` the entries above quote.
+
+**Why each piece is shaped this way — measured.**
+
+- ⚠ **A tarball install keeps the lockfile on and restores it afterwards.** With `--config.lockfile=false` pnpm re-resolves every third-party package: a control `dequal`, locked at `2.0.0` under `^2.0.0`, came back as `2.0.3`, both on a fresh install and incrementally after a frozen one. With the lockfile on only the `@real-router/*` entries change, and restoring the copy leaves `git status` empty. `pnpm install --frozen-lockfile` returns to the releases.
+- ⚠ **`verifyDepsBeforeRun: false` is load-bearing.** After a tarball install `node_modules` disagrees with the restored lockfile, and with pnpm's default the next `pnpm run` reinstalls the releases over the tarballs.
+- **The substitution is `overrides`, not `readPackage`.** Every tarball declares `@real-router/core` as a peer. An aggregator that declares an adapter but not core (`*-examples-shared`) gets core through `autoInstallPeers` from the registry, an edge `readPackage` does not see: the probe bundle of `react/basic` carried two copies of core, 387 189 B against 359 865 B from npm.
+- **Tarball mode also sets `peerDependencyRules.allowAny: ["@real-router/*"]`.** Without it `strictPeerDependencies` refuses, because a peer `>=0.148.0` does not accept a `file:` version (`ERR_PNPM_PEER_DEP_ISSUES`).
+- **The tarball name carries a content hash.** pnpm does not pick up new content under an old name, whether incrementally or after the `node_modules` state record is deleted.
+- **`.pnpmfile.mjs` and `pnpm-lock.yaml` change together.** The lockfile records `pnpmfileChecksum`, and a frozen install refuses a mismatch.
+- **The examples lockfile was seeded from the root's.** Every example importer and package entry was copied over before the first install, so pnpm resolved only the changed specifiers, and no third-party version moved. The root lockfile lost the 315 packages that only examples reached, and no importer outside `examples/` changed.
+- **The copied ESLint config applies the same rules.** `calculateConfigForFile` over the 1814 lintable example files gives the rules and parsers the root config gave, except `turbo/no-undeclared-env-vars`. The examples config loads no turbo plugin, and a disable directive for an unknown rule is itself an error, so the 34 directives for it were deleted. Over the root workspace's 2535 files, the trimmed root config differs only in `extraFileExtensions`, which lost `.vue`: no `.vue` file is left outside `examples/`.
+- The import resolver's `conditionNames` drop `@real-router/internal-source`: the published manifests keep that condition, but ship no `src/`.
+- Linted from `examples/`, the project service found no TSConfig for the preact and solid `shared/Layout.tsx`. Those two frameworks gained the `shared/tsconfig.json` the other four had.
+- **`knip.json` names `examples/**` in `ignore`, not in `ignoreWorkspaces`.** The examples are no workspace of the root, so `ignoreWorkspaces` matches nothing, and without `ignore` knip reads their files as the root's: 512 unlisted dependencies in 486 files.
+- **The weekly lint first checks that every package declares `lint:example`** (`examples-plan.mjs --missing-lint`). `pnpm -r run` skips a package without the script silently, and `lint:reach` does not see this workspace.
+- **The examples' component-config cells run in `examples/tests/`, not in `scripts/tests/`.** Their config imports `vue-eslint-parser`, which only the examples workspace installs. A root test that asks ESLint about an example file therefore fails wherever the examples are not installed — root CI and pre-push; measured, all six cells of `component-lint-config.test.mjs` failed with `ERR_MODULE_NOT_FOUND`. The weekly lint job runs them after the lint, and a config that drops `.vue` fails four of the six.
+- **`--no-bail` keeps one failure from hiding the rest.** Measured on pnpm 12.4.1: every package's script runs, and the command still exits 1 (`ERR_PNPM_RECURSIVE_FAIL`). Without it, pnpm stops at the first failure.
+- **The planner follows no dependents.** Every example depends on core, so following them would build every example on any library change (#1642: 156 tasks and 5m23s on the gate's critical path). A library change that breaks an example is the weekly run's to find, against this checkout's tarballs.
+- **The three Solid SSR examples declare no `ssr.noExternal`.** The entry kept one copy of the workspace-linked core in dev, and installed like an npm consumer the examples render the same without it. Measured on the dev servers of `ssr`, `ssr-streaming` and `ssr-mixed` in tarball mode: 200 and a byte-identical body with the entry and without it. A control that forces core into Vite's SSR graph answers 500 with core's `This IS a router, but not one this copy of @real-router/core built`. Without the entry their e2e suites pass on the production build.

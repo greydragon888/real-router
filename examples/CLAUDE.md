@@ -99,9 +99,20 @@ Subgrouped examples sit one extra level deeper, so their imports adjust:
 - Top-level styles: `../../../../../shared/styles.css` (one extra `..`)
 - `tsconfig.json` `include`: `["src", "../../shared"]` (per-framework shared, one extra `..`)
 
-Workspace glob (`pnpm-workspace.yaml`) includes `examples/web/*/*/*` to register subgrouped packages.
+The glob `web/*/*/*` in `examples/pnpm-workspace.yaml` registers subgrouped packages.
 
 **When to create a subgroup**: ≥3 examples on one theme. Below that threshold, keep them flat — premature grouping for two examples adds nesting without comparison value. Subgroups should appear in **all relevant adapter directories simultaneously** (e.g. when Phase 2 replicates animation examples to preact/vue/solid/svelte/angular, each adapter gets its own `animation-examples/` subgroup — symmetry is more important than minimising depth).
+
+## Workspace
+
+`examples/` is a pnpm workspace of its own, with its own `pnpm-lock.yaml`, `eslint.config.mjs` and `prettier.config.mjs`. The root workspace does not list it, so a root `pnpm install` leaves it alone.
+
+- `pnpm install` here installs the `@real-router/*` releases the manifests pin. Dependabot's `/examples` entry keeps those pins current.
+- `pnpm dev` in an example first runs `predev` → `pnpm -w run use-checkout` → `scripts/checkout-tarballs.mjs`. It bundles and packs every public package of this checkout, installs the tarballs over the pinned releases, and leaves `pnpm-lock.yaml` as it found it. `pnpm install --frozen-lockfile` here goes back to the releases.
+- ⚠ `verifyDepsBeforeRun: false` in `pnpm-workspace.yaml` is load-bearing. With pnpm's default, the next `pnpm run` finds `node_modules` out of step with the lockfile and reinstalls the releases over the tarballs.
+- `pnpm -r` orchestrates here, not turbo: `pnpm --dir examples -r --no-bail run --if-present build`.
+- The weekly `examples.yml` is the only place the examples are linted, in a job nothing waits on that files its own issue. Locally: `pnpm lint:example` in an example. The same job runs `tests/` (`pnpm test:lint-config` here), which checks what the ESLint config gives each component kind — a green lint cannot show that.
+- On a pull request, `ci.yml` builds the examples the diff edits (`scripts/examples-plan.mjs`), against this checkout's tarballs.
 
 ## Desktop-specific notes (`desktop/electron/`, `desktop/tauri/`)
 
@@ -125,7 +136,8 @@ Workspace glob (`pnpm-workspace.yaml`) includes `examples/web/*/*/*` to register
 ## Rules
 
 - Each example is a standalone Vite app with its own `package.json`
-- Dependencies use `workspace:^` protocol
+- `@real-router/*` dependencies pin exact npm releases (see Workspace)
+- Nothing outside `examples/` is imported — library code comes through a `@real-router/*` package
 - Shared files imported via relative paths: `../../shared/store`
 - Layout imported from `../shared/Layout`
 - No CSS frameworks — shared `styles.css` only
@@ -136,7 +148,7 @@ Workspace glob (`pnpm-workspace.yaml`) includes `examples/web/*/*/*` to register
 
 **MANDATORY: explore the app visually BEFORE writing tests.**
 
-1. Build: `pnpm build`
+1. Build: `pnpm build` — against the `@real-router/*` that is installed: the pinned releases, or this checkout's packages after `pnpm -w run use-checkout`
 2. Start preview: `pnpm preview &`
 3. Use Playwright MCP: `browser_navigate` → `browser_snapshot` → see real DOM
 4. Write tests matching ACTUAL selectors, headings, URLs
