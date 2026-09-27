@@ -5,9 +5,9 @@
 [![bundle size](https://deno.bundlejs.com/?q=@real-router/sources&treeshake=[*]&badge=detailed)](https://bundlejs.com/?q=@real-router/sources&treeshake=[*])
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](../../LICENSE)
 
-> Framework-agnostic subscription layer for [Real-Router](https://github.com/greydragon888/real-router). Reactive primitives compatible with `useSyncExternalStore` and vanilla JS.
+> Framework-agnostic subscription layer for [Real-Router](https://github.com/greydragon888/real-router) adapters. Reactive primitives compatible with `useSyncExternalStore`.
 
-Used internally by [`@real-router/react`](https://www.npmjs.com/package/@real-router/react). Use this package directly when building integrations for other frameworks or vanilla JS applications.
+**This package is for adapter authors.** Every Real-Router framework adapter — React, Preact, Solid, Vue, Svelte and Angular — is built on it. An application reaches the router through its framework's adapter, not through this package; use it directly only when you write an adapter for another framework.
 
 ## Installation
 
@@ -108,7 +108,9 @@ const source = createActiveRouteSource(router, "users", undefined, undefined, {
 
 ## Usage Examples
 
-### With React (`useSyncExternalStore`)
+How an adapter binds a source to its framework. An application does not write these: it uses its adapter's hooks, which are built exactly this way.
+
+### A hook-based framework (`useSyncExternalStore`)
 
 ```tsx
 import { useSyncExternalStore } from "react";
@@ -122,7 +124,7 @@ function CurrentRoute() {
 }
 ```
 
-### With Vanilla JS
+### A plain subscription
 
 ```typescript
 import { createRouteNodeSource } from "@real-router/sources";
@@ -205,7 +207,7 @@ This is by design (#1215): the source is a live event stream, symmetric with `cr
 | Package                                                                | Description                                 |
 | ---------------------------------------------------------------------- | ------------------------------------------- |
 | [@real-router/core](https://www.npmjs.com/package/@real-router/core)   | Core router (required dependency)           |
-| [@real-router/react](https://www.npmjs.com/package/@real-router/react) | React integration (uses sources internally) |
+| [@real-router/react](https://www.npmjs.com/package/@real-router/react) | React adapter — built on sources, like the other five |
 | [@real-router/rx](https://www.npmjs.com/package/@real-router/rx)       | Observable API (`state$`, `events$`)        |
 
 ## Contributing
