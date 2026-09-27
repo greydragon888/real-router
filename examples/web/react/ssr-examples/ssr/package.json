@@ -17,7 +17,7 @@
     "@real-router/react": "0.37.0",
     "@real-router/ssr-data-plugin": "0.6.0",
     "@real-router/ssr-utils": "0.3.0",
-    "express": "5.1.0",
+    "express": "5.2.1",
     "react": "~19.3.0",
     "react-dom": "~19.3.0"
   },
