@@ -381,30 +381,6 @@ The action automatically adds `role="link"` + `tabindex="0"` to non-interactive 
 
 > **Hash asymmetry vs `<Link hash>`:** `createLinkAction` does **not** accept a `hash` parameter; `<Link hash="x">` does (#532). Use `<Link>` when a hash-aware variant is needed (tab-style UIs, same-route different-fragment navigation through `navigateWithHash`). For pure `use:link` callers, attach a click handler that calls `router.navigate(name, params, undefined, { force: true, hash: "x" })` manually if hash control is required.
 
-## Reactive Primitives
-
-### `createReactiveSource`
-
-Public building block that bridges any `RouterSource<T>` to Svelte's reactivity system. Returns a `{ current: T }` getter object that lazily subscribes via `createSubscriber`.
-
-```svelte
-<script lang="ts">
-  import { createReactiveSource, useRouter } from "@real-router/svelte";
-  import { createActiveRouteSource } from "@real-router/sources";
-
-  const router = useRouter();
-  const isActive = createReactiveSource(
-    createActiveRouteSource(router, "users.profile", {})
-  );
-</script>
-
-{#if isActive.current}
-  <span class="badge">Active</span>
-{/if}
-```
-
-Use cases: custom active route indicators, domain-specific composables, integration with other reactive primitives.
-
 ## Svelte-Specific Patterns
 
 ### Reading .current in Reactive Contexts
@@ -569,7 +545,7 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 24 runnable examples — each is a standalone Vite app. Run: `cd examples/web/svelte/basic && pnpm dev`
 
-**Core:** [basic](../../examples/web/svelte/basic) · [nested-routes](../../examples/web/svelte/nested-routes) · [auth-guards](../../examples/web/svelte/auth-guards) · [data-loading](../../examples/web/svelte/data-loading) · [lazy-loading](../../examples/web/svelte/lazy-loading) · [async-guards](../../examples/web/svelte/async-guards) · [hash-routing](../../examples/web/svelte/hash-routing) · [persistent-params](../../examples/web/svelte/persistent-params) · [error-handling](../../examples/web/svelte/error-handling) · [dynamic-routes](../../examples/web/svelte/dynamic-routes) · [link-action](../../examples/web/svelte/link-action) · [lazy-loading-svelte](../../examples/web/svelte/lazy-loading-svelte) · [snippets-routing](../../examples/web/svelte/snippets-routing) · [reactive-source](../../examples/web/svelte/reactive-source) · [search-schema](../../examples/web/svelte/search-schema) · [combined](../../examples/web/svelte/combined)
+**Core:** [basic](../../examples/web/svelte/basic) · [nested-routes](../../examples/web/svelte/nested-routes) · [auth-guards](../../examples/web/svelte/auth-guards) · [data-loading](../../examples/web/svelte/data-loading) · [lazy-loading](../../examples/web/svelte/lazy-loading) · [async-guards](../../examples/web/svelte/async-guards) · [hash-routing](../../examples/web/svelte/hash-routing) · [persistent-params](../../examples/web/svelte/persistent-params) · [error-handling](../../examples/web/svelte/error-handling) · [dynamic-routes](../../examples/web/svelte/dynamic-routes) · [link-action](../../examples/web/svelte/link-action) · [lazy-loading-svelte](../../examples/web/svelte/lazy-loading-svelte) · [snippets-routing](../../examples/web/svelte/snippets-routing) · [search-schema](../../examples/web/svelte/search-schema) · [combined](../../examples/web/svelte/combined)
 
 **Animations:** [motion-animations](../../examples/web/svelte/animation-examples/motion-animations) · [page-animations](../../examples/web/svelte/animation-examples/page-animations) · [route-animations](../../examples/web/svelte/animation-examples/route-animations) · [view-transitions](../../examples/web/svelte/animation-examples/view-transitions)
 
