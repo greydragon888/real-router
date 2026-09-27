@@ -535,6 +535,29 @@ Opt-in animated route transitions via the browser's [View Transitions API](https
 
 Reactive via `$effect` — toggling the prop creates/destroys the utility. No-op on unsupported browsers (Firefox as of 2026-04, SSR). Customization is pure CSS via `::view-transition-*` pseudo-elements and `view-transition-name` for hero morphs. See [View Transitions guide](https://github.com/greydragon888/real-router/wiki/View-Transitions) for patterns.
 
+## Navigation Direction
+
+`createDirectionTracker(router)` writes `data-nav-direction="forward" | "back"` on `<html>` on every leave, so exit and entry animations can key off the direction. Install it **before** `router.usePlugin(browserPluginFactory())`: both listen to `popstate`, and the tracker has to see the event first.
+
+```ts
+import { browserPluginFactory } from "@real-router/browser-plugin";
+import { createRouter } from "@real-router/core";
+import { createDirectionTracker } from "@real-router/svelte";
+
+const router = createRouter(routes);
+
+createDirectionTracker(router); // before usePlugin
+router.usePlugin(browserPluginFactory());
+```
+
+```css
+html[data-nav-direction="back"] .page {
+  animation-name: slide-in-from-left;
+}
+```
+
+`destroy()` removes the listener and the attribute. Without a `document` (SSR) it returns a no-op instance. The argument must be a live `Router`: the tracker follows its transitions through `getPluginApi`. The API is unstable — it may change in a minor release. Live demo: [`examples/web/svelte/animation-examples/route-animations/`](../../examples/web/svelte/animation-examples/route-animations/). Recipes: [Routing Animations guide](https://github.com/greydragon888/real-router/wiki/Routing-Animations).
+
 ## Documentation
 
 Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)

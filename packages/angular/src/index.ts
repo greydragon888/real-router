@@ -52,6 +52,10 @@ export { RealLink } from "./directives/RealLink";
 
 export { RealLinkActive } from "./directives/RealLinkActive";
 
+export { createDirectionTracker } from "./dom-utils";
+
+export type { DirectionTracker } from "./dom-utils";
+
 export type { RouteSignals, ErrorContext } from "./types";
 
 export type {

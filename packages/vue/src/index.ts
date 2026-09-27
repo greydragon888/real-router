@@ -33,12 +33,17 @@ export { RouterProvider } from "./RouterProvider";
 
 export { RouterKey, NavigatorKey, RouteKey } from "./context";
 
+// DOM utilities
+export { createDirectionTracker } from "./dom-utils";
+
 // Types
 export type { RouteContext, LinkProps } from "./types";
 
 export type { RouterErrorBoundaryProps } from "./components/RouterErrorBoundary";
 
 export type { LinkDirectiveValue } from "./directives/vLink";
+
+export type { DirectionTracker } from "./dom-utils";
 
 export type {
   RouteViewProps,

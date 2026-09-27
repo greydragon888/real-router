@@ -114,7 +114,8 @@ import { Component } from "@angular/core";
       </ul>
       <p>
         <code>createDirectionTracker(router)</code> from
-        <code>shared/dom-utils</code> is wired in <code>main.ts</code> before
+        <code>@real-router/angular</code> is wired in
+        <code>main.ts</code> before
         <code>router.usePlugin(browserPluginFactory())</code>; it writes
         <code>data-nav-direction="forward" | "back"</code> on
         <code>&lt;html&gt;</code> for direction-aware slide keyframes.

@@ -409,6 +409,7 @@ describe("door total (#2303)", () => {
     // application fills.
     ActiveNameSelector: "output",
     DeferredPayload: "output",
+    DirectionTracker: "output — `createDirectionTracker()` mints it",
     DismissableErrorSnapshot: "output",
     ErrorContext: "output",
     HttpStatusSink: "output — `createHttpStatusSink()` mints it",

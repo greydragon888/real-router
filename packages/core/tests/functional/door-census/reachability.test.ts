@@ -541,6 +541,14 @@ describe("reachability census (#2303)", () => {
     expect(doors).toStrictEqual({
       Browser: ["@real-router/browser-plugin", "@real-router/hash-plugin"],
       DeferredPayload: ["@real-router/ssr-data-plugin"],
+      DirectionTracker: [
+        "@real-router/angular",
+        "@real-router/preact",
+        "@real-router/react",
+        "@real-router/solid",
+        "@real-router/svelte",
+        "@real-router/vue",
+      ],
       LoaderNotFound: [
         "@real-router/rsc-server-plugin/errors",
         "@real-router/ssr-data-plugin/errors",
@@ -558,6 +566,14 @@ describe("reachability census (#2303)", () => {
         "@real-router/ssr-data-plugin",
       ],
       SsrMode: ["@real-router/ssr-data-plugin"],
+      createDirectionTracker: [
+        "@real-router/angular",
+        "@real-router/preact",
+        "@real-router/react",
+        "@real-router/solid",
+        "@real-router/svelte",
+        "@real-router/vue",
+      ],
       defer: ["@real-router/ssr-data-plugin"],
       getDeferBootstrapScript: ["@real-router/ssr-data-plugin/server"],
       isDeferred: ["@real-router/ssr-data-plugin"],

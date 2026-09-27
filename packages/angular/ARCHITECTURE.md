@@ -83,7 +83,7 @@ src/                            # Main entry — client API
     ├── route-announcer.ts      # createRouteAnnouncer
     ├── scroll-restore.ts       # createScrollRestoration (opt-in scroll capture + restore)
     ├── view-transitions.ts     # createViewTransitions (opt-in View Transitions API integration)
-    ├── direction-tracker.ts    # createDirectionTracker — optional public utility (not re-exported from src/index.ts)
+    ├── direction-tracker.ts    # createDirectionTracker — optional public utility (re-exported from src/index.ts)
     └── index.ts
 
 ssr/                            # SSR-feature entry — @real-router/angular/ssr

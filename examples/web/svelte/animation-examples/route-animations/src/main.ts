@@ -1,10 +1,10 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
+import { createDirectionTracker } from "@real-router/svelte";
 import { mount } from "svelte";
 
 import App from "./App.svelte";
 import { routes } from "./routes";
-import { createDirectionTracker } from "../../../../../../shared/dom-utils";
 
 import "../../../../../shared/styles.css";
 import "./styles/animations.css";

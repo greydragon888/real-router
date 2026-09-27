@@ -1,11 +1,10 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
-import { RouterProvider } from "@real-router/vue";
+import { RouterProvider, createDirectionTracker } from "@real-router/vue";
 import { createApp, h } from "vue";
 
 import App from "./App.vue";
 import { routes } from "./routes";
-import { createDirectionTracker } from "../../../../../../shared/dom-utils";
 
 import "../../../../../shared/styles.css";
 import "./styles/animations.css";

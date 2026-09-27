@@ -32,6 +32,9 @@ export { useRouteEnter } from "./hooks/useRouteEnter";
 // Context
 export { RouterProvider } from "./RouterProvider";
 
+// DOM utilities
+export { createDirectionTracker } from "./dom-utils";
+
 // Types
 export type { LinkProps } from "./types";
 
@@ -55,6 +58,8 @@ export type {
 } from "./components/modern/RouteView";
 
 export type { RouterErrorBoundaryProps } from "./components/RouterErrorBoundary";
+
+export type { DirectionTracker } from "./dom-utils";
 
 export type { Navigator } from "@real-router/core";
 

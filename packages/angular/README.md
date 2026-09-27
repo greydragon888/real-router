@@ -665,6 +665,36 @@ bootstrapApplication(AppComponent, {
 
 No-op on unsupported browsers (Firefox as of 2026-04, SSR). Utility is created by `provideEnvironmentInitializer` at bootstrap and torn down via `inject(DestroyRef)`. Option is a snapshot at bootstrap — not reactive to runtime changes. Customization is pure CSS via `::view-transition-*` pseudo-elements and `view-transition-name` for hero morphs. See [View Transitions guide](https://github.com/greydragon888/real-router/wiki/View-Transitions) for patterns.
 
+## Navigation Direction
+
+`createDirectionTracker(router)` writes `data-nav-direction="forward" | "back"` on `<html>` on every leave, so exit and entry animations can key off the direction. Install it **before** `router.usePlugin(browserPluginFactory())`: both listen to `popstate`, and the tracker has to see the event first.
+
+```typescript
+import { browserPluginFactory } from "@real-router/browser-plugin";
+import { createRouter } from "@real-router/core";
+import {
+  createDirectionTracker,
+  provideRealRouter,
+} from "@real-router/angular";
+
+const router = createRouter(routes);
+
+createDirectionTracker(router); // before usePlugin
+router.usePlugin(browserPluginFactory());
+
+bootstrapApplication(AppComponent, {
+  providers: [provideRealRouter(router)],
+});
+```
+
+```css
+html[data-nav-direction="back"] .page {
+  animation-name: slide-in-from-left;
+}
+```
+
+`destroy()` removes the listener and the attribute. Without a `document` (SSR) it returns a no-op instance. The argument must be a live `Router`: the tracker follows its transitions through `getPluginApi`. The API is unstable — it may change in a minor release. Live demo: [`examples/web/angular/animation-examples/route-animations/`](../../examples/web/angular/animation-examples/route-animations/). Recipes: [Routing Animations guide](https://github.com/greydragon888/real-router/wiki/Routing-Animations).
+
 ## Angular-Specific Patterns
 
 ### Signals, Not Observables

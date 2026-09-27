@@ -2053,9 +2053,6 @@
     "packages/vue/CLAUDE.md": [
       "cca8d4dcc837"
     ],
-    "shared/dom-utils/CLAUDE.md": [
-      "25c168471026",
-      "f742052c8371"
-    ]
+    "shared/dom-utils/CLAUDE.md": []
   }
 }

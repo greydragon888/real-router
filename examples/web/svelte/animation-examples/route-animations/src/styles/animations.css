@@ -61,7 +61,7 @@
 /* ------------------------------------------------------------------ */
 /* 2. Slide (direction-aware) — ProductsList                           */
 /* `html[data-nav-direction]` is flipped by createDirectionTracker    */
-/* (from shared/dom-utils) on every popstate. forward = exit-left +   */
+/* (@real-router/svelte) on every popstate. forward = exit-left +     */
 /* entry-from-right; back = exit-right + entry-from-left.             */
 /* ------------------------------------------------------------------ */
 

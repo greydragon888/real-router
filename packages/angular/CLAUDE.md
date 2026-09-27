@@ -61,7 +61,7 @@ src/                            # Main entry — client API
 │   ├── scroll-restore.ts       # createScrollRestoration
 │   ├── scroll-spy.ts           # createScrollSpy — IntersectionObserver → URL hash (#575)
 │   ├── view-transitions.ts     # createViewTransitions
-│   ├── direction-tracker.ts    # createDirectionTracker — optional utility, not re-exported from src/index.ts (consumers import from "@real-router/angular/dom-utils" deep-path)
+│   ├── direction-tracker.ts    # createDirectionTracker — optional utility, re-exported from src/index.ts (#2587)
 │   └── index.ts
 ├── internal/                   # Internal helpers (not re-exported)
 │   ├── install.ts              # installScrollRestoration + installScrollSpy + installViewTransitions — shared by providers + providersFactory

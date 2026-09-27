@@ -27,10 +27,15 @@ export { RouterProvider } from "./RouterProvider";
 
 export { RouterContext, NavigatorContext, RouteContext } from "./context";
 
+// DOM utilities
+export { createDirectionTracker } from "./dom-utils";
+
 // Types
 export type { LinkProps } from "./types";
 
 export type { RouterErrorBoundaryProps } from "./components/RouterErrorBoundary";
+
+export type { DirectionTracker } from "./dom-utils";
 
 export type {
   RouteViewProps,

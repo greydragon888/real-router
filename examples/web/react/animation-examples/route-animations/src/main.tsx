@@ -1,14 +1,10 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
-import { RouterProvider } from "@real-router/react";
+import { RouterProvider, createDirectionTracker } from "@real-router/react";
 import { createRoot } from "react-dom/client";
-
-// Relative path to shared utility — symlinks make
-// `@real-router/{adapter}/dom-utils` re-exports a follow-up step.
 
 import { App } from "./App";
 import { routes } from "./routes";
-import { createDirectionTracker } from "../../../../../../shared/dom-utils";
 
 import "../../../../../shared/styles.css";
 import "./styles/animations.css";
