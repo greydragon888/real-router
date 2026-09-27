@@ -28,6 +28,9 @@
 # - build: Final build to ensure compilation
 # - lint:bench: ESLint over benchmarks/ but cross-router/, a workspace of
 #               its own
+# - lint:cross-router: ESLint over that workspace with its own config, then
+#                      its census of what the config reaches; the workspace
+#                      is installed first
 # - test:stress: Heap/timing stress suites, isolated at --concurrency=1 so
 #                heap measurements are free of build contention (#1423)
 # - lint:types: Validate TypeScript types in dist (arethetypeswrong)
@@ -146,6 +149,12 @@ pnpm turbo run build lint:package lint:types
 # lint only in the weekly examples.yml.
 echo "🧹 Linting the benchmarks..."
 pnpm turbo run lint:bench --filter=router-benchmarks
+
+# A workspace of its own, which lint:reach does not read: its census runs
+# after its lint.
+echo "🧹 Linting the cross-router bench..."
+pnpm --dir benchmarks/cross-router install --frozen-lockfile --prefer-offline
+pnpm lint:cross-router
 
 # Heap/timing stress suites — run isolated at --concurrency=1 (they were
 # dropped from build.dependsOn in #1423). Under the concurrent build, up to 4

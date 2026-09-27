@@ -8,6 +8,7 @@
 benchmarks/
 ├── cross-router/                  # REAL browser (Playwright + CDP): ALL competitors, per-cohort (no cross-framework rank)
 │   ├── package.json · pnpm-workspace.yaml · pnpm-lock.yaml  # a pnpm workspace of its own: `@real-router/*` declared `*` and installed from npm, like every competitor
+│   ├── eslint.config.mjs · prettier.config.mjs · tests/lint-config.test.mjs  # its own lint (see Utilities)
 │   ├── apps/<framework>/<engine>/ # per-cohort shells (engine-agnostic, only routing differs): base + {wide,deep,nested,links,params,tableheap,linkbuild} variants + feature demos {data,search,guard}
 │   │   #  react cohort: real-router · react-router (v8 Data mode) · tanstack — wouter EXCLUDED (minimalist, different class) · _baseline = bare React floor · real-router-full = REFERENCE variant (base app + production plugin stack: browser+persistent-params+search-schema+ssr-data): SELF-calibration only, BY DESIGN — Δ(full−bare) = per-nav cost of enabled capabilities, the coefficient for translating bare-matrix numbers into production expectations. Compares only vs rr itself because a fair full-vs-full is semantically impossible (react-router has no detachable persistent-params/validated-search analog; TanStack search validation is baked-in/non-removable — its bare cell already pays it), so the matrix stays bare-vs-bare. Also the FIRST perf cell where persistent-params/search-schema/ssr-data per-nav code executes at all (regression cell after plugin edits). react-only (stack is core-level, framework-agnostic). NOT in run-all rosters; run manually: run.mjs {nav-latency,param-nav} real-router-full react 50. See IMPLEMENTATION_NOTES «real-router-full reference bench variant»
 │   │   #  preact cohort REMOVED (2026-06-29) — no full-router competitor (preact-iso = minimalist/recommended, preact-router = deprecated); no honest competitive perf comparison. apps/preact/ deleted (git-recoverable); @real-router/preact adapter still ships + is tested
@@ -103,10 +104,18 @@ its own whose dependencies this package does not install; the adapter-bench
 `.svelte` components are included, and pre-push runs it after its build. CI runs it too when a lockfile or global-input change reaches the tree,
 such as an ESLint bump (#2402). Run it through turbo — `pnpm turbo run lint:bench --filter=router-benchmarks`: it builds no package, and its `^type-check` puts the packages' `src` into its cache key.
 
+`cross-router/` lints with a config of its own — a copy of the root's plus
+the apps' relaxations — and its own ESLint dependencies. `pnpm lint:cross-router`
+at the root runs the lint and then `tests/lint-config.test.mjs`, the census
+`lint:reach` cannot do there: every tracked code file has a config, and only
+the deck templates and `*.mjs` are ignored. pre-push installs the workspace and
+runs it.
+
 ⚠ **A lint fix in `cross-router/apps` or `adapter-bench/apps` must leave the
 built bundle byte-identical.** The results were measured on those bytes. The
-rules whose fixes change the program are off for those paths in this
-directory's `eslint.config.mjs`, each with the measurement behind it; before
+rules whose fixes change the program are off for those paths — in
+`cross-router/eslint.config.mjs` and in this directory's `eslint.config.mjs` —
+each with the measurement behind it; before
 trusting a new fix there, build the touched apps before and after it and compare
 the outputs.
 

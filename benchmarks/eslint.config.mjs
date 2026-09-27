@@ -11,20 +11,9 @@ import tsEslint from "typescript-eslint";
 export default tsEslint.config(
   ...eslintConfig,
 
-  // `cross-router/` is a pnpm workspace of its own; its dependencies are not
-  // installed here.
+  // `cross-router/` is a pnpm workspace of its own, linted by its own config
+  // with its own dependencies — none of which this package installs.
   { ignores: ["cross-router/**"] },
-
-  {
-    // Deck TEMPLATES, not JavaScript: build-deck.mjs string-replaces their
-    // `__TOKEN__` placeholders before they become valid JS, so a lint run reads
-    // the placeholders as undefined names, and `--fix` could rewrite text the
-    // build replaces verbatim.
-    ignores: [
-      "cross-router/deck/deck-config.js",
-      "cross-router/deck/deck-render.js",
-    ],
-  },
 
   {
     files: ["*.mjs", "*.js"],
@@ -34,17 +23,13 @@ export default tsEslint.config(
   // The apps' components (`.svelte`) take the same relaxations as their `.ts`.
   ...withComponentFiles([
     {
-      // ⚠ The measured program. `cross-router/apps` are the shells the reference
-      // results were measured on, and `adapter-bench/apps` build the bundles
-      // CodSpeed measures. A fix here must leave the built bundle byte-identical,
-      // or the results stop describing the code (#2390). Each rule below can only
-      // be satisfied by changing that program — hoisting a closure, dropping a
-      // guard, reordering class fields, renaming a component input — so it is off
-      // here.
-      files: [
-        "cross-router/apps/**/*.{ts,tsx}",
-        "adapter-bench/apps/**/*.{ts,tsx}",
-      ],
+      // ⚠ The measured program. `adapter-bench/apps` build the bundles CodSpeed
+      // measures. A fix here must leave the built bundle byte-identical, or the
+      // results stop describing the code (#2390). Each rule below can only be
+      // satisfied by changing that program — hoisting a closure, dropping a
+      // guard, reordering class fields, renaming a component input — so it is
+      // off here.
+      files: ["adapter-bench/apps/**/*.{ts,tsx}"],
       rules: {
         "id-length": "off",
         // Rollup emits modules in import order, so reordering an app's imports
@@ -84,14 +69,6 @@ export default tsEslint.config(
       },
     },
   ]),
-
-  {
-    // sv-router's route table imports the components it renders, and they
-    // import `route` back from it: the cycle is the router's API. Breaking it
-    // moves code between modules, and rollup emits modules in import order.
-    files: ["cross-router/apps/svelte/sv-router/**/*.svelte"],
-    rules: { "import-x/no-cycle": "off" },
-  },
 
   {
     // The CodSpeed benches run under tsx, not from a bundle, so no build can

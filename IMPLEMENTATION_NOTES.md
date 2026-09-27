@@ -12350,6 +12350,10 @@ Two edges outside their range are the entry's purpose, and their comments say so
 
 ## `benchmarks/cross-router` is a pnpm workspace of its own (2026-09-27)
 
+> ⚠ Superseded later on 2026-09-27 in one respect: the workspace lints its
+> apps with a config of its own. See "The cross-router bench lints in its own
+> workspace".
+
 **Problem.** The cross-router bench belonged to the root workspace, and the root carried it everywhere:
 
 - `benchmarks/package.json` declared what only its apps import — the competitor routers, `playwright`, `@vitejs/plugin-vue-jsx`, three `@real-router` plugins — so every root install in every CI job installed them.
@@ -12405,3 +12409,20 @@ Two edges outside their range are the entry's purpose, and their comments say so
 - Every tsconfig left in `benchmarks/` resolves `@real-router/*` to `packages/*/src`: `tsc --listFiles` over the five of them reads 0 files from any `dist/`. In a checkout with no `packages/*/dist`, `lint:bench` passes, and a planted `any` fails it with three typed-rule errors, so the run is not vacuous.
 - A turbo task's hash covers upstream packages only through `dependsOn`. With none, an edit to `packages/core/src` left the `lint:bench` hash unchanged, so its cache would replay a verdict computed against the old core; with `^type-check` the hash moved. Both variants plan 15 upstream tasks over the same packages.
 - `@solidjs/*` stays in both lists: `packages/solid` declares `@solidjs/testing-library`. knip's `ignoreBinaries` keeps `playwright`: removed, knip reports the binary as unlisted in `cross-router-bench.yml`, whose `working-directory` it does not read.
+
+## The cross-router bench lints in its own workspace (2026-09-27)
+
+**Problem.** Once `benchmarks/cross-router` became a workspace of its own, `benchmarks/eslint.config.mjs` had to ignore it — its plugins and types are installed there, not in `router-benchmarks` — and nothing linted the 422 files the old `lint:bench` read there. `lint:reach` does not see the workspace either: its census walks the root workspace's packages.
+
+**Solution.**
+
+- `benchmarks/cross-router/eslint.config.mjs` is a copy of the root config plus the blocks that were in `benchmarks/eslint.config.mjs` for the apps: the deck templates' ignore, the relaxations for the measured program, the sv-router cycle. The copy loses the turbo plugin, and the import resolver loses the `@real-router/internal-source` condition, as the examples' copy did. The workspace declares the ESLint dependencies at the root's versions, and its own `prettier.config.mjs`.
+- `pnpm lint:cross-router` at the root runs the workspace's `lint`, then `tests/lint-config.test.mjs`: a census that every tracked code file has a config and that only `*.mjs` and the two deck templates are ignored, and the component cells the root's `component-lint-config.test.mjs` asked of the bench before. pre-push installs the workspace and runs it after `lint:bench`.
+- `benchmarks/eslint.config.mjs` keeps only its global ignore of `cross-router/**`.
+
+**Why — measured.**
+
+- **The lint reads what it read before.** `calculateConfigForFile` over the 466 tracked code files, in a checkout of the layout before the move and in the workspace now: the same 44 ignored, and for the other 422 the same parser, parser options, plugins and rules, except the turbo plugin and its `turbo/no-undeclared-env-vars`. The run is clean: 20 s cold, 2 s from the cache. A planted `any` fails it in an Angular component and in a Svelte one.
+- **`eslint .` in `benchmarks/` does not enter the nested workspace.** With a planted error in a cross-router app, `lint:bench` stays green and does not name the file, and it passes with the workspace's `node_modules` moved away: the global ignore keeps ESLint from loading the nested config.
+- **The census holds.** An `ignores` entry added for `apps/react/tanstack/**` fails it, and so does moving the sv-router exemption to a path that holds no component.
+- The ESLint dependencies added 192 packages to the lockfile and re-keyed the peer variants of a few others, without moving a version; all 139 app bundles rebuilt byte-identical.

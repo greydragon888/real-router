@@ -23,6 +23,7 @@
     "lint:duplicates": "jscpd packages/*/src/ shared/ --no-tips",
     "lint:duplicates:sarif": "jscpd packages/*/src/ shared/ --no-tips -t 100 -r sarif -o jscpd-report",
     "lint:e2e": "bash scripts/check-e2e-specs.sh",
+    "lint:cross-router": "pnpm --dir benchmarks/cross-router lint && pnpm --dir benchmarks/cross-router test:lint-config",
     "lint:doc-anchors": "node scripts/check-doc-anchors.mjs",
     "lint:property-headroom": "node scripts/check-property-headroom.mjs",
     "lint:doc-dup": "node scripts/check-doc-duplication.mjs",
