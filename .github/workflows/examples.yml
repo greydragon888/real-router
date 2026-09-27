@@ -141,22 +141,6 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-  # `router-benchmarks` stays in the root workspace, and its `lint:bench` has
-  # no other weekly home.
-  bench-lint:
-    name: Lint the benchmark apps
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Setup (pnpm + Node + install)
-        uses: ./.github/actions/setup
-
-      - name: Lint the benchmark apps
-        run: pnpm turbo run lint:bench --filter=router-benchmarks
-
   # Open/refresh a tracking issue when the scheduled suite fails, so chronic
   # redness can't live unnoticed (the only other signal is an email to the
   # workflow-file author). Skipped on workflow_dispatch to avoid noise during
@@ -164,7 +148,7 @@ jobs:
   notify-failure:
     name: Open issue on failure
     runs-on: ubuntu-latest
-    needs: [examples, bench-lint]
+    needs: [examples]
     # `!success()`, not `failure()`: a job killed by `timeout-minutes` ends as
     # CANCELLED, which `failure()` does not match — so the timeout added above would
     # otherwise free the runner SILENTLY, and the class this job exists to surface

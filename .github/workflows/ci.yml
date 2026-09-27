@@ -45,8 +45,9 @@ jobs:
       matrix: ${{ steps.plan.outputs.matrix }} # always-valid JSON; {"include":[]} for leaf
       leaf_filter: ${{ steps.plan.outputs.leaf_filter }} # explicit --filter set for pipeline-leaf; empty on a zero-package leaf
       examples_filter: ${{ steps.examples_plan.outputs.examples_filter }} # explicit --filter set for examples-build; empty when the PR edits no example
-      examples_lint_filter: ${{ steps.examples_lint.outputs.examples_lint_filter }} # explicit --filter set for examples-lint; empty when no change reaches the benchmarks from outside
-      examples_lint_reasons: ${{ steps.examples_lint.outputs.examples_lint_reasons }}
+      benchmarks_lint_filter: ${{ steps.benchmarks_lint.outputs.benchmarks_lint_filter }} # explicit --filter set for benchmarks-lint; empty when no change reaches the benchmarks from outside
+      benchmarks_lint_reasons: ${{ steps.benchmarks_lint.outputs.benchmarks_lint_reasons }}
+      cross_router: ${{ steps.cross_router.outputs.changed }} # 'true' when the PR edits benchmarks/cross-router
       no_source: ${{ steps.source.outputs.no_source }} # 'true' when the diff holds no code a check could read
     steps:
       - name: Checkout
@@ -166,10 +167,25 @@ jobs:
       # are a workspace of their own and lint only in the weekly examples.yml.
       # The checkout is the PR's merge commit, so `HEAD^1` is the base it is
       # built on.
-      - name: Plan examples lint
-        id: examples_lint
+      - name: Plan benchmarks lint
+        id: benchmarks_lint
         if: steps.changes.outputs.should_run == 'true'
-        run: node scripts/examples-lint-filter.mjs HEAD^1 HEAD >> "$GITHUB_OUTPUT"
+        run: node scripts/benchmarks-lint-filter.mjs HEAD^1 HEAD >> "$GITHUB_OUTPUT"
+
+      # benchmarks/cross-router is a workspace of its own, which turbo does not
+      # see: its lint runs when the PR edits it. `git diff` on its own line, so
+      # its failure fails the step instead of reading as an empty diff.
+      - name: Plan cross-router lint
+        id: cross_router
+        if: steps.changes.outputs.should_run == 'true'
+        run: |
+          set -euo pipefail
+          EDITED=$(git diff --name-only HEAD^1 HEAD -- benchmarks/cross-router)
+          if [ -n "$EDITED" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
 
       # The examples this PR edits, for "Examples (affected)". Same base as above.
       - name: Plan examples
@@ -1069,18 +1085,18 @@ jobs:
   # BENCHMARKS LINT: what the pipeline cannot see (#2402). A change OUTSIDE
   # benchmarks/ — an ESLint bump in the lockfile, the root eslint.config.mjs,
   # turbo.json — edits none of it, while `lint:bench` imports the root config:
-  # #2395 merged green on a base whose lint was red. `scripts/examples-lint-filter.mjs`
+  # #2395 merged green on a base whose lint was red. `scripts/benchmarks-lint-filter.mjs`
   # takes the set from turbo's own attribution.
   #
   # ⚠ This is the only arm that runs BEFORE a merge, and it has no Dependabot
   # skip on purpose: the incident is an ESLint bump going green here and then
   # failing every branch's pre-push, which lints the benchmarks too.
   # ============================================
-  examples-lint:
+  benchmarks-lint:
     name: Benchmarks lint (outside changes)
     runs-on: ubuntu-latest
     needs: [check]
-    if: needs.check.outputs.examples_lint_filter != ''
+    if: needs.check.outputs.benchmarks_lint_filter != ''
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -1092,11 +1108,34 @@ jobs:
       # like $EXAMPLES_FILTER above.
       - name: Lint the benchmarks
         env:
-          EXAMPLES_LINT_FILTER: ${{ needs.check.outputs.examples_lint_filter }}
-          EXAMPLES_LINT_REASONS: ${{ needs.check.outputs.examples_lint_reasons }}
+          BENCHMARKS_LINT_FILTER: ${{ needs.check.outputs.benchmarks_lint_filter }}
+          BENCHMARKS_LINT_REASONS: ${{ needs.check.outputs.benchmarks_lint_reasons }}
         run: |
-          echo "Reached from outside — turbo's reasons: $EXAMPLES_LINT_REASONS"
-          pnpm turbo run lint:bench $EXAMPLES_LINT_FILTER
+          echo "Reached from outside — turbo's reasons: $BENCHMARKS_LINT_REASONS"
+          pnpm turbo run lint:bench $BENCHMARKS_LINT_FILTER
+
+  # ============================================
+  # CROSS-ROUTER LINT: benchmarks/cross-router is a workspace of its own, with
+  # its own config and plugins, so nothing outside it changes what it reports
+  # and turbo does not see it. It runs when the PR edits it; `.husky/pre-push`
+  # runs the same script on every push.
+  # ============================================
+  cross-router-lint:
+    name: Cross-router lint
+    runs-on: ubuntu-latest
+    needs: [check]
+    if: needs.check.outputs.cross_router == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup (pnpm + Node + install)
+        uses: ./.github/actions/setup
+        with:
+          working-directory: benchmarks/cross-router
+
+      - name: Lint the cross-router bench
+        run: pnpm lint:cross-router
 
   # ============================================
   # DOWNSTREAM: Smoke, Coverage, Bundle Size
@@ -1824,7 +1863,7 @@ jobs:
     # beside "CI Result" / "Require Changeset" / "Validate Changesets" /
     # "Dependency Review". So a red quality gate blocks the merge without its
     # ~90s scan sitting on this job's critical path.
-    needs: [check, pipeline-leaf, base-bundle, base-test, base-lint, base-coverage, base-properties, pipeline-sharded, repo-lints, smoke, coverage, actionlint, examples-build, examples-lint]
+    needs: [check, pipeline-leaf, base-bundle, base-test, base-lint, base-coverage, base-properties, pipeline-sharded, repo-lints, smoke, coverage, actionlint, examples-build, benchmarks-lint, cross-router-lint]
     if: always()
     steps:
       - name: Determine result
@@ -1877,8 +1916,9 @@ jobs:
           COVERAGE="${{ needs.coverage.result }}"
           LINTS="${{ needs.repo-lints.result }}"
           EXAMPLES="${{ needs.examples-build.result }}"
-          EXAMPLES_LINT="${{ needs.examples-lint.result }}"
-          echo "plan=$PLAN mode=$MODE leaf=$LEAF base_bundle=$BASE_BUNDLE base_test=$BASE_TEST base_lint=$BASE_LINT base_cov=$BASE_COV base_props=$BASE_PROPS sharded=$SHARDED smoke=$SMOKE coverage=$COVERAGE lints=$LINTS examples=$EXAMPLES examples_lint=$EXAMPLES_LINT"
+          BENCHMARKS_LINT="${{ needs.benchmarks-lint.result }}"
+          CROSS_ROUTER_LINT="${{ needs.cross-router-lint.result }}"
+          echo "plan=$PLAN mode=$MODE leaf=$LEAF base_bundle=$BASE_BUNDLE base_test=$BASE_TEST base_lint=$BASE_LINT base_cov=$BASE_COV base_props=$BASE_PROPS sharded=$SHARDED smoke=$SMOKE coverage=$COVERAGE lints=$LINTS examples=$EXAMPLES benchmarks_lint=$BENCHMARKS_LINT cross_router_lint=$CROSS_ROUTER_LINT"
 
           # Defensive belt-and-suspenders on the shard-plan output (R2.19): the
           # check-result guard at the top of this step already exits on any check
@@ -1911,9 +1951,10 @@ jobs:
           # requirement, not ok()-skippable like smoke/sonar).
           # examples-build is ok()-skippable: it runs only when a PR touches an
           # example, which most PRs do not. When it DOES run, a failure is hard.
-          # examples-lint likewise: it runs only when a change reaches the
-          # benchmarks from outside them (#2402).
-          if [[ "$PATH_OK" == "1" ]] && [[ "$LINTS" == "success" ]] && ok "$SMOKE" && ok "$COVERAGE" && ok "$EXAMPLES" && ok "$EXAMPLES_LINT"; then
+          # benchmarks-lint likewise: it runs only when a change reaches the
+          # benchmarks from outside them (#2402); cross-router-lint only when
+          # the PR edits benchmarks/cross-router.
+          if [[ "$PATH_OK" == "1" ]] && [[ "$LINTS" == "success" ]] && ok "$SMOKE" && ok "$COVERAGE" && ok "$EXAMPLES" && ok "$BENCHMARKS_LINT" && ok "$CROSS_ROUTER_LINT"; then
             echo "✅ All checks passed"
             exit 0
           fi

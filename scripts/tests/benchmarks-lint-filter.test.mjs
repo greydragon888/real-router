@@ -1,7 +1,9 @@
-// examples-lint-filter.test.mjs — which examples and benchmarks CI lints for a
-// change made outside them.
+// benchmarks-lint-filter.test.mjs — which workspaces CI lints for a change made
+// outside them. The fixtures keep the examples of the ranges they were measured
+// on, when the examples were members of the root workspace: the plan does not
+// depend on which workspace declares the lint task.
 //
-// Run:  node --test scripts/tests/examples-lint-filter.test.mjs
+// Run:  node --test scripts/tests/benchmarks-lint-filter.test.mjs
 //
 // #2402: an ESLint bump reached `master` with `lint:example` red, and #2395's CI
 // passed on top of it, because the only CI job that lints examples keys on the
@@ -14,7 +16,10 @@ import { dirname } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { LOCAL_REASONS, planExamplesLint } from "../examples-lint-filter.mjs";
+import {
+  LOCAL_REASONS,
+  planBenchmarksLint,
+} from "../benchmarks-lint-filter.mjs";
 
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 
@@ -38,7 +43,7 @@ const LINTED = new Set([
 const lints = (dir) => LINTED.has(dir);
 
 test("f9915f567: a lockfile-only ESLint bump lints every example and benchmarks", () => {
-  const plan = planExamplesLint(
+  const plan = planBenchmarksLint(
     query(
       item("//", "", "FileChanged"),
       item("@real-router/core", "packages/core", "FileChanged"),
@@ -63,7 +68,7 @@ test("f9915f567: a lockfile-only ESLint bump lints every example and benchmarks"
 });
 
 test("#2395: a root eslint.config.mjs edit lints them all", () => {
-  const plan = planExamplesLint(
+  const plan = planBenchmarksLint(
     query(
       item(
         "react-combined-example",
@@ -84,7 +89,7 @@ test("#2395: a root eslint.config.mjs edit lints them all", () => {
 });
 
 test("a library change lints nothing: the weekly examples.yml owns it", () => {
-  const plan = planExamplesLint(
+  const plan = planBenchmarksLint(
     query(
       item("@real-router/core", "packages/core", "FileChanged"),
       item(
@@ -103,7 +108,7 @@ test("a library change lints nothing: the weekly examples.yml owns it", () => {
 test("an edited example is left to Examples (affected); the rest of a mixed range still lints", () => {
   // f6c97513d: a grouped react bump edits some examples' manifests and moves
   // the lockfile under the others.
-  const plan = planExamplesLint(
+  const plan = planBenchmarksLint(
     query(
       item(
         "react-combined-example",
@@ -120,7 +125,7 @@ test("an edited example is left to Examples (affected); the rest of a mixed rang
 
 test("a reason outside LOCAL_REASONS lints, including one turbo has not shipped", () => {
   for (const reason of ["GitRefNotFound", "ScmError", "SomeFutureReason"]) {
-    const plan = planExamplesLint(
+    const plan = planBenchmarksLint(
       query(item("vue-basic-example", "examples/web/vue/basic", reason)),
       lints,
     );
@@ -130,7 +135,7 @@ test("a reason outside LOCAL_REASONS lints, including one turbo has not shipped"
 });
 
 test("a workspace without a lint task is not in the filter", () => {
-  const plan = planExamplesLint(
+  const plan = planBenchmarksLint(
     query(
       item("//", "", "LockfileChanged"),
       item("@real-router/react", "packages/react", "LockfileChanged"),
@@ -144,7 +149,8 @@ test("a workspace without a lint task is not in the filter", () => {
 
 test("a query without affectedPackages throws instead of planning nothing", () => {
   assert.throws(
-    () => planExamplesLint(JSON.stringify({ data: null, errors: [{}] }), lints),
+    () =>
+      planBenchmarksLint(JSON.stringify({ data: null, errors: [{}] }), lints),
     /no affectedPackages/,
   );
 });

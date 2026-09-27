@@ -337,3 +337,92 @@ jobs:
                 labels: ['bug', 'area: ci/cd'],
               });
             }
+
+  # The weekly lint of both benchmark suites, beside the snapshot and not in its
+  # way: GitHub-hosted, and nothing of the snapshot waits on it. The CodSpeed
+  # suites (`router-benchmarks`) belong to the root workspace, the cross-router
+  # apps to their own. Before a merge, pre-push lints both, and ci.yml lints each
+  # when a pull request reaches it.
+  lint-benchmarks:
+    name: Lint router-benchmarks (the CodSpeed suites)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup (pnpm + Node + install)
+        uses: ./.github/actions/setup
+
+      - name: Lint router-benchmarks
+        run: pnpm turbo run lint:bench --filter=router-benchmarks
+
+  lint-cross-router:
+    name: Lint the cross-router bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup (pnpm + Node + install)
+        uses: ./.github/actions/setup
+        with:
+          working-directory: benchmarks/cross-router
+
+      - name: Lint the cross-router bench
+        run: pnpm lint:cross-router
+
+  # The lint's own tracker — a separate marker, so a lint finding and a failed
+  # snapshot never share an issue. Same `!success()` and `schedule` rules as
+  # notify-failure above.
+  notify-lint-failure:
+    name: Open issue on lint failure
+    runs-on: ubuntu-latest
+    needs: [lint-benchmarks, lint-cross-router]
+    if: '!success() && github.event_name == ''schedule'''
+    permissions:
+      issues: write
+    steps:
+      - name: Create or update tracking issue
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const marker = '<!-- benchmarks-lint-failure-tracker -->';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const title = '🟡 Benchmarks lint failing';
+            const body = [
+              marker,
+              `The scheduled **Cross Routers Benchmarks** workflow's lint failed. The snapshot ran regardless.`,
+              '',
+              `- Run: ${runUrl}`,
+              `- Commit: ${context.sha}`,
+              '',
+              '_Auto-filed by `cross-router-bench.yml`. This comment updates on each subsequent failure; close the issue once green._',
+            ].join('\n');
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'area: ci/cd',
+              per_page: 100,
+            });
+            const existing = issues.find(i => (i.body || '').includes(marker));
+
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body: `Still failing — ${runUrl}`,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['bug', 'area: ci/cd'],
+              });
+            }

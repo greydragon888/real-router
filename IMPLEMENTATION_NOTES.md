@@ -360,6 +360,9 @@ The lever this blocks is concrete. Measured on core, 11-core M3 Pro, two rounds:
 > `ci.yml` nor pre-push lints the examples, and a root ESLint bump cannot reach
 > them — they declare their own ESLint config and dependencies. See "The examples
 > are a pnpm workspace of their own".
+>
+> ⚠ Superseded later on 2026-09-27 for the benchmarks: their weekly lint left
+> `examples.yml` for `cross-router-bench.yml`. See "The bench lints sit with the benches, named for what they read".
 
 **Problem.** `examples-lint.yml` ran on every push to `master` and cost 1 m 42 s each time. Measured on run 35442887524: the planner itself takes **1 s**, and the rest is two dependency installs (41 s), two checkouts (10 s), 9 s of queue and setup, and 33 s of remote-cache round-trips for 166 tasks that were **all hits** — `lint:example` declares no outputs, so most of that is latency, not artifacts. Thirty runs, thirty greens.
 
@@ -648,6 +651,9 @@ not just peer floors.
 > `Benchmarks lint (outside changes)`. A root ESLint change no longer reaches the
 > examples' lint; a library change still does, through the tarballs the weekly
 > lint installs. See "The examples are a pnpm workspace of their own".
+>
+> ⚠ Superseded later on 2026-09-27 in its names: the script is
+> `benchmarks-lint-filter.mjs` and the job `benchmarks-lint`. See "The bench lints sit with the benches, named for what they read".
 
 **Problem.** The only CI job that linted examples, "Examples (affected)", builds
 the examples a PR edits. `lint:bench` ran in no workflow, and `post-merge.yml`
@@ -12426,3 +12432,15 @@ Two edges outside their range are the entry's purpose, and their comments say so
 - **`eslint .` in `benchmarks/` does not enter the nested workspace.** With a planted error in a cross-router app, `lint:bench` stays green and does not name the file, and it passes with the workspace's `node_modules` moved away: the global ignore keeps ESLint from loading the nested config.
 - **The census holds.** An `ignores` entry added for `apps/react/tanstack/**` fails it, and so does moving the sv-router exemption to a path that holds no component.
 - The ESLint dependencies added 192 packages to the lockfile and re-keyed the peer variants of a few others, without moving a version; all 139 app bundles rebuilt byte-identical.
+
+## The bench lints sit with the benches, named for what they read (2026-09-27)
+
+**Problem.** After the examples and the cross-router bench left the root workspace, three names described work that had moved. The weekly lint of `router-benchmarks` was a job of `examples.yml`, and the ci.yml job `examples-lint` and `scripts/examples-lint-filter.mjs`, which plan the lint a change reaches from outside, could name only `router-benchmarks`. The cross-router workspace lint had no run in CI.
+
+**Solution.**
+
+- The script is `scripts/benchmarks-lint-filter.mjs`, planning `lint:bench` alone; the ci.yml job is `benchmarks-lint`, with the same display name, and the gate reads it under that id.
+- ci.yml gains `cross-router-lint`, which installs `benchmarks/cross-router` alone and runs `pnpm lint:cross-router` when a pull request edits the workspace; `check` detects the edit, and the `ci` gate needs the job and reads its result as skippable.
+- The weekly lint leaves `examples.yml` for `cross-router-bench.yml`: two jobs on GitHub-hosted runners, one per workspace, and a failure tracker with a marker of its own. Nothing of the snapshot waits on them.
+
+**Why.** turbo does not see the cross-router workspace, so no affected-package plan can reach it; an edit under its directory is the only change that can move what its lint reports, since it installs its own config and plugins. `ci-hook-parity.test.mjs` pairs the `pnpm lint:cross-router` of both workflows with the pre-push line, and `ci-gate-completeness.test.mjs` finds the new job in the gate.

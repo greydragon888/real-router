@@ -75,9 +75,9 @@ const CLIS = {
     args: [],
     ran: /no changed paths/,
   },
-  "scripts/examples-lint-filter.mjs": {
+  "scripts/benchmarks-lint-filter.mjs": {
     args: [],
-    ran: /usage: examples-lint-filter\.mjs <base> <head>/,
+    ran: /usage: benchmarks-lint-filter\.mjs <base> <head>/,
   },
   "scripts/examples-plan.mjs": {
     args: [],

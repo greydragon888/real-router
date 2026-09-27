@@ -1,19 +1,20 @@
 #!/usr/bin/env node
-// examples-lint-filter.mjs — which workspaces linted by `lint:example` or
-// `lint:bench` does a range reach from OUTSIDE them (#2402)?
+// benchmarks-lint-filter.mjs — which workspaces linted by `lint:bench` does a
+// range reach from OUTSIDE them (#2402)? Today that is `router-benchmarks`
+// alone: the examples and `benchmarks/cross-router` are workspaces of their
+// own, which turbo does not see.
 //
-//   node scripts/examples-lint-filter.mjs <base> <head> >> "$GITHUB_OUTPUT"
+//   node scripts/benchmarks-lint-filter.mjs <base> <head> >> "$GITHUB_OUTPUT"
 //
-// prints `examples_lint_filter=--filter=<pkg> …`, empty when none, and
-// `examples_lint_reasons=<reason>=<count> …` for the log. `ci.yml` asks it about
-// a pull request and runs `turbo run lint:example lint:bench` with the filter.
+// prints `benchmarks_lint_filter=--filter=<pkg> …`, empty when none, and
+// `benchmarks_lint_reasons=<reason>=<count> …` for the log. `ci.yml` asks it
+// about a pull request and runs `turbo run lint:bench` with the filter.
 //
 // The answer is turbo's package-level `affected` reason. A workspace counts
 // unless turbo gives it one of LOCAL_REASONS:
-// - `FileChanged` — the range edits the workspace itself. "Examples (affected)"
-//   builds the examples a pull request edits, and `build` lints them.
-// - `DependencyChanged` — a library it depends on changed. That stays the weekly
-//   `examples.yml`'s job, as the comment above "Examples (affected)" records.
+// - `FileChanged` — the range edits the workspace itself, which pre-push lints.
+// - `DependencyChanged` — a library it depends on changed; pre-push and the
+//   weekly lint in `cross-router-bench.yml` read it.
 // Anything else lints: a global input such as the root `eslint.config.mjs` or
 // `turbo.json`, a lockfile change such as an ESLint bump, or a reason a later
 // turbo adds.
@@ -27,8 +28,8 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-/** The lint tasks `.husky/pre-push` runs outside `lint`, which CI already runs. */
-export const LINT_TASKS = ["lint:example", "lint:bench"];
+/** The lint task `.husky/pre-push` runs outside `lint`, which CI already runs. */
+export const LINT_TASKS = ["lint:bench"];
 
 /** Reasons already covered elsewhere — see the header. */
 export const LOCAL_REASONS = new Set(["FileChanged", "DependencyChanged"]);
@@ -48,11 +49,11 @@ export function hasLintTask(dir) {
  * @param {(dir: string) => boolean} [lints] injectable {@link hasLintTask}
  * @returns {{ packages: string[], reasons: Map<string, number> }}
  */
-export function planExamplesLint(queryJson, lints = hasLintTask) {
+export function planBenchmarksLint(queryJson, lints = hasLintTask) {
   const items = JSON.parse(queryJson).data?.affectedPackages?.items;
   if (!Array.isArray(items)) {
     throw new Error(
-      "examples-lint-filter: turbo query returned no affectedPackages",
+      "benchmarks-lint-filter: turbo query returned no affectedPackages",
     );
   }
   const packages = [];
@@ -88,13 +89,13 @@ export function runQuery(base, head) {
 export function main(argv) {
   const [base, head] = argv;
   if (!base || !head) {
-    throw new Error("usage: examples-lint-filter.mjs <base> <head>");
+    throw new Error("usage: benchmarks-lint-filter.mjs <base> <head>");
   }
-  const { packages, reasons } = planExamplesLint(runQuery(base, head));
+  const { packages, reasons } = planBenchmarksLint(runQuery(base, head));
   const filter = packages.map((p) => `--filter=${p}`).join(" ");
   const counts = [...reasons].map(([why, n]) => `${why}=${n}`).join(" ");
-  process.stdout.write(`examples_lint_filter=${filter}\n`);
-  process.stdout.write(`examples_lint_reasons=${counts}\n`);
+  process.stdout.write(`benchmarks_lint_filter=${filter}\n`);
+  process.stdout.write(`benchmarks_lint_reasons=${counts}\n`);
 }
 
 if (import.meta.main) {
