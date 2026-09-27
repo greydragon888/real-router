@@ -12,10 +12,10 @@
     "lint:example": "eslint --cache . --max-warnings 0"
   },
   "dependencies": {
-    "@real-router/core": "0.148.0",
-    "@real-router/solid": "0.25.0",
-    "@real-router/ssr-data-plugin": "0.6.0",
-    "@real-router/ssr-utils": "0.3.0",
+    "@real-router/core": "*",
+    "@real-router/solid": "*",
+    "@real-router/ssr-data-plugin": "*",
+    "@real-router/ssr-utils": "*",
     "express": "5.2.1",
     "solid-js": "~1.9.14"
   },

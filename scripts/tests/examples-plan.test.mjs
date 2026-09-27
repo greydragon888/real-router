@@ -129,3 +129,25 @@ test("no example depends on @real-router/sources — the adapter authors' packag
     [],
   );
 });
+
+test("every @real-router/* dependency of an example is `*` — the lockfile records the release", () => {
+  // `pnpm update -r` without `--no-save` rewrites `*` into `^x.y.z`, and on 0.x
+  // that caret refuses the next minor; `pnpm add` under `saveExact` writes an
+  // exact version. Either one would pin an example behind the next release.
+  const packages = examplePackages(path.join(repoRoot, "examples"));
+  const pinned = packages.flatMap(({ name, dir }) => {
+    const manifest = JSON.parse(
+      readFileSync(path.join(repoRoot, dir, "package.json"), "utf8"),
+    );
+
+    return Object.entries({
+      ...manifest.dependencies,
+      ...manifest.devDependencies,
+    })
+      .filter(([dep, spec]) => dep.startsWith("@real-router/") && spec !== "*")
+      .map(([dep, spec]) => `${name}: ${dep}@${spec}`);
+  });
+
+  assert.ok(packages.length > 0, "the workspace has packages");
+  assert.deepEqual(pinned, []);
+});

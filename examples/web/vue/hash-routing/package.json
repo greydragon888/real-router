@@ -12,9 +12,9 @@
     "lint:example": "eslint --cache . --max-warnings 0"
   },
   "dependencies": {
-    "@real-router/core": "0.148.0",
-    "@real-router/hash-plugin": "0.15.0",
-    "@real-router/vue": "0.25.0",
+    "@real-router/core": "*",
+    "@real-router/hash-plugin": "*",
+    "@real-router/vue": "*",
     "vue": "~3.5.39"
   },
   "devDependencies": {

@@ -13,14 +13,14 @@
     "lint:example": "eslint --cache . --max-warnings 0"
   },
   "dependencies": {
-    "@real-router/browser-plugin": "0.25.0",
-    "@real-router/core": "0.148.0",
-    "@real-router/lifecycle-plugin": "0.8.0",
-    "@real-router/logger-plugin": "0.7.0",
-    "@real-router/persistent-params-plugin": "0.7.0",
-    "@real-router/preload-plugin": "0.8.0",
-    "@real-router/search-schema-plugin": "0.7.0",
-    "@real-router/svelte": "0.23.0",
+    "@real-router/browser-plugin": "*",
+    "@real-router/core": "*",
+    "@real-router/lifecycle-plugin": "*",
+    "@real-router/logger-plugin": "*",
+    "@real-router/persistent-params-plugin": "*",
+    "@real-router/preload-plugin": "*",
+    "@real-router/search-schema-plugin": "*",
+    "@real-router/svelte": "*",
     "svelte": "~5.57.0",
     "zod": "4.6.5"
   },

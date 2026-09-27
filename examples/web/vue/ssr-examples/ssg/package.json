@@ -12,11 +12,11 @@
     "lint:example": "eslint --cache . --max-warnings 0"
   },
   "dependencies": {
-    "@real-router/browser-plugin": "0.25.0",
-    "@real-router/core": "0.148.0",
-    "@real-router/ssr-data-plugin": "0.6.0",
-    "@real-router/ssr-utils": "0.3.0",
-    "@real-router/vue": "0.25.0",
+    "@real-router/browser-plugin": "*",
+    "@real-router/core": "*",
+    "@real-router/ssr-data-plugin": "*",
+    "@real-router/ssr-utils": "*",
+    "@real-router/vue": "*",
     "vue": "~3.5.39"
   },
   "devDependencies": {

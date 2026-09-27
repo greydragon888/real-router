@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "dependencies": {
-    "@real-router/vue": "0.25.0",
+    "@real-router/vue": "*",
     "vue": "~3.5.39"
   },
   "scripts": {

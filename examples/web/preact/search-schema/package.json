@@ -12,10 +12,10 @@
     "lint:example": "eslint --cache . --max-warnings 0"
   },
   "dependencies": {
-    "@real-router/browser-plugin": "0.25.0",
-    "@real-router/core": "0.148.0",
-    "@real-router/search-schema-plugin": "0.7.0",
-    "@real-router/preact": "0.24.0",
+    "@real-router/browser-plugin": "*",
+    "@real-router/core": "*",
+    "@real-router/search-schema-plugin": "*",
+    "@real-router/preact": "*",
     "preact": "~10.29.7",
     "zod": "4.6.5"
   },

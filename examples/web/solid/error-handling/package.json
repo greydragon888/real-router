@@ -13,9 +13,9 @@
     "lint:example": "eslint --cache . --max-warnings 0"
   },
   "dependencies": {
-    "@real-router/browser-plugin": "0.25.0",
-    "@real-router/core": "0.148.0",
-    "@real-router/solid": "0.25.0",
+    "@real-router/browser-plugin": "*",
+    "@real-router/core": "*",
+    "@real-router/solid": "*",
     "solid-js": "~1.9.14"
   },
   "devDependencies": {

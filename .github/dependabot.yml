@@ -158,9 +158,9 @@ updates:
 
   # The examples workspace — its own lockfile, so its own block: a single
   # `directory: "/"` sees only what the root pnpm-workspace.yaml includes. The
-  # manifests pin @real-router/* to npm releases; the weekly group moves them to
-  # the latest ones, so an example that uses a new API builds for someone who
-  # copies it once a release carries the API.
+  # manifests declare @real-router/* as `*`, so the weekly group moves only the
+  # releases the lockfile records; someone who copies an example installs the
+  # latest release regardless.
   - package-ecosystem: "npm"
     directory: "/examples"
     schedule:

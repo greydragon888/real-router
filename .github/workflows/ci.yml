@@ -1027,7 +1027,7 @@ jobs:
 
   # ============================================
   # EXAMPLES: the dogfooding surface. The examples are a pnpm workspace of their
-  # own that pins npm releases of @real-router/*; this job installs THIS PR's
+  # own that installs npm releases of @real-router/*; this job installs THIS PR's
   # packages in their place (scripts/checkout-tarballs.mjs) and builds the
   # examples the diff edits, so a PR that adds an API together with its example
   # is checked as one. `scripts/examples-plan.mjs` picks the set: an example

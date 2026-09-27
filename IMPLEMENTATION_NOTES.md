@@ -12164,6 +12164,10 @@ The two periods built different trees, so this is not an A/B. Nothing in it pays
 
 ## The examples are a pnpm workspace of their own (2026-09-27)
 
+> ⚠ Superseded later on 2026-09-27 in one respect: the manifests declare
+> `@real-router/*` as `*`, and the lockfile records the release. See "The
+> examples declare `@real-router/*` as `*`".
+
 **Problem.** The 145 example packages were members of the root workspace and took `@real-router/*` as `workspace:^`, so the root reached into all of them:
 
 - A root lockfile change invalidated every `lint:example`, and the tail it put on a pull request's gate had no way out ("The `Examples lint` tail is accepted…", #2429).
@@ -12198,3 +12202,17 @@ The two periods built different trees, so this is not an A/B. Nothing in it pays
 - **`--no-bail` keeps one failure from hiding the rest.** Measured on pnpm 12.4.1: every package's script runs, and the command still exits 1 (`ERR_PNPM_RECURSIVE_FAIL`). Without it, pnpm stops at the first failure.
 - **The planner follows no dependents.** Every example depends on core, so following them would build every example on any library change (#1642: 156 tasks and 5m23s on the gate's critical path). A library change that breaks an example is the weekly run's to find, against this checkout's tarballs.
 - **The three Solid SSR examples declare no `ssr.noExternal`.** The entry kept one copy of the workspace-linked core in dev, and installed like an npm consumer the examples render the same without it. Measured on the dev servers of `ssr`, `ssr-streaming` and `ssr-mixed` in tarball mode: 200 and a byte-identical body with the entry and without it. A control that forces core into Vite's SSR graph answers 500 with core's `This IS a router, but not one this copy of @real-router/core built`. Without the entry their e2e suites pass on the production build.
+
+## The examples declare `@real-router/*` as `*` (2026-09-27)
+
+**Problem.** The manifests pinned exact `@real-router/*` releases, and each release left them behind until a bump rewrote all of them. In between, an example copied out of `master` could install a release older than the API it uses — measured on solid 0.25.0, published without #2583: the Solid SSG example failed `build:app` and the three Solid SSR production servers died at start with `Client-only API called on the server side`. CI never read the pins: both examples jobs install this checkout's tarballs over them.
+
+**Solution.** Every `@real-router/*` dependency of an example is `*`. The lockfile records the release, so a frozen install stays reproducible; an example copied out of the repository installs the latest release. `scripts/tests/examples-plan.test.mjs` fails on any other specifier, naming the example.
+
+**Why each piece is shaped this way — measured.**
+
+- ⚠ **`pnpm update -r` without `--no-save` rewrites `*` into `^x.y.z`.** Probed from a lockfile on react 0.36.0: the update installed 0.37.0 and wrote `^0.37.0`. On 0.x a caret refuses the next minor, so the next release would stop there.
+- ⚠ **`pnpm update -r --no-save "@real-router/*"` keeps `*`, but pnpm 12.4 rewrites the specifiers the `vite` override recorded.** All 124 `vite` importer entries went from `>=8.2.2 <9` to `8.2.2`; `install --frozen-lockfile` then fails with `ERR_PNPM_OUTDATED_LOCKFILE`, and `dedupe --check` fails too, so `lint:dedupe` catches it. `install --no-frozen-lockfile` and `install --lockfile-only` leave the rewrite in place. `install --fix-lockfile` restores it, but splits the peer variants of the Angular build tooling (`@analogjs/*`, `@angular/build`), and `dedupe --check` still fails.
+- **What does refresh cleanly is a changed specifier.** Switching the specifiers to `latest`, installing, and switching them back to `*` makes pnpm resolve `@real-router/*` afresh through the install path, which records overrides the way a frozen install expects. Measured on this refresh: exactly the three packages with a newer release moved (angular 0.24.0, solid 0.26.0, svelte 0.24.0), no third-party entry changed, and both `install --frozen-lockfile` and `dedupe --check` pass.
+- **The refresh closed the solid window above.** On solid 0.26.0 every example builds (`build` 112/112, `build:app` 25/25), and the three Solid SSR production servers answer 200 with hydration keys.
+- Dependabot reads `*` as `>= 0` (dependabot-core's constraint converter), so a new release already satisfies the manifest and its `/examples` PRs should touch the lockfile alone — to be confirmed on its first `@real-router/*` run.

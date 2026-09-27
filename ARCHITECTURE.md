@@ -47,7 +47,7 @@ real-router/
 │   ├── dom-utils/                 # Shared DOM utilities for adapters: route announcer, scroll restoration, scroll spy, view transitions, direction tracker, link helpers
 │   ├── browser-env/               # Shared browser abstractions for URL plugins: history API, popstate, SSR fallback
 │   └── ssr/                       # Shared SSR plugin scaffolding: createSsrLoaderPlugin generic factory + createLoadersValidator
-├── examples/                       # A pnpm workspace of its own; pins npm releases of @real-router/*
+├── examples/                       # A pnpm workspace of its own; @real-router/* declared as *
 │   ├── shared/                            # Shared store, API, abilities, styles
 │   ├── web/
 │   │   ├── react/      (28 vite apps)     # React 19.2+ (incl. animation-examples × 4 + ssr-examples × 5 [ssr, ssr-streaming, ssr-mixed, ssg, ssr-rsc]); 59 e2e specs
@@ -638,7 +638,7 @@ All navigation errors are `RouterError` instances with typed `code` from `errorC
 
 ### Build System
 
-pnpm monorepo with Turborepo for task orchestration. Dual ESM/CJS output via tsdown (Rolldown-based bundler). Internal packages are bundled into consumers — not separate npm artifacts. `workspace:^` protocol for inter-package dependencies. All turbo tasks use `outputLogs: "errors-only"` — silent on success, full output on failure. `build:verbose`/`test:verbose` scripts override to full output for debugging. The examples sit outside turbo, in a pnpm workspace of their own: `pnpm -r` builds and tests them against the npm releases their manifests pin, or against tarballs of this checkout's packages (`scripts/checkout-tarballs.mjs`).
+pnpm monorepo with Turborepo for task orchestration. Dual ESM/CJS output via tsdown (Rolldown-based bundler). Internal packages are bundled into consumers — not separate npm artifacts. `workspace:^` protocol for inter-package dependencies. All turbo tasks use `outputLogs: "errors-only"` — silent on success, full output on failure. `build:verbose`/`test:verbose` scripts override to full output for debugging. The examples sit outside turbo, in a pnpm workspace of their own: `pnpm -r` builds and tests them against the npm releases their lockfile records, or against tarballs of this checkout's packages (`scripts/checkout-tarballs.mjs`).
 
 ### Performance Hot Path
 

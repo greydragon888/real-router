@@ -12,9 +12,9 @@
     "lint:example": "eslint --cache . --max-warnings 0"
   },
   "dependencies": {
-    "@real-router/core": "0.148.0",
-    "@real-router/hash-plugin": "0.15.0",
-    "@real-router/svelte": "0.23.0",
+    "@real-router/core": "*",
+    "@real-router/hash-plugin": "*",
+    "@real-router/svelte": "*",
     "svelte": "~5.57.0"
   },
   "devDependencies": {

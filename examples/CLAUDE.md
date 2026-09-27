@@ -107,8 +107,11 @@ The glob `web/*/*/*` in `examples/pnpm-workspace.yaml` registers subgrouped pack
 
 `examples/` is a pnpm workspace of its own, with its own `pnpm-lock.yaml`, `eslint.config.mjs` and `prettier.config.mjs`. The root workspace does not list it, so a root `pnpm install` leaves it alone.
 
-- `pnpm install` here installs the `@real-router/*` releases the manifests pin. Dependabot's `/examples` entry keeps those pins current.
-- `pnpm dev` in an example first runs `predev` → `pnpm -w run use-checkout` → `scripts/checkout-tarballs.mjs`. It bundles and packs every public package of this checkout, installs the tarballs over the pinned releases, and leaves `pnpm-lock.yaml` as it found it. `pnpm install --frozen-lockfile` here goes back to the releases.
+- Every manifest declares its `@real-router/*` dependencies as `*`. The lockfile records which release that is, and `pnpm install` here installs it; an example copied out of the repository installs the latest release. Dependabot's `/examples` entry moves the recorded releases.
+- To move them by hand, switch the specifiers to `latest`, run `pnpm install`, switch them back to `*` and run `pnpm install` again. The changed specifier makes pnpm resolve `@real-router/*` afresh, and nothing else moves.
+- ⚠ `pnpm update -r` without `--no-save` rewrites `*` into `^x.y.z`, and on 0.x that caret refuses the next minor.
+- ⚠ `pnpm update -r --no-save "@real-router/*"` keeps `*`, but pnpm 12.4 also rewrites the `vite` specifier the `vite` override put in the lockfile: `install --frozen-lockfile` and `dedupe --check` then refuse the lockfile.
+- `pnpm dev` in an example first runs `predev` → `pnpm -w run use-checkout` → `scripts/checkout-tarballs.mjs`. It bundles and packs every public package of this checkout, installs the tarballs over the recorded releases, and leaves `pnpm-lock.yaml` as it found it. `pnpm install --frozen-lockfile` here goes back to the releases.
 - ⚠ `verifyDepsBeforeRun: false` in `pnpm-workspace.yaml` is load-bearing. With pnpm's default, the next `pnpm run` finds `node_modules` out of step with the lockfile and reinstalls the releases over the tarballs.
 - `pnpm -r` orchestrates here, not turbo: `pnpm --dir examples -r --no-bail run --if-present build`.
 - The weekly `examples.yml` is the only place the examples are linted, in a job nothing waits on that files its own issue. Locally: `pnpm lint:example` in an example. The same job runs `tests/` (`pnpm test:lint-config` here), which checks what the ESLint config gives each component kind — a green lint cannot show that.
@@ -136,7 +139,7 @@ The glob `web/*/*/*` in `examples/pnpm-workspace.yaml` registers subgrouped pack
 ## Rules
 
 - Each example is a standalone Vite app with its own `package.json`
-- `@real-router/*` dependencies pin exact npm releases (see Workspace)
+- `@real-router/*` dependencies are `*`; the lockfile records the release (see Workspace)
 - Nothing outside `examples/` is imported — library code comes through a `@real-router/*` package
 - Shared files imported via relative paths: `../../shared/store`
 - Layout imported from `../shared/Layout`
@@ -148,7 +151,7 @@ The glob `web/*/*/*` in `examples/pnpm-workspace.yaml` registers subgrouped pack
 
 **MANDATORY: explore the app visually BEFORE writing tests.**
 
-1. Build: `pnpm build` — against the `@real-router/*` that is installed: the pinned releases, or this checkout's packages after `pnpm -w run use-checkout`
+1. Build: `pnpm build` — against the `@real-router/*` that is installed: the recorded releases, or this checkout's packages after `pnpm -w run use-checkout`
 2. Start preview: `pnpm preview &`
 3. Use Playwright MCP: `browser_navigate` → `browser_snapshot` → see real DOM
 4. Write tests matching ACTUAL selectors, headings, URLs

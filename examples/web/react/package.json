@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "dependencies": {
-    "@real-router/react": "0.37.0",
+    "@real-router/react": "*",
     "react": "~19.3.0"
   },
   "devDependencies": {

@@ -38,7 +38,7 @@ jobs:
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
 
-      # The manifests pin npm releases; the lint reads this checkout's packages
+      # The lockfile records npm releases; the lint reads this checkout's packages
       # — the types typed rules resolve are master's, not the last release's.
       - name: Install the examples with this checkout's packages
         run: node scripts/checkout-tarballs.mjs examples
@@ -75,7 +75,7 @@ jobs:
         uses: ./.github/actions/setup
 
       # Bundles and packs every public package of this checkout and installs
-      # the tarballs in place of the npm releases the manifests pin — a library
+      # the tarballs in place of the npm releases the lockfile records — a library
       # change that breaks an example surfaces here, before it is published.
       - name: Install the examples with this checkout's packages
         run: node scripts/checkout-tarballs.mjs examples
