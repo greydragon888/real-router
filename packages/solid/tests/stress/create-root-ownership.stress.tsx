@@ -1,12 +1,9 @@
 import { createRoot } from "solid-js";
 import { describe, it, expect, vi } from "vitest";
 
-import {
-  createSignalFromSource,
-  createStoreFromSource,
-} from "@real-router/solid";
-
 import { createStressRouter, forceGC, takeHeapSnapshot, MB } from "./helpers";
+import { createSignalFromSource } from "../../src/createSignalFromSource";
+import { createStoreFromSource } from "../../src/createStoreFromSource";
 
 import type { RouterSource } from "@real-router/sources";
 

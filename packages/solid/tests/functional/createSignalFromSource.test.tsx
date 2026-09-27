@@ -2,7 +2,7 @@ import { renderHook } from "@solidjs/testing-library";
 import { createRoot } from "solid-js";
 import { describe, it, expect, vi } from "vitest";
 
-import { createSignalFromSource } from "@real-router/solid";
+import { createSignalFromSource } from "../../src/createSignalFromSource";
 
 import type { RouterSource } from "@real-router/sources";
 

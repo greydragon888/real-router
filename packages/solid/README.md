@@ -116,17 +116,6 @@ function UserProfile() {
 
 Signal-based hooks (`useRoute`, `useRouteNode`) remain available for simpler use cases.
 
-### Primitives
-
-Two low-level bridges convert `@real-router/sources` `RouterSource<T>` instances into Solid reactive primitives. Use them when you build custom hooks on top of `@real-router/sources`:
-
-| Primitive                | Returns           | Description                                                      |
-| ------------------------ | ----------------- | ---------------------------------------------------------------- |
-| `createSignalFromSource` | `Accessor<T>`     | Bridges a source to a Solid signal. Calls `onCleanup`.           |
-| `createStoreFromSource`  | `T` (Solid store) | Bridges a source to a Solid store via `createStore + reconcile`. |
-
-Both must be called inside a reactive owner (component body or `createRoot`).
-
 ### Contexts (Advanced)
 
 Two Solid contexts are exported for building custom hooks or deeply nested integrations that need direct access to router internals without prop drilling:
@@ -636,7 +625,7 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 20 runnable examples — each is a standalone Vite app. Run: `cd examples/web/solid/basic && pnpm dev`
 
-[basic](../../examples/web/solid/basic) · [nested-routes](../../examples/web/solid/nested-routes) · [auth-guards](../../examples/web/solid/auth-guards) · [data-loading](../../examples/web/solid/data-loading) · [lazy-loading](../../examples/web/solid/lazy-loading) · [async-guards](../../examples/web/solid/async-guards) · [hash-routing](../../examples/web/solid/hash-routing) · [persistent-params](../../examples/web/solid/persistent-params) · [error-handling](../../examples/web/solid/error-handling) · [dynamic-routes](../../examples/web/solid/dynamic-routes) · [store-based-state](../../examples/web/solid/store-based-state) · [use-link-directive](../../examples/web/solid/use-link-directive) · [signal-primitives](../../examples/web/solid/signal-primitives) · [combined](../../examples/web/solid/combined) · [animation-examples](../../examples/web/solid/animation-examples) · [search-schema](../../examples/web/solid/search-schema)
+[basic](../../examples/web/solid/basic) · [nested-routes](../../examples/web/solid/nested-routes) · [auth-guards](../../examples/web/solid/auth-guards) · [data-loading](../../examples/web/solid/data-loading) · [lazy-loading](../../examples/web/solid/lazy-loading) · [async-guards](../../examples/web/solid/async-guards) · [hash-routing](../../examples/web/solid/hash-routing) · [persistent-params](../../examples/web/solid/persistent-params) · [error-handling](../../examples/web/solid/error-handling) · [dynamic-routes](../../examples/web/solid/dynamic-routes) · [store-based-state](../../examples/web/solid/store-based-state) · [use-link-directive](../../examples/web/solid/use-link-directive) · [combined](../../examples/web/solid/combined) · [animation-examples](../../examples/web/solid/animation-examples) · [search-schema](../../examples/web/solid/search-schema)
 
 Server-side rendering: [ssr](../../examples/web/solid/ssr-examples/ssr) · [ssr-streaming](../../examples/web/solid/ssr-examples/ssr-streaming) · [ssr-mixed](../../examples/web/solid/ssr-examples/ssr-mixed) · [ssg](../../examples/web/solid/ssr-examples/ssg)
 
