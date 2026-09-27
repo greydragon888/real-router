@@ -51,9 +51,11 @@ name: Dependabot Lockfile Dedupe
 
 on:
   pull_request:
-    # Every Dependabot dep bump edits the lockfile; nothing else runs us.
+    # Every Dependabot dep bump edits a lockfile — the root's or the examples
+    # workspace's; nothing else runs us.
     paths:
       - "pnpm-lock.yaml"
+      - "examples/pnpm-lock.yaml"
 
 # Read-only since 2026-08-01: the push is authenticated by DEPENDABOT_PUSH_TOKEN
 # (checkout's `token:`), not by GITHUB_TOKEN, so no write scope is needed — and a
@@ -101,13 +103,23 @@ jobs:
 
       - name: Dedupe lockfile
         id: dedupe
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           # `pnpm dedupe` does its own install+dedupe in one pass, so no separate
           # `pnpm install` is needed (Dependabot's head already has a manifest and
           # lockfile that agree — there's no rebase to reconcile). --ignore-scripts
           # ensures no dependency lifecycle script runs with the write token.
-          pnpm dedupe --ignore-scripts
-          if git diff --quiet -- pnpm-lock.yaml; then
+          # Only the workspace whose lockfile this PR changes: a Dependabot block
+          # covers one directory, and installing the other would be wasted time.
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          for dir in . examples; do
+            if git diff --quiet "$BASE_SHA" HEAD -- "$dir/pnpm-lock.yaml"; then
+              continue
+            fi
+            pnpm --dir "$dir" dedupe --ignore-scripts
+          done
+          if git diff --quiet -- pnpm-lock.yaml examples/pnpm-lock.yaml; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "Lockfile already deduped — nothing to push."
           else
@@ -121,7 +133,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pnpm-lock.yaml
+          git add pnpm-lock.yaml examples/pnpm-lock.yaml
           git commit -m "chore(deps): pnpm dedupe lockfile for #${PR_NUMBER}"
           git push
 
@@ -136,11 +148,11 @@ jobs:
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          echo "::warning::pnpm-lock.yaml needs a dedupe, but the DEPENDABOT_PUSH_TOKEN Dependabot secret is not configured — refusing to push. Fix locally: pnpm resolve:dependabot ${PR_NUMBER}"
+          echo "::warning::A lockfile needs a dedupe, but the DEPENDABOT_PUSH_TOKEN Dependabot secret is not configured — refusing to push. Fix locally: pnpm resolve:dependabot ${PR_NUMBER}"
           {
             echo "### Lockfile dedupe NOT applied"
             echo
-            echo "\`pnpm dedupe\` changes \`pnpm-lock.yaml\`, but no \`DEPENDABOT_PUSH_TOKEN\` secret is"
+            echo "\`pnpm dedupe\` changes a lockfile, but no \`DEPENDABOT_PUSH_TOKEN\` secret is"
             echo "configured, so this job did not push. (A \`GITHUB_TOKEN\` push would leave the PR"
             echo "head without any status checks and block the merge on checks that never report.)"
             echo

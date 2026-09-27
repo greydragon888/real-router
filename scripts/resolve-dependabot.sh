@@ -4,9 +4,14 @@
 #
 # Rebases the PR branch onto origin/master, auto-resolves package.json conflicts
 # via scripts/resolve-dep-conflicts.mjs (semver-union: newest of each dep),
-# regenerates the lockfile, validates with `pnpm build`, then STOPS for review
-# and prints the exact force-push + squash-merge commands. Nothing destructive
-# (force-push / merge) happens unless you pass --merge.
+# regenerates the lockfile, validates, then STOPS for review and prints the
+# exact force-push + squash-merge commands. Nothing destructive (force-push /
+# merge) happens unless you pass --merge.
+#
+# Two workspaces, two lockfiles: the root's and examples/'s. Each step runs in
+# the workspace the PR touches; the root validates with `pnpm build`, the
+# examples by building every example against the npm releases their manifests
+# pin — what someone who copies an example gets.
 #
 # Usage:
 #   pnpm resolve:dependabot <PR_NUMBER> [--merge]
@@ -69,7 +74,7 @@ git rebase origin/master || true
 
 while rebase_in_progress; do
   CONFLICTED="$(git diff --name-only --diff-filter=U || true)"
-  OTHER="$(echo "$CONFLICTED" | grep -vE '(^|/)package\.json$|^pnpm-lock\.yaml$' || true)"
+  OTHER="$(echo "$CONFLICTED" | grep -vE '(^|/)package\.json$|^(examples/)?pnpm-lock\.yaml$' || true)"
   if [ -n "$OTHER" ]; then
     echo "❌ Non-dependency conflicts need manual resolution:" >&2
     echo "$OTHER" | sed 's/^/    /' >&2
@@ -84,32 +89,53 @@ while rebase_in_progress; do
     exit 1
   fi
 
-  if echo "$CONFLICTED" | grep -q '^pnpm-lock.yaml$'; then
-    echo "🔒 Regenerating pnpm-lock.yaml from merged manifests ..."
-    git checkout origin/master -- pnpm-lock.yaml
-    pnpm install
-    pnpm dedupe
-  fi
+  for lock in pnpm-lock.yaml examples/pnpm-lock.yaml; do
+    if echo "$CONFLICTED" | grep -qx "$lock"; then
+      echo "🔒 Regenerating $lock from merged manifests ..."
+      git checkout origin/master -- "$lock"
+      pnpm --dir "$(dirname "$lock")" install
+      pnpm --dir "$(dirname "$lock")" dedupe
+    fi
+  done
 
   git add -u  # tracked changes only — never sweep in untracked files
   GIT_EDITOR=true git rebase --continue || true
 done
 
-# Normalize lockfile to the final rebased manifests (covers clean-rebase case and
-# any residual dedupe), folding the result into the (single) dep-bump commit.
-echo "🔒 Reconciling lockfile ..."
-pnpm install
-pnpm dedupe
+# The workspaces this PR touches: examples/ when a changed path is under it,
+# the root when one is not. A Dependabot block covers one directory.
+CHANGED="$(git diff --name-only origin/master...HEAD)"
+WORKSPACES=""
+if echo "$CHANGED" | grep -qv '^examples/'; then WORKSPACES="."; fi
+if echo "$CHANGED" | grep -q '^examples/'; then WORKSPACES="$WORKSPACES examples"; fi
+[ -n "$WORKSPACES" ] || WORKSPACES="."
+
+# Normalize each lockfile to the final rebased manifests (covers clean-rebase case
+# and any residual dedupe), folding the result into the (single) dep-bump commit.
+for dir in $WORKSPACES; do
+  echo "🔒 Reconciling the lockfile in $dir ..."
+  pnpm --dir "$dir" install
+  pnpm --dir "$dir" dedupe
+done
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   git add -u  # tracked changes only — never sweep in untracked files
   git commit --amend --no-edit >/dev/null
 fi
 
-echo "✅ Verifying dedupe ..."
-pnpm dedupe --check
+for dir in $WORKSPACES; do
+  echo "✅ Verifying dedupe in $dir ..."
+  pnpm --dir "$dir" dedupe --check
+done
 
-echo "🏗️  Validating (pnpm build) ..."
-pnpm build
+for dir in $WORKSPACES; do
+  if [ "$dir" = "examples" ]; then
+    echo "🏗️  Validating (every example against the npm releases) ..."
+    pnpm --dir examples -r --no-bail run --if-present build
+  else
+    echo "🏗️  Validating (pnpm build) ..."
+    pnpm build
+  fi
+done
 
 echo
 echo "=== Resolved. Version changes vs origin/master: ==="

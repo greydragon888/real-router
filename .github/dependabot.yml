@@ -97,8 +97,8 @@ updates:
       # bump TS manually.
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
-      # vite is a direct dev-dep across 127 example workspaces (all pinned 7.3.6),
-      # so Dependabot bumps it INDIVIDUALLY ahead of its ecosystem. On a new MAJOR
+      # vite is a direct dev-dep of benchmarks/package.json (the CodSpeed
+      # bundles), so Dependabot bumps it INDIVIDUALLY ahead of its ecosystem. On a new MAJOR
       # (vite 8) the whole plugin/test stack still peers `vite >=7.3.5 <8` —
       # vitest@4.1.x + @vitest/mocker, vite-plugin-solid, @sveltejs/vite-plugin-svelte,
       # @analogjs/vite-plugin-angular, vite-tsconfig-paths, @testing-library/svelte,
@@ -115,8 +115,9 @@ updates:
       # as peerDependency ranges). Declared with `~` patch-float ranges in every
       # manifest + a syncpack semverGroup (syncpack.config.mjs). `pnpm update`
       # pulls the latest patch; Dependabot stays quiet on PATCH so it stops the
-      # per-patch PR churn these spread across ~150 example/adapter/benchmark
+      # per-patch PR churn these spread across the adapter and benchmark
       # manifests (e.g. the @angular/ssr #1368 / @angular/router #1371 noise).
+      # The examples carry the same rules in their own block below.
       # MINOR/major still flow as PRs (reviewed). Add new UI-framework/router/
       # testing deps here (and to the syncpack group) when introduced.
       - dependency-name: "react"
@@ -153,6 +154,88 @@ updates:
       # The framework only moves via a manual, coordinated `pnpm update` across
       # all @angular/* at once; the `~22.0.x` ranges then absorb the patch.
       # Ignore the namespace entirely (this replaced the `@angular/router` override).
+      - dependency-name: "@angular/*"
+
+  # The examples workspace — its own lockfile, so its own block: a single
+  # `directory: "/"` sees only what the root pnpm-workspace.yaml includes. The
+  # manifests pin @real-router/* to npm releases; the weekly group moves them to
+  # the latest ones, so an example that uses a new API builds for someone who
+  # copies it once a release carries the API.
+  - package-ecosystem: "npm"
+    directory: "/examples"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+    open-pull-requests-limit: 10
+    groups:
+      # First: a dependency joins the first group that matches.
+      real-router:
+        patterns:
+          - "@real-router/*"
+      # react + react-dom move in lockstep — the root block has the reason.
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      dev-dependencies:
+        dependency-type: "development"
+        patterns:
+          - "*"
+    reviewers:
+      - "greydragon888"
+    assignees:
+      - "greydragon888"
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "automated"
+    ignore:
+      # Transitive deps whose advisories an `overrides` entry in
+      # examples/pnpm-workspace.yaml resolves. Dependabot does not apply pnpm
+      # overrides, re-resolves them to their natural ceiling and errors the whole
+      # job — the root block has the incident.
+      - dependency-name: "undici"
+      - dependency-name: "piscina"
+      - dependency-name: "js-yaml"
+      # Held to the Node.js runtime major and to the TypeScript major the lint
+      # toolchain supports, as in the root block.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # vite is a direct dev-dep of most examples, so Dependabot bumps it ahead
+      # of the plugin stack that peers on it; a new MAJOR fails the re-resolve
+      # under strictPeerDependencies and errors the whole job. Majors move by hand.
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      # Patch-float set: declared with `~` in the manifests, so `pnpm update`
+      # takes the latest patch and Dependabot stays quiet on PATCH.
+      - dependency-name: "react"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "preact"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "preact-render-to-string"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "solid-js"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "svelte"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "vue"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "@testing-library/*"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "@solidjs/*"
+        update-types: ["version-update:semver-patch"]
+      # @angular/* peers each other EXACTLY, so any single-package bump breaks
+      # strictPeerDependencies; it moves only by a coordinated `pnpm update`.
       - dependency-name: "@angular/*"
 
   # Enable version updates for GitHub Actions
