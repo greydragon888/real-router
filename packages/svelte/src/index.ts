@@ -37,8 +37,13 @@ export { default as RouterProvider } from "./RouterProvider.svelte";
 
 export { ROUTER_KEY, NAVIGATOR_KEY, ROUTE_KEY } from "./context";
 
+// DOM utilities
+export { createDirectionTracker } from "./dom-utils";
+
 // Types
 export type { LinkProps, RouteContext } from "./types";
+
+export type { DirectionTracker } from "./dom-utils";
 
 export type {
   RouteExitContext,

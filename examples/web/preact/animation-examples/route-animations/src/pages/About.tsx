@@ -114,8 +114,8 @@ export function About() {
       </ul>
       <p>
         <code>createDirectionTracker(router)</code> from{" "}
-        <code>shared/dom-utils</code> is wired in <code>main.tsx</code> before{" "}
-        <code>router.usePlugin(browserPluginFactory())</code>; it writes{" "}
+        <code>@real-router/preact</code> is wired in <code>main.tsx</code>{" "}
+        before <code>router.usePlugin(browserPluginFactory())</code>; it writes{" "}
         <code>data-nav-direction=&quot;forward&quot; | &quot;back&quot;</code>{" "}
         on <code>&lt;html&gt;</code> for direction-aware slide keyframes.
       </p>

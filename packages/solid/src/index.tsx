@@ -36,11 +36,15 @@ export { createSignalFromSource } from "./createSignalFromSource";
 
 export { createStoreFromSource } from "./createStoreFromSource";
 
+export { createDirectionTracker } from "./dom-utils";
+
 export type { LinkProps, RouteState } from "./types";
 
 export type { RouterErrorBoundaryProps } from "./components/RouterErrorBoundary";
 
 export type { LinkDirectiveOptions } from "./directives/link";
+
+export type { DirectionTracker } from "./dom-utils";
 
 export type {
   RouteViewProps,

@@ -1,11 +1,10 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
-import { RouterProvider } from "@real-router/solid";
+import { RouterProvider, createDirectionTracker } from "@real-router/solid";
 import { render } from "solid-js/web";
 
 import { App } from "./App";
 import { routes } from "./routes";
-import { createDirectionTracker } from "../../../../../../shared/dom-utils";
 
 import "../../../../../shared/styles.css";
 import "./styles/animations.css";

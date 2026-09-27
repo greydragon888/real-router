@@ -20,6 +20,8 @@ export {
   applyLinkA11y,
 } from "./link-utils.js";
 
+export type { DirectionTracker } from "./direction-tracker.js";
+
 export type { RouteAnnouncerOptions } from "./route-announcer.js";
 
 export type { ScrollRestorationOptions } from "./scroll-restore.js";

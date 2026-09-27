@@ -59,7 +59,7 @@ src/
 │   ├── route-announcer.ts      # createRouteAnnouncer — WCAG aria-live announcements
 │   ├── scroll-restore.ts       # createScrollRestoration — opt-in scroll capture + restore
 │   ├── view-transitions.ts     # createViewTransitions — opt-in View Transitions API integration
-│   └── direction-tracker.ts    # createDirectionTracker — back/forward annotation. Available through the symlink barrel but NOT consumed by the Preact RouterProvider; consumers opt in manually (install before usePlugin(browserPlugin)).
+│   └── direction-tracker.ts    # createDirectionTracker — back/forward annotation. Exported from src/index.ts but NOT consumed by the Preact RouterProvider; consumers opt in manually (install before usePlugin(browserPlugin)).
 ├── utils/
 │   └── createHttpStatusSink.ts # /ssr — fresh { code: undefined } sink per request
 ├── hooks/
