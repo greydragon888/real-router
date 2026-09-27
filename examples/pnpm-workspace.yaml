@@ -17,32 +17,17 @@ overrides:
   '@types/node': $@types/node
   # Bound to <8 for the SOLID CHAIN ONLY: an open upper bound lets `pnpm dedupe`
   # (the pre-commit hook auto-dedupes) pull @babel/core 8 into a chain that cannot
-  # run it. Lift when vite-plugin-solid supports babel 8.
-  #
-  # ⚠ This entry once also carried a vite bound, on the grounds that
-  # vite-plugin-solid broke on vite 8. That half is gone — measured on 2026-09-10,
-  # the plugin builds and passes its 480 tests on vite 8.2.2. The babel half below
-  # is a SEPARATE axis and still holds.
-  #
-  # ⚠ Scoped to the consumer rather than global since 2026-09-06. Unscoped, this
-  # entry also pinned Stryker: @stryker-mutator/instrumenter 10 declares
-  # `@babel/core: ~8.0.0`, got 7.29.7 from here, and every run died inside
-  # @babel/generator@8 with `Cannot read properties of undefined (reading 'length')`
-  # — a babel-7 core driving a babel-8 generator. The solid chain does not need the
-  # global reach: `packages/solid` pins `@babel/core` at an exact 7.29.7, and
-  # vite-plugin-solid (`^7.23.3`), babel-preset-solid and @rollup/plugin-babel (peer
-  # `^7.0.0`) all declare carets that semver cannot resolve to 8 anyway.
+  # run it. Lift when vite-plugin-solid supports babel 8. Why the entry is scoped to
+  # the consumer rather than global is recorded in the root pnpm-workspace.yaml.
   'vite-plugin-solid>@babel/core': '>=7.29.6 <8'
-  axios: '>=1.16.0'
-  follow-redirects: '>=1.16.0'
   # Floor raised for GHSA-4mjr-xmp4-gh2g + GHSA-x5fp-wj9c-mxmx (both Medium, 6.16.0).
-  # Parents are express / body-parser / @gitbeaker / typed-rest-client — dev servers and CI
-  # tooling, never a published @real-router/* package.
+  # Parents are express and body-parser — the SSR examples' servers, never a
+  # published @real-router/* package.
   qs: '>=6.16.0'
   # Floor raised for GHSA-mw96-cpmx-2vgc (arbitrary file write via path traversal,
   # High, fixed in 4.59.0). Written as a FLOOR, not the exact pin it started as:
   # an exact override silently overrides the consumer's own version too, so
-  # `packages/solid` could raise its pin and get the old rollup anyway — install
+  # a consumer could raise its own pin and get the old rollup anyway — install
   # green, lockfile untouched, manifest and tree disagreeing with nobody told.
   rollup: '>=4.59.0'
   minimatch@3: ~3.1.4
@@ -53,7 +38,6 @@ overrides:
   http-proxy-agent: 7.0.2
   undici: '>=7.29.0 <8.0.0'
   piscina: '>=5.2.0 <6.0.0'
-  flatted: '>=3.4.2'
   path-to-regexp: '>=8.4.0'
   # ReDoS in brace-expansion (GHSA-3jxr-9vmj-r5cp, High). All three major lines are in the tree
   # via assorted dev/tooling deps — pin each to its patched release. EXACT (not '>=') because the
@@ -66,7 +50,7 @@ overrides:
   # ⛔ Collapsing all three onto 5.0.8 is NOT the fix, and this is measured rather than assumed:
   # v1 and v2 both end in `module.exports = expandTop` (the function IS the export), while 5.x's
   # CJS build emits `exports.expand = expand` — a NAMED export with no default. Every consumer of
-  # the older lines is `minimatch` (3.1.5 → @1, 5.1.9 and 9.0.9 → @2, 10.2.5 → @5) doing
+  # the older lines is `minimatch` doing
   # `require('brace-expansion')` and calling the result, so the override would hand it an object
   # and break glob matching across the tooling — which is why each line is pinned separately
   # rather than collapsed onto @5.
@@ -95,11 +79,11 @@ overrides:
   picomatch@2: 2.3.2
   picomatch@4: 4.0.4
   yaml@1: 1.10.3
-  # Collapses every 2.x consumer onto one copy (@changesets/parse, @manypkg/tools,
-  # knip, vite, vue-router, eslint-plugin-sonarjs, eslint-plugin-unicorn today).
-  # Floor raised to 2.9.0 because an override outranks semver: at 2.8.3 it silently
-  # downgraded @changesets/parse@1, which declares ^2.9.0 and parses every changeset
-  # on the release path. Raise this line with the highest declared range, never below.
+  # Collapses every 2.x consumer onto one copy (vite, eslint-plugin-sonarjs,
+  # eslint-plugin-unicorn today). An override outranks semver, so a value below a
+  # consumer's declared range downgrades it silently — the root pnpm-workspace.yaml
+  # records the release-path incident. Raise this line with the highest declared
+  # range, never below.
   yaml@2: 2.9.0
   # Floor at 5.9.2 for GHSA-9rgm-9g3h-6x36 (Medium; 5.3) — denial of service via
   # malformed input. Transitive via `svelte`, which declares `^5.8.1`, so the floor
@@ -107,10 +91,10 @@ overrides:
   # which leaves the examples' builds and this audit gate as the exposure.
   devalue: '>=5.9.2'
   esbuild: '>=0.28.1'
-  # Collapses every transitive vite copy onto the one the manifests pin, which is an
-  # exact 8.2.2 in all 127 of them (`vite` is not in syncpack's `~`-float group). This
-  # is a DEDUPE pin, not a security floor — the ceiling keeps the collapse inside the
-  # major so a transitive cannot drag the tree onto a vite the plugins have not met.
+  # Collapses every transitive vite copy onto the exact 8.2.2 the example manifests
+  # declare. This is a DEDUPE pin, not a security floor — the ceiling keeps the
+  # collapse inside the major so a transitive cannot drag the tree onto a vite the
+  # plugins have not met.
   vite: '>=8.2.2 <9'
   fast-uri: '>=3.1.6 <4'
   # Floor at 4.13.5 for GHSA-crvj-82cr-hjcx, GHSA-gqvv-2mrq-wpjv and
@@ -118,9 +102,9 @@ overrides:
   # Transitive via the Angular dev/build toolchain, as the entry below says.
   hono: '>=4.13.5'
   # @hono/node-server: GHSA-frvp-7c67-39w9 (Medium) has no v1 fix — the patch is v2-only, so a
-  # bounded major bump. Like hono / fast-uri above, it's transitive via the Angular dev/build
-  # toolchain (@angular/build SSR dev server; ajv -> fast-uri) in angular examples only — not in
-  # any published @real-router/* package. Bump/drop when the toolchain moves off these floors.
+  # bounded major bump. Like hono above, it arrives through @angular/cli's MCP server
+  # (@modelcontextprotocol/sdk), in the angular examples only — not in any published
+  # @real-router/* package. Bump/drop when the toolchain moves off these floors.
   '@hono/node-server': '>=2.0.5 <3'
   ip-address: '>=10.3.1'
   # @xmldom/xmldom < 0.8.15 (GHSA-6gmq-8vp8-gcm6, Medium). Its one parent is `plist`, pulled
@@ -130,8 +114,8 @@ overrides:
   # Bounded `<0.9` deliberately: on a 0.x line the minor IS the major, and an open floor
   # jumps `plist` onto 0.9 — an unvetted parser change for a bump whose fix is same-line.
   '@xmldom/xmldom': '>=0.8.15 <0.9'
-  # postcss < 8.5.23 (GHSA-fxqj-rqcc-2cmp, Medium). Eleven parents, every one of them build- or
-  # lint-time: vite, @angular/build, ng-packagr, @vue/compiler-sfc, beasties, postcss-scss /
+  # postcss < 8.5.23 (GHSA-fxqj-rqcc-2cmp, Medium). Every parent is build- or lint-time:
+  # vite, @angular/build, ng-packagr, @vue/compiler-sfc, beasties, postcss-scss /
   # -safe-parser / -load-config, eslint-plugin-svelte, svelte-eslint-parser. Not in any published
   # @real-router/* package. Single 8.x line, patch-level fix, so a floor is enough. Drop when the
   # toolchain pulls >=8.5.23 on its own.
@@ -141,9 +125,7 @@ overrides:
   # only, exactly like the entry above, and never in a published @real-router/*
   # package. An override rather than a plain update because the lockfile pinned
   # 3.3.16 before the advisory existed and `pnpm update` does not reach that
-  # depth; the second line in the tree — 6.x, via `@size-limit/esbuild` — carried
-  # the same advisory (GHSA-28wg-ghj8-5hjv) on its 5.x predecessor and has moved
-  # past it on its own, so it needs no entry.
+  # depth. No other nanoid line is in the tree.
   # Selector-scoped with an upper bound deliberately, per the brace-expansion
   # note above: an unqualified '>=3.3.17' would let dedupe pull the whole tree
   # onto that newer line, which postcss does not declare. Drop when the toolchain
@@ -152,21 +134,16 @@ overrides:
   js-cookie: '>=3.0.7'
   tmp: '>=0.2.6'
   # fflate < 0.8.3: `unzipSync` can loop forever on a malformed ZIP64 archive
-  # (GHSA-px8p-9vwx-vf98, 7.5). This entry already existed as an exact `0.8.2` to
-  # collapse two copies — and that pin is what held the tree BELOW the fix, since
-  # both parents (`@arethetypeswrong/core`, via its CLI and tsdown, and
-  # `@vitest/ui`) declare `^0.8.3` and would resolve to it on their own. Dropping
-  # the entry outright is not the fix: measured, the tree then carries 0.8.2 AND
-  # 0.8.3 and `lint:dedupe` refuses it.
-  # Root devDeps, build and test tooling, never in a published @real-router/*
-  # package, and what they unzip is our own build output rather than untrusted
-  # input. Bounded `<0.9` for the reason the @xmldom/xmldom entry states: on a 0.x
-  # line the minor IS the major. No 0.9 exists today, so the bound costs nothing.
+  # (GHSA-px8p-9vwx-vf98, 7.5). Its one parent here, `@vitest/ui`, declares
+  # `^0.8.2`, a range that admits the affected release; the floor is what excludes
+  # it. Test tooling, never in a published @real-router/* package. Bounded `<0.9`
+  # for the reason the @xmldom/xmldom entry states: on a 0.x line the minor IS the
+  # major. No 0.9 exists today, so the bound costs nothing.
   fflate: '>=0.8.3 <0.9'
   # js-yaml 4.x — GHSA-5p4m-2wfm-xmqj (High, quadratic CPU in `!!omap`, fixed 4.3.1)
-  # and GHSA-2883-xcg3-v3hh (High, 7.5, fixed 4.3.2). Every parent is dev/build
-  # tooling that parses OUR OWN yaml (@commitlint/load, cosmiconfig,
-  # electron-builder/app-builder-lib), never a published @real-router/* package and never
+  # and GHSA-2883-xcg3-v3hh (High, 7.5, fixed 4.3.2). Every parent is part of
+  # electron-builder (app-builder-lib, builder-util, dmg-builder) and parses OUR OWN
+  # yaml for the desktop examples, never a published @real-router/* package and never
   # untrusted input — but both fixes are same-line patches, so there is no reason to allowlist.
   # Bounded `<5` deliberately: 5.x is a separate major these consumers don't declare, and an
   # open floor would let dedupe jump the whole tree onto it. Drop when the tooling pulls >=4.3.2.

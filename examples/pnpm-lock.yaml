@@ -7,8 +7,6 @@ settings:
 overrides:
   '@types/node': 24.13.5
   vite-plugin-solid>@babel/core: '>=7.29.6 <8'
-  axios: '>=1.16.0'
-  follow-redirects: '>=1.16.0'
   qs: '>=6.16.0'
   rollup: '>=4.59.0'
   minimatch@3: ~3.1.4
@@ -19,7 +17,6 @@ overrides:
   http-proxy-agent: 7.0.2
   undici: '>=7.29.0 <8.0.0'
   piscina: '>=5.2.0 <6.0.0'
-  flatted: '>=3.4.2'
   path-to-regexp: '>=8.4.0'
   brace-expansion@1: 1.1.18
   brace-expansion@2: 2.1.4

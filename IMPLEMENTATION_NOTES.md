@@ -12216,3 +12216,21 @@ The two periods built different trees, so this is not an A/B. Nothing in it pays
 - **What does refresh cleanly is a changed specifier.** Switching the specifiers to `latest`, installing, and switching them back to `*` makes pnpm resolve `@real-router/*` afresh through the install path, which records overrides the way a frozen install expects. Measured on this refresh: exactly the three packages with a newer release moved (angular 0.24.0, solid 0.26.0, svelte 0.24.0), no third-party entry changed, and both `install --frozen-lockfile` and `dedupe --check` pass.
 - **The refresh closed the solid window above.** On solid 0.26.0 every example builds (`build` 112/112, `build:app` 25/25), and the three Solid SSR production servers answer 200 with hydration keys.
 - Dependabot reads `*` as `>= 0` (dependabot-core's constraint converter), so a new release already satisfies the manifest and its `/examples` PRs should touch the lockfile alone — to be confirmed on its first `@real-router/*` run.
+
+## Each `pnpm-workspace.yaml` describes its own tree (2026-09-27)
+
+**Problem.** The override comments of `examples/pnpm-workspace.yaml` were copied from the root file when the examples became a workspace of their own, and they kept describing the root tree: Stryker and `packages/solid` under `@babel/core`, `@gitbeaker` and `typed-rest-client` as `qs` parents, `@changesets/parse` under `yaml@2`, `@arethetypeswrong/core` under `fflate`, `@commitlint/load` under `js-yaml`. The root comments still named parents that had left with the examples — express, body-parser, `concurrently`, electron-builder — and listed `vue-router`, which declares no `yaml`, as a `yaml@2` consumer. One root override, `@isaacs/brace-expansion`, has no target in the root lockfile. Three examples overrides, `axios`, `follow-redirects` and `flatted`, set floors that every parent's declared range already clears.
+
+**Solution.** Each comment names the parents its own lockfile shows, read per override from the installed manifests together with the range each parent declares. Where the root file records why an entry has its shape, the examples copy points there instead of repeating it. The four overrides above are gone. Both lockfiles changed only in their `overrides:` header, with no package, snapshot or importer moved; both frozen installs, `lint:dedupe`, `lint:deps` and `lint:audit` pass.
+
+**Why.** pnpm reads an override's value and never its comment, so no gate notices when a comment names parents the tree no longer has. A comment copied into a second workspace describes the first one's tree from the day it is copied.
+
+**Found and left for a decision.** An override outranks semver, and three of them hold a package outside the range its parent declares, so dropping any of them moves its lockfile:
+
+- ⚠ `js-cookie: '>=3.0.7'`, in both files, keeps 3.0.7 while `js-beautify@2.0.3` declares `^3.0.8`.
+- ⚠ The root `axios: '>=1.16.0'` keeps 1.18.1 while `@sonar/scan@5.0.1` declares exactly `1.20.0`.
+- ⚠ The examples `shell-quote: '>=1.9.0'` lifts the exact `1.9.0` of `concurrently@10.0.5` to 1.10.0. The entry's own drop condition, `concurrently` pulling `>=1.9.0`, holds.
+
+The root also keeps floors its parents' ranges already clear: `adm-zip`, `underscore`, `node-forge`, `smol-toml`, `defu`, `flatted`, `follow-redirects`.
+
+The `fflate` record in "Third shape — the override WAS the vulnerability" says both parents declare `^0.8.3`. `@vitest/ui@4.1.11` declares `^0.8.2`, so for that parent the floor, not the declared range, is what excludes the affected release.
