@@ -242,6 +242,50 @@ updates:
       # strictPeerDependencies; it moves only by a coordinated `pnpm update`.
       - dependency-name: "@angular/*"
 
+  # The cross-router bench — its own lockfile, so its own block. A bump here
+  # moves the bench's numbers rather than a shipped package, so it comes
+  # monthly and in one group. @real-router/* is not updated here: the weekly
+  # snapshot installs the latest release before it measures.
+  - package-ecosystem: "npm"
+    directory: "/benchmarks/cross-router"
+    schedule:
+      interval: "monthly"
+      time: "04:00"
+    open-pull-requests-limit: 5
+    groups:
+      # react + react-dom move in lockstep — the root block has the reason.
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      bench:
+        patterns:
+          - "*"
+    reviewers:
+      - "greydragon888"
+    assignees:
+      - "greydragon888"
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "automated"
+    ignore:
+      - dependency-name: "@real-router/*"
+      # Majors move by hand, as in the root block: the plugin stack peers on
+      # vite, and the type tooling lags each TypeScript major.
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # @angular/* peers each other EXACTLY, so any single-package bump breaks
+      # strictPeerDependencies; it moves only by a coordinated `pnpm update`.
+      - dependency-name: "@angular/*"
+
   # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"
     # `/` covers `.github/workflows/**` only. A composite action referenced by a

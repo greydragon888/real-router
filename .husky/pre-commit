@@ -34,8 +34,8 @@ if [ "$want_pnpm" != "$have_pnpm" ]; then
   exit 1
 fi
 
-# Auto-deduplicate a lockfile that is being committed — the root's or the
-# examples workspace's, each in its own workspace.
+# Auto-deduplicate a lockfile that is being committed — the root's, the
+# examples workspace's or the cross-router bench's, each in its own workspace.
 # pnpm add/update don't dedupe automatically (pnpm/pnpm#7258),
 # so we do it here to keep the lockfile clean.
 if git diff --cached --name-only | grep -qx 'pnpm-lock.yaml'; then
@@ -47,6 +47,11 @@ if git diff --cached --name-only | grep -qx 'examples/pnpm-lock.yaml'; then
   echo "🔗 Auto-deduplicating the examples lockfile..."
   pnpm --dir examples dedupe
   git add examples/pnpm-lock.yaml
+fi
+if git diff --cached --name-only | grep -qx 'benchmarks/cross-router/pnpm-lock.yaml'; then
+  echo "🔗 Auto-deduplicating the cross-router lockfile..."
+  pnpm --dir benchmarks/cross-router dedupe
+  git add benchmarks/cross-router/pnpm-lock.yaml
 fi
 
 # Check dependency version consistency across workspace packages (~1s).

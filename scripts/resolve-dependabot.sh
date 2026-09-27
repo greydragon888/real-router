@@ -8,10 +8,11 @@
 # exact force-push + squash-merge commands. Nothing destructive (force-push /
 # merge) happens unless you pass --merge.
 #
-# Two workspaces, two lockfiles: the root's and examples/'s. Each step runs in
-# the workspace the PR touches; the root validates with `pnpm build`, the
-# examples by building every example against the npm releases their manifests
-# pin — what someone who copies an example gets.
+# Three workspaces, three lockfiles: the root's, examples/'s and
+# benchmarks/cross-router/'s. Each step runs in the workspace the PR touches;
+# the root validates with `pnpm build`, the examples by building every example
+# against the npm releases their manifests pin — what someone who copies an
+# example gets — and the cross-router bench by an n=1 smoke of its matrix.
 #
 # Usage:
 #   pnpm resolve:dependabot <PR_NUMBER> [--merge]
@@ -74,7 +75,7 @@ git rebase origin/master || true
 
 while rebase_in_progress; do
   CONFLICTED="$(git diff --name-only --diff-filter=U || true)"
-  OTHER="$(echo "$CONFLICTED" | grep -vE '(^|/)package\.json$|^(examples/)?pnpm-lock\.yaml$' || true)"
+  OTHER="$(echo "$CONFLICTED" | grep -vE '(^|/)package\.json$|^(examples/|benchmarks/cross-router/)?pnpm-lock\.yaml$' || true)"
   if [ -n "$OTHER" ]; then
     echo "❌ Non-dependency conflicts need manual resolution:" >&2
     echo "$OTHER" | sed 's/^/    /' >&2
@@ -89,7 +90,7 @@ while rebase_in_progress; do
     exit 1
   fi
 
-  for lock in pnpm-lock.yaml examples/pnpm-lock.yaml; do
+  for lock in pnpm-lock.yaml examples/pnpm-lock.yaml benchmarks/cross-router/pnpm-lock.yaml; do
     if echo "$CONFLICTED" | grep -qx "$lock"; then
       echo "🔒 Regenerating $lock from merged manifests ..."
       git checkout origin/master -- "$lock"
@@ -102,12 +103,14 @@ while rebase_in_progress; do
   GIT_EDITOR=true git rebase --continue || true
 done
 
-# The workspaces this PR touches: examples/ when a changed path is under it,
-# the root when one is not. A Dependabot block covers one directory.
+# The workspaces this PR touches: examples/ or benchmarks/cross-router/ when a
+# changed path is under it, the root when one is under neither. A Dependabot
+# block covers one directory.
 CHANGED="$(git diff --name-only origin/master...HEAD)"
 WORKSPACES=""
-if echo "$CHANGED" | grep -qv '^examples/'; then WORKSPACES="."; fi
+if echo "$CHANGED" | grep -qvE '^(examples|benchmarks/cross-router)/'; then WORKSPACES="."; fi
 if echo "$CHANGED" | grep -q '^examples/'; then WORKSPACES="$WORKSPACES examples"; fi
+if echo "$CHANGED" | grep -q '^benchmarks/cross-router/'; then WORKSPACES="$WORKSPACES benchmarks/cross-router"; fi
 [ -n "$WORKSPACES" ] || WORKSPACES="."
 
 # Normalize each lockfile to the final rebased manifests (covers clean-rebase case
@@ -128,13 +131,22 @@ for dir in $WORKSPACES; do
 done
 
 for dir in $WORKSPACES; do
-  if [ "$dir" = "examples" ]; then
-    echo "🏗️  Validating (every example against the npm releases) ..."
-    pnpm --dir examples -r --no-bail run --if-present build
-  else
-    echo "🏗️  Validating (pnpm build) ..."
-    pnpm build
-  fi
+  case "$dir" in
+    examples)
+      echo "🏗️  Validating (every example against the npm releases) ..."
+      pnpm --dir examples -r --no-bail run --if-present build
+      ;;
+    benchmarks/cross-router)
+      # Builds and drives every app once, and writes nothing to results/.
+      echo "🏗️  Validating (an n=1 smoke of the cross-router matrix) ..."
+      pnpm --dir benchmarks/cross-router exec playwright install chromium
+      (cd benchmarks/cross-router && BENCH_SMOKE=1 node run-all.mjs 1)
+      ;;
+    *)
+      echo "🏗️  Validating (pnpm build) ..."
+      pnpm build
+      ;;
+  esac
 done
 
 echo

@@ -51,11 +51,12 @@ name: Dependabot Lockfile Dedupe
 
 on:
   pull_request:
-    # Every Dependabot dep bump edits a lockfile — the root's or the examples
-    # workspace's; nothing else runs us.
+    # Every Dependabot dep bump edits a lockfile — the root's, the examples
+    # workspace's or the cross-router bench's; nothing else runs us.
     paths:
       - "pnpm-lock.yaml"
       - "examples/pnpm-lock.yaml"
+      - "benchmarks/cross-router/pnpm-lock.yaml"
 
 # Read-only since 2026-08-01: the push is authenticated by DEPENDABOT_PUSH_TOKEN
 # (checkout's `token:`), not by GITHUB_TOKEN, so no write scope is needed — and a
@@ -111,15 +112,15 @@ jobs:
           # lockfile that agree — there's no rebase to reconcile). --ignore-scripts
           # ensures no dependency lifecycle script runs with the write token.
           # Only the workspace whose lockfile this PR changes: a Dependabot block
-          # covers one directory, and installing the other would be wasted time.
+          # covers one directory, and installing the others would be wasted time.
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
-          for dir in . examples; do
+          for dir in . examples benchmarks/cross-router; do
             if git diff --quiet "$BASE_SHA" HEAD -- "$dir/pnpm-lock.yaml"; then
               continue
             fi
             pnpm --dir "$dir" dedupe --ignore-scripts
           done
-          if git diff --quiet -- pnpm-lock.yaml examples/pnpm-lock.yaml; then
+          if git diff --quiet -- pnpm-lock.yaml examples/pnpm-lock.yaml benchmarks/cross-router/pnpm-lock.yaml; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "Lockfile already deduped — nothing to push."
           else
@@ -133,7 +134,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pnpm-lock.yaml examples/pnpm-lock.yaml
+          git add pnpm-lock.yaml examples/pnpm-lock.yaml benchmarks/cross-router/pnpm-lock.yaml
           git commit -m "chore(deps): pnpm dedupe lockfile for #${PR_NUMBER}"
           git push
 

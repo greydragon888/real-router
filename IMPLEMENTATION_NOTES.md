@@ -12372,3 +12372,14 @@ Two edges outside their range are the entry's purpose, and their comments say so
 - **`lint:reach` reads a nested workspace as no package's.** Its census walks the tracked files under each root package's directory, so with `cross-router/**` ignored the 422 code files there read as hidden by a global `ignores`. A fixture pair holds the rule: a package whose directory holds a nested workspace passes, and the same tree without the `pnpm-workspace.yaml` fails naming the file. `examples/` falls under the same rule, and no root package's directory holds it.
 - **`codspeed-gate.test.mjs` asserted absences the lockfile no longer tested.** `vue-router`, `sv-router` and `playwright` left the root lockfile with this workspace, and `wouter` was already absent; asserting that a closure stops before a package the lockfile does not hold passes without a closure. The cell now names eslint, prettier, knip and `@types/node`, and asserts each is in the lockfile first. Adding `wouter` to the list fails it, and so does adding `eslint` to the roots.
 - Until the workspace has a lint config of its own, nothing lints the cross-router apps.
+
+## Dependabot and the lockfile tooling cover the cross-router workspace (2026-09-27)
+
+**Problem.** `benchmarks/cross-router` has a lockfile of its own, and every tool that keeps a lockfile healthy knew two: `lint:dedupe`, the pre-commit auto-dedupe, `dependabot-dedupe.yml` and `resolve:dependabot` read the root's and the examples', and `.github/dependabot.yml` had no entry for the directory.
+
+**Solution.**
+
+- `.github/dependabot.yml` gains a `/benchmarks/cross-router` entry: monthly, the React pair in its lockstep group and everything else in one group. It ignores `@real-router/*`, which the weekly snapshot updates itself, `@angular/*`, whose packages peer each other exactly, and the majors of vite and TypeScript, as the other entries do. It has no patch-float `ignore`: nothing in this workspace runs `pnpm update` for the competitors, so their patches arrive through this entry or not at all.
+- `lint:dedupe` checks the third lockfile, the pre-commit hook dedupes it when it is staged, `dependabot-dedupe.yml` runs on it, and `resolve:dependabot` regenerates it and validates the workspace with an n=1 smoke of the whole matrix (`BENCH_SMOKE=1 node run-all.mjs 1`), which builds and drives every app and writes nothing to `results/`.
+
+**Why monthly, in one group.** A bump here moves the bench's numbers, not a shipped package: one pull request a month keeps the competitors' releases moving without a review per patch.
