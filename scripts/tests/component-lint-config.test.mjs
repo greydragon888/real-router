@@ -3,6 +3,9 @@
 // lint run cannot hold this: a rule dropped from, or an exception widened to,
 // a file kind with nothing to report leaves the run green. So each cell asks
 // ESLint which rules reach a file of each kind, in each tree that lints one.
+// The examples lint under a config of their own, which loads only where their
+// workspace is installed: `examples/tests/component-lint-config.test.mjs` asks
+// the same of it, in the weekly `examples.yml` lint job.
 //
 // Runs in the repo-lints CI job via `node --test scripts/tests/*.test.mjs`.
 
@@ -20,7 +23,7 @@ const ROOT = path.join(
 );
 
 // ESLint 10 looks the config up from each file, so one instance answers for
-// the package, the examples and the benchmarks alike.
+// the package and the benchmarks alike.
 const eslint = new ESLint({ cwd: ROOT });
 
 async function configOf(file) {
@@ -42,12 +45,6 @@ const PACKAGE = {
   component: "packages/svelte/src/components/Link.svelte",
   module: "packages/svelte/src/index.ts",
   runes: "packages/svelte/src/createRouteContext.svelte.ts",
-};
-
-const EXAMPLE = {
-  svelte: "examples/web/svelte/basic/src/App.svelte",
-  vue: "examples/web/vue/basic/src/App.vue",
-  module: "examples/web/svelte/basic/src/main.ts",
 };
 
 const BENCH = {
@@ -75,25 +72,22 @@ test("a component's script gets the root's TypeScript blocks", async () => {
     "@typescript-eslint/no-unused-vars",
   ];
   const module = await severities(PACKAGE.module, carried);
+  const component = await severities(PACKAGE.component, carried);
 
-  for (const file of [PACKAGE.component, EXAMPLE.svelte, EXAMPLE.vue]) {
-    const component = await severities(file, carried);
-
-    for (const rule of carried) {
-      assert.ok(module[rule] > 0, `${rule} is not on for ${PACKAGE.module}`);
-      assert.equal(component[rule], module[rule], `${rule} for ${file}`);
-    }
+  for (const rule of carried) {
+    assert.ok(module[rule] > 0, `${rule} is not on for ${PACKAGE.module}`);
+    assert.equal(component[rule], module[rule], rule);
   }
 });
 
 test("the svelte exceptions reach a svelte component and nothing else", async () => {
   const rules = Object.keys(SVELTE_EXCEPTIONS);
 
-  for (const file of [PACKAGE.component, EXAMPLE.svelte, BENCH.component]) {
+  for (const file of [PACKAGE.component, BENCH.component]) {
     assert.deepEqual(await severities(file, rules), SVELTE_EXCEPTIONS, file);
   }
 
-  for (const file of [PACKAGE.module, PACKAGE.runes, EXAMPLE.vue]) {
+  for (const file of [PACKAGE.module, PACKAGE.runes]) {
     const other = await severities(file, rules);
 
     assert.equal(other["svelte/prefer-const"], undefined, file);
@@ -105,31 +99,22 @@ test("the svelte exceptions reach a svelte component and nothing else", async ()
 });
 
 test("a rule a path block relaxes for `.ts` is relaxed for that path's components", async () => {
-  // The examples block, and the benchmark apps' block.
-  const examples = [
-    "@typescript-eslint/no-misused-promises",
-    "unicorn/name-replacements",
-    "@typescript-eslint/no-unsafe-assignment",
-  ];
+  // The benchmark apps' block.
   const bench = ["import-x/order", "prefer-template", "id-length"];
+  const expected = await severities(BENCH.module, bench);
 
-  for (const [module, components, rules] of [
-    [EXAMPLE.module, [EXAMPLE.svelte, EXAMPLE.vue], examples],
-    [BENCH.module, [BENCH.component], bench],
-  ]) {
-    const expected = await severities(module, rules);
-
-    for (const rule of rules) {
-      assert.equal(expected[rule], 0, `${rule} is not relaxed for ${module}`);
-    }
-
-    for (const file of components) {
-      assert.deepEqual(await severities(file, rules), expected, file);
-    }
+  for (const rule of bench) {
+    assert.equal(
+      expected[rule],
+      0,
+      `${rule} is not relaxed for ${BENCH.module}`,
+    );
   }
 
+  assert.deepEqual(await severities(BENCH.component, bench), expected);
+
   // A relaxation stays on its path: the package's component keeps the rules.
-  const strict = await severities(PACKAGE.component, [...examples, ...bench]);
+  const strict = await severities(PACKAGE.component, bench);
 
   for (const [rule, severity] of Object.entries(strict)) {
     assert.ok(severity > 0, `${rule} is off for ${PACKAGE.component}`);
@@ -139,11 +124,7 @@ test("a rule a path block relaxes for `.ts` is relaxed for that path's component
 test("⚠ one `extraFileExtensions` for every file the project service parses", async () => {
   // A different value between two files reloads every project: set on
   // components alone, a run mixing them with `.ts` files is many times slower.
-  const files = [
-    ...Object.values(PACKAGE),
-    ...Object.values(EXAMPLE),
-    ...Object.values(BENCH),
-  ];
+  const files = [...Object.values(PACKAGE), ...Object.values(BENCH)];
   const values = await Promise.all(
     files.map(
       async (file) =>
@@ -153,7 +134,7 @@ test("⚠ one `extraFileExtensions` for every file the project service parses", 
   );
 
   for (const [index, value] of values.entries()) {
-    assert.deepEqual(value, [".svelte", ".vue"], files[index]);
+    assert.deepEqual(value, [".svelte"], files[index]);
   }
 });
 
@@ -161,12 +142,7 @@ test("⚠ a component parser gets the parser module, which svelte-eslint-parser 
   // Handed a smaller object, svelte-eslint-parser parses an empty file with no
   // `tsconfigRootDir` to tell. Under `benchmarks/` that parse fails, and the
   // component is read as JavaScript, without the rune types.
-  for (const file of [
-    PACKAGE.component,
-    EXAMPLE.svelte,
-    EXAMPLE.vue,
-    BENCH.component,
-  ]) {
+  for (const file of [PACKAGE.component, BENCH.component]) {
     const { parser } = (await configOf(file)).languageOptions.parserOptions;
 
     for (const member of [
@@ -186,7 +162,7 @@ test("⚠ import-x/no-duplicates is off for a svelte file", async () => {
   // Every `svelte/*` subpath resolves to one declaration file, so the rule's
   // fix merges `svelte/transition` and `svelte/easing` into an import that
   // does not exist.
-  for (const file of [PACKAGE.component, PACKAGE.runes, EXAMPLE.svelte]) {
+  for (const file of [PACKAGE.component, PACKAGE.runes, BENCH.component]) {
     assert.deepEqual(
       await severities(file, ["import-x/no-duplicates"]),
       { "import-x/no-duplicates": 0 },
@@ -195,7 +171,7 @@ test("⚠ import-x/no-duplicates is off for a svelte file", async () => {
   }
 
   assert.equal(
-    (await severities(EXAMPLE.module, ["import-x/no-duplicates"]))[
+    (await severities(PACKAGE.module, ["import-x/no-duplicates"]))[
       "import-x/no-duplicates"
     ] > 0,
     true,

@@ -48,7 +48,15 @@ jobs:
         run: node scripts/examples-plan.mjs --missing-lint
 
       - name: Lint
+        id: lint
         run: pnpm --dir examples -r --no-bail run lint:example
+
+      # What the config gives each component kind, which a green lint cannot
+      # show (examples/tests/component-lint-config.test.mjs). Runs after a red
+      # lint too, but not when the lint never ran.
+      - name: Lint config
+        if: ${{ !cancelled() && steps.lint.outcome != 'skipped' }}
+        run: pnpm --dir examples run test:lint-config
 
   examples:
     name: Build & Test Examples

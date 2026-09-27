@@ -24,7 +24,7 @@
       "dependsOn": ["^bundle"],
       "outputs": ["dist/**"],
       "inputs": [
-        "src/**/*.{ts,tsx,vue,svelte}",
+        "src/**/*.{ts,tsx,svelte}",
         "../../shared/**/*.ts",
         "tsdown.*",
         "rollup.*",
@@ -41,38 +41,8 @@
       "cache": true
     },
     "build": {
-      "dependsOn": [
-        "^bundle",
-        "bundle",
-        "test",
-        "test:properties",
-        "lint",
-        "lint:example"
-      ],
-      "inputs": [
-        "src/**/*.{ts,tsx,vue,svelte,html,css}",
-        "index.html",
-        "vite.config.*",
-        "angular.json",
-        "tsconfig.json",
-        "tsconfig.app.json",
-        "package.json"
-      ],
-      "outputs": ["dist/**"],
-      "cache": true
-    },
-    "test:e2e": {
-      "dependsOn": ["^bundle", "build"],
-      "outputs": [],
-      "inputs": [
-        "src/**/*.{ts,tsx,vue,svelte}",
-        "e2e/**/*.{ts,tsx}",
-        "playwright.config.*",
-        "index.html",
-        "vite.config.*",
-        "package.json"
-      ],
-      "outputLogs": "errors-only",
+      "dependsOn": ["^bundle", "bundle", "test", "test:properties", "lint"],
+      "inputs": ["src/**/*.{ts,tsx,svelte}", "tsconfig.json", "package.json"],
       "cache": true
     },
     "test:stress": {
@@ -120,7 +90,7 @@
       "dependsOn": ["^type-check"],
       "outputs": [],
       "inputs": [
-        "**/*.{ts,tsx,js,jsx,svelte,vue}",
+        "**/*.{ts,tsx,js,jsx,svelte}",
         "../../shared/**/*.ts",
         "../../scripts/lib/**",
         "!dist/**",
@@ -131,24 +101,11 @@
       "outputLogs": "errors-only",
       "cache": true
     },
-    "lint:example": {
-      "dependsOn": ["^bundle"],
-      "outputs": [],
-      "inputs": [
-        "**/*.{ts,tsx,mts,cts,js,jsx,cjs,svelte,vue}",
-        "**/tsconfig*.json",
-        "package.json",
-        "!dist/**",
-        "!**/node_modules/**"
-      ],
-      "outputLogs": "errors-only",
-      "cache": true
-    },
     "lint:bench": {
       "dependsOn": ["^bundle"],
       "outputs": [],
       "inputs": [
-        "**/*.{ts,tsx,mts,cts,js,jsx,cjs,svelte,vue}",
+        "**/*.{ts,tsx,mts,cts,js,jsx,cjs,svelte}",
         "**/tsconfig*.json",
         "eslint.config.*",
         "package.json",
@@ -161,7 +118,7 @@
     "lint:fix": {
       "outputs": [],
       "inputs": [
-        "**/*.{ts,tsx,js,jsx,svelte,vue}",
+        "**/*.{ts,tsx,js,jsx,svelte}",
         "../../shared/**/*.ts",
         "../../scripts/lib/**",
         "!dist/**",
@@ -175,7 +132,7 @@
       "dependsOn": ["^type-check"],
       "outputs": [],
       "inputs": [
-        "**/*.{ts,tsx,vue,svelte}",
+        "**/*.{ts,tsx,svelte}",
         "../../shared/**/*.ts",
         "../../scripts/lib/**",
         "!dist/**",

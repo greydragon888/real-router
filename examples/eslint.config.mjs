@@ -1456,8 +1456,8 @@ const blocks = tsEslint.config(
       // outside such a list does not merely go unchecked: it aborts the whole
       // run on the first matching file with "you have used a rule which
       // requires type information". `no-array-delete` did exactly that, and
-      // this mask matches 464 tracked files — every example's `*.config.ts`,
-      // the four Angular `app.config.ts` app sources, and 46 package configs.
+      // this mask matches every example's `*.config.ts` and the Angular
+      // `app.config.ts` app sources.
       ...tsEslint.configs.disableTypeChecked.rules,
 
       "import-x/no-default-export": "off",

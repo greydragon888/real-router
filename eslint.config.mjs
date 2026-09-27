@@ -24,7 +24,6 @@ import security from "eslint-plugin-security";
 import tsParser from "@typescript-eslint/parser";
 import sveltePlugin from "eslint-plugin-svelte";
 import svelteParser from "svelte-eslint-parser";
-import vueParser from "vue-eslint-parser";
 
 const gitignorePath = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -32,9 +31,9 @@ const gitignorePath = path.resolve(
 );
 
 // ============================================
-// COMPONENTS — a .svelte or .vue file is TypeScript with markup (#2556)
+// COMPONENTS — a .svelte file is TypeScript with markup (#2556)
 // ============================================
-const COMPONENT_EXTENSIONS = ["svelte", "vue"];
+const COMPONENT_EXTENSIONS = ["svelte"];
 
 // ⚠ One value for every file the project service parses. typescript-eslint
 // reloads every project whenever `extraFileExtensions` differs from the
@@ -133,8 +132,6 @@ const blocks = tsEslint.config(
     "**/*.mjs", // JS config files - no TypeScript type-checking needed
     "cz.config.js", // cz-git configuration
     ".changeset/**", // Changesets configuration and markdown files
-    "**/e2e/**", // Playwright e2e tests — not type-checked by ESLint
-    "**/e2e-recording/**", // Playwright recording specs — the same reason
   ]),
 
   // ============================================
@@ -1342,66 +1339,6 @@ const blocks = tsEslint.config(
   },
 
   // ============================================
-  // 13.1 EXAMPLES (demo apps — relaxed library-grade rules)
-  // ============================================
-  // Examples are demonstration apps, not library code.
-  // Many library-grade rules (default exports for framework boilerplate,
-  // explicit module boundary types on demo helpers, etc.) add noise without value.
-  {
-    files: ["examples/**/*.ts", "examples/**/*.tsx"],
-    rules: {
-      // Default exports are idiomatic for framework entry components.
-      "import-x/no-default-export": "off",
-      // Demo-grade signatures — return-type inference is fine.
-      "@typescript-eslint/explicit-module-boundary-types": "off",
-      "@typescript-eslint/explicit-function-return-type": "off",
-      // Demo data uses simple loops/conditions; cognitive complexity bumps are fine.
-      "sonarjs/cognitive-complexity": "off",
-      // Demo IDs (e.g. `id`) are fine.
-      "id-length": "off",
-      // Demos use Math.random for data generation — not security-sensitive.
-      "sonarjs/pseudo-random": "off",
-      // Loader factories `() => (params) => ...` and similar nested
-      // arrow patterns are idiomatic for the router API.
-      "unicorn/consistent-function-scoping": "off",
-      // Demo Promise chains in click handlers / hooks frequently pattern as
-      // `void promise` — the explicit `void` is intentional, the rule
-      // misreads it.
-      "@typescript-eslint/no-floating-promises": "off",
-      // React/Vue event handlers naturally take async callbacks.
-      "@typescript-eslint/no-misused-promises": "off",
-      // `params.id as string` is a frequent demo idiom for nested params
-      // typed as Params (Record<string, unknown>).
-      "@typescript-eslint/no-unsafe-argument": "off",
-      "@typescript-eslint/no-unsafe-assignment": "off",
-      // Demo data structures use mutable arrays/objects — readonly mods
-      // would clutter the examples without illustrating router behavior.
-      "sonarjs/prefer-read-only-props": "off",
-      // Demo abbreviations (id, e, ev) are fine in component bodies.
-      "unicorn/name-replacements": "off",
-    },
-  },
-
-  // ============================================
-  // 13.2 ANGULAR COMPONENT FILES (decorator-only classes)
-  // ============================================
-  // Angular components are decorator-driven; the class itself is a metadata
-  // anchor for @Component(). Many lint rules trip false positives here.
-  {
-    files: ["examples/web/angular/**/*.component.ts"],
-    rules: {
-      // @Component metadata classes legitimately have no instance members.
-      "@typescript-eslint/no-extraneous-class": "off",
-      // Field decorators (signal(), computed(), input()) define members in
-      // declaration order — re-ordering them obscures the component shape.
-      "@typescript-eslint/member-ordering": "off",
-      // Angular signal types (Signal<T>, InputSignal<T>) read as
-      // "always-truthy" to TS, but the framework wraps them in callable values.
-      "@typescript-eslint/no-unnecessary-condition": "off",
-    },
-  },
-
-  // ============================================
   // 13.3 NON-SHIPPED CODE — v66/v67 unicorn carve-out
   // ============================================
   // Tests, benchmarks, and test helpers (ANY file name) — see the
@@ -1454,8 +1391,7 @@ const blocks = tsEslint.config(
       // outside such a list does not merely go unchecked: it aborts the whole
       // run on the first matching file with "you have used a rule which
       // requires type information". `no-array-delete` did exactly that, and
-      // this mask matches 464 tracked files — every example's `*.config.ts`,
-      // the four Angular `app.config.ts` app sources, and 46 package configs.
+      // this mask matches every package's `*.config.ts`.
       ...tsEslint.configs.disableTypeChecked.rules,
 
       "import-x/no-default-export": "off",
@@ -1480,7 +1416,7 @@ const blocks = tsEslint.config(
   },
 
   // ============================================
-  // 15.2 COMPONENTS (.svelte, .vue)
+  // 15.2 COMPONENTS (.svelte)
   // ============================================
   // Every block above that addresses `*.ts` addresses a component as well
   // (`withComponentFiles`). These give a component its parser and say what
@@ -1524,17 +1460,6 @@ const blocks = tsEslint.config(
       "@typescript-eslint/no-meaningless-void-operator": "off",
       "sonarjs/void-use": "off",
       "import-x/no-self-import": "off",
-    },
-  },
-  {
-    files: ["**/*.vue"],
-    languageOptions: {
-      parser: vueParser,
-      parserOptions: {
-        parser: tsParser,
-        extraFileExtensions,
-        sourceType: "module",
-      },
     },
   },
 

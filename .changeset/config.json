@@ -10,7 +10,7 @@
   "access": "public",
   "baseBranch": "master",
   "updateInternalDependencies": "patch",
-  "ignore": ["*-example", "*-examples-shared"],
+  "ignore": [],
   "privatePackages": {
     "version": true,
     "tag": false

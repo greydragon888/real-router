@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test:lint-config": "node --test tests/*.test.mjs",
     "use-checkout": "node ../scripts/checkout-tarballs.mjs ."
   },
   "devDependencies": {

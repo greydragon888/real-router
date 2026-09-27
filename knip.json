@@ -200,11 +200,11 @@
     }
   },
   "ignoreWorkspaces": [
-    "examples/**",
     "benchmarks"
   ],
   "ignore": [
-    "benchmarks/**"
+    "benchmarks/**",
+    "examples/**"
   ],
   "ignoreDependencies": [
     "@stryker-mutator/api",
