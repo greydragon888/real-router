@@ -1,3 +1,5 @@
+import { readdirSync } from "node:fs";
+
 import { defineConfig } from "tsdown";
 
 import type { UserConfig } from "tsdown";
@@ -37,6 +39,15 @@ export interface CreateConfigOptions {
 }
 
 /**
+ * Whether the package being built symlinks a `shared/` directory into its
+ * `src/`. A package's `bundle` script runs tsdown from that package's directory.
+ */
+const hasSharedSymlink = (): boolean =>
+  readdirSync("src", { withFileTypes: true }).some((entry) =>
+    entry.isSymbolicLink(),
+  );
+
+/**
  * Creates tsdown configuration for ESM and CJS formats
  *
  * Generates dual format output with co-located type definitions.
@@ -73,7 +84,17 @@ export const createConfig = (opts: CreateConfigOptions = {}): UserConfig[] => {
 
     // Generate type definitions with declaration maps (.d.ts.map)
     // Maps .d.ts → .ts source for IDE go-to-definition (#423)
-    dts: { sourcemap: true },
+    //
+    // ⚠ A package whose `src/` symlinks into `shared/` resolves declaration
+    // imports with `tsc`: `oxc` follows the symlink to `shared/…`, the
+    // TypeScript program holds the path through it, and rolldown-plugin-dts
+    // then builds one program per shared module. `tsc` resolution is slower
+    // where nothing is symlinked — core's unbundled pass — so the rest keep
+    // `oxc`.
+    dts: {
+      sourcemap: true,
+      ...(hasSharedSymlink() && { resolver: "tsc" as const }),
+    },
 
     // Sourcemaps
     sourcemap,

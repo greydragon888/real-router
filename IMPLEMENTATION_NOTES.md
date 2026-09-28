@@ -12651,3 +12651,18 @@ Measured after the push: the post-merge run on `d32b27d8d` (00:57–01:15 UTC) e
 - On the host, `validate` passed before the swap, and the deployed file's sha256 matches the repository's. The previous config is `otel-collector.yml.bak-20260928-scm-branch`. Recreating the container reset the accumulator, which PromQL reads as a counter reset.
 - A probe sent through the public endpoint with `9999/merge` and `ci.job=telemetry-branch-probe` reached Grafana as `turbo_scm_branch="pr"`.
 - Series written before 2026-09-28 10:53 UTC keep their PR refs, so a query reaching back past that point still needs `max_over_time` for them.
+
+## Packages with symlinked `shared/` sources resolve declarations with `tsc` (2026-09-28)
+
+**Problem.** The turbo telemetry showed `bundle` in two populations: the eight tsdown packages whose `src/` symlinks into `shared/` — browser-, hash-, navigation-, ssr-data- and rsc-server-plugin, react, preact, vue — took 24–58 s on a CI cache miss, the other twelve 3.6–7.2 s. Over 24–28.09 their misses cost 97.9 minutes in 162 runs. Locally hash-plugin took 12.8 s against logger-plugin's 1.2 s, and its JS bundle 19 ms of that.
+
+`DEBUG=rolldown-plugin-dts:*` showed the cause: 33 TypeScript programs for hash-plugin, 32 of them one per `shared/browser-env` module (16 modules × 2 formats), 9.3 s together. rolldown-plugin-dts 0.28.5 reuses a program only when `program.getSourceFile(id)` finds the module. Its default resolver, oxc, follows the symlink to `shared/…`, while TypeScript keeps a relative import under the path through the symlink, `src/browser-env/…`, so the lookup misses and a program is built for every such module.
+
+**Solution.** `createConfig` gives the declaration build `resolver: "tsc"` when the package's `src/` holds a symlink. TypeScript's resolution keeps the symlink path, and every module resolves into the entry's program.
+
+**Why — measured.**
+
+- With the change in `tsdown.base.ts`, the eight build in 1.2–2.0 s locally, down from 5.9–12.5 s. One TypeScript program per build, counted on one package per shared area: hash-plugin 33 → 1, react 15 → 1, ssr-data-plugin 17 → 1.
+- Their JS is unchanged. The declarations differ in `//#region` paths and chunk hash names, and the maps in `sources`, `../../../../shared/…` → `../../src/…`, with `mappings` and `names` equal. The other twelve, core included, produce an identical `dist`.
+- Not global, measured: `tsc` resolution takes core from 1.8 s to 5.5 s over its unbundled declaration pass, with an identical `dist`. The condition selects exactly the eight.
+- Three cheaper fixes changed nothing: `shared/…` in the tsconfig `include` (with entries set, a program's roots are the entries, not the tsconfig's files), `preserveSymlinks` (−2 s, still 33 programs), and rolldown `resolve.symlinks: false` (the plugin resolves with its own resolver).
