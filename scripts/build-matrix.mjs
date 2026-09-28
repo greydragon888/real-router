@@ -27,6 +27,10 @@
 //    and `mode=leaf` never fires (proven on an rx-only commit, companion §D).
 //    Explicit `--base origin/master --head HEAD` also fixes the bare-`--affected`
 //    footgun (its auto-detected base is `main`, but this repo is on `master`).
+//    ⚠ With `futureFlags.affectedUsingTaskInputs` on, turbo 2.11 answers this
+//    query with every workspace for a one-package edit, so no PR routes to leaf.
+//    The flag is off: IMPLEMENTATION_NOTES "turbo 2.11: `affectedUsingTaskInputs`
+//    is off".
 //
 // 2. MEMBERSHIP (which packages become shards) — `deriveMembership(runMembership
 //    Query())`, the INPUT-AWARE `turbo run … --filter='...[origin/master]'

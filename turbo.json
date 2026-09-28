@@ -3,7 +3,7 @@
   "futureFlags": {
     "globalConfiguration": true,
     "errorsOnlyShowHash": true,
-    "affectedUsingTaskInputs": true,
+    "affectedUsingTaskInputs": false,
     "watchUsingTaskInputs": true,
     "filterUsingTasks": true,
     "experimentalObservability": true

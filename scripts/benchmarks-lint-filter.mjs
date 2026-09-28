@@ -19,6 +19,11 @@
 // `eslint.config.mjs` or `turbo.json`, a lockfile change such as an ESLint
 // bump, or a reason a later turbo adds.
 //
+// ⚠ With `futureFlags.affectedUsingTaskInputs` on, turbo 2.11 reports
+// `router-benchmarks` as `DependencyChanged` even when the range edits it, and
+// nothing lints. The flag is off: IMPLEMENTATION_NOTES "turbo 2.11:
+// `affectedUsingTaskInputs` is off".
+//
 // ⚠ Package-level, not `affectedTasks`. Measured on turbo 2.10.13, a one-line
 // edit to one example reports all 143 `lint:example` tasks as `TaskFileChanged`
 // naming that file, and a task keeps the first reason it is given — so a

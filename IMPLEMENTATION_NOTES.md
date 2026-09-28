@@ -3682,7 +3682,7 @@ Uses syncpack v14 (Rust rewrite). `syncpack.config.mjs` enforces:
 
 ## Turbo Configuration
 
-Uses turbo v2.9.6.
+The version in use is the `turbo` pin in the root `package.json`.
 
 **v2.9 migration:** Adopted `futureFlags` for the new global configuration schema:
 
@@ -12517,3 +12517,27 @@ The `@angular/build>vite` comments of all three workspaces stop naming the vite 
 **Why — measured, in a clean worktree.** On `b6cb5c547`, which edited `benchmarks/eslint.config.mjs`, the old filter planned nothing and the new one plans `router-benchmarks` (`FileChanged`). A commit touching only `packages/core`, one touching only `packages/react`, and one touching only `.github/dependabot.yml` plan nothing under either.
 
 ⚠ **`turbo query affected` counts uncommitted changes, even with an explicit `--head`.** Run in a working tree that edited `benchmarks/CLAUDE.md`, every range above reported `router-benchmarks` as `FileChanged`, blaming that file. CI checks out a clean tree, so its plans are unaffected; a local measurement of the filter needs a clean one.
+
+## turbo 2.11: `affectedUsingTaskInputs` is off (2026-09-28)
+
+**Problem.** With `futureFlags.affectedUsingTaskInputs` on, turbo 2.11 answers `turbo query affected --packages` for an edit to one package with every workspace of the root. Both scripts that read the query then plan wrong, and CI stays green either way:
+
+- `build-matrix.mjs` routes the pull request to the sharded path, ten shards, instead of a leaf job for the package;
+- `benchmarks-lint-filter.mjs` receives `router-benchmarks` as `DependencyChanged`, one of its LOCAL_REASONS, even when the pull request edits `benchmarks/`, so no `lint:bench` runs.
+
+On 2.10.13 the flag leaves the query alone. Dependabot's turbo group proposed 2.11.x seven times, #2585 to #2620, and each was closed by hand.
+
+**Solution.** The flag is `false`, and `turbo` and `eslint-config-turbo` move to 2.11.4. Changing a future flag moves the global hash, so the first run after this commit misses the cache everywhere.
+
+**Why — measured on 2026-09-28**, with the 2.10.13 and 2.11.4 binaries on one clean tree (`17590a399`), each case a commit, and both outputs fed through `deriveAffected`, `deriveMembership`, `buildPlan` and `planBenchmarksLint`:
+
+- flag on, 2.11.4: an edit to a validation-plugin test, a logger-plugin source, `scripts/lib` or `benchmarks/` reports 25 workspaces and plans `sharded` with 10 shards. 2.10.13 plans a leaf — `validation-plugin` with `react`, `logger-plugin`, and an empty filter for the other two — and lints `router-benchmarks` for the `benchmarks/` edit;
+- flag off, 2.11.4: eleven cases — those four, a source with `IMPLEMENTATION_NOTES.md`, `packages/core/src`, `shared/`, `vitest.config.common.mts`, a root doc, a package README and a lockfile change — plan exactly as on 2.10.13: the reported set and its reasons, leaf or sharded, the filter, the shards, the membership set and the bench lint. On 2.10.13 the flag changes none of them;
+- 225 of 225 task hashes and `globalCacheInputs` are equal between the binaries, and the `--dry=json` schema is unchanged. `turbo query` output gains a top-level `version` key (vercel/turborepo#14229); both scripts read `.data`. Two `--filter` flags select the same set; 2.11.0 and 2.11.1 broke repeatable flags, and #14106 fixed them. A restore from the local cache gives the same `dist` on both;
+- `eslint-config-turbo` 2.11.4 is file-for-file identical to 2.10.13, and `eslint-plugin-turbo` differs only in its version string.
+
+⚠ **A green CI on turbo's own bump says nothing about the planners.** A lockfile change sends a pull request down the full matrix under either setting: #2616 (2.11.4, flag on) ran 26 checks and passed them all.
+
+⚠ **This defers the question; it does not settle it.** turbo's configuration reference describes `futureFlags` as behaviour that becomes the default, and its 2.9 release post as 3.0's. On 3.0 the flag cannot be turned off, and both scripts need another answer to "what did this pull request change".
+
+Not measured: the OTLP export. The variable and flag names are the same in both binaries; the metrics of the first post-merge run after this commit show whether they still arrive.
