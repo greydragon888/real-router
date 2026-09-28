@@ -666,7 +666,7 @@ describe("idempotence: normalizeBase is a projection", () => {
         .string({ minLength: 0, maxLength: 20 })
         // Drop bases that safeBaseRule would reject — validation is out of scope.
         // eslint-disable-next-line no-control-regex -- reject control chars
-        .filter((s) => !/[ -]/.test(s))
+        .filter((s) => !/[\u0000-\u001F\u007F]/.test(s))
         .filter((s) => !s.split("/").includes("..")),
     ],
     { numRuns: NUM_RUNS.standard },

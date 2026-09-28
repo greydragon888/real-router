@@ -348,7 +348,7 @@ describe("router.start() - path string scenarios", () => {
 
     // FINDING (#14): a NUL byte in the URL is NOT rejected or sanitized — it is
     // silently accepted as a route param value (round-trips into state.params.id
-    // as " ", with state.path percent-encoded to "/items/%00"). The matcher
+    // as "\0", with state.path percent-encoded to "/items/%00"). The matcher
     // treats it as an ordinary segment character. Documented here as current
     // behavior; whether this should be rejected is a separate question.
     it("accepts a NUL byte as a route param value (current behavior, allowNotFound false)", async () => {

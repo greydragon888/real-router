@@ -222,15 +222,15 @@ function aggregate(mutants, { survivedOnly } = {}) {
   // group by file → line
   const byFileLine = new Map();
   for (const m of survivors) {
-    const key = `${m.file} ${m.line}`;
+    const key = `${m.file}\0${m.line}`;
     if (!byFileLine.has(key)) byFileLine.set(key, []);
     byFileLine.get(key).push(m);
   }
 
   let lastFile = "";
   const sortedKeys = [...byFileLine.keys()].sort((a, b) => {
-    const [fa, la] = a.split(" ");
-    const [fb, lb] = b.split(" ");
+    const [fa, la] = a.split("\0");
+    const [fb, lb] = b.split("\0");
     return fa === fb ? Number(la) - Number(lb) : fa < fb ? -1 : 1;
   });
 
