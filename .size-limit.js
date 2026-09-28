@@ -1,5 +1,15 @@
 const ignoreCore = ["@real-router/core"];
 
+// ⚑ Adapters and the SSR plugins import these packages instead of inlining
+// them, and each has an entry of its own below. Bundled into a dependent's
+// measurement as well, one change to route-utils would move its own row and
+// every dependent's, and the PR comment's Total would count it once per row.
+const ignoreShared = [
+  "@real-router/sources",
+  "@real-router/route-utils",
+  "@real-router/ssr-utils",
+];
+
 const esm = (name, limit, ignore) => ({
   name: `@real-router/${name} (ESM)`,
   path: `packages/${name}/dist/esm/index.mjs`,
@@ -48,34 +58,42 @@ export default [
   },
 
   // ── UI Bindings ───────────────────────────────────────────────────
-  esm("react", "9 kB", ["react", "react-dom", ...ignoreCore]),
-  esm("preact", "8.9 kB", [
+  esm("react", "6.5 kB", [
+    "react",
+    "react-dom",
+    ...ignoreCore,
+    ...ignoreShared,
+  ]),
+  esm("preact", "6.4 kB", [
     "preact",
     "preact/hooks",
     "preact/compat",
     ...ignoreCore,
+    ...ignoreShared,
   ]),
-  esm("solid", "8.7 kB", [
+  esm("solid", "6.8 kB", [
     "solid-js",
     "solid-js/store",
     "solid-js/web",
     ...ignoreCore,
+    ...ignoreShared,
   ]),
-  esm("vue", "10 kB", ["vue", ...ignoreCore]),
+  esm("vue", "7.6 kB", ["vue", ...ignoreCore, ...ignoreShared]),
   {
     name: "@real-router/angular (FESM2022)",
     path: "packages/angular/dist/fesm2022/real-router-angular.mjs",
-    limit: "11 kB",
+    limit: "8.1 kB",
     ignore: [
       "@angular/core",
       "@angular/common",
       ...ignoreCore,
       "@real-router/core/api",
+      ...ignoreShared,
     ],
   },
   // Note: @real-router/svelte uses svelte-package (individual files),
   // not a single ESM bundle — cannot be measured by size-limit's bundler.
-  esm("sources", "2.8 kB", ignoreCore),
+  esm("sources", "2.8 kB", [...ignoreCore, ...ignoreShared]),
   esm("rx", "1.5 kB", ignoreCore),
 
   // ── Plugins ───────────────────────────────────────────────────────
@@ -94,8 +112,8 @@ export default [
   esm("preload-plugin", "1.3 kB", ignoreCore),
   esm("search-schema-plugin", "1.5 kB", ignoreCore),
   esm("validation-plugin", "8.7 kB", ignoreCore),
-  esm("ssr-data-plugin", "2.7 kB", ignoreCore),
-  esm("rsc-server-plugin", "2.7 kB", ignoreCore),
+  esm("ssr-data-plugin", "2.7 kB", [...ignoreCore, ...ignoreShared]),
+  esm("rsc-server-plugin", "2.7 kB", [...ignoreCore, ...ignoreShared]),
 
   // ── Utilities ─────────────────────────────────────────────────────
   esm("route-utils", "950 B"),

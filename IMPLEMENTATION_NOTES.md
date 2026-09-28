@@ -12653,6 +12653,20 @@ Measured after the push: the post-merge run on `d32b27d8d` (00:57–01:15 UTC) e
 - `CI=1` bundles of eight packages raised no new warning. rolldown 1.2.9 adds `MODULE_LEVEL_DIRECTIVE`, and no source file carries a module-level directive.
 - `scripts/codspeed-gate.mjs` answers RUN for the bump: the rolldown bindings are measured dependencies through vite.
 
+## size-limit measures each package without the `@real-router` packages it imports (2026-09-28)
+
+**Problem.** The adapters and the SSR plugins import `@real-router/sources`, `@real-router/route-utils` and `@real-router/ssr-utils` instead of inlining them, and each of the three has an entry of its own in `.size-limit.js`. Only core was external to a measurement, so size-limit bundled the other three into every dependent: one change to them moved its own row and every dependent's, and the PR comment's Total counted it once per row. With about 350 B appended to a package's `dist`, route-utils moved 7 rows and the Total by 2,469 B, sources 6 rows and 2,081 B, ssr-utils 4 rows and 1,424 B.
+
+**Solution.** `.size-limit.js` adds `ignoreShared`, the three names, to the ignore list of the eight entries that import them: the five adapters, `sources`, `ssr-data-plugin` and `rsc-server-plugin`. The same probes now move one row each, and the Total by that package's own delta: 379, 355 and 361 B. The five adapter limits follow the rule of the size-limit 14 section — about 6 % headroom, at least +120 B, rounded up to 0.1 kB: react 9 → 6.5 kB, preact 8.9 → 6.4, solid 8.7 → 6.8, vue 10 → 7.6, angular 11 → 8.1.
+
+**Why — measured.**
+
+- On the same `dist`, only those eight entries move. The adapters drop by 1,933 to 2,726 B. `sources` and the two SSR plugins move by −1 to +10 B: each takes one function (`areRoutesRelated`, `getHydrationState`), and the external `import` costs about what the inlined function did. The other 17 entries are unchanged, and the Total goes from 146,378 to 134,143 B.
+- An adapter row no longer shows what a consumer of that adapter downloads. Its dependencies are rows of their own, as core has always been.
+- `--ignore-missing`, new in size-limit 14.1.0, does not do this: it drops the checks whose `path` matches no file, and every path here matches.
+- The three names are the whole class today: every `@real-router/*` specifier the 25 measured bundles import, other than core and a package's own subpaths, is one of them. A dependency added between packages later has to join the list by hand.
+- The first pull-request comment measured against a base recorded before this change shows the adapters' drop as a difference. It comes from the configuration, not the code.
+
 ## Pull-request series keep one identity: the collector folds `turbo.scm.branch` (2026-09-28)
 
 **Problem.** turbo stamps every point with `turbo.scm.branch`, and on a pull request that is the merge ref, `<N>/merge`. Each PR therefore wrote series of its own, one or two points long: from 24.09 to 28.09, 3,874 of the 4,336 task series belonged to 17 PR refs. `increase` and `rate` need two points in their window, so every PR query through them came back empty — the first analysis of the telemetry read 0 rows for PR task time, cache and failures, and fell back to `max_over_time` per series. A feature branch's name, `2397-codec-shape`, did the same.
