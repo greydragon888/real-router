@@ -12694,3 +12694,18 @@ Measured after the push: the post-merge run on `d32b27d8d` (00:57–01:15 UTC) e
 - Their JS is unchanged. The declarations differ in `//#region` paths and chunk hash names, and the maps in `sources`, `../../../../shared/…` → `../../src/…`, with `mappings` and `names` equal. The other twelve, core included, produce an identical `dist`.
 - Not global, measured: `tsc` resolution takes core from 1.8 s to 5.5 s over its unbundled declaration pass, with an identical `dist`. The condition selects exactly the eight.
 - Three cheaper fixes changed nothing: `shared/…` in the tsconfig `include` (with entries set, a program's roots are the entries, not the tsconfig's files), `preserveSymlinks` (−2 s, still 33 programs), and rolldown `resolve.symlinks: false` (the plugin resolves with its own resolver).
+
+## turbo 2.11.5: `agentGuidance` is off (2026-09-28)
+
+**Problem.** turbo 2.11.5 adds `agentGuidance` (turborepo#14250), on by default. When turbo detects an AI coding agent — its binary lists `CLAUDECODE` among the variables it looks for — it writes a managed block into the repository-root `AGENTS.md` before repository-scoped commands, and creates the file when it is missing. Every Claude Code session here runs turbo through the git hooks and the `pnpm` scripts. In a scratch worktree with the 2.11.5 package installed, one `turbo run build --dry=json` created a 10-line `AGENTS.md` and printed nothing about it. The file is untracked, and `.husky/pre-push` refuses a push whose working tree is not clean.
+
+**Solution.** The root `turbo.json` sets `"agentGuidance": false`, the opt-out the bundled docs name in `docs/reference/configuration.mdx`; they name no environment variable for it. `turbo` and `eslint-config-turbo` move to 2.11.5 in the same commit, because 2.11.4 rejects the key with `turbo_json_parse_error`.
+
+**Why — measured.**
+
+- With the key, `run` and `query affected` leave no `AGENTS.md`, in the worktree and in the main checkout. The key moves no task hash: the 150 `build` tasks keep one digest with and without it, while a `global.env` edit, the control, moves it.
+- 2.11.5 replaces the CLI parser, `clap` with `usage-rs` (turborepo#14259). The 17 invocation shapes the hooks, the workflows and the scripts use give the same task set, task hashes, `cliArguments` and external-dependency hash under 2.11.4 and 2.11.5, and a different `--shard` after `--` moves the hash. `--output-logs`, `--summarize` and `--concurrency` behave alike in a real run, and a bad flag or value fails the same way on both.
+- Eleven committed windows fed through `deriveAffected`, `deriveMembership`, `buildPlan` and `planBenchmarksLint` plan alike. The lockfile window reports the root workspace as `ConservativeRootLockfileChanged` instead of `FileChanged`; the root declares no `lint:bench` and `build-matrix.mjs` reads no reasons, so no plan changes.
+- All 200 task hashes of `build lint:package lint:types` move with the bump, because the root devDependencies changed: on the old lockfile both binaries hash every task alike. The first run after this commit misses the remote cache, as it does after any root devDependency bump.
+- `eslint-plugin-turbo`'s bundle differs in its version and in the error strings of its bundled `js-yaml` (turborepo#14255); the rest is renamed identifiers. With the key in `turbo.json` a lint run passes, and `turbo/no-undeclared-env-vars` still flags an undeclared variable.
+- `scripts/codspeed-gate.mjs` answers `skip` for the bump, and `RUN` for the jsdom bump used as the control.
