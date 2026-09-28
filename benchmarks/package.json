@@ -37,7 +37,7 @@
     "@angular/build": "~22.2.0",
     "@angular/compiler": "~22.2.0",
     "@angular/compiler-cli": "~22.2.0",
-    "@codspeed/tinybench-plugin": "5.7.1",
+    "@codspeed/tinybench-plugin": "6.0.0-beta.2",
     "@real-router/persistent-params-plugin": "workspace:^",
     "@sveltejs/vite-plugin-svelte": "7.3.0",
     "@types/react": "19.3.0",

@@ -46,8 +46,8 @@ importers:
         specifier: 3.0.3
         version: 3.0.3
       '@codspeed/tinybench-plugin':
-        specifier: 5.7.1
-        version: 5.7.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(tinybench@6.2.0)
+        specifier: 6.0.0-beta.2
+        version: 6.0.0-beta.2(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(tinybench@6.2.0)
       '@commitlint/cli':
         specifier: 21.2.3
         version: 21.2.3(@types/node@24.13.6)(typescript@6.0.3)
@@ -269,8 +269,8 @@ importers:
         specifier: ~22.2.0
         version: 22.2.0(@angular/compiler@22.2.0)(typescript@6.0.3)
       '@codspeed/tinybench-plugin':
-        specifier: 5.7.1
-        version: 5.7.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(tinybench@6.2.0)
+        specifier: 6.0.0-beta.2
+        version: 6.0.0-beta.2(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(tinybench@6.2.0)
       '@real-router/persistent-params-plugin':
         specifier: workspace:^
         version: link:../packages/persistent-params-plugin
@@ -1307,11 +1307,11 @@ packages:
     resolution: {integrity: sha512-y7/yvZ2TPAnR9+jnc00klvNNLkJiXFFrQA/hlLCcxA9a2A4zQIOimyFQ9XfwYKiGD1fb5GY8vbKIIgO8d5Tb2A==}
     engines: {node: '>= 20.12.0'}
 
-  '@codspeed/core@5.7.1':
-    resolution: {integrity: sha512-7mrFkqaY14rXu3XHv3o7bK3btLK0LFRxfeK3bQC8dLduI/Ty9eq8Hv8rx04FAY/onQbRTx3rUUQg5xprYHpATQ==}
+  '@codspeed/core@6.0.0-beta.2':
+    resolution: {integrity: sha512-l/elGsNOwQV/m8PZMK0j7FHRNvFytgeSUUwUFuO6WSDZGYe3uH+da5mMjS1KpRsRElYvshkKrqvnRRqxzWQ/tQ==}
 
-  '@codspeed/tinybench-plugin@5.7.1':
-    resolution: {integrity: sha512-4YZvqqbic55rJrjqawB8wHnKkCklFlHlrTfnLB8/w2EXEJ7XwkFpRDSGYQxV30K4K6llRLc0aYvYy1WwgCqVBw==}
+  '@codspeed/tinybench-plugin@6.0.0-beta.2':
+    resolution: {integrity: sha512-WNqsTuiBSGk/bNKwDsRCYIxVq44cfU0ZIBHyLKD8uk7HBNPz+dwN5zCbcy6O0iNwIFOt3u1Co2nKCW9Nm9mzNA==}
     peerDependencies:
       tinybench: '>=4.0.1'
 
@@ -8261,7 +8261,7 @@ snapshots:
       fast-wrap-ansi: 0.2.2
       sisteransi: 1.0.5
 
-  '@codspeed/core@5.7.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)':
+  '@codspeed/core@6.0.0-beta.2(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)':
     dependencies:
       axios: 1.20.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       find-up: 6.3.0
@@ -8272,9 +8272,9 @@ snapshots:
       - debug
       - supports-color
 
-  '@codspeed/tinybench-plugin@5.7.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(tinybench@6.2.0)':
+  '@codspeed/tinybench-plugin@6.0.0-beta.2(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(tinybench@6.2.0)':
     dependencies:
-      '@codspeed/core': 5.7.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
+      '@codspeed/core': 6.0.0-beta.2(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       tinybench: 6.2.0
     transitivePeerDependencies:
       - debug

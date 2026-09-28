@@ -14,7 +14,7 @@
  * data under the SAME options is realistic polymorphism, not megamorphism
  * (RFC §9.2). The process-per-file runner (`run.ts`) keeps forms isolated.
  */
-import { argv } from "node:process";
+import { argv, env, execArgv } from "node:process";
 import { setImmediate as nextTask } from "node:timers/promises";
 
 import { withCodSpeed } from "@codspeed/tinybench-plugin";
@@ -49,6 +49,46 @@ export function isMain(moduleFilename: string): boolean {
 }
 
 /**
+ * Refuses a `simulation` run that an optimizing tier can reach.
+ *
+ * `--no-opt` turns off TurboFan only. Maglev is on from Node 24 and, under
+ * `--predictable`, compiles on the main thread, so a tier-up that lands in the
+ * plugin's single measured call is measured with it. `@codspeed/core` adds
+ * `--no-maglev` to the flags the runner injects and only WARNS when one is
+ * missing: without this check a failed injection would measure the compiler
+ * and say nothing. See IMPLEMENTATION_NOTES "CodSpeed simulation runs without
+ * Maglev".
+ *
+ * ⚠ It runs here, after the plugin import, and not at the top of an entry: the
+ * runner first starts the command without flags to learn them, and that pass
+ * exits inside the plugin's import (`tryIntrospect`). A check before that
+ * import fails the pass the flags come from.
+ *
+ * The two variables are the CodSpeed runner's, and no turbo task runs this
+ * file, so `turbo.json` does not declare them.
+ */
+function assertNoOptimizingTier(): void {
+  const mode = env.CODSPEED_RUNNER_MODE;
+
+  if (
+    env.CODSPEED_ENV === undefined ||
+    (mode !== "simulation" && mode !== "instrumentation")
+  ) {
+    return;
+  }
+
+  const missing = ["--no-opt", "--no-maglev"].filter(
+    (flag) => !execArgv.includes(flag),
+  );
+
+  if (missing.length > 0) {
+    throw new Error(
+      `[codspeed] simulation without ${missing.join(" ")}: an optimizing tier would compile inside the measured call`,
+    );
+  }
+}
+
+/**
  * Creates a CodSpeed-instrumented tinybench `Bench`. Under `codspeed run`
  * (CI) the plugin measures simulated CPU instructions; locally it degrades to
  * a normal wall-clock run (the numbers are not the gate — CodSpeed is).
@@ -57,6 +97,8 @@ export function isMain(moduleFilename: string): boolean {
  * exits non-zero (a broken bench must never pass silently).
  */
 export function makeBench(name: string): Bench {
+  assertNoOptimizingTier();
+
   return withCodSpeed(
     new Bench({ name, time: 100, warmup: false, throws: true }),
   );

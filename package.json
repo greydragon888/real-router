@@ -84,7 +84,7 @@
     "@arethetypeswrong/cli": "0.18.5",
     "@changesets/changelog-github": "1.0.1",
     "@changesets/cli": "3.0.3",
-    "@codspeed/tinybench-plugin": "5.7.1",
+    "@codspeed/tinybench-plugin": "6.0.0-beta.2",
     "@commitlint/cli": "21.2.3",
     "@commitlint/config-conventional": "21.2.3",
     "@eslint-react/eslint-plugin": "5.20.8",

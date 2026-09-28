@@ -383,19 +383,21 @@ jobs:
 
       # CodSpeed injects its required V8 flags (--allow-natives-syntax, --no-opt,
       # …) ONLY into the process it wraps directly, and those flags can't ride
-      # ⚠ #1728 briefly "corrected" this line to say `--no-opt` is not applied in
-      # `simulation`. That was WRONG and is restored: `getV8Flags()` switches on
-      # `getInstrumentMode()`, and that function maps BOTH `simulation` and
-      # `memory` onto `analysis` — so the full set (`--no-opt`, `--predictable`,
-      # `--expose-gc`, fixed seeds, no concurrent sweeping) does apply. Reading
-      # the switch without following the mapping is how the mistake happened;
-      # the consequence is load-bearing, because the benchmarked code runs with
-      # the JIT OFF and every deopt / inlining / tier explanation is moot.
       # through NODE_OPTIONS. So we wrap a DIRECT `node` that runs the whole suite
       # in ONE process (tests/benchmarks/codspeed.ts imports every *.bench.ts and
       # awaits them serially) — NOT `pnpm bench`, whose pnpm → tsx → spawn-per-file
       # hops strip the flags and crash @codspeed/core on its `%` native. Local
       # `pnpm bench` keeps process-per-file (run.ts) for wall-clock dev.
+      #
+      # ⚠ The set is `getV8Flags()`'s `analysis` branch, and `getInstrumentMode()`
+      # maps BOTH `simulation` and `memory` onto it — so `--no-opt`,
+      # `--predictable`, `--expose-gc`, fixed seeds and no concurrent sweeping all
+      # apply (#1728 read the switch without the mapping and concluded otherwise).
+      # `--no-opt` is only `--no-turbofan`. What keeps an optimizing tier out of
+      # the measured call is `--no-maglev`, which @codspeed/core adds from 6.0 on
+      # Node >= 24; core only warns when a flag is missing, so `makeBench` in both
+      # suites refuses to run without it. IMPLEMENTATION_NOTES "CodSpeed
+      # simulation runs without Maglev" has the measurement.
       #
       # working-directory: packages/core so `tsx` and @real-router/* resolve from
       # the package; --conditions maps @real-router/* to live `src/` (no build).

@@ -8,9 +8,9 @@
  *
  * CI does NOT use it. CodSpeed must inject V8 flags into the bench process and
  * can't carry them across spawn hops, so CI wraps the single-process
- * `codspeed.ts` entry directly — safe there because `simulation` runs JIT-off
- * (`--no-opt --predictable`), so inline-cache shape can't perturb the
- * deterministic instruction counts. See `codspeed.ts` + `codspeed.yml`.
+ * `codspeed.ts` entry directly — acceptable there because `simulation` runs
+ * with no optimizing tier (`--no-opt --no-maglev`); `codspeed.ts` says what
+ * that bounds and what it leaves. See `codspeed.ts` + `codspeed.yml`.
  *
  * Each child is launched as
  * `node --conditions=@real-router/internal-source --import tsx <file>`, so

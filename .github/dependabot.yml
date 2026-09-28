@@ -25,6 +25,16 @@ updates:
           - "react-dom"
           - "@types/react"
           - "@types/react-dom"
+      # @codspeed/* decides the V8 flags CodSpeed's simulation runs under, so a
+      # bump moves every CodSpeed baseline at once. It arrives alone, not inside
+      # `dev-dependencies`, where the step would be read as another package's.
+      # Pinned to a 6.0.0 prerelease, it is also offered the later 6.0.0
+      # prereleases. Listed before `dev-dependencies` for the reason the `react`
+      # group gives. (IMPLEMENTATION_NOTES "CodSpeed simulation runs without
+      # Maglev".)
+      codspeed:
+        patterns:
+          - "@codspeed/*"
       # Group all development dependencies
       dev-dependencies:
         dependency-type: "development"

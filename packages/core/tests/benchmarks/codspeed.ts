@@ -18,10 +18,14 @@
  * that actually runs. See `.github/workflows/codspeed.yml`.
  *
  * Per-file process isolation (RFC §9.2) is intentionally dropped HERE only: it
- * exists to keep V8 inline caches from cross-contaminating WALL-CLOCK numbers,
- * but `simulation` runs under `--no-opt --predictable` (JIT off), so megamorphic
- * call-sites do not perturb the deterministic instruction counts. Local
- * `pnpm bench` keeps process-per-file via `run.ts` for honest wall-clock dev.
+ * exists to keep V8 inline caches from cross-contaminating WALL-CLOCK numbers.
+ * `simulation` runs with no optimizing tier — `--no-opt` turns off TurboFan and
+ * `--no-maglev` Maglev, which `makeBench` in fixtures.ts refuses to run
+ * without — so an earlier suite cannot move a later one's counts by where a
+ * tier-up lands. The interpreter's inline caches still carry feedback across
+ * suites, which bounds that effect rather than removing it (IMPLEMENTATION_NOTES
+ * "CodSpeed simulation runs without Maglev"). Local `pnpm bench` keeps
+ * process-per-file via `run.ts` for honest wall-clock dev.
  */
 import { run as runDefault } from "./default.bench";
 import { run as runEncodingNone } from "./encoding-none.bench";

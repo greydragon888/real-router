@@ -7,10 +7,41 @@
  * CodSpeed plugin attributes the benchmark URI to the file that CALLS `add`
  * (an add-wrapping helper re-homes every URI to this file).
  */
+import { env, execArgv } from "node:process";
+
 import { withCodSpeed } from "@codspeed/tinybench-plugin";
 import { Bench } from "tinybench";
 
+/**
+ * Refuses a `simulation` run without `--no-opt --no-maglev` — the same check,
+ * placed after the plugin import for the same reason, as
+ * `assertNoOptimizingTier` in packages/core/tests/benchmarks/fixtures.ts,
+ * whose docblock gives both.
+ */
+function assertNoOptimizingTier(): void {
+  const mode = env.CODSPEED_RUNNER_MODE;
+
+  if (
+    env.CODSPEED_ENV === undefined ||
+    (mode !== "simulation" && mode !== "instrumentation")
+  ) {
+    return;
+  }
+
+  const missing = ["--no-opt", "--no-maglev"].filter(
+    (flag) => !execArgv.includes(flag),
+  );
+
+  if (missing.length > 0) {
+    throw new Error(
+      `[codspeed] simulation without ${missing.join(" ")}: an optimizing tier would compile inside the measured call`,
+    );
+  }
+}
+
 export function makeBench(name: string): Bench {
+  assertNoOptimizingTier();
+
   return withCodSpeed(
     new Bench({ name, time: 100, warmup: false, throws: true }),
   );
