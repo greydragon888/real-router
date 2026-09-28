@@ -1,0 +1,42 @@
+{
+  "$schema": "../../node_modules/turbo/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "type-check": {
+      "inputs": [
+        "src/**/*.ts",
+        "tsconfig.json",
+        "tsconfig.src.json",
+        "!$TURBO_ROOT$/eslint.config.*",
+        "!$TURBO_ROOT$/prettier.config.*",
+        "!$TURBO_ROOT$/tsdown.base.*",
+        "!$TURBO_ROOT$/vitest.config.*"
+      ]
+    },
+    "type-check:tests": {
+      "outputs": [],
+      "inputs": [
+        "src/**/*.ts",
+        "tests/**/*.ts",
+        "../../scripts/lib/**",
+        "../../scripts/*.d.mts",
+        "tsconfig.json",
+        "!$TURBO_ROOT$/eslint.config.*",
+        "!$TURBO_ROOT$/prettier.config.*",
+        "!$TURBO_ROOT$/tsdown.base.*",
+        "!$TURBO_ROOT$/vitest.config.*"
+      ],
+      "outputLogs": "errors-only",
+      "cache": true
+    },
+    "test": {
+      "dependsOn": ["$TURBO_EXTENDS$", "type-check:tests"]
+    },
+    "test:properties": {
+      "dependsOn": ["$TURBO_EXTENDS$", "type-check:tests"]
+    },
+    "test:stress": {
+      "dependsOn": ["$TURBO_EXTENDS$", "type-check:tests"]
+    }
+  }
+}

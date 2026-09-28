@@ -104,7 +104,8 @@
     "test:mutation": "stryker run",
     "test:mutation:report": "open reports/mutation-report.html",
     "bench": "tsx tests/benchmarks/run.ts",
-    "type-check": "tsc --noEmit",
+    "type-check": "tsc --noEmit -p tsconfig.src.json",
+    "type-check:tests": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --max-warnings 0",
     "lint:fix": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "bundle": "RR_DTS_PASS=1 tsdown --config-loader unrun && tsdown --config-loader unrun && node scripts/check-dts-augment-targets.mjs"

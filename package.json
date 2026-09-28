@@ -42,7 +42,7 @@
     "lint:dedupe": "pnpm dedupe --check && pnpm --dir examples dedupe --check && pnpm --dir cross-router-bench dedupe --check",
     "lint:changeset": "node .changeset/check-changeset.mjs",
     "resolve:dependabot": "bash scripts/resolve-dependabot.sh",
-    "type-check": "turbo run type-check",
+    "type-check": "turbo run type-check type-check:tests",
     "sonar:local": "bash scripts/sonar-local.sh",
     "packages-structure": "find packages/*/src -type f -name \"*.ts*\" -print | tree --fromfile",
     "prepare": "husky || true",

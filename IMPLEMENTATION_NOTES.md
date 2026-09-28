@@ -354,6 +354,10 @@ The lever this blocks is concrete. Measured on core, 11-core M3 Pro, two rounds:
 
 ⚠ **Each job type-checks core separately** — 9.3 s in `base-test`, 12.7 s in `base-lint` — because `lint.dependsOn: ["^type-check"]` (#2432) makes turbo schedule the filtered package's own `type-check` even when that package has no workspace dependency for `^` to reach. Measured by `--dry=json` with and without the edge: two tasks against one. It runs concurrently with the lint, so it costs CPU on the runner rather than wall.
 
+> ⚠ Narrowed on 2026-09-28: core's `type-check` checks `src` only, and
+> `base-test` also runs `type-check:tests` for the tests. See "Core's
+> `type-check` checks `src` only; its tests have `type-check:tests`".
+
 ## The push-to-master examples lint is the weekly run's job (2026-09-19)
 
 > ⚠ Superseded on 2026-09-27 from "What still runs before a merge" on: neither
@@ -381,6 +385,11 @@ The lever this blocks is concrete. Measured on core, 11-core M3 Pro, two rounds:
 **Solution.** `"dependsOn": ["^type-check"]` on the `lint` task. With the plant, `react#lint` hashes `409812ddbe17c484` and goes red without `--force`; clean, `01163a692ffc59ee`. A change in an unrelated package (`packages/vue/src`) leaves that hash where it was.
 
 **Why not an input glob.** `inputs` are package-relative and cannot name "the packages I depend on", so a sibling glob such as `../*/src/**` would move every package's lint hash on every package's change — `react`'s edit would re-lint `vue`. `^type-check` is the upstream task whose hash already covers the upstream types, and it invalidates exactly the dependents.
+
+> ⚠ Narrowed on 2026-09-28 for core: its key also covered its tests,
+> benchmarks, `shared/` and `scripts/lib/`, so a test-only change re-keyed
+> every dependent. See "Core's `type-check` checks `src` only; its tests have
+> `type-check:tests`".
 
 **Cost, measured on an 11-core M3 Pro under load 3–7, two rounds each, every round from a cold `.eslintcache` with the two configurations alternating.**
 
@@ -3699,6 +3708,10 @@ The version in use is the `turbo` pin in the root `package.json`.
 `globalConfiguration: true` moves top-level settings into a `global` block: `concurrency`, `passThroughEnv`, `inputs`, `env`. This replaces the deprecated flat `globalPassThroughEnv`, `globalDependencies`, etc.
 
 `global.inputs` defines config-level inputs that affect all tasks (e.g., `tsconfig.json`, `pnpm-lock.yaml`, `eslint.config.*`).
+
+> ⚠ Narrowed on 2026-09-28: the heavy tasks negate the global files they do
+> not read. See "A task's cache key leaves out the root configs it does not
+> read".
 
 `global.env` is unset: no task reads a variable that should key the cache globally (see "Dead benchmark dependencies and `BENCH_*` leave the root config", 2026-09-26).
 
@@ -12769,3 +12782,48 @@ It surfaced as `navigate/pre-commit-listener` going from 11.9 to 7.4 ms between 
 
 - `**/*.md` stays in: a changeset is a `.md` file under `.changeset/`, and `changesets.yml` starts only on this workflow's success, so a push that adds one must still build. `scripts/**` stays because `scripts/lib/**` is an input of core's `test`, and `.github/**` because it holds this workflow.
 - The PR size diff keeps its base: `scripts/bundle-size-base.mjs` falls back to the closest ancestor with a successful build within 20 commits, and a commit confined to these directories changes no package's output. The longest run of such commits in the last 600 on master is 4.
+
+## A task's cache key leaves out the root configs it does not read (2026-09-28)
+
+**Problem.** Under `futureFlags.globalConfiguration`, every file in `global.inputs` is prepended to the inputs of every task, so an edit to one root config re-keyed every task, whichever read it. The turbo telemetry holds the case: on 24.09 a push whose only root-config change was `eslint.config.mjs` missed 115 of 115 tasks in Post-Merge Build and ran 999 s, `bundle` included. Since 29.08, `eslint.config.mjs` changed in 14 commits on `master`, `vitest.config.*` in 5 and `tsdown.base.*` in 4, and each re-ran every package's tests, in CI and in the local hooks.
+
+**Solution.** The heavy tasks negate, with `!$TURBO_ROOT$/…`, the root configs their process does not read:
+
+| task                                     | negates                                                   |
+| ---------------------------------------- | --------------------------------------------------------- |
+| `bundle`                                 | `eslint.config.*`, `prettier.config.*`, `vitest.config.*` |
+| `test`, `test:properties`, `test:stress` | `eslint.config.*`, `prettier.config.*`, `tsdown.base.*`   |
+| `type-check`                             | all four                                                  |
+| `lint`                                   | `tsdown.base.*`, `vitest.config.*`                        |
+
+`tsconfig.json` stays in every task. `build`, `lint:fix`, `lint:package`, `lint:types` and the two bench tasks keep every root config: `build` is an orchestrator whose key moves with its dependencies, and the rest are cheap.
+
+**Why — measured with `--dry=json` on this tree, one edit at a time.** Before the change an edit to `eslint.config.mjs` re-keyed 125 of 125 tasks. Of the 116 tasks with a script, after it:
+
+| edited                     | re-keyed                       |
+| -------------------------- | ------------------------------ |
+| `eslint.config.mjs`        | 23 (`lint`)                    |
+| `prettier.config.mjs`      | 23 (`lint`)                    |
+| `vitest.config.common.mts` | 46 (`test`, `test:properties`) |
+| `tsdown.base.ts`           | 23 (`bundle`)                  |
+
+⚠ **A negation claims the task never reads the file, and a wrong one replays a stale result green.** What this change relies on: every package's `tsconfig.json` includes only `src` and `tests` (angular adds `ssr`), so no type-check program reaches `tsdown.config.ts` or a vitest config; every `lint` script names `src/`, `tests/` and the package's symlinked directories, never a config file; no test imports a root config — the two bundle-shape tests run rolldown on `src` entries or load `rollup.config.mjs`, which `test` already names. A task added later gets every root config by default, the safe direction.
+
+⚠ **Changing the inputs re-keys every task once,** so the first run after this entry misses everywhere.
+
+## Core's `type-check` checks `src` only; its tests have `type-check:tests` (2026-09-28)
+
+**Problem.** Every package's `type-check` and `lint` depend on `^type-check` (#2432), so a dependent's key carries core's `type-check` key. That task checked one program over `src` and `tests`, and its inputs added `../../shared/**` and `../../scripts/lib/**`. A change to a core test or benchmark therefore re-keyed `type-check`, `lint`, `test` and `test:properties` in every package: 100 of 125 tasks for `6cab282d8`, a benchmark edit, against 4 for `1b7b0fc43`, a navigation-plugin test (`--dry=json`). The telemetry holds three such post-merge runs over 25–28.09, 592–888 s each, with all 23 `bundle` tasks hit and the other 92 missed. Since 29.08, 82 of the 205 commits on `master` that changed a `.ts` file in core changed none under `src/`.
+
+**Solution.**
+
+- `packages/core/tsconfig.src.json` includes `src` only, and core's `type-check` is `tsc --noEmit -p tsconfig.src.json`. Its inputs in `packages/core/turbo.json` are `src/**/*.ts` and the two tsconfigs: the program reads 138 files, all under `src/` (`tsc --listFilesOnly`).
+- `type-check:tests` is `tsc --noEmit` over the whole tsconfig. Its inputs are the files that program reads outside `node_modules`: `src/**`, `tests/**`, `../../scripts/lib/**` and `../../scripts/*.d.mts`. Core's `test`, `test:properties` and `test:stress` add it to their `dependsOn` with `$TURBO_EXTENDS$`.
+- A package configuration replaces any array it names, so both tasks repeat the root's four negations (the previous entry).
+- The root `type-check` script is `turbo run type-check type-check:tests`, so `pnpm type-check` still checks core's tests.
+
+**Why — measured.**
+
+- `--dry=json`, one edit at a time on this tree: a core test re-keys 4 tasks — core's `type-check:tests`, `test`, `test:properties` and `lint`. A core `src` edit still re-keys 116 of 116, the cascade #2432 is for.
+- The `src` program takes 0.8 s cold against 3.3 s for the whole one (M3 Pro, `--incremental false`, two rounds each). The two run in parallel under core's `test`, and the dependents wait for the smaller one.
+- `shared/` and `scripts/lib/` no longer reach a dependent through core's key, but they stay in every package's own `bundle`, `lint`, `test` and `type-check` inputs through the root patterns: a one-line edit in `shared/browser-env/state-guard.ts`, read by three packages, re-keys 113 of 116 tasks. That is left for a decision.

@@ -35,7 +35,10 @@
         "tsconfig.json",
         "tsconfig.build.json",
         "tsconfig.lib.json",
-        "package.json"
+        "package.json",
+        "!$TURBO_ROOT$/eslint.config.*",
+        "!$TURBO_ROOT$/prettier.config.*",
+        "!$TURBO_ROOT$/vitest.config.*"
       ],
       "env": ["NODE_ENV"],
       "outputLogs": "errors-only",
@@ -52,7 +55,10 @@
       "inputs": [
         "tests/stress/**/*.{ts,tsx}",
         "vitest.config.stress.*",
-        "!**/node_modules/**"
+        "!**/node_modules/**",
+        "!$TURBO_ROOT$/eslint.config.*",
+        "!$TURBO_ROOT$/prettier.config.*",
+        "!$TURBO_ROOT$/tsdown.base.*"
       ],
       "outputLogs": "errors-only",
       "cache": true
@@ -63,7 +69,10 @@
       "inputs": [
         "tests/property/**/*.{ts,tsx}",
         "vitest.config.properties.*",
-        "!**/node_modules/**"
+        "!**/node_modules/**",
+        "!$TURBO_ROOT$/eslint.config.*",
+        "!$TURBO_ROOT$/prettier.config.*",
+        "!$TURBO_ROOT$/tsdown.base.*"
       ],
       "outputLogs": "errors-only",
       "cache": true
@@ -80,7 +89,10 @@
         "rollup.*",
         "**/*.test.{ts,tsx}",
         "**/*.spec.{ts,tsx}",
-        "!**/node_modules/**"
+        "!**/node_modules/**",
+        "!$TURBO_ROOT$/eslint.config.*",
+        "!$TURBO_ROOT$/prettier.config.*",
+        "!$TURBO_ROOT$/tsdown.base.*"
       ],
       "env": ["NODE_ENV", "FORCE_COLOR"],
       "passThroughEnv": ["CI"],
@@ -97,7 +109,9 @@
         "!dist/**",
         "!coverage/**",
         "!**/node_modules/**",
-        "eslint.config.*"
+        "eslint.config.*",
+        "!$TURBO_ROOT$/tsdown.base.*",
+        "!$TURBO_ROOT$/vitest.config.*"
       ],
       "outputLogs": "errors-only",
       "cache": true
@@ -140,7 +154,11 @@
         "!**/node_modules/**",
         "rollup.*",
         "tsconfig.json",
-        "**/tsconfig.json"
+        "**/tsconfig.json",
+        "!$TURBO_ROOT$/eslint.config.*",
+        "!$TURBO_ROOT$/prettier.config.*",
+        "!$TURBO_ROOT$/tsdown.base.*",
+        "!$TURBO_ROOT$/vitest.config.*"
       ],
       "outputLogs": "errors-only",
       "cache": true
