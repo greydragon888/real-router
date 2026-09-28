@@ -12639,6 +12639,20 @@ Measured after the push: the post-merge run on `d32b27d8d` (00:57–01:15 UTC) e
 
 **Why — measured.** `check-semgrep.test.mjs` asserts the line on the clean run, including that it names the baseline commit, and its absence after a finding, a tool error and the no-delta exit. Deleting the line reddens the clean-run test; printing it before the exit-code arms reddens the finding and tool-error tests.
 
+## size-limit 14.1: rolldown 1.2.11 reaches the published build, and minified `dist` drops annotation comments (2026-09-28)
+
+**Problem.** rolldown 1.2.9 keeps annotation comments in minified output (rolldown#10854). size-limit 14.0.1 turns them off in its measurement bundle and raises `@size-limit/rolldown`'s floor to `rolldown ^1.2.10`; 14.1.0 raises it to `^1.2.11`. `lint:dedupe` then moves tsdown, `rolldown-plugin-dts` and vite from 1.2.8 to 1.2.11, so the published build changes with the measurement tool. Rebuilt under 1.2.11, five packages — core, react, route-utils, vue, browser-plugin — gained 194 `/* @__PURE__ */` and 24 `/* v8 ignore … -- @preserve: … */` comments, +8,174 B of raw JS. oxc counts the coverage pragmas as annotations, so `comments.legal: false` leaves them in place, and the `@preserve` in their text keeps them in a consumer's bundle: esbuild's default bundle mode over browser-plugin's ESM entry emitted none before and one after.
+
+**Solution.** `tsdown.base.ts` sets `outputOptions: { comments: { annotation: false } }`. Rebuilt with it, the five packages' 50 JS files and 122 `.d.ts` files are byte-identical to the 1.2.8 build, chunk file names included. The source maps differ — 50 of 138, in `names` and `mappings` — from rolldown 1.2.11's fix that carries names through `collapse_sourcemaps`: browser-plugin's ESM map goes from 2 names to 197.
+
+**Why — measured.**
+
+- The measurement does not move. On the same `dist`, size-limit 14.0.0 on rolldown 1.2.8 and 14.1.0 on 1.2.11 report the same 25 sizes, and a scratch copy of the 1.2.8 arm first reproduced the repository's 25 of 25. The third arm, 14.0.0 on 1.2.11, reads 22 of the 25 entries higher by 14 to 182 B. Anything that moves rolldown past 1.2.8 without size-limit 14.0.1 lands there: vite 8.3 requires `rolldown ~1.2.9`.
+- Without the option the comparison is not vacuous: it flagged the changed files, and after dropping comments and normalising chunk hashes it counted 50 of 50 JS files the same, while a one-token mutation of route-utils was caught.
+- `@__PURE__` goes with the pragmas because one switch governs both. The 1.2.8 build shipped none, so the published output stays as it was; shipping them is a decision of its own, and it needs the pragmas handled first.
+- `CI=1` bundles of eight packages raised no new warning. rolldown 1.2.9 adds `MODULE_LEVEL_DIRECTIVE`, and no source file carries a module-level directive.
+- `scripts/codspeed-gate.mjs` answers RUN for the bump: the rolldown bindings are measured dependencies through vite.
+
 ## Pull-request series keep one identity: the collector folds `turbo.scm.branch` (2026-09-28)
 
 **Problem.** turbo stamps every point with `turbo.scm.branch`, and on a pull request that is the merge ref, `<N>/merge`. Each PR therefore wrote series of its own, one or two points long: from 24.09 to 28.09, 3,874 of the 4,336 task series belonged to 17 PR refs. `increase` and `rate` need two points in their window, so every PR query through them came back empty — the first analysis of the telemetry read 0 rows for PR task time, cache and failures, and fell back to `max_over_time` per series. A feature branch's name, `2397-codec-shape`, did the same.

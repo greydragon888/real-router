@@ -102,6 +102,15 @@ export const createConfig = (opts: CreateConfigOptions = {}): UserConfig[] => {
     // Minification (oxc minifier)
     minify,
 
+    // ⚠ Minified output keeps ANNOTATION comments unless told otherwise, and
+    // oxc counts the source's `/* v8 ignore … -- @preserve: <reason> */`
+    // coverage pragmas as annotations alongside `@__PURE__` — `legal: false`
+    // does not reach them. Kept, they ship in `dist`, and the `@preserve` in
+    // their text makes a consumer's bundler keep them too (esbuild's default
+    // `legalComments` for a bundle). `@__PURE__` goes with them: one switch
+    // governs both.
+    outputOptions: { comments: { annotation: false } },
+
     // Shims for CJS compatibility (__dirname, __filename)
     shims: true,
 
