@@ -684,6 +684,49 @@ describe("Async navigate-event delivery (#580)", () => {
   });
 });
 
+describe("Same-URL guard under a non-special scheme (#580, INVARIANTS K3d)", () => {
+  // Tauri and Electron load the app from an authority-only custom URL. For a
+  // non-special scheme the URL parser keeps the empty pathname, so the entry
+  // reads `tauri://localhost` while the first transition targets `/`. The guard
+  // has to see one document there: a `navigate` is the cross-document reload
+  // Safari 26.2 WKWebView turns into a loop.
+
+  let router: Router;
+  let mockNav: MockNavigation;
+  let browser: NavigationBrowser;
+  let unsub: Unsubscribe | undefined;
+
+  beforeEach(() => {
+    mockNav = new MockNavigation("tauri://localhost");
+    browser = createMockNavigationBrowser(mockNav);
+    router = createRouter(routerConfig, {
+      defaultRoute: "home",
+      queryParamsMode: "default",
+    });
+    unsub = router.usePlugin(navigationPluginFactory({}, browser));
+  });
+
+  afterEach(() => {
+    router.stop();
+    unsub?.();
+    vi.clearAllMocks();
+  });
+
+  it("writes the entry state instead of navigating on the first transition", async () => {
+    const navigateSpy = vi.spyOn(browser, "navigate");
+    const updateSpy = vi.spyOn(browser, "updateCurrentEntry");
+
+    // The mock's `getLocation` skips `extractPath`, so the start path is passed
+    // explicitly: `/` is what a real browser derives from `tauri://localhost`.
+    await router.start("/");
+
+    expect(router.getState()?.name).toBe("index");
+    expect(navigateSpy).not.toHaveBeenCalled();
+    expect(updateSpy).toHaveBeenCalledTimes(1);
+    expect(mockNav.currentEntry?.url).toBe("tauri://localhost");
+  });
+});
+
 describe("Error Recovery", () => {
   let router: Router;
   let mockNav: MockNavigation;
