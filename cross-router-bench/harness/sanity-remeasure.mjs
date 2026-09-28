@@ -22,7 +22,7 @@
 // alloc held, it was load, not code. Canary metric = navMsWall (the most load-sensitive
 // per-nav signal; the retired totalMs is gone — do NOT key on it).
 //
-// Usage: node cross-router/harness/sanity-remeasure.mjs <framework> [runs=12] [shift%=20]
+// Usage: node cross-router-bench/harness/sanity-remeasure.mjs <framework> [runs=12] [shift%=20]
 // Exit: 0 = consistent · 1 = flagged (ratio and/or uniform) · 2 = cannot judge.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -39,7 +39,7 @@ const framework = process.argv[2];
 const runs = argNum(process.argv[3], 12);
 const shiftLimit = argNum(process.argv[4], 20);
 if (!framework) {
-  console.error("Usage: node cross-router/harness/sanity-remeasure.mjs <framework> [runs=12] [shift%=20]");
+  console.error("Usage: node cross-router-bench/harness/sanity-remeasure.mjs <framework> [runs=12] [shift%=20]");
   process.exit(2);
 }
 

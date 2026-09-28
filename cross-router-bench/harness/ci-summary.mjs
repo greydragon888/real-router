@@ -7,7 +7,7 @@
 //
 // The rme-gate step (its own workflow step) owns pass/fail; this section is informational.
 //
-//   node cross-router/harness/ci-summary.mjs >> "$GITHUB_STEP_SUMMARY"
+//   node cross-router-bench/harness/ci-summary.mjs >> "$GITHUB_STEP_SUMMARY"
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

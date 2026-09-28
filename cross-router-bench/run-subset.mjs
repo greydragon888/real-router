@@ -4,8 +4,8 @@
 // without the full ~3 h matrix. Shares the run-all contract end-to-end (audit 07-18
 // K14/K15): the COHORT_ENGINES roster and KNOWN_NA skip-map come from the same shared
 // modules, and cells carry the same full env stamp (cpu/runner included, O-10).
-//   node cross-router/run-subset.mjs <scenariosCSV> [runs=50] [framework]
-// e.g. node cross-router/run-subset.mjs active-links,link-build 50
+//   node cross-router-bench/run-subset.mjs <scenariosCSV> [runs=50] [framework]
+// e.g. node cross-router-bench/run-subset.mjs active-links,link-build 50
 //
 // The build → serve → interleave → write sequence itself lives in
 // `harness/scenario-run.mjs` (#1746). It used to be copied here, and the copy is exactly

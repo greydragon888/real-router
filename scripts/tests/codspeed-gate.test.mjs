@@ -133,7 +133,7 @@ const BASE_FILES = {
   }),
   "benchmarks/adapter-bench/app.ts":
     'import { createRoot } from "react-dom/client";\n',
-  "benchmarks/cross-router/wouter.ts": 'import { Router } from "wouter";\n',
+  "cross-router-bench/wouter.ts": 'import { Router } from "wouter";\n',
   "pnpm-lock.yaml": lockfile(),
 };
 

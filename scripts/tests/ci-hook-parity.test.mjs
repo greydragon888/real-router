@@ -64,7 +64,7 @@ export const CI_ONLY = new Map([
   [
     "lint:spec-parity",
     "preflight of the scheduled cross-router bench suite, a pnpm workspace of its " +
-      "own that no hook installs (benchmarks/CLAUDE.md)",
+      "own that no hook installs (cross-router-bench/CLAUDE.md)",
   ],
 ]);
 

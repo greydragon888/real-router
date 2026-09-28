@@ -3,7 +3,7 @@
 //
 // It exists because there were two copies of this sequence — `run-all.mjs` and
 // `run-subset.mjs` each carried their own — and a third was about to appear for the
-// per-scenario worker (#1746). That is the drift `benchmarks/CLAUDE.md` already guards
+// per-scenario worker (#1746). That is the drift this workspace's `CLAUDE.md` already guards
 // against for the provenance stamp, the write guard and the scenario registry: one
 // implementation, several schedulers, so the runners cannot disagree about what a cell IS.
 //

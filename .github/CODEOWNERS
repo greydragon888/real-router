@@ -20,6 +20,7 @@
 
 # Benchmarks
 /benchmarks/ @greydragon888
+/cross-router-bench/ @greydragon888
 
 # Documentation
 *.md @greydragon888

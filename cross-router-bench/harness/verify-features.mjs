@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { build, preview } from "vite";
 
-const here = dirname(dirname(fileURLToPath(import.meta.url))); // cross-router/
+const here = dirname(dirname(fileURLToPath(import.meta.url))); // cross-router-bench/
 const FW = "react";
 
 // Which engines have a first-class API for each feature (wouter has none).

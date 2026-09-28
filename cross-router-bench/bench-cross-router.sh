@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
 # Cross-Router Benchmark Runner — machine-readiness + full unattended matrix
-# Sibling of bench-compare.sh.bak, but for the cross-router (Playwright + CDP) suite.
+# Modelled on benchmarks/bench-compare.sh.bak, but for the cross-router (Playwright + CDP) suite.
 #
 # Updates @real-router/* in the cross-router workspace to the latest npm release, gates
 # on machine readiness for a ~3 h unattended run, and — on success — runs the full
@@ -132,8 +132,8 @@ if [[ "$EUID" -ne 0 ]]; then
     exit 1
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # benchmarks/
-CROSS_DIR="$SCRIPT_DIR/cross-router"                         # the cross-router pnpm workspace
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # cross-router-bench/
+CROSS_DIR="$SCRIPT_DIR"                                      # the cross-router pnpm workspace
 ORIGINAL_USER="${SUDO_USER:-$USER}"
 
 if [[ "$ORIGINAL_USER" == "root" ]]; then
@@ -146,7 +146,7 @@ fi
 # Save the full run to a timestamped, gitignored log (an artifact — a ~2 h run is easy
 # to lose to terminal scrollback). tee keeps it live on-console too; chown so the
 # invoking user (not root) owns it.
-RUN_LOG_DIR="$SCRIPT_DIR/cross-router/run-logs"
+RUN_LOG_DIR="$SCRIPT_DIR/run-logs"
 mkdir -p "$RUN_LOG_DIR"
 LOGFILE="$RUN_LOG_DIR/run-$(date +%Y%m%d-%H%M%S).log"
 touch "$LOGFILE"
@@ -434,8 +434,8 @@ echo "  @real-router/core under test: ${CORE_VERSION:-not installed}"
 # workflow's update → matcher-bench → run-all order).
 echo ""
 echo -e "${YELLOW}[Step 4b] Isolated matcher-bench (wide + deep sweeps, pure Node)...${NC}"
-if as_user "cd '$SCRIPT_DIR' && node --expose-gc cross-router/matcher-bench/run.mjs all"; then
-    echo -e "${GREEN}  ✓ matcher-bench refreshed (cross-router/matcher-bench/results.json)${NC}"
+if as_user "cd '$SCRIPT_DIR' && node --expose-gc matcher-bench/run.mjs all"; then
+    echo -e "${GREEN}  ✓ matcher-bench refreshed (matcher-bench/results.json)${NC}"
 else
     echo -e "${RED}  ✗ matcher-bench failed — the deck's wide/deep cards would go stale; aborting before the matrix.${NC}"
     exit 1
@@ -451,7 +451,7 @@ if [[ "$SMOKE" == true ]]; then
     SMOKE_FAILED=""
     for cohort in "${COHORTS[@]}"; do
         echo -e "${BLUE}  smoke: $cohort...${NC}"
-        if as_user "cd '$SCRIPT_DIR' && BENCH_SMOKE=1 node cross-router/run-all.mjs 1 $cohort"; then
+        if as_user "cd '$SCRIPT_DIR' && BENCH_SMOKE=1 node run-all.mjs 1 $cohort"; then
             echo -e "${GREEN}  ✓ $cohort smoke ok${NC}"
         else
             echo -e "${RED}  ✗ $cohort smoke FAILED${NC}"
@@ -487,7 +487,7 @@ for cohort in "${COHORTS[@]}"; do
     # Perf matrix. run-all continues past a failed cell but exits 1 if any failed;
     # we tally and move on (a flaky cell must not kill the remaining cohorts).
     echo -e "${BLUE}  Running perf matrix (n=$RUNS)...${NC}"
-    if as_user "cd '$SCRIPT_DIR' && node cross-router/run-all.mjs $RUNS $cohort"; then
+    if as_user "cd '$SCRIPT_DIR' && node run-all.mjs $RUNS $cohort"; then
         echo -e "${GREEN}  ✓ $cohort matrix complete${NC}"
     else
         echo -e "${RED}  ⚠ $cohort matrix had failed cells (see '!! FAILED' above)${NC}"
@@ -496,7 +496,7 @@ for cohort in "${COHORTS[@]}"; do
 
     # RME quality gate (non-fatal): prints offenders worst-first; exit 1 = over
     # threshold, 2 = no results. Either way we only flag — results are still written.
-    if as_user "cd '$SCRIPT_DIR' && node cross-router/harness/rme-gate.mjs $RME_STABLE $RME_NOISY $cohort"; then
+    if as_user "cd '$SCRIPT_DIR' && node harness/rme-gate.mjs $RME_STABLE $RME_NOISY $cohort"; then
         echo -e "${GREEN}  ✓ $cohort RME within thresholds${NC}"
     else
         echo -e "${YELLOW}  ⚠ $cohort RME flagged (or no results) — numbers may be noisy${NC}"
@@ -511,7 +511,7 @@ for cohort in "${COHORTS[@]}"; do
     # shift means this cohort's sub-ms per-nav absolutes are load-tainted.
     if [[ "$SANITY_RUNS" -gt 0 ]]; then
         echo -e "${BLUE}  Sub-ms sanity re-measure (nav-latency × real-router, n=$SANITY_RUNS)...${NC}"
-        as_user "cd '$SCRIPT_DIR' && node cross-router/harness/sanity-remeasure.mjs $cohort $SANITY_RUNS $SANITY_SHIFT"
+        as_user "cd '$SCRIPT_DIR' && node harness/sanity-remeasure.mjs $cohort $SANITY_RUNS $SANITY_SHIFT"
         sanity_rc=$?
         if [[ "$sanity_rc" -eq 0 ]]; then
             echo -e "${GREEN}  ✓ $cohort sub-ms consistent with a fresh re-measure${NC}"
@@ -541,7 +541,7 @@ echo ""
 banner "Cross-Router Benchmark Complete"
 echo "  Elapsed: $((SECONDS / 60)) min ($((SECONDS / 3600))h $(((SECONDS % 3600) / 60))m)"
 echo "  Cohorts run: ${COHORTS[*]} (n=$RUNS)"
-echo "  Results:  $SCRIPT_DIR/cross-router/results/<cohort>/ (gitignored — source for the infographic deck)"
+echo "  Results:  $SCRIPT_DIR/results/<cohort>/ (gitignored — source for the infographic deck)"
 echo "  Log:      $LOGFILE"
 echo ""
 if [[ -n "$FAILED_COHORTS" ]]; then

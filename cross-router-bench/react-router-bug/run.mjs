@@ -1,6 +1,6 @@
 // Runs the react-router-bug scenario two ways and prints the tables + writes results.json.
 //   node run.mjs
-// Uses benchmarks/cross-router's react-router@8 (or standalone: npm i react-router@8 && node run.mjs).
+// Uses cross-router-bench's react-router@8 (or standalone: npm i react-router@8 && node run.mjs).
 import { writeFileSync } from "node:fs";
 
 import { buildRoutes, deepPath, matchCostAmortizedMs, matchCostMs } from "./scenario.mjs";

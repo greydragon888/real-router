@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
  * This began as a census — the enumeration that let the retirement be cut into
  * steps with their own greens. The steps shipped, the set went empty, and what
  * is left is the tripwire: a `addInterceptor("buildPath", …)` written anywhere
- * in `packages/*` or `benchmarks/` reds here, in code no test has to run.
+ * in `packages/*`, `benchmarks/` or `cross-router-bench/` reds here, in code no test has to run.
  *
  * ⚑ It is not the only guard, and it is the earlier one. `addInterceptor`
  * THROWS on a name outside `SEAM` (#2088), so a live registration fails at
@@ -30,6 +30,7 @@ import { describe, expect, it } from "vitest";
 const PACKAGES = path.resolve(__dirname, "../../..");
 const REPO = path.resolve(PACKAGES, "..");
 const BENCHMARKS = path.resolve(REPO, "benchmarks");
+const CROSS_ROUTER_BENCH = path.resolve(REPO, "cross-router-bench");
 
 const repoPath = (file: string): string =>
   path.relative(REPO, file).split(path.sep).join("/");
@@ -90,6 +91,7 @@ const sourceFiles = (): string[] =>
     ...globSync(`${PACKAGES}/*/src/**/*.{ts,tsx,mts}`),
     ...globSync(`${PACKAGES}/*/tests/**/*.{ts,tsx,mts}`),
     ...globSync(`${BENCHMARKS}/**/*.{ts,tsx,mts,mjs}`),
+    ...globSync(`${CROSS_ROUTER_BENCH}/**/*.{ts,tsx,mts,mjs}`),
   ].filter((f) => !/node_modules|[/\\](dist|coverage)[/\\]/.test(f));
 
 /** Arm A, and the seeds arm B needs. */
@@ -221,7 +223,7 @@ const transitiveFiles = (seeds: ReadonlySet<string>): string[] => {
 };
 
 describe("nothing registers on a buildPath interception point (#2090)", () => {
-  it("the TRIPWIRE — no site in packages/* or benchmarks/ names the seam", () => {
+  it("the TRIPWIRE — no site in packages/*, benchmarks/ or cross-router-bench/ names the seam", () => {
     const { keys, seeds } = namingSites();
 
     expect(keys).toStrictEqual([]);
@@ -278,7 +280,7 @@ describe("nothing registers on a buildPath interception point (#2090)", () => {
       "packages/persistent-params-plugin/tests/functional/plugin.test.ts",
     );
     expect(reached).toContain(
-      "benchmarks/cross-router/apps/react/real-router-full/src/main.tsx",
+      "cross-router-bench/apps/react/real-router-full/src/main.tsx",
     );
   });
 });

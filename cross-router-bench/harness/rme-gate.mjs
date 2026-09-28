@@ -10,9 +10,9 @@
 // of core's check-rme.sh). Prints the offenders worst-first regardless of exit code.
 //
 // Usage:
-//   node cross-router/harness/rme-gate.mjs                # defaults: stable 15%, noisy 40%
-//   node cross-router/harness/rme-gate.mjs 10 30          # stable 10%, noisy 30%
-//   node cross-router/harness/rme-gate.mjs 15 40 vue      # restrict to one cohort
+//   node cross-router-bench/harness/rme-gate.mjs                # defaults: stable 15%, noisy 40%
+//   node cross-router-bench/harness/rme-gate.mjs 10 30          # stable 10%, noisy 30%
+//   node cross-router-bench/harness/rme-gate.mjs 15 40 vue      # restrict to one cohort
 //   RME_STABLE=12 RME_NOISY=35 node …/rme-gate.mjs        # via env
 // Exit: 0 = pass · 1 = threshold(s) exceeded · 2 = no results (run run-all first)
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -91,7 +91,7 @@ for (const cohort of cohorts) {
 }
 
 if (!existsSync(RESULTS) || scanned === 0) {
-  console.error(`rme-gate: no results under ${RESULTS} — run \`node cross-router/run-all.mjs\` first.`);
+  console.error(`rme-gate: no results under ${RESULTS} — run \`node cross-router-bench/run-all.mjs\` first.`);
   process.exit(2);
 }
 

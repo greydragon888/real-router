@@ -56,7 +56,7 @@ on:
     paths:
       - "pnpm-lock.yaml"
       - "examples/pnpm-lock.yaml"
-      - "benchmarks/cross-router/pnpm-lock.yaml"
+      - "cross-router-bench/pnpm-lock.yaml"
 
 # Read-only since 2026-08-01: the push is authenticated by DEPENDABOT_PUSH_TOKEN
 # (checkout's `token:`), not by GITHUB_TOKEN, so no write scope is needed — and a
@@ -114,13 +114,13 @@ jobs:
           # Only the workspace whose lockfile this PR changes: a Dependabot block
           # covers one directory, and installing the others would be wasted time.
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
-          for dir in . examples benchmarks/cross-router; do
+          for dir in . examples cross-router-bench; do
             if git diff --quiet "$BASE_SHA" HEAD -- "$dir/pnpm-lock.yaml"; then
               continue
             fi
             pnpm --dir "$dir" dedupe --ignore-scripts
           done
-          if git diff --quiet -- pnpm-lock.yaml examples/pnpm-lock.yaml benchmarks/cross-router/pnpm-lock.yaml; then
+          if git diff --quiet -- pnpm-lock.yaml examples/pnpm-lock.yaml cross-router-bench/pnpm-lock.yaml; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "Lockfile already deduped — nothing to push."
           else
@@ -134,7 +134,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pnpm-lock.yaml examples/pnpm-lock.yaml benchmarks/cross-router/pnpm-lock.yaml
+          git add pnpm-lock.yaml examples/pnpm-lock.yaml cross-router-bench/pnpm-lock.yaml
           git commit -m "chore(deps): pnpm dedupe lockfile for #${PR_NUMBER}"
           git push
 

@@ -11,10 +11,6 @@ import tsEslint from "typescript-eslint";
 export default tsEslint.config(
   ...eslintConfig,
 
-  // `cross-router/` is a pnpm workspace of its own, linted by its own config
-  // with its own dependencies — none of which this package installs.
-  { ignores: ["cross-router/**"] },
-
   {
     files: ["*.mjs", "*.js"],
     extends: [tsEslint.configs.disableTypeChecked],

@@ -12,9 +12,9 @@
 > измерения). **Факты — на 2026-07-10; перепроверяй против живого дерева** (номера
 > строк/issue дрейфуют; секция 2 помечает якоря, а не истину).
 >
-> **Companion-доки в репо** (читай, не дублируй): `benchmarks/CLAUDE.md`
-> (методология бенча), `benchmarks/cross-router/REPORT-SUMMARY.md` (кросс-когортная
-> матрица rr-статуса), `benchmarks/cross-router/REPORT-<fw>.md` (нарратив по
+> **Companion-доки в репо** (читай, не дублируй): `cross-router-bench/CLAUDE.md`
+> (методология бенча), `cross-router-bench/REPORT-SUMMARY.md` (кросс-когортная
+> матрица rr-статуса), `cross-router-bench/REPORT-<fw>.md` (нарратив по
 > когорте), `packages/*/CLAUDE.md` (архитектура пакетов), `ARCHITECTURE.md`,
 > `IMPLEMENTATION_NOTES.md`.
 >
@@ -78,7 +78,7 @@ matcher/tree ~33 KB. Минимальное приложение, вызвав `
 
 ### 2.2 Бенчмарки — ground truth + как читать
 
-- **Каталог:** `benchmarks/cross-router/` (real browser: Playwright + programmatic
+- **Каталог:** `cross-router-bench/` (real browser: Playwright + programmatic
   Chromium + `CDPSession`). **5 когорт** (react/vue/solid/svelte/angular), каждая
   сравнивается ТОЛЬКО внутри себя (кросс-фреймворк-ранга нет — это сравнение
   фреймворков, не роутеров).
@@ -91,9 +91,9 @@ matcher/tree ~33 KB. Минимальное приложение, вызвав `
 - **12 сценариев:** cold-start · nav-latency · param-nav · nested-switch ·
   active-links · link-build · wide-config · deep-config · search-param-scaling ·
   table-heap · nav-churn · back-forward.
-- **Запуск (если `results/` пуст/устарел):** `node cross-router/run.mjs <scenario>
+- **Запуск (если `results/` пуст/устарел):** `node cross-router-bench/run.mjs <scenario>
   <engine> [framework=react] [runs=30]`; полная матрица —
-  `node cross-router/run-all.mjs 15 [cohort]`. Движки: react `real-router|react-router|tanstack`;
+  `node cross-router-bench/run-all.mjs 15 [cohort]`. Движки: react `real-router|react-router|tanstack`;
   vue `real-router|vue-router|tanstack`; solid `real-router|solid-router|tanstack`;
   svelte `real-router|sv-router|mateo-router`; angular `real-router|angular-router`.
 

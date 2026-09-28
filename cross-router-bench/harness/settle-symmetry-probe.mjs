@@ -11,7 +11,7 @@
 //                        absorbs it into the next nav, but flag it (per-nav view is
 //                        skewed; consider a task-boundary / double-rAF settle point).
 // Run across a sync engine (near-0 tail expected) and the async ones (the concern).
-//   node cross-router/harness/settle-symmetry-probe.mjs <engine> [framework=react]
+//   node cross-router-bench/harness/settle-symmetry-probe.mjs <engine> [framework=react]
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -23,7 +23,7 @@ import { attachCDP, installNavMetric } from "./cdp.mjs";
 const [engine, framework = "react"] = process.argv.slice(2);
 if (!engine) {
   console.error(
-    "usage: node cross-router/harness/settle-symmetry-probe.mjs <engine> [framework=react]",
+    "usage: node cross-router-bench/harness/settle-symmetry-probe.mjs <engine> [framework=react]",
   );
   process.exit(1);
 }

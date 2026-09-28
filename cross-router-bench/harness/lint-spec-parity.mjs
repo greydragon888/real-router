@@ -17,8 +17,8 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { relative } from "node:path";
 
-const HERE = import.meta.dirname; // benchmarks/cross-router/harness
-const CR = `${HERE}/..`; //          benchmarks/cross-router
+const HERE = import.meta.dirname; // cross-router-bench/harness
+const CR = `${HERE}/..`; //          cross-router-bench
 
 function walk(dir, out = []) {
   let entries;

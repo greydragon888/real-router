@@ -1,7 +1,0 @@
-# Raw machine output — the JSON results feed the infographic deck; not committed
-results/
-# Isolated-matcher microbench output (pure Node; feeds the wide-config matcher card)
-matcher-bench/results.json
-# Per-app Vite build output
-**/dist/
-run-logs/

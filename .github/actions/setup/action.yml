@@ -23,7 +23,7 @@ inputs:
     description:
       Directory, relative to the repository root, that `pnpm install` runs
       in. Default "." installs the root workspace; a workspace of its own
-      (benchmarks/cross-router) passes its directory and installs only that.
+      (cross-router-bench) passes its directory and installs only that.
     required: false
     default: "."
 runs:

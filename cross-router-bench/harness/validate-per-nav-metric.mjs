@@ -9,7 +9,7 @@
 // Relative/binary (Δ between inject levels on ONE machine in seconds) → load-tolerant,
 // unlike the competitive bench. Do NOT merge the re-instrumentation without this green.
 //
-//   node cross-router/harness/validate-per-nav-metric.mjs
+//   node cross-router-bench/harness/validate-per-nav-metric.mjs
 import { chromium } from "playwright";
 
 import { attachCDP, getMetrics, installNavMetric } from "./cdp.mjs";

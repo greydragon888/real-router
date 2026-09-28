@@ -145,7 +145,7 @@ export function unreadSharedDirs(sharedDirs, aliases, linted) {
 /**
  * The tracked files of this workspace: every file less those under a
  * directory that holds a `pnpm-workspace.yaml` of its own. Such a directory
- * is a separate workspace (`examples/`, `benchmarks/cross-router/`), so no
+ * is a separate workspace (`examples/`, `cross-router-bench/`), so no
  * package of this one owns its files — not even the package whose directory
  * holds it, and whose lint command names it by path.
  *

@@ -3,7 +3,7 @@
 // Chromium page.pdf(). print.html is client-rendered (charts are SVG built by JS on load), so
 // we load it, wait for the render, then page.pdf() — capturing the RENDERED page as vector
 // (SVG stays crisp/scalable). Build print.html first: `node deck/build-deck.mjs`.
-//   node cross-router/deck/render-pdf.mjs
+//   node cross-router-bench/deck/render-pdf.mjs
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";

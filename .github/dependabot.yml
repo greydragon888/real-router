@@ -268,7 +268,7 @@ updates:
   # monthly and in one group. @real-router/* is not updated here: the weekly
   # snapshot installs the latest release before it measures.
   - package-ecosystem: "npm"
-    directory: "/benchmarks/cross-router"
+    directory: "/cross-router-bench"
     schedule:
       interval: "monthly"
       time: "04:00"

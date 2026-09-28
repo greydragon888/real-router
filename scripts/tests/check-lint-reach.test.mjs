@@ -323,9 +323,9 @@ test("own tracked files: a nested pnpm-workspace.yaml takes its directory out, t
       "pnpm-workspace.yaml",
       "benchmarks/package.json",
       "benchmarks/adapter-bench/run.mts",
-      "benchmarks/cross-router/pnpm-workspace.yaml",
-      "benchmarks/cross-router/apps/react/main.tsx",
-      "benchmarks/cross-router-notes.md",
+      "benchmarks/nested-bench/pnpm-workspace.yaml",
+      "benchmarks/nested-bench/apps/react/main.tsx",
+      "benchmarks/nested-bench-notes.md",
       "examples/pnpm-workspace.yaml",
       "examples/web/react/basic/src/main.tsx",
     ]),
@@ -333,7 +333,7 @@ test("own tracked files: a nested pnpm-workspace.yaml takes its directory out, t
       "pnpm-workspace.yaml",
       "benchmarks/package.json",
       "benchmarks/adapter-bench/run.mts",
-      "benchmarks/cross-router-notes.md",
+      "benchmarks/nested-bench-notes.md",
     ],
   );
 });

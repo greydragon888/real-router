@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Run the full matrix (every scenario × engine, per cohort) to populate results/
 // (the source the infographic deck is rebuilt from; text REPORT-*.md are retired).
-//   node cross-router/run-all.mjs [runs=15] [framework]
+//   node cross-router-bench/run-all.mjs [runs=15] [framework]
 // No framework arg → all cohorts (react + vue + solid + svelte + angular) = the full matrix.
 // A framework arg restricts to that cohort, using its OWN engine roster.
 //

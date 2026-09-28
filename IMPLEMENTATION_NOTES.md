@@ -12541,3 +12541,20 @@ On 2.10.13 the flag leaves the query alone. Dependabot's turbo group proposed 2.
 ⚠ **This defers the question; it does not settle it.** turbo's configuration reference describes `futureFlags` as behaviour that becomes the default, and its 2.9 release post as 3.0's. On 3.0 the flag cannot be turned off, and both scripts need another answer to "what did this pull request change".
 
 Not measured: the OTLP export. The variable and flag names are the same in both binaries; the metrics of the first post-merge run after this commit show whether they still arrive.
+
+Measured after the push: the post-merge run on `d32b27d8d` (00:57–01:15 UTC) exported — `turbo_run_tasks_attempted_total{ci_job="build", ci_event="push"}` has a sample at 01:15:27Z.
+
+## `cross-router-bench/` moves out of `benchmarks/` (2026-09-28)
+
+**Problem.** The cross-router bench, a pnpm workspace of its own, sat at `benchmarks/cross-router/`, inside the directory of `router-benchmarks`, a package of the root workspace. turbo gives every file under a package's directory to that package, so a pull request that edited only the cross-router bench reached `router-benchmarks` as `FileChanged`, and CI ran the CodSpeed suites' `lint:bench` for it. The nesting also took three exceptions: `!cross-router/**` in the inputs of `lint:bench`, an `ignores` entry in `benchmarks/eslint.config.mjs`, and the `deck/out/` entry in `benchmarks/.gitignore`.
+
+**Solution.** The bench lives at `cross-router-bench/` in the repository root, beside `examples/`, with `bench-cross-router.sh`, its README and a `CLAUDE.md` of its own, split out of `benchmarks/CLAUDE.md`. `benchmarks/` keeps the CodSpeed suites. The three exceptions go; knip ignores `cross-router-bench/**` as it ignores `examples/**` and drops its `benchmarks/**` entry, `CODEOWNERS` names the directory, and the seam census of #2090 globs it beside `benchmarks/`.
+
+**Why — measured.**
+
+- Before, on `d32b27d8d`: a one-line edit to `benchmarks/cross-router/harness/stats.mjs` or to an app's `main.tsx` reported `router-benchmarks` as `FileChanged`, and `benchmarks-lint-filter.mjs` planned `--filter=router-benchmarks`. After, on this change: the same edits under `cross-router-bench/` report `//` alone, and the filter plans nothing. An edit to `benchmarks/adapter-bench` plans `router-benchmarks` in both. The CodSpeed gate skips the cross-router edits and runs the adapter-bench one, before and after.
+- `benchmarks/` keeps its name because CodSpeed identifies a benchmark by the file that registers it: `@codspeed/tinybench-plugin` 5.7.1 builds the URI as `` `${rootCallingFile}::${taskName}` ``. Renaming the directory would start every adapter benchmark's history over. The cross-router bench publishes to Pages, not to CodSpeed.
+- knip: without `cross-router-bench/**` in `ignore` it fails on an unlisted dependency; with the bench gone from `benchmarks/`, it reports the `benchmarks/**` entry as one to remove — `ignoreWorkspaces` already covers `router-benchmarks` — and passes without it.
+- The seam census globbed `packages/*` and `benchmarks/**`. Without the new glob its CONTROL cell, which expects the `real-router-full` app, fails, and its tripwire stops reading the cross-router apps.
+
+⚠ **git moves only the tracked files.** A checkout that ran the bench before this commit keeps the gitignored `results/`, `node_modules/`, the apps' `dist/` and `deck/out/` under `benchmarks/cross-router/`. Move them to `cross-router-bench/` by hand, or the next run starts from an empty `results/`.

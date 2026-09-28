@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ONE scenario, ONE process — the worker `run-all.mjs` forks per scenario (#1746).
-//   node cross-router/run-scenario.mjs <runs> <framework> <scenario> <enginesCSV> [--hide-framework]
+//   node cross-router-bench/run-scenario.mjs <runs> <framework> <scenario> <enginesCSV> [--hide-framework]
 //
 // Why a process per scenario, measured: an in-process `vite build()` RETAINS ~73 MB of
 // live heap (~105 MB RSS) per call — after two forced GCs, linearly, with no saturation

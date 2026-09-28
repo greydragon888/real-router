@@ -48,10 +48,10 @@ if git diff --cached --name-only | grep -qx 'examples/pnpm-lock.yaml'; then
   pnpm --dir examples dedupe
   git add examples/pnpm-lock.yaml
 fi
-if git diff --cached --name-only | grep -qx 'benchmarks/cross-router/pnpm-lock.yaml'; then
+if git diff --cached --name-only | grep -qx 'cross-router-bench/pnpm-lock.yaml'; then
   echo "🔗 Auto-deduplicating the cross-router lockfile..."
-  pnpm --dir benchmarks/cross-router dedupe
-  git add benchmarks/cross-router/pnpm-lock.yaml
+  pnpm --dir cross-router-bench dedupe
+  git add cross-router-bench/pnpm-lock.yaml
 fi
 
 # Check dependency version consistency across workspace packages (~1s).

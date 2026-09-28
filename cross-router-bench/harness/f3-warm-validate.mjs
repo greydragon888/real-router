@@ -5,7 +5,7 @@
 // heavier-bundle engines, i.e. warming NARROWS the unfair cross-engine gap #1453
 // describes. Per sample, from ONE reload: measure the cold first-nav, then warm and
 // measure again. No results/ write.
-//   node cross-router/harness/f3-warm-validate.mjs <engine> [framework=react] [variant=wide] [target=<sweep endpoint>]
+//   node cross-router-bench/harness/f3-warm-validate.mjs <engine> [framework=react] [variant=wide] [target=<sweep endpoint>]
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,7 +18,7 @@ const [engine, framework = "react", variant = "wide", targetArg] =
   process.argv.slice(2);
 if (!engine) {
   console.error(
-    "usage: node cross-router/harness/f3-warm-validate.mjs <engine> [framework] [variant] [target]",
+    "usage: node cross-router-bench/harness/f3-warm-validate.mjs <engine> [framework] [variant] [target]",
   );
   process.exit(1);
 }

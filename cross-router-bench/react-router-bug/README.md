@@ -58,7 +58,7 @@ expensive (amortized 9.95 ms) when 120 more levels sit beneath it.
 ## Run
 
 ```sh
-node run.mjs      # in the benchmarks/cross-router workspace — uses its react-router@8
+node run.mjs      # in the cross-router-bench workspace — uses its react-router@8
 # standalone:   npm i react-router@8 && node run.mjs
 ```
 

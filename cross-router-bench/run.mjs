@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // cross-router runner: build app (Vite prod) → serve (vite preview) → run a
 // scenario K times → write results/<framework>/<scenario>/<engine>.json.
-//   node cross-router/run.mjs <scenario> <engine> [framework=react] [runs]
+//   node cross-router-bench/run.mjs <scenario> <engine> [framework=react] [runs]
 // Path-convention: app at apps/<framework>/<engine>/, scenario in scenarios/.
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
@@ -21,7 +21,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 function fail(message) {
   console.error(`run.mjs: ${message}`);
   console.error(
-    "Usage: node cross-router/run.mjs <scenario> <engine> [framework=react] [runs]",
+    "Usage: node cross-router-bench/run.mjs <scenario> <engine> [framework=react] [runs]",
   );
   console.error(`  scenarios: ${Object.keys(SCENARIOS).join(" | ")}`);
   process.exit(1);

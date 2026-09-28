@@ -47,7 +47,7 @@ jobs:
       examples_filter: ${{ steps.examples_plan.outputs.examples_filter }} # explicit --filter set for examples-build; empty when the PR edits no example
       benchmarks_lint_filter: ${{ steps.benchmarks_lint.outputs.benchmarks_lint_filter }} # explicit --filter set for benchmarks-lint; empty when no change reaches the benchmarks from outside
       benchmarks_lint_reasons: ${{ steps.benchmarks_lint.outputs.benchmarks_lint_reasons }}
-      cross_router: ${{ steps.cross_router.outputs.changed }} # 'true' when the PR edits benchmarks/cross-router
+      cross_router: ${{ steps.cross_router.outputs.changed }} # 'true' when the PR edits cross-router-bench
       no_source: ${{ steps.source.outputs.no_source }} # 'true' when the diff holds no code a check could read
     steps:
       - name: Checkout
@@ -172,7 +172,7 @@ jobs:
         if: steps.changes.outputs.should_run == 'true'
         run: node scripts/benchmarks-lint-filter.mjs HEAD^1 HEAD >> "$GITHUB_OUTPUT"
 
-      # benchmarks/cross-router is a workspace of its own, which turbo does not
+      # cross-router-bench is a workspace of its own, which turbo does not
       # see: its lint runs when the PR edits it. `git diff` on its own line, so
       # its failure fails the step instead of reading as an empty diff.
       - name: Plan cross-router lint
@@ -180,7 +180,7 @@ jobs:
         if: steps.changes.outputs.should_run == 'true'
         run: |
           set -euo pipefail
-          EDITED=$(git diff --name-only HEAD^1 HEAD -- benchmarks/cross-router)
+          EDITED=$(git diff --name-only HEAD^1 HEAD -- cross-router-bench)
           if [ -n "$EDITED" ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
@@ -1116,7 +1116,7 @@ jobs:
           pnpm turbo run lint:bench $BENCHMARKS_LINT_FILTER
 
   # ============================================
-  # CROSS-ROUTER LINT: benchmarks/cross-router is a workspace of its own, with
+  # CROSS-ROUTER LINT: cross-router-bench is a workspace of its own, with
   # its own config and plugins, so nothing outside it changes what it reports
   # and turbo does not see it. It runs when the PR edits it; `.husky/pre-push`
   # runs the same script on every push.
@@ -1133,7 +1133,7 @@ jobs:
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
         with:
-          working-directory: benchmarks/cross-router
+          working-directory: cross-router-bench
 
       - name: Lint the cross-router bench
         run: pnpm lint:cross-router
@@ -1954,7 +1954,7 @@ jobs:
           # example, which most PRs do not. When it DOES run, a failure is hard.
           # benchmarks-lint likewise: it runs only when a PR edits the
           # benchmarks or a change reaches them from outside (#2402);
-          # cross-router-lint only when the PR edits benchmarks/cross-router.
+          # cross-router-lint only when the PR edits cross-router-bench.
           if [[ "$PATH_OK" == "1" ]] && [[ "$LINTS" == "success" ]] && ok "$SMOKE" && ok "$COVERAGE" && ok "$EXAMPLES" && ok "$BENCHMARKS_LINT" && ok "$CROSS_ROUTER_LINT"; then
             echo "✅ All checks passed"
             exit 0

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // benchmarks-lint-filter.mjs — which workspaces linted by `lint:bench` does a
 // range reach, by an edit to them or from outside them (#2402)? Today that is
-// `router-benchmarks` alone: the examples and `benchmarks/cross-router` are
+// `router-benchmarks` alone: the examples and `cross-router-bench` are
 // workspaces of their own, which turbo does not see.
 //
 //   node scripts/benchmarks-lint-filter.mjs <base> <head> >> "$GITHUB_OUTPUT"

@@ -203,8 +203,8 @@
     "benchmarks"
   ],
   "ignore": [
-    "benchmarks/**",
-    "examples/**"
+    "examples/**",
+    "cross-router-bench/**"
   ],
   "ignoreDependencies": [
     "@stryker-mutator/api",

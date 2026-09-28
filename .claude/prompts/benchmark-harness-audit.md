@@ -28,7 +28,7 @@
 > Этот промпт их **ВАЛИДИРУЕТ**. **Гоняй ЭТОТ ПЕРВЫМ.** Dimension-находка →
 > обнови §2.3 perf-промпта + карту метрик в `/bench-report`/`/perf-optimize`
 > скилах. Пер-сценарные причинные находки — в трекаемый ledger
-> `benchmarks/cross-router/SCENARIO-LAG-ANALYSIS.md` (confidence + cause-class),
+> `cross-router-bench/SCENARIO-LAG-ANALYSIS.md` (confidence + cause-class),
 > харнесс-находки — в отчёт §8.
 
 ---
@@ -73,7 +73,7 @@ downstream: деку (публичная инфографика!), ledger, ко�
 
 ## 2. Карта харнесса (факты-якоря 2026-07-18 — перепроверь)
 
-Каталог: `benchmarks/cross-router/`.
+Каталог: `cross-router-bench/`.
 
 ### 2.1 Файлы
 
@@ -269,7 +269,7 @@ parent давал fuzzy 2-match → ложный O(1)-флэт → ledger зап
 
 **Отчёт документом** `.claude/benchmark-harness-audit-YYYY-MM-DD.md` (рядом с
 прогонами 07-12). Пер-сценарные причинные находки — дублируй в ledger
-(`benchmarks/cross-router/SCENARIO-LAG-ANALYSIS.md`, формат confidence+cause-class).
+(`cross-router-bench/SCENARIO-LAG-ANALYSIS.md`, формат confidence+cause-class).
 
 ```
 # real-router — аудит бенчмарк-харнесса (дата)

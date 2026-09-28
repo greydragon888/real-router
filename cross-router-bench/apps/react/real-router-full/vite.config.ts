@@ -7,8 +7,8 @@ import { defineConfig } from "vite";
 // quantifies "the cost of enabled capabilities" over the bare real-router cell.
 // NOT part of run-all / REPORT engine rosters (apples-to-oranges vs bare
 // competitors) — run manually:
-//   node cross-router/run.mjs nav-latency real-router-full react 50
-//   node cross-router/run.mjs param-nav  real-router-full react 50
+//   node cross-router-bench/run.mjs nav-latency real-router-full react 50
+//   node cross-router-bench/run.mjs param-nav  real-router-full react 50
 // Same build settings as the base variant (production dist, esbuild minify).
 export default defineConfig({
   plugins: [react()],

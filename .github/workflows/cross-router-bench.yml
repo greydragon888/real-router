@@ -3,7 +3,7 @@ name: Cross Routers Benchmarks
 # Scheduled snapshot of the cross-router Playwright + CDP benchmark matrix (5 cohorts ×
 # 12 scenarios) → Pages dashboard + step-summary + artifact. It measures the latest npm
 # release of @real-router/* against the competitors' releases, installed in the
-# benchmarks/cross-router workspace; this checkout's packages/ are not built. GHA runners are shared/noisy,
+# cross-router-bench workspace; this checkout's packages/ are not built. GHA runners are shared/noisy,
 # so this is an HONEST SNAPSHOT with RME annotation, NOT a regression gate. Action majors
 # pinned to the current majors (checkout v7 · upload-artifact v7 · download-artifact v8 · pages v5).
 
@@ -47,18 +47,18 @@ jobs:
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v7
-      # pnpm + Node 24 + `pnpm install --frozen-lockfile` of benchmarks/cross-router ONLY: it is
+      # pnpm + Node 24 + `pnpm install --frozen-lockfile` of cross-router-bench ONLY: it is
       # a pnpm workspace of its own, and nothing it runs reads the root's node_modules.
       - uses: ./.github/actions/setup
         with:
           node-cache: "" # persistent self-hosted store survives between runs → skip the ~200 MB cache tarball (as codspeed.yml)
-          working-directory: benchmarks/cross-router
+          working-directory: cross-router-bench
 
       # spec-parity preflight — ~2 s static scan, fail-fast BEFORE the ~2.8h matrix.
       # A drifted sweep constant silently drops an @N point per cohort (jagged snapshot); catch it in seconds.
       - name: Spec-parity preflight
         run: pnpm lint:spec-parity
-        working-directory: benchmarks/cross-router
+        working-directory: cross-router-bench
 
       # The snapshot measures the LATEST npm release of @real-router/*, as it measures the
       # competitors' published releases. The lockfile records whichever release was current when
@@ -67,25 +67,25 @@ jobs:
       # admits patches only).
       - name: Update @real-router/* to the latest release
         run: pnpm update --no-save "@real-router/*"
-        working-directory: benchmarks/cross-router
+        working-directory: cross-router-bench
 
       # playwright ships NO install script → browsers don't arrive with `pnpm install` (by design);
-      # `pnpm exec` resolves playwright only inside benchmarks/cross-router (its dep) → working-directory. On the persistent
+      # `pnpm exec` resolves playwright only inside cross-router-bench (its dep) → working-directory. On the persistent
       # self-hosted store (node-cache:"") the pinned Chromium survives between runs, so this is a fast no-op AFTER the
       # one-time VPS pre-install. The browser revision is seeded out-of-band ONCE, because this VPS's network
       # DPI-throttles the Playwright CDN. So are its system libs: NO --with-deps, which runs `apt-get update` +
       # `apt-get install` as root on every call, on a co-tenant production host. Re-seed on a playwright bump —
-      # benchmarks/CLAUDE.md carries the revision to seed, so it is not restated here.
+      # cross-router-bench/CLAUDE.md carries the revision to seed, so it is not restated here.
       - name: Install Chromium (expects the one-time VPS pre-install)
         run: pnpm exec playwright install chromium
-        working-directory: benchmarks/cross-router
+        working-directory: cross-router-bench
 
       # matcher-bench/results.json is gitignored → it is deck-extract's input and absent on a fresh checkout.
       # Regenerate it (pure Node; after the update, so the engines load the release the matrix builds). µs absolutes
       # are noisier on a shared VM, but the O(1)-vs-O(N) matcher-curve SHAPE is hardware-invariant.
       - name: Isolated matcher microbench
         run: node --expose-gc matcher-bench/run.mjs
-        working-directory: benchmarks/cross-router
+        working-directory: cross-router-bench
 
       # Same cgroup sampler as the CodSpeed jobs (#2376) — same host, same unit,
       # same `MemoryMax=5G` ceiling, so the same exposure. The rationale is
@@ -144,7 +144,7 @@ jobs:
             fi
           done
           exit $rc
-        working-directory: benchmarks/cross-router
+        working-directory: cross-router-bench
         # 300 min covers all five cohorts (~2.8 h measured) with ~1.8× headroom,
         # and — unlike the previous 600 — it is REACHABLE: `timeout-minutes`
         # defaults to 360 at the JOB level, so a 600-minute step cap could never
@@ -178,7 +178,7 @@ jobs:
       - name: Rebuild deck snapshot
         id: deck
         run: node deck/deck-extract.mjs && node deck/build-deck.mjs
-        working-directory: benchmarks/cross-router
+        working-directory: cross-router-bench
 
       # render the print/PDF edition (deck/print.html) → cross-router-report.pdf via Playwright's
       # Chromium page.pdf (the same browser the matrix already drives). Non-fatal: a PDF failure
@@ -188,7 +188,7 @@ jobs:
         if: ${{ !cancelled() && steps.deck.outcome == 'success' }}
         continue-on-error: true
         run: node deck/render-pdf.mjs
-        working-directory: benchmarks/cross-router
+        working-directory: cross-router-bench
 
       # RME watch — REPORT-ONLY, never fails the run. Breaches surface here (the offenders in
       # this step's log) and in the step summary's RME watch section, but the workflow indicator
@@ -201,7 +201,7 @@ jobs:
       # failure, the run stays green.
       - name: RME watch (report-only)
         continue-on-error: true
-        working-directory: benchmarks/cross-router
+        working-directory: cross-router-bench
         run: node harness/rme-gate.mjs 15 40
 
       # stamp + win/loss/parity grid (advisory competitive-ratio) + RME watch, from the fresh deck-data.json.
@@ -212,7 +212,7 @@ jobs:
         # ci-summary from rendering a broken/empty snapshot.
         if: ${{ !cancelled() && steps.deck.outcome == 'success' }}
         run: node harness/ci-summary.mjs >> "$GITHUB_STEP_SUMMARY"
-        working-directory: benchmarks/cross-router
+        working-directory: cross-router-bench
 
       # ONE artifact — raw numbers + matcher input + the rebuilt CI deck.
       - name: Upload results + CI deck
@@ -224,11 +224,11 @@ jobs:
           name: bench-results
           retention-days: 30
           path: |
-            benchmarks/cross-router/results
-            benchmarks/cross-router/matcher-bench/results.json
-            benchmarks/cross-router/deck/out/deck.html
-            benchmarks/cross-router/deck/out/deck-data.json
-            benchmarks/cross-router/deck/out/cross-router-report.pdf
+            cross-router-bench/results
+            cross-router-bench/matcher-bench/results.json
+            cross-router-bench/deck/out/deck.html
+            cross-router-bench/deck/out/deck-data.json
+            cross-router-bench/deck/out/cross-router-report.pdf
 
   publish:
     # One snapshot → Pages. The self-contained CI deck.html is the landing page.
@@ -368,7 +368,7 @@ jobs:
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
         with:
-          working-directory: benchmarks/cross-router
+          working-directory: cross-router-bench
 
       - name: Lint the cross-router bench
         run: pnpm lint:cross-router
