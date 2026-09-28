@@ -12507,3 +12507,13 @@ The `@angular/build>vite` comments of all three workspaces stop naming the vite 
 **Solution.** Both entries go, with their comments.
 
 **Why — measured.** Every postcss the floor admits declares a fixed nanoid: 8.5.26 `^3.3.17`, 8.5.27 and 8.5.28 `^3.3.18`. Removing the entries changed each lockfile by its override line alone; nanoid stays 3.3.18, and `dedupe --check`, the frozen installs and `lint:audit` pass.
+
+## A pull request that edits `benchmarks/` is linted in CI (2026-09-28)
+
+**Problem.** `scripts/benchmarks-lint-filter.mjs` counted turbo's `FileChanged` among its LOCAL_REASONS, as if something else in CI linted a workspace a pull request edits. For the examples "Examples (affected)" did; for `router-benchmarks` nothing did — the pipeline runs no `lint:bench` — so a pull request that edited `benchmarks/` merged without it, and only pre-push and the weekly run read it.
+
+**Solution.** LOCAL_REASONS holds `DependencyChanged` alone, so an edit to `benchmarks/` puts `router-benchmarks` into the `benchmarks-lint` job, which drops "(outside changes)" from its name.
+
+**Why — measured, in a clean worktree.** On `b6cb5c547`, which edited `benchmarks/eslint.config.mjs`, the old filter planned nothing and the new one plans `router-benchmarks` (`FileChanged`). A commit touching only `packages/core`, one touching only `packages/react`, and one touching only `.github/dependabot.yml` plan nothing under either.
+
+⚠ **`turbo query affected` counts uncommitted changes, even with an explicit `--head`.** Run in a working tree that edited `benchmarks/CLAUDE.md`, every range above reported `router-benchmarks` as `FileChanged`, blaming that file. CI checks out a clean tree, so its plans are unaffected; a local measurement of the filter needs a clean one.

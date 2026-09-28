@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // benchmarks-lint-filter.mjs — which workspaces linted by `lint:bench` does a
-// range reach from OUTSIDE them (#2402)? Today that is `router-benchmarks`
-// alone: the examples and `benchmarks/cross-router` are workspaces of their
-// own, which turbo does not see.
+// range reach, by an edit to them or from outside them (#2402)? Today that is
+// `router-benchmarks` alone: the examples and `benchmarks/cross-router` are
+// workspaces of their own, which turbo does not see.
 //
 //   node scripts/benchmarks-lint-filter.mjs <base> <head> >> "$GITHUB_OUTPUT"
 //
@@ -12,12 +12,12 @@
 //
 // The answer is turbo's package-level `affected` reason. A workspace counts
 // unless turbo gives it one of LOCAL_REASONS:
-// - `FileChanged` — the range edits the workspace itself, which pre-push lints.
 // - `DependencyChanged` — a library it depends on changed; pre-push and the
 //   weekly lint in `cross-router-bench.yml` read it.
-// Anything else lints: a global input such as the root `eslint.config.mjs` or
-// `turbo.json`, a lockfile change such as an ESLint bump, or a reason a later
-// turbo adds.
+// Anything else lints: an edit to the workspace itself (`FileChanged`) — the
+// pipeline runs no `lint:bench` —, a global input such as the root
+// `eslint.config.mjs` or `turbo.json`, a lockfile change such as an ESLint
+// bump, or a reason a later turbo adds.
 //
 // ⚠ Package-level, not `affectedTasks`. Measured on turbo 2.10.13, a one-line
 // edit to one example reports all 143 `lint:example` tasks as `TaskFileChanged`
@@ -32,7 +32,7 @@ import { join } from "node:path";
 export const LINT_TASKS = ["lint:bench"];
 
 /** Reasons already covered elsewhere — see the header. */
-export const LOCAL_REASONS = new Set(["FileChanged", "DependencyChanged"]);
+export const LOCAL_REASONS = new Set(["DependencyChanged"]);
 
 /** Whether the workspace at `dir` declares one of LINT_TASKS. */
 export function hasLintTask(dir) {

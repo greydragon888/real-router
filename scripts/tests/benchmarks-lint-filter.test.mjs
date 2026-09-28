@@ -1,7 +1,7 @@
-// benchmarks-lint-filter.test.mjs — which workspaces CI lints for a change made
-// outside them. The fixtures keep the examples of the ranges they were measured
-// on, when the examples were members of the root workspace: the plan does not
-// depend on which workspace declares the lint task.
+// benchmarks-lint-filter.test.mjs — which workspaces CI lints for a change: an
+// edit to them, or one made outside them. The fixtures keep the examples of the
+// ranges they were measured on, when the examples were members of the root
+// workspace: the plan does not depend on which workspace declares the task.
 //
 // Run:  node --test scripts/tests/benchmarks-lint-filter.test.mjs
 //
@@ -88,7 +88,7 @@ test("#2395: a root eslint.config.mjs edit lints them all", () => {
   assert.equal(plan.packages.length, 3);
 });
 
-test("a library change lints nothing: the weekly examples.yml owns it", () => {
+test("a library change lints nothing: pre-push and the weekly lint own it", () => {
   const plan = planBenchmarksLint(
     query(
       item("@real-router/core", "packages/core", "FileChanged"),
@@ -105,22 +105,19 @@ test("a library change lints nothing: the weekly examples.yml owns it", () => {
   assert.deepEqual(plan.packages, []);
 });
 
-test("an edited example is left to Examples (affected); the rest of a mixed range still lints", () => {
-  // f6c97513d: a grouped react bump edits some examples' manifests and moves
-  // the lockfile under the others.
+test("an edit to the workspace itself lints it: the pipeline runs no lint:bench", () => {
+  // b6cb5c547 edited benchmarks/eslint.config.mjs; with FileChanged local, CI
+  // linted nothing for it.
   const plan = planBenchmarksLint(
     query(
-      item(
-        "react-combined-example",
-        "examples/web/react/combined",
-        "FileChanged",
-      ),
-      item("vue-basic-example", "examples/web/vue/basic", "LockfileChanged"),
+      item("//", "", "FileChanged"),
+      item("router-benchmarks", "benchmarks", "FileChanged"),
     ),
     lints,
   );
 
-  assert.deepEqual(plan.packages, ["vue-basic-example"]);
+  assert.deepEqual(plan.packages, ["router-benchmarks"]);
+  assert.deepEqual([...plan.reasons], [["FileChanged", 1]]);
 });
 
 test("a reason outside LOCAL_REASONS lints, including one turbo has not shipped", () => {
@@ -155,9 +152,9 @@ test("a query without affectedPackages throws instead of planning nothing", () =
   );
 });
 
-test("turbo still emits both LOCAL_REASONS", () => {
-  // A rename would move every library PR or every edited example onto the
-  // full lint, silently. The installed turbo's schema is the authority.
+test("turbo still emits the LOCAL_REASONS", () => {
+  // A rename would move every library PR onto the full lint, silently. The
+  // installed turbo's schema is the authority.
   const out = execFileSync(
     "pnpm",
     [
