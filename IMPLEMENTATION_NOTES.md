@@ -12839,3 +12839,16 @@ It surfaced as `navigate/pre-commit-listener` going from 11.9 to 7.4 ms between 
 - A local run sent with `ci.cpu=Apple_M3_Pro` reached Grafana as the label `ci_cpu` on `turbo_run_tasks_attempted_total`.
 - The reduction was run on four `cpuinfo` samples: AMD EPYC, an Intel model with `(R)` and `@`, a KVM model with a comma, and a file without the line.
 - Every job identity's series now splits by the models the hosted pool hands out. The next analysis checks the active series against the 10k budget.
+
+## `sources` takes core's `type-check` split through `extends` (2026-09-29)
+
+**Problem.** `@real-router/sources` sits upstream of the six adapters, and its `type-check` checked one program over `src` and `tests` — the shape core had before "Core's `type-check` checks `src` only; its tests have `type-check:tests`". A change to a `sources` test re-keyed 28 of 116 tasks, among them the adapters' `type-check`, `lint`, `test` and `test:properties` (`--dry=json`). Since 29.08, 5 of the 12 commits that changed a `.ts` file in `sources` changed none under `src/`.
+
+**Solution.** `packages/sources/turbo.json` is `"extends": ["//", "@real-router/core"]`, so it takes core's package configuration whole: `type-check` over `src` through its own `tsconfig.src.json`, `type-check:tests` over the whole tsconfig, and the negations. Core's configuration gives `type-check:tests` `dependsOn: ["^type-check"]`: both `sources` programs read core's and route-utils' `src` through the `@real-router/internal-source` condition (`tsc --listFilesOnly`), and without the edge a change there would not re-key the check of the tests. Core declares no workspace dependency, so the edge adds nothing to core's own graph.
+
+**Why — measured.**
+
+- `--dry=json`, one edit at a time: a `sources` test re-keys 4 tasks, all of `sources`; a `sources` `src` edit still re-keys 36, the six adapters included; a core `src` edit re-keys `sources#type-check:tests` with everything else.
+- The `src` program takes 0.8 s cold against 1.1 s for the whole one (M3 Pro, `--incremental false`).
+
+⚠ **`packages/core/turbo.json` is a shared configuration now:** an edit there changes the tasks of every package that extends it.
