@@ -12853,6 +12853,8 @@ It surfaced as `navigate/pre-commit-listener` going from 11.9 to 7.4 ms between 
 
 ⚠ **`packages/core/turbo.json` is a shared configuration now:** an edit there changes the tasks of every package that extends it.
 
+⚠ **Any edit to `packages/core/turbo.json` re-keys the whole graph.** A package's own `turbo.json` is an input of its tasks, so the edit re-keys core's `type-check`, and every package reaches that task through `^type-check`. Measured with `--dry=json` on 2026-09-29: an edit that changes no task's behaviour — the file reformatted, plus a key set to the value it already inherits — re-keyed 121 of 121 tasks in all 23 packages.
+
 ## Four more upstream packages take core's `type-check` split (2026-09-29)
 
 **Problem.** The shape core and `sources` had holds for every package another one depends on: a dependent keys on its upstream's `type-check`, and that task read the upstream's tests. Measured with `--dry=json` on one test edit, and with `git log` since 29.08:
