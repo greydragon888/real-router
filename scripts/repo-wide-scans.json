@@ -31,6 +31,10 @@
       "reads": "every package's src"
     },
     {
+      "file": "packages/core/tests/functional/control-byte-authority.test.ts",
+      "reads": "every tracked file in the repository, bar the binary formats it names"
+    },
+    {
       "file": "packages/core/tests/functional/door-census/application.test.ts",
       "reads": "every plugin's factory and types, every adapter's Link and provider surface, shared/dom-utils, and the example apps"
     },

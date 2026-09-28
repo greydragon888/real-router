@@ -12589,3 +12589,16 @@ Measured after the push: the post-merge run on `d32b27d8d` (00:57–01:15 UTC) e
 - Under `--no-opt --predictable`, a batch of 1024 takes 1.23 ms against `sync-baseline`'s 0.91 ms at 512; an op costs about 0.7× a `sync-baseline` op. K=1024 keeps the mass above that bench's. Its simulated mass is inferred rather than measured — the first CodSpeed run on master is the reading.
 
 ⚠ The new benchmark changes the suite's composition, so that first comparison may step the benchmarks after it in the process (GC schedule, «CodSpeed benchmark gate — consolidated record»).
+
+## Tracked text files carry no raw control byte (2026-09-28)
+
+**Problem.** Six tracked sources held raw control bytes where an escape was meant: ten NULs in key separators, string literals and comments, and a regex character class spelled with raw U+0000, U+001F and U+007F. Git classified each file as binary, so rg skipped it in a directory search, `git grep` answered "Binary file … matches" without the line, and `git show` printed `Bin`. The files parsed and their tests passed, so no gate noticed. `74d330c6e` wrote the bytes as escapes.
+
+**Solution.** `packages/core/tests/functional/control-byte-authority.test.ts`, registered in `scripts/repo-wide-scans.json`, reads every tracked regular file except the binary formats it names by extension — `png`, `ico`, `icns` — and fails on any C0 control byte other than TAB and LF, on DEL, and on a CR that does not end a CRLF.
+
+**Why — measured.**
+
+- The rule is the byte rather than git's verdict. In a file of 300 printable bytes, git classifies one raw ESC, BEL or DEL as text and a NUL or a lone CR as binary, and rg skips only the file with the NUL. The unescaped byte is the defect in every case.
+- After the fix, the 6,116 tracked files git reads as text carry no C0 byte other than TAB and LF, no CR and no DEL, so the rule holds without an exemption. Of the rest, 100 are images — 96 `png`, two `ico`, two `icns` — and 11 are the symlinks into `shared/`, which the scan skips because the files they name are tracked in their own right.
+- Four mutations each redden their own cell: a raw NUL appended to a tracked script, a rule blind to NUL, a listed extension no tracked file carries, and a filter that skips the dot-directories.
+- Its subject is the whole tree, so it runs with the repo-wide scans rather than behind core's cache key, which a change elsewhere would replay.
