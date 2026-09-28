@@ -3,7 +3,7 @@
  *
  * Covers (RFC §6.3):
  *   Axis A — synchronous `navigate()` paths (incl. deactivation-guard phase and
- *            `subscribe` success fan-out).
+ *            `subscribe` success fan-out), and `navigateToState()`.
  *   Axis C — view-layer: `buildPath` (warm), `isActiveRoute`, `canNavigateTo`,
  *            `areStatesEqual`, `shouldUpdateNode`, `matchPath`.
  *   Axis B — worst-case route/tree inputs reachable under default options
@@ -194,6 +194,57 @@ export async function run(): Promise<void> {
       "navigate/same-state-reject",
       batched(512, () => {
         void router.navigate("about");
+      }),
+    );
+  }
+
+  // navigateToState: the primitive a URL plugin commits through — popstate
+  // (browser / hash), navigate events (navigation), back / forward (memory).
+  // Two committed snapshots swap the way a history replay hands them in, so the
+  // state arrives from outside and takes the foreign-bag adoption path.
+  // K=1024: under the simulation's `--no-opt --predictable` an op costs about
+  // 0.7× a `sync-baseline` op, so twice that bench's K keeps the mass above it.
+  {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "about", path: "/about" },
+    ]);
+
+    await router.start("/");
+    await router.navigate("about");
+    const about = router.getState();
+
+    await router.navigate("home");
+    const home = router.getState();
+
+    if (about === undefined || home === undefined) {
+      throw new Error("navigate/navigateToState: setup committed no state");
+    }
+
+    const api = getPluginApi(router);
+
+    // Each call must commit before the next one starts; an asynchronous commit
+    // would turn every call after the first into a cancellation.
+    void api.navigateToState(about, { replace: true });
+    const committed = router.getState()?.name;
+
+    void api.navigateToState(home, { replace: true });
+
+    if (committed !== "about" || router.getState()?.name !== "home") {
+      throw new Error(
+        "navigate/navigateToState: the commit is not synchronous",
+      );
+    }
+
+    const targets = [about, home] as const;
+    let i = 0;
+
+    bench.add(
+      "navigate/navigateToState",
+      batched(1024, () => {
+        void api.navigateToState(targets[i++ % targets.length], {
+          replace: true,
+        });
       }),
     );
   }

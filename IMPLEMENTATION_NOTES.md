@@ -12573,6 +12573,19 @@ Measured after the push: the post-merge run on `d32b27d8d` (00:57–01:15 UTC) e
 - The functions `navigate-route-swap` ran and the two remaining scenarios do not — hook subscriptions on mount, `RouteView`, Angular's factories — held 0.35–2.11 % of its time. Branches that only a route-name change takes inside shared functions were not measured on their own.
 - Leaks across mount and unmount are guarded by each adapter's stress suite, 14 to 28 files with such cycles per adapter.
 
-⚠ **No CodSpeed benchmark exercises `navigateToState`.** The core suite has none, and the adapter scenario that ran it here could not see it. A regression on the history path (back / forward, popstate, traverse) needs a core bench through `getPluginApi`, where the path is the measured work.
+⚠ **No CodSpeed benchmark exercises `navigateToState`.** The core suite has none, and the adapter scenario that ran it here could not see it. A regression on the history path (back / forward, popstate, traverse) needs a core bench through `getPluginApi`, where the path is the measured work. The next entry adds it.
 
 ⚠ Changing a suite's composition moves the GC schedule of the benchmarks that stay, so the first comparison after this commit may show a one-time step on them («CodSpeed benchmark gate — consolidated record»).
+
+## `navigate/navigateToState` joins the core CodSpeed suite (2026-09-28)
+
+**Problem.** `navigateToState` is the primitive a URL plugin commits through — popstate in the browser and hash plugins, navigate events in navigation-plugin, back / forward in memory-plugin — and no CodSpeed benchmark measured it. The adapter scenario that reached it held it at 0.37–0.93 % of its time, and is gone.
+
+**Solution.** `packages/core/tests/benchmarks/default.bench.ts` gains `navigate/navigateToState`: two committed snapshots swap through `getPluginApi(router).navigateToState(state, { replace: true })`, the way a history replay hands a stored state back. It sits after `same-state-reject`, so `sync-baseline` stays task #1. Its setup refuses to register it unless each call commits before returning.
+
+**Why — measured.**
+
+- The commit is synchronous: `getState()` changes on return, and thousands of alternating calls rejected none. An asynchronous commit would make each call cancel its predecessor, so the setup check guards what the loop measures.
+- Under `--no-opt --predictable`, a batch of 1024 takes 1.23 ms against `sync-baseline`'s 0.91 ms at 512; an op costs about 0.7× a `sync-baseline` op. K=1024 keeps the mass above that bench's. Its simulated mass is inferred rather than measured — the first CodSpeed run on master is the reading.
+
+⚠ The new benchmark changes the suite's composition, so that first comparison may step the benchmarks after it in the process (GC schedule, «CodSpeed benchmark gate — consolidated record»).
