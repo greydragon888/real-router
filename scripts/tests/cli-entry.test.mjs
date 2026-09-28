@@ -44,7 +44,7 @@ const SELF = "scripts/tests/cli-entry.test.mjs";
  * the reason given.
  */
 const CLIS = {
-  "scripts/build-matrix.mjs": { args: [], ran: /turbo \d+\.\d+/ },
+  "scripts/build-matrix.mjs": { args: [], ran: /^mode=(leaf|sharded)$/m },
   "scripts/bundle-size-base.mjs": {
     args: [],
     ran: /Base bundle sizes unavailable/,
