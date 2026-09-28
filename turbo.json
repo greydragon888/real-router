@@ -102,7 +102,7 @@
       "cache": true
     },
     "lint:bench": {
-      "dependsOn": ["^type-check"],
+      "dependsOn": ["^type-check", "type-check:bench"],
       "outputs": [],
       "inputs": [
         "**/*.{ts,tsx,mts,cts,js,jsx,cjs,svelte}",
@@ -140,6 +140,19 @@
         "rollup.*",
         "tsconfig.json",
         "**/tsconfig.json"
+      ],
+      "outputLogs": "errors-only",
+      "cache": true
+    },
+    "type-check:bench": {
+      "dependsOn": ["^type-check"],
+      "outputs": [],
+      "inputs": [
+        "**/*.{ts,tsx,mts,cts}",
+        "**/tsconfig*.json",
+        "package.json",
+        "!**/dist/**",
+        "!**/node_modules/**"
       ],
       "outputLogs": "errors-only",
       "cache": true

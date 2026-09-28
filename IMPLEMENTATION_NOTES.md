@@ -12618,3 +12618,15 @@ Measured after the push: the post-merge run on `d32b27d8d` (00:57–01:15 UTC) e
 - With `DEBUG=vite-tsconfig-paths`, a core run and a svelte run each loaded 867 tsconfig files under the repository root, gitignored worktrees included, and skipped all 867: 863 for having no `paths` or `baseUrl`, and four copies of `benchmarks/tsconfig.json` for an empty `files` list. No resolver was built, so the plugin could not resolve an import.
 - Of the packages installed at the root, only `tsconfck` peers a `typescript` range that excludes 6.0.3. Without the rule, `pnpm install` passes under `strictPeerDependencies: true`, and the lockfile loses three packages — `vite-tsconfig-paths`, `tsconfck`, `globrex` — and gains none.
 - Five alternating pairs of the same one-file core run: median 995 ms with the plugin, 709 ms without. The saving is the plugin's startup parse, so it scales with the tsconfig files under the root, and a fresh checkout has fewer than this one.
+
+## adapter-bench is type-checked by a gate: `type-check:bench` rides `lint:bench` (2026-09-28)
+
+**Problem.** `benchmarks/adapter-bench` has three tsconfigs whose programs together cover every TypeScript file of the suite and of `plugin-seam` (#2159, #2167), and nothing ran them. `router-benchmarks` has no `test` script to pull a `type-check` in, and no hook, CI job or turbo task named the three programs, so a change there was type-checked only by hand. A plain `type-check` script would not have closed it: that task's turbo inputs match `**/*.{ts,tsx,svelte}` and `**/tsconfig.json`, which miss the suite's `.mts` files and `tsconfig.preact.json` / `tsconfig.solid.json`, so an edit to a bench would replay a stale result.
+
+**Solution.** `benchmarks/package.json` gains `type-check:bench` — `tsc --noEmit` over the three configs — and `turbo.json` a task of that name, shaped like `lint:bench`: `dependsOn: ["^type-check"]`, inputs `**/*.{ts,tsx,mts,cts}`, `**/tsconfig*.json` and `package.json`. `lint:bench` depends on it, so it runs wherever the lint runs: pre-push, the CI job that lints a pull request reaching `benchmarks/`, and the weekly `cross-router-bench.yml`.
+
+**Why — measured.**
+
+- The three programs were green before the change and read nothing from `packages/*/dist`, so `^type-check` is enough and no bundle has to come first. Together they cover all 24 tracked TypeScript files under `adapter-bench/` and `plugin-seam/`: 22 in the main program, and the preact and solid apps in their own.
+- In a scratch turbo cache, a cold `lint:bench` ran 17 tasks, `type-check:bench` among them, and a repeat took all 17 from the cache.
+- Five mutations each missed the cache and failed with exit 2: a type error in a `.mts` bench, in the preact app, in the solid app and in `plugin-seam`, and `jsxImportSource` dropped from `tsconfig.preact.json`, which raised the 5 errors #2167 recorded.

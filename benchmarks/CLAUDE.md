@@ -21,7 +21,7 @@ pnpm cpu                # Check CPU load before benchmarking (run from benchmark
 `lint:bench` is ESLint over this tree; the adapter-bench `.svelte` components
 are included, and pre-push runs it after its build. CI runs it too when a pull request edits the tree or a lockfile or
 global-input change reaches it, such as an ESLint bump (#2402), and so does
-the weekly `cross-router-bench.yml`. Run it through turbo — `pnpm turbo run lint:bench --filter=router-benchmarks`: it builds no package, and its `^type-check` puts the packages' `src` into its cache key.
+the weekly `cross-router-bench.yml`. Run it through turbo — `pnpm turbo run lint:bench --filter=router-benchmarks`: it builds no package, its `^type-check` puts the packages' `src` into its cache key, and it depends on `type-check:bench` below, so the type-check runs wherever the lint does.
 
 ⚠ **A lint fix in `adapter-bench/apps` must leave the built bundle
 byte-identical.** The results were measured on those bytes. The rules whose
@@ -29,9 +29,10 @@ fixes change the program are off for those paths in this directory's
 `eslint.config.mjs`, each with the measurement behind it; before trusting a new
 fix there, build the touched apps before and after it and compare the outputs.
 
-⚠ There is no `bench:type-check` script — neither at the root nor here, so no
-gate type-checks this tree. Checking a change by hand takes **three** configs,
-and `benchmarks/tsconfig.json` is not one of them — it holds no file of its own:
+`type-check:bench` runs `tsc` over **three** configs, and `benchmarks/tsconfig.json`
+is not one of them — it holds no file of its own. Its turbo inputs cover `.mts`
+and every `tsconfig*.json`, which the packages' `type-check` inputs do not. By
+hand, the same three:
 
 ```bash
 tsc --noEmit -p benchmarks/adapter-bench/tsconfig.json            # adapter-bench + plugin-seam (all but the two below)

@@ -26,7 +26,8 @@
 #               packages/, its own ESLint config lints each tracked file
 #               of code its lint command names (#2407)
 # - build: Final build to ensure compilation
-# - lint:bench: ESLint over benchmarks/, the CodSpeed suites
+# - lint:bench: tsc (type-check:bench) and ESLint over benchmarks/, the
+#               CodSpeed suites
 # - lint:cross-router: ESLint over cross-router-bench/, a workspace of its
 #                      own, with its own config, then its census of what the
 #                      config reaches; the workspace is installed first
@@ -144,8 +145,9 @@ echo "📦 Building packages..."
 pnpm turbo run build lint:package lint:types
 
 # The task depends on `^type-check`, not on a build: every tsconfig it reads
-# resolves @real-router/* to src. The examples are a workspace of their own and
-# lint only in the weekly examples.yml.
+# resolves @real-router/* to src. It also depends on `type-check:bench`, the
+# three tsc programs of adapter-bench. The examples are a workspace of their own
+# and lint only in the weekly examples.yml.
 echo "🧹 Linting the benchmarks..."
 pnpm turbo run lint:bench --filter=router-benchmarks
 
