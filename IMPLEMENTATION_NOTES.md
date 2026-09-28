@@ -12852,3 +12852,26 @@ It surfaced as `navigate/pre-commit-listener` going from 11.9 to 7.4 ms between 
 - The `src` program takes 0.8 s cold against 1.1 s for the whole one (M3 Pro, `--incremental false`).
 
 ⚠ **`packages/core/turbo.json` is a shared configuration now:** an edit there changes the tasks of every package that extends it.
+
+## Four more upstream packages take core's `type-check` split (2026-09-29)
+
+**Problem.** The shape core and `sources` had holds for every package another one depends on: a dependent keys on its upstream's `type-check`, and that task read the upstream's tests. Measured with `--dry=json` on one test edit, and with `git log` since 29.08:
+
+| package             | commits touching only tests, of those changing `.ts` | dependents' tasks re-keyed per such commit       |
+| ------------------- | ---------------------------------------------------- | ------------------------------------------------ |
+| `browser-plugin`    | 12 of 19                                             | 20 (the five adapters that depend on it)         |
+| `validation-plugin` | 29 of 68                                             | 4 (react)                                        |
+| `ssr-utils`         | 4 of 11                                              | 12 (angular, rsc-server-plugin, ssr-data-plugin) |
+| `ssr-data-plugin`   | 9 of 12                                              | 4 (rsc-server-plugin)                            |
+
+`route-utils` (0 of 2) and `search-schema-plugin` (1 of 4, one dependent) keep one `type-check`.
+
+**Solution.** Each of the four has a `tsconfig.src.json`, the two scripts and a `turbo.json` that extends core's configuration. `browser-plugin` and `ssr-data-plugin` hold a symlink into `shared/` under `src/`, and turbo does not hash through it: their `type-check` inputs held 0 files under `src/browser-env` against 32 under `../../shared/`. Their configuration therefore appends `../../shared/browser-env/**/*.ts` and `../../shared/ssr/**/*.ts` to both tasks with `$TURBO_EXTENDS$`; a bare `extends` would have left the `shared/` files out of the key.
+
+**Why — measured.**
+
+- `--dry=json`, one edit at a time: a test edit in any of the four re-keys its own 4 tasks and nothing else. A `src` edit still re-keys the dependents — 11, 22, 31 and 11 tasks — and a core `src` edit all 121.
+- An edit in `shared/browser-env` or `shared/ssr` still re-keys `type-check` and `type-check:tests` of the package that symlinks it.
+- Each program reads its own `src` and `tests`, the upstream `src` its `^type-check` edges cover, and for validation-plugin `scripts/lib/raiser-head.d.mts`, an input of core's configuration (`tsc --listFilesOnly`).
+
+⚠ **A cross-package read at run time is no type-check input.** `validation-plugin`'s `prefix-reachability-authority-2457` reads core's `tests/fixtures/raiser-heads` from disk, and since core's split no task key covers those files. The test is in `scripts/repo-wide-scans.json`, so `lint:repo-scans` runs it outside the cache on every commit and in Repo Lints.

@@ -39,7 +39,8 @@
   },
   "license": "MIT",
   "scripts": {
-    "type-check": "tsc --noEmit",
+    "type-check": "tsc --noEmit -p tsconfig.src.json",
+    "type-check:tests": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --max-warnings 0 --no-error-on-unmatched-pattern",
     "lint:fix": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0 --no-error-on-unmatched-pattern",
     "test": "vitest run",

@@ -1,0 +1,12 @@
+{
+  "$schema": "../../node_modules/turbo/schema.json",
+  "extends": ["//", "@real-router/core"],
+  "tasks": {
+    "type-check": {
+      "inputs": ["$TURBO_EXTENDS$", "../../shared/browser-env/**/*.ts"]
+    },
+    "type-check:tests": {
+      "inputs": ["$TURBO_EXTENDS$", "../../shared/browser-env/**/*.ts"]
+    }
+  }
+}

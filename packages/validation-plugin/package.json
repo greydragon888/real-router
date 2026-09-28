@@ -43,7 +43,8 @@
   },
   "scripts": {
     "test": "vitest",
-    "type-check": "tsc --noEmit",
+    "type-check": "tsc --noEmit -p tsconfig.src.json",
+    "type-check:tests": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --max-warnings 0",
     "lint:fix": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "test:properties": "vitest run --config vitest.config.properties.mts",
