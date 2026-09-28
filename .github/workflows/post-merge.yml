@@ -79,11 +79,13 @@ jobs:
       # The same stamp as the setup action's (#1745): this job does not use it.
       - name: Stamp CI identity for turbo telemetry
         run: |
+          cpu="$(awk -F': *' '/^model name/ {print $2; exit}' /proc/cpuinfo 2>/dev/null | tr -c 'A-Za-z0-9._-' '_' | tr -s '_' | sed 's/^_//; s/_$//')"
           {
             printf 'TURBO_EXPERIMENTAL_OTEL_RESOURCE=service.name=turbo,service.namespace=real-router'
             printf ',ci.job=%s' "${GITHUB_JOB}"
             printf ',ci.event=%s' "${GITHUB_EVENT_NAME}"
             printf ',ci.runner=%s' "${RUNNER_ENVIRONMENT:-unknown}"
+            printf ',ci.cpu=%s' "${cpu:-unknown}"
             printf ',process.runtime.version=%s\n' "$(node -v)"
           } >> "$GITHUB_ENV"
 

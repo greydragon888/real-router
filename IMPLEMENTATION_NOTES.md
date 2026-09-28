@@ -12827,3 +12827,15 @@ It surfaced as `navigate/pre-commit-listener` going from 11.9 to 7.4 ms between 
 - `--dry=json`, one edit at a time on this tree: a core test re-keys 4 tasks — core's `type-check:tests`, `test`, `test:properties` and `lint`. A core `src` edit still re-keys 116 of 116, the cascade #2432 is for.
 - The `src` program takes 0.8 s cold against 3.3 s for the whole one (M3 Pro, `--incremental false`, two rounds each). The two run in parallel under core's `test`, and the dependents wait for the smaller one.
 - `shared/` and `scripts/lib/` no longer reach a dependent through core's key, but they stay in every package's own `bundle`, `lint`, `test` and `type-check` inputs through the root patterns: a one-line edit in `shared/browser-env/state-guard.ts`, read by three packages, re-keys 113 of 116 tasks. That is left for a decision.
+
+## turbo's telemetry carries the runner's CPU model as `ci.cpu` (2026-09-29)
+
+**Problem.** The second telemetry analysis found a job's speed index bimodal: about 20 % of hosted runs ran at 0.70–0.80 of the rest, and that had already read as "turbo 2.11 is 15 % slower". Nothing in the series said which hardware a run had drawn.
+
+**Solution.** Both stamps, in `.github/actions/setup` and in `post-merge.yml`, add `ci.cpu`: the first `model name` in `/proc/cpuinfo`, reduced to `[A-Za-z0-9._-]` because a comma or `=` in it would split the resource list, and `unknown` when there is none. It is named under `ci.*` because the collector turns only `ci.*` and `process.runtime.version` into labels, so the collector on the host is unchanged.
+
+**Why — measured.**
+
+- A local run sent with `ci.cpu=Apple_M3_Pro` reached Grafana as the label `ci_cpu` on `turbo_run_tasks_attempted_total`.
+- The reduction was run on four `cpuinfo` samples: AMD EPYC, an Intel model with `(R)` and `@`, a KVM model with a comma, and a file without the line.
+- Every job identity's series now splits by the models the hosted pool hands out. The next analysis checks the active series against the 10k budget.
