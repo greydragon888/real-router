@@ -64,6 +64,7 @@ const OUT_OF_SCOPE = [
   ".claude/commands/skill.md",
   "CHANGELOG.md",
   "benchmarks/notes.md",
+  "cross-router-bench/notes.md",
   "examples/web/a/README.md",
   "packages/core/CHANGELOG.md",
 ];
@@ -138,6 +139,7 @@ const SUBDIRECTORIES = [
   "packages",
   "packages/core",
   "benchmarks",
+  "cross-router-bench",
   "examples",
   ".claude",
 ];
