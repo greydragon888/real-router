@@ -125,4 +125,11 @@ elif [ $exit_code -ge 2 ]; then
   exit 0
 fi
 
+# Under --quiet a clean scan prints nothing, which reads the same as a scan that
+# never ran. Only a real exit 0 reaches this line.
+if [ -n "$BASELINE" ]; then
+  echo "✓ semgrep: no newly-introduced findings against $(git rev-parse --short "$BASELINE")"
+else
+  echo "✓ semgrep: no findings"
+fi
 exit 0

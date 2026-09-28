@@ -169,6 +169,11 @@ test("control: from the root, semgrep scans both targets with the local rules", 
   assert.deepEqual(valuesOf(argv, "--config"), ["p/javascript", ".semgrep/"]);
   assert.deepEqual(valuesOf(argv, "--baseline-commit"), [base]);
   assert.deepEqual(argv.slice(-2), ["packages", "shared"]);
+  // A clean scan says so, and names the baseline it was scoped to.
+  const clean =
+    /✓ semgrep: no newly-introduced findings against ([0-9a-f]+)/.exec(output);
+  assert.ok(clean, output);
+  assert.ok(base.startsWith(clean[1]), `${clean[1]} is not ${base}`);
 });
 
 test("a finding blocks, from any directory", () => {
@@ -186,6 +191,7 @@ test("a finding blocks, from any directory", () => {
       /Semgrep found newly-introduced issue/,
       `from ${where}`,
     );
+    assert.doesNotMatch(output, /✓ semgrep/, `from ${where}`);
     assert.equal(ranIn, root, `from ${where}: semgrep must run at the root`);
   }
 });
@@ -218,6 +224,8 @@ test("control: an error of semgrep itself still only warns", () => {
 
   assert.equal(status, 0, output);
   assert.match(output, /semgrep errored \(exit 2/);
+  // A tool error is not a clean scan, and must not print as one.
+  assert.doesNotMatch(output, /✓ semgrep/);
   assert.equal(ranIn, root);
 });
 
@@ -227,5 +235,6 @@ test("control: with no branch delta there is nothing to scan", () => {
 
   assert.equal(status, 0, output);
   assert.match(output, /No branch delta against origin\/master/);
+  assert.doesNotMatch(output, /✓ semgrep/);
   assert.equal(ranIn, undefined);
 });

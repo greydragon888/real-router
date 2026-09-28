@@ -12630,3 +12630,11 @@ Measured after the push: the post-merge run on `d32b27d8d` (00:57–01:15 UTC) e
 - The three programs were green before the change and read nothing from `packages/*/dist`, so `^type-check` is enough and no bundle has to come first. Together they cover all 24 tracked TypeScript files under `adapter-bench/` and `plugin-seam/`: 22 in the main program, and the preact and solid apps in their own.
 - In a scratch turbo cache, a cold `lint:bench` ran 17 tasks, `type-check:bench` among them, and a repeat took all 17 from the cache.
 - Five mutations each missed the cache and failed with exit 2: a type error in a `.mts` bench, in the preact app, in the solid app and in `plugin-seam`, and `jsxImportSource` dropped from `tsconfig.preact.json`, which raised the 5 errors #2167 recorded.
+
+## `check-semgrep.sh` says when a scan came back clean (2026-09-28)
+
+**Problem.** semgrep runs with `--quiet`, and on exit 0 the script printed nothing after the tool's banner, so the pre-push log could not tell a clean scan from a scan that never ran.
+
+**Solution.** After a real exit 0 the script prints `✓ semgrep: no newly-introduced findings against <merge-base>`, or `✓ semgrep: no findings` when there is no baseline. A finding, a tool error and the no-delta exit each leave before that line.
+
+**Why — measured.** `check-semgrep.test.mjs` asserts the line on the clean run, including that it names the baseline commit, and its absence after a finding, a tool error and the no-delta exit. Deleting the line reddens the clean-run test; printing it before the exit-code arms reddens the finding and tool-error tests.
