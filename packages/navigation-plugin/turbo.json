@@ -1,6 +1,6 @@
 {
   "$schema": "../../node_modules/turbo/schema.json",
-  "extends": ["//", "@real-router/core"],
+  "extends": ["//"],
   "tasks": {
     "bundle": {
       "inputs": ["$TURBO_EXTENDS$", "../../shared/browser-env/**/*.ts"]
@@ -12,9 +12,6 @@
       "inputs": ["$TURBO_EXTENDS$", "../../shared/browser-env/**/*.ts"]
     },
     "type-check": {
-      "inputs": ["$TURBO_EXTENDS$", "../../shared/browser-env/**/*.ts"]
-    },
-    "type-check:tests": {
       "inputs": ["$TURBO_EXTENDS$", "../../shared/browser-env/**/*.ts"]
     }
   }

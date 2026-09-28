@@ -309,6 +309,23 @@ const acceptedTree = () => ({
     "sonar.coverage.exclusions=packages/b/src/**,packages/svelte/src/**\n",
   ".size-limit.js":
     'export default [esm("a", "1 kB"), esm("owner", "1 kB")];\n',
+  "turbo.json": JSON.stringify({
+    tasks: Object.fromEntries(
+      ["bundle", "lint", "test", "type-check"].map((task) => [
+        task,
+        { inputs: ["src/**/*.ts"] },
+      ]),
+    ),
+  }),
+  "packages/owner/turbo.json": JSON.stringify({
+    extends: ["//"],
+    tasks: Object.fromEntries(
+      ["bundle", "lint", "test", "type-check"].map((task) => [
+        task,
+        { inputs: ["$TURBO_EXTENDS$", "../../shared/dx/**/*.ts"] },
+      ]),
+    ),
+  }),
 });
 
 const ALIAS_PATH = "packages/owner/src/dx-alias";
@@ -357,7 +374,7 @@ test("CONTROL — the script accepts the tree every drift cell departs from", ()
   assert.equal(run.status, 0, run.stderr);
   assert.match(
     run.stderr,
-    /✓ Coverage scope in sync: 2 components, 2 Sonar coverage-exclusions \(b, svelte\); 3 public packages size-tracked \(exceptions: svelte\)\./,
+    /✓ Coverage scope in sync: 2 components, 2 Sonar coverage-exclusions \(b, svelte\); 3 public packages size-tracked \(exceptions: svelte\); shared\/ consumers keyed on their dir: 1\./,
   );
 });
 
@@ -443,13 +460,21 @@ const DRIFTS = [
     line: /codecov\.yml: no component path "shared\/dx\/\*\*"/,
   },
   {
+    // Without the symlink the owner links no shared dir, so its turbo.json goes
+    // too: kept, its inputs are what check 5 reports as stale.
     name: "an owner with no src/* symlink",
     alias: null,
+    plant: (tree) => {
+      delete tree["packages/owner/turbo.json"];
+    },
     line: /packages\/owner: measures shared\/dx for coverage but has no src\/\* symlink pointing at it/,
   },
   {
     name: "an owner whose src/* symlink points at another dir",
     alias: "../../../shared/other",
+    plant: (tree) => {
+      delete tree["packages/owner/turbo.json"];
+    },
     line: /packages\/owner: measures shared\/dx for coverage but has no src\/\* symlink pointing at it/,
   },
   {
@@ -503,6 +528,56 @@ const DRIFTS = [
         "sonar.coverage.exclusions=packages/b/src/**\n";
     },
     line: /SIZE_LIMIT_EXCEPTIONS lists "svelte" which is not a package/,
+  },
+  {
+    name: "a shared consumer with no turbo.json",
+    plant: (tree) => {
+      delete tree["packages/owner/turbo.json"];
+    },
+    line: /packages\/owner: src\/ links shared\/dx but the package has no turbo\.json/,
+  },
+  {
+    name: "a shared consumer whose task does not list the dir",
+    plant: (tree) => {
+      const turbo = JSON.parse(tree["packages/owner/turbo.json"]);
+
+      turbo.tasks.lint.inputs = ["$TURBO_EXTENDS$"];
+      tree["packages/owner/turbo.json"] = JSON.stringify(turbo);
+    },
+    line: /packages\/owner\/turbo\.json: task "lint" does not list \.\.\/\.\.\/shared\/dx\//,
+  },
+  {
+    // `type-check:tests` is keyed only where the package has the script.
+    name: "a shared consumer with a type-check:tests task that does not list the dir",
+    plant: (tree) => {
+      const pkg = JSON.parse(tree["packages/owner/package.json"]);
+
+      pkg.scripts["type-check:tests"] = "tsc --noEmit";
+      tree["packages/owner/package.json"] = JSON.stringify(pkg);
+    },
+    line: /packages\/owner\/turbo\.json: task "type-check:tests" does not list \.\.\/\.\.\/shared\/dx\//,
+  },
+  {
+    name: "a package that lists a shared dir its src/ does not link",
+    plant: (tree) => {
+      tree["packages/a/turbo.json"] = JSON.stringify({
+        extends: ["//"],
+        tasks: {
+          test: { inputs: ["$TURBO_EXTENDS$", "../../shared/dx/**/*.ts"] },
+        },
+      });
+    },
+    line: /packages\/a\/turbo\.json: task "test" lists \.\.\/\.\.\/shared\/dx\/\*\*\/\*\.ts, but src\/ links no shared\/dx/,
+  },
+  {
+    name: "a root task that lists shared/ for every package",
+    plant: (tree) => {
+      const turbo = JSON.parse(tree["turbo.json"]);
+
+      turbo.tasks.test.inputs.push("../../shared/**/*.ts");
+      tree["turbo.json"] = JSON.stringify(turbo);
+    },
+    line: /turbo\.json: task "test" lists \.\.\/\.\.\/shared\/\*\*\/\*\.ts for every package/,
   },
   {
     name: "a size-limit exception that is private",

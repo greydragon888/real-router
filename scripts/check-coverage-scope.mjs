@@ -36,6 +36,11 @@
  *      package public?" must be answered consistently by every per-package list,
  *      not independently (a package can otherwise be public on npm + a codecov
  *      component + smoke-tested yet silently absent from size tracking).
+ *   5. `turbo.json` — every package whose `src/` symlinks `shared/<dir>` lists
+ *      `../../shared/<dir>/` in the inputs of its cached tasks, in its own
+ *      `turbo.json`; no other package and not the root lists `shared/` there.
+ *      turbo does not hash through a symlink, so a consumer without the input
+ *      replays its tasks from cache after a change in the dir.
  *
  * Emit mode (`--emit`, used by ci.yml's coverage job and sonar-trusted.yml):
  *   prints `sources=…`, `tests=…`, `reports=…` lines for `$GITHUB_OUTPUT`,
@@ -357,6 +362,104 @@ for (const pkg of SIZE_LIMIT_EXCEPTIONS.keys()) {
   }
 }
 
+// --- Check 5: turbo keys each shared/ consumer on its own dir, and only it ---
+// turbo does not hash through a symlink: a package whose src/ links
+// shared/<dir> has none of those files among its inputs unless its turbo.json
+// names ../../shared/<dir>/ in each cached task that reads src/. A consumer
+// that omits it replays that task from cache after a change in the dir. The
+// consumers are DERIVED from the symlinks, as for the lint alias above, and
+// each declares the dir in its own turbo.json, so an input inherited through
+// `extends` does not count. The reverse directions keep shared/ out of the key
+// of everything else: a package that links no shared/<dir>, and the root
+// turbo.json, which would re-key every package on every shared edit.
+const SHARED_KEYED_TASKS = ["bundle", "lint", "test", "type-check"];
+const SHARED_PREFIX = "../../shared/";
+
+/** @param {string} file */
+const readTurbo = (file) =>
+  existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : undefined;
+
+/** @param {{ inputs?: string[] } | undefined} task @returns {string[]} */
+const sharedInputsOf = (task) =>
+  (task?.inputs ?? []).filter((glob) => glob.startsWith(SHARED_PREFIX));
+
+/** The shared dirs a package's src/ links, from its symlinks. */
+const linkedSharedDirs = (pkg) => {
+  const srcDir = join(PKG_DIR, pkg, "src");
+
+  if (!isRealDir(srcDir)) return [];
+
+  return readdirSync(srcDir).flatMap((entry) => {
+    try {
+      const target = join(srcDir, readlinkSync(join(srcDir, entry)));
+
+      return sharedDirs.filter((dir) => target === join(SHARED_DIR, dir));
+    } catch {
+      return [];
+    }
+  });
+};
+
+let sharedConsumers = 0;
+
+for (const pkg of packages) {
+  const dirs = linkedSharedDirs(pkg);
+  const turbo = readTurbo(join(PKG_DIR, pkg, "turbo.json"));
+
+  if (dirs.length > 0) sharedConsumers++;
+
+  if (dirs.length > 0 && turbo === undefined) {
+    errors.push(
+      `packages/${pkg}: src/ links shared/${dirs.join(", shared/")} but the package has no turbo.json — turbo does not hash through the symlink, so no task of it is keyed on those files`,
+    );
+    continue;
+  }
+
+  const scripts =
+    JSON.parse(readFileSync(join(PKG_DIR, pkg, "package.json"), "utf8"))
+      .scripts ?? {};
+  const keyedTasks = [
+    ...SHARED_KEYED_TASKS,
+    ...(scripts["type-check:tests"] === undefined ? [] : ["type-check:tests"]),
+  ];
+
+  for (const dir of dirs) {
+    for (const task of keyedTasks) {
+      const listed = sharedInputsOf(turbo.tasks?.[task]).some((glob) =>
+        glob.startsWith(`${SHARED_PREFIX}${dir}/`),
+      );
+
+      if (!listed) {
+        errors.push(
+          `packages/${pkg}/turbo.json: task "${task}" does not list ${SHARED_PREFIX}${dir}/ — turbo does not hash through the src/ symlink, so a change there replays the task from cache`,
+        );
+      }
+    }
+  }
+
+  for (const [task, definition] of Object.entries(turbo?.tasks ?? {})) {
+    for (const glob of sharedInputsOf(definition)) {
+      const dir = glob.slice(SHARED_PREFIX.length).split("/")[0];
+
+      if (!dirs.includes(dir)) {
+        errors.push(
+          `packages/${pkg}/turbo.json: task "${task}" lists ${glob}, but src/ links no shared/${dir} — the task re-runs on every change there`,
+        );
+      }
+    }
+  }
+}
+
+const rootTurbo = readTurbo(join(ROOT, "turbo.json"));
+
+for (const task of SHARED_KEYED_TASKS) {
+  for (const glob of sharedInputsOf(rootTurbo?.tasks?.[task])) {
+    errors.push(
+      `turbo.json: task "${task}" lists ${glob} for every package — each shared/ consumer declares its own dir in its turbo.json`,
+    );
+  }
+}
+
 // --- Report ------------------------------------------------------------------
 if (errors.length > 0) {
   console.error("✖ Coverage-scope drift detected (#732):\n");
@@ -390,6 +493,7 @@ if (emitMode) {
   console.error(
     `✓ Coverage scope in sync: ${coverageProducing.length} components, ` +
       `${mustCoverageExclude.length} Sonar coverage-exclusions (${mustCoverageExclude.join(", ")}); ` +
-      `${publicCount} public packages size-tracked (exceptions: ${[...SIZE_LIMIT_EXCEPTIONS.keys()].join(", ")}).`,
+      `${publicCount} public packages size-tracked (exceptions: ${[...SIZE_LIMIT_EXCEPTIONS.keys()].join(", ")}); ` +
+      `shared/ consumers keyed on their dir: ${sharedConsumers}.`,
   );
 }

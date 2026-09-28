@@ -1,0 +1,18 @@
+{
+  "$schema": "../../node_modules/turbo/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "bundle": {
+      "inputs": ["$TURBO_EXTENDS$", "../../shared/dom-utils/**/*.ts"]
+    },
+    "lint": {
+      "inputs": ["$TURBO_EXTENDS$", "../../shared/dom-utils/**/*.ts"]
+    },
+    "test": {
+      "inputs": ["$TURBO_EXTENDS$", "../../shared/dom-utils/**/*.ts"]
+    },
+    "type-check": {
+      "inputs": ["$TURBO_EXTENDS$", "../../shared/dom-utils/**/*.ts"]
+    }
+  }
+}

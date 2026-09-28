@@ -12875,3 +12875,27 @@ It surfaced as `navigate/pre-commit-listener` going from 11.9 to 7.4 ms between 
 - Each program reads its own `src` and `tests`, the upstream `src` its `^type-check` edges cover, and for validation-plugin `scripts/lib/raiser-head.d.mts`, an input of core's configuration (`tsc --listFilesOnly`).
 
 ⚠ **A cross-package read at run time is no type-check input.** `validation-plugin`'s `prefix-reachability-authority-2457` reads core's `tests/fixtures/raiser-heads` from disk, and since core's split no task key covers those files. The test is in `scripts/repo-wide-scans.json`, so `lint:repo-scans` runs it outside the cache on every commit and in Repo Lints.
+
+## Each `shared/` consumer keys its tasks on its own dir (2026-09-29)
+
+**Problem.** turbo does not hash through a symlink, and eleven packages read `shared/` through one under `src/`. The root task definitions therefore listed `../../shared/**/*.ts` in the inputs of `bundle`, `lint`, `test` and `type-check` for all 25 packages, so an edit in any shared dir re-keyed nearly the whole graph, core's test suite included. Since 29.08, `shared/dom-utils` changed in 18 commits on `master`, `shared/browser-env` in 16 and `shared/ssr` in 13.
+
+**Solution.**
+
+- The root tasks drop the pattern. Each consumer names its own dir in its `turbo.json`, appended with `$TURBO_EXTENDS$` to the four tasks and to `type-check:tests` where the package has it: `dom-utils` for the six adapters, `browser-env` for browser-, hash- and navigation-plugin, `ssr` for ssr-data- and rsc-server-plugin. `lint:fix` keeps the root pattern: it is not cached.
+- `scripts/check-coverage-scope.mjs` gains check 5. It derives the consumers from the `src/` symlinks, as its lint-alias check does, and fails when a consumer's own `turbo.json` omits its dir from one of those tasks, when a package that links no shared dir lists one, or when the root lists `shared/` again. `check-coverage-scope.test.mjs` plants each departure in its fixture tree.
+- `CLAUDE.md` states the rule beside the symlink-consumer table.
+
+**Why — measured with `--dry=json`** over `bundle test test:properties test:stress lint type-check type-check:tests`, one edit at a time:
+
+| edited                              | before     | after                                                                          |
+| ----------------------------------- | ---------- | ------------------------------------------------------------------------------ |
+| `shared/dom-utils/link-utils.ts`    | 125 of 140 | 36 — the six adapters                                                          |
+| `shared/browser-env/state-guard.ts` | 128        | 49 — the three URL plugins and the five adapters that depend on browser-plugin |
+| `shared/ssr/errors.ts`              | 128        | 13 — the two SSR plugins                                                       |
+
+After the change every consumer still re-keys `bundle`, `lint`, `test` and `type-check` on an edit in its dir, and a core `src` edit re-keys all 140.
+
+⚠ **A consumer without the input replays its tasks green after an edit in the dir it reads.** This change makes that failure possible, and check 5 stands in front of it, in both hooks and in Repo Lints.
+
+⚠ **Tests outside the consumers that read `shared/` from disk no longer re-run with their package on a shared edit.** Each of them is in `scripts/repo-wide-scans.json` — checked for this change, and `repo-scan-authority-2241` derives that list — so `lint:repo-scans` runs them outside the cache.

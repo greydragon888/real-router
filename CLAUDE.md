@@ -27,6 +27,8 @@ shared/
 
 **Any edit to `shared/browser-env/utils.ts`, `shared/dom-utils/link-utils.ts`, or `shared/ssr/createSsrLoaderPlugin.ts` propagates instantly to every consumer via its symlink** — verify with `pnpm build` across all affected packages. For `shared/ssr/` specifically, both `ssr-data-plugin` and `rsc-server-plugin` consume the same generic factory `createSsrLoaderPlugin<T>` with different type parameters (`unknown` vs `ReactNode`) and namespaces (`"data"` vs `"rsc"`) — one source of truth, two plugins; an edit that breaks one breaks the other.
 
+**A consumer names its shared dir in its own `turbo.json`**, in the inputs of `bundle`, `lint`, `test` and `type-check` (`../../shared/<dir>/**/*.ts`, appended with `$TURBO_EXTENDS$`): turbo does not hash through the symlink, so without it the package replays those tasks from cache after an edit in the dir. `pnpm lint:coverage-scope` derives the consumers from the symlinks and fails one that omits it.
+
 ## Toolchain Versions
 
 `major.minor` of the key tooling/runtime, kept in context so suggested APIs, flags and config formats match what's actually installed (this stack is bleeding-edge — TS 6, ESLint 10 flat-config, Vitest 4, Turbo 2 — so defaults from training tend to lag). **When a version changes, or you notice a mismatch with the "source of truth" column, update this table.** `major.minor` only — patch drift is noise.
