@@ -46,9 +46,9 @@ import type { Bench } from "tinybench";
  */
 async function addSubscribeFanout(bench: Bench): Promise<void> {
   for (const [count, batch] of [
-    [1, 384],
-    [3, 384],
-    [5, 384],
+    [1, 150],
+    [3, 148],
+    [5, 148],
   ] as const) {
     const router = createRouter([
       { name: "home", path: "/" },
@@ -96,7 +96,7 @@ async function addDeactivateGuards(bench: Bench): Promise<void> {
 
   bench.add(
     "navigate/sync-deactivate-guards",
-    batched(256, () => {
+    batched(106, () => {
       void router.navigate(targets[i++ % targets.length]);
     }),
   );
@@ -128,13 +128,13 @@ async function addCanNavigateTo(bench: Bench): Promise<void> {
 
   bench.add(
     "state/canNavigateTo-allowed",
-    batched(1024, () => {
+    batched(402, () => {
       keep(nav.canNavigateTo("dashboard"));
     }),
   );
   bench.add(
     "state/canNavigateTo-navbar-5",
-    batched(192, () => {
+    batched(78, () => {
       for (const name of navbar) {
         keep(nav.canNavigateTo(name));
       }
@@ -142,7 +142,7 @@ async function addCanNavigateTo(bench: Bench): Promise<void> {
   );
   bench.add(
     "state/canNavigateTo-guarded",
-    batched(1024, () => {
+    batched(407, () => {
       keep(nav.canNavigateTo("admin"));
     }),
   );
@@ -167,15 +167,15 @@ export async function run(): Promise<void> {
     const targets = ["about", "users", "home"] as const;
     let i = 0;
 
-    // K=512 (≈7 ms — double the usual target): as TASK #1 of the CI process
-    // this bench sits closest to startup noise (`--predictable` does not
-    // virtualize wall-clock, and module-compile/IO jitter shifts the GC
-    // alignment near the first measure window). At K=256 a same-sha pair
-    // straddled the 10% report threshold (3.7↔3.4 ms); the extra mass turns
-    // that ±0.3 ms wiggle into ~4%.
+    // K=282 (≈12 ms — several times the usual target): as TASK #1 of the CI
+    // process this bench sits closest to startup noise (`--predictable` does
+    // not virtualize wall-clock, and module-compile/IO jitter shifts the GC
+    // alignment near the first measure window). At ~3.5 ms of mass a same-sha
+    // pair straddled the 10% report threshold (3.7↔3.4 ms); the extra mass
+    // turns that ±0.3 ms wiggle into a few percent.
     bench.add(
       "navigate/sync-baseline",
-      batched(512, () => {
+      batched(282, () => {
         void router.navigate(targets[i++ % targets.length]);
       }),
     );
@@ -192,7 +192,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "navigate/same-state-reject",
-      batched(512, () => {
+      batched(222, () => {
         void router.navigate("about");
       }),
     );
@@ -202,8 +202,8 @@ export async function run(): Promise<void> {
   // (browser / hash), navigate events (navigation), back / forward (memory).
   // Two committed snapshots swap the way a history replay hands them in, so the
   // state arrives from outside and takes the foreign-bag adoption path.
-  // K=1024: under the simulation's `--no-opt --predictable` an op costs about
-  // 0.7× a `sync-baseline` op, so twice that bench's K keeps the mass above it.
+  // K=436: in simulation an op costs about 0.75× a `sync-baseline` op, so a K
+  // about 1.5× that bench's keeps the mass above it.
   {
     const router = createRouter([
       { name: "home", path: "/" },
@@ -241,7 +241,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "navigate/navigateToState",
-      batched(1024, () => {
+      batched(436, () => {
         void api.navigateToState(targets[i++ % targets.length], {
           replace: true,
         });
@@ -251,26 +251,25 @@ export async function run(): Promise<void> {
 
   // sync-guards: 3 passthrough activate guards (AbortController alloc+release, #722).
   //
-  // K=512, not the 192 it shipped with. At 192 the measured call carried ~3.57 ms
-  // of operations ((3.634 ms − ~60 µs harness) on the base run) — over the
-  // `batched` sizing floor of ~3 ms, but with the thinnest margin of any guard
-  // arc, and this is the arc where the documented failure mode actually fired:
-  // PR #1642 reported -38.52 % on a delta that measures -0.62 % (p = 1) in
-  // wall-clock over the SAME two commits, and -1.33 % with JIT off. `batched`'s
-  // own rationale is that a stray GC landing in CodSpeed's single measured
-  // iteration costs 0.13-0.22 ms of simulated CPU and read as phantom
-  // x5.1 / +82 % / +41 % swings in #984 — mass is the documented remedy, so this
-  // takes the margin from 1.2x the floor to ~3.2x, in line with its closest
-  // siblings (`sync-baseline` and `same-state-reject`, both 512).
+  // K=224 carries ~11 ms of operations, close to 4x the `batched` sizing floor
+  // of ~3 ms. At ~3.6 ms (1.2x the floor) this arc had the thinnest margin of
+  // any guard arc, and it is the arc where the documented failure mode actually
+  // fired: PR #1642 reported -38.52 % on a delta that measures -0.62 % (p = 1)
+  // in wall-clock over the SAME two commits, and -1.33 % under `--no-opt`.
+  // `batched`'s own rationale is that a stray GC landing in CodSpeed's single
+  // measured iteration costs 0.13-0.22 ms of simulated CPU and read as phantom
+  // x5.1 / +82 % / +41 % swings in #984 — mass is the documented remedy, and it
+  // puts this arc in line with its closest siblings (`sync-baseline` and
+  // `same-state-reject`).
   //
   // NOT a threshold tweak: the measurement is unchanged, only its mass. And not
   // a proven cure — the observed gap is an order of magnitude larger than one
   // documented GC event, so a residual may remain and would then belong to
   // callgrind's cost model rather than to the harness.
   //
-  // `navigate/params` is thinner still (3.02 ms of operations, 1.01x the floor)
-  // and is deliberately left alone — it has not misfired, and widening the
-  // change without that evidence would cost CI time on every run for a guess.
+  // `navigate/params` is thinner still (~3.7 ms of operations, ~1.2x the
+  // floor) and is deliberately left alone — it has not misfired, and widening
+  // the change without that evidence would cost CI time on every run for a guess.
   {
     const router = createRouter([
       { name: "home", path: "/" },
@@ -287,7 +286,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "navigate/sync-guards",
-      batched(512, () => {
+      batched(224, () => {
         void router.navigate(targets[i++ % targets.length]);
       }),
     );
@@ -324,7 +323,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "navigate/sync-guards-both-phases",
-      batched(192, () => {
+      batched(90, () => {
         void router.navigate(targets[i++ % targets.length]);
       }),
     );
@@ -360,7 +359,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "navigate/pre-commit-listener",
-      batched(384, () => {
+      batched(159, () => {
         void router.navigate(targets[i++ % targets.length]);
       }),
     );
@@ -386,7 +385,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "navigate/external-signal",
-      batched(384, () => {
+      batched(156, () => {
         void router.navigate(
           targets[i++ % targets.length],
           undefined,
@@ -407,7 +406,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       `navigate/deep-${String(depth)}`,
-      batched(256, () => {
+      batched(114, () => {
         void router.navigate(targets[i++ % targets.length]);
       }),
     );
@@ -427,7 +426,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "navigate/forwardTo",
-      batched(384, () => {
+      batched(150, () => {
         void router.navigate(targets[i++ % targets.length]);
       }),
     );
@@ -453,7 +452,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "navigate/params",
-      batched(192, () => {
+      batched(76, () => {
         void router.navigate("user", targets[i++ % targets.length]);
       }),
     );
@@ -485,7 +484,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "navigate/query-params",
-      batched(192, () => {
+      batched(86, () => {
         void router.navigate("search", {}, targets[i++ % targets.length]);
       }),
     );
@@ -493,9 +492,9 @@ export async function run(): Promise<void> {
 
   // N-plugin onTransitionSuccess fan-out (1 / 3 / 5).
   for (const [count, batch] of [
-    [1, 384],
-    [3, 384],
-    [5, 384],
+    [1, 150],
+    [3, 150],
+    [5, 148],
   ] as const) {
     const router = createRouter([
       { name: "home", path: "/" },
@@ -539,7 +538,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       `navigate/leave-${String(count)}`,
-      batched(192, () => {
+      batched(78, () => {
         void router.navigate(targets[i++ % targets.length]);
       }),
     );
@@ -597,31 +596,31 @@ export async function run(): Promise<void> {
   // buildPath (warm — after start(), options cached).
   bench.add(
     "buildPath/warm-static",
-    batched(6144, () => {
+    batched(2129, () => {
       keep(view.buildPath("users.list"));
     }),
   );
   bench.add(
     "buildPath/warm-params",
-    batched(2048, () => {
+    batched(809, () => {
       keep(view.buildPath("users.view", { id: "123" }));
     }),
   );
   bench.add(
     "buildPath/warm-defaultParams",
-    batched(768, () => {
+    batched(380, () => {
       keep(view.buildPath("withDefaults", { id: "5" }));
     }),
   );
   bench.add(
     "buildPath/warm-encoder",
-    batched(2048, () => {
+    batched(816, () => {
       keep(view.buildPath("encoded", { id: "x" }));
     }),
   );
   bench.add(
     "buildPath/warm-splat",
-    batched(1536, () => {
+    batched(656, () => {
       keep(view.buildPath("files", { path: "a/b/c" }));
     }),
   );
@@ -629,25 +628,25 @@ export async function run(): Promise<void> {
   // isActiveRoute — active state is users.view {id:123}.
   bench.add(
     "state/isActiveRoute-exact",
-    batched(4096, () => {
+    batched(1566, () => {
       keep(view.isActiveRoute("users.view", { id: "123" }));
     }),
   );
   bench.add(
     "state/isActiveRoute-parent",
-    batched(8192, () => {
+    batched(3177, () => {
       keep(view.isActiveRoute("users"));
     }),
   );
   bench.add(
     "state/isActiveRoute-sibling",
-    batched(16_384, () => {
+    batched(6058, () => {
       keep(view.isActiveRoute("users.list"));
     }),
   );
   bench.add(
     "state/isActiveRoute-strict",
-    batched(6144, () => {
+    batched(2374, () => {
       keep(view.isActiveRoute("users.view", { id: "123" }, undefined, true));
     }),
   );
@@ -662,7 +661,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "state/isActiveRoute-navbar-5",
-      batched(1024, () => {
+      batched(375, () => {
         for (const name of navbar) {
           keep(view.isActiveRoute(name));
         }
@@ -680,7 +679,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "state/shouldUpdateNode-batch",
-      batched(2048, () => {
+      batched(847, () => {
         for (const predicate of predicates) {
           keep(predicate(toState, fromState));
         }
@@ -704,13 +703,13 @@ export async function run(): Promise<void> {
 
     bench.add(
       "state/areStatesEqual-ignoreQuery",
-      batched(8192, () => {
+      batched(2901, () => {
         keep(eq.areStatesEqual(sA, sB));
       }),
     );
     bench.add(
       "state/areStatesEqual-fullCompare",
-      batched(8192, () => {
+      batched(3288, () => {
         keep(eq.areStatesEqual(sA, sB, false));
       }),
     );
@@ -745,7 +744,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "navigate/search-channel",
-      batched(192, () => {
+      batched(88, () => {
         void router.navigate("search", {}, searches[i++ % searches.length]);
       }),
     );
@@ -777,7 +776,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "navigate/channel-guard-clean",
-      batched(192, () => {
+      batched(88, () => {
         void router.navigate("search", {}, searches[i++ % searches.length]);
       }),
     );
@@ -796,7 +795,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "buildPath/warm-search",
-      batched(768, () => {
+      batched(384, () => {
         keep(router.buildPath("search", {}, search));
       }),
     );
@@ -819,7 +818,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "state/isActiveRoute-search",
-      batched(4096, () => {
+      batched(1771, () => {
         keep(router.isActiveRoute("search", {}, search, undefined, false));
       }),
     );
@@ -837,7 +836,7 @@ export async function run(): Promise<void> {
     url: string;
   }[] = [
     {
-      batch: 768,
+      batch: 310,
       name: "matchPath/flat",
       routes: [
         { name: "home", path: "/" },
@@ -848,7 +847,7 @@ export async function run(): Promise<void> {
       url: "/users",
     },
     {
-      batch: 384,
+      batch: 166,
       name: "matchPath/nested-4",
       routes: [
         {
@@ -873,7 +872,7 @@ export async function run(): Promise<void> {
       url: "/app/users/123/settings",
     },
     {
-      batch: 256,
+      batch: 118,
       name: "matchPath/search-params",
       routes: [
         { name: "home", path: "/" },
@@ -883,7 +882,7 @@ export async function run(): Promise<void> {
       url: "/search?q=hello&page=1&category=books",
     },
     {
-      batch: 768,
+      batch: 316,
       name: "matchPath/forwardTo",
       routes: [
         { name: "home", path: "/" },
@@ -894,7 +893,7 @@ export async function run(): Promise<void> {
       url: "/members",
     },
     {
-      batch: 192,
+      batch: 91,
       name: "matchPath/defaultParams",
       routes: [
         { name: "home", path: "/" },
@@ -914,21 +913,21 @@ export async function run(): Promise<void> {
       url: "/users?sort=desc",
     },
     {
-      batch: 384,
+      batch: 167,
       name: "matchPath/splat-backtrack",
       routes: splatRoutes(50),
       start: "/base",
       url: "/base/unknown/deep/path",
     },
     {
-      batch: 256,
+      batch: 109,
       name: "matchPath/utf8-decode",
       routes: [{ name: "user", path: "/users/:id" }],
       start: "/users/seed",
       url: "/users/%E4%B8%AD%E6%96%87%E6%B5%8B%E8%AF%95",
     },
     {
-      batch: 256,
+      batch: 119,
       name: "matchPath/multi-decode",
       routes: [
         {
@@ -941,14 +940,14 @@ export async function run(): Promise<void> {
       url: "/a/hello%20world/b/foo%26bar",
     },
     {
-      batch: 768,
+      batch: 310,
       name: "matchPath/wide-500",
       routes: wideRoutes(500),
       start: "/route0",
       url: "/route250",
     },
     {
-      batch: 768,
+      batch: 278,
       name: "matchPath/deep-10",
       routes: deepRoutes(10),
       start: "/l0",
@@ -958,7 +957,7 @@ export async function run(): Promise<void> {
       // Was `matchPath/constraints` (5 regex-constrained params). M1 removed
       // regex constraints — matching a plain 5-param path carries no per-segment
       // validation cost, so this now pins the multi-param capture path itself.
-      batch: 256,
+      batch: 118,
       name: "matchPath/params-5",
       routes: [{ name: "r", path: "/a/:p1/:p2/:p3/:p4/:p5" }],
       start: "/a/1/abc/2/def/3",
@@ -968,7 +967,7 @@ export async function run(): Promise<void> {
       // Was `matchPath/constraints-uuid` (a UUID regex constraint). M1 removed
       // constraints; a plain `:id` captures the UUID-length value with no regex
       // check — pins the single-param, long-value capture cost.
-      batch: 384,
+      batch: 148,
       name: "matchPath/param-long-value",
       routes: [{ name: "entity", path: "/entities/:id" }],
       start: "/entities/550e8400-e29b-41d4-a716-446655440000",
@@ -978,7 +977,7 @@ export async function run(): Promise<void> {
       // M1 replaced optional params (`/profiles/:id?`) with two sibling routes.
       // These two pin the cost of matching the DEEP vs the SHALLOW sibling of
       // such a pair (the former optional-present / optional-absent cases).
-      batch: 512,
+      batch: 223,
       name: "matchPath/sibling-deep",
       routes: [
         { name: "profiles", path: "/profiles" },
@@ -988,7 +987,7 @@ export async function run(): Promise<void> {
       url: "/profiles/456",
     },
     {
-      batch: 512,
+      batch: 205,
       name: "matchPath/sibling-shallow",
       routes: [
         { name: "profiles", path: "/profiles" },
@@ -1004,7 +1003,7 @@ export async function run(): Promise<void> {
       // splat); a root-level miss would walk strictly less. Pins the miss path
       // to its O(1)-ish cost so an accidental O(N) sibling scan on failure
       // gets caught.
-      batch: 1536,
+      batch: 453,
       name: "matchPath/no-match",
       routes: wideRoutes(500),
       start: "/route0",

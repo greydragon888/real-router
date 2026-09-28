@@ -24,7 +24,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "matchPath/encoding-uriComponent",
-      batched(384, () => {
+      batched(178, () => {
         keep(api.matchPath("/users/hello%20world"));
       }),
     );
@@ -37,7 +37,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "buildPath/encoding-uriComponent",
-      batched(1536, () => {
+      batched(646, () => {
         keep(router.buildPath("user", { id: "hello world" }));
       }),
     );

@@ -113,7 +113,7 @@ export async function run(): Promise<void> {
     // differ by an order of magnitude between plugins.
     bench.add(
       `seam/buildPath-${arm}`,
-      batched(1024, () => {
+      batched(489, () => {
         router.buildPath("list", {}, search);
       }),
     );
@@ -157,7 +157,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       `seam/resolveThenPrint-${arm}`,
-      batched(1024, () => {
+      batched(480, () => {
         const forwarded = api.forwardState("list", {}, search);
 
         api.buildPathResolved(

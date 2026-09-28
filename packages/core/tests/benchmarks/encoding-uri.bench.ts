@@ -42,7 +42,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "buildPath/encoding-uri",
-      batched(1536, () => {
+      batched(646, () => {
         keep(router.buildPath("user", { id: "hello world" }));
       }),
     );

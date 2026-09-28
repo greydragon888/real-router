@@ -24,7 +24,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "matchPath/encoding-none",
-      batched(384, () => {
+      batched(182, () => {
         keep(api.matchPath("/users/plainvalue"));
       }),
     );
@@ -37,7 +37,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "buildPath/encoding-none",
-      batched(2048, () => {
+      batched(798, () => {
         keep(router.buildPath("user", { id: "plainvalue" }));
       }),
     );

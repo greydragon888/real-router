@@ -28,7 +28,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "matchPath/strict-query",
-      batched(128, () => {
+      batched(75, () => {
         keep(api.matchPath(url));
       }),
     );
@@ -65,7 +65,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "navigate/strict-query",
-      batched(192, () => {
+      batched(132, () => {
         void router.navigate("search", {}, searches[i++ % searches.length]);
       }),
     );
@@ -94,7 +94,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "buildPath/strict-query",
-      batched(384, () => {
+      batched(229, () => {
         keep(router.buildPath("search", {}, search));
       }),
     );

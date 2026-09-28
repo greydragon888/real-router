@@ -31,7 +31,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "matchPath/trailing-preserve",
-      batched(768, () => {
+      batched(440, () => {
         keep(api.matchPath(urls[i++ % urls.length]));
       }),
     );
@@ -47,7 +47,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "navigate/trailing-preserve-roundtrip",
-      batched(192, () => {
+      batched(100, () => {
         const matched = api.matchPath(urls[i++ % urls.length]);
 
         if (matched) {

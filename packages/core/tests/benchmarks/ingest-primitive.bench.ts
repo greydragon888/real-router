@@ -19,7 +19,7 @@
  * affordability question is "what does the guard cost against the call it
  * replaces", and that call is `Object.assign`. `{ ...source }` is a different
  * operation: one optimised object-literal build rather than N `[[Set]]`s,
- * measured here at roughly a QUARTER of `Object.assign`'s time, and it is kept
+ * measured here at about HALF of `Object.assign`'s time, and it is kept
  * as its own arm so the two are never read as interchangeable.
  *
  * ⚠ **The target's prototype decides which branch runs, and the two are not the
@@ -47,11 +47,11 @@ export async function run(): Promise<void> {
   const bench = makeBench("ingest-primitive");
 
   // One batch count per pair, plus one per arm without a twin — see the header.
-  const PLAIN_BATCH = 4096;
-  const NULL_PROTO_BATCH = 3072;
-  const RECORD_BATCH = 6144;
-  const SPREAD_BATCH = 16_384;
-  const INHERITED_BATCH = 1000;
+  const PLAIN_BATCH = 2420;
+  const NULL_PROTO_BATCH = 2063;
+  const RECORD_BATCH = 4608;
+  const SPREAD_BATCH = 9681;
+  const INHERITED_BATCH = 662;
 
   // ── plain `{}` target — the shape `channels/` writes into ──────────────────
   bench.add(
@@ -166,8 +166,8 @@ export async function run(): Promise<void> {
   // The third field is the pair's batch count.
   const bags: readonly (readonly [string, Record<string, unknown>, number])[] =
     [
-      ["1-key", { id: 1 }, 12_288],
-      ["2-key", { id: 1, page: 2 }, 8192],
+      ["1-key", { id: 1 }, 7615],
+      ["2-key", { id: 1, page: 2 }, 5514],
     ];
 
   for (const [label, bag, batch] of bags) {

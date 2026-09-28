@@ -12739,3 +12739,14 @@ It surfaced as `navigate/pre-commit-listener` going from 11.9 to 7.4 ms between 
 - The flame graphs agree: the whole difference sits inside the measured subtree. Frame names in Maglev code are unreliable there — the head run shows `getQueryParams`, a one-line lookup, as the parent of `buildURL` and `canonicalize`.
 - The plugin's `dist` is byte-identical to 5.7.1 apart from its version string, so the change is `@codspeed/core`'s. Its `instrument-hooks` submodule is the same commit in both tags, so the runner pinned at `rev:v4.18.4` is unaffected, and the flags arrive through the same introspection. 5.7.1's native addon calls `WriteUtf8`, which Node 26 removes, so 6.x was due before Node 26 regardless.
 - Cost, measured locally: the whole core suite goes from 1.7 to 2.6 s and the adapter suite from 3.1 to 4.9 s, the measured calls alone ×2.6 and ×2.4. Every simulation baseline steps once, and the K sizes and per-op ratios quoted in the bench comments were measured with Maglev on.
+
+## CodSpeed batches keep the mass they were sized to after `--no-maglev` (2026-09-28)
+
+**Problem.** The first CodSpeed run without Maglev (entry above) reported 98 of 99 benchmarks slower, from ×1.3 (`Object.assign/*`) to ×3.4 (`matchPath/no-match`, the Angular arms): each op costs more in the interpreter, so every batch carried that much more mass than it was sized to. The benchmark steps of the two jobs grew from 184 to 268 s (core) and from 241 to 342 s (adapters).
+
+**Solution.** Every K in the core suite and plugin-seam's two are recalculated from that run to give each benchmark back its previous mass: `K_new = K_old × old mass / new mass`, rounded to a multiple of the bench's target cycle (2, 3 or 4 targets), so that every call does the same work. A count shared by a pair or a group follows its lighter arm, the rule the ingest-primitive header states. `matchPath/encoding-uri` keeps 128, because its mass did not move. The six framework adapters keep their K: it is calibrated from local wall-clock medians, which the simulation's flags do not touch, and their headers forbid lowering it to save CI time. The comments that quote a K or a mass are updated with it.
+
+**Why — measured.**
+
+- On the first run's numbers each single-arm benchmark returns to its previous mass within 1 %. The heavier arm of a shared count lands where its lighter twin puts it — `seam/buildPath-persistent` 12.9 ms against 14.1 before, `copyFields/plain-target` 29.1 ms against 22.6 — and every arm stays above the ~3 ms floor. Over the recalculated benchmarks the head masses sum to 770 ms instead of 1701.
+- A stray GC event is native work, not slowed the way interpreted code is, so a restored mass puts it back to the share of the batch each K was sized for.
