@@ -121,6 +121,11 @@ on:
       # real bench MUST re-seed the baseline, and swallowing that is how a
       # comparison silently starts measuring against the wrong reference.
       - "knip.json"
+      # Each a pnpm workspace with its own lockfile: nothing the suites import
+      # lives there, and `scripts/codspeed-gate.mjs` never answers RUN for a
+      # change confined to them.
+      - "examples/**"
+      - "cross-router-bench/**"
   pull_request:
     branches: [master]
     paths-ignore:
@@ -137,6 +142,11 @@ on:
       # real bench MUST re-seed the baseline, and swallowing that is how a
       # comparison silently starts measuring against the wrong reference.
       - "knip.json"
+      # Each a pnpm workspace with its own lockfile: nothing the suites import
+      # lives there, and `scripts/codspeed-gate.mjs` never answers RUN for a
+      # change confined to them.
+      - "examples/**"
+      - "cross-router-bench/**"
   # Manual re-seed / backtest of the CodSpeed baseline.
   workflow_dispatch:
     inputs:

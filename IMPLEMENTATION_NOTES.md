@@ -12750,3 +12750,11 @@ It surfaced as `navigate/pre-commit-listener` going from 11.9 to 7.4 ms between 
 
 - On the first run's numbers each single-arm benchmark returns to its previous mass within 1 %. The heavier arm of a shared count lands where its lighter twin puts it — `seam/buildPath-persistent` 12.9 ms against 14.1 before, `copyFields/plain-target` 29.1 ms against 22.6 — and every arm stays above the ~3 ms floor. Over the recalculated benchmarks the head masses sum to 770 ms instead of 1701.
 - A stray GC event is native work, not slowed the way interpreted code is, so a restored mass puts it back to the share of the batch each K was sized for.
+
+## CodSpeed does not start for `examples/` or `cross-router-bench/` (2026-09-28)
+
+**Problem.** #2624 bumped `motion` in two examples and started a CodSpeed run on master. Its gate would have answered `skip`, but the run never got that far: the workflow's `concurrency` group queued it, gate included, behind the run already measuring. `codspeed.yml`'s `paths-ignore` still let `examples/**` and `cross-router-bench/**` through, although each has been a pnpm workspace with its own lockfile since the examples and the cross-router bench left the root workspace.
+
+**Solution.** Both triggers ignore `examples/**` and `cross-router-bench/**`, so a change confined to them starts no run. `concurrency` stays on the workflow: its comment records why both suites must be superseded together, and moving it onto the two self-hosted jobs would let a stale half upload into the next run's report.
+
+**Why — measured.** `scripts/codspeed-gate.mjs` reads neither directory and no suite imports from either. It answers `skip` for #2624's range and for `e1b3456de`, a Dependabot bump confined to `cross-router-bench/`. A cache-based trigger was set aside: the suites are not turbo tasks, turbo's global inputs include `eslint.config.*` and `prettier.config.*`, which move no instruction count, and none of its tasks takes this workflow, the runner pin or adapter-bench's vite configs as input.
