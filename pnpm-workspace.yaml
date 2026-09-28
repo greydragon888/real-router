@@ -2,9 +2,6 @@ packages:
   - "packages/*"
   - "shared"
   - "benchmarks"
-peerDependencyRules:
-  allowedVersions:
-    typescript: '6'
 overrides:
   '@types/node': $@types/node
   # Bound to <8 for the SOLID CHAIN ONLY: an open upper bound lets `pnpm dedupe`

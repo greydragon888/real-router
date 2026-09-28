@@ -16,7 +16,6 @@ import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
-import tsconfigPaths from "vite-tsconfig-paths";
 
 /**
  * Auto-generate resolve aliases from workspace packages.
@@ -106,12 +105,6 @@ function workspaceSourceAliases(): Record<string, string> {
  * @see https://vitest.dev/config/
  */
 export const commonConfig = defineConfig({
-  /**
-   * Plugins
-   * - tsconfigPaths: Resolve TypeScript path aliases from tsconfig.json
-   */
-  plugins: [tsconfigPaths()],
-
   // Resolve workspace packages to source for test coverage.
   // Without this, Vitest resolves via exports → dist and v8
   // coverage can't track source files.

@@ -4373,6 +4373,8 @@ Originally three packages declared `typescript <6.0.0` or `^5.0.0` as peer deps:
 
 **TODO:** Remove the override once `tsconfck` widens its `typescript` peer range to include 6.x.
 
+**Done 2026-09-28** — by the other route: `vite-tsconfig-paths` left the repository and took `tsconfck` with it, and the rule went from `pnpm-workspace.yaml`. See «`vite-tsconfig-paths` leaves: it resolved nothing».
+
 ### What Did NOT Need Changing
 
 - **No code changes** — zero source files modified
@@ -12602,3 +12604,15 @@ Measured after the push: the post-merge run on `d32b27d8d` (00:57–01:15 UTC) e
 - After the fix, the 6,116 tracked files git reads as text carry no C0 byte other than TAB and LF, no CR and no DEL, so the rule holds without an exemption. Of the rest, 100 are images — 96 `png`, two `ico`, two `icns` — and 11 are the symlinks into `shared/`, which the scan skips because the files they name are tracked in their own right.
 - Four mutations each redden their own cell: a raw NUL appended to a tracked script, a rule blind to NUL, a listed extension no tracked file carries, and a filter that skips the dot-directories.
 - Its subject is the whole tree, so it runs with the repo-wide scans rather than behind core's cache key, which a change elsewhere would replay.
+
+## `vite-tsconfig-paths` leaves: it resolved nothing (2026-09-28)
+
+**Problem.** `vitest.config.common.mts` loaded `vite-tsconfig-paths` into every Vitest run. The plugin maps imports through a tsconfig's `paths` and `baseUrl`, and no tsconfig in the repository declares either. It pulled in `tsconfck` 3.1.6, which npm marks "unmaintained" and which peers `typescript ^5.0.0`; that peer was the only reason for `peerDependencyRules.allowedVersions.typescript: '6'`. Vitest printed a notice on every run that Vite resolves tsconfig paths natively.
+
+**Solution.** The plugin goes from the shared config and the root `devDependencies`, and the peer rule goes from `pnpm-workspace.yaml`. `resolve.tsconfigPaths` is not switched on in its place: with no `paths` to follow it would do the same nothing, and Vite documents it as having a performance cost.
+
+**Why — measured.**
+
+- With `DEBUG=vite-tsconfig-paths`, a core run and a svelte run each loaded 867 tsconfig files under the repository root, gitignored worktrees included, and skipped all 867: 863 for having no `paths` or `baseUrl`, and four copies of `benchmarks/tsconfig.json` for an empty `files` list. No resolver was built, so the plugin could not resolve an import.
+- Of the packages installed at the root, only `tsconfck` peers a `typescript` range that excludes 6.0.3. Without the rule, `pnpm install` passes under `strictPeerDependencies: true`, and the lockfile loses three packages — `vite-tsconfig-paths`, `tsconfck`, `globrex` — and gains none.
+- Five alternating pairs of the same one-file core run: median 995 ms with the plugin, 709 ms without. The saving is the plugin's startup parse, so it scales with the tsconfig files under the root, and a fresh checkout has fewer than this one.

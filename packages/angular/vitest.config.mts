@@ -43,8 +43,8 @@ export default mergeConfig(
       },
       projects: [
         {
-          // Inherits the merged root config: tsconfigPaths plugin, workspace
-          // src aliases, globals/mocks/pool settings.
+          // Inherits the merged root config: workspace src aliases,
+          // globals/mocks/pool settings.
           extends: true,
           test: {
             name: "jit",
@@ -57,8 +57,9 @@ export default mergeConfig(
         {
           // Hand-rolled config — deliberately NO `extends: true`: the analog
           // plugin must be FIRST in the plugin chain, and inheriting the root
-          // would prepend tsconfigPaths ahead of it. (Not inheriting is the
-          // default; `extends: false` is not even a valid type.)
+          // would put any plugin the root config declares ahead of it. (Not
+          // inheriting is the default; `extends: false` is not even a valid
+          // type.)
           plugins: [
             angular({
               tsconfig: new URL("./tsconfig.spec.aot.json", import.meta.url)
