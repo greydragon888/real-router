@@ -12758,3 +12758,14 @@ It surfaced as `navigate/pre-commit-listener` going from 11.9 to 7.4 ms between 
 **Solution.** Both triggers ignore `examples/**` and `cross-router-bench/**`, so a change confined to them starts no run. `concurrency` stays on the workflow: its comment records why both suites must be superseded together, and moving it onto the two self-hosted jobs would let a stale half upload into the next run's report.
 
 **Why — measured.** `scripts/codspeed-gate.mjs` reads neither directory and no suite imports from either. It answers `skip` for #2624's range and for `e1b3456de`, a Dependabot bump confined to `cross-router-bench/`. A cache-based trigger was set aside: the suites are not turbo tasks, turbo's global inputs include `eslint.config.*` and `prettier.config.*`, which move no instruction count, and none of its tasks takes this workflow, the runner pin or adapter-bench's vite configs as input.
+
+## Post-Merge Build does not start for `examples/`, `cross-router-bench/` or `.claude/` (2026-09-28)
+
+**Problem.** Post-Merge Build ran on every push to master. For a push confined to `examples/`, `cross-router-bench/` or `.claude/` it has nothing to do: `turbo.json` declares no root task, so the job's `bundle test test:properties lint` covers the root workspace's packages, and none of them reads those directories. `e1b3456de`, a bump confined to `cross-router-bench/`, replayed everything from the cache in 58 s. Its start still costs something, because the workflow cancels the run in progress: #2624's push cancelled the build of `eb0231b27` at 248 s, then ran 845 s on the work that had not reached the cache, and was cancelled by the next push. 29 of the last 200 commits on master are confined to the three directories.
+
+**Solution.** The push trigger ignores `examples/**`, `cross-router-bench/**` and `.claude/**`. `notify-failure`'s issue text says that such a push no longer re-runs a failed build, and names the re-run and the Changesets dispatch.
+
+**Why these three, and not more.**
+
+- `**/*.md` stays in: a changeset is a `.md` file under `.changeset/`, and `changesets.yml` starts only on this workflow's success, so a push that adds one must still build. `scripts/**` stays because `scripts/lib/**` is an input of core's `test`, and `.github/**` because it holds this workflow.
+- The PR size diff keeps its base: `scripts/bundle-size-base.mjs` falls back to the closest ancestor with a successful build within 20 commits, and a commit confined to these directories changes no package's output. The longest run of such commits in the last 600 on master is 4.

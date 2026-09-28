@@ -3,6 +3,20 @@ name: Post-Merge Build
 on:
   push:
     branches: [master]
+    # A push confined to these starts no build. No task this job runs reads
+    # them — `examples/` and `cross-router-bench/` are pnpm workspaces of their
+    # own, `.claude/` is agent configuration — so the build would only replay
+    # the cache, while its start cancelled the run still building the previous
+    # push (`cancel-in-progress` below).
+    # ⚠ Never widen this to `**/*.md`: a changeset is a `.md` file under
+    # `.changeset/`, and a push that only adds one must still reach
+    # `changesets.yml`, which starts on this workflow's success.
+    # ⚠ Such a push no longer re-runs a failed build either: re-run the failed
+    # run, or dispatch Changesets (see `notify-failure`).
+    paths-ignore:
+      - ".claude/**"
+      - "cross-router-bench/**"
+      - "examples/**"
 
 # ⚠ A RELEASE commit is the one build that must not be treated as superseded.
 # `cancel-in-progress` is right for ordinary pushes and wrong for exactly this
@@ -156,9 +170,10 @@ jobs:
               `- Run: ${runUrl}`,
               `- Commit: ${context.sha}`,
               '',
-              'Once master is green again, either push another commit (the next successful post-merge re-arms the',
-              'chain) or dispatch **Changesets** manually — `changeset publish` is idempotent and the reconcile step',
-              'backfills tags/Releases.',
+              'Once master is green again, re-run the failed run, push a commit that touches more than `examples/`,',
+              '`cross-router-bench/` or `.claude/` (the next successful post-merge re-arms the chain; a push confined',
+              'to them starts no build), or dispatch **Changesets** manually — `changeset publish` is idempotent and',
+              'the reconcile step backfills tags/Releases.',
               '',
               '_Auto-filed by `post-merge.yml`. This comment updates on each subsequent failure; close the issue once green._',
             ].join('\n');
