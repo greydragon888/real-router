@@ -48,7 +48,8 @@ overrides:
   # an optional peer; `.pnpmfile.mjs` drops the peer declaration, so danger
   # installs a 7.x of its own. jsdom 30 takes 8.x on its own range (#2605;
   # IMPLEMENTATION_NOTES has the measurements).
-  piscina: '>=5.2.0 <6.0.0'
+  # At the version @angular/build pins exactly; ng-packagr's `^5.0.0` admits it.
+  piscina: '>=5.3.2 <6.0.0'
   # ReDoS in brace-expansion (GHSA-3jxr-9vmj-r5cp, High). Two major lines, @2 and @5, are in the tree
   # via assorted dev/tooling deps — pin each to its patched release. EXACT (not '>=') because the
   # '@N' selector value can't be an open range without risking a cross-major jump (a '>=1.1.16' on
@@ -84,9 +85,8 @@ overrides:
   shell-quote: '>=1.9.0'
   picomatch@2: 2.3.2
   # 4.0.7 is the highest minimum a parent declares (`^4.0.7`: @changesets/config,
-  # knip, tsdown). @angular-devkit/core and @angular/build pin 4.0.5 exactly, and
-  # this lifts them two patches on purpose: any lower value holds the `^4.0.7`
-  # parents below their range instead.
+  # knip, tsdown) and the version @angular-devkit/core and @angular/build pin
+  # exactly; any lower value holds those parents below their range.
   picomatch@4: 4.0.7
   yaml@1: 1.10.3
   # Collapses every 2.x consumer onto one copy (@changesets/parse, @manypkg/tools,
