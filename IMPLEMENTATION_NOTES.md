@@ -12638,3 +12638,16 @@ Measured after the push: the post-merge run on `d32b27d8d` (00:57–01:15 UTC) e
 **Solution.** After a real exit 0 the script prints `✓ semgrep: no newly-introduced findings against <merge-base>`, or `✓ semgrep: no findings` when there is no baseline. A finding, a tool error and the no-delta exit each leave before that line.
 
 **Why — measured.** `check-semgrep.test.mjs` asserts the line on the clean run, including that it names the baseline commit, and its absence after a finding, a tool error and the no-delta exit. Deleting the line reddens the clean-run test; printing it before the exit-code arms reddens the finding and tool-error tests.
+
+## Pull-request series keep one identity: the collector folds `turbo.scm.branch` (2026-09-28)
+
+**Problem.** turbo stamps every point with `turbo.scm.branch`, and on a pull request that is the merge ref, `<N>/merge`. Each PR therefore wrote series of its own, one or two points long: from 24.09 to 28.09, 3,874 of the 4,336 task series belonged to 17 PR refs. `increase` and `rate` need two points in their window, so every PR query through them came back empty — the first analysis of the telemetry read 0 rows for PR task time, cache and failures, and fell back to `max_over_time` per series. A feature branch's name, `2397-codec-shape`, did the same.
+
+**Solution.** `transform/scm-branch`, first after `memory_limiter`, sets a merge ref to `pr` and any other branch except `master` to `branch`, before `delta_to_cumulative` keys its streams. `ci.event` already tells a PR from a push. Concurrent PR runs now share streams, which #1745 measured to accumulate.
+
+**Why — measured.**
+
+- Locally, on the pinned collector image with a debug exporter: `2600/merge`, `master` and `2397-codec-shape` came out as `pr`, `master` and `branch`, on a counter and on the sum and count extracted from the task histogram. Without the processor the same payload kept its three values.
+- On the host, `validate` passed before the swap, and the deployed file's sha256 matches the repository's. The previous config is `otel-collector.yml.bak-20260928-scm-branch`. Recreating the container reset the accumulator, which PromQL reads as a counter reset.
+- A probe sent through the public endpoint with `9999/merge` and `ci.job=telemetry-branch-probe` reached Grafana as `turbo_scm_branch="pr"`.
+- Series written before 2026-09-28 10:53 UTC keep their PR refs, so a query reaching back past that point still needs `max_over_time` for them.
