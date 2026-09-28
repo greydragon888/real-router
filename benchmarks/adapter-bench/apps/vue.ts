@@ -174,15 +174,6 @@ export async function mountTestApp(
       void router.navigate(name, params, search);
       await nextTick();
     },
-    commitHistory: async (dir) => {
-      if (dir === "back") {
-        router.back();
-      } else {
-        router.forward();
-      }
-
-      await nextTick();
-    },
     unmount: () => {
       app.unmount();
     },

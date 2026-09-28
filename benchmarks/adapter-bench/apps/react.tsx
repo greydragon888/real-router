@@ -1,6 +1,6 @@
 /**
  * React adapter-bench app. Subject: per-navigation adapter work — uSES
- * fan-out, <Link> active-class recompute, RouteView subtree swap.
+ * fan-out and <Link> active-class recompute.
  * Commit mechanics: `flushSync` wraps each navigation so the synchronous
  * React commit lands inside the measure window.
  */
@@ -152,15 +152,6 @@ export async function mountTestApp(
     commitNavigate: (name, params, search) => {
       flushSync(() => {
         void router.navigate(name, params, search);
-      });
-    },
-    commitHistory: (dir) => {
-      flushSync(() => {
-        if (dir === "back") {
-          router.back();
-        } else {
-          router.forward();
-        }
       });
     },
     unmount: () => {

@@ -65,8 +65,6 @@ export interface MountedApp {
     params?: Record<string, string>,
     search?: Record<string, string>,
   ) => void | Promise<void>;
-  /** memory-plugin back()/forward() + the same commit mechanics. */
-  commitHistory: (dir: "back" | "forward") => void | Promise<void>;
   unmount: () => void;
 }
 

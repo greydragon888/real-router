@@ -12559,3 +12559,20 @@ Measured after the push: the post-merge run on `d32b27d8d` (00:57–01:15 UTC) e
 - `lint:prose` leaves `benchmarks/` out by owner decision, and the move carried the bench's six Markdown files out of that exclusion: pre-push read 129 files and failed on two historiography findings in `SCENARIO-LAG-ANALYSIS.md` and `matcher-bench/README.md`. `check-prose.sh` excludes `cross-router-bench/` beside `benchmarks/` and reads 123; without the entry, three of the four cells in `check-prose.test.mjs` fail.
 
 ⚠ **git moves only the tracked files.** A checkout that ran the bench before this commit keeps the gitignored `results/`, `node_modules/`, the apps' `dist/` and `deck/out/` under `benchmarks/cross-router/`. Move them to `cross-router-bench/` by hand, or the next run starts from an empty `results/`.
+
+## adapter-bench keeps two scenarios per framework (2026-09-28)
+
+**Problem.** Each of the six adapter suites ran four scenarios, and two of them measured little of this repository's code. `back-forward` drove the same UI transitions as `navigate-route-swap` (`items/1 ↔ about`) through `router.back()` / `router.forward()`, and `navigate-route-swap` spent most of its time mounting and unmounting a subtree in jsdom. Together the two carried 61 % of the suite's measured mass.
+
+**Solution.** `back-forward` and `navigate-route-swap` go from all six suites; `navigate-param-swap` and `navigate-search-active-swap` stay. `commitHistory`, which only `back-forward` called, goes from `MountedApp` and the six apps.
+
+**Why — measured.** Each scenario body was repeated verbatim with CodSpeed's V8 flags (`--no-opt --predictable`), sampled for 1.5 s and attributed through the bundle's module regions. These are wall-clock shares, not callgrind counts.
+
+- Our code (core, the adapter, `sources`, memory-plugin) took 24–39 % of `navigate-param-swap` and 32–48 % of `navigate-search-active-swap`, against 3.9–20.6 % of `navigate-route-swap`, where jsdom took 27–71 % (Vue: 71 %).
+- `back-forward` and `navigate-route-swap` run the same adapter functions in all six frameworks. They differ in the core entry (`navigateToState` against `navigate`) and in memory-plugin's `back` / `forward`, which held 0.37–0.93 % of `back-forward`'s time.
+- The functions `navigate-route-swap` ran and the two remaining scenarios do not — hook subscriptions on mount, `RouteView`, Angular's factories — held 0.35–2.11 % of its time. Branches that only a route-name change takes inside shared functions were not measured on their own.
+- Leaks across mount and unmount are guarded by each adapter's stress suite, 14 to 28 files with such cycles per adapter.
+
+⚠ **No CodSpeed benchmark exercises `navigateToState`.** The core suite has none, and the adapter scenario that ran it here could not see it. A regression on the history path (back / forward, popstate, traverse) needs a core bench through `getPluginApi`, where the path is the measured work.
+
+⚠ Changing a suite's composition moves the GC schedule of the benchmarks that stay, so the first comparison after this commit may show a one-time step on them («CodSpeed benchmark gate — consolidated record»).

@@ -42,15 +42,6 @@ export async function mountTestApp(
       void router.navigate(name, params, search);
       flushSync();
     },
-    commitHistory: (dir) => {
-      if (dir === "back") {
-        router.back();
-      } else {
-        router.forward();
-      }
-
-      flushSync();
-    },
     unmount: () => {
       void unmount(app);
     },

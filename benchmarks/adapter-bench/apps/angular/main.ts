@@ -160,15 +160,6 @@ export async function mountTestApp(
       void router.navigate(name, params, search);
       appRef.tick();
     },
-    commitHistory: (dir) => {
-      if (dir === "back") {
-        router.back();
-      } else {
-        router.forward();
-      }
-
-      appRef.tick();
-    },
     unmount: () => {
       appRef.destroy();
       host.remove();

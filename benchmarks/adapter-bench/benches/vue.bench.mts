@@ -47,39 +47,6 @@ export async function run(): Promise<void> {
     );
   }
 
-  {
-    const app = await mountTestApp(newContainer(), "/items/1");
-    const targets = ["about", "items"] as const;
-    let i = 0;
-
-    bench.add(
-      "vue/navigate-route-swap",
-      batchedAsync(96, async () => {
-        const name = targets[i++ % targets.length];
-
-        await app.commitNavigate(
-          name,
-          name === "items" ? { id: "1" } : undefined,
-        );
-      }),
-    );
-  }
-
-  {
-    const app = await mountTestApp(newContainer(), "/items/1");
-
-    await app.commitNavigate("about");
-    let back = true;
-
-    bench.add(
-      "vue/back-forward",
-      batchedAsync(96, async () => {
-        await app.commitHistory(back ? "back" : "forward");
-        back = !back;
-      }),
-    );
-  }
-
   // routeSearch active-recompute (RFC-4 M2 / #1548): query-only ?tab swap on
   // the same route — RouteView/param subscribers stay put; the five routeSearch
   // <Link>s recompute active (ignoreQueryParams=false slow-path active source).

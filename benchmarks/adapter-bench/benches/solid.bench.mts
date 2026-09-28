@@ -50,38 +50,6 @@ export async function run(): Promise<void> {
     );
   }
 
-  // route swap: items/1 <-> about — conditional subtree unmount/mount.
-  {
-    const app = await mountTestApp(newContainer(), "/items/1");
-    const targets = ["about", "items"] as const;
-    let i = 0;
-
-    bench.add(
-      "solid/navigate-route-swap",
-      batched(96, () => {
-        const name = targets[i++ % targets.length];
-
-        app.commitNavigate(name, name === "items" ? { id: "1" } : undefined);
-      }),
-    );
-  }
-
-  // memory-plugin history churn: back <-> forward (navigateToState path).
-  {
-    const app = await mountTestApp(newContainer(), "/items/1");
-
-    await app.commitNavigate("about");
-    let back = true;
-
-    bench.add(
-      "solid/back-forward",
-      batched(128, () => {
-        app.commitHistory(back ? "back" : "forward");
-        back = !back;
-      }),
-    );
-  }
-
   // routeSearch active-recompute (RFC-4 M2 / #1548): query-only ?tab swap on
   // the same route — RouteView/param subscribers stay put; the five routeSearch
   // <Link>s recompute active (ignoreQueryParams=false slow-path active source).
