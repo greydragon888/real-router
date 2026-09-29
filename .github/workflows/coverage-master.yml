@@ -1,0 +1,65 @@
+name: Coverage (master)
+
+# Codecov compares a pull request with the report of its base commit on master,
+# and master had none: every upload came from the coverage job in `ci.yml`,
+# which runs on pull requests only (IMPLEMENTATION_NOTES "Codecov gets a report
+# for every master commit"). Post-Merge Build runs `test` on every push to
+# master; this workflow restores that run's `coverage/**` from the turbo remote
+# cache and uploads it for the same commit.
+on:
+  workflow_run:
+    workflows: [Post-Merge Build]
+    types: [completed]
+    branches: [master]
+
+permissions:
+  contents: read
+
+# Self-hosted ducktors/turborepo-remote-cache, as in post-merge.yml.
+env:
+  TURBO_API: ${{ vars.TURBO_API }}
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
+jobs:
+  upload:
+    name: Upload master coverage
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    # A remote-cache miss runs the tests themselves; Post-Merge Build's p90 is
+    # about 14 minutes.
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - name: Setup (pnpm + Node + install)
+        uses: ./.github/actions/setup
+
+      # Post-Merge Build ran these tasks at this commit, so each is a remote-cache
+      # hit that restores its `coverage/**` output. A miss runs the test, which is
+      # slower and yields the same report.
+      - name: Restore coverage from the remote cache
+        run: pnpm turbo run test --filter='./packages/*' --output-logs=errors-only
+
+      - name: Fix coverage paths
+        run: bash scripts/fix-lcov-paths.sh
+
+      - name: Collect coverage reports
+        id: lcov
+        run: node scripts/check-coverage-scope.mjs --emit >> "$GITHUB_OUTPUT"
+
+      # The commit and branch are given explicitly: on `workflow_run`, GITHUB_SHA
+      # is the newest commit on master, not the one Post-Merge Build tested.
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ${{ steps.lcov.outputs.reports }}
+          disable_search: true
+          fail_ci_if_error: true
+          override_commit: ${{ github.event.workflow_run.head_sha }}
+          override_branch: master

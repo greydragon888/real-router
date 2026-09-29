@@ -3,6 +3,9 @@
 
 # Basic Settings
 codecov:
+  # Codecov had recorded `main`, a branch this repository does not have, so its
+  # dashboard and default-branch comparisons read nothing.
+  branch: master
   require_ci_to_pass: yes # Wait for CI to pass before reporting
   notify:
     wait_for_ci: yes # Wait for all CI checks before notifications

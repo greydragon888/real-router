@@ -5598,6 +5598,11 @@ Coverage and SonarCloud depend on test job artifacts. Without test, there are no
 
 `changesets.yml` uses a `workflow_run` trigger and must reference the workflow that runs on master push. After the split, this trigger was updated from `workflows: [CI]` to `workflows: [Post-Merge Build]`. Missing this update breaks the release pipeline — changesets never triggers after merge, no Version PR is created.
 
+> ⚠ Narrowed on 2026-09-29: the reference is now checked.
+> `scripts/tests/workflow-run-names.test.mjs` refuses a `workflow_run` trigger
+> that names no workflow. See "Every `workflow_run` trigger names a workflow
+> that exists".
+
 ## State Context — Plugin-Extensible Route Data via Claim-Based API
 
 ### Problem
@@ -13026,3 +13031,25 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 - `scripts/tests/sonar-trusted-boundary.test.mjs` holds the sparse list to the import closure of every script the job runs from `.trusted/`, and refuses a script run from the working tree, inline `node` code that loads a module, and a missing clear step.
 
 **Why — measured.** The test passes on the fixed workflow and fails on each defect planted back into it: the old run line, `coverage-owner.mjs` dropped from the sparse list, the `require` restored, the clear step removed. `actionlint` is clean. Only a fork PR exercises the job, so the first one is the end-to-end check.
+
+## Codecov gets a report for every master commit (2026-09-29)
+
+**Problem.** Codecov compares a pull request with the report of its base commit on master, and master commits had none. Every upload came from the coverage job in `ci.yml`, which runs on pull requests only. Codecov's newest master report was `9159420aa` from 2026-06-03, and Codecov had recorded `main` as the default branch, a branch this repository does not have [measured: api.codecov.io, 2026-09-29]. For four months a PR's Codecov comparison had no base, and nothing reported it: the vitest thresholds and Sonar were the gates that worked.
+
+**Solution.**
+
+- `.github/workflows/coverage-master.yml` runs after a successful Post-Merge Build (`workflow_run`), checks out the commit that run tested and restores the `test` tasks from the turbo remote cache. `coverage/**` is a declared output of `test`, so a hit restores the reports; a miss runs the tests.
+- It normalizes paths with the same `scripts/fix-lcov-paths.sh` and collects reports with the same `check-coverage-scope.mjs --emit` as the PR job, and uploads with `override_commit` and `override_branch`: on `workflow_run`, `GITHUB_SHA` is the newest commit on master, not the one tested.
+- `codecov.yml` sets `codecov.branch: master`.
+
+**Why a separate workflow.** Post-Merge Build starts the release chain, and edits to it wait out the moratorium on the release path (2026-09-29). The upload also fails its job on error instead of `continue-on-error`: the PR job tolerates a transport failure because it sits in the merge gate, while this one gates nothing, and a silent failure is how Codecov went four months without a master report.
+
+**Verified so far.** `codecov.io/validate` accepts the file, and `actionlint` is clean. The first master push after this lands is the end-to-end check: a Codecov report for that commit.
+
+## Every `workflow_run` trigger names a workflow that exists (2026-09-29)
+
+**Problem.** `on.workflow_run.workflows` matches the other workflow's top-level `name:` as a string. A rename or a typo raises no error; the dependent workflow simply never starts. Three workflows hang on such a link: the release chain (`changesets.yml` waits for "Post-Merge Build"), the fork path of the SonarCloud check (`sonar-trusted.yml` waits for "CI") and the master coverage upload (`coverage-master.yml`). Nothing checked any of them.
+
+**Solution.** `scripts/tests/workflow-run-names.test.mjs` reads every workflow's `name:` and every `workflow_run` list, in the flow and the block-list form, and refuses a reference that names no workflow.
+
+**Why — measured.** Renaming Post-Merge Build in memory flags both of its dependents; fixtures cover a misspelled reference, a renamed target and the block-list form.
