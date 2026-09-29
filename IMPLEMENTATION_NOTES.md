@@ -12980,6 +12980,9 @@ The longest shard is now react, a single package: 139–142 s in both arms.
 
 A Dependabot run and a human one land on the same `pr` series: no label tells them apart.
 
+> ⚠ Narrowed on 2026-09-29: `ci.actor` tells them apart. See "turbo telemetry
+> labels the class of actor".
+
 ## The CodSpeed gate asks each commit for its own run (2026-09-29)
 
 **Problem.** The fix above still read the run list: the last 20 push runs, the first green one. The list answered with runs weeks old again: the gate of `36c62d791`, a commit of two documents, a workflow comment and a test ledger, took `889ff3b75` (07.09), a range of 3,381 files, and measured both suites. On 29.09 three of five pushes got a base like that, two before that fix and one after; the 14 gates of 28.09 read back took the previous green run. In one series from a workstation, one list call of about 95 answered with the runs of 01–03.09 and the rest were right, so the failure comes and goes. The class was already on record: "The Bundle Size base is picked by commit, not by the first run the API lists" (#2396), met on #2492 and #2514. The fix above did not look there.
@@ -12987,3 +12990,15 @@ A Dependabot run and a human one land on the same `pr` series: no label tells th
 **Solution.** The push branch of `Decide` walks the first-parent ancestors of the pushed commit, newest first and at most 50, and asks each for its own runs by SHA (`.../workflows/codspeed.yml/runs?head_sha=<sha>`), the kind of query #2396 settled on. The first with a green push run is the base. `gh api` prints the body of an HTTP error to stdout without applying `--jq`, so only an exact `true` counts: with a count compared to `0`, a repository that does not exist gave the parent as the base.
 
 **Why — replayed.** The snippet, cut from the workflow and run against the API for eight pushes of 28–29.09, found the previous green run every time. It passed over `c38db4774`, which no run covered, and `4e34ffb40`, whose run was cancelled. `2c011f151` and `36c62d791` skip, and `06943b0ba`, the dependency bump of #2623, still runs. With every call failing the base is empty and the gate measures. A commit the API does not answer for, or answers without its run, only moves the base further back, so a flaky answer can cost a measurement but cannot skip one; from the list, a single bad call cost a base three weeks old.
+
+## turbo telemetry labels the class of actor (2026-09-29)
+
+**Problem.** Since the Dependabot copies of the OTLP secrets, a Dependabot run exports as a human one does, onto the same `pr` series: `ci.event` is `pull_request` for both, and the collector folds every merge ref into `pr`. A root-dependency bump re-keys every task, so such runs miss the cache wholesale, and mixed into the human runs they would move every hit rate and mean the `pr` series gives. From 24.09 to 29.09 Dependabot started 33 of the 63 pull-request runs of `ci.yml`.
+
+**Solution.** Both stamps, the setup action's and its copy in `post-merge.yml`, add `ci.actor`: `dependabot` for `dependabot[bot]`, `bot` for any other `[bot]` login, `human` for the rest and `unknown` when `GITHUB_ACTOR` is unset. The collector turns every `ci.*` resource attribute into a label, so it needs no change; the label reads `ci_actor`. Only `ci.yml`, through the setup action, and `post-merge.yml` set an OTLP endpoint, so the two stamps cover every run that exports.
+
+**Why a class of `GITHUB_ACTOR`.**
+
+- A login would add a set of series per contributor, and the question is only whether Dependabot started the run.
+- `GITHUB_ACTOR` is the actor of the initial run, and a re-run keeps that actor's privileges (the `github` context reference), so the label names the secret store a run exported with. A Dependabot PR a human pushed to, as `resolve:dependabot` does, reads `human`.
+- The cost is bounded by what the two classes both write. In the day to 29.09 about 4,900 series were written, about 1,900 of them by pull-request runs; a day with both classes of PR run writes up to twice that share. Series written before the change carry no `ci_actor`.
