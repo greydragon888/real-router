@@ -12057,6 +12057,10 @@ Without a run id, a series survives across runs, so `rate` and `increase` work a
   - `turbo_task_cache_events_total`;
 - one local run of three tasks wrote 79 series, 64 of them histogram buckets. Active series against the free tier's 10k are measured after a week.
 
+> ⚠ Narrowed on 2026-09-29: Dependabot runs export too, through Dependabot
+> copies of the two secrets; fork PRs still export nothing. See "Dependabot
+> runs export turbo telemetry".
+
 **The host is shared.** It also runs production services and the benchmark runner. So the collector is capped at 256 MB and half a CPU, and listens on loopback only.
 
 ## Per-task duration reaches Grafana as a sum and a count, not a histogram (#1745, 2026-09-24)
@@ -12961,3 +12965,13 @@ After the change every consumer still re-keys `bundle`, `lint`, `test` and `type
 ⚠ **The extra job reaches GitHub's limit on concurrent jobs.** 19 jobs ran at once in both arms, and in the split Repo Lints, adapter-shared and `leaf-2` waited 26–39 s for a runner — none of them on the critical path. A further shard queues more.
 
 The longest shard is now react, a single package: 139–142 s in both arms.
+
+## Dependabot runs export turbo telemetry (2026-09-29)
+
+**Problem.** A run started by `dependabot[bot]` reads Dependabot secrets only, and `TELEMETRY_OTLP_ENDPOINT` / `TELEMETRY_OTLP_AUTH` existed as Actions secrets alone, so those runs started no exporter. From 24.09 until the secrets were set on 29.09 that was 33 of the 63 pull-request runs of `ci.yml`. The Dependabot PRs the telemetry did show were the ones a human had pushed to, as `resolve:dependabot` does, so the sample was biased, and the runs it missed included the root-dependency bumps, which re-key every task.
+
+**Solution.** Both secrets exist as Dependabot secrets under the same names, so `ci.yml` reads them unchanged. The values were checked before they were stored: an empty OTLP request, which writes nothing, answered 200 with the token and 401 with another. A new ingest token goes to the collector's `.env`, to both secret stores and to the local `TELEMETRY_OTLP_AUTH` that the probes of `/telemetry-analyze` read; the comment on the OTLP block in `ci.yml` names the first three.
+
+**Why this exposure is acceptable.** The token opens the collector's OTLP receiver and nothing else: nginx forwards only `/v1/metrics`, and reading the metrics takes a Grafana credential. `TURBO_TOKEN`, which can write the build cache, is a Dependabot secret already. A token that leaks costs a rotation and, at worst, spam in the metrics. Fork PRs still get no secrets and export nothing.
+
+A Dependabot run and a human one land on the same `pr` series: no label tells them apart.

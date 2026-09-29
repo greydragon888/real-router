@@ -24,7 +24,9 @@ env:
   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
   # turbo's OTLP metrics (#1745) go to the collector in ops/telemetry, which
   # turns turbo's delta temporality into what Grafana Cloud accepts. A fork PR
-  # gets empty secrets, and turbo starts no exporter without an endpoint. The
+  # gets empty secrets, and turbo starts no exporter without an endpoint. A
+  # Dependabot run reads the Dependabot copies of the two secrets, so a new
+  # ingest token goes to both stores and to the collector's `.env`. The
   # resource attributes come from the setup action's stamp step.
   TURBO_EXPERIMENTAL_OTEL_ENABLED: "true"
   TURBO_EXPERIMENTAL_OTEL_PROTOCOL: http-protobuf
