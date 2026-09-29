@@ -21,8 +21,14 @@ name: Sonar (trusted)
 # ⚠ **This workflow holds secrets, so the boundary is: it EXECUTES only
 # base-repository code, and the PR's tree is DATA.** The analysis config
 # (`sonar-project.properties`) and the scope script are checked out from
-# `master`, never from the PR; there is no `pnpm install`, so no lifecycle script
-# from the PR runs; and the scanner parses the source rather than executing it.
+# `master` into `.trusted/`, and the script RUNS FROM THERE, so every module it
+# imports resolves inside `.trusted/` as well: a module missing from the sparse
+# list fails to load rather than loading the PR's copy. The PR's files are read
+# as text, never through `require` or `import` — a `.json` path the PR controls
+# can be a symlink to a `.js` file, and `require` executes it. There is no
+# `pnpm install`, so no lifecycle script from the PR runs, and the scanner parses
+# the source rather than executing it. `scripts/tests/sonar-trusted-boundary.test.mjs`
+# holds the sparse list to the import closure of what the job runs.
 # `ci.yml`'s own comment names the trap this avoids: a workflow with
 # `pull-requests: write` executing attacker-shaped JS.
 #
@@ -280,9 +286,14 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      # ── Base-repository code, which IS executed. Checked out second and
-      #    copied over the PR's copies, so a PR cannot redirect the scanner
-      #    (`sonar.host.url`) or change what the scope script does.
+      # A PR's tree can carry a `.trusted/` of its own; a module left out of the
+      # sparse list below would then load from it.
+      - name: Clear the trusted checkout path
+        run: rm -rf .trusted
+
+      # ── Base-repository code, which IS executed — in place, from `.trusted/`.
+      #    The list is every file the job runs plus everything those files
+      #    import; the boundary test holds it to that closure.
       - name: Checkout trusted analysis config
         uses: actions/checkout@v7
         with:
@@ -292,15 +303,17 @@ jobs:
           sparse-checkout: |
             sonar-project.properties
             scripts/check-coverage-scope.mjs
+            scripts/coverage-owner.mjs
           sparse-checkout-cone-mode: false
 
-      - name: Install trusted config over the PR's
+      # The scanner reads its config from the working directory, so this one
+      # file is copied — over the PR's, which could redirect the scanner
+      # (`sonar.host.url`). Removed first: `cp` onto a symlink writes through it.
+      - name: Install trusted scanner config over the PR's
         run: |
           set -euo pipefail
-          cp .trusted/sonar-project.properties ./sonar-project.properties
-          mkdir -p scripts
-          cp .trusted/scripts/check-coverage-scope.mjs scripts/check-coverage-scope.mjs
-          rm -rf .trusted
+          rm -f sonar-project.properties
+          cp .trusted/sonar-project.properties sonar-project.properties
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -322,19 +335,22 @@ jobs:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
 
+      # Read from the commit, not the working tree: a PR can make the path a
+      # symlink, and `require` of a `.json` that links to a `.js` executes it
+      # (measured). `git show` prints a symlink's target path, which is not JSON.
       - name: Get version from core package
         id: version
         run: |
           set -euo pipefail
-          # `require` on a .json parses it, it does not execute it.
-          node -p 'require("./packages/core/package.json").version' > version.txt
+          git show "HEAD:packages/core/package.json" | jq -er '.version' > version.txt
           echo "version=$(head -c 40 version.txt)" >> "$GITHUB_OUTPUT"
 
-      # Same derivation as `ci.yml`'s job used, from the TRUSTED copy of the
-      # script — but run against the PR's filesystem, so its OUTPUT is data.
+      # Same derivation as `ci.yml`'s job used, run from the TRUSTED copy — the
+      # script walks the working directory, which is the PR's tree, so its
+      # OUTPUT is data.
       - name: Compute Sonar scope
         id: scope
-        run: node scripts/check-coverage-scope.mjs --emit >> "$GITHUB_OUTPUT"
+        run: node .trusted/scripts/check-coverage-scope.mjs --emit >> "$GITHUB_OUTPUT"
 
       # ⚠ Every value below reaches the scanner's ARGV, and every one of them was
       # read off the PR's own tree — `packages/<name>/src` from a directory the

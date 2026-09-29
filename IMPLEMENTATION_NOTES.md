@@ -10062,6 +10062,11 @@ lifecycle script from the fork executes, and the scanner parses source rather
 than running it. `ci.yml` already carries the warning this avoids — a job with
 `pull-requests: write` executing attacker-shaped JS.
 
+> ⚠ Refuted on 2026-09-29: the rule did not hold. The scope script imported
+> `coverage-owner.mjs` from the fork's tree, and the version step `require`d a
+> file the fork controls. See "The trusted Sonar job ran code from the fork's
+> tree".
+
 ⚠ **This workflow has never executed.** It was fork-only for a day and no fork
 PR arrived, so `actionlint` and review are the whole of its verification —
 `ci.yml` triggers on `pull_request` only, which is the same reason gate changes
@@ -13002,3 +13007,22 @@ A Dependabot run and a human one land on the same `pr` series: no label tells th
 - A login would add a set of series per contributor, and the question is only whether Dependabot started the run.
 - `GITHUB_ACTOR` is the actor of the initial run, and a re-run keeps that actor's privileges (the `github` context reference), so the label names the secret store a run exported with. A Dependabot PR a human pushed to, as `resolve:dependabot` does, reads `human`.
 - The cost is bounded by what the two classes both write. In the day to 29.09 about 4,900 series were written, about 1,900 of them by pull-request runs; a day with both classes of PR run writes up to twice that share. Series written before the change carry no `ci_actor`.
+
+## The trusted Sonar job ran code from the fork's tree (2026-09-29)
+
+**Problem.** `sonar-trusted.yml` holds `statuses: write` and gives `SONAR_TOKEN` to its scan step, over a fork's tree checked out as data. Two of its steps executed that tree:
+
+- The job copied `scripts/check-coverage-scope.mjs` from `master`, but the script imports `./coverage-owner.mjs`, and that module stayed the fork's copy. The import dates from `44f11bb63` (2026-08-26), the workflow from `93c73f51f` (#1868, 2026-09-10).
+- The version step ran `node -p 'require("./packages/core/package.json").version'`. `require` picks the loader by the extension of the resolved file, so a `package.json` that is a symlink to a `.js` file runs it. Measured with a probe: the linked file printed from inside `node -p`.
+
+Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_PATH`: the scan, which holds `SONAR_TOKEN`, and `gh`, which posts the required `SonarCloud` status with the job's token. End-to-end exploitation was not attempted. No fork PR has been analysed by the job: since 2026-09-20 its analysis runs only for forks and every run was skipped, and the only fork PR in the history, #1857, predates the workflow.
+
+**Solution.**
+
+- Trusted scripts run in place from `.trusted/`, the sparse checkout of `master`, so their relative imports resolve there as well. A module missing from the sparse list fails to load instead of loading the fork's copy. `scripts/coverage-owner.mjs` joins the list.
+- A step removes any `.trusted/` the fork's tree carries before the checkout into it.
+- Only `sonar-project.properties` is still copied into the working directory, where the scanner reads it, and the fork's file is removed first: `cp` onto a symlink writes through it.
+- The version is read from the commit: `git show HEAD:packages/core/package.json | jq -er .version`. The blob of a symlink is its target path, which is not JSON.
+- `scripts/tests/sonar-trusted-boundary.test.mjs` holds the sparse list to the import closure of every script the job runs from `.trusted/`, and refuses a script run from the working tree, inline `node` code that loads a module, and a missing clear step.
+
+**Why — measured.** The test passes on the fixed workflow and fails on each defect planted back into it: the old run line, `coverage-owner.mjs` dropped from the sparse list, the `require` restored, the clear step removed. `actionlint` is clean. Only a fork PR exercises the job, so the first one is the end-to-end check.
