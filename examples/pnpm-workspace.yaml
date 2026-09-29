@@ -38,12 +38,12 @@ overrides:
   ajv@8: ~8.20.0
   http-proxy-agent: 7.0.2
   # undici, split by major: every parent here takes it as a regular dependency,
-  # so a floor per line holds — 7.29.0 on @electron/get's 7.x, 6.28.0 on node-gyp's
-  # 6.x, each the release that fixes that line's advisories. No entry for 8:
-  # jsdom's `^8.10.2` is above 8.9.0, where that line fixed them, and a floor
-  # below its range could hold it there (#2605).
-  undici@6: '>=6.28.0 <7'
-  undici@7: '>=7.29.0 <8'
+  # so a floor per line holds — 7.29.1 on @electron/get's 7.x, 6.28.1 on node-gyp's
+  # 6.x, each the release that fixes that line's advisories, GHSA-3wwx-pv8p-q78v
+  # the latest. No entry for 8: jsdom's `^8.10.2` starts at the release that fixed
+  # that line, and a floor could only hold it back (#2605).
+  undici@6: '>=6.28.1 <7'
+  undici@7: '>=7.29.1 <8'
   # At the version @angular/build pins exactly; ng-packagr's `^5.0.0` admits it.
   piscina: '>=5.3.2 <6.0.0'
   path-to-regexp: '>=8.4.0'

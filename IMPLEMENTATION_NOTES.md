@@ -12907,3 +12907,11 @@ After the change every consumer still re-keys `bundle`, `lint`, `test` and `type
 **Problem.** `.gitignore` listed `tsup.*` and `vitest.config.{mjs,d.mts}`, at the root and in every package, as TypeScript compile output. Fifteen `packages/*/vitest.config.mjs` — copies of the `.mts` configs compiled on 2026-05-06 and stale since — sat there unseen for five months. Vitest never loaded them: it resolves `.mts` before `.mjs`. turbo hashed them all the same, because the `test` inputs name `vitest.config.*` and a file that glob matches enters the key whether git ignores it or not — measured with `--dry=json`, an ignored `vitest.config.mjs` added to logger-plugin changed its `test` hash. No workspace depends on tsup.
 
 **Solution.** The fifteen files are deleted and the ten rules removed. A compile run that emits such a file again shows it in `git status`, where it gets deleted rather than hashed.
+
+## undici leaves 7.29.0 for GHSA-3wwx-pv8p-q78v (2026-09-29)
+
+**Problem.** GHSA-3wwx-pv8p-q78v, a denial of service in undici's WebSocket permessage-deflate handling (medium, published 28.09), covers `>= 6.25.0 < 6.28.1`, `>= 7.28.0 < 7.29.1` and `>= 8.1.0 < 8.10.2`. Both lockfiles held 7.29.0, the examples through their `undici@7` floor and the root through danger 14, and `lint:audit` failed on both. Dependabot's security job for `/examples` ended in `all_versions_ignored`: that entry ignores undici, whose versions the overrides set.
+
+**Solution.** The examples' floors rise to the fixed releases, `undici@7: '>=7.29.1 <8'` and `undici@6: '>=6.28.1 <7'`. The root keeps no undici entry (#2605), and `pnpm update undici` moves danger's copy. jsdom's `^8.10.2` already starts at the fixed 8.x release.
+
+**Why — measured.** Each lockfile changes only undici's entries, 7.29.0 → 7.30.0 (published 25.09 with provenance); the examples' 6.x stays at 6.29.0. `lint:audit` reports no issues, and `lint:dedupe` and the examples' `pnpm dedupe --check` pass.

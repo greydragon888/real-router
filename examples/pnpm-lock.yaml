@@ -15,8 +15,8 @@ overrides:
   ajv@6: ~6.14.0
   ajv@8: ~8.20.0
   http-proxy-agent: 7.0.2
-  undici@6: '>=6.28.0 <7'
-  undici@7: '>=7.29.0 <8'
+  undici@6: '>=6.28.1 <7'
+  undici@7: '>=7.29.1 <8'
   piscina: '>=5.3.2 <6.0.0'
   path-to-regexp: '>=8.4.0'
   brace-expansion@1: 1.1.18
@@ -11618,8 +11618,8 @@ packages:
     resolution: {integrity: sha512-R+RODBqp6i2pPflGdq+xIOUkl+RNfGgHwoinecKu/JCuf2uO06cOKoDbI2P7Dn6KcswdKwrczbU6IYJ6K8X+wg==}
     engines: {node: '>=18.17'}
 
-  undici@7.29.0:
-    resolution: {integrity: sha512-IDxfleLmmbSskfWSUATiN1nfn2rDuvnMOqb5CWR92iIfojA0Ud+ulOAAEQ57LPr9rWmsreUyf5lwyao+7GNNVw==}
+  undici@7.30.0:
+    resolution: {integrity: sha512-dkrQXeHSaoamnItlYbmzG0wFYrM0ZwDxCIg0A7aKjTyyhh9svRzCNFEzV+Vm05/yehjCzjDZ31KXfGEjYSztDQ==}
     engines: {node: '>=20.18.1'}
 
   undici@8.11.2:
@@ -12529,7 +12529,7 @@ snapshots:
       semver: 7.8.5
       sumchecker: 3.0.1(supports-color@10.2.2)
     optionalDependencies:
-      undici: 7.29.0
+      undici: 7.30.0
     transitivePeerDependencies:
       - supports-color
 
@@ -17858,7 +17858,7 @@ snapshots:
 
   undici@6.29.0: {}
 
-  undici@7.29.0:
+  undici@7.30.0:
     optional: true
 
   undici@8.11.2: {}
