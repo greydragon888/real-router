@@ -12901,3 +12901,9 @@ After the change every consumer still re-keys `bundle`, `lint`, `test` and `type
 ⚠ **A consumer without the input replays its tasks green after an edit in the dir it reads.** This change makes that failure possible, and check 5 stands in front of it, in both hooks and in Repo Lints.
 
 ⚠ **Tests outside the consumers that read `shared/` from disk no longer re-run with their package on a shared edit.** Each of them is in `scripts/repo-wide-scans.json` — checked for this change, and `repo-scan-authority-2241` derives that list — so `lint:repo-scans` runs them outside the cache.
+
+## `.gitignore` stops hiding compiled `vitest` and `tsup` configs (2026-09-29)
+
+**Problem.** `.gitignore` listed `tsup.*` and `vitest.config.{mjs,d.mts}`, at the root and in every package, as TypeScript compile output. Fifteen `packages/*/vitest.config.mjs` — copies of the `.mts` configs compiled on 2026-05-06 and stale since — sat there unseen for five months. Vitest never loaded them: it resolves `.mts` before `.mjs`. turbo hashed them all the same, because the `test` inputs name `vitest.config.*` and a file that glob matches enters the key whether git ignores it or not — measured with `--dry=json`, an ignored `vitest.config.mjs` added to logger-plugin changed its `test` hash. No workspace depends on tsup.
+
+**Solution.** The fifteen files are deleted and the ten rules removed. A compile run that emits such a file again shows it in `git status`, where it gets deleted rather than hashed.

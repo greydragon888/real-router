@@ -14,16 +14,6 @@ examples/**/src-tauri/gen/schemas
 # TypeScript compiled artifacts
 *.tsbuildinfo
 .tsbuildinfo*
-tsup.base.d.mts
-tsup.base.mjs
-tsup.config.d.mts
-tsup.config.mjs
-vitest.config.d.mts
-vitest.config.mjs
-packages/*/tsup.config.d.mts
-packages/*/tsup.config.mjs
-packages/*/vitest.config.d.mts
-packages/*/vitest.config.mjs
 
 # Turbo
 .turbo
