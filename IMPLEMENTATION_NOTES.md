@@ -1971,6 +1971,9 @@ Enforces conventional commits. Types and scopes defined in `commitlint.config.mj
 
 **Rationale:** Pre-commit validates correctness in <2 min so it stays painless on every commit. Pre-push validates artifacts (full build pipeline + dist surface area + dep consistency + GHSA audit) — slower, runs once per push. `lint:deps` lives in **both** layers: pre-commit catches workspace version drift the moment a `package.json` is staged (~1s static check), pre-push acts as the final gate. `lint:package`/`lint:types`/`lint:unused` **also run in CI** now (#813 — see below); only `lint:duplicates`' hard threshold stays pre-push-only (CI keeps an informational jscpd SARIF channel). `lint:audit` was added after PR #643 (see "Local Dependency Audit" below) so contributors can catch CVEs locally before CI Dependency Review flags them.
 
+> ⚠ Superseded on 2026-09-29: the SARIF job is removed, and `pnpm lint:duplicates`
+> gates CI in Repo Lints. See "The jscpd SARIF channel is removed, and the 2 % threshold gates CI".
+
 The full build orchestrator (`pnpm turbo run build`) is wired in `turbo.json` to depend on `bundle`, `test`, `test:properties` (as of #1423, **no longer** `test:stress`). Pre-push exercises stress via a dedicated `pnpm test:stress` step (`turbo run test:stress --concurrency=1`) — isolated from the concurrent build so heap/timing assertions don't flake (#1423). Stress coverage is intentionally **not** duplicated in CI workflows (see "CI: `test:stress` lives only in pre-push" below).
 
 #### Changeset content validation (pre-push fast-block)
@@ -2040,6 +2043,9 @@ Both fold into the required `CI Result` (they're steps in `pipeline`).
 **Lesson:** jscpd 5.x config keys are unstable across patch releases (`ignore` → `ignorePattern` in #714 at 5.0.4, back to `ignore` in #831 at 5.0.9). Pin jscpd exactly (`save-exact`) and re-verify the ignore list actually excludes after any jscpd bump — a green-looking config can silently stop filtering.
 
 ### jscpd: `--no-tips` + non-blocking SARIF in CI
+
+> ⚠ Superseded on 2026-09-29: the SARIF job is removed, and `pnpm lint:duplicates`
+> gates CI in Repo Lints. See "The jscpd SARIF channel is removed, and the 2 % threshold gates CI".
 
 **Three jscpd 5.x features adopted (the only ones worth it for this repo):**
 
@@ -9688,6 +9694,11 @@ All 22 new mutants come from `CallExpression`, the `empty-expression-mutator` th
 
 ## The SARIF channel uploaded eight results and produced zero alerts (#2154, 2026-09-07)
 
+> ⚠ Refuted on 2026-09-29: the fix did not reach GitHub. Every alert on a PR
+> still carried a path relative to its scan root (`guards.ts`,
+> `api/getPluginApi.ts`), so none attached to a file, and `master` had no
+> alerts at all. The job is removed. See "The jscpd SARIF channel is removed, and the 2 % threshold gates CI".
+
 **Problem.** The `Code Duplication (SARIF)` job had been uploading to GitHub code scanning since #813, and the two notes above promised the result would "show up as PR annotations + Security-tab entries". Measured: **18 analyses, the newest reporting `results_count: 8`, and `code-scanning/alerts?tool_name=jscpd` answering `[]`** — every time, for the channel's whole life. jscpd scans eight roots (`packages/*/src/ shared/`) and, up to 5.0.16, reported every URI relative to its OWN root: `index.ts`, `types.ts`, `RxObservable.ts`. GitHub resolves a relative SARIF URI against the repository root, found no such files, and dropped all eight results. GitHub also recorded the tool as `jscpd/5.0.3` — a version string hardcoded in the reporter long before ours.
 
 ⚠ **Nothing in CI could see it, and that is the point.** jscpd exits 0 (`-t 100`), the upload step exits 0, and the alert count lives in an API this job never calls. A green job, a truthful `results_count`, and no alerts is indistinguishable from a clean repository.
@@ -11646,6 +11657,9 @@ The dedupe check earns its place here. A dev-only measurement tool is exactly th
 
 Both duplication channels — `pnpm lint:duplicates` in pre-push and the `duplication` job's SARIF upload — treat "found no clones" and "analysed no files" as the same green. A glob that stops matching, an `ignore` entry that widens too far, a scan root that moves: each produces an empty report, exit 0, and a channel that looks healthy.
 
+> ⚠ Superseded on 2026-09-29: the SARIF job is removed, and `pnpm lint:duplicates`
+> gates CI in Repo Lints. See "The jscpd SARIF channel is removed, and the 2 % threshold gates CI".
+
 This is the class the repository has already paid for once. Section "Code Duplication (SARIF)" above records eighteen analyses that uploaded results and produced ZERO alerts (#2154), and the guard written afterwards — `scripts/check-sarif-paths.mjs` — closes the half that was actually diagnosed. It does not close this half: given a report whose `results` array is empty it prints "no results to resolve" and exits 0. Measured on a crafted empty SARIF, and jscpd itself exits 0 on a scan where every file is ignored.
 
 ### Solution
@@ -13053,3 +13067,14 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 **Solution.** `scripts/tests/workflow-run-names.test.mjs` reads every workflow's `name:` and every `workflow_run` list, in the flow and the block-list form, and refuses a reference that names no workflow.
 
 **Why — measured.** Renaming Post-Merge Build in memory flags both of its dependents; fixtures cover a misspelled reference, a renamed target and the block-list form.
+
+## The jscpd SARIF channel is removed, and the 2 % threshold gates CI (2026-09-29)
+
+**Problem.** CI ran jscpd only in the `Code Duplication (SARIF)` job: `-t 100`, so it never failed, and outside the `CI Result` gate. Its one product was Code Scanning alerts, and they never reached a file. On PR #2625 all 13 alerts carried paths relative to jscpd's scan root — `guards.ts`, `api/getPluginApi.ts`, `engine/path-matcher/registration/trieNodes.ts` — which GitHub cannot attach to a line of the diff; `master` had no jscpd alerts in any state [measured: `code-scanning/alerts?tool_name=jscpd`, 2026-09-29]. So the #2154 fix and `check-sarif-paths.mjs`, which resolves the paths itself rather than asking GitHub, reported a working channel that was not. Meanwhile the 2 % threshold gated only the pre-push hook, so a PR whose source did not pass through that hook met no duplication check at all.
+
+**Solution.**
+
+- The `duplication` job is gone, with `scripts/check-sarif-paths.mjs`, its test, its entry in `cli-entry.test.mjs`, the `lint:duplicates:sarif` script, the `jscpd-report/` ignore rule and its `OUTSIDE_GATE` entry in `ci-gate-completeness.test.mjs`.
+- Repo Lints runs `pnpm lint:duplicates`, the same command as the pre-push hook, blocking, except on a Dependabot PR or a diff without source, like the other source checks there.
+
+**Why.** The owner's decision (2026-09-29): the threshold blocks everywhere, and annotations that never attach are not worth a second jscpd run and a second copy of its arguments. Verified: the script tests pass, including gate completeness and hook parity with the new step; `actionlint` reports the same 16 shellcheck notes on `ci.yml` as before the change and nothing else.

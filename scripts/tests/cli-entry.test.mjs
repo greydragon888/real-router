@@ -58,10 +58,6 @@ const CLIS = {
     args: [],
     ran: /✓ no site counts a record's own keys/,
   },
-  "scripts/check-sarif-paths.mjs": {
-    args: [],
-    ran: /usage: check-sarif-paths\.mjs/,
-  },
   "scripts/checkout-tarballs.mjs": {
     args: [],
     ran: /usage: checkout-tarballs\.mjs <workspace>/,

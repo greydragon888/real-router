@@ -919,10 +919,16 @@ jobs:
       # Dead-code / unused-export / unused-dependency detection (knip). Pure
       # source-graph analysis — no dist needed. Catches unused introduced by a PR
       # that turbo's affected filter scored as "nothing built". Previously
-      # pre-push only (#813); the hard jscpd duplication threshold stays in the
-      # hook — CI keeps the informational SARIF channel instead.
+      # pre-push only (#813).
       - name: Check for unused code
         run: pnpm lint:unused
+
+      # The copy-paste gate the pre-push hook also runs: the 2 % threshold and
+      # the exclusions live in `.jscpd.json`. A Dependabot bump and a diff with
+      # no source change no source for it to compare.
+      - name: Check for code duplication
+        if: env.DEPENDABOT_PR != 'true' && env.NO_SOURCE != 'true'
+        run: pnpm lint:duplicates
 
       # Unit-test the CI meta-layer itself (scripts/tests/*.test.mjs — node:test
       # outside the turbo graph, so it runs here; several files import tooling
@@ -1195,91 +1201,6 @@ jobs:
 
       - name: Run smoke test
         run: bash scripts/smoke-test-packages.sh
-
-  # Code duplication — INFORMATIONAL ONLY, never blocks the merge.
-  # The hard duplication gate stays in the pre-push hook (`pnpm lint:duplicates`,
-  # threshold 2% in `.jscpd.json`). This job re-runs jscpd with the SARIF reporter
-  # and `-t 100` (so jscpd itself always exits 0) and uploads the report to GitHub
-  # Code Scanning — duplication then surfaces as PR annotations + Security-tab
-  # entries without gating CI. NOT in the `ci` gate's `needs`, so it can't block.
-  #
-  # ⚠ That last sentence was aspirational for the channel's whole first year:
-  # eighteen analyses uploaded `results_count: 8` and produced ZERO alerts,
-  # because jscpd's paths were relative to its own scan roots (#2154). Fixed by
-  # jscpd 5.1.1+, which emits `uriBaseId` + `originalUriBaseIds`; kept fixed by
-  # the resolution check below.
-  duplication:
-    name: Code Duplication (SARIF)
-    needs: [check]
-    # Not on a Dependabot PR: a bump duplicates no source (IMPLEMENTATION_NOTES
-    # "Dependabot PRs skip every metric"). Nor on a diff that holds no source at
-    # all — a release PR, where this would rescan master's code (#2433).
-    if: >-
-      needs.check.outputs.should_run == 'true' &&
-      needs.check.outputs.no_source != 'true' &&
-      github.event.pull_request.user.login != 'dependabot[bot]'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6.1.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-
-      # jscpd only reads packages/*/src/ + shared/ and has NO workspace-package
-      # deps — its engine ships as a platform binary via optionalDependencies
-      # (cpd-<arch>). So skip the full 32-package `pnpm install` (~30-60s on a
-      # store cache-miss, #734) and fetch only jscpd via dlx (hardlinked from the
-      # setup-node pnpm store cache). The version is read from package.json so a
-      # Dependabot jscpd bump can't drift. Args mirror the root
-      # `lint:duplicates:sarif` script (-t 100 = threshold 100 so jscpd always
-      # exits 0 — this job is informational, it only uploads SARIF to Code
-      # Scanning, never gates).
-      #
-      # `shared/` is part of the scan set: #1523 added it to close the
-      # cross-boundary duplication blind spot (shared sources are symlinked into
-      # 10 published packages), but only in the npm scripts — this inline command
-      # kept the pre-#1523 scope until 2026-08-01, so the CI SARIF channel was
-      # still blind to exactly what #1523 paid for. Keep the two in sync.
-      # (2026-08-01 CI/CD audit §4.1.)
-      - name: Detect duplication (SARIF)
-        run: |
-          jscpd_version="$(node -p "require('./package.json').devDependencies.jscpd")"
-          pnpm dlx "jscpd@${jscpd_version}" packages/*/src/ shared/ --no-tips -t 100 -r sarif -o jscpd-report
-
-      # #2154: this channel spent eighteen analyses uploading `results_count: 8`
-      # and producing ZERO alerts. jscpd scans eight roots, and up to 5.0.16 its
-      # report gave every uri relative to its OWN root (`index.ts`, `types.ts`),
-      # which GitHub resolves against the repository root, fails to find, and
-      # drops. Nothing in the job could see it: the scan exits 0, the upload
-      # exits 0, and the alert count lives in an API this job never calls.
-      #
-      # So resolve the paths here, by GitHub's own rule, before handing the file
-      # over. Pure stdlib on purpose — this job deliberately skips `pnpm
-      # install` (see above), so the guard must not need node_modules.
-      # No `continue-on-error`: this job is already outside the `ci` gate's
-      # `needs`, so a red step here is loud and still blocks nothing — which is
-      # exactly the trade a guard against SILENCE wants. The upload below keeps
-      # `if: always()`, so a failing check reports the breakage without also
-      # withholding the report.
-      - name: Verify SARIF paths resolve in this repository
-        run: node scripts/check-sarif-paths.mjs jscpd-report/jscpd-report.sarif
-
-      - name: Upload SARIF to Code Scanning
-        if: always()
-        uses: github/codeql-action/upload-sarif@v4.38.2
-        with:
-          sarif_file: jscpd-report/jscpd-report.sarif
-          category: jscpd
 
   coverage:
     name: Coverage (Codecov)

@@ -40,11 +40,6 @@ export const GATE_JOB = "ci";
  */
 export const OUTSIDE_GATE = new Map([
   [
-    "duplication",
-    "informational jscpd SARIF channel — the hard 2% threshold deliberately " +
-      "lives in the pre-push hook, not CI (#813)",
-  ],
-  [
     "bundle-size",
     "informational size-limit PR comment — 'not a gate' by design " +
       "(infra-review W4 §3.4); its latency/failure must not move the merge point",
