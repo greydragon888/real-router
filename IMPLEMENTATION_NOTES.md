@@ -1023,6 +1023,11 @@ suites passed against fresh production builds: 49, 8, 23 and 27 tests.
 - `pnpm-lock.yaml` runs if the set of `name@version` reachable from what the harness imports (plus `tsx`, which it runs without importing) changed, with peer suffixes dropped and `@types/*` left out;
 - anything else, Markdown anywhere included, does not.
 
+> ⚠ Narrowed on 2026-09-29: a measured package's `turbo.json` is excepted
+> too, and the base lookup filters the conclusion itself. See "The CodSpeed
+> gate finds its base without the API's status filter, and skips a package's
+> `turbo.json`".
+
 The measured packages are derived: `@real-router/core` plus the workspace dependencies of `benchmarks/package.json`, closed over `dependencies` and `peerDependencies`. A push is compared with the last `master` commit whose CodSpeed push run finished green — a run the gate skipped counts, because it certified that commit equivalent to its own base; a pull request with its merge base; a dispatch always measures. The push-side Dependabot author clause is removed; the pull-request side still skips Dependabot.
 
 **Why these rules (measured).** Over the same 149 commits (base = parent) the gate runs 61. It runs all 7 bumps of a dependency the suites load (the react group #2336, zod ×2, svelte, `@angular/*`, `@analogjs/vite-plugin-angular`, jsdom) and skips all 4 that only the cross-router bench imports (sv-router, wouter, vue-router, playwright). The 7 commits a line-based count had called "code in `src`" that it skips are comment, type or in-`src` Markdown edits; three were read by hand. Two findings shaped the comparison. A plain esbuild transform keeps a JSDoc block before a class member (`ed3e8947d`), hence `minifyWhitespace`. And pnpm renames a snapshot when one of its peers moves — a `@types/node` bump renames `vite` — hence the peer-suffix strip. The base rule was checked on `master` the same day: from `0292670f5`, the last green run, the gate answers RUN for the react group that the author clause had let through unmeasured.
@@ -12915,3 +12920,14 @@ After the change every consumer still re-keys `bundle`, `lint`, `test` and `type
 **Solution.** The examples' floors rise to the fixed releases, `undici@7: '>=7.29.1 <8'` and `undici@6: '>=6.28.1 <7'`. The root keeps no undici entry (#2605), and `pnpm update undici` moves danger's copy. jsdom's `^8.10.2` already starts at the fixed 8.x release.
 
 **Why — measured.** Each lockfile changes only undici's entries, 7.29.0 → 7.30.0 (published 25.09 with provenance); the examples' 6.x stays at 6.29.0. `lint:audit` reports no issues, and `lint:dedupe` and the examples' `pnpm dedupe --check` pass.
+
+## The CodSpeed gate finds its base without the API's status filter, and skips a package's `turbo.json` (2026-09-29)
+
+**Problem.** Two kinds of push ran both suites for nothing.
+
+- The base of a push is the newest `master` commit whose CodSpeed push run finished green, and `codspeed.yml` asked for it as `gh run list --status success --limit 1`. On 2026-09-29 the API answered that with runs weeks old: the gate of `2c011f151` took `817f2098f` (22.09) and the merge of #2623 took `889ff3b75` (07.09), ranges of 2,223 and 3,381 changed files. A range that long always holds a harness change, so every push measured. Replayed at the time, the query returned a run from 05.08, and ten minutes later the right one; the list without `--status` kept its order throughout. With the right base the gate skips `2c011f151`. Before 29.09 the base was the previous green run in all 39 readable runs of the last 45.
+- `classify` counts every unlisted file in a measured package's directory as build config, so the package `turbo.json` files of `eb55b3704` ran both suites. turbo reads that file to plan and key tasks; no build reads it.
+
+**Solution.** The base lookup lists the last 20 push runs and takes the first green one with `jq`. `classify` skips a package's `turbo.json` beside the vitest, eslint and stryker configs; `codspeed-gate.test.mjs` pins it with a control, a `tsdown.config.ts` edit that still runs.
+
+**Why.** Replayed with the new script, `eb55b3704` skips and `bd3dc8d1b`, whose range holds a `codspeed.yml` edit, still runs. A stale base can only widen the range, so the defect cost runner time rather than a missed measurement, and an empty base still measures: the gate keeps failing open.

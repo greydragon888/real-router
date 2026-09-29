@@ -435,9 +435,11 @@ export function classify(file, scope) {
       return "manifest";
     }
 
+    // `turbo.json` plans and keys the package's tasks; no build reads it.
     if (
       rel.startsWith("tests/") ||
       rel.endsWith(".md") ||
+      rel === "turbo.json" ||
       /^(vitest|eslint|stryker)\.config\./.test(rel)
     ) {
       return undefined;

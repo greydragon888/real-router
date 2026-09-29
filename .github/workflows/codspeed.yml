@@ -232,9 +232,13 @@ jobs:
               # gate skipped counts: it certified that commit equivalent to its
               # own base. An API failure leaves BASE empty, and an empty base
               # measures.
+              # ⚠ The conclusion is filtered here, not by the API: with
+              # `--status success --limit 1` the API has answered with a run
+              # weeks old, and a base that old measures every push.
               BASE=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow codspeed.yml \
-                --branch master --event push --status success --limit 1 \
-                --json headSha --jq '.[0].headSha // ""' || true)
+                --branch master --event push --limit 20 \
+                --json headSha,conclusion \
+                --jq '[.[] | select(.conclusion == "success")][0].headSha // ""' || true)
               node scripts/codspeed-gate.mjs --base "$BASE" --head "$GITHUB_SHA"
               ;;
           esac

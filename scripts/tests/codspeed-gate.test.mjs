@@ -242,6 +242,27 @@ test("a document inside a measured src is not measured", () => {
   assert.equal(result.run, false, result.reasons.join("; "));
 });
 
+test("a measured package's turbo.json is not measured; a build config beside it is", () => {
+  const skipped = verdict({
+    "packages/core/turbo.json": JSON.stringify({
+      extends: ["//"],
+      tasks: { "type-check": { inputs: ["src/**/*.ts"] } },
+    }),
+  });
+
+  assert.equal(skipped.run, false, skipped.reasons.join("; "));
+
+  const measured = verdict({
+    "packages/core/tsdown.config.ts": "export default {};\n",
+  });
+
+  assert.equal(measured.run, true);
+  assert.match(
+    measured.reasons.join("; "),
+    /build config of a measured package: packages\/core\/tsdown\.config\.ts/,
+  );
+});
+
 test("a package the suites never load is not measured", () => {
   const result = verdict({
     "packages/other/src/index.ts": "export const other = 2;\n",
