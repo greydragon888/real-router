@@ -56,13 +56,22 @@ import { basename, dirname, join, relative } from "node:path";
  *
  * RE-MEASURED 2026-07-19 (cold per-task timings from the #1521 full-execution
  * run, cross-checked against two historical leaf runs): K is deliberately KEPT
- * at 10 — count is the wrong axis. Non-adapter groups are batched into single
- * shards, so same-group sets tie leaf-vs-sharded at ANY count; the entire
+ * at 10 — count is the wrong axis. Non-adapter groups are batched into shards
+ * of up to MAX_PER_SHARD packages, so a same-group set that small ties
+ * leaf-vs-sharded at ANY count; the entire
  * sharded win comes from the per-package ADAPTER shards. That is handled by the
  * `multiAdapter` composition trigger in `buildPlan` (≥2 affected adapters →
  * force sharded); K stays as the generic wide-set backstop.
  */
 export const K = 10;
+
+/**
+ * The most packages one batched shard carries. A larger group is split, in name
+ * order, into the fewest near-equal chunks, named `<group>-1`, `<group>-2`, …:
+ * a batched shard runs every task of its packages on one four-vCPU runner, and
+ * `leaf` as a single shard was the longest job of every sharded pull request.
+ */
+export const MAX_PER_SHARD = 5;
 
 /**
  * The single package that forms the `base` layer: `@real-router/core` alone.
@@ -230,6 +239,22 @@ export function classify(pkg, dirOf, readers = defaultReaders) {
 }
 
 /**
+ * Splits a group, in name order, into the fewest near-equal chunks of at most
+ * MAX_PER_SHARD packages. An empty group yields no chunk.
+ * @param {string[]} pkgs
+ * @returns {string[][]}
+ */
+export function chunkGroup(pkgs) {
+  const sorted = [...pkgs].sort();
+  const count = Math.ceil(sorted.length / MAX_PER_SHARD);
+  const size = Math.ceil(sorted.length / count);
+
+  return Array.from({ length: count }, (_, i) =>
+    sorted.slice(i * size, (i + 1) * size),
+  );
+}
+
+/**
  * Bucket every affected package by layer.
  * @returns {Record<string,string[]>}
  */
@@ -262,7 +287,8 @@ export function groupAffected(affected, dirOf, readers = defaultReaders) {
  * the sharded job's `if:` is false (companion C1).
  *
  * Sharded: each adapter is its own shard (1 adapter = 1 shard, R2.10); the other
- * non-empty groups become one shard each. `base` is handled by a separate job,
+ * non-empty groups become one shard each, split into chunks when larger than
+ * MAX_PER_SHARD. `base` is handled by a separate job,
  * so it is never in `include`. Empty groups are omitted → GHA spawns no runner.
  *
  * `leafFilter` (leaf only, else "") is the explicit `--filter=<pkg>` set the
@@ -327,9 +353,9 @@ export function buildPlan(
     f.startsWith("shared/"),
   );
   // Composition trigger (K re-measure, 2026-07-19): adapters are the ONLY
-  // per-package shards — every other group is batched into a single shard, so
-  // for same-group sets the sharded path equals the leaf path at ANY count
-  // (measured tie). The win exists exactly when ≥2 adapters are affected:
+  // per-package shards — every other group is batched into shards of up to
+  // MAX_PER_SHARD packages, so for same-group sets that small the sharded path
+  // equals the leaf path at ANY count (measured tie). The win exists exactly when ≥2 adapters are affected:
   // cold per-task CI timings give sharded +29s at 2 adapters, +59s at 3,
   // +143s at 6 (the historical 371s leaf run), while a SINGLE adapter is ~6s
   // better on leaf. A pure count (K) cannot see this — "2 adapters + 1 plugin"
@@ -398,12 +424,13 @@ export function buildPlan(
   }
   for (const name of GROUP_NAMES) {
     if (name === "base" || name === "adapter") continue;
-    const pkgs = groups[name];
-    if (pkgs.length === 0) continue;
-    include.push({
-      name,
-      filter: pkgs.map((p) => `--filter=${p}`).join(" "),
-      distPaths: distPathsFor(pkgs),
+    const chunks = chunkGroup(groups[name]);
+    chunks.forEach((pkgs, i) => {
+      include.push({
+        name: chunks.length === 1 ? name : `${name}-${String(i + 1)}`,
+        filter: pkgs.map((p) => `--filter=${p}`).join(" "),
+        distPaths: distPathsFor(pkgs),
+      });
     });
   }
 
