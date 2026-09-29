@@ -22,6 +22,9 @@ env:
   TURBO_API: ${{ vars.TURBO_API }}
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+  # EXPERIMENT (exp/leaf-shard-split, never merged): every task runs cold, so
+  # the shard timings compare with the cold runs of master.
+  TURBO_FORCE: "true"
   # turbo's OTLP metrics (#1745) go to the collector in ops/telemetry, which
   # turns turbo's delta temporality into what Grafana Cloud accepts. A fork PR
   # gets empty secrets, and turbo starts no exporter without an endpoint. The
