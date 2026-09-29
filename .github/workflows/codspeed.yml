@@ -228,17 +228,25 @@ jobs:
               node scripts/codspeed-gate.mjs --base "$PR_BASE" --head "$PR_HEAD" --merge-base
               ;;
             *)
-              # The last master commit a push run finished green on. A run the
-              # gate skipped counts: it certified that commit equivalent to its
-              # own base. An API failure leaves BASE empty, and an empty base
-              # measures.
-              # ⚠ The conclusion is filtered here, not by the API: with
-              # `--status success --limit 1` the API has answered with a run
-              # weeks old, and a base that old measures every push.
-              BASE=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow codspeed.yml \
-                --branch master --event push --limit 20 \
-                --json headSha,conclusion \
-                --jq '[.[] | select(.conclusion == "success")][0].headSha // ""' || true)
+              # The newest first-parent ancestor whose own CodSpeed push run
+              # finished green. A run the gate skipped counts: it certified that
+              # commit equivalent to its own base. Each commit is asked for its
+              # runs by SHA, as the Bundle Size base is (#2396): the run LIST
+              # has answered with runs weeks old, and a base that old measures
+              # every push.
+              # ⚠ On an HTTP error `gh api` prints the error body to stdout, so
+              # only an exact `true` counts. Anything else passes the commit
+              # over, which can only widen the range; no green run in 50 commits
+              # leaves BASE empty, and an empty base measures.
+              BASE=""
+              for SHA in $(git rev-list --first-parent --max-count=50 "$GITHUB_SHA~1"); do
+                GREEN=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/codspeed.yml/runs?head_sha=$SHA" \
+                  --jq "any(.workflow_runs[]; .head_sha == \"$SHA\" and .event == \"push\" and .conclusion == \"success\")" || true)
+                if [ "$GREEN" = true ]; then
+                  BASE=$SHA
+                  break
+                fi
+              done
               node scripts/codspeed-gate.mjs --base "$BASE" --head "$GITHUB_SHA"
               ;;
           esac

@@ -12932,6 +12932,10 @@ After the change every consumer still re-keys `bundle`, `lint`, `test` and `type
 - The base of a push is the newest `master` commit whose CodSpeed push run finished green, and `codspeed.yml` asked for it as `gh run list --status success --limit 1`. On 2026-09-29 the API answered that with runs weeks old: the gate of `2c011f151` took `817f2098f` (22.09) and the merge of #2623 took `889ff3b75` (07.09), ranges of 2,223 and 3,381 changed files. A range that long always holds a harness change, so every push measured. Replayed at the time, the query returned a run from 05.08, and ten minutes later the right one; the list without `--status` kept its order throughout. With the right base the gate skips `2c011f151`. Before 29.09 the base was the previous green run in all 39 readable runs of the last 45.
 - `classify` counts every unlisted file in a measured package's directory as build config, so the package `turbo.json` files of `eb55b3704` ran both suites. turbo reads that file to plan and key tasks; no build reads it.
 
+> ⚠ Refuted on 2026-09-29: the list without `--status` answers with runs weeks
+> old too — the gate of `36c62d791` took `889ff3b75`. See "The CodSpeed gate
+> asks each commit for its own run".
+
 **Solution.** The base lookup lists the last 20 push runs and takes the first green one with `jq`. `classify` skips a package's `turbo.json` beside the vitest, eslint and stryker configs; `codspeed-gate.test.mjs` pins it with a control, a `tsdown.config.ts` edit that still runs.
 
 **Why.** Replayed with the new script, `eb55b3704` skips and `bd3dc8d1b`, whose range holds a `codspeed.yml` edit, still runs. A stale base can only widen the range, so the defect cost runner time rather than a missed measurement, and an empty base still measures: the gate keeps failing open.
@@ -12975,3 +12979,11 @@ The longest shard is now react, a single package: 139–142 s in both arms.
 **Why this exposure is acceptable.** The token opens the collector's OTLP receiver and nothing else: nginx forwards only `/v1/metrics`, and reading the metrics takes a Grafana credential. `TURBO_TOKEN`, which can write the build cache, is a Dependabot secret already. A token that leaks costs a rotation and, at worst, spam in the metrics. Fork PRs still get no secrets and export nothing.
 
 A Dependabot run and a human one land on the same `pr` series: no label tells them apart.
+
+## The CodSpeed gate asks each commit for its own run (2026-09-29)
+
+**Problem.** The fix above still read the run list: the last 20 push runs, the first green one. The list answered with runs weeks old again: the gate of `36c62d791`, a commit of two documents, a workflow comment and a test ledger, took `889ff3b75` (07.09), a range of 3,381 files, and measured both suites. On 29.09 three of five pushes got a base like that, two before that fix and one after; the 14 gates of 28.09 read back took the previous green run. In one series from a workstation, one list call of about 95 answered with the runs of 01–03.09 and the rest were right, so the failure comes and goes. The class was already on record: "The Bundle Size base is picked by commit, not by the first run the API lists" (#2396), met on #2492 and #2514. The fix above did not look there.
+
+**Solution.** The push branch of `Decide` walks the first-parent ancestors of the pushed commit, newest first and at most 50, and asks each for its own runs by SHA (`.../workflows/codspeed.yml/runs?head_sha=<sha>`), the kind of query #2396 settled on. The first with a green push run is the base. `gh api` prints the body of an HTTP error to stdout without applying `--jq`, so only an exact `true` counts: with a count compared to `0`, a repository that does not exist gave the parent as the base.
+
+**Why — replayed.** The snippet, cut from the workflow and run against the API for eight pushes of 28–29.09, found the previous green run every time. It passed over `c38db4774`, which no run covered, and `4e34ffb40`, whose run was cancelled. `2c011f151` and `36c62d791` skip, and `06943b0ba`, the dependency bump of #2623, still runs. With every call failing the base is empty and the gate measures. A commit the API does not answer for, or answers without its run, only moves the base further back, so a flaky answer can cost a measurement but cannot skip one; from the list, a single bad call cost a base three weeks old.
