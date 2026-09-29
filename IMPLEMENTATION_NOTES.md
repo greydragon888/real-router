@@ -12931,3 +12931,11 @@ After the change every consumer still re-keys `bundle`, `lint`, `test` and `type
 **Solution.** The base lookup lists the last 20 push runs and takes the first green one with `jq`. `classify` skips a package's `turbo.json` beside the vitest, eslint and stryker configs; `codspeed-gate.test.mjs` pins it with a control, a `tsdown.config.ts` edit that still runs.
 
 **Why.** Replayed with the new script, `eb55b3704` skips and `bd3dc8d1b`, whose range holds a `codspeed.yml` edit, still runs. A stale base can only widen the range, so the defect cost runner time rather than a missed measurement, and an empty base still measures: the gate keeps failing open.
+
+## pre-push lints the cross-router bench with git's repository variables unset (2026-09-29)
+
+**Problem.** git exports `GIT_DIR` to a hook run from a linked worktree, and a branch lives in one by the rule in `CLAUDE.md`. The census in `lint:cross-router` lists the bench's tracked files with `git ls-files` from `cross-router-bench/`; with the inherited `GIT_DIR` git takes that directory for the root of the work tree, no path starts with `apps/`, and the census fails with "the census reached no app". Every push from a worktree stopped at this step, and a push from the main checkout, which gets no `GIT_DIR`, passed.
+
+**Solution.** `.husky/pre-push` runs `pnpm lint:cross-router` inside `(unset $(git rev-parse --local-env-vars); …)`, the wrapper the scripts tests already use for the same reason.
+
+**Why — measured.** With `GIT_DIR` exported the census test passes 5 of 6, through the wrapper 6 of 6.

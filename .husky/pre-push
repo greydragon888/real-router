@@ -153,9 +153,15 @@ pnpm turbo run lint:bench --filter=router-benchmarks
 
 # A workspace of its own, which lint:reach does not read: its census runs
 # after its lint.
+#
+# ⚠ The census asks `git ls-files` from `cross-router-bench/`. With a GIT_DIR
+# inherited from a push out of a linked worktree, git takes that directory for
+# the root of the work tree, no path starts with `apps/`, and the census fails.
+# Hence the same unset as the scripts tests above.
 echo "🧹 Linting the cross-router bench..."
 pnpm --dir cross-router-bench install --frozen-lockfile --prefer-offline
-pnpm lint:cross-router
+# shellcheck disable=SC2046 # the names must split: one operand per variable
+(unset $(git rev-parse --local-env-vars); pnpm lint:cross-router)
 
 # Heap/timing stress suites — run isolated at --concurrency=1 (they were
 # dropped from build.dependsOn in #1423). Under the concurrent build, up to 4
