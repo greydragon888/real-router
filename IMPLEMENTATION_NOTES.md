@@ -12939,3 +12939,25 @@ After the change every consumer still re-keys `bundle`, `lint`, `test` and `type
 **Solution.** `.husky/pre-push` runs `pnpm lint:cross-router` inside `(unset $(git rev-parse --local-env-vars); …)`, the wrapper the scripts tests already use for the same reason.
 
 **Why — measured.** With `GIT_DIR` exported the census test passes 5 of 6, through the wrapper 6 of 6.
+
+## A batched CI shard carries at most five packages (2026-09-29)
+
+**Problem.** `build-matrix.mjs` gives every adapter a shard of its own and every other group exactly one. `leaf`, the group of every package that is no adapter, URL plugin, SSR plugin or adapter-shared package, holds nine: about 500 task-seconds of a cold sharded run on one four-vCPU runner, 1.4 to 4 times any other shard (turbo telemetry, 24–28.09). In the cold CI of #2623 its test step ran 150 s against 85 s for the next shard, and it finished 70 s after every other job — smoke, Bundle Size and Sonar wait for the whole shard stage, and `CI Result` waits for them. Inside the shard lint is 43 % of the work: each package pays for starting ESLint, its plugins and a TypeScript program over core's `src`, which takes 3.4–5.3 s for lifecycle-plugin on an M3 Pro, 1.4 s of it in the rules, and about 20 s per package on a runner shared with the vitest workers of the tasks beside it. validation-plugin alone is about 30 % of the shard.
+
+**Solution.** `chunkGroup` splits a batched group larger than `MAX_PER_SHARD` (5), in name order, into the fewest near-equal chunks, named `<group>-1`, `<group>-2`, …; the full plan becomes eleven shards, `leaf-1` with five packages and `leaf-2` with four. Routing is unchanged. The upload names follow the shard (`coverage-reports-`, `dist-`, `turbo-summary-` plus `matrix.name`), and the jobs downstream download by `coverage-reports-*` and `dist-*` and read `pipeline-sharded` as one result. `build-matrix.test.mjs` pins the chunk shapes, the name order and the eleven shards.
+
+**Why — measured** on the draft PR #2625, both arms with `TURBO_FORCE`, so every task ran cold:
+
+|                                    | one `leaf`  | `leaf-1` + `leaf-2` |
+| ---------------------------------- | ----------- | ------------------- |
+| test step of the leaf shard        | 117 s       | 70 s and 63 s       |
+| last leaf job ends                 | 202 s       | 153 s               |
+| last shard to finish               | leaf, 202 s | react, 172 s        |
+| smoke, Bundle Size and Sonar start | 205 s       | 175 s               |
+| `CI Result`                        | 291 s       | 262 s               |
+
+⚠ **One pair of runs.** Every job lands on a runner of its own hardware, so the seconds are noisy; the drop of the leaf shard itself is structural.
+
+⚠ **The extra job reaches GitHub's limit on concurrent jobs.** 19 jobs ran at once in both arms, and in the split Repo Lints, adapter-shared and `leaf-2` waited 26–39 s for a runner — none of them on the critical path. A further shard queues more.
+
+The longest shard is now react, a single package: 139–142 s in both arms.

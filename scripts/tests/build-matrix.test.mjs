@@ -29,11 +29,13 @@ import { fileURLToPath } from "node:url";
 
 import {
   buildPlan,
+  chunkGroup,
   classify,
   CORE_LAYER,
   deriveAffected,
   deriveMembership,
   K,
+  MAX_PER_SHARD,
 } from "../build-matrix.mjs";
 
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
@@ -546,16 +548,79 @@ test("routing: sharded matrix — adapter shards + non-empty groups only, emptie
   );
 });
 
-test("routing: full rebuild (all 23) → base excluded, 10 shards", () => {
+test("routing: full rebuild (all 23) → base excluded, 11 shards", () => {
   const { mode, matrix } = buildPlan(allPackages, realDirOf);
   assert.equal(mode, "sharded");
   const names = matrix.include.map((i) => i.name);
   assert.ok(!names.includes("base"), "base is a separate job, never a shard");
-  // 6 adapters + url-plugin + ssr-plugin + adapter-shared + leaf.
-  for (const g of ["url-plugin", "ssr-plugin", "adapter-shared", "leaf"]) {
+  // 6 adapters + url-plugin + ssr-plugin + adapter-shared + leaf in two chunks.
+  for (const g of [
+    "url-plugin",
+    "ssr-plugin",
+    "adapter-shared",
+    "leaf-1",
+    "leaf-2",
+  ]) {
     assert.ok(names.includes(g), g);
   }
-  assert.equal(matrix.include.length, 10);
+  assert.ok(!names.includes("leaf"), "a split group has no unnumbered shard");
+  assert.equal(matrix.include.length, 11);
+});
+
+// ─── chunking a batched group (MAX_PER_SHARD) ────────────────────────────────
+
+test("chunkGroup: the fewest near-equal chunks of at most MAX_PER_SHARD, in name order", () => {
+  const names = (n) =>
+    Array.from({ length: n }, (_, i) => `p${String(n - i).padStart(2, "0")}`);
+  const sizes = (n) => chunkGroup(names(n)).map((c) => c.length);
+
+  assert.equal(MAX_PER_SHARD, 5);
+  assert.deepEqual(sizes(0), []);
+  assert.deepEqual(sizes(1), [1]);
+  assert.deepEqual(sizes(5), [5]);
+  assert.deepEqual(sizes(6), [3, 3]);
+  assert.deepEqual(sizes(9), [5, 4]);
+  assert.deepEqual(sizes(11), [4, 4, 3]);
+  // Name order, whatever order the group arrives in.
+  assert.deepEqual(chunkGroup(["c", "a", "b"]), [["a", "b", "c"]]);
+});
+
+test("routing: a group larger than MAX_PER_SHARD becomes numbered shards; a small one keeps its name", () => {
+  const leaves = Array.from(
+    { length: MAX_PER_SHARD + 4 },
+    (_, i) => `@real-router/leaf-${String(i).padStart(2, "0")}`,
+  );
+  const affected = ["@real-router/core", ...leaves];
+  const dirOf = new Map(
+    affected.map((p) => [p, `packages/${p.replace("@real-router/", "")}`]),
+  );
+  const readers = { readManifestDeps: noDeps, readSymlinks: () => [] };
+
+  const { mode, matrix } = buildPlan(affected, dirOf, affected, [], readers);
+
+  assert.equal(mode, "sharded");
+  assert.deepEqual(
+    matrix.include.map((i) => [i.name, i.filter.split(" ").length]),
+    [
+      ["leaf-1", MAX_PER_SHARD],
+      ["leaf-2", 4],
+    ],
+  );
+  assert.equal(
+    matrix.include[0].filter,
+    leaves
+      .slice(0, MAX_PER_SHARD)
+      .map((p) => `--filter=${p}`)
+      .join(" "),
+  );
+
+  const small = ["@real-router/core", ...leaves.slice(0, MAX_PER_SHARD)];
+  const plan = buildPlan(small, dirOf, small, [], readers);
+
+  assert.deepEqual(
+    plan.matrix.include.map((i) => i.name),
+    ["leaf"],
+  );
 });
 
 // ─── per-shard dist paths (§3.3) ────────────────────────────────────────────
