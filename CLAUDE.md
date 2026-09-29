@@ -29,6 +29,8 @@ shared/
 
 **A consumer names its shared dir in its own `turbo.json`**, in the inputs of `bundle`, `lint`, `test` and `type-check` (`../../shared/<dir>/**/*.ts`, appended with `$TURBO_EXTENDS$`): turbo does not hash through the symlink, so without it the package replays those tasks from cache after an edit in the dir. `pnpm lint:coverage-scope` derives the consumers from the symlinks and fails one that omits it.
 
+**So does a package that builds an entry point from a directory other than `src/`** — `ssr/**` in angular's four tasks, since the root inputs of `bundle` and `test` reach no other source directory. `pnpm lint:coverage-scope` derives these directories from the `@real-router/internal-source` targets in `exports`.
+
 ## Toolchain Versions
 
 `major.minor` of the key tooling/runtime, kept in context so suggested APIs, flags and config formats match what's actually installed (this stack is bleeding-edge — TS 6, ESLint 10 flat-config, Vitest 4, Turbo 2 — so defaults from training tend to lag). **When a version changes, or you notice a mismatch with the "source of truth" column, update this table.** `major.minor` only — patch drift is noise.

@@ -3,16 +3,16 @@
   "extends": ["//"],
   "tasks": {
     "bundle": {
-      "inputs": ["$TURBO_EXTENDS$", "../../shared/dom-utils/**/*.ts"]
+      "inputs": ["$TURBO_EXTENDS$", "../../shared/dom-utils/**/*.ts", "ssr/**"]
     },
     "lint": {
-      "inputs": ["$TURBO_EXTENDS$", "../../shared/dom-utils/**/*.ts"]
+      "inputs": ["$TURBO_EXTENDS$", "../../shared/dom-utils/**/*.ts", "ssr/**"]
     },
     "test": {
-      "inputs": ["$TURBO_EXTENDS$", "../../shared/dom-utils/**/*.ts"]
+      "inputs": ["$TURBO_EXTENDS$", "../../shared/dom-utils/**/*.ts", "ssr/**"]
     },
     "type-check": {
-      "inputs": ["$TURBO_EXTENDS$", "../../shared/dom-utils/**/*.ts"]
+      "inputs": ["$TURBO_EXTENDS$", "../../shared/dom-utils/**/*.ts", "ssr/**"]
     }
   }
 }

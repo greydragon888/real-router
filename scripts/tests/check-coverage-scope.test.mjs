@@ -265,7 +265,8 @@ const SCRIPT = join(ROOT, "scripts/check-coverage-scope.mjs");
 
 /**
  * A tree the script accepts: `a` produces coverage; `b` (private) and `svelte`
- * have no tests and are excluded from Sonar coverage; `owner` measures
+ * have no tests and are excluded from Sonar coverage; `b` builds its `./extra`
+ * entry from `extra/`, as angular builds `./ssr` from `ssr/`; `owner` measures
  * `shared/dx` and lints it through the `src/dx-alias` symlink.
  */
 const acceptedTree = () => ({
@@ -274,8 +275,25 @@ const acceptedTree = () => ({
   "packages/a/tests/a.test.ts": "\n",
   "packages/a/vitest.config.mts":
     "thresholds: { statements: 100, branches: 100, functions: 100, lines: 100 }\n",
-  "packages/b/package.json": JSON.stringify({ name: "@fx/b", private: true }),
+  "packages/b/package.json": JSON.stringify({
+    name: "@fx/b",
+    private: true,
+    exports: {
+      ".": { "@real-router/internal-source": "./src/index.ts" },
+      "./extra": { "@real-router/internal-source": "./extra/index.ts" },
+    },
+  }),
   "packages/b/src/index.ts": "export const b = 1;\n",
+  "packages/b/extra/index.ts": "export const extra = 1;\n",
+  "packages/b/turbo.json": JSON.stringify({
+    extends: ["//"],
+    tasks: Object.fromEntries(
+      ["bundle", "lint", "test", "type-check"].map((task) => [
+        task,
+        { inputs: ["$TURBO_EXTENDS$", "extra/**"] },
+      ]),
+    ),
+  }),
   "packages/svelte/package.json": JSON.stringify({ name: "@fx/svelte" }),
   "packages/svelte/src/index.ts": "export const svelte = 1;\n",
   "packages/owner/package.json": JSON.stringify({
@@ -374,8 +392,21 @@ test("CONTROL — the script accepts the tree every drift cell departs from", ()
   assert.equal(run.status, 0, run.stderr);
   assert.match(
     run.stderr,
-    /✓ Coverage scope in sync: 2 components, 2 Sonar coverage-exclusions \(b, svelte\); 3 public packages size-tracked \(exceptions: svelte\); shared\/ consumers keyed on their dir: 1\./,
+    /✓ Coverage scope in sync: 2 components, 2 Sonar coverage-exclusions \(b, svelte\); 3 public packages size-tracked \(exceptions: svelte\); shared\/ consumers keyed on their dir: 1; entry dirs outside src\/ keyed: b\/extra\./,
   );
+});
+
+test("CONTROL — the repository's entry dirs outside src/ are derived, and each is keyed", () => {
+  // Check 6 passes by finding nothing when its derivation stops finding
+  // angular's ssr/, and the fixture above cannot tell: it has its own exports.
+  // The repository can, so this cell runs the script on it and pins the set.
+  const run = spawnSync(process.execPath, [SCRIPT], {
+    cwd: ROOT,
+    encoding: "utf8",
+  });
+
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.stderr, /entry dirs outside src\/ keyed: angular\/ssr\.$/m);
 });
 
 const withoutLine = (text, line) => {
@@ -578,6 +609,64 @@ const DRIFTS = [
       tree["turbo.json"] = JSON.stringify(turbo);
     },
     line: /turbo\.json: task "test" lists \.\.\/\.\.\/shared\/\*\*\/\*\.ts for every package/,
+  },
+  {
+    name: "a package that builds an entry from outside src/ with no turbo.json",
+    plant: (tree) => {
+      delete tree["packages/b/turbo.json"];
+    },
+    line: /packages\/b: exports "\.\/extra" is built from extra\/, but the package has no turbo\.json/,
+  },
+  {
+    // The #2626 shape: the task keeps the root inputs and omits the entry dir.
+    name: "an entry dir outside src/ that a task does not list",
+    plant: (tree) => {
+      const turbo = JSON.parse(tree["packages/b/turbo.json"]);
+
+      turbo.tasks.bundle.inputs = ["$TURBO_EXTENDS$"];
+      tree["packages/b/turbo.json"] = JSON.stringify(turbo);
+    },
+    line: /packages\/b\/turbo\.json: task "bundle" does not list extra\/\*\* — exports "\.\/extra" is built from that directory/,
+  },
+  {
+    // A glob that names the sources leaves the entry's build config (angular's
+    // `ssr/ng-package.json`) out of the key.
+    name: "an entry dir outside src/ that a task lists only in part",
+    plant: (tree) => {
+      const turbo = JSON.parse(tree["packages/b/turbo.json"]);
+
+      turbo.tasks.bundle.inputs = ["$TURBO_EXTENDS$", "extra/**/*.ts"];
+      tree["packages/b/turbo.json"] = JSON.stringify(turbo);
+    },
+    line: /packages\/b\/turbo\.json: task "bundle" does not list extra\/\*\*/,
+  },
+  {
+    name: "an entry dir outside src/ with a type-check:tests task that does not list it",
+    plant: (tree) => {
+      const pkg = JSON.parse(tree["packages/b/package.json"]);
+
+      pkg.scripts = { "type-check:tests": "tsc --noEmit" };
+      tree["packages/b/package.json"] = JSON.stringify(pkg);
+    },
+    line: /packages\/b\/turbo\.json: task "type-check:tests" does not list extra\/\*\*/,
+  },
+  {
+    // The condition can sit under another one, and the derivation still finds
+    // the directory: the missing turbo.json is what gets reported.
+    name: "a package with no turbo.json whose entry dir a nested condition names",
+    plant: (tree) => {
+      const pkg = JSON.parse(tree["packages/b/package.json"]);
+
+      pkg.exports["./extra"] = {
+        import: {
+          "@real-router/internal-source": "./extra/index.ts",
+          default: "./dist/extra.js",
+        },
+      };
+      tree["packages/b/package.json"] = JSON.stringify(pkg);
+      delete tree["packages/b/turbo.json"];
+    },
+    line: /packages\/b: exports "\.\/extra" is built from extra\/, but the package has no turbo\.json/,
   },
   {
     name: "a size-limit exception that is private",

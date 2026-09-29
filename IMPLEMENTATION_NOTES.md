@@ -13078,3 +13078,28 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 - Repo Lints runs `pnpm lint:duplicates`, the same command as the pre-push hook, blocking, except on a Dependabot PR or a diff without source, like the other source checks there.
 
 **Why.** The owner's decision (2026-09-29): the threshold blocks everywhere, and annotations that never attach are not worth a second jscpd run and a second copy of its arguments. Verified: the script tests pass, including gate completeness and hook parity with the new step; `actionlint` reports the same 16 shellcheck notes on `ci.yml` as before the change and nothing else.
+
+## An entry point built outside `src/` keys its package's tasks (#2626, 2026-09-30)
+
+**Problem.** `@real-router/angular` publishes `./ssr`, which ng-packagr builds from `packages/angular/ssr/`. The root inputs of `bundle` and `test` reach no source directory but `src/`, and angular's `turbo.json` added only `shared/dom-utils`. A change confined to `ssr/` kept the `bundle` key, so CI and Post-Merge Build replayed the previous build, and with it `lint:package` (publint) and `lint:types` (attw), which read its `dist/`: a change that broke the ng-packagr build of `ssr/` merged green. `test` re-ran only through its `type-check` dependency, and a change to `ssr/ng-package.json`, which names the entry file, re-keyed none of the four tasks.
+
+⚠ **A release does not publish a stale `./ssr`.** Every angular release bumps `packages/angular/package.json`, an input of `bundle`, so the release job bundles the commit it publishes. A broken `ssr/` build surfaces on the Version Packages PR at the latest.
+
+**Solution.**
+
+- `packages/angular/turbo.json` appends `ssr/**` to `bundle`, `lint`, `test` and `type-check`, beside `shared/dom-utils`. The directory is listed whole because it holds the entry's `ng-package.json` as well as its sources.
+- `scripts/check-coverage-scope.mjs` gains check 6. It derives each package's entry directories other than `src/` from the `@real-router/internal-source` targets in `exports`, and fails when such a package has no `turbo.json` or when a task that check 5 keys does not list `<dir>/**`. `check-coverage-scope.test.mjs` plants each departure in its fixture — the directory left out, a glob naming only its `*.ts`, `type-check:tests`, a nested condition — and one cell runs the script on the repository and pins the derived set to `angular/ssr`.
+- `CLAUDE.md` states the rule beside the one for `shared/` consumers.
+
+**Why — measured with `--dry=json`** in a `git archive` copy, one edit at a time:
+
+| edited                        | `bundle`  | `lint`    | `test`                        | `type-check` |
+| ----------------------------- | --------- | --------- | ----------------------------- | ------------ |
+| `ssr/public_api.ts`, before   | unchanged | re-keyed  | re-keyed through `type-check` | re-keyed     |
+| `ssr/ng-package.json`, before | unchanged | unchanged | unchanged                     | unchanged    |
+| either, after                 | re-keyed  | re-keyed  | re-keyed                      | re-keyed     |
+| `README.md`, after (control)  | unchanged | unchanged | unchanged                     | unchanged    |
+
+`lint:package` and `lint:types` follow `bundle` in every row. Check 6 reports all four tasks on the tree before the change. Five mutants of it — no directory derived, a prefix match in place of `<dir>/**`, no walk into a nested condition, `type-check:tests` never keyed, nothing reported — are each caught by the fixture.
+
+⚠ **`ssr/` is still outside five lists scoped to `src/`:** the coverage `include` in `vitest.config.unit.mts`, the Sonar sources `check-coverage-scope.mjs` emits, the `angular` component in `codecov.yml`, the CodeQL `paths` and the jscpd roots of `lint:duplicates`. No file in angular's `lcov.info` is under `ssr/`. ESLint and `tsc` do read it.

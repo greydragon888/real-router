@@ -41,6 +41,10 @@
  *      `turbo.json`; no other package and not the root lists `shared/` there.
  *      turbo does not hash through a symlink, so a consumer without the input
  *      replays its tasks from cache after a change in the dir.
+ *   6. `turbo.json` — every package that builds an entry point from a
+ *      directory other than `src/` lists `<dir>/**` in the inputs of the same
+ *      tasks, in its own `turbo.json`. The directories come from the
+ *      `@real-router/internal-source` targets in `exports`.
  *
  * Emit mode (`--emit`, used by ci.yml's coverage job and sonar-trusted.yml):
  *   prints `sources=…`, `tests=…`, `reports=…` lines for `$GITHUB_OUTPUT`,
@@ -372,12 +376,28 @@ for (const pkg of SIZE_LIMIT_EXCEPTIONS.keys()) {
 // `extends` does not count. The reverse directions keep shared/ out of the key
 // of everything else: a package that links no shared/<dir>, and the root
 // turbo.json, which would re-key every package on every shared edit.
-const SHARED_KEYED_TASKS = ["bundle", "lint", "test", "type-check"];
+const KEYED_TASKS = ["bundle", "lint", "test", "type-check"];
 const SHARED_PREFIX = "../../shared/";
 
 /** @param {string} file */
 const readTurbo = (file) =>
   existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : undefined;
+
+/** @param {string} pkg */
+const readManifest = (pkg) =>
+  JSON.parse(readFileSync(join(PKG_DIR, pkg, "package.json"), "utf8"));
+
+/**
+ * The cached tasks that read a package's sources: KEYED_TASKS, and
+ * `type-check:tests` where the package has the script. Checks 5 and 6 key them.
+ * @param {string} pkg
+ */
+const keyedTasksOf = (pkg) => [
+  ...KEYED_TASKS,
+  ...(readManifest(pkg).scripts?.["type-check:tests"] === undefined
+    ? []
+    : ["type-check:tests"]),
+];
 
 /** @param {{ inputs?: string[] } | undefined} task @returns {string[]} */
 const sharedInputsOf = (task) =>
@@ -415,16 +435,8 @@ for (const pkg of packages) {
     continue;
   }
 
-  const scripts =
-    JSON.parse(readFileSync(join(PKG_DIR, pkg, "package.json"), "utf8"))
-      .scripts ?? {};
-  const keyedTasks = [
-    ...SHARED_KEYED_TASKS,
-    ...(scripts["type-check:tests"] === undefined ? [] : ["type-check:tests"]),
-  ];
-
   for (const dir of dirs) {
-    for (const task of keyedTasks) {
+    for (const task of keyedTasksOf(pkg)) {
       const listed = sharedInputsOf(turbo.tasks?.[task]).some((glob) =>
         glob.startsWith(`${SHARED_PREFIX}${dir}/`),
       );
@@ -452,11 +464,89 @@ for (const pkg of packages) {
 
 const rootTurbo = readTurbo(join(ROOT, "turbo.json"));
 
-for (const task of SHARED_KEYED_TASKS) {
+for (const task of KEYED_TASKS) {
   for (const glob of sharedInputsOf(rootTurbo?.tasks?.[task])) {
     errors.push(
       `turbo.json: task "${task}" lists ${glob} for every package — each shared/ consumer declares its own dir in its turbo.json`,
     );
+  }
+}
+
+// --- Check 6: turbo keys each package on every dir it builds an entry from ---
+// `@real-router/angular/ssr` is built from packages/angular/ssr/, and the root
+// `bundle` and `test` inputs cover no source directory but src/. Unless the
+// package lists ssr/ itself, an edit confined to it restores the previous dist/
+// from the cache, and an edit to `ssr/ng-package.json` re-keys no task (#2626).
+// The directories are DERIVED from the `@real-router/internal-source` targets
+// in `exports`, and the package's own turbo.json lists each one whole, as
+// `<dir>/**`, in the tasks check 5 keys: the directory holds the entry's build
+// config as well as its sources. A file src/ imports from outside src/ without
+// being an entry point is out of this check's reach.
+const INTERNAL_SOURCE = "@real-router/internal-source";
+
+/** Every `@real-router/internal-source` target under one `exports` entry. */
+const internalSourcesOf = (entry) =>
+  entry !== null && typeof entry === "object"
+    ? Object.entries(entry).flatMap(([condition, value]) =>
+        condition === INTERNAL_SOURCE && typeof value === "string"
+          ? [value]
+          : internalSourcesOf(value),
+      )
+    : [];
+
+/**
+ * The directories other than src/ that a package builds an entry point from,
+ * each with the first `exports` key built from it.
+ * @param {string} pkg
+ * @returns {Map<string, string>}
+ */
+const entryDirsOutsideSrc = (pkg) => {
+  const entries = readManifest(pkg).exports;
+  const dirs = new Map();
+
+  if (entries === null || typeof entries !== "object") return dirs;
+
+  for (const [key, entry] of Object.entries(entries)) {
+    for (const target of internalSourcesOf(entry)) {
+      const [dir, ...rest] = target.replace(/^\.\//, "").split("/");
+
+      if (rest.length > 0 && dir !== "src" && !dirs.has(dir)) {
+        dirs.set(dir, key);
+      }
+    }
+  }
+
+  return dirs;
+};
+
+const keyedEntryDirs = [];
+
+for (const pkg of packages) {
+  const dirs = entryDirsOutsideSrc(pkg);
+
+  if (dirs.size === 0) continue;
+
+  const turbo = readTurbo(join(PKG_DIR, pkg, "turbo.json"));
+
+  for (const [dir, key] of dirs) {
+    if (turbo === undefined) {
+      errors.push(
+        `packages/${pkg}: exports "${key}" is built from ${dir}/, but the package has no turbo.json — no task of it is keyed on that directory`,
+      );
+      continue;
+    }
+
+    const unlisted = keyedTasksOf(pkg).filter(
+      (task) => !(turbo.tasks?.[task]?.inputs ?? []).includes(`${dir}/**`),
+    );
+
+    for (const task of unlisted) {
+      errors.push(
+        `packages/${pkg}/turbo.json: task "${task}" does not list ${dir}/** — exports "${key}" is built from that directory, so a change there must re-key every task that reads the package's sources`,
+      );
+    }
+
+    if (unlisted.length === 0) keyedEntryDirs.push(`${pkg}/${dir}`);
   }
 }
 
@@ -494,6 +584,7 @@ if (emitMode) {
     `✓ Coverage scope in sync: ${coverageProducing.length} components, ` +
       `${mustCoverageExclude.length} Sonar coverage-exclusions (${mustCoverageExclude.join(", ")}); ` +
       `${publicCount} public packages size-tracked (exceptions: ${[...SIZE_LIMIT_EXCEPTIONS.keys()].join(", ")}); ` +
-      `shared/ consumers keyed on their dir: ${sharedConsumers}.`,
+      `shared/ consumers keyed on their dir: ${sharedConsumers}; ` +
+      `entry dirs outside src/ keyed: ${keyedEntryDirs.join(", ") || "none"}.`,
   );
 }
