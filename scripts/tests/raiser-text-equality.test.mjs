@@ -25,7 +25,7 @@ import { dirname, join, relative } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { render } from "../raiser-text-equality.mjs";
+import { isComparedSource, render } from "../raiser-text-equality.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const FIXTURE = join(ROOT, "packages/core/tests/fixtures/raiser-heads");
@@ -57,6 +57,16 @@ test("the shared raiser fixture: each site renders its own binding's head", () =
       "[router.navigate] the second binding shares the first one's name",
     ],
   });
+});
+
+test("the compared file set reaches shared/, which consumers' src/ only links to", () => {
+  assert.equal(isComparedSource("packages/core/src/Router.ts"), true);
+  assert.equal(
+    isComparedSource("shared/browser-env/popstate-handler.ts"),
+    true,
+  );
+  assert.equal(isComparedSource("shared/dom-utils/README.md"), false);
+  assert.equal(isComparedSource("scripts/raiser-text-equality.mjs"), false);
 });
 
 test("the CLI runs when it is invoked through a symlink whose name holds a space", () => {

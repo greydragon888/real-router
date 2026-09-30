@@ -29,7 +29,7 @@ shared/
 
 **A consumer names its shared dir in its own `turbo.json`**, in the inputs of `bundle`, `lint`, `test` and `type-check` (`../../shared/<dir>/**/*.ts`, appended with `$TURBO_EXTENDS$`): turbo does not hash through the symlink, so without it the package replays those tasks from cache after an edit in the dir. `pnpm lint:coverage-scope` derives the consumers from the symlinks and fails one that omits it.
 
-**A package's code lives under `src/`; the only other code root is `shared/<dir>`.** Tool scopes — turbo inputs, coverage, Sonar, CodeQL, jscpd among them — name a package's code as `src/`, so a file outside it drops out of all of them at once (#2627). Check 6 of `pnpm lint:coverage-scope` holds the layout; its header lists what it fails. A list that names the src root across packages names `shared/` too, by its real path: the shared dirs enter `src/` only as symlinks, which Node's `globSync` and CodeQL's extractor do not follow. `scripts/tests/code-roots-authority.test.mjs` fails such a list unless it carries a named exemption.
+**A package's code lives under `src/`; the only other code root is `shared/<dir>`.** Tool scopes — turbo inputs, coverage, Sonar, CodeQL, jscpd among them — name a package's code as `src/`, so a file outside it drops out of all of them at once (#2627). Check 6 of `pnpm lint:coverage-scope` holds the layout; its header lists what it fails. A list that names the src root across packages, or the `packages/` root as a path prefix, names `shared/` too, by its real path: the shared dirs enter `src/` only as symlinks, which Node's `globSync` and CodeQL's extractor do not follow. `scripts/tests/code-roots-authority.test.mjs` fails such a list unless it carries a named exemption.
 
 ## Toolchain Versions
 

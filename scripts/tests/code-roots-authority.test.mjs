@@ -4,8 +4,9 @@
 // Run:  node --test scripts/tests/code-roots-authority.test.mjs
 //
 // The code roots are `packages/<pkg>/src` and `shared/<dir>`, and check 6 of
-// `scripts/check-coverage-scope.mjs` holds that there are no others. A glob or
-// regex that names the src root across packages does not reach `shared/`: the
+// `scripts/check-coverage-scope.mjs` holds that there are no others. A glob,
+// regex or path prefix that names the src root across packages — or the
+// `packages/` root that holds it — does not reach `shared/`: the
 // shared dirs enter a package's `src/` only through symlinks. Node's `globSync`
 // and CodeQL's extractor do not follow them, and the lists whose tool does
 // follow them exclude the aliases so each file is read once (`.jscpd.json`,
@@ -30,7 +31,7 @@ import ts from "typescript";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-/** The shapes a repo-wide src root is written in. */
+/** The shapes a repo-wide src root, or the packages root above it, is written in. */
 const SRC_ROOT = [
   /packages\/\*\/src\b/u,
   /\}\/\*\/src\b/u,
@@ -39,6 +40,8 @@ const SRC_ROOT = [
   /packages\/\(\$[A-Za-z_]+\)\/src/u,
   /\*\*\/src\/\*\*/u,
   /["']packages["'],\s*["']\*["'],\s*["']src["']/u,
+  /startsWith\(\s*["'`]packages\/["'`]\s*\)/u,
+  /\^packages\\?\/(?=["'`\s)\]|/]|$)/mu,
 ];
 
 /** The shapes the shared root is written in. */
@@ -64,6 +67,10 @@ const EXEMPT = new Map([
     "leaves shared/ to the per-owner authority-1838 suites by design",
   ],
   ["scripts/add-package-paths.sh", "a manual codemod that enforces nothing"],
+  [
+    "scripts/git-diff-report.sh",
+    "a manual diff report that no hook or workflow runs",
+  ],
   [
     "scripts/refusal-census.mjs",
     "counts refusals in core and validation-plugin, neither of which links a shared dir",
@@ -179,6 +186,7 @@ test("CONTROL — the census finds the lists known to name both roots", () => {
     "scripts/check-semgrep.sh",
     "tsconfig.sonar.json",
     "packages/core/tests/functional/captured-intrinsics-authority-1971.test.ts",
+    "scripts/raiser-text-equality.mjs",
   ]) {
     assert.ok(found.includes(file), `the census does not reach ${file}`);
   }
@@ -234,6 +242,28 @@ test("fixture: the template, join and shell spellings are read", () => {
   );
   assert.equal(
     namesSrcRoot(codeOf("x.yml", '# was "packages/*/src/**"\nkey: 1\n')),
+    false,
+  );
+});
+
+test("fixture: a prefix filter on the packages root is read", () => {
+  assert.equal(
+    namesSrcRoot(
+      codeOf("x.mjs", 'files.filter((f) => f.startsWith("packages/"));\n'),
+    ),
+    true,
+  );
+  assert.equal(
+    namesSrcRoot(codeOf("x.sh", 'git ls-files | grep "^packages/"\n')),
+    true,
+  );
+  assert.equal(
+    namesSrcRoot(codeOf("x.sh", "awk '$1 ~ /^packages\\// { print }'\n")),
+    true,
+  );
+  // One package's directory is out of scope, like one package's `src/`.
+  assert.equal(
+    namesSrcRoot(codeOf("x.mjs", 'f.startsWith("packages/core/");\n')),
     false,
   );
 });
