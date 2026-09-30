@@ -480,8 +480,8 @@ for (const task of KEYED_TASKS) {
 // a list is blind to code anywhere else (#2627). So the layout is what is
 // checked: the code roots are `packages/<pkg>/src` and `shared/<dir>`, the
 // second reached through a symlink under `src/`, and a list that covers both
-// covers all code. Generated directories and dot-directories are not walked; a
-// symlink is never followed.
+// covers all code (`scripts/tests/code-roots-authority.test.mjs`). Generated
+// directories and dot-directories are not walked; a symlink is never followed.
 const INTERNAL_SOURCE = "@real-router/internal-source";
 const CODE_FILE = /\.(?:[cm]?[jt]sx?|svelte|vue)$/;
 const ROOT_CONFIG_FILE =

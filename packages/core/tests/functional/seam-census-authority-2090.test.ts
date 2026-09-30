@@ -29,6 +29,7 @@ import { describe, expect, it } from "vitest";
 
 const PACKAGES = path.resolve(__dirname, "../../..");
 const REPO = path.resolve(PACKAGES, "..");
+const SHARED = path.resolve(REPO, "shared");
 const BENCHMARKS = path.resolve(REPO, "benchmarks");
 const CROSS_ROUTER_BENCH = path.resolve(REPO, "cross-router-bench");
 
@@ -89,6 +90,9 @@ const enclosing = (node: ts.Node): string => {
 const sourceFiles = (): string[] =>
   [
     ...globSync(`${PACKAGES}/*/src/**/*.{ts,tsx,mts}`),
+    // A shared dir reaches a package's src/ only through a symlink, which
+    // globSync does not follow.
+    ...globSync(`${SHARED}/*/**/*.{ts,tsx,mts}`),
     ...globSync(`${PACKAGES}/*/tests/**/*.{ts,tsx,mts}`),
     ...globSync(`${BENCHMARKS}/**/*.{ts,tsx,mts,mjs}`),
     ...globSync(`${CROSS_ROUTER_BENCH}/**/*.{ts,tsx,mts,mjs}`),

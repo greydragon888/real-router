@@ -39,13 +39,11 @@ paths:
   # (packages/{browser,hash,navigation}-plugin/src/browser-env, every adapter's
   # src/dom-utils, packages/{ssr-data,rsc-server}-plugin/src/shared-ssr), and the
   # extractor does not follow symlinked directories — measured on run
-  # 30711121982, of 586 extracted files ZERO were under shared/. So each shared
-  # dir is listed here by its real path. Same reason sonar-project.properties
-  # lists shared/* explicitly (see ci.yml "Compute Sonar scope"). (2026-08-01
-  # CI/CD audit §1.4; dom-utils since #2552.)
-  - "shared/browser-env/**"
-  - "shared/dom-utils/**"
-  - "shared/ssr/**"
+  # 30711121982, of 586 extracted files ZERO were under shared/. So shared/ is
+  # listed here by its real path, as one glob: a new shared dir is in scope the
+  # day it lands. Same reason sonar-project.properties lists shared/* explicitly
+  # (see ci.yml "Compute Sonar scope").
+  - "shared/**"
 
 # Queries to run
 queries:
