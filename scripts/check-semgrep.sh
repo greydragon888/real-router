@@ -157,13 +157,16 @@ set +e
 count_json="$("${SEMGREP[@]}" scan --config .semgrep/ --metrics=off --json --time "$fixture_dir/fixture.ts" 2>/dev/null)"
 count_exit=$?
 set -e
+# Written as a string: `console.log` colours a number when FORCE_COLOR is set,
+# which `node --test` does for its children under a terminal, and `-lt` below
+# cannot read a coloured digit.
 rule_count="$(printf '%s' "$count_json" | node -e '
 let text = "";
 process.stdin.on("data", (chunk) => (text += chunk)).on("end", () => {
   try {
-    console.log(JSON.parse(text).time?.rules?.length ?? "");
+    process.stdout.write(String(JSON.parse(text).time?.rules?.length ?? ""));
   } catch {
-    console.log("");
+    process.stdout.write("");
   }
 });')"
 if [ $count_exit -ne 0 ] || [ -z "$rule_count" ]; then
