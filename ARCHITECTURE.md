@@ -177,7 +177,7 @@ graph TD
     SSRUTILS -.->|peer| CORE
 ```
 
-Solid arrows = runtime `dependencies`. Dashed arrows = bundled at build time (consumer's bundle includes the internal package).
+Solid arrows = runtime `dependencies`. Dashed arrows = bundled at build time (consumer's bundle includes the internal package). The graph used to be larger.
 
 ## Core Architecture
 
