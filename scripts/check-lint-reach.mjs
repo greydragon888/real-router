@@ -117,8 +117,20 @@ const result = evaluateReach({
       JSON.parse(readFileSync(path.join(ROOT, "turbo.json"), "utf8")).tasks,
     ),
   ),
+  // `--cache=local:rw` keeps the dry runs off the remote cache, which turbo
+  // asks, one request at a time, about each task the local cache lacks — in
+  // CI, every task. The verdict reads no cache field.
   dryRun: ({ tasks, flags }) =>
-    JSON.parse(sh("pnpm", ["turbo", "run", ...tasks, ...flags, "--dry=json"])),
+    JSON.parse(
+      sh("pnpm", [
+        "turbo",
+        "run",
+        ...tasks,
+        ...flags,
+        "--dry=json",
+        "--cache=local:rw",
+      ]),
+    ),
   packages,
   trackedFiles,
   sharedDirs,

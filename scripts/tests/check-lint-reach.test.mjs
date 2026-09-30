@@ -584,13 +584,27 @@ const ENTRIES = [
 ];
 
 /** The whole-graph dry run of the definition layer. */
-const DEFINITION_CALL = ["turbo", "run", "lint", "lint:bench", "--dry=json"];
+const DEFINITION_CALL = [
+  "turbo",
+  "run",
+  "lint",
+  "lint:bench",
+  "--dry=json",
+  "--cache=local:rw",
+];
 
 /** The three calls the CLI makes for {@link ENTRIES}, as the stub must receive them. */
 const EXPECTED_CALLS = [
   ["ls", "-r", "--depth", "-1", "--json"],
   DEFINITION_CALL,
-  ["turbo", "run", "lint", "--filter=./packages/*", "--dry=json"],
+  [
+    "turbo",
+    "run",
+    "lint",
+    "--filter=./packages/*",
+    "--dry=json",
+    "--cache=local:rw",
+  ],
 ];
 
 /**

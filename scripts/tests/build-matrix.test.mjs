@@ -36,6 +36,7 @@ import {
   deriveMembership,
   K,
   MAX_PER_SHARD,
+  runMembershipQuery,
 } from "../build-matrix.mjs";
 
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
@@ -182,6 +183,18 @@ test("L1: deriveMembership dedups tasks[].package, keeps packages/* via turbo di
     "membership = deduped packages/* target set",
   );
   assert.ok(!dirOf.has("@real-router/shared-sources"));
+});
+
+test("L1: the membership query is a dry run that stays off the remote cache", () => {
+  // A dry run asks the remote cache, one request at a time, about each task
+  // the local cache lacks — in CI, every task. The plan reads no cache field.
+  let command = "";
+  runMembershipQuery((cmd) => {
+    command = cmd;
+    return "";
+  });
+  assert.match(command, /--dry=json(?:\s|$)/);
+  assert.match(command, /--cache=local:rw(?:\s|$)/);
 });
 
 // ─── Level 2 — classify() live sweep over the real packages/* tree ───────────
