@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-30]
 
+### @real-router/angular@0.24.2
+
+### Patch Changes
+
+- [#2630](https://github.com/greydragon888/real-router/pull/2630) [`3606c0a`](https://github.com/greydragon888/real-router/commit/3606c0a5460e2041b21a3ac6e01b6f76b4b5e99f) Thanks [@greydragon888](https://github.com/greydragon888)! - Keep the `/ssr` entry's sources in `src/ssr/` ([#2627](https://github.com/greydragon888/real-router/issues/2627))
+
+  The seven source files of `@real-router/angular/ssr` move from `ssr/` to `src/ssr/`; `ssr/` keeps only the entry's `ng-package.json`, which points at them. Every tool that reads the package's `src/` — coverage, Sonar, CodeQL, jscpd, turbo's task keys — now reads the `/ssr` entry as well.
+
+  No API change: the built `.mjs` and `.d.ts` files are byte-identical. The `/ssr` source maps name `src/ssr/…` as their sources.
+
+
 ### @real-router/angular@0.24.1
 
 ### Patch Changes
