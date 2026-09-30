@@ -13171,3 +13171,21 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 - On PR #2633, with the flag, `lint:reach` took 10.9 s of Repo Lints, against 110 s on #2632, and printed the same verdict.
 
 ⚠ **Another script that plans with `--dry=json` pays the same cost unless it passes the flag.** No check looks for one; each of the two call sites is pinned by its own test.
+
+## `lint:security` skips its scans when a delta changes nothing they read (2026-10-01)
+
+**Problem.** `check-semgrep.sh` runs semgrep four times: the version, the count of our rules, a scan with our rules and a scan with `p/javascript`. Under a terminal, on a delta that changes no file the scans read, a hook spent 7.2–7.9 s on it and printed semgrep's banner twice: semgrep writes the banner to stderr on every scan when its stdout is a terminal, and `--quiet` does not stop it. Without a semgrep binary, a hook ran `uvx semgrep` with no version, so uv resolved the latest release on every run.
+
+**Solution.**
+
+- After the version and the rule count, the script reads `git diff --name-only <base> HEAD`. With no path under a `src` directory in `packages/`, none under `shared/` and none under `.semgrep/`, both scans are skipped, and the script says so. A baseline scan reports what the delta adds to the files it reads, so it has nothing to report. The version and the rules are still checked, so a semgrep that cannot run is still caught.
+- Each scan's stdout goes through `cat`, and the exit code comes from `PIPESTATUS[0]`.
+- Without a semgrep binary, a hook runs `uvx … semgrep==$SEMGREP_FLOOR`. A cell of `check-semgrep.test.mjs` holds the floor equal to the `SEMGREP_VERSION` that `ci.yml` pins.
+
+**Why — measured**, under a terminal on one machine, alternating the two versions:
+
+- A delta without a scan target: 7.2–7.9 s before, 1.9–2.0 s after. A delta with a file under `src/`: 6.1 s before, 6.1–6.2 s after.
+- Banners on the terminal: two before, none after. A planted finding still prints and exits 1.
+- Seven mutants, each caught by a cell: never skipping, the pattern without `shared/`, without `.semgrep/`, with `src/` one level under a package, `$?` after the pipe, `uvx` without the pin, and a floor that differs from `ci.yml`'s.
+
+⚠ **The skip pattern must cover the scans' `--include`s.** An include it misses makes a delta there skip its scan, and no check ties the two.

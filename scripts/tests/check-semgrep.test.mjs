@@ -1,7 +1,8 @@
 // check-semgrep.test.mjs — `lint:security` scans its own checkout from any
 // directory, with our rules and the registry's in two scans of their own
 // strictness, and a rule set or target that is not there is refused rather
-// than reported as a tool error.
+// than reported as a tool error. A delta that changes nothing the scans read
+// gets no scan.
 //
 // Run:  node --test scripts/tests/check-semgrep.test.mjs
 //
@@ -98,13 +99,13 @@ after(() => {
 
 /**
  * A git checkout holding a byte copy of the script, a rule set and both
- * targets. `origin/master` sits one commit behind HEAD, so the branch has a
- * delta to scan; `delta: false` puts it at HEAD.
+ * targets. `origin/master` sits one commit behind HEAD, whose commit writes
+ * `delta` — by default a file the scans read; `delta: false` puts it at HEAD.
  *
  * @returns {{ root: string, base: string }} the physical root, and the commit
  *   the scan must take as its baseline.
  */
-function fixture({ delta = true } = {}) {
+function fixture({ delta = "packages/core/src/a.ts" } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "semgrep-")));
   fixtures.push(root);
   const files = {
@@ -123,11 +124,10 @@ function fixture({ delta = true } = {}) {
   git(root, "commit", "-qm", "base");
   const base = git(root, "rev-parse", "HEAD");
   if (delta) {
-    writeFileSync(
-      join(root, "packages/core/src/a.ts"),
-      "export const a = 3;\n",
-    );
-    git(root, "commit", "-qam", "branch");
+    mkdirSync(dirname(join(root, delta)), { recursive: true });
+    writeFileSync(join(root, delta), "export const a = 3;\n");
+    git(root, "add", "-A");
+    git(root, "commit", "-qm", "branch");
   }
   git(root, "update-ref", "refs/remotes/origin/master", base);
   return { root, base };
@@ -359,6 +359,66 @@ test("control: with no branch delta nothing is asked of semgrep, in either stage
     assert.match(output, /No branch delta against origin\/master/);
     assert.doesNotMatch(output, /✓ semgrep/);
     assert.deepEqual(calls, [], `${env.VERIFY_STAGE}: not even --version`);
+  }
+});
+
+test("a delta that changes no file the scans read gets no scan, after the version and the rules", () => {
+  for (const delta of [
+    "README.md",
+    "packages/core/package.json",
+    "packages/core/tests/a.test.ts",
+    "scripts/build.mjs",
+  ]) {
+    const { root, base } = fixture({ delta });
+    for (const env of [HOOK, CI]) {
+      const arm = `${delta}, ${env.VERIFY_STAGE}`;
+      const { status, output, calls, scans } = run(root, {
+        env,
+        bins: [SEMGREP_BIN, UVX_BIN],
+      });
+
+      assert.equal(status, 0, `${arm}: ${output}`);
+      assert.deepEqual(scans, [], `${arm}: no scan`);
+      assert.ok(calls.some(({ args }) => args[0] === "--version"), `${arm}: the version is checked`);
+      assert.ok(calls.some(({ args }) => args.includes("--json")), `${arm}: the rules are counted`);
+      const skipped = /✓ semgrep: no file it scans changed against ([0-9a-f]+)/.exec(output);
+      assert.ok(skipped && base.startsWith(skipped[1]), `${arm}: ${output}`);
+    }
+  }
+});
+
+test("a delta that changes a file the scans read, or a rule, gets both scans", () => {
+  for (const delta of [
+    "packages/core/src/deep/b.ts",
+    "packages/core/tests/fixtures/src/c.ts",
+    "shared/new-area/c.ts",
+    ".semgrep/more.yml",
+  ]) {
+    const { root } = fixture({ delta });
+    const { status, output, scans } = run(root, { env: HOOK });
+
+    assert.equal(status, 0, `${delta}: ${output}`);
+    assert.equal(scans.length, 2, `${delta}: ${output}`);
+    assert.match(output, /✓ semgrep: no newly-introduced findings/, delta);
+  }
+});
+
+test("a hook without a semgrep binary runs uvx at the version ci.yml pins", () => {
+  const floor = /^SEMGREP_FLOOR="([^"]+)"$/m.exec(readFileSync(SCRIPT, "utf8"))?.[1];
+  const pinned = /^\s*SEMGREP_VERSION: "([^"]+)"$/m.exec(
+    readFileSync(join(repoRoot, ".github", "workflows", "ci.yml"), "utf8"),
+  )?.[1];
+  assert.ok(floor, "SEMGREP_FLOOR is in the script");
+  assert.equal(floor, pinned, "the floor is the version CI pins");
+
+  const { root } = fixture();
+  const { status, output, calls } = run(root, { env: HOOK, bins: [UVX_BIN] });
+
+  assert.equal(status, 0, output);
+  const uvx = calls.filter(({ via }) => via === "uvx-args");
+  assert.ok(uvx.length > 0, "uvx was asked");
+  for (const { args } of uvx) {
+    assert.deepEqual(args, ["--quiet", "--with", "setuptools<81", `semgrep==${floor}`]);
   }
 });
 

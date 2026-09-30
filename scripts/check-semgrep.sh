@@ -24,13 +24,14 @@
 #     newer than SEMGREP_EXCLUDE_NEWER; either one unset, or no uvx, fails, and
 #     a semgrep binary on PATH is not used. semgrep that cannot be fetched is
 #     red (exit 3), and so is our rules' scan that errors.
-#   - a hook: the semgrep binary, else `uvx semgrep`; none of them is a skip,
-#     and so is semgrep that cannot be fetched. A binary below SEMGREP_FLOOR
-#     refuses with exit 3.
+#   - a hook: the semgrep binary, else `uvx` at SEMGREP_FLOOR; none of them is
+#     a skip, and so is semgrep that cannot be fetched. A binary below
+#     SEMGREP_FLOOR refuses with exit 3.
 #
 # Before either scan: a rule set or target missing from the checkout, or a
 # `.semgrep/` that loads no rule, fails (exit 1) — the checkout's own breakage.
-# The rules are counted offline, on a fixture.
+# The rules are counted offline, on a fixture. A delta that changes no file
+# the scans read and no rule gets no scan.
 #
 # Usage: ./scripts/check-semgrep.sh   (from any directory)
 
@@ -41,7 +42,8 @@ set -e
 # semgrep exits 7 for a missing config.
 cd "$(dirname "$0")/.."
 
-# The version CI pins; a local semgrep below it may read our rules otherwise.
+# The version CI pins, held equal to ci.yml's by check-semgrep.test.mjs. A hook
+# runs it through uvx; a semgrep binary below it may read our rules otherwise.
 SEMGREP_FLOOR="1.178.0"
 
 STAGE="${VERIFY_STAGE:-}"
@@ -68,7 +70,7 @@ if [ "$STAGE" = "ci" ]; then
 elif command -v semgrep >/dev/null 2>&1; then
   SEMGREP=(semgrep)
 elif command -v uvx >/dev/null 2>&1; then
-  SEMGREP=(uvx --quiet "${UVX_WITH[@]}" semgrep)
+  SEMGREP=(uvx --quiet "${UVX_WITH[@]}" "semgrep==$SEMGREP_FLOOR")
 else
   echo "⚠️  semgrep not found — skipping SAST diff scan."
   echo "    Install with: brew install semgrep   (or: uv tool install semgrep)"
@@ -182,6 +184,18 @@ if [ "$rule_count" -lt 1 ]; then
   exit 1
 fi
 
+# A baseline scan reports what the delta adds to the files it reads, so a
+# delta that changes none of them, and no rule, leaves it nothing to report.
+# The pattern covers the includes below — a `src` directory anywhere under
+# packages/, anything under shared/ — and adds .semgrep/.
+if [ -n "$BASELINE" ]; then
+  changed="$(git diff --name-only "$BASELINE" HEAD)"
+  if ! printf '%s\n' "$changed" | grep -Eq '^(packages/(.*/)?src/|shared/|\.semgrep/)'; then
+    echo "✓ semgrep: no file it scans changed against $(git rev-parse --short "$BASELINE") — nothing to scan"
+    exit 0
+  fi
+fi
+
 BASELINE_ARG=""
 if [ -n "$BASELINE" ]; then
   BASELINE_ARG="--baseline-commit $BASELINE"
@@ -193,6 +207,9 @@ fi
 # `shared/<area>/*.ts` with no `src/` segment, so `**/src/**` alone filtered out
 # the entire directory while `TARGETS` still listed it — a scan reporting "no
 # findings" over code it never opened.
+#
+# stdout goes through `cat`: when it is a terminal, semgrep prints a banner to
+# stderr on every scan, and `--quiet` does not stop it.
 scan() {
   set +e
   # BASELINE_ARG and TARGETS are intentionally word-split into separate arguments.
@@ -203,8 +220,8 @@ scan() {
     --include 'shared/**' \
     $BASELINE_ARG \
     --error --quiet \
-    $TARGETS
-  scan_exit=$?
+    $TARGETS | cat
+  scan_exit=${PIPESTATUS[0]}
   set -e
 }
 
