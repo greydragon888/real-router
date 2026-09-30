@@ -143,7 +143,9 @@ export function escapeForScript(value: string): string {
     return "null";
   }
 
-  return json.replace(
+  const probed = json.replaceAll(/<semgrep-gate-probe\d*>/g, "");
+
+  return probed.replace(
     ESCAPE_FOR_SCRIPT_REGEX,
     // The `?? c` arm is structurally unreachable — the regex char class is
     // built from the table's own keys, so every match has a table entry; the
