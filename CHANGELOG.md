@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-09-30]
+
+### @real-router/angular@0.24.1
+
+### Patch Changes
+
+- [`97dab26`](https://github.com/greydragon888/real-router/commit/97dab26d53c6d104b758e8c3b084b11559958571) Thanks [@greydragon888](https://github.com/greydragon888)! - Ship `dist/` only: the tarball no longer carries the `ssr/` sources or a second copy of the README ([#2628](https://github.com/greydragon888/real-router/issues/2628))
+
+  - `ssr/` held the TypeScript sources of the `/ssr` entry. `@real-router/angular/ssr` resolves to `dist/`, whose sourcemaps embed those sources, so no import, bundler or debugger read them. The one visible difference: "Go to Definition" on a `/ssr` symbol now opens its declaration file, as it already did for the main entry.
+  - `dist/README.md` was ng-packagr's copy of the package README, which already ships at the package root.
+
+  No API change: every export resolves to the same file as before.
+
 ## [2026-09-27]
 
 ### @real-router/angular@0.24.0
