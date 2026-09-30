@@ -168,7 +168,7 @@ export const CHECKS = [
     run: ["pnpm", "lint:cross-router"],
     stages: ["pre-push"],
     ciBy: ["ci.yml#cross-router-lint"],
-    why: "ESLint over cross-router-bench/, then the census of what its config reaches",
+    why: "installs cross-router-bench/, a workspace of its own, then ESLint over it and the census of what its config reaches",
   },
   {
     // CI and post-merge exclude it by design: heap thresholds flake under a

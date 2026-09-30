@@ -37,6 +37,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { checkId } from "../check-id.mjs";
+import { CHECKS } from "../checks.mjs";
 
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const WORKFLOWS = join(repoRoot, ".github", "workflows");
@@ -69,6 +70,30 @@ export const CI_ONLY = new Map([
       "own that no hook installs (cross-router-bench/CLAUDE.md)",
   ],
 ]);
+
+/**
+ * The check ids a single command runs: the one {@link checkId} reads, or, for a
+ * call of `scripts/verify.mjs`, those of the registry's checks of its stage that
+ * `checkId` can read. A hook or a step that calls `verify` runs exactly those.
+ *
+ * @param {string} command
+ * @param {{ run: string[], stages: string[] }[]} [checks] the check registry
+ * @returns {string[]}
+ */
+export function lineChecks(command, checks = CHECKS) {
+  const verify = /^node scripts\/verify\.mjs\b.*\s--stage[= ](\S+)/.exec(
+    command.trim(),
+  );
+  if (verify) {
+    return checks
+      .filter((check) => check.stages.includes(verify[1]))
+      .map((check) => checkId(check.run.join(" ")))
+      .filter((id) => id !== undefined);
+  }
+
+  const id = checkId(command);
+  return id === undefined ? [] : [id];
+}
 
 /**
  * Every `- name:` step of one job, with the first command of its `run:`.
@@ -122,7 +147,7 @@ export function parseSteps(yaml, jobId) {
  * @param {string} yaml workflow text
  * @returns {string[]}
  */
-export function workflowChecks(yaml) {
+export function workflowChecks(yaml, checks = CHECKS) {
   const ids = [];
   for (const raw of yaml.split("\n")) {
     const line = raw
@@ -130,8 +155,7 @@ export function workflowChecks(yaml) {
       .replace(/^- /, "")
       .replace(/^run:\s*/, "");
     if (!line || line.startsWith("#")) continue;
-    const id = checkId(line);
-    if (id) ids.push(id);
+    ids.push(...lineChecks(line, checks));
   }
   return [...new Set(ids)];
 }
@@ -146,13 +170,12 @@ export function workflowChecks(yaml) {
  * @param {string} hookText
  * @returns {string[]}
  */
-export function hookChecks(hookText) {
+export function hookChecks(hookText, checks = CHECKS) {
   const ids = [];
   for (const raw of hookText.split("\n")) {
     const line = raw.trim();
     if (!line || line.startsWith("#")) continue;
-    const id = checkId(line);
-    if (id) ids.push(id);
+    ids.push(...lineChecks(line, checks));
   }
   return [...new Set(ids)];
 }
@@ -166,18 +189,23 @@ export function hookChecks(hookText) {
 export function findViolations(
   workflows,
   hooks,
-  { ciOnly = CI_ONLY, notACheck = NOT_A_CHECK, checksJob = CHECKS_JOB } = {},
+  {
+    ciOnly = CI_ONLY,
+    notACheck = NOT_A_CHECK,
+    checksJob = CHECKS_JOB,
+    checks = CHECKS,
+  } = {},
 ) {
   const inHooks = new Map();
   for (const [hook, text] of Object.entries(hooks)) {
-    for (const id of hookChecks(text)) {
+    for (const id of hookChecks(text, checks)) {
       inHooks.set(id, [...(inHooks.get(id) ?? []), hook]);
     }
   }
 
   const inWorkflows = new Set();
   for (const text of Object.values(workflows)) {
-    for (const id of workflowChecks(text)) inWorkflows.add(id);
+    for (const id of workflowChecks(text, checks)) inWorkflows.add(id);
   }
 
   const unpaired = [...inWorkflows]
@@ -191,7 +219,7 @@ export function findViolations(
   for (const text of Object.values(workflows)) {
     for (const { name, command } of parseSteps(text, checksJob)) {
       if (notACheck.has(name)) continue;
-      if (command === undefined || checkId(command) === undefined) {
+      if (command === undefined || lineChecks(command, checks).length === 0) {
         unclassified.push(name);
       }
     }
@@ -230,10 +258,10 @@ export const PRE_COMMIT_ONLY = new Map();
  */
 export function findPrePushGaps(
   hooks,
-  { preCommitOnly = PRE_COMMIT_ONLY } = {},
+  { preCommitOnly = PRE_COMMIT_ONLY, checks = CHECKS } = {},
 ) {
-  const commit = hookChecks(hooks["pre-commit"]);
-  const push = new Set(hookChecks(hooks["pre-push"]));
+  const commit = hookChecks(hooks["pre-commit"], checks);
+  const push = new Set(hookChecks(hooks["pre-push"], checks));
 
   const missing = commit
     .filter((id) => !push.has(id) && !preCommitOnly.has(id))
@@ -496,6 +524,77 @@ test("fixture: an allowlisted pre-commit-only check is not a gap, and going stal
     ["lint:retired"],
     "the allowlist names a check pre-commit no longer runs — the entry is stale",
   );
+});
+
+// --------------------------------------------------------------------------
+// Calls of `scripts/verify.mjs`: a hook or a step that calls it runs the checks
+// of its stage in the registry, and both axes read them.
+// --------------------------------------------------------------------------
+
+const REGISTRY = [
+  {
+    id: "lint:deps",
+    run: ["pnpm", "lint:deps"],
+    stages: ["pre-commit", "pre-push", "ci"],
+    why: "a",
+  },
+  {
+    id: "node:t",
+    run: ["node", "--test", "--test-reporter=dot", "scripts/tests/*.test.mjs"],
+    stages: ["pre-push", "ci"],
+    why: "b",
+  },
+  { id: "turbo:x", run: ["pnpm", "turbo", "run", "x"], stages: ["pre-push"], why: "c" },
+  { id: "lint:y", run: ["pnpm", "lint:y"], stages: ["pre-commit"], why: "d" },
+];
+
+test("fixture: a hook that calls verify runs the readable checks of its stage", () => {
+  assert.deepEqual(
+    hookChecks("#!/bin/sh\nnode scripts/verify.mjs --stage pre-push\n", REGISTRY).sort(),
+    ["lint:deps", "node --test scripts/tests/*.test.mjs"],
+  );
+  assert.deepEqual(
+    lineChecks("node scripts/verify.mjs --stage pre-merge", REGISTRY),
+    [],
+    "a stage the registry does not hold runs nothing",
+  );
+});
+
+test("fixture: a repo-lints step that calls verify is a check, and pairs with a hook that calls it", () => {
+  const workflow = `name: X
+jobs:
+  repo-lints:
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Run the checks
+        run: node scripts/verify.mjs --stage ci --context dependabot-pr
+`;
+  const found = findViolations(
+    { "ci.yml": workflow },
+    { "pre-push": "node scripts/verify.mjs --stage pre-push\n" },
+    { ciOnly: new Map(), notACheck: NOT_A_CHECK, checks: REGISTRY },
+  );
+
+  assert.deepEqual(found.unclassified, []);
+  assert.deepEqual(found.unpaired, []);
+  assert.deepEqual([...found.paired.keys()].sort(), [
+    "lint:deps",
+    "node --test scripts/tests/*.test.mjs",
+  ]);
+});
+
+test("fixture: the second axis reads both hooks through verify", () => {
+  const found = findPrePushGaps(
+    {
+      "pre-commit": "node scripts/verify.mjs --stage pre-commit\n",
+      "pre-push": "node scripts/verify.mjs --stage pre-push\n",
+    },
+    { preCommitOnly: new Map(), checks: REGISTRY },
+  );
+
+  assert.deepEqual(found.missing, ["lint:y"]);
+  assert.deepEqual(found.twinned, ["lint:deps"]);
 });
 
 // --------------------------------------------------------------------------

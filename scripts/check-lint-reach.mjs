@@ -1,13 +1,15 @@
 #!/usr/bin/env node
-// Every workspace package is read by a lint step of the pre-push hook, or is
-// named in EXEMPT with the issue that tracks it (#2370). The package's own
-// ESLint config also lints each tracked file of code its lint command names
-// (#2407), in every workspace package that has one (#2556).
+// Every workspace package has a lint task, and the turbo entries of the
+// pre-push stage of the check registry run it — or the package is named in
+// EXEMPT with the issue that tracks it (#2370). The package's own ESLint config
+// also lints each tracked file of code its lint command names (#2407), in
+// every workspace package that has one (#2556). `lint-reach.mjs` holds the two
+// layers.
 //
-// ⚠ "Read" is derived, never listed. The hook's own `turbo run` lines are
-// replayed with `--dry=json`, and a package counts only when a lint task would
-// execute a real command for it. A package with no lint script and a hook
-// filter that drops a workspace glob therefore fail alike.
+// ⚠ "Read" is derived, never listed. Turbo answers with `--dry=json`: once for
+// every lint task over the whole graph, and once for each turbo entry of the
+// stage, word for word as `verify` runs it. A package counts only when a lint
+// task would execute a real command for it.
 import { execFileSync } from "node:child_process";
 import {
   existsSync,
@@ -22,19 +24,23 @@ import { fileURLToPath } from "node:url";
 
 import { ESLint } from "eslint";
 
+import { CHECKS } from "./checks.mjs";
 import { DELIBERATE } from "./lint-reach-deliberate.mjs";
 import {
+  LINT_TASKS,
   evaluateReach,
   lintTargets,
   ownTrackedFiles,
   staleDeliberate,
+  turboEntries,
   unlintedFiles,
 } from "./lint-reach.mjs";
 
 const ROOT = realpathSync(
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."),
 );
-const HOOK = ".husky/pre-push";
+const STAGE = "pre-push";
+const REGISTRY = "scripts/checks.mjs";
 const SHARED_PACKAGE = "@real-router/shared-sources";
 
 /** No lint step reads these yet. An entry that stops being true fails the check. */
@@ -105,7 +111,7 @@ for (const entry of readdirSync(path.join(ROOT, "packages"))) {
 
 const started = Date.now();
 const result = evaluateReach({
-  hookText: readFileSync(path.join(ROOT, HOOK), "utf8"),
+  runs: turboEntries(CHECKS, STAGE),
   knownTasks: new Set(
     Object.keys(
       JSON.parse(readFileSync(path.join(ROOT, "turbo.json"), "utf8")).tasks,
@@ -202,7 +208,11 @@ const unlinted = unlintedFiles(census, DELIBERATE);
 const failures = [
   ...result.unreached.map(
     (name) =>
-      `${name}: no lint step of ${HOOK} reads it — give it a lint script the hook runs, or name it in EXEMPT with an issue`,
+      `${name}: no lint task lints it — give it a ${[...LINT_TASKS].join(" or ")} script, or name it in EXEMPT with an issue`,
+  ),
+  ...result.unrun.map(
+    (name) =>
+      `${name}: no turbo entry of the ${STAGE} stage in ${REGISTRY} runs its lint task — widen that entry's --filter, or name it in EXEMPT with an issue`,
   ),
   ...result.staleExemptions.map(
     (name) =>
@@ -237,8 +247,8 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `✓ lint:reach: ${String(result.linted.size)} of ${String(packages.length)} workspace packages linted by ${HOOK}` +
-    ` (${String(result.runs.length)} turbo run(s), ${String(Date.now() - started)} ms);` +
+  `✓ lint:reach: ${String(result.linted.size)} of ${String(packages.length)} workspace packages have a lint task, and the ${STAGE} stage runs it` +
+    ` (${String(result.runs.length)} turbo entr${result.runs.length === 1 ? "y" : "ies"} of ${REGISTRY}, ${String(Date.now() - started)} ms);` +
     ` shared/ read through consumers; exempt: ${[...EXEMPT].map(([name, issue]) => `${name} ${issue}`).join(", ") || "none"};` +
     ` ${String(census.filter(({ linted }) => linted).length)} of ${String(census.length)} tracked files in ${String(scoped)} packages linted by their own config, the rest not code or named in DELIBERATE.`,
 );

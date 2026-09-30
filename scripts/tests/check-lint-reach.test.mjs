@@ -1,10 +1,14 @@
 // `lint:reach` guards the hole #2370 names: a workspace package that no lint
 // step reads stays green everywhere, because nothing fails for code nobody
 // lints. `examples/**` sat behind two shapes of it at once — no manifest
-// declared a lint script, and both hooks dropped the glob with
-// `--filter='!./examples/**'`. Each shape gets a cell that runs the WHOLE chain
-// (hook → dry-run → verdict), because the pieces can each be right while the
-// composition reads nothing.
+// declared a lint script, and both hooks dropped the glob with a filter. The
+// cells below carry both shapes on benchmark workspaces. Each shape gets a cell
+// that runs the WHOLE chain (registry → dry-run → verdict), because the pieces
+// can each be right while the composition reads nothing.
+//
+// Two layers answer: the definition layer asks the whole graph whether each
+// package has a lint task, and the executor layer asks the turbo entries of the
+// pre-push stage of the check registry whether they run it.
 //
 // Runs in the repo-lints CI job via `node --test scripts/tests/*.test.mjs`.
 
@@ -25,6 +29,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test, { after } from "node:test";
 
+import { CHECKS } from "../checks.mjs";
 import {
   LINT_TASKS,
   NOT_CODE,
@@ -36,7 +41,7 @@ import {
   ownTrackedFiles,
   packagesWithNothingToRead,
   staleDeliberate,
-  turboRuns,
+  turboEntries,
   unlintedFiles,
   unreadSharedDirs,
 } from "../lint-reach.mjs";
@@ -51,8 +56,8 @@ const PACKAGES = [
   { name: "@real-router/core", dir: "packages/core" },
   { name: "@real-router/react", dir: "packages/react" },
   { name: "@real-router/shared-sources", dir: "shared" },
-  { name: "react-basic-example", dir: "examples/web/react/basic" },
-  { name: "vue-examples-shared", dir: "examples/web/vue" },
+  { name: "core-bench", dir: "benchmarks/core" },
+  { name: "vue-bench-components", dir: "benchmarks/vue" },
   { name: "docs-only", dir: "docs" },
 ];
 
@@ -60,8 +65,8 @@ const TRACKED = [
   "packages/core/src/index.ts",
   "packages/react/src/index.tsx",
   "shared/dom-utils/link-utils.ts",
-  "examples/web/react/basic/src/main.tsx",
-  "examples/web/vue/shared/Layout.vue",
+  "benchmarks/core/src/bench.ts",
+  "benchmarks/vue/Layout.vue",
   "docs/README.md",
 ];
 
@@ -70,24 +75,37 @@ const HEALTHY_SCRIPTS = {
   "@real-router/react": {
     lint: "eslint --cache src/ src/dom-utils/ tests/ --max-warnings 0",
   },
-  "react-basic-example": {
-    "lint:example": "eslint --cache . --max-warnings 0",
-  },
-  "vue-examples-shared": {
-    "lint:example": "eslint --cache shared/ --max-warnings 0",
-  },
+  "core-bench": { "lint:bench": "eslint --cache . --max-warnings 0" },
+  "vue-bench-components": { "lint:bench": "eslint --cache . --max-warnings 0" },
 };
 
-const HEALTHY_HOOK = [
-  "#!/bin/sh",
-  "# pnpm turbo run lint — a comment, not an invocation",
-  "pnpm turbo run build lint:package --filter='!./examples/**'",
-  "pnpm turbo run lint:example --filter='./examples/**'",
-].join("\n");
+/** A registry whose pre-push stage lints the packages and the benchmarks apart. */
+const HEALTHY_REGISTRY = [
+  {
+    id: "turbo:build",
+    run: ["pnpm", "turbo", "run", "build", "lint:package", "--filter=!./benchmarks/**"],
+    stages: ["pre-push"],
+    why: "build",
+  },
+  {
+    id: "turbo:bench",
+    run: ["pnpm", "turbo", "run", "lint:bench", "--filter=./benchmarks/**"],
+    stages: ["pre-push"],
+    why: "bench",
+  },
+  { id: "lint:deps", run: ["pnpm", "lint:deps"], stages: ["pre-push"], why: "not turbo" },
+  {
+    id: "turbo:commit",
+    run: ["pnpm", "turbo", "run", "test", "lint"],
+    stages: ["pre-commit"],
+    why: "another stage",
+  },
+];
+const HEALTHY_RUNS = turboEntries(HEALTHY_REGISTRY, "pre-push");
 
 /**
- * turbo, reduced to what the hook uses: the two example filters, and `build`
- * pulling both lint tasks through `dependsOn`. Any other filter fails the test
+ * turbo, reduced to what the registry uses: the two benchmark filters, and
+ * `build` pulling `lint` through `dependsOn`. Any other filter fails the test
  * rather than being modelled wrongly.
  */
 function fakeTurbo(scripts) {
@@ -95,19 +113,17 @@ function fakeTurbo(scripts) {
     const filters = flags
       .filter((flag) => flag.startsWith("--filter="))
       .map((flag) => flag.slice("--filter=".length));
-    const inExamples = (dir) => dir.startsWith("examples/");
+    const inBenchmarks = (dir) => dir.startsWith("benchmarks/");
     const selected = PACKAGES.filter(({ dir }) =>
       filters.every((filter) => {
-        if (filter === "!./examples/**") return !inExamples(dir);
-        if (filter === "./examples/**") return inExamples(dir);
+        if (filter === "!./benchmarks/**") return !inBenchmarks(dir);
+        if (filter === "./benchmarks/**") return inBenchmarks(dir);
 
         return assert.fail(`the fake turbo does not model --filter=${filter}`);
       }),
     );
     const expanded = new Set(
-      tasks.flatMap((task) =>
-        task === "build" ? ["build", "lint", "lint:example"] : [task],
-      ),
+      tasks.flatMap((task) => (task === "build" ? ["build", "lint"] : [task])),
     );
 
     return {
@@ -125,13 +141,13 @@ function fakeTurbo(scripts) {
 }
 
 function reach({
-  hookText = HEALTHY_HOOK,
+  runs = HEALTHY_RUNS,
   scripts = HEALTHY_SCRIPTS,
   exempt = new Map(),
 } = {}) {
   return evaluateReach({
-    hookText,
-    knownTasks: new Set(["build", "lint", "lint:example", "lint:package"]),
+    runs,
+    knownTasks: new Set(["build", "lint", "lint:bench", "lint:package"]),
     dryRun: fakeTurbo(scripts),
     packages: PACKAGES,
     trackedFiles: TRACKED,
@@ -144,6 +160,18 @@ function reach({
   });
 }
 
+/** The pre-push turbo entries of a registry holding only `runs`. */
+const stageOf = (...runs) =>
+  turboEntries(
+    runs.map((run, index) => ({
+      id: `turbo:${String(index)}`,
+      run,
+      stages: ["pre-push"],
+      why: "fixture",
+    })),
+    "pre-push",
+  );
+
 // ─── the chain ───────────────────────────────────────────────────────────────
 
 test("healthy: every package is linted, read through a consumer, or has nothing to read", () => {
@@ -152,34 +180,45 @@ test("healthy: every package is linted, read through a consumer, or has nothing 
   assert.deepEqual([...result.linted.keys()].sort(), [
     "@real-router/core",
     "@real-router/react",
-    "react-basic-example",
-    "vue-examples-shared",
+    "core-bench",
+    "vue-bench-components",
   ]);
   assert.deepEqual(result.unreached, []);
+  assert.deepEqual(result.unrun, []);
   assert.deepEqual(result.staleExemptions, []);
   assert.deepEqual(result.unreadShared, []);
   assert.equal(result.vacuous, null);
 });
 
-test("#2370 shape 1: an example with no lint script is unreached", () => {
-  const { "react-basic-example": _dropped, ...scripts } = HEALTHY_SCRIPTS;
+test("#2370 shape 1: a workspace with no lint script is unreached", () => {
+  const { "core-bench": _dropped, ...scripts } = HEALTHY_SCRIPTS;
+  const result = reach({ scripts });
 
-  assert.deepEqual(reach({ scripts }).unreached, ["react-basic-example"]);
+  assert.deepEqual(result.unreached, ["core-bench"]);
+  assert.deepEqual(result.unrun, []);
 });
 
-test("#2370 shape 2: a hook filter that drops the glob leaves it unreached, script or not", () => {
-  const hookText = "pnpm turbo run build --filter='!./examples/**'";
-
-  assert.deepEqual(reach({ hookText }).unreached, [
-    "react-basic-example",
-    "vue-examples-shared",
+test("#2370 shape 2: a stage entry whose filter drops the glob leaves it unrun, and with no script unreached", () => {
+  const runs = stageOf([
+    "pnpm",
+    "turbo",
+    "run",
+    "build",
+    "--filter=!./benchmarks/**",
   ]);
+
+  assert.deepEqual(reach({ runs }).unrun, ["core-bench", "vue-bench-components"]);
+
+  const { "core-bench": _dropped, ...scripts } = HEALTHY_SCRIPTS;
+  const without = reach({ runs, scripts });
+  assert.deepEqual(without.unreached, ["core-bench"]);
+  assert.deepEqual(without.unrun, ["vue-bench-components"]);
 });
 
 test("#2556: a workspace that holds only a component is unreached without a lint step", () => {
-  const { "vue-examples-shared": _dropped, ...scripts } = HEALTHY_SCRIPTS;
+  const { "vue-bench-components": _dropped, ...scripts } = HEALTHY_SCRIPTS;
 
-  assert.deepEqual(reach({ scripts }).unreached, ["vue-examples-shared"]);
+  assert.deepEqual(reach({ scripts }).unreached, ["vue-bench-components"]);
 });
 
 test("a consumer that lints src/ alone does not read the shared dir behind its symlink", () => {
@@ -194,18 +233,24 @@ test("a consumer that lints src/ alone does not read the shared dir behind its s
 });
 
 test("an exemption excuses exactly its package, and goes stale once that package is linted or gone", () => {
-  const { "react-basic-example": _dropped, ...scripts } = HEALTHY_SCRIPTS;
+  const { "core-bench": _dropped, ...scripts } = HEALTHY_SCRIPTS;
   const excused = reach({
     scripts,
-    exempt: new Map([["react-basic-example", "#0"]]),
+    exempt: new Map([["core-bench", "#0"]]),
   });
 
   assert.deepEqual(excused.unreached, []);
   assert.deepEqual(excused.staleExemptions, []);
 
+  const unrunExcused = reach({
+    runs: stageOf(["pnpm", "turbo", "run", "build", "--filter=!./benchmarks/**"]),
+    exempt: new Map([["core-bench", "#0"]]),
+  });
+  assert.deepEqual(unrunExcused.unrun, ["vue-bench-components"]);
+
   assert.deepEqual(
-    reach({ exempt: new Map([["react-basic-example", "#0"]]) }).staleExemptions,
-    ["react-basic-example"],
+    reach({ exempt: new Map([["core-bench", "#0"]]) }).staleExemptions,
+    ["core-bench"],
   );
   assert.deepEqual(
     reach({ exempt: new Map([["no-such-package", "#0"]]) }).staleExemptions,
@@ -214,64 +259,65 @@ test("an exemption excuses exactly its package, and goes stale once that package
 });
 
 test("a verdict over nothing is refused, not passed", () => {
+  assert.match(reach({ runs: [] }).vacuous, /no `pnpm turbo run` entry/);
+  assert.match(reach({ scripts: {} }).vacuous, /no lint task lints any package/);
   assert.match(
-    reach({ hookText: "#!/bin/sh\necho hi" }).vacuous,
-    /no `pnpm turbo run`/,
-  );
-  assert.match(
-    reach({ hookText: "pnpm turbo run build", scripts: {} }).vacuous,
-    /lints any package/,
+    reach({ runs: stageOf(["pnpm", "turbo", "run", "lint:package"]) }).vacuous,
+    /no turbo entry of the stage lints any package/,
   );
 });
 
-test("a hook task turbo.json does not define fails loudly", () => {
+test("a stage entry naming a task turbo.json does not define fails loudly", () => {
   assert.throws(
-    () => reach({ hookText: "pnpm turbo run lint:examples" }),
-    /`lint:examples` is not a task in turbo.json/,
+    () => reach({ runs: stageOf(["pnpm", "turbo", "run", "lint:examples"]) }),
+    /turbo:0: `lint:examples` is not a task in turbo.json/,
   );
 });
 
 // ─── the pieces ──────────────────────────────────────────────────────────────
 
-test("the real pre-push hook is readable by the parser", () => {
-  const runs = turboRuns(
-    readFileSync(path.join(ROOT, ".husky/pre-push"), "utf8"),
-  );
+test("the real registry's pre-push stage has turbo entries, and one of them lints", () => {
+  const runs = turboEntries(CHECKS, "pre-push");
 
-  assert.ok(runs.length > 0, "pre-push has no `pnpm turbo run` line");
+  assert.ok(runs.length > 0, "the pre-push stage of scripts/checks.mjs has no turbo entry");
+  assert.ok(
+    runs.some(({ tasks }) =>
+      tasks.some((task) => task === "build" || LINT_TASKS.has(task)),
+    ),
+    "no pre-push turbo entry runs build or a lint task",
+  );
 });
 
-test("quotes are removed from flag values, and comment lines are not invocations", () => {
-  assert.deepEqual(turboRuns(HEALTHY_HOOK), [
+test("turbo entries come from the registry's argv: tasks and flags apart, other stages and commands left out", () => {
+  assert.deepEqual(HEALTHY_RUNS, [
     {
-      line: 3,
+      id: "turbo:build",
       tasks: ["build", "lint:package"],
-      flags: ["--filter=!./examples/**"],
+      flags: ["--filter=!./benchmarks/**"],
     },
-    { line: 4, tasks: ["lint:example"], flags: ["--filter=./examples/**"] },
+    { id: "turbo:bench", tasks: ["lint:bench"], flags: ["--filter=./benchmarks/**"] },
   ]);
 });
 
-test("an invocation the parser cannot read faithfully throws instead of being skipped", () => {
-  for (const line of [
-    "if pnpm turbo run lint; then",
-    "npx turbo run lint",
-    "pnpm turbo run lint $FILTER",
-    "pnpm turbo run lint && echo done",
-    "pnpm turbo run lint > out.log",
-  ]) {
-    assert.throws(() => turboRuns(line), Error, line);
-  }
+test("a flag with a separate value reads as a task, and the known-task check fails it", () => {
+  assert.throws(
+    () =>
+      reach({
+        runs: stageOf(["pnpm", "turbo", "run", "lint", "--filter", "./benchmarks/**"]),
+      }),
+    /`\.\/benchmarks\/\*\*` is not a task in turbo.json/,
+  );
 });
 
-test("only a lint task with a real command counts as linted", () => {
+test("only a lint task with a real command counts as linted, and lint:example is not one", () => {
   const linted = lintedPackages({
     tasks: [
       { task: "lint", package: "a", command: "<NONEXISTENT>" },
       { task: "test", package: "b", command: "vitest" },
-      { task: "lint:example", package: "c", command: "eslint ." },
+      { task: "lint:bench", package: "c", command: "eslint ." },
       { task: "lint", package: "d", command: "eslint src/" },
-      { task: "lint:example", package: "d", command: "eslint ." },
+      { task: "lint:bench", package: "d", command: "eslint ." },
+      { task: "lint:example", package: "e", command: "eslint ." },
     ],
   });
 
@@ -493,12 +539,13 @@ test("CONTROL — a census that lints every code file reports nothing", () => {
 // the verdict; these hold the step that turns it into an exit code.
 //
 // The script takes its root from its own location, so each cell runs byte copies
-// of it and of `lint-reach.mjs` inside a fixture git repository — two workspace
-// packages, a `turbo.json` and a `.husky/pre-push` — from its `packages/`, so a
-// copy that took its root from the working directory fails here. `pnpm` is a
-// stub first on PATH: it logs every call and answers `ls` with the fixture's
-// packages and `turbo` with the tasks a cell names, and the cells hold the exact
-// arguments, the hook's `--filter` among them.
+// of it, `lint-reach.mjs` and `lint-tasks.mjs` inside a fixture git repository —
+// two workspace packages, a `turbo.json` and a check registry — from its
+// `packages/`, so a copy that took its root from the working directory fails
+// here. `pnpm` is a stub first on PATH: it logs every call and answers `ls` with
+// the fixture's packages and `turbo` with the tasks a cell names — one set for
+// the whole-graph dry run, another for the stage's entries — and the cells hold
+// the exact arguments, the stage entry's `--filter` among them.
 //
 // The fixture sits at the path `os.tmpdir()` returns, which on macOS runs
 // through a symlink. This CLI has no entry guard and resolves its root and every
@@ -526,12 +573,23 @@ const gitEnv = {
 const lints = (...names) =>
   names.map((name) => ({ task: "lint", package: name, command: "eslint src" }));
 
-/** The hook every cell but the vacuous one carries: a lint run with a filter. */
-const HOOK = "pnpm turbo run lint --filter='./packages/*'";
+/** The registry every cell but the vacuous one carries: one pre-push lint entry with a filter. */
+const ENTRIES = [
+  {
+    id: "turbo:lint",
+    run: ["pnpm", "turbo", "run", "lint", "--filter=./packages/*"],
+    stages: ["pre-push"],
+    why: "fixture",
+  },
+];
 
-/** The two calls the CLI makes for {@link HOOK}, as the stub must receive them. */
+/** The whole-graph dry run of the definition layer. */
+const DEFINITION_CALL = ["turbo", "run", "lint", "lint:bench", "--dry=json"];
+
+/** The three calls the CLI makes for {@link ENTRIES}, as the stub must receive them. */
 const EXPECTED_CALLS = [
   ["ls", "-r", "--depth", "-1", "--json"],
+  DEFINITION_CALL,
   ["turbo", "run", "lint", "--filter=./packages/*", "--dry=json"],
 ];
 
@@ -544,9 +602,11 @@ const EXPECTED_CALLS = [
  * config up from the file it is asked about.
  *
  * @param {object} options
- * @param {string} options.hook the pre-push hook's text
+ * @param {object[]} [options.entries] the fixture's check registry
  * @param {{ task: string, package: string, command: string }[]} options.tasks
- *   the tasks the stubbed dry run reports
+ *   the tasks the stubbed dry runs report
+ * @param {{ task: string, package: string, command: string }[]} [options.stageTasks]
+ *   the tasks the dry runs of the stage's entries report instead
  * @param {Record<string, string>} [options.files] extra files, by path from the root
  * @param {Record<string, string>} [options.configs] package dir → its ESLint config text
  * @param {string} [options.rootConfig] the root ESLint config text
@@ -556,8 +616,9 @@ const EXPECTED_CALLS = [
  * @returns {string} the fixture root
  */
 function cliFixture({
-  hook,
+  entries = ENTRIES,
   tasks,
+  stageTasks = tasks,
   files = {},
   configs = {},
   rootConfig = 'export default [{ files: ["**/*.ts"] }];',
@@ -569,7 +630,7 @@ function cliFixture({
   fixtures.push(root);
 
   mkdirSync(path.join(root, "scripts"));
-  for (const file of ["check-lint-reach.mjs", "lint-reach.mjs"]) {
+  for (const file of ["check-lint-reach.mjs", "lint-reach.mjs", "lint-tasks.mjs"]) {
     copyFileSync(
       path.join(ROOT, "scripts", file),
       path.join(root, "scripts", file),
@@ -580,8 +641,10 @@ function cliFixture({
     `export const DELIBERATE = new Map(${JSON.stringify(Object.entries(deliberate))});\n`,
   );
 
-  mkdirSync(path.join(root, ".husky"));
-  writeFileSync(path.join(root, ".husky", "pre-push"), `${hook}\n`);
+  writeFileSync(
+    path.join(root, "scripts", "checks.mjs"),
+    `export const CHECKS = ${JSON.stringify(entries)};\n`,
+  );
   writeFileSync(
     path.join(root, "turbo.json"),
     JSON.stringify({ tasks: { lint: {} } }),
@@ -628,7 +691,8 @@ function cliFixture({
 const args = process.argv.slice(2);
 process.getBuiltinModule("node:fs").appendFileSync(${JSON.stringify(log)}, JSON.stringify(args) + "\\n");
 if (args[0] === "ls") console.log(${JSON.stringify(JSON.stringify(packages))});
-else if (args[0] === "turbo") console.log(${JSON.stringify(JSON.stringify({ tasks }))});
+else if (args.join(" ") === ${JSON.stringify(DEFINITION_CALL.join(" "))}) console.log(${JSON.stringify(JSON.stringify({ tasks }))});
+else if (args[0] === "turbo") console.log(${JSON.stringify(JSON.stringify({ tasks: stageTasks }))});
 else process.exit(9);
 `,
   );
@@ -670,10 +734,9 @@ const censusLine = (linted, named, packageCount) =>
     `\\b${String(linted)} of ${String(named)} tracked files in ${String(packageCount)} packages linted by their own config`,
   );
 
-test("CONTROL — the CLI passes a hook that lints every package, and says so", () => {
+test("CONTROL — the CLI passes a registry that lints every package, and says so", () => {
   const result = runCli(
     cliFixture({
-      hook: HOOK,
       tasks: lints("@fx/a", "@fx/b"),
       // Shares the prefix `src` with the target and sits outside it.
       files: { "packages/a/srcx/extra.ts": "export const y = 2;\n" },
@@ -683,41 +746,54 @@ test("CONTROL — the CLI passes a hook that lints every package, and says so", 
   assert.equal(result.status, 0, result.output);
   assert.match(
     result.output,
-    /✓ lint:reach: 2 of 2 workspace packages linted by \.husky\/pre-push/,
+    /✓ lint:reach: 2 of 2 workspace packages have a lint task, and the pre-push stage runs it/,
   );
   assert.match(result.output, censusLine(2, 2, 2));
   assert.deepEqual(result.calls, EXPECTED_CALLS);
 });
 
-test("the CLI refuses a package no lint step reads, and names it", () => {
-  const result = runCli(cliFixture({ hook: HOOK, tasks: lints("@fx/a") }));
+test("the CLI refuses a package no lint task lints, and names it", () => {
+  const result = runCli(cliFixture({ tasks: lints("@fx/a") }));
 
   assert.equal(result.status, 1, result.output);
-  assert.match(
-    result.output,
-    /@fx\/b: no lint step of \.husky\/pre-push reads it/,
-  );
+  assert.match(result.output, /@fx\/b: no lint task lints it/);
   assert.doesNotMatch(result.output, /✓ lint:reach/);
   assert.deepEqual(result.calls, EXPECTED_CALLS);
 });
 
-test("the CLI refuses a hook with nothing to replay: exit 2, not a pass", () => {
+test("the CLI refuses a package whose lint task the pre-push stage does not run, and names it", () => {
+  const result = runCli(
+    cliFixture({ tasks: lints("@fx/a", "@fx/b"), stageTasks: lints("@fx/a") }),
+  );
+
+  assert.equal(result.status, 1, result.output);
+  assert.match(
+    result.output,
+    /@fx\/b: no turbo entry of the pre-push stage in scripts\/checks\.mjs runs its lint task/,
+  );
+  assert.doesNotMatch(result.output, /@fx\/b: no lint task lints it/);
+  assert.deepEqual(result.calls, EXPECTED_CALLS);
+});
+
+test("the CLI refuses a registry whose stage has no turbo entry: exit 2, not a pass", () => {
   const result = runCli(
     cliFixture({
-      hook: "echo nothing to replay",
+      entries: [
+        { id: "lint:deps", run: ["pnpm", "lint:deps"], stages: ["pre-push"], why: "x" },
+        { ...ENTRIES[0], stages: ["pre-commit"] },
+      ],
       tasks: lints("@fx/a", "@fx/b"),
     }),
   );
 
   assert.equal(result.status, 2, result.output);
   assert.match(result.output, /refusing to pass over nothing/);
-  assert.deepEqual(result.calls, [EXPECTED_CALLS[0]]);
+  assert.deepEqual(result.calls, EXPECTED_CALLS.slice(0, 2));
 });
 
 test("#2407: the CLI refuses a package whose own config ignores what its lint command reaches, and names the files", () => {
   const result = runCli(
     cliFixture({
-      hook: HOOK,
       tasks: lints("@fx/a", "@fx/b"),
       files: Object.fromEntries(
         ["A", "B", "C", "D"].map((name) => [
@@ -745,7 +821,6 @@ test("#2407: the CLI refuses a package whose own config ignores what its lint co
 test("CONTROL — the same package, with a config that lints what it addresses, passes", () => {
   const result = runCli(
     cliFixture({
-      hook: HOOK,
       tasks: lints("@fx/a", "@fx/b"),
       files: { "packages/b/src/App.svelte": "<p>hi</p>\n" },
       configs: {
@@ -761,7 +836,6 @@ test("CONTROL — the same package, with a config that lints what it addresses, 
 test("a file the root config ignores is the repository's policy, not the package's", () => {
   const result = runCli(
     cliFixture({
-      hook: HOOK,
       tasks: lints("@fx/a", "@fx/b"),
       rootConfig:
         'export default [{ files: ["**/*.ts"] }, { ignores: ["**/*.gen.ts"] }];',
@@ -776,7 +850,6 @@ test("a file the root config ignores is the repository's policy, not the package
 test("the CLI names a package whose lint command names no path", () => {
   const result = runCli(
     cliFixture({
-      hook: HOOK,
       tasks: [
         ...lints("@fx/a"),
         { task: "lint", package: "@fx/b", command: "eslint lib/" },
@@ -791,7 +864,7 @@ test("the CLI names a package whose lint command names no path", () => {
 
 test("the CLI names each package whose named paths hold no tracked file", () => {
   const result = runCli(
-    cliFixture({ hook: HOOK, tasks: lints("@fx/a", "@fx/b"), track: false }),
+    cliFixture({ tasks: lints("@fx/a", "@fx/b"), track: false }),
   );
 
   assert.equal(result.status, 1, result.output);
@@ -802,7 +875,6 @@ test("the CLI names each package whose named paths hold no tracked file", () => 
 test("the CLI counts every file of a package whose lint command names its root", () => {
   const result = runCli(
     cliFixture({
-      hook: HOOK,
       tasks: [
         ...lints("@fx/a"),
         { task: "lint", package: "@fx/b", command: "eslint ." },
@@ -818,7 +890,6 @@ test("the CLI counts every file of a package whose lint command names its root",
 test("a lint command that names two paths counts the files of both", () => {
   const result = runCli(
     cliFixture({
-      hook: HOOK,
       tasks: [
         {
           task: "lint",
@@ -838,7 +909,6 @@ test("a lint command that names two paths counts the files of both", () => {
 test("#2556: a package outside packages/ is in the file census", () => {
   const result = runCli(
     cliFixture({
-      hook: HOOK,
       tasks: lints("@fx/a", "@fx/b", "@fx/x"),
       extraPackages: ["examples/x"],
       files: { "examples/x/src/App.svelte": "<p>hi</p>\n" },
@@ -859,7 +929,6 @@ test("#2556: a package outside packages/ is in the file census", () => {
 test("a directory with a pnpm-workspace.yaml of its own is outside the census of the package that holds it", () => {
   const fixture = (separate) =>
     cliFixture({
-      hook: HOOK,
       tasks: [
         ...lints("@fx/a", "@fx/b"),
         { task: "lint", package: "@fx/bench", command: "eslint ." },
@@ -896,7 +965,6 @@ test("a directory with a pnpm-workspace.yaml of its own is outside the census of
 test("#2556: the CLI names a file of an extension no config addresses", () => {
   const result = runCli(
     cliFixture({
-      hook: HOOK,
       tasks: lints("@fx/a", "@fx/b"),
       files: { "packages/b/src/App.vue": "<template><p>hi</p></template>\n" },
     }),
@@ -913,7 +981,6 @@ test("#2556: the CLI names a file of an extension no config addresses", () => {
 test("the CLI passes a file DELIBERATE names, and fails an entry that excuses nothing", () => {
   const fixture = (deliberate) =>
     cliFixture({
-      hook: HOOK,
       tasks: lints("@fx/a", "@fx/b"),
       files: { "packages/b/src/template.js": "__TOKEN__\n" },
       configs: {
@@ -948,7 +1015,6 @@ test("the CLI passes a file DELIBERATE names, and fails an entry that excuses no
 test("the CLI refuses a census no config lints: exit 2, not a pass", () => {
   const result = runCli(
     cliFixture({
-      hook: HOOK,
       tasks: lints("@fx/a", "@fx/b"),
       rootConfig: 'export default [{ files: ["**/*.nothing"] }];',
     }),
@@ -961,7 +1027,6 @@ test("the CLI refuses a census no config lints: exit 2, not a pass", () => {
 test("a file a lint command names is in the census", () => {
   const result = runCli(
     cliFixture({
-      hook: HOOK,
       tasks: [
         ...lints("@fx/a"),
         { task: "lint", package: "@fx/b", command: "eslint src/index.ts" },

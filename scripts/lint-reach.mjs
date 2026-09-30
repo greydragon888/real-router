@@ -1,14 +1,22 @@
-// Which workspace packages the lint steps of a hook actually read (#2370), and
-// which of their files the package's own ESLint config lints (#2407).
+// Which workspace packages are linted, in two layers (#2370, #2407):
 //
-// Pure functions: `check-lint-reach.mjs` feeds them the hook, turbo's dry-run
-// output, the tracked tree and ESLint's answers; `check-lint-reach.test.mjs`
-// feeds them fixtures.
+//   - definition — the whole task graph: every package has a lint task, each
+//     `shared/<dir>` is named by its consumer's lint command, and the package's
+//     own ESLint config lints each tracked file of code that command names;
+//   - executor — the turbo entries of a stage of the check registry: the stage
+//     reads every package that has a lint task. `verify` runs those entries
+//     word for word, so what is checked here is what runs.
+//
+// Pure functions: `check-lint-reach.mjs` feeds them the registry, turbo's
+// dry-run output, the tracked tree and ESLint's answers;
+// `check-lint-reach.test.mjs` feeds them fixtures.
 
 import path from "node:path";
 
+import { LINT_TASK_ROLES } from "./lint-tasks.mjs";
+
 /** Tasks that run ESLint over a package. */
-export const LINT_TASKS = new Set(["lint", "lint:example", "lint:bench"]);
+export const LINT_TASKS = new Set(Object.keys(LINT_TASK_ROLES));
 
 /**
  * The extensions that hold no code. Every other tracked file is code, whether
@@ -49,52 +57,34 @@ export function extensionOf(file) {
 /** @param {string} file */
 export const isCode = (file) => !NOT_CODE.has(extensionOf(file));
 
-const TURBO_RUN = "pnpm turbo run ";
-
 /**
- * The `pnpm turbo run …` invocations of a shell hook.
+ * The turbo entries of a stage of the check registry, split into tasks and
+ * flags. The registry holds argv lists, so nothing is parsed out of shell text.
  *
- * ⚠ An invocation it cannot read faithfully throws instead of being skipped:
- * a skipped invocation is a gate the guard does not count.
+ * ⚠ A flag with a separate value (`--filter pkg`) would read `pkg` as a task;
+ * the known-task check then fails it rather than letting it pass unseen.
  *
- * @param {string} hookText
- * @returns {{ line: number, tasks: string[], flags: string[] }[]}
+ * @param {{ id: string, run: string[], stages: string[] }[]} checks
+ * @param {string} stage
+ * @returns {{ id: string, tasks: string[], flags: string[] }[]}
  */
-export function turboRuns(hookText) {
-  const runs = [];
-
-  for (const [index, raw] of hookText.split("\n").entries()) {
-    const text = raw.trim();
-
-    if (text.startsWith("#") || !/\bturbo\s+run\b/.test(text)) {
-      continue;
-    }
-
-    if (!text.startsWith(TURBO_RUN)) {
-      throw new Error(
-        `line ${String(index + 1)}: \`turbo run\` in a shape this guard cannot read: ${text}`,
-      );
-    }
-
-    if (/[$`\\;&|<>()]/.test(text)) {
-      throw new Error(
-        `line ${String(index + 1)}: expansion, chaining or redirection in a turbo invocation: ${text}`,
-      );
-    }
-
-    const words =
-      text.slice(TURBO_RUN.length).match(/(?:[^\s'"]+|'[^']*'|"[^"]*")+/g) ??
-      [];
-    const args = words.map((word) => word.replaceAll(/['"]/g, ""));
-
-    runs.push({
-      line: index + 1,
-      tasks: args.filter((arg) => !arg.startsWith("-")),
-      flags: args.filter((arg) => arg.startsWith("-")),
+export function turboEntries(checks, stage) {
+  return checks
+    .filter(
+      ({ run, stages }) =>
+        stages.includes(stage) &&
+        run[0] === "pnpm" &&
+        run[1] === "turbo" &&
+        run[2] === "run",
+    )
+    .map(({ id, run }) => {
+      const args = run.slice(3);
+      return {
+        id,
+        tasks: args.filter((arg) => !arg.startsWith("-")),
+        flags: args.filter((arg) => arg.startsWith("-")),
+      };
     });
-  }
-
-  return runs;
 }
 
 /**
@@ -306,10 +296,11 @@ export function reachVerdict({
 }
 
 /**
- * The whole chain, with turbo injected: hook → runs → dry-runs → verdict.
+ * Both layers, with turbo injected.
  *
  * @param {object} input
- * @param {string} input.hookText
+ * @param {{ id: string, tasks: string[], flags: string[] }[]} input.runs the
+ *   turbo entries of the stage, from {@link turboEntries}
  * @param {Set<string>} input.knownTasks the task names in turbo.json
  * @param {(run: { tasks: string[], flags: string[] }) => { tasks: object[] }} input.dryRun
  * @param {{ name: string, dir: string }[]} input.packages the root excluded
@@ -320,7 +311,7 @@ export function reachVerdict({
  * @param {string} input.sharedPackage
  */
 export function evaluateReach({
-  hookText,
+  runs,
   knownTasks,
   dryRun,
   packages,
@@ -330,35 +321,34 @@ export function evaluateReach({
   exempt,
   sharedPackage,
 }) {
-  const runs = turboRuns(hookText);
-
-  for (const { line, tasks } of runs) {
+  for (const { id, tasks } of runs) {
     for (const task of tasks) {
       if (!knownTasks.has(task)) {
-        throw new Error(
-          `line ${String(line)}: \`${task}\` is not a task in turbo.json`,
-        );
+        throw new Error(`${id}: \`${task}\` is not a task in turbo.json`);
       }
     }
   }
 
   const workspace = packages.map(({ name }) => name);
-  const linted = new Map();
+  const linted = lintedPackages(dryRun({ tasks: [...LINT_TASKS], flags: [] }));
+  const byStage = new Map();
 
   for (const run of runs) {
     for (const [name, commands] of lintedPackages(dryRun(run))) {
-      linted.set(name, [...(linted.get(name) ?? []), ...commands]);
+      byStage.set(name, [...(byStage.get(name) ?? []), ...commands]);
     }
   }
 
   let vacuous = null;
 
   if (runs.length === 0) {
-    vacuous = "the hook has no `pnpm turbo run` line";
+    vacuous = "the stage has no `pnpm turbo run` entry in the registry";
   } else if (workspace.length === 0) {
     vacuous = "the workspace lists no packages";
   } else if (linted.size === 0) {
-    vacuous = "no run lints any package";
+    vacuous = "no lint task lints any package";
+  } else if (byStage.size === 0) {
+    vacuous = "no turbo entry of the stage lints any package";
   } else if (workspace.includes(sharedPackage) && sharedDirs.length === 0) {
     vacuous = `${sharedPackage} is in the workspace but no shared/<dir> was found`;
   }
@@ -366,7 +356,11 @@ export function evaluateReach({
   return {
     runs,
     linted,
+    byStage,
     vacuous,
+    unrun: [...linted.keys()].filter(
+      (name) => !byStage.has(name) && !exempt.has(name),
+    ),
     ...reachVerdict({
       workspace,
       linted,

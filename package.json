@@ -22,7 +22,7 @@
     "lint:unused": "knip",
     "lint:duplicates": "jscpd packages/*/src/ shared/ --no-tips",
     "lint:e2e": "bash scripts/check-e2e-specs.sh",
-    "lint:cross-router": "pnpm --dir cross-router-bench lint && pnpm --dir cross-router-bench test:lint-config",
+    "lint:cross-router": "pnpm --dir cross-router-bench install --frozen-lockfile --prefer-offline && pnpm --dir cross-router-bench lint && pnpm --dir cross-router-bench test:lint-config",
     "lint:doc-anchors": "node scripts/check-doc-anchors.mjs",
     "lint:property-headroom": "node scripts/check-property-headroom.mjs",
     "lint:doc-dup": "node scripts/check-doc-duplication.mjs",

@@ -12,12 +12,13 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
   LOCAL_REASONS,
+  hasLintTask,
   planBenchmarksLint,
 } from "../benchmarks-lint-filter.mjs";
 
@@ -172,4 +173,12 @@ test("turbo still emits the LOCAL_REASONS", () => {
   for (const reason of LOCAL_REASONS) {
     assert.ok(emitted.has(reason), `turbo no longer emits ${reason}`);
   }
+});
+
+test("on the real manifests only the benchmarks declare the filter's lint task: a package's lint does not count", () => {
+  // The cells above take `lints` as a stub and would pass under any task set.
+  // With `lint` among the filter's tasks, every package would count, and the
+  // job would be planned on each PR that touches one.
+  assert.equal(hasLintTask(join(repoRoot, "packages", "core")), false);
+  assert.equal(hasLintTask(join(repoRoot, "benchmarks")), true);
 });
