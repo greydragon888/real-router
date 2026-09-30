@@ -23,11 +23,19 @@
 # corpus it never read. `lint:issue-refs` shipped the opposite bug first — every
 # non-zero exit read as "no network", and a planted bad reference passed.
 #
+# A Vale older than the version CI installs (`vale-styles/VERSION`) refuses with
+# exit 3: the rules are checked against that version.
+#
 # Usage: ./scripts/check-prose.sh [path ...]
+#        ./scripts/check-prose.sh --changed <base>
 #   Paths are relative to the caller's cwd. With none, the corpus is the
-#   repository's, from any directory.
+#   repository's, from any directory. `--changed` lints the corpus files that
+#   `<base>..HEAD` adds or edits — or the whole corpus, when the range edits
+#   what decides the result: `.vale.ini`, `vale-styles/` or this script.
 
 set -e
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 if ! command -v vale >/dev/null 2>&1; then
   if [ -n "${VALE_REQUIRED:-}" ]; then
@@ -40,6 +48,24 @@ if ! command -v vale >/dev/null 2>&1; then
   echo "    Install with: brew install vale"
   echo "    (Hook stays non-blocking; CI runs it with VALE_REQUIRED=1.)"
   exit 0
+fi
+
+VALE_FLOOR="$(sed -n 's/^VALE_VERSION=//p' "$ROOT/vale-styles/VERSION" 2>/dev/null || true)"
+vale_version="$(vale --version 2>/dev/null |
+  sed -n 's/^vale version \([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p')"
+if [ -z "$VALE_FLOOR" ] || [ -z "$vale_version" ]; then
+  echo "❌ Could not read the Vale version or its floor — the prose lint did NOT run."
+  echo "   It must be ${VALE_FLOOR:-the one in vale-styles/VERSION} or newer: brew upgrade vale"
+  exit 3
+fi
+# The lower of the two, field by field as numbers: as strings, 3.9.0 sorts
+# above 3.20.0.
+lower="$(printf '%s\n%s\n' "$VALE_FLOOR" "$vale_version" |
+  sort -t . -k 1,1n -k 2,2n -k 3,3n | head -n 1)"
+if [ "$lower" != "$VALE_FLOOR" ]; then
+  echo "❌ vale $vale_version is below $VALE_FLOOR, the version CI installs — the prose lint did NOT run."
+  echo "   Upgrade with: brew upgrade vale"
+  exit 3
 fi
 
 # Tracked Markdown only: `git ls-files` excludes every ignored tree structurally,
@@ -55,20 +81,52 @@ fi
 #   - `.claude/` is out of scope by owner decision. Most of it is ignored, but
 #     `git ls-files` still returns what of it is tracked — the skills among it —
 #     and that has its own checks: `line-anchor-authority` reads it.
-if [ "$#" -gt 0 ]; then
+#
+# `|| true`: when the exclusions remove every path — a release PR edits only
+# CHANGELOG.md — grep exits 1, and `set -e` would stop the script before it
+# says there is no Markdown to lint.
+in_corpus() {
+  grep -v 'CHANGELOG\.md$' |
+    grep -v '^benchmarks/' |
+    grep -v '^cross-router-bench/' |
+    grep -v '^examples/' |
+    grep -v '^\.claude/' || true
+}
+
+if [ "${1:-}" = "--changed" ]; then
+  if [ -z "${2:-}" ]; then
+    echo "❌ --changed needs a base: check-prose.sh --changed <base>"
+    exit 2
+  fi
+  base="$2"
+  # From the root, like the whole corpus: the paths git prints are the root's.
+  cd "$ROOT"
+  # No --diff-filter here: a deleted word list changes what Vale accepts.
+  if ! rules="$(git diff --name-only "$base" HEAD -- .vale.ini vale-styles scripts/check-prose.sh)"; then
+    echo "❌ git diff against $base failed — nothing was linted."
+    exit 2
+  fi
+  if [ -n "$rules" ]; then
+    echo "The range edits what decides the result — linting the whole corpus."
+    # shellcheck disable=SC2207 # paths in this repository carry no spaces
+    TARGETS=($(git ls-files '*.md' | in_corpus))
+  else
+    if ! changed="$(git diff --name-only --diff-filter=d "$base" HEAD -- '*.md')"; then
+      echo "❌ git diff against $base failed — nothing was linted."
+      exit 2
+    fi
+    # shellcheck disable=SC2207 # paths in this repository carry no spaces
+    TARGETS=($(printf '%s\n' "$changed" | in_corpus))
+  fi
+elif [ "$#" -gt 0 ]; then
   TARGETS=("$@")
 else
   # From the script's own location, never from the cwd (#2544): `git ls-files`
   # lists the files under the cwd, with paths relative to it, and the
-  # exclusions below are written against paths from the root.
-  cd "$(dirname "$0")/.."
+  # exclusions above are written against paths from the root.
+  cd "$ROOT"
   # shellcheck disable=SC2207 # paths in this repository carry no spaces
-  TARGETS=($(git ls-files '*.md' |
-    grep -v 'CHANGELOG\.md$' |
-    grep -v '^benchmarks/' |
-    grep -v '^cross-router-bench/' |
-    grep -v '^examples/' |
-    grep -v '^\.claude/'))
+  TARGETS=($(git ls-files '*.md' | in_corpus))
 fi
 
 if [ "${#TARGETS[@]}" -eq 0 ]; then
