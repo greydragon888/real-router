@@ -41,10 +41,12 @@
  *      `turbo.json`; no other package and not the root lists `shared/` there.
  *      turbo does not hash through a symlink, so a consumer without the input
  *      replays its tasks from cache after a change in the dir.
- *   6. `turbo.json` — every package that builds an entry point from a
- *      directory other than `src/` lists `<dir>/**` in the inputs of the same
- *      tasks, in its own `turbo.json`. The directories come from the
- *      `@real-router/internal-source` targets in `exports`.
+ *   6. Layout — every package's code lives under `src/`: each
+ *      `@real-router/internal-source` target in `exports` is under `./src/`,
+ *      no code file sits outside `src/`, `tests/`, `scripts/` and the
+ *      package-root config files, and every symlink under `src/` leads into a
+ *      `shared/<dir>`. The code roots are then `packages/<pkg>/src` and
+ *      `shared/<dir>`, and nothing else.
  *
  * Emit mode (`--emit`, used by ci.yml's coverage job and sonar-trusted.yml):
  *   prints `sources=…`, `tests=…`, `reports=…` lines for `$GITHUB_OUTPUT`,
@@ -60,7 +62,7 @@ import {
   lstatSync,
   readlinkSync,
 } from "node:fs";
-import { join } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 
 import { declaresSharedOwner } from "./coverage-owner.mjs";
 
@@ -472,17 +474,20 @@ for (const task of KEYED_TASKS) {
   }
 }
 
-// --- Check 6: turbo keys each package on every dir it builds an entry from ---
-// `@real-router/angular/ssr` is built from packages/angular/ssr/, and the root
-// `bundle` and `test` inputs cover no source directory but src/. Unless the
-// package lists ssr/ itself, an edit confined to it restores the previous dist/
-// from the cache, and an edit to `ssr/ng-package.json` re-keys no task (#2626).
-// The directories are DERIVED from the `@real-router/internal-source` targets
-// in `exports`, and the package's own turbo.json lists each one whole, as
-// `<dir>/**`, in the tasks check 5 keys: the directory holds the entry's build
-// config as well as its sources. A file src/ imports from outside src/ without
-// being an entry point is out of this check's reach.
+// --- Check 6: every package's code lives under src/ ---------------------------
+// Tools name a package's code `src/` in many independent lists — coverage,
+// Sonar, CodeQL, jscpd, semgrep, knip, ESLint blocks, the changeset gate — and
+// a list is blind to code anywhere else (#2627). So the layout is what is
+// checked: the code roots are `packages/<pkg>/src` and `shared/<dir>`, the
+// second reached through a symlink under `src/`, and a list that covers both
+// covers all code. Generated directories and dot-directories are not walked; a
+// symlink is never followed.
 const INTERNAL_SOURCE = "@real-router/internal-source";
+const CODE_FILE = /\.(?:[cm]?[jt]sx?|svelte|vue)$/;
+const ROOT_CONFIG_FILE =
+  /\.config(?:\.[\w-]+)*\.[cm]?[jt]s$|^rollup\.[\w.-]+\.[cm]?[jt]s$/;
+const CODE_DIRS = new Set(["src", "tests", "scripts"]);
+const GENERATED_DIRS = new Set(["node_modules", "dist", "coverage"]);
 
 /** Every `@real-router/internal-source` target under one `exports` entry. */
 const internalSourcesOf = (entry) =>
@@ -494,59 +499,81 @@ const internalSourcesOf = (entry) =>
       )
     : [];
 
-/**
- * The directories other than src/ that a package builds an entry point from,
- * each with the first `exports` key built from it.
- * @param {string} pkg
- * @returns {Map<string, string>}
- */
-const entryDirsOutsideSrc = (pkg) => {
+/** @param {string} dir @returns {string[]} code files, symlinks not followed */
+const codeFilesUnder = (dir) =>
+  readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+
+    if (entry.isDirectory()) return codeFilesUnder(path);
+
+    return entry.isFile() && CODE_FILE.test(entry.name) ? [path] : [];
+  });
+
+/** @param {string} dir @returns {string[]} symlinks, none of them followed */
+const symlinksUnder = (dir) =>
+  readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+
+    if (entry.isSymbolicLink()) return [path];
+
+    return entry.isDirectory() ? symlinksUnder(path) : [];
+  });
+
+let srcLinks = 0;
+
+for (const pkg of packages) {
+  const root = join(PKG_DIR, pkg);
+  const rel = (path) => relative(ROOT, path);
   const entries = readManifest(pkg).exports;
-  const dirs = new Map();
 
-  if (entries === null || typeof entries !== "object") return dirs;
-
-  for (const [key, entry] of Object.entries(entries)) {
+  for (const [key, entry] of Object.entries(
+    entries !== null && typeof entries === "object" ? entries : {},
+  )) {
     for (const target of internalSourcesOf(entry)) {
-      const [dir, ...rest] = target.replace(/^\.\//, "").split("/");
-
-      if (rest.length > 0 && dir !== "src" && !dirs.has(dir)) {
-        dirs.set(dir, key);
+      if (!target.startsWith("./src/")) {
+        errors.push(
+          `packages/${pkg}/package.json: exports "${key}" is built from ${target}, outside src/ — every list that names a package's code src/ misses it`,
+        );
       }
     }
   }
 
-  return dirs;
-};
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    const path = join(root, entry.name);
 
-const keyedEntryDirs = [];
-
-for (const pkg of packages) {
-  const dirs = entryDirsOutsideSrc(pkg);
-
-  if (dirs.size === 0) continue;
-
-  const turbo = readTurbo(join(PKG_DIR, pkg, "turbo.json"));
-
-  for (const [dir, key] of dirs) {
-    if (turbo === undefined) {
-      errors.push(
-        `packages/${pkg}: exports "${key}" is built from ${dir}/, but the package has no turbo.json — no task of it is keyed on that directory`,
-      );
-      continue;
+    if (entry.isSymbolicLink()) {
+      errors.push(`${rel(path)}: a symlink outside src/`);
+    } else if (entry.isFile()) {
+      if (CODE_FILE.test(entry.name) && !ROOT_CONFIG_FILE.test(entry.name)) {
+        errors.push(`${rel(path)}: code outside src/, tests/ and scripts/`);
+      }
+    } else if (
+      entry.isDirectory() &&
+      !CODE_DIRS.has(entry.name) &&
+      !GENERATED_DIRS.has(entry.name) &&
+      !entry.name.startsWith(".")
+    ) {
+      for (const file of codeFilesUnder(path)) {
+        errors.push(`${rel(file)}: code outside src/, tests/ and scripts/`);
+      }
     }
+  }
 
-    const unlisted = keyedTasksOf(pkg).filter(
-      (task) => !(turbo.tasks?.[task]?.inputs ?? []).includes(`${dir}/**`),
-    );
+  if (!hasRealSrc(pkg)) continue;
 
-    for (const task of unlisted) {
+  // Whether the shared dir it leads to exists and has an owner is checks 2b
+  // and 2c; this one asks only that the link stays inside shared/.
+  for (const link of symlinksUnder(join(root, "src"))) {
+    const target = resolve(dirname(link), readlinkSync(link));
+    const inShared = relative(SHARED_DIR, target);
+
+    srcLinks++;
+
+    if (inShared === "" || inShared.startsWith("..")) {
       errors.push(
-        `packages/${pkg}/turbo.json: task "${task}" does not list ${dir}/** — exports "${key}" is built from that directory, so a change there must re-key every task that reads the package's sources`,
+        `${rel(link)}: a symlink under src/ that leads to ${rel(target)}, not into shared/`,
       );
     }
-
-    if (unlisted.length === 0) keyedEntryDirs.push(`${pkg}/${dir}`);
   }
 }
 
@@ -585,6 +612,6 @@ if (emitMode) {
       `${mustCoverageExclude.length} Sonar coverage-exclusions (${mustCoverageExclude.join(", ")}); ` +
       `${publicCount} public packages size-tracked (exceptions: ${[...SIZE_LIMIT_EXCEPTIONS.keys()].join(", ")}); ` +
       `shared/ consumers keyed on their dir: ${sharedConsumers}; ` +
-      `entry dirs outside src/ keyed: ${keyedEntryDirs.join(", ") || "none"}.`,
+      `code outside src/: none (${packages.length} packages, ${srcLinks} src/ links into shared/).`,
   );
 }

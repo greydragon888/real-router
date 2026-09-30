@@ -105,9 +105,6 @@ export class HttpStatusCode implements OnInit {
       // Surface the bad value at the source instead of at the response boundary.
       // Angular uses `isDevMode()` rather than `process.env.NODE_ENV` — ng-packagr
       // does not replace the latter and `process` is undefined in the browser.
-      // JIT/TestBed reads `code()` as undefined, so this branch (and the sink
-      // write below) is reachable only under AOT — covered by the AOT
-      // ssr-examples once an `<http-status-code>` consumer lands there.
       if (
         isDevMode() &&
         (!Number.isInteger(value) || value < 100 || value > 999)

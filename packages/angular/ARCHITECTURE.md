@@ -20,7 +20,7 @@ depend on Angular SSR plumbing (`afterNextRender`, `TransferState`,
 
 ```
 @real-router/angular        →  src/index.ts          →  Client API (Angular 22+)
-@real-router/angular/ssr    →  ssr/public_api.ts     →  SSR-feature surface
+@real-router/angular/ssr    →  src/ssr/public_api.ts →  SSR-feature surface
 ```
 
 **Build output** (ng-packagr, partial compilation):
@@ -30,17 +30,17 @@ dist/
 ├── fesm2022/
 │   ├── real-router-angular.mjs
 │   └── real-router-angular-ssr.mjs
-├── esm2022/
-│   └── (individual compiled files)
 ├── types/
 │   ├── real-router-angular.d.ts
 │   └── real-router-angular-ssr.d.ts
-└── ssr/                       # ng-packagr secondary entry
+├── package.json
+└── ssr/
+    └── package.json            # ng-packagr secondary entry manifest
 ```
 
 ng-packagr produces FESM2022 bundles (ESM-only, no CJS). `src/dom-utils/` is a symlink to `shared/dom-utils/`, as in the other framework adapters; ng-packagr compiles the shared sources through it (#2552).
 
-The `/ssr` subpath is built as a ng-packagr secondary entry point with its own `ssr/ng-package.json`. Importing from `@real-router/angular/ssr` does not pull SSR-only dependencies into client bundles.
+The `/ssr` subpath is built as a ng-packagr secondary entry point: ng-packagr names it after the directory of `ssr/ng-package.json`, whose `entryFile` is `src/ssr/public_api.ts`, so every source file lives under `src/` (#2627). Importing from `@real-router/angular/ssr` does not pull SSR-only dependencies into client bundles.
 
 ## Source Structure
 
@@ -78,26 +78,27 @@ src/                            # Main entry — client API
 │   ├── RouterErrorBoundary.ts  # Navigation error handling
 │   ├── NavigationAnnouncer.ts  # WCAG aria-live announcer
 │   └── index.ts
-└── dom-utils/                  # Shared DOM utilities (prebuild copy of shared/)
-    ├── link-utils.ts           # buildHref, buildActiveClassName, applyLinkA11y, shouldNavigate, targetsAnotherContext, anchorTargetsAnotherContext, navigateWithHash, shallowEqual
-    ├── route-announcer.ts      # createRouteAnnouncer
-    ├── scroll-restore.ts       # createScrollRestoration (opt-in scroll capture + restore)
-    ├── view-transitions.ts     # createViewTransitions (opt-in View Transitions API integration)
-    ├── direction-tracker.ts    # createDirectionTracker — optional public utility (re-exported from src/index.ts)
-    └── index.ts
+├── dom-utils/                  # Symlink → shared/dom-utils/ (#2552)
+│   ├── link-utils.ts           # buildHref, buildActiveClassName, applyLinkA11y, shouldNavigate, targetsAnotherContext, anchorTargetsAnotherContext, navigateWithHash, shallowEqual
+│   ├── route-announcer.ts      # createRouteAnnouncer
+│   ├── scroll-restore.ts       # createScrollRestoration (opt-in scroll capture + restore)
+│   ├── view-transitions.ts     # createViewTransitions (opt-in View Transitions API integration)
+│   ├── direction-tracker.ts    # createDirectionTracker — optional public utility (re-exported from src/index.ts)
+│   └── index.ts
+└── ssr/                        # SSR-feature entry — @real-router/angular/ssr
+    ├── public_api.ts           # Public exports (8 names + 1 type)
+    ├── components/
+    │   ├── ClientOnly.ts       # <client-only [fallback]="tpl"> — server emits fallback, client swaps after afterNextRender
+    │   ├── ServerOnly.ts       # <server-only> — symmetric inverse of ClientOnly
+    │   └── HttpStatusCode.ts   # <http-status-code [code]="N"> — writes to optional HttpStatusSink
+    ├── functions/
+    │   ├── injectDeferred.ts   # Reads state.context.ssrDataDeferred[key] from ssr-data-plugin
+    │   └── provideHttpStatusSink.ts  # Environment providers helper for HTTP_STATUS_SINK
+    └── utils/
+        └── createHttpStatusSink.ts # HTTP_STATUS_SINK + createHttpStatusSink — request-scoped sink
 
-ssr/                            # SSR-feature entry — @real-router/angular/ssr
-├── public_api.ts               # Public exports (8 names + 1 type)
-├── ng-package.json             # ng-packagr secondary entry-point config
-├── components/
-│   ├── ClientOnly.ts           # <client-only [fallback]="tpl"> — server emits fallback, client swaps after afterNextRender
-│   ├── ServerOnly.ts           # <server-only> — symmetric inverse of ClientOnly
-│   └── HttpStatusCode.ts       # <http-status-code [code]="N"> — writes to optional HttpStatusSink
-├── functions/
-│   ├── injectDeferred.ts       # Reads state.context.ssrDataDeferred[key] from ssr-data-plugin
-│   └── provideHttpStatusSink.ts  # Environment providers helper for HTTP_STATUS_SINK
-└── utils/
-    └── createHttpStatusSink.ts # HTTP_STATUS_SINK + createHttpStatusSink — request-scoped sink
+ssr/
+└── ng-package.json             # ng-packagr secondary entry config — names the /ssr subpath
 ```
 
 ## Key Differences from React, Preact, Solid, and Vue Adapters

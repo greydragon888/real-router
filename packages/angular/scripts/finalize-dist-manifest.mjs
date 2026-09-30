@@ -14,26 +14,26 @@
 // about output that ships as FESM2022 only.
 //
 // ⚠ The source manifest deliberately stays `"type": "commonjs"`: flipping it
-// makes every relative import in `src/`, `ssr/` and `tests/` an ESM specifier
-// under `moduleResolution: NodeNext` — measured, 426 `tsc` errors across 87
-// files. The published shape and the source tree's module format are different
-// questions, and only the first one reaches consumers.
+// makes every relative import in `src/` and `tests/` an ESM specifier
+// under `moduleResolution: NodeNext` (the package's `CLAUDE.md` holds the
+// measured cost). The published shape and the source tree's module format are
+// different questions, and only the first one reaches consumers.
 //
 // ⚠ `exports` STAYS, and only its `@real-router/internal-source` condition is
-// stripped — those targets (`./src/index.ts`, `./ssr/public_api.ts`) do not
+// stripped — those targets (`./src/index.ts`, `./src/ssr/public_api.ts`) do not
 // exist under `dist/`. publint advises removing the whole field because Node
 // ignores a nested `exports` "and some bundlers may still pick them up, leading
 // to inconsistent resolution". Half of that is measurable and half is not:
 // Node ignores it when resolving INTO the package from outside, and honours it
 // for a SELF-REFERENCE from within the package scope, which is the mechanism
-// ng-packagr's cross-entry imports run on. `ssr/functions/injectDeferred.ts`
+// ng-packagr's cross-entry imports run on. `src/ssr/functions/injectDeferred.ts`
 // imports `@real-router/angular` — the form ng-packagr documents — and the FESM
 // keeps that bare specifier. An installed copy resolves it by walking up to
 // `node_modules/@real-router/angular`; in this workspace nothing sits above
 // `packages/angular/dist`, so self-reference is the only route. The guard at
 // the bottom is that claim, executed. Inconsistency does not arise either:
 // the nested map resolves `.` to the same file the parent map does.
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -66,6 +66,41 @@ writeFileSync(MANIFEST, `${JSON.stringify(manifest, undefined, 2)}\n`);
 // parent directory, so the copy would put it in the tarball twice (#2628).
 rmSync(join(DIST, "README.md"), { force: true });
 
+// ng-packagr names a secondary entry point after the directory of its
+// `ng-package.json`. The `/ssr` entry's sits at `ssr/` with an `entryFile` that
+// reaches into `src/ssr/`, so all shipped code stays under `src/` (#2627), and
+// nothing in ng-packagr checks where an `entryFile` points. So the published
+// shape is checked here: the nested manifest carries exactly the subpaths the
+// root one publishes, and every file the root one names was built.
+const PACKAGE = dirname(DIST);
+const published = JSON.parse(
+  readFileSync(join(PACKAGE, "package.json"), "utf8"),
+).exports;
+const subpathsOf = (exportsMap) =>
+  Object.keys(exportsMap ?? {})
+    .filter((key) => key !== "./package.json")
+    .sort()
+    .join(", ");
+
+if (subpathsOf(manifest.exports) !== subpathsOf(published)) {
+  throw new Error(
+    `dist/package.json exports [${subpathsOf(manifest.exports)}], the package publishes [${subpathsOf(published)}] — ng-packagr named an entry point differently`,
+  );
+}
+
+for (const [key, target] of Object.entries(published)) {
+  for (const [condition, file] of Object.entries(target)) {
+    if (
+      condition !== "@real-router/internal-source" &&
+      !existsSync(join(PACKAGE, file))
+    ) {
+      throw new Error(
+        `exports "${key}" ${condition} names ${file}, which the build did not produce`,
+      );
+    }
+  }
+}
+
 // The claim above, executed rather than asserted. Resolving the package's own
 // name from inside the built output is what the secondary entry point's
 // `import { injectRoute } from "@real-router/angular"` does at bundle time, and
@@ -85,5 +120,5 @@ try {
 }
 
 console.log(
-  '✓ dist/package.json: type="module", internal-source condition stripped, self-reference resolves',
+  '✓ dist/package.json: type="module", internal-source condition stripped, subpaths match the package, self-reference resolves',
 );

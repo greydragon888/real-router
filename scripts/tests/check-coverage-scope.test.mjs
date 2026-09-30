@@ -265,9 +265,10 @@ const SCRIPT = join(ROOT, "scripts/check-coverage-scope.mjs");
 
 /**
  * A tree the script accepts: `a` produces coverage; `b` (private) and `svelte`
- * have no tests and are excluded from Sonar coverage; `b` builds its `./extra`
- * entry from `extra/`, as angular builds `./ssr` from `ssr/`; `owner` measures
- * `shared/dx` and lints it through the `src/dx-alias` symlink.
+ * have no tests and are excluded from Sonar coverage; `b` builds a second
+ * entry, `./extra`, from `src/extra/`, as angular builds `./ssr` from
+ * `src/ssr/`; `owner` measures `shared/dx` and lints it through the
+ * `src/dx-alias` symlink.
  */
 const acceptedTree = () => ({
   "packages/a/package.json": JSON.stringify({ name: "@fx/a" }),
@@ -280,20 +281,11 @@ const acceptedTree = () => ({
     private: true,
     exports: {
       ".": { "@real-router/internal-source": "./src/index.ts" },
-      "./extra": { "@real-router/internal-source": "./extra/index.ts" },
+      "./extra": { "@real-router/internal-source": "./src/extra/index.ts" },
     },
   }),
   "packages/b/src/index.ts": "export const b = 1;\n",
-  "packages/b/extra/index.ts": "export const extra = 1;\n",
-  "packages/b/turbo.json": JSON.stringify({
-    extends: ["//"],
-    tasks: Object.fromEntries(
-      ["bundle", "lint", "test", "type-check"].map((task) => [
-        task,
-        { inputs: ["$TURBO_EXTENDS$", "extra/**"] },
-      ]),
-    ),
-  }),
+  "packages/b/src/extra/index.ts": "export const extra = 1;\n",
   "packages/svelte/package.json": JSON.stringify({ name: "@fx/svelte" }),
   "packages/svelte/src/index.ts": "export const svelte = 1;\n",
   "packages/owner/package.json": JSON.stringify({
@@ -352,9 +344,15 @@ const LCOV = "TN:\nend_of_record\n";
 
 /**
  * Builds the accepted tree, lets `plant` depart from it, and runs the script
- * there. `alias` is the symlink's target, or `null` for no symlink.
+ * there. `alias` is the symlink's target, or `null` for no symlink; `links`
+ * plants further symlinks as `[path, target]` pairs.
  */
-function runScript({ plant = () => {}, alias = ALIAS_TARGET, args = [] } = {}) {
+function runScript({
+  plant = () => {},
+  alias = ALIAS_TARGET,
+  links = [],
+  args = [],
+} = {}) {
   const root = mkdtempSync(join(tmpdir(), "coverage-scope-"));
 
   try {
@@ -369,6 +367,11 @@ function runScript({ plant = () => {}, alias = ALIAS_TARGET, args = [] } = {}) {
 
     if (alias !== null) {
       symlinkSync(alias, join(root, ALIAS_PATH));
+    }
+
+    for (const [path, target] of links) {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      symlinkSync(target, join(root, path));
     }
 
     const run = spawnSync(process.execPath, [SCRIPT, ...args], {
@@ -392,21 +395,87 @@ test("CONTROL — the script accepts the tree every drift cell departs from", ()
   assert.equal(run.status, 0, run.stderr);
   assert.match(
     run.stderr,
-    /✓ Coverage scope in sync: 2 components, 2 Sonar coverage-exclusions \(b, svelte\); 3 public packages size-tracked \(exceptions: svelte\); shared\/ consumers keyed on their dir: 1; entry dirs outside src\/ keyed: b\/extra\./,
+    /✓ Coverage scope in sync: 2 components, 2 Sonar coverage-exclusions \(b, svelte\); 3 public packages size-tracked \(exceptions: svelte\); shared\/ consumers keyed on their dir: 1; code outside src\/: none \(4 packages, 1 src\/ links into shared\/\)\./,
   );
 });
 
-test("CONTROL — the repository's entry dirs outside src/ are derived, and each is keyed", () => {
-  // Check 6 passes by finding nothing when its derivation stops finding
-  // angular's ssr/, and the fixture above cannot tell: it has its own exports.
-  // The repository can, so this cell runs the script on it and pins the set.
+test("CONTROL — on the repository, check 6 walks every package and every src/ link", () => {
+  // Check 6 passes by finding nothing when its walk stops reaching the tree,
+  // and the fixture above cannot tell. The repository can: the counts the
+  // script prints must be the ones the manifests and git's index give.
+  const packages = readdirSync(join(ROOT, "packages")).filter((name) =>
+    existsSync(join(ROOT, "packages", name, "package.json")),
+  ).length;
+  const links = spawnSync("git", ["ls-files", "-s", "--", "packages"], {
+    cwd: ROOT,
+    encoding: "utf8",
+  })
+    .stdout.split("\n")
+    .filter(
+      (line) => line.startsWith("120000 ") && line.includes("/src/"),
+    ).length;
   const run = spawnSync(process.execPath, [SCRIPT], {
     cwd: ROOT,
     encoding: "utf8",
   });
 
+  assert.ok(packages > 0 && links > 0, "nothing to compare the walk against");
   assert.equal(run.status, 0, run.stderr);
-  assert.match(run.stderr, /entry dirs outside src\/ keyed: angular\/ssr\.$/m);
+  assert.match(
+    run.stderr,
+    new RegExp(
+      `code outside src/: none \\(${packages} packages, ${links} src/ links into shared/\\)\\.$`,
+      "m",
+    ),
+  );
+});
+
+test("generated and dot-directories are not walked", () => {
+  const run = runScript({
+    plant: (tree) => {
+      tree["packages/a/dist/index.js"] = "\n";
+      tree["packages/a/coverage/lcov-report/prettify.js"] = "\n";
+      tree["packages/a/node_modules/x/index.js"] = "\n";
+      tree["packages/a/.turbo/cache.js"] = "\n";
+    },
+  });
+
+  assert.equal(run.status, 0, run.stderr);
+});
+
+test("a package without src/ is walked without error", () => {
+  const run = runScript({
+    plant: (tree) => {
+      tree["packages/c/package.json"] = JSON.stringify({
+        name: "@fx/c",
+        private: true,
+      });
+    },
+  });
+
+  assert.equal(run.status, 0, run.stderr);
+});
+
+test("package-root config files and scripts/ hold code legitimately", () => {
+  const run = runScript({
+    plant: (tree) => {
+      for (const file of [
+        "eslint.config.mjs",
+        "rollup.config.mjs",
+        "rollup.external.d.mts",
+        "stryker.config.mjs",
+        "svelte.config.js",
+        "tsdown.config.mts",
+        "vitest.config.properties.mts",
+        "vitest.stryker.config.mts",
+        "scripts/build.mjs",
+      ]) {
+        tree[`packages/a/${file}`] = "\n";
+      }
+    },
+  });
+
+  assert.equal(run.status, 0, run.stderr);
 });
 
 const withoutLine = (text, line) => {
@@ -611,62 +680,68 @@ const DRIFTS = [
     line: /turbo\.json: task "test" lists \.\.\/\.\.\/shared\/\*\*\/\*\.ts for every package/,
   },
   {
-    name: "a package that builds an entry from outside src/ with no turbo.json",
-    plant: (tree) => {
-      delete tree["packages/b/turbo.json"];
-    },
-    line: /packages\/b: exports "\.\/extra" is built from extra\/, but the package has no turbo\.json/,
-  },
-  {
-    // The #2626 shape: the task keeps the root inputs and omits the entry dir.
-    name: "an entry dir outside src/ that a task does not list",
-    plant: (tree) => {
-      const turbo = JSON.parse(tree["packages/b/turbo.json"]);
-
-      turbo.tasks.bundle.inputs = ["$TURBO_EXTENDS$"];
-      tree["packages/b/turbo.json"] = JSON.stringify(turbo);
-    },
-    line: /packages\/b\/turbo\.json: task "bundle" does not list extra\/\*\* — exports "\.\/extra" is built from that directory/,
-  },
-  {
-    // A glob that names the sources leaves the entry's build config (angular's
-    // `ssr/ng-package.json`) out of the key.
-    name: "an entry dir outside src/ that a task lists only in part",
-    plant: (tree) => {
-      const turbo = JSON.parse(tree["packages/b/turbo.json"]);
-
-      turbo.tasks.bundle.inputs = ["$TURBO_EXTENDS$", "extra/**/*.ts"];
-      tree["packages/b/turbo.json"] = JSON.stringify(turbo);
-    },
-    line: /packages\/b\/turbo\.json: task "bundle" does not list extra\/\*\*/,
-  },
-  {
-    name: "an entry dir outside src/ with a type-check:tests task that does not list it",
+    // The #2627 shape: an entry point built from a directory beside `src/`.
+    name: "an entry point built from outside src/",
     plant: (tree) => {
       const pkg = JSON.parse(tree["packages/b/package.json"]);
 
-      pkg.scripts = { "type-check:tests": "tsc --noEmit" };
+      pkg.exports["./extra"]["@real-router/internal-source"] = "./lib/index.ts";
       tree["packages/b/package.json"] = JSON.stringify(pkg);
     },
-    line: /packages\/b\/turbo\.json: task "type-check:tests" does not list extra\/\*\*/,
+    line: /packages\/b\/package\.json: exports "\.\/extra" is built from \.\/lib\/index\.ts, outside src\//,
   },
   {
-    // The condition can sit under another one, and the derivation still finds
-    // the directory: the missing turbo.json is what gets reported.
-    name: "a package with no turbo.json whose entry dir a nested condition names",
+    // The condition can sit under another one; the walk still finds it.
+    name: "an entry point built from outside src/, named by a nested condition",
     plant: (tree) => {
       const pkg = JSON.parse(tree["packages/b/package.json"]);
 
       pkg.exports["./extra"] = {
         import: {
-          "@real-router/internal-source": "./extra/index.ts",
+          "@real-router/internal-source": "./lib/index.ts",
           default: "./dist/extra.js",
         },
       };
       tree["packages/b/package.json"] = JSON.stringify(pkg);
-      delete tree["packages/b/turbo.json"];
     },
-    line: /packages\/b: exports "\.\/extra" is built from extra\/, but the package has no turbo\.json/,
+    line: /packages\/b\/package\.json: exports "\.\/extra" is built from \.\/lib\/index\.ts, outside src\//,
+  },
+  {
+    // Nested, as angular's `ssr/components/*` was: the walk must descend.
+    name: "code in a directory that is not src/, tests/ or scripts/",
+    plant: (tree) => {
+      tree["packages/b/lib/deep/helper.ts"] = "export const helper = 1;\n";
+    },
+    line: /packages\/b\/lib\/deep\/helper\.ts: code outside src\/, tests\/ and scripts\//,
+  },
+  {
+    name: "a Svelte component outside src/",
+    plant: (tree) => {
+      tree["packages/b/lib/Widget.svelte"] = "<p>widget</p>\n";
+    },
+    line: /packages\/b\/lib\/Widget\.svelte: code outside src\/, tests\/ and scripts\//,
+  },
+  {
+    name: "a code file at the package root that is not a config file",
+    plant: (tree) => {
+      tree["packages/b/index.ts"] = "export const b = 1;\n";
+    },
+    line: /packages\/b\/index\.ts: code outside src\/, tests\/ and scripts\//,
+  },
+  {
+    name: "a symlink under src/ that leads outside shared/",
+    links: [["packages/b/src/sibling", "../../a/src"]],
+    line: /packages\/b\/src\/sibling: a symlink under src\/ that leads to packages\/a\/src, not into shared\//,
+  },
+  {
+    name: "a symlink under src/ that leads to shared/ itself",
+    links: [["packages/b/src/everything", "../../../shared"]],
+    line: /packages\/b\/src\/everything: a symlink under src\/ that leads to shared, not into shared\//,
+  },
+  {
+    name: "a symlink at the package root",
+    links: [["packages/b/vendor", "../a/src"]],
+    line: /packages\/b\/vendor: a symlink outside src\//,
   },
   {
     name: "a size-limit exception that is private",
@@ -682,7 +757,11 @@ const DRIFTS = [
 
 for (const drift of DRIFTS) {
   test(`drift: ${drift.name} — exit 1, and that one line names it`, () => {
-    const run = runScript({ plant: drift.plant, alias: drift.alias });
+    const run = runScript({
+      plant: drift.plant,
+      alias: drift.alias,
+      links: drift.links,
+    });
 
     assert.equal(run.status, 1, run.stderr);
     assert.match(run.stderr, /✖ Coverage-scope drift detected/);

@@ -25,7 +25,7 @@ import {
 
 **Peer dependency:** `@angular/core` >= 22.0.0, `@angular/common` >= 22.0.0
 
-**Architecture:** Flat structure with two entry points (main + `/ssr` ng-packagr secondary entry). All code lives in `src/` and `ssr/`. Built with ng-packagr (partial compilation mode). Signal-first, zoneless-compatible.
+**Architecture:** Flat structure with two entry points (main + `/ssr` ng-packagr secondary entry). All code lives in `src/`, the `/ssr` entry's in `src/ssr/`; `ssr/` holds only the entry's `ng-package.json` (#2627). Built with ng-packagr (partial compilation mode). Signal-first, zoneless-compatible.
 
 ### Source Structure
 
@@ -72,20 +72,21 @@ src/                            # Main entry — client API
 ├── providersFactory.ts         # provideRealRouterFactory (SSR/SSG per-request clones)
 ├── sourceToSignal.ts           # RouterSource → Signal bridge
 ├── types.ts                    # RouteSignals, ErrorContext interfaces
-└── index.ts                    # Main entry — public exports
+├── index.ts                    # Main entry — public exports
+└── ssr/                        # /ssr subpath — SSR-feature surface
+    ├── public_api.ts           # Public exports (8 names + 1 type)
+    ├── components/
+    │   ├── ClientOnly.ts       # <client-only [fallback]>
+    │   ├── ServerOnly.ts       # <server-only>
+    │   └── HttpStatusCode.ts   # <http-status-code [code]="N">
+    ├── functions/
+    │   ├── injectDeferred.ts   # Reads state.context.ssrDataDeferred[key]
+    │   └── provideHttpStatusSink.ts  # Wires HTTP_STATUS_SINK provider
+    └── utils/
+        └── createHttpStatusSink.ts # HTTP_STATUS_SINK + createHttpStatusSink
 
-ssr/                            # /ssr subpath — SSR-feature surface
-├── public_api.ts               # Public exports (8 names + 1 type)
-├── ng-package.json             # ng-packagr secondary entry config
-├── components/
-│   ├── ClientOnly.ts           # <client-only [fallback]>
-│   ├── ServerOnly.ts           # <server-only>
-│   └── HttpStatusCode.ts       # <http-status-code [code]="N">
-├── functions/
-│   ├── injectDeferred.ts       # Reads state.context.ssrDataDeferred[key]
-│   └── provideHttpStatusSink.ts  # Wires HTTP_STATUS_SINK provider
-└── utils/
-    └── createHttpStatusSink.ts # HTTP_STATUS_SINK + createHttpStatusSink
+ssr/
+└── ng-package.json             # ng-packagr secondary entry config — names the /ssr subpath, entryFile: ../src/ssr/public_api.ts
 ```
 
 ## Exports
@@ -156,8 +157,8 @@ through them, and the script fails the build when it does not.
 README, so the tarball carries the build and one README (#2628).
 
 ⚠ **The source manifest deliberately stays `"type": "commonjs"`.** Flipping it
-costs 426 `tsc` errors across 87 files, because every relative import in `src/`,
-`ssr/` and `tests/` becomes an ESM specifier under `moduleResolution: NodeNext`.
+costs 419 `tsc` errors across 87 files (measured 2026-09-30), because every relative import in `src/`
+and `tests/` becomes an ESM specifier under `moduleResolution: NodeNext`.
 The published shape and the source tree's module format are different questions.
 
 ⚠ **An `--ignore-rules` entry is package-wide** — it also hides a FUTURE finding
@@ -255,8 +256,8 @@ export class Reviews {
 - `<client-only>`/`<server-only>`: `signal(false)` + `afterNextRender(() => mounted.set(true))`. `afterNextRender` is a no-op on the server (Angular runtime guarantees), so SSR emits the SSR-side branch — projected children for `<server-only>`, the bound `[fallback]` `TemplateRef` for `<client-only>`. After the first browser render the signal flips and the `@if` branch swaps.
 - `<http-status-code>`: writes to `inject(HTTP_STATUS_SINK, { optional: true })` in `ngOnInit` (after the input binding has fired). `code` is declared as optional `input<number>()` rather than `input.required<number>()` to keep the JIT/TestBed test path safe (`NG0950` would fire under JIT signal-input limitations) — the body skips the write when the value is `undefined`. Loader-driven errors (`LoaderNotFound` → 404, `LoaderRedirect` → 30x) keep working as before; this component covers render-time decisions only.
 - **Asymmetric Angular**: no `<Await>` / `<Streamed>` adapter components. Angular has no native `<Suspense>` / `use(promise)` analogue, so `injectDeferred()` returns a `Signal<T | undefined>` (starts undefined, updates on settle) instead. Compose with `@if (signal()) { … } @else { … }`, the `async` pipe (`from(deferredPromise)`), or native `@defer` blocks for chunk-level lazy hydration.
-- Trigger reached at #610 (defer + injectDeferred + ClientOnly + ServerOnly = 3 SSR-feature exports, ≥3 was the threshold from `.claude/SSR_FEATURE_GAPS_RU.md` §8). Built as a ng-packagr secondary entry-point at `packages/angular/ssr/` with its own `ng-package.json` — produces `dist/fesm2022/real-router-angular-ssr.mjs` + `dist/types/real-router-angular-ssr.d.ts`.
-- `ssr/` lies outside `src/`, so `turbo.json` lists `ssr/**` in `bundle`, `lint`, `test` and `type-check`; `pnpm lint:coverage-scope` fails without it. The coverage `include`, the Sonar sources, the Codecov component, the CodeQL paths and the jscpd roots do not reach `ssr/` (#2627).
+- Trigger reached at #610 (defer + injectDeferred + ClientOnly + ServerOnly = 3 SSR-feature exports, ≥3 was the threshold from `.claude/SSR_FEATURE_GAPS_RU.md` §8). Built as a ng-packagr secondary entry-point: ng-packagr names the subpath after the directory of `ssr/ng-package.json`, whose `entryFile` is `../src/ssr/public_api.ts` — produces `dist/fesm2022/real-router-angular-ssr.mjs` + `dist/types/real-router-angular-ssr.d.ts`.
+- The sources sit in `src/ssr/` so that every list naming the package's code reaches them. `ssr/ng-package.json` is the one file outside `src/`, and `turbo.json` names it in the `bundle` inputs. ⚠ Nothing in ng-packagr checks where `entryFile` points: `scripts/finalize-dist-manifest.mjs` fails the build when the built manifest's subpaths differ from the package's, and check 6 of `pnpm lint:coverage-scope` fails code outside `src/` (#2627).
 
 ## Gotchas
 

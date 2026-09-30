@@ -9,8 +9,8 @@ import { describe, it, expect } from "vitest";
  * RxJS"). A regression here would silently bloat the bundle and break the
  * "zero rxjs" promise advertised in package docs.
  *
- * The test scans every `.ts` file under `packages/angular/src/` and
- * `packages/angular/ssr/` for static `import ... from "rxjs"` and
+ * The test scans every `.ts` file under `packages/angular/src/` (the `/ssr`
+ * entry included) for static `import ... from "rxjs"` and
  * `from "@angular/core/rxjs-interop"`. Tooling alternatives (knip / eslint
  * `no-restricted-imports`) were considered, but a plain test keeps the
  * constraint co-located with the package and visible in CI failure output.
@@ -23,7 +23,7 @@ const FORBIDDEN_PATTERNS: readonly RegExp[] = [
   /import\(["']rxjs["']\)/,
 ];
 
-const SCAN_ROOTS = ["src", "ssr"] as const;
+const SCAN_ROOTS = ["src"] as const;
 
 function collectTsFiles(root: string): string[] {
   const out: string[] = [];

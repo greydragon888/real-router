@@ -10,7 +10,7 @@
       "default": "./dist/fesm2022/real-router-angular.mjs"
     },
     "./ssr": {
-      "@real-router/internal-source": "./ssr/public_api.ts",
+      "@real-router/internal-source": "./src/ssr/public_api.ts",
       "types": "./dist/types/real-router-angular-ssr.d.ts",
       "default": "./dist/fesm2022/real-router-angular-ssr.mjs"
     }
@@ -28,8 +28,8 @@
     "test:properties": "vitest run --config vitest.config.properties.mts",
     "test:stress": "vitest -c vitest.config.stress.mts",
     "type-check": "tsc --noEmit",
-    "lint": "eslint --cache src/ ssr/ tests/ --max-warnings 0",
-    "lint:fix": "eslint --cache src/ ssr/ tests/ --fix --max-warnings 0",
+    "lint": "eslint --cache src/ tests/ --max-warnings 0",
+    "lint:fix": "eslint --cache src/ tests/ --fix --max-warnings 0",
     "lint:package": "publint",
     "lint:types": "attw --pack . --ignore-rules no-resolution cjs-resolves-to-esm",
     "bundle": "ng-packagr -p ng-package.json -c tsconfig.lib.json && node scripts/finalize-dist-manifest.mjs"
