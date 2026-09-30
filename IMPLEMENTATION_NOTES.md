@@ -13156,3 +13156,18 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 ⚠ **ng-packagr may one day refuse an `entryFile` outside the entry's directory.** The build then fails loudly, not silently, and the finalize guard catches a changed subpath.
 
 ⚠ **The census reads lists that name the src root ACROSS packages.** A list naming one package's `src/` — a turbo input, a vitest `include` — reaches `shared/` through the per-consumer mechanisms that checks 2b, 2c and 5 hold.
+
+## A turbo dry run in CI stays off the remote cache (2026-09-30)
+
+**Problem.** `turbo run … --dry=json` records the cache status of every task it plans, and for a task its local cache lacks it asks the remote cache: one `HEAD /v8/artifacts/<hash>` per task, one request at a time. CI sets `TURBO_API`, `TURBO_TOKEN` and `TURBO_TEAM` for every job, and a runner starts with an empty local cache, so each dry run in CI pays a round trip per task. Two scripts plan with a dry run and read no cache field: `check-lint-reach.mjs`, three dry runs over the whole graph in Repo Lints, and the membership query of `build-matrix.mjs`, in the `check` job that every other job waits for. On PR #2632 `lint:reach` took 110 s of the 199 s check step of Repo Lints; `Build shard plan` takes 23–46 s on a pull request whose affected set is large, and under 10 s on a small one.
+
+**Solution.** Both pass `--cache=local:rw`. A cache source the flag leaves out is off for reads and writes. The CLI test of `lint:reach` pins its argv, and a cell of `build-matrix.test.mjs` pins the membership query's.
+
+**Why — measured.**
+
+- Against a local stand-in for the remote cache that answers 404 after 300 ms, `turbo run lint lint:bench --dry=json` with an empty local cache sent one `HEAD` per task, 91 of 91, never two at once, and took 28.4 s. With the flag it sent nothing and took 0.3 s. The two outputs differ only in the run `id`; every task hash is equal.
+- With a warm local cache the requests equal the local misses, 50 of 91: on a developer machine the cost is partial or absent, on a fresh runner it is total.
+- Without the remote cache the rest of `lint:reach` takes 10.5 s in CI (#2633), so on #2632 the remote cache took about 99 s for about 320 requests, 0.31 s each. The membership query plans 102 tasks on the whole graph, about 32 s at that latency; `Build shard plan` took 31–46 s on the six Dependabot pull requests of 27–29 September that ran the full sharded matrix.
+- On PR #2633, with the flag, `lint:reach` took 10.9 s of Repo Lints, against 110 s on #2632, and printed the same verdict.
+
+⚠ **Another script that plans with `--dry=json` pays the same cost unless it passes the flag.** No check looks for one; each of the two call sites is pinned by its own test.

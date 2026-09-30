@@ -478,14 +478,19 @@ export function runAffectedQuery() {
  * Run the input-aware membership query (#1067) — mirrors the shard command
  * (`test test:properties bundle`) so membership = exactly the packages a shard
  * would run for the affected filter. `--dry=json` plans without executing.
+ * `--cache=local:rw` keeps it off the remote cache, which a dry run asks, one
+ * request at a time, about each task the local cache lacks — in CI, every task.
+ * The plan reads no cache field.
  * `maxBuffer` is raised: on a full/shared rebuild the graph JSON (per-task input
  * maps for ~32 packages × 3 tasks) exceeds the 1 MiB execSync default.
+ *
+ * @param {typeof execSync} [exec] runs the command; the tests inject it
  */
-export function runMembershipQuery() {
-  return execSync(
+export function runMembershipQuery(exec = execSync) {
+  return exec(
     "pnpm exec turbo run test test:properties bundle " +
       "--filter='...[origin/master]' " +
-      "--filter='!./benchmarks' --dry=json",
+      "--filter='!./benchmarks' --dry=json --cache=local:rw",
     {
       encoding: "utf8",
       maxBuffer: 256 * 1024 * 1024,
