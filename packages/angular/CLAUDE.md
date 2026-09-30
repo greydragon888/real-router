@@ -147,8 +147,13 @@ the same two:
 ng-packagr copies this manifest into `dist/package.json`, and Node reads a file's
 module format from the NEAREST manifest above it — so `dist/types/*.d.ts` read as
 CommonJS while `dist/fesm2022/*.mjs` is ESM. `scripts/finalize-dist-manifest.mjs`
-sets `"type": "module"` on the generated manifest after every build (and drops
-its `exports`, which Node ignores in a nested manifest and publint flags).
+sets `"type": "module"` on the generated manifest after every build. It keeps
+that manifest's `exports`, minus the `@real-router/internal-source` condition: in
+this workspace the `/ssr` entry's import of `@real-router/angular` resolves only
+through them, and the script fails the build when it does not.
+
+`files` is `["dist"]`, and the same script deletes ng-packagr's copy of the
+README, so the tarball carries the build and one README (#2628).
 
 ⚠ **The source manifest deliberately stays `"type": "commonjs"`.** Flipping it
 costs 426 `tsc` errors across 87 files, because every relative import in `src/`,
@@ -251,7 +256,7 @@ export class Reviews {
 - `<http-status-code>`: writes to `inject(HTTP_STATUS_SINK, { optional: true })` in `ngOnInit` (after the input binding has fired). `code` is declared as optional `input<number>()` rather than `input.required<number>()` to keep the JIT/TestBed test path safe (`NG0950` would fire under JIT signal-input limitations) — the body skips the write when the value is `undefined`. Loader-driven errors (`LoaderNotFound` → 404, `LoaderRedirect` → 30x) keep working as before; this component covers render-time decisions only.
 - **Asymmetric Angular**: no `<Await>` / `<Streamed>` adapter components. Angular has no native `<Suspense>` / `use(promise)` analogue, so `injectDeferred()` returns a `Signal<T | undefined>` (starts undefined, updates on settle) instead. Compose with `@if (signal()) { … } @else { … }`, the `async` pipe (`from(deferredPromise)`), or native `@defer` blocks for chunk-level lazy hydration.
 - Trigger reached at #610 (defer + injectDeferred + ClientOnly + ServerOnly = 3 SSR-feature exports, ≥3 was the threshold from `.claude/SSR_FEATURE_GAPS_RU.md` §8). Built as a ng-packagr secondary entry-point at `packages/angular/ssr/` with its own `ng-package.json` — produces `dist/fesm2022/real-router-angular-ssr.mjs` + `dist/types/real-router-angular-ssr.d.ts`.
-- `ssr/` lies outside `src/`, so `turbo.json` lists `ssr/**` in `bundle`, `lint`, `test` and `type-check`; `pnpm lint:coverage-scope` fails without it. The coverage `include`, the Sonar sources, the Codecov component, the CodeQL paths and the jscpd roots do not reach `ssr/`.
+- `ssr/` lies outside `src/`, so `turbo.json` lists `ssr/**` in `bundle`, `lint`, `test` and `type-check`; `pnpm lint:coverage-scope` fails without it. The coverage `include`, the Sonar sources, the Codecov component, the CodeQL paths and the jscpd roots do not reach `ssr/` (#2627).
 
 ## Gotchas
 

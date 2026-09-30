@@ -3984,6 +3984,9 @@ The shipped `src/` was not just redundant but **broken** for every symlink-consu
 
 **Solution:** Drop `src` from `files[]` on **all** public packages (kept `dist`; `@real-router/angular` → `["dist", "ssr"]`). Sourcemaps stay — with `sourcesContent` embedded they already provide source-level debugging into the library, which is exactly why the separate `src/` tree is redundant. Policy: **keep maps (the debugging mechanism), drop `src/` (the broken, redundant duplicate)**.
 
+> ⚠ Narrowed on 2026-09-30: angular's `files` is `["dist"]` too. See "Angular
+> ships `dist/` only".
+
 `@real-router/svelte` needed an extra cleanup: `svelte-package` materializes the symlinked `dom-utils` **per file** into `dist/dom-utils/*` (unlike tsdown, which bundles it inline), and dragged `dist/dom-utils/CLAUDE.md` (internal doc) along with it. Its `bundle` script appends `rimraf dist/dom-utils/CLAUDE.md` (rimraf `6.1.3`, matching `@real-router/solid`). `@sveltejs/package` 2.x removed the `config.package.files` filter hook (throws "config.package is no longer supported"), so post-build removal is the supported path.
 
 > **Update (#1211 encoder-mirror retirement):** the rimraf previously also stripped `dist/dom-utils/__test-helpers/*` — a shared drift-sentinel oracle (`computeExpectedFragment`) that the adapters' property suites compared `buildHref` against. When #1211 collapsed `encodeFragmentInline` to the trivial `encodeURI(s).replaceAll("#", "%23")`, the shared mirror lost its reason to exist (it only ever centralised a one-liner) and became the last surviving shared test-support node after the #1086 test-node retirement — plus it red the SonarCloud new-code-coverage gate whenever edited (a `__test-helpers` file is exercised only by `test:properties`, not the coverage-producing `test` run, so it scored 0%). It was retired: the formula is now a local `const computeExpectedFragment` in each adapter's property test (an independent per-adapter re-derivation — the drift sentinel stays valid), and `shared/dom-utils/__test-helpers/` was deleted, so the svelte rimraf now strips only `CLAUDE.md`.
@@ -13102,4 +13105,20 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 
 `lint:package` and `lint:types` follow `bundle` in every row. Check 6 reports all four tasks on the tree before the change. Five mutants of it — no directory derived, a prefix match in place of `<dir>/**`, no walk into a nested condition, `type-check:tests` never keyed, nothing reported — are each caught by the fixture.
 
-⚠ **`ssr/` is still outside five lists scoped to `src/`:** the coverage `include` in `vitest.config.unit.mts`, the Sonar sources `check-coverage-scope.mjs` emits, the `angular` component in `codecov.yml`, the CodeQL `paths` and the jscpd roots of `lint:duplicates`. No file in angular's `lcov.info` is under `ssr/`. ESLint and `tsc` do read it.
+⚠ **`ssr/` is still outside five lists scoped to `src/`:** the coverage `include` in `vitest.config.unit.mts`, the Sonar sources `check-coverage-scope.mjs` emits, the `angular` component in `codecov.yml`, the CodeQL `paths` and the jscpd roots of `lint:duplicates`. No file in angular's `lcov.info` is under `ssr/`. ESLint and `tsc` do read it. Tracked in #2627.
+
+## Angular ships `dist/` only (#2628, 2026-09-30)
+
+**Problem.** #728 dropped `src/` from every package's `files` and set angular aside to "treat separately", so `@real-router/angular` kept `["dist", "ssr"]`. `ssr/` is the TypeScript source of the `/ssr` entry, which resolves through `exports` to `dist/`, and that entry's FESM sourcemap embeds all 8 of its sources — #728's argument for dropping `src/` applies unchanged. Separately, ng-packagr copies `README.md` into `dist/` as a default asset of every entry point (`copyAssets` in `write-package.transform.js`), with no option to turn it off. The package publishes its parent directory, so the 0.24.0 tarball carried the README twice.
+
+**Solution.**
+
+- `files: ["dist"]`.
+- `scripts/finalize-dist-manifest.mjs`, which already rewrites ng-packagr's `dist/package.json` for this layout, deletes `dist/README.md`.
+- A `patch` changeset, so the smaller tarball reaches npm.
+
+**Why — measured** against the published 0.24.0 tarball: the pack loses exactly nine files and gains none — the eight under `ssr/` (14,327 B) and `dist/README.md` (40,075 B), 10 % of 546,093 B unpacked. `lint:package` (publint) and `lint:types` (attw) pass on the rebuilt package, and so does the script's own self-reference guard.
+
+⚠ **"Go to Definition" on a `/ssr` symbol now opens the `.d.ts`.** The declaration maps carry no `sourcesContent`, so they pointed into the shipped `ssr/*.ts`; the main entry and every other package were already in this state.
+
+⚠ **`dist/ssr/package.json` (111 B) still ships.** ng-packagr's own `dist/.npmignore` lists it, and `pnpm pack` includes it anyway. It is ng-packagr's stub for the secondary entry point, left out of #2628.

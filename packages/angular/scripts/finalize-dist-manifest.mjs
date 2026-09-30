@@ -5,7 +5,7 @@
 // (#2155 — nothing ran them on this package).
 //
 // ⚠ `type` is the load-bearing one. This package publishes the PARENT directory
-// (`files: ["dist", "ssr"]`), not `dist/` itself, so `dist/package.json` is a
+// (`files: ["dist"]`), not `dist/` itself, so `dist/package.json` is a
 // nested manifest — and Node resolves a file's module format from the NEAREST
 // package.json above it. `dist/types/*.d.ts` therefore reads as CommonJS while
 // `dist/fesm2022/*.mjs` is ESM, which attw reports as `FalseCJS`
@@ -33,7 +33,7 @@
 // `packages/angular/dist`, so self-reference is the only route. The guard at
 // the bottom is that claim, executed. Inconsistency does not arise either:
 // the nested map resolves `.` to the same file the parent map does.
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -60,6 +60,11 @@ for (const target of Object.values(manifest.exports ?? {})) {
 }
 
 writeFileSync(MANIFEST, `${JSON.stringify(manifest, undefined, 2)}\n`);
+
+// ng-packagr copies `README.md` into `dist/` as a default asset of every entry
+// point, and no option turns that off. The package README already ships from the
+// parent directory, so the copy would put it in the tarball twice (#2628).
+rmSync(join(DIST, "README.md"), { force: true });
 
 // The claim above, executed rather than asserted. Resolving the package's own
 // name from inside the built output is what the secondary entry point's
