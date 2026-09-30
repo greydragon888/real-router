@@ -90,6 +90,7 @@ const CLIS = {
     args: [],
     ran: /REFUSALS with a bracketed head: \d+/,
   },
+  "scripts/verify.mjs": { args: [], ran: /usage: verify\.mjs --stage/ },
   ".changeset/changelog-notes.mjs": {
     args: [],
     ran: /usage: changelog-notes\.mjs/,
