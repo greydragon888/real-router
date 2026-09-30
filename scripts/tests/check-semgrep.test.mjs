@@ -315,17 +315,22 @@ test("refuses a checkout without a target, before semgrep runs", () => {
   }
 });
 
-test("refuses a .semgrep/ that loads no rule, in either stage", () => {
+test("refuses a .semgrep/ that loads no rule, in either stage, coloured or not", () => {
   const { root } = fixture();
-  for (const env of [HOOK, CI]) {
-    const { status, output, scans } = run(root, {
-      env: { ...env, STUB_RULES: "0" },
-      bins: [SEMGREP_BIN, UVX_BIN],
-    });
+  // `node --test` sets FORCE_COLOR=1 for its children under a terminal, and
+  // node then colours a number it prints: both values, whatever the runner has.
+  for (const colour of ["0", "1"]) {
+    for (const env of [HOOK, CI]) {
+      const arm = `${env.VERIFY_STAGE}, FORCE_COLOR=${colour}`;
+      const { status, output, scans } = run(root, {
+        env: { ...env, FORCE_COLOR: colour, STUB_RULES: "0" },
+        bins: [SEMGREP_BIN, UVX_BIN],
+      });
 
-    assert.equal(status, 1, `${env.VERIFY_STAGE}: ${output}`);
-    assert.match(output, /\.semgrep\/ loads no rule/);
-    assert.deepEqual(scans, [], `${env.VERIFY_STAGE}: no scan with an empty set`);
+      assert.equal(status, 1, `${arm}: ${output}`);
+      assert.match(output, /\.semgrep\/ loads no rule/);
+      assert.deepEqual(scans, [], `${arm}: no scan with an empty set`);
+    }
   }
 });
 

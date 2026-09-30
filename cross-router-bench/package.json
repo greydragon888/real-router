@@ -10,10 +10,10 @@
     "test:lint-config": "node --test tests/*.test.mjs"
   },
   "dependencies": {
-    "@angular/common": "~22.1.6",
-    "@angular/core": "~22.1.6",
-    "@angular/platform-browser": "~22.1.6",
-    "@angular/router": "~22.1.6",
+    "@angular/common": "~22.2",
+    "@angular/core": "~22.2",
+    "@angular/platform-browser": "~22.2",
+    "@angular/router": "~22.2",
     "@mateothegreat/svelte5-router": "~2.16.19",
     "@real-router/angular": "*",
     "@real-router/browser-plugin": "*",
@@ -40,9 +40,9 @@
   },
   "devDependencies": {
     "@analogjs/vite-plugin-angular": "2.7.5",
-    "@angular/build": "~22.1.8",
-    "@angular/compiler": "~22.1.6",
-    "@angular/compiler-cli": "~22.1.6",
+    "@angular/build": "~22.2",
+    "@angular/compiler": "~22.2",
+    "@angular/compiler-cli": "~22.2",
     "@eslint/js": "10.0.1",
     "@real-router/persistent-params-plugin": "*",
     "@real-router/ssr-data-plugin": "*",
