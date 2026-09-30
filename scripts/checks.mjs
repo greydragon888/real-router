@@ -89,6 +89,11 @@ export const CHECKS = [
   {
     // The check twin of the `pnpm dedupe` that pre-commit runs when a lockfile
     // is staged: a rebased or merged lockfile never passes through that step.
+    // Skipped for a run Dependabot starts while `dependabot-dedupe.yml` can
+    // push its fix: the two workflows race on one event, and CI would read the
+    // lockfile before the fix lands. The fix's push reruns CI as another
+    // author, where the check runs hard; without the token nothing fixes the
+    // lockfile, and the check stays hard (#1085).
     id: "lint:dedupe",
     run: ["pnpm", "lint:dedupe"],
     stages: ["pre-push", "ci"],

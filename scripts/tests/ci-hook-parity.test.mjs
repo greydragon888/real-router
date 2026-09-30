@@ -55,7 +55,8 @@ export const CHECKS_JOB = "repo-lints";
 export const NOT_A_CHECK = new Map([
   ["Checkout", "actions/checkout"],
   ["Setup (pnpm + Node + install)", "the composite setup action"],
-  ["Install Vale", "downloads the binary the prose step needs"],
+  ["Install osv-scanner", "downloads the binary lint:audit needs"],
+  ["Install uv", "installs the uvx lint:security runs semgrep through"],
 ]);
 
 /**

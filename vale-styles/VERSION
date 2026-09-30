@@ -1,0 +1,5 @@
+# The Vale CI installs (ci.yml, job prose-lint), and the floor
+# scripts/check-prose.sh holds a local Vale to. The job checks the download
+# against the checksum. A range that edits this file lints the whole corpus.
+VALE_VERSION=3.20.0
+VALE_SHA256=f59e7030c5d4ace6cf915497d0d076a1699d61e876142765963237e6867c9712

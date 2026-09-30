@@ -762,25 +762,25 @@ jobs:
     needs: [check]
     if: needs.check.outputs.should_run == 'true'
     env:
-      # Read by the dedupe step below. The `secrets` context is not usable in a
-      # job-level `if:`, so the presence check is materialised here. On a run
+      # Read into the context of the checks step below. The `secrets` context is
+      # not usable in an `if:` or an expression of a step, so the presence check
+      # is materialised here. On a run
       # triggered BY Dependabot this resolves from the Dependabot secret store (the
       # only store such a run can see); on every other run — including the one the
       # dedupe workflow's PAT push retriggers — it is empty. That asymmetry is what
       # makes the condition below self-limiting.
       HAS_DEDUPE_FIXER: ${{ secrets.DEPENDABOT_PUSH_TOKEN != '' }}
-      # On a Dependabot PR only the four checks a bump can fail run here: deps,
-      # dedupe, the repository-wide scans and knip. The rest read code and docs
-      # a bump does not change; the failure record behind this split is in
-      # IMPLEMENTATION_NOTES "Dependabot PRs skip every metric".
+      # On a Dependabot PR only the checks a bump can fail run here: those whose
+      # `ciSkip` in `scripts/checks.mjs` does not name `dependabot-pr`. The rest
+      # read code and docs a bump does not change; the failure record behind
+      # this split is in IMPLEMENTATION_NOTES "Dependabot PRs skip every metric".
       DEPENDABOT_PR: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
       # A release PR has the SAME diff shape as a bump — manifests, CHANGELOGs,
       # the consumed changesets and the lockfile (#2433's predicate) — so it takes
-      # the same split rather than its own. The four that stay are the four whose
-      # subject that shape holds: `lint:deps` judges the peer floors
-      # `changeset version` rewrites, `lint:dedupe` the lockfile the root
-      # `version` script regenerates (#2411), and four of the twelve
-      # repository-wide scans plus knip read manifests and Markdown.
+      # the same split rather than its own: the checks that stay are those whose
+      # subject that shape holds, their `ciSkip` naming neither context. Among
+      # them `lint:deps` judges the peer floors `changeset version` rewrites, and
+      # `lint:dedupe` the lockfile the root `version` script regenerates (#2411).
       # ⚠ Asked of the DIFF, not of the branch name: one source file in a
       # `changeset-release/*` branch must still reach every check (#2450).
       NO_SOURCE: ${{ needs.check.outputs.no_source }}
@@ -797,150 +797,42 @@ jobs:
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
 
-      - name: Check dependency consistency
-        run: pnpm lint:deps
-
-      # `ci.yml` and `dependabot-dedupe.yml` start on the SAME `pull_request` event
-      # and race. CI always wins (the dedupe job does a full install first), so on a
-      # Dependabot PR this step reads the lockfile BEFORE the fix is pushed and fails
-      # `ERR_PNPM_DEDUPE_CHECK_ISSUES` by construction — measured 2026-08-02: of the
-      # last 40 ci.yml runs, 35 green / 4 red, and all four reds are `dependabot/*`
-      # branches with `Repo Lints` failing. The gate was therefore red on every
-      # Dependabot PR, which is exactly what #1085 set out to prevent.
-      #
-      # Skipped for a Dependabot-triggered run ONLY when the dedupe workflow can
-      # actually push its fix (`DEPENDABOT_PUSH_TOKEN` present). That is what keeps
-      # the guarantee instead of trading it away: the PAT push retriggers CI, and
-      # that second run is authored by the PAT owner — not dependabot[bot], and with
-      # no Dependabot secrets — so BOTH halves of this condition are false there and
-      # the check runs HARD on the head SHA that actually gets merged. When dedupe
-      # finds nothing to change there is no second run, but then the lockfile was
-      # already clean. Without the token the condition keeps the check hard: nothing
-      # would fix the lockfile automatically, so a red run is the accurate state and
-      # `pnpm resolve:dependabot <PR#>` is the documented path.
-      # (2026-08-01 CI/CD audit §1.8.)
-      - name: Check for duplicate dependencies
-        if: github.actor != 'dependabot[bot]' || env.HAS_DEDUPE_FIXER != 'true'
-        run: pnpm lint:dedupe
-
-      # Guard: codecov.yml components + Sonar coverage-exclusions stay in sync
-      # with the package set, so external quality gates can't silently drift (#732).
-      - name: Check coverage scope
-        if: env.DEPENDABOT_PR != 'true' && env.NO_SOURCE != 'true'
-        run: pnpm lint:coverage-scope
-
-      # Every example with a playwright.config.ts must ship at least one spec —
-      # a find+wc static check (scripts/check-e2e-specs.sh), so it belongs with
-      # the other repo-global lints. It used to run in pre-commit ONLY, which a
-      # bot push, `--no-verify` or a web edit all bypass: exactly the #813 class
-      # that moved knip/publint/attw into CI. Cheap enough to sit ahead of knip.
-      # (2026-08-01 CI/CD audit §4.3.)
-      - name: Check e2e specs
-        if: env.DEPENDABOT_PR != 'true' && env.NO_SOURCE != 'true'
-        run: pnpm lint:e2e
-
-      # A rule written in a docblock AND in the package's own docs goes stale in
-      # one of them and is believed anyway, because the stale copy sits next to
-      # the code. Measured on the `UNSAFE_KEY` docblock, which had become a
-      # second copy of INVARIANTS.md's hand-out section and disagreed with it on
-      # the exempt-door count. A ratchet over a baseline, so only NEW restatement
-      # fails; ~0.5 s, no build needed.
-      - name: Check docblock/doc duplication
-        if: env.DEPENDABOT_PR != 'true' && env.NO_SOURCE != 'true'
-        run: pnpm lint:doc-dup
-
-      # One record, two questions about its own keys: a function that COUNTS with
-      # `Object.keys` (own AND enumerable) and tests MEMBERSHIP with
-      # `hasOwnProperty` (own only) or `in` (walks the chain) disagrees with
-      # itself on the keys the count refuses to see, and two disjoint records
-      # compare equal. Shipped three times — #1815, #2064, and the `shared/ssr`
-      # site this guard found on its first run. A root script rather than a test
-      # per package: a scan rooted in a package cannot see `shared/` (#1838), and
-      # four copies of one predicate is the class it guards. ~0.6 s, no build.
-      - name: Check membership predicates
-        if: env.DEPENDABOT_PR != 'true' && env.NO_SOURCE != 'true'
-        run: pnpm lint:membership
-
-      # EVERY repository-wide scan, in one step (#2241). A scan whose SUBJECT is
-      # the whole tree cannot live behind a per-package cache key: turbo keys
-      # core's `test` on core's own files, so a change in a SIBLING replays a
-      # PASS and the scan never runs — and a scan that did not run is
-      # indistinguishable from one that passed. Measured:
-      # `captured-intrinsics-authority-1971` sat RED on `master` from #2236 to
-      # #2240 while the pre-commit run on the breaking commit printed
-      # `cache hit, replaying logs (no errors)`.
-      #
-      # This replaces three steps that covered three of TWELVE scans. Two of the
-      # nine uncovered ones are not even in core — `target-predicate-authority-1834`
-      # in `@real-router/react`, `core-union-mirror-authority-2091` in
-      # `validation-plugin` — so "lift the core ones" would not have reached them.
-      #
-      # ⚠ CI as well as the hook, and that is not belt-and-braces: infrastructure
-      # commits here use `--no-verify` routinely, so a hook-only scan gates only
-      # whoever did not bypass it. `lint:anchors` was exactly that shape until
-      # #2241, and a rotten anchor shipped in `c1020c885` on a replayed cache.
-      #
-      # ⚠ The list lives in `scripts/repo-wide-scans.json` and is proved COMPLETE
-      # by `repo-scan-authority-2241`, which derives the set from the AST rather
-      # than reading the list. One list, two consumers.
-      - name: Run the repository-wide scans
-        run: pnpm lint:repo-scans
-
-      # Historiography in the Markdown corpus — the half no FORM ratchet reaches
-      # (`comment-historiography-authority` and its count table scan
-      # `packages/*/src` and `shared/` only, #2126). Reporting-only until #2129
-      # cleared the 34 standing sites; a gate over an empty floor from here on.
-      #
-      # ⚠ Vale is INSTALLED rather than assumed, and the run sets
-      # `VALE_REQUIRED=1`: `scripts/check-prose.sh` skips a missing binary so a
-      # fresh clone is never wedged, and that same skip would make this job green
-      # over a corpus it never read. The strict flag turns the skip into a
-      # failure. Pin the version — a floor of zero is only meaningful against a
-      # fixed rule engine.
-      - name: Install Vale
-        if: env.DEPENDABOT_PR != 'true' && env.NO_SOURCE != 'true'
+      # lint:audit reads every lockfile with osv-scanner, pinned and checked
+      # against the release's checksum; `scripts/check-deps-audit.sh` refuses a
+      # version below its floor.
+      - name: Install osv-scanner
         env:
-          VALE_VERSION: "3.20.0"
-          VALE_SHA256: "f59e7030c5d4ace6cf915497d0d076a1699d61e876142765963237e6867c9712"
+          OSV_SCANNER_VERSION: "2.6.0"
+          OSV_SCANNER_SHA256: "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108"
         run: |
-          curl -fsSL -o /tmp/vale.tar.gz \
-            "https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz"
-          echo "${VALE_SHA256}  /tmp/vale.tar.gz" | sha256sum --check --strict
-          tar -xzf /tmp/vale.tar.gz -C /tmp vale
-          sudo install -m 0755 /tmp/vale /usr/local/bin/vale
-          vale --version
+          curl -fsSL -o /tmp/osv-scanner \
+            "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64"
+          echo "${OSV_SCANNER_SHA256}  /tmp/osv-scanner" | sha256sum --check --strict
+          sudo install -m 0755 /tmp/osv-scanner /usr/local/bin/osv-scanner
+          osv-scanner --version
 
-      - name: Check Markdown prose
-        if: env.DEPENDABOT_PR != 'true' && env.NO_SOURCE != 'true'
+      # lint:security runs semgrep through uvx, which fetches it only when the
+      # check runs, so a skipped check downloads nothing. No cache: semgrep that
+      # cannot be fetched is red, and uv's `enable-cache: auto` would keep
+      # ~570 MB of it under one key on every pull request.
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.12.21"
+          enable-cache: false
+
+      # Every check of the ci stage of `scripts/checks.mjs`, in its order, each
+      # in a ::group:: and a row of the step summary. The context names the
+      # `ciSkip` values this run matches; `scripts/verify.mjs` skips those checks
+      # and says why. The semgrep pins take effect in the ci stage alone: the
+      # version, and a time no dependency may be newer than (RFC 3339 — a bare
+      # date is read in the runner's time zone).
+      - name: Run the checks
         env:
-          VALE_REQUIRED: "1"
-        run: pnpm lint:prose
-
-      # Dead-code / unused-export / unused-dependency detection (knip). Pure
-      # source-graph analysis — no dist needed. Catches unused introduced by a PR
-      # that turbo's affected filter scored as "nothing built". Previously
-      # pre-push only (#813).
-      - name: Check for unused code
-        run: pnpm lint:unused
-
-      # The copy-paste gate the pre-push hook also runs: the 2 % threshold and
-      # the exclusions live in `.jscpd.json`. A Dependabot bump and a diff with
-      # no source change no source for it to compare.
-      - name: Check for code duplication
-        if: env.DEPENDABOT_PR != 'true' && env.NO_SOURCE != 'true'
-        run: pnpm lint:duplicates
-
-      # Unit-test the CI meta-layer itself (scripts/tests/*.test.mjs — node:test
-      # outside the turbo graph, so it runs here; several files import tooling
-      # the setup step installs, such as typescript and eslint): the shard
-      # planner (build-matrix.*) gating the leaf/sharded routing + input-aware
-      # membership logic (#1067, R2.18), and the gate needs-completeness
-      # meta-test (ci-gate-completeness.test.mjs) — every ci.yml job must feed
-      # the CI Result gate or be allowlisted with a written reason (the #1127
-      # class, debt-map axis A6).
-      - name: Test CI meta (shard planner + gate completeness)
-        if: env.DEPENDABOT_PR != 'true' && env.NO_SOURCE != 'true'
-        run: node --test scripts/tests/*.test.mjs
+          VERIFY_CONTEXT: ${{ format('{0},{1},{2}', env.DEPENDABOT_PR == 'true' && 'dependabot-pr' || '', env.NO_SOURCE == 'true' && 'no-source' || '', (github.actor == 'dependabot[bot]' && env.HAS_DEDUPE_FIXER == 'true') && 'dependabot-actor-with-dedupe-fixer' || '') }}
+          SEMGREP_VERSION: "1.178.0"
+          SEMGREP_EXCLUDE_NEWER: "2026-09-23T21:14:00Z"
+        run: node scripts/verify.mjs --stage ci --context "$VERIFY_CONTEXT"
 
   # ============================================
   # PIPELINE-SHARDED: one runner per affected class (mode=sharded). The matrix
@@ -1564,6 +1456,59 @@ jobs:
         env:
           SHELLCHECK_OPTS: --severity=warning
 
+
+  # ============================================
+  # PROSE-LINT: Vale over the Markdown a PR changes, on every PR — one of
+  # Markdown alone included: Repo Lints does not start for it (should_run), and
+  # its prose would pass the gate unread. A range that edits the rules
+  # (.vale.ini, vale-styles/, scripts/check-prose.sh) lints the whole corpus.
+  # No Dependabot skip: a bump changes no Markdown the corpus holds, so the job
+  # passes on its own, and so does a release PR, whose CHANGELOGs are out of it.
+  # ============================================
+  prose-lint:
+    name: Lint Markdown prose (Vale)
+    runs-on: ubuntu-latest
+    steps:
+      # Depth 2: the checkout is the PR's merge commit, and `HEAD^1`, the base it
+      # is built on, must be in it for the diff.
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6.1.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          # Nothing is installed: `scripts/check-prose.sh` needs Vale, git and bash.
+          package-manager-cache: false
+
+      # The version and its checksum live in vale-styles/VERSION: a range that
+      # edits them lints the whole corpus, and check-prose.sh holds a local Vale
+      # to the same version.
+      - name: Install Vale
+        run: |
+          VALE_VERSION="$(sed -n 's/^VALE_VERSION=//p' vale-styles/VERSION)"
+          VALE_SHA256="$(sed -n 's/^VALE_SHA256=//p' vale-styles/VERSION)"
+          curl -fsSL -o /tmp/vale.tar.gz \
+            "https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz"
+          echo "${VALE_SHA256}  /tmp/vale.tar.gz" | sha256sum --check --strict
+          tar -xzf /tmp/vale.tar.gz -C /tmp vale
+          sudo install -m 0755 /tmp/vale /usr/local/bin/vale
+          vale --version
+
+      # `pnpm lint:prose`, not a bare call of the script: the check registry
+      # sees this job run it (`ciBy`). pnpm installs every dependency before a
+      # script by default, and this job needs none. VALE_REQUIRED turns a missing
+      # Vale into a failure rather than a skip.
+      - name: Check Markdown prose
+        env:
+          VALE_REQUIRED: "1"
+          pnpm_config_verify_deps_before_run: "false"
+        run: pnpm lint:prose --changed HEAD^1
   # ============================================
   # SONAR, for a pull request from THIS repository (#2442). The analysis needs
   # only the coverage artifacts, which are ready when the pipeline's test jobs
@@ -1787,7 +1732,7 @@ jobs:
     # beside "CI Result" / "Require Changeset" / "Validate Changesets" /
     # "Dependency Review". So a red quality gate blocks the merge without its
     # ~90s scan sitting on this job's critical path.
-    needs: [check, pipeline-leaf, base-bundle, base-test, base-lint, base-coverage, base-properties, pipeline-sharded, repo-lints, smoke, coverage, actionlint, examples-build, benchmarks-lint, cross-router-lint]
+    needs: [check, pipeline-leaf, base-bundle, base-test, base-lint, base-coverage, base-properties, pipeline-sharded, repo-lints, smoke, coverage, actionlint, prose-lint, examples-build, benchmarks-lint, cross-router-lint]
     if: always()
     steps:
       - name: Determine result
@@ -1809,6 +1754,14 @@ jobs:
             exit 1
           fi
 
+          # prose-lint runs on every PR, Dependabot's included: a PR of Markdown
+          # alone is the one Repo Lints skips, so its prose is read there or
+          # nowhere. Checked before the short-circuit, like actionlint.
+          if [[ "${{ needs.prose-lint.result }}" != "success" ]]; then
+            echo "❌ prose-lint failed (Markdown prose)"
+            exit 1
+          fi
+
           # check must have SUCCEEDED before ANY of its outputs can be trusted.
           # A check that dies before the change-detection step writes should_run
           # (transient checkout/diff failure) leaves should_run empty — which the
@@ -1823,7 +1776,7 @@ jobs:
           fi
 
           if [[ "${{ needs.check.outputs.should_run }}" != "true" ]]; then
-            echo "✅ Skipped — no code changes (actionlint passed)"
+            echo "✅ Skipped — no code changes (actionlint and prose-lint passed)"
             exit 0
           fi
 
