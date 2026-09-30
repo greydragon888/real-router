@@ -54,71 +54,9 @@ if git diff --cached --name-only | grep -qx 'cross-router-bench/pnpm-lock.yaml';
   git add cross-router-bench/pnpm-lock.yaml
 fi
 
-# Check dependency version consistency across workspace packages (~1s).
-# Catches sub-package version drift at commit time instead of waiting for
-# pre-push. Pure static check (no install), so it's cheap enough to run
-# unconditionally.
-echo "🔗 Checking dependency versions..."
-pnpm lint:deps
-
-# Coverage-scope drift guard — keeps codecov.yml components + Sonar coverage
-# exclusions in sync with the package set (#732). Cheap static check, so it
-# runs before the expensive turbo test pipeline (fail-fast).
-echo "📊 Checking coverage scope..."
-pnpm lint:coverage-scope
-
-# One record, two questions about its own keys: a function that COUNTS with
-# `Object.keys` and tests MEMBERSHIP with `hasOwnProperty` or `in` disagrees with
-# itself about the keys the count refuses to see, and two disjoint records compare
-# equal — #1815 and #2064 are the two instances (#2108). A static scan of
-# `packages` and `shared`, ~0.6 s, so it runs ahead of the slower scans below.
-#
-# ⚠ pre-push runs it too, and that is not belt-and-braces: git runs NO pre-commit
-# for a tree that `git merge` or `git rebase` produced — it looks for
-# `pre-merge-commit`, which this repository does not have, and rebase gets neither.
-# Measured on the last 30 merged PRs: three merged master into the branch, one of
-# them the branch this gap was found on (#2392).
-echo "🔑 Checking membership predicates..."
-pnpm lint:membership
-
-# EVERY repository-wide scan, in one step (#2241). A scan whose SUBJECT is the
-# whole tree cannot live behind a per-package cache key: turbo keys core's `test`
-# on core's own files, so a change in a SIBLING replays a PASS and the scan never
-# runs — and a scan that did not run is indistinguishable from one that passed.
-# Measured: `captured-intrinsics-authority-1971` sat RED on `master` from #2236 to
-# #2240 while the hook on the breaking commit printed `cache hit, replaying logs`.
-#
-# This replaces three steps that covered three of TWELVE scans. The other nine had
-# no scheduler at all, including two outside core — `target-predicate-authority-1834`
-# in `@real-router/react` and `core-union-mirror-authority-2091` in
-# `validation-plugin`.
-#
-# ⚠ The list lives in `scripts/repo-wide-scans.json` and is proved COMPLETE by
-# `repo-scan-authority-2241`, which derives the set from the AST rather than reading
-# the list. Registering coverage by hand is the defect itself; one list with two
-# consumers is what keeps it from returning.
-echo "🔭 Running the repository-wide scans..."
-pnpm lint:repo-scans
-
-# Run type checking, linting, and tests via turbo pipeline
-# (turbo caching makes lint-staged redundant)
-#
-# `lint` is listed EXPLICITLY: it used to ride along as a `test` dependency, but
-# that serialised it in front of every test run (core#lint alone is ~70 s on a CI
-# runner, and nothing started until it finished). It is now a sibling task, so it
-# runs in parallel with the tests instead of gating them. Dropping it from this
-# line would silently stop linting on commit.
-#
-# The examples are a workspace of their own (examples/) and lint only in the
-# weekly examples.yml.
-echo "🧪 Running tests + lint (type-check rides along via turbo)..."
-pnpm turbo run test lint
-
-# Check that e2e directories have specs
-# Cheap static check (find + wc) — catches forgotten e2e/ during scaffolding.
-# lint:duplicates (jscpd) and lint:unused (knip) live in pre-push only —
-# their analysis depends on the full tree, not on the current commit's diff.
-echo "🎭 Checking e2e specs..."
-pnpm lint:e2e
+# The checks: the pre-commit stage of `scripts/checks.mjs`, each with what it
+# catches, run by `scripts/verify.mjs` in the registry's order. It keeps
+# GIT_INDEX_FILE, so each check judges the index of the commit being made.
+node scripts/verify.mjs --stage pre-commit
 
 echo "✅ Pre-commit checks passed!"

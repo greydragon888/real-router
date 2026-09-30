@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, globSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
@@ -26,7 +27,7 @@ import { describe, expect, it } from "vitest";
  * **Two halves, and both are here.** DISCOVERY is this file — which tests are repo-wide,
  * derived rather than remembered. EXECUTION is `pnpm lint:repo-scans`
  * (`scripts/run-repo-scans.mjs`), which runs every registered scan out of turbo, from
- * `.husky/pre-commit` AND from `ci.yml`, so no cache can answer for one. They share one
+ * a git hook AND from `ci.yml`, so no cache can answer for one. They share one
  * list, `scripts/repo-wide-scans.json`, and the assertions below pin that sharing: a
  * runner that grew a list of its own would be the defect coming back in a new place.
  *
@@ -738,7 +739,7 @@ describe("every repository-wide scan is registered (#2241)", () => {
     expect(named.map((entry) => entry.file)).toStrictEqual([]);
   });
 
-  it("the runner reaches BOTH schedulers, not one", () => {
+  it("the runner reaches BOTH schedulers, not one", async () => {
     // ⚠ A hook is not a gate on this repository: infrastructure commits use
     // `--no-verify` routinely, so a hook-only scan stands between a defect and `master`
     // only for whoever did not bypass it. `lint:anchors` was exactly that shape until
@@ -760,8 +761,22 @@ describe("every repository-wide scan is registered (#2241)", () => {
       "utf8",
     );
 
-    expect(hook).toContain("lint:repo-scans");
-    expect(ci).toContain("lint:repo-scans");
+    // A scheduler reaches the runner by a line of its own, or by calling
+    // `scripts/verify.mjs` for a stage whose checks in `scripts/checks.mjs`
+    // include it.
+    const { CHECKS } = (await import(
+      pathToFileURL(path.join(REPO_ROOT, "scripts/checks.mjs")).href
+    )) as { CHECKS: { id: string; stages: string[] }[] };
+    const reaches = (text: string, stage: string) =>
+      text.includes("lint:repo-scans") ||
+      (text.includes(`scripts/verify.mjs --stage ${stage}`) &&
+        CHECKS.some(
+          (check) =>
+            check.id === "lint:repo-scans" && check.stages.includes(stage),
+        ));
+
+    expect(reaches(hook, "pre-commit")).toBe(true);
+    expect(reaches(ci, "ci")).toBe(true);
   });
 
   it("the repository is a git checkout, so the sweep is over tracked files", () => {
