@@ -6342,6 +6342,11 @@ Every adapter (`react`, `preact`, `solid`, `vue`, `svelte`, `angular`) ships a d
 
 Symmetric 8-export surface for React/Preact/Vue/Solid/Svelte: `<ClientOnly>`, `<ServerOnly>`, `<Await>`, `<Streamed>`, `useDeferred`, `<HttpStatusCode>`, `<HttpStatusProvider>`, `createHttpStatusSink`. Angular is asymmetric by language: `ClientOnly`, `ServerOnly`, `injectDeferred` (no `<Await>` — Angular has no `<Suspense>`/`use(promise)`), `<http-status-code>` component, `provideHttpStatusSink` env-providers, `HTTP_STATUS_SINK` injection token, `createHttpStatusSink`. Angular's `/ssr` is built as an ng-packagr **secondary entry-point** (`packages/angular/ssr/` with its own `ng-package.json`) because ng-packagr cannot emit a secondary bundle from a `src/ssr/` subdirectory of the primary entry-point.
 
+> ⚠ Refuted on 2026-09-30: ng-packagr names a secondary entry point after the
+> directory of its `ng-package.json` and does not check where `entryFile`
+> points, so `ssr/ng-package.json` builds `/ssr` from `src/ssr/`. See
+> "Every package's code lives under `src/`, and a list that names the src root names `shared/` too".
+
 `@real-router/react/legacy` is preserved alongside `/ssr` for React 18 consumers: no `<Await>` (depends on React 19 `use()`), and the `react-server` condition on the main entry resolves into a type-only re-export so server components can `import type { Navigator, LinkProps }` without dragging client-only runtime in.
 
 ### Why per-adapter subpath, not a centralised `@real-router/ssr` package
@@ -13084,6 +13089,11 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 
 ## An entry point built outside `src/` keys its package's tasks (#2626, 2026-09-30)
 
+> ⚠ Superseded on 2026-09-30: no entry point is built from outside `src/`
+> any more. The `/ssr` sources sit in `src/ssr/`, `ssr/` holds only the
+> `ng-package.json` that `bundle` is keyed on, and check 6 fails code outside
+> `src/` instead of keying it. See "Every package's code lives under `src/`, and a list that names the src root names `shared/` too".
+
 **Problem.** `@real-router/angular` publishes `./ssr`, which ng-packagr builds from `packages/angular/ssr/`. The root inputs of `bundle` and `test` reach no source directory but `src/`, and angular's `turbo.json` added only `shared/dom-utils`. A change confined to `ssr/` kept the `bundle` key, so CI and Post-Merge Build replayed the previous build, and with it `lint:package` (publint) and `lint:types` (attw), which read its `dist/`: a change that broke the ng-packagr build of `ssr/` merged green. `test` re-ran only through its `type-check` dependency, and a change to `ssr/ng-package.json`, which names the entry file, re-keyed none of the four tasks.
 
 ⚠ **A release does not publish a stale `./ssr`.** Every angular release bumps `packages/angular/package.json`, an input of `bundle`, so the release job bundles the commit it publishes. A broken `ssr/` build surfaces on the Version Packages PR at the latest.
@@ -13122,3 +13132,27 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 ⚠ **"Go to Definition" on a `/ssr` symbol now opens the `.d.ts`.** The declaration maps carry no `sourcesContent`, so they pointed into the shipped `ssr/*.ts`; the main entry and every other package were already in this state.
 
 ⚠ **`dist/ssr/package.json` (111 B) still ships.** ng-packagr's own `dist/.npmignore` lists it, and `pnpm pack` includes it anyway. It is ng-packagr's stub for the secondary entry point, left out of #2628.
+
+## Every package's code lives under `src/`, and a list that names the src root names `shared/` too (#2627, 2026-09-30)
+
+**Problem.** Tool scopes name a package's code as a literal `src/`: turbo's root inputs, the coverage `include`, the Sonar sources, the Codecov components, the CodeQL `paths`, the jscpd roots, the repository scans in `packages/*/tests`. Two code roots sat outside it. `packages/angular/ssr/` held the seven source files of the `/ssr` entry. `shared/<dir>` enters its consumers' `src/` only through symlinks, which Node's `globSync` and CodeQL's extractor do not follow. Every new literal list was therefore born blind to one or both, and nothing said so: over 112 days, 14 detections (11 `shared/`, 3 `ssr/`), none of them by a guard, 11 fixed in the one list that surfaced them, 3 in a few, none at the level of the class. On 2026-09-30 one directory produced three issues in a day — the turbo keys (#2626), coverage (#2627), the tarball (#2628).
+
+**Solution.**
+
+- **Layout.** The seven files move to `packages/angular/src/ssr/`. `ssr/` keeps only `ng-package.json`, with `"entryFile": "../src/ssr/public_api.ts"`: ng-packagr names a secondary entry point after the directory of its `ng-package.json`, so the subpath stays `@real-router/angular/ssr`, and it does not check where `entryFile` points. The `@real-router/internal-source` target, both `tsconfig`s, the `lint` scripts and the `no-rxjs` scan follow. `turbo.json` keys `bundle` on `ssr/ng-package.json` and drops `ssr/**` from the other tasks.
+- **`finalize-dist-manifest.mjs`** fails the build when the nested manifest's subpaths differ from the package's, or when a file the package's `exports` names was not built — the guard for an ng-packagr that names the entry differently.
+- **Check 6 of `check-coverage-scope.mjs`** holds the layout instead of keying outside directories: every `@real-router/internal-source` target is under `./src/`, no code file sits outside `src/`, `tests/`, `scripts/` and the package-root config files, and every symlink under `src/` leads into `shared/`. It fails closed: a new outside root is an error, not a new key.
+- **`scripts/tests/code-roots-authority.test.mjs`** reads every tracked file that could hold a list, strips comments with the TypeScript printer (or `#` for YAML and shell), and fails one that names the src root across packages — or the `packages/` root as a path prefix — without naming `shared/` in code. Seven files carry a named exemption; an exemption that stops applying fails too. On the tree before this change it named five lists, fixed here: `wiki-checkers.yml` did not trigger on `shared/**`; `seam-census-authority-2090` and `target-predicate-authority-1834` globbed `packages/*/src` alone, and the second missed the live call in `shared/dom-utils/link-utils.ts`; `line-anchor-authority`'s reach control asserted `packages/*/src` only; `raiser-text-equality.mjs` compared changed files that start with `packages/`, so a converted raiser in `shared/` would go uncompared — none of `shared/`'s messages carries a head its renderer reads today.
+- CodeQL's `paths` names `shared/**` instead of the three shared dirs, so a new one is in scope the day it lands.
+
+**Why a convention and a check, not a declared root list.** Of 39 scanners inventoried, every one that saw `ssr/` took its roots from something derived — the git index, the manifests' `exports`, the package's own lint command — or had `ssr` added by hand, and each of the 19 blind ones held a literal `src`. With the code under `src/`, those 19 lists are correct without an edit; a declared list would need every tool to read it.
+
+**Why — measured.**
+
+- The built `.mjs` and `.d.ts` files are byte-identical to the build before the move; the two `/ssr` source maps differ in `sources` (`../../ssr/` → `../../src/ssr/`), and the `.mjs` map also in `sourcesContent` and `mappings`, because a comment left `HttpStatusCode.ts`.
+- Coverage now counts the seven files. It showed one untested branch: `<http-status-code>`'s dev-mode warning for a code outside [100, 999], which the five other adapters test. The added test is mutation-checked (seven mutants, all caught), and the thresholds hold.
+- Fourteen mutants of check 6 and seven of the census are each caught by their fixtures; the finalize guard throws on a renamed subpath and on a missing file.
+
+⚠ **ng-packagr may one day refuse an `entryFile` outside the entry's directory.** The build then fails loudly, not silently, and the finalize guard catches a changed subpath.
+
+⚠ **The census reads lists that name the src root ACROSS packages.** A list naming one package's `src/` — a turbo input, a vitest `include` — reaches `shared/` through the per-consumer mechanisms that checks 2b, 2c and 5 hold.

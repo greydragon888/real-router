@@ -1,6 +1,6 @@
 import { Injector, runInInjectionContext } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 import {
   HTTP_STATUS_SINK,
@@ -15,14 +15,10 @@ import type { HttpStatusSink } from "@real-router/angular/ssr";
  * JIT-mode caveat: signal `input()` template bindings (`[code]="404"`) and
  * `componentRef.setInput("code", N)` do not propagate the value to the
  * `code()` signal in JIT — see `packages/angular/CLAUDE.md` "Coverage
- * Ceiling (~95%) — JIT Limitation". The component's ngOnInit therefore
- * always reads `undefined` for `code` in this test environment and the
- * `sink.code = value` write is unreachable. The tests below exercise the
- * JIT-reachable surface (factory, DI token, optional injection, no-provider
- * safety, no-throw rendering); the actual write-on-bind behaviour is covered
- * end-to-end via the AOT-compiled examples in
- * `examples/web/angular/ssr-examples/*` once an `<http-status-code>` consumer
- * lands there.
+ * Ceiling — JIT Limitation, not Poor Testing". A component created through
+ * TestBed therefore reads `undefined` for `code`. The tests that reach the
+ * sink write construct the component in an injection context and replace
+ * `code` before calling `ngOnInit`.
  */
 describe("createHttpStatusSink", () => {
   it("starts with code === undefined", () => {
@@ -247,5 +243,63 @@ describe("HttpStatusCode component", () => {
     cmp.ngOnInit();
 
     expect(sink.code).toBe(451);
+  });
+
+  describe("dev-only validation (#1441)", () => {
+    // Symmetric with the other adapters: a `code` that is not an integer in
+    // [100, 999] logs a console.error at the source and is still written to
+    // the sink. `isDevMode()` is true under TestBed.
+    const initWith = (code: number, sink: HttpStatusSink) => {
+      TestBed.configureTestingModule({
+        providers: [provideHttpStatusSink(sink)],
+      });
+
+      const cmp = runInInjectionContext(
+        TestBed.inject(Injector),
+        () => new HttpStatusCode(),
+      );
+
+      Object.defineProperty(cmp, "code", { value: () => code });
+      cmp.ngOnInit();
+    };
+
+    it.each([[Number.NaN], [0], [99], [1.5], [1000]])(
+      "dev-warns when code === %s (still writes to sink)",
+      (invalidCode) => {
+        const sink = createHttpStatusSink();
+        const consoleError = vi
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
+
+        initWith(invalidCode, sink);
+
+        expect(consoleError).toHaveBeenCalledTimes(1);
+        expect(consoleError).toHaveBeenCalledWith(
+          expect.stringMatching(
+            /^\[real-router\] <http-status-code \[code\]="[^"]*" \/> received an invalid HTTP status code\./,
+          ),
+        );
+        expect(sink.code).toBe(invalidCode);
+
+        consoleError.mockRestore();
+      },
+    );
+
+    it.each([[100], [404], [999]])(
+      "does NOT warn for the valid code %s",
+      (validCode) => {
+        const sink = createHttpStatusSink();
+        const consoleError = vi
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
+
+        initWith(validCode, sink);
+
+        expect(consoleError).not.toHaveBeenCalled();
+        expect(sink.code).toBe(validCode);
+
+        consoleError.mockRestore();
+      },
+    );
   });
 });

@@ -128,6 +128,17 @@ export const render = (name, text) => {
   return { out, bodies };
 };
 
+/**
+ * Whether a changed file is one the comparison reads. `shared/<dir>` reaches its
+ * consumers' `src/` only through symlinks, and git names its files by their real
+ * path, so the shared root is listed beside `packages/`.
+ *
+ * @param {string} file repo-relative path
+ */
+export const isComparedSource = (file) =>
+  file.endsWith(".ts") &&
+  (file.startsWith("packages/") || file.startsWith("shared/"));
+
 function main() {
   // Committed AND uncommitted, because a conversion is measured both before it lands
   // and after. ⚠ Two spellings of the file set each printed `lost: 0  new: 0` on work
@@ -147,7 +158,7 @@ function main() {
             encoding: "utf8",
           },
         ).split("\n"),
-      ].filter((f) => f.endsWith(".ts") && f.startsWith("packages/")),
+      ].filter(isComparedSource),
     ),
   ];
 

@@ -284,6 +284,7 @@ describe("nothing points at our code by line number", () => {
     expect(files.some((file) => /^packages\/[^/]+\/src\//.test(file))).toBe(
       true,
     );
+    expect(files.some((file) => file.startsWith("shared/"))).toBe(true);
   });
 
   it("CONTROL — the scanner-output exemption carries exactly the one anchor it is for", () => {

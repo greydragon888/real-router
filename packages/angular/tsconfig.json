@@ -13,6 +13,6 @@
     "experimentalDecorators": true,
     "useDefineForClassFields": false
   },
-  "include": ["src", "ssr", "tests"],
+  "include": ["src", "tests"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

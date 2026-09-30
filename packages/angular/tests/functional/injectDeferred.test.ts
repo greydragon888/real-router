@@ -96,6 +96,37 @@ describe("injectDeferred", () => {
     fixture.destroy();
   });
 
+  it("ignores a promise that settles after the component is destroyed", async () => {
+    let settle!: (value: string[]) => void;
+    const late = new Promise<string[]>((resolve) => {
+      settle = resolve;
+    });
+
+    injectDeferredMap(router, { reviews: late });
+
+    @Component({ template: "" })
+    class TestComponent {
+      readonly reviews: Signal<string[] | undefined> =
+        injectDeferred<string[]>("reviews");
+    }
+
+    TestBed.configureTestingModule({
+      providers: [provideRealRouter(router)],
+      imports: [TestComponent],
+    });
+    const fixture = TestBed.createComponent(TestComponent);
+
+    fixture.detectChanges();
+
+    const reviews = fixture.componentInstance.reviews;
+
+    fixture.destroy();
+    settle(["late"]);
+    await late;
+
+    expect(reviews()).toBeUndefined();
+  });
+
   it.each([
     ["zero", 0],
     ["false", false],

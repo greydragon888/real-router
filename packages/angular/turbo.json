@@ -3,16 +3,20 @@
   "extends": ["//"],
   "tasks": {
     "bundle": {
-      "inputs": ["$TURBO_EXTENDS$", "../../shared/dom-utils/**/*.ts", "ssr/**"]
+      "inputs": [
+        "$TURBO_EXTENDS$",
+        "../../shared/dom-utils/**/*.ts",
+        "ssr/ng-package.json"
+      ]
     },
     "lint": {
-      "inputs": ["$TURBO_EXTENDS$", "../../shared/dom-utils/**/*.ts", "ssr/**"]
+      "inputs": ["$TURBO_EXTENDS$", "../../shared/dom-utils/**/*.ts"]
     },
     "test": {
-      "inputs": ["$TURBO_EXTENDS$", "../../shared/dom-utils/**/*.ts", "ssr/**"]
+      "inputs": ["$TURBO_EXTENDS$", "../../shared/dom-utils/**/*.ts"]
     },
     "type-check": {
-      "inputs": ["$TURBO_EXTENDS$", "../../shared/dom-utils/**/*.ts", "ssr/**"]
+      "inputs": ["$TURBO_EXTENDS$", "../../shared/dom-utils/**/*.ts"]
     }
   }
 }

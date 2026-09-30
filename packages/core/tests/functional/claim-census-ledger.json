@@ -1570,6 +1570,7 @@
       "e7905100ce67",
       "8340f7b80669",
       "3c4ac56d4ab8",
+      "91d07c8046be",
       "6a1f1efba89e",
       "f78f6edff94e",
       "b219bc2c7a07",
@@ -1788,16 +1789,20 @@
       "a927a81aa976",
       "9d044c0b2954",
       "4e90c5d4099f",
+      "178845f21c9e",
       "ee4208364eab",
       "00122d621b92",
       "a1ce9f7d686b",
-      "b21a2d81b4d3"
+      "b21a2d81b4d3",
+      "74813e6dfe76",
+      "7276f446f5a0"
     ],
     "packages/angular/CLAUDE.md": [
       "b1af9733937e",
       "7ad959a27a8f",
-      "7f578b6a800d",
-      "520b6368f7d2"
+      "209506b2a07d",
+      "520b6368f7d2",
+      "c1f7607fb817"
     ],
     "packages/browser-plugin/CLAUDE.md": [
       "5782bce19551",

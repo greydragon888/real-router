@@ -10,9 +10,10 @@ import { describe, expect, it } from "vitest";
  * The two forms are not interchangeable: the VALUE form is for sites where the
  * element is guaranteed to be an anchor — the five `<Link>` components render
  * one, Angular's directive selects `a[realLink]` — and the ELEMENT form is for
- * the three that attach to whatever the consumer wrote. A site that swaps forms
- * either asks about an element it cannot assume is an anchor, or narrows one it
- * already knows is.
+ * the three that attach to whatever the consumer wrote. The element form itself
+ * asks the value form, once it has narrowed the element to an `<a>`. A site that
+ * swaps forms either asks about an element it cannot assume is an anchor, or
+ * narrows one it already knows is.
  *
  * ⚠ The counts this replaces went stale inside a single branch: a round moved
  * the directives onto the element form and left three prose sentences naming
@@ -21,9 +22,15 @@ import { describe, expect, it } from "vitest";
 
 const REPO_ROOT = path.resolve(__dirname, "../../../../..");
 
-/** Call sites, by form. */
+/**
+ * Call sites, by form. `shared/` is globbed on its own: it reaches a package's
+ * `src/` only through a symlink, which globSync does not follow.
+ */
 const callSites = (callee: string): string[] =>
-  globSync("packages/*/src/**/*.{ts,tsx,svelte}", { cwd: REPO_ROOT })
+  [
+    ...globSync("packages/*/src/**/*.{ts,tsx,svelte}", { cwd: REPO_ROOT }),
+    ...globSync("shared/*/**/*.ts", { cwd: REPO_ROOT }),
+  ]
     .map((file) => file.split(path.sep).join("/"))
     .filter((file) =>
       readFileSync(path.join(REPO_ROOT, file), "utf8")
@@ -43,7 +50,8 @@ describe("the target predicate's two forms have disjoint homes (#1834)", () => {
   const byElement = callSites("anchorTargetsAnotherContext");
 
   it("the VALUE form is asked only where the element is guaranteed to be an anchor", () => {
-    // `<Link>` renders the anchor; Angular's selector is `a[realLink]`.
+    // `<Link>` renders the anchor; Angular's selector is `a[realLink]`; the
+    // element form checks `tagName === "A"` before it asks.
     expect(byValue).toStrictEqual([
       "packages/angular/src/directives/RealLink.ts",
       "packages/preact/src/components/Link.tsx",
@@ -51,6 +59,7 @@ describe("the target predicate's two forms have disjoint homes (#1834)", () => {
       "packages/solid/src/components/Link.tsx",
       "packages/svelte/src/components/Link.svelte",
       "packages/vue/src/components/Link.ts",
+      "shared/dom-utils/link-utils.ts",
     ]);
   });
 
