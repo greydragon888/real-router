@@ -2790,6 +2790,11 @@ refused — this workflow only removes the dedupe-only chore.
 > router: they live in `benchmarks/cross-router`, and the syncpack group and the
 > root Dependabot entry no longer name them. See "The root drops what only the
 > cross-router bench needed".
+>
+> **Superseded in part (2026-10-01).** Dependabot no longer ignores the patches of
+> the set: the root and examples entries carry them in a `patches` group with
+> `versioning-strategy: increase-if-necessary`, since nothing ran the `pnpm update`
+> this entry relied on. See "Dependabot carries the float-set patches".
 
 **Problem:** every UI-framework, competitor-router, and testing-library dependency
 is a `devDependency` of an adapter or a `dependency` of a benchmark/example — none
@@ -12561,6 +12566,8 @@ The `@angular/build>vite` comments of all three workspaces stop naming the vite 
 
 ## Dependabot stops retrying the bumps it cannot install (2026-09-28)
 
+> **Superseded in part (2026-10-01).** The patch ignore of `babel-preset-solid` is gone: solid-js patches now arrive from Dependabot, and the two move in the `patches` group. See "Dependabot carries the float-set patches".
+
 **Problem.** Every run of the Dependabot `/` entry ended in failure, and every run of `/examples` since 27.09 23:00: pnpm refused an update with `ERR_PNPM_PEER_DEP_ISSUES`, Dependabot recorded `dependency_file_not_resolvable` and marked the run failed, although it still opened the updates that resolved.
 
 **Solution.** The root entry ignores the majors of `vitest`, `@vitest/coverage-v8`, `@vitest/ui` and `@babel/*`, and the patches of `babel-preset-solid`; the examples entry ignores the majors of `vitest`.
@@ -13226,3 +13233,22 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 ⚠ **The gate model reads ci.yml alone.** The other required statuses of the ruleset live in GitHub's settings, so their workflows count as not gating; a check the test does not credit to CI stays in pre-push.
 
 ⚠ **`verify` stops at the first failure in CI too.** A PR's author sees one red check; on 2026-09-30 two advisories in lockfiles no package ships reddened `lint:audit` within 40 minutes, and every check after it went unrun.
+
+## Dependabot carries the float-set patches (2026-10-01)
+
+**Problem.** Since `af253a813` (2026-07-10) the root and `/examples` entries of `.github/dependabot.yml` ignored the patches of the float set — the UI frameworks and testing libraries declared with `~` — because `pnpm update` was to pull them. Nothing runs `pnpm update` for them: no workflow, script or hook, and CI installs from the frozen lockfile. On 2026-10-01, of the 16 packages of the set that a manifest of the two workspaces declares, 7 lagged a patch in both lockfiles: `preact`, `solid-js`, `svelte`, `vue`, `@testing-library/dom`, `@testing-library/react` and `@testing-library/user-event`. Each lagging version entered the lockfile before its first missing patch was published, and every one of those patches came after the policy — the oldest, `vue` 3.5.40, on 2026-07-16.
+
+**Solution.**
+
+- Both entries set `versioning-strategy: increase-if-necessary` and gain a `patches` group — `update-types: ["patch"]`, `patterns: ["*"]` — after the groups that keep their members (`react` and `codspeed` at the root, `real-router` and `react` in the examples). Every patch of an entry arrives in one PR a week.
+- The float-set patch ignores leave both entries, and so does the patch ignore of `babel-preset-solid`, whose patch now arrives in the same group as `solid-js`'s.
+- `@angular/*` stays ignored entirely in the three npm entries, and `@angular-devkit/*` in the examples. The seven Angular examples that declare `@angular-devkit/*` declare it with `~`, and `examples/CLAUDE.md` § Workspace gives the coordinated update, devkit included.
+
+**Why — read and measured.**
+
+- dependabot-core's npm updater leaves a requirement untouched when the new version satisfies it, and otherwise raises it as `increase` does (`update_version_requirement_if_needed` in `npm_and_yarn/lib/dependabot/npm_and_yarn/update_checker/requirements_updater.rb`). A patch inside `~` therefore moves the lockfile alone, a minor rewrites the `~` as #2163 did, an exact pin rises as before, and `*` and `workspace:` stay. The GitHub reference's "Otherwise widen the requirement" does not describe the npm updater.
+- Without the setting both manifests count as apps — they are private — and get `increase`, so a patch would rewrite every `~` declaration of the dependency.
+- The group answers the reason for the ignore, a PR per patch across the manifests, without dropping the patches. The `react` group already showed that Dependabot resolves, inside a group, a set it cannot move one member at a time (#2336).
+- With exact devkit pins, `pnpm update "@angular/*"` moves `@angular/build`, which requires `@angular-devkit/architect` exactly, and leaves the examples' devkit behind — the two generations of #2611. With `~`, one `pnpm update` moves both. The switch changed 14 specifiers in the lockfile and no resolution: 0.2202.0 is the only release of its line.
+
+⚠ **The first Monday run, 2026-10-05, is the check:** the patches should arrive in one PR per entry and touch only the lockfiles; `solid-js` and `babel-preset-solid` 1.9.15 should arrive together; the runs should end without `dependency_file_not_resolvable`. If `babel-preset-solid` fails beside `solid-js`, its patch ignore comes back and the pair moves by hand, as before.

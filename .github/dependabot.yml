@@ -8,6 +8,10 @@ updates:
       day: "monday"
       time: "04:00"
     open-pull-requests-limit: 10
+    # A requirement that already allows the new version stays as it is, and only
+    # the lockfile moves; any other is raised, as `increase` does. So a patch of
+    # a dependency declared with `~` (syncpack.config.mjs) touches no manifest.
+    versioning-strategy: increase-if-necessary
     groups:
       # react + react-dom move in lockstep: React checks at runtime that the two
       # versions are identical. Their peer ranges let `react` move alone
@@ -35,6 +39,17 @@ updates:
       codspeed:
         patterns:
           - "@codspeed/*"
+      # Every patch of the entry, in one PR a week: the float set gets its
+      # patches without a PR per patch. Listed after `react` and `codspeed`,
+      # which keep their members. `babel-preset-solid` peers `solid-js` at its
+      # own version, so its patch installs only beside solid-js's — this group
+      # carries the two together. (IMPLEMENTATION_NOTES "Dependabot carries the
+      # float-set patches".)
+      patches:
+        update-types:
+          - "patch"
+        patterns:
+          - "*"
       # Group all development dependencies
       dev-dependencies:
         dependency-type: "development"
@@ -139,46 +154,11 @@ updates:
       # once the Solid chain takes babel 8.
       - dependency-name: "@babel/*"
         update-types: ["version-update:semver-major"]
-      # babel-preset-solid releases in step with solid-js and peers `solid-js` at
-      # its own version, while solid-js patches arrive through `pnpm update`, not
-      # here: its patch alone cannot install (1.9.15 wants solid-js ^1.9.15 beside
-      # 1.9.14). It moves by hand with solid-js; minor/major still come as PRs.
-      - dependency-name: "babel-preset-solid"
-        update-types: ["version-update:semver-patch"]
-      # --- Patch-float set: UI frameworks, testing libs --------------------------
-      # Dev/test-only deps (never shipped — published adapters expose them as
-      # peerDependency ranges). Declared with `~` patch-float ranges in every
-      # manifest + a syncpack semverGroup (syncpack.config.mjs). `pnpm update`
-      # pulls the latest patch; Dependabot stays quiet on PATCH so it stops the
-      # per-patch PR churn these spread across the adapter and benchmark
-      # manifests (e.g. the @angular/ssr #1368 / @angular/router #1371 noise).
-      # The examples carry the same rules in their own block below; the
-      # competitor routers live in the cross-router block alone.
-      # MINOR/major still flow as PRs (reviewed). Add new UI-framework/testing
-      # deps here (and to the syncpack group) when introduced.
-      - dependency-name: "react"
-        update-types: ["version-update:semver-patch"]
-      - dependency-name: "react-dom"
-        update-types: ["version-update:semver-patch"]
-      - dependency-name: "preact"
-        update-types: ["version-update:semver-patch"]
-      - dependency-name: "preact-render-to-string"
-        update-types: ["version-update:semver-patch"]
-      - dependency-name: "solid-js"
-        update-types: ["version-update:semver-patch"]
-      - dependency-name: "svelte"
-        update-types: ["version-update:semver-patch"]
-      - dependency-name: "vue"
-        update-types: ["version-update:semver-patch"]
-      - dependency-name: "@testing-library/*"
-        update-types: ["version-update:semver-patch"]
-      - dependency-name: "@solidjs/*"
-        update-types: ["version-update:semver-patch"]
       # @angular/* — EXACT cross-peer coupling (router@x requires core@x exactly),
       # so ANY single-package bump (patch/minor/major) breaks strictPeerDependencies
       # and can halt the whole npm job (same coupled-peer class as vite above).
       # The framework only moves via a manual, coordinated `pnpm update` across
-      # all @angular/* at once; the `~22.0.x` ranges then absorb the patch.
+      # all @angular/* at once; the `~` ranges then absorb the patch.
       # Ignore the namespace entirely (this replaced the `@angular/router` override).
       - dependency-name: "@angular/*"
 
@@ -194,6 +174,8 @@ updates:
       day: "monday"
       time: "04:00"
     open-pull-requests-limit: 10
+    # A patch inside a `~` range moves the lockfile alone, as in the root entry.
+    versioning-strategy: increase-if-necessary
     groups:
       # First: a dependency joins the first group that matches.
       real-router:
@@ -206,6 +188,13 @@ updates:
           - "react-dom"
           - "@types/react"
           - "@types/react-dom"
+      # Every patch of the entry, in one PR a week — the root entry has the
+      # reason. After `real-router` and `react`, which keep their members.
+      patches:
+        update-types:
+          - "patch"
+        patterns:
+          - "*"
       dev-dependencies:
         dependency-type: "development"
         patterns:
@@ -244,33 +233,15 @@ updates:
       # re-resolve beside their 4.x — the root block has the measurement.
       - dependency-name: "vitest"
         update-types: ["version-update:semver-major"]
-      # Patch-float set: declared with `~` in the manifests, so `pnpm update`
-      # takes the latest patch and Dependabot stays quiet on PATCH.
-      - dependency-name: "react"
-        update-types: ["version-update:semver-patch"]
-      - dependency-name: "react-dom"
-        update-types: ["version-update:semver-patch"]
-      - dependency-name: "preact"
-        update-types: ["version-update:semver-patch"]
-      - dependency-name: "preact-render-to-string"
-        update-types: ["version-update:semver-patch"]
-      - dependency-name: "solid-js"
-        update-types: ["version-update:semver-patch"]
-      - dependency-name: "svelte"
-        update-types: ["version-update:semver-patch"]
-      - dependency-name: "vue"
-        update-types: ["version-update:semver-patch"]
-      - dependency-name: "@testing-library/*"
-        update-types: ["version-update:semver-patch"]
-      - dependency-name: "@solidjs/*"
-        update-types: ["version-update:semver-patch"]
       # @angular/* peers each other EXACTLY, so any single-package bump breaks
-      # strictPeerDependencies; it moves only by a coordinated `pnpm update`.
+      # strictPeerDependencies; it moves only by a coordinated `pnpm update`
+      # (examples/CLAUDE.md § Workspace).
       - dependency-name: "@angular/*"
       # @angular-devkit/* is released in lockstep with @angular/cli and
       # @angular/build, which the entry above holds back. Bumped alone it gives
       # the tree two devkit generations (#2611: 22.2.0 beside the 22.1.8 of
-      # @angular/build), so it moves with them.
+      # @angular/build), so it moves with them: the manifests declare it with
+      # `~`, and the coordinated update names it beside @angular/*.
       - dependency-name: "@angular-devkit/*"
 
   # The cross-router bench — its own lockfile, so its own block. A bump here

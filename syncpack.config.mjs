@@ -50,8 +50,9 @@ export default {
       // to consumers (published adapters expose them via peerDependency ranges,
       // governed by the ">= ranges" group above).
       // Float the PATCH (`~`, not `^` — a minor can carry behavioural change and
-      // stays reviewed) so `pnpm update` pulls the latest patch and Dependabot can
-      // stay quiet on patch bumps (see .github/dependabot.yml "float-set" ignores).
+      // stays reviewed): a patch then moves the lockfile alone, and Dependabot
+      // brings it in the weekly `patches` group without touching the range
+      // (`increase-if-necessary`, see .github/dependabot.yml).
       // @angular/* is included so the whole framework floats in lockstep: its
       // packages have EXACT cross-peer requirements (router@x needs core@x
       // exactly), so a single-package bump breaks strictPeerDependencies — hence
