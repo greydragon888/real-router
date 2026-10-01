@@ -218,7 +218,7 @@ test("the CI-state arm precedes every arm that reads an output of `check`", () =
   assert.match(decide, /CHECK: \$\{\{ needs\.check\.result \}\}/);
 });
 
-test("the three arms the trusted gate decides are decided here too", () => {
+test("the in-CI job keeps the dependabot, no-source and coverage verdicts", () => {
   const at = ci.indexOf("\n  sonar:\n");
   const decide = ci.slice(at, ci.indexOf("- name: Checkout", at));
 

@@ -32,10 +32,11 @@ name: Sonar (trusted)
 # `ci.yml`'s own comment names the trap this avoids: a workflow with
 # `pull-requests: write` executing attacker-shaped JS.
 #
-# ⚠ **`SonarCloud` is a required status check and this workflow is its only
-# producer.** A verdict that is never posted is not a pass — it leaves the PR
-# blocked on a context nobody produces. Every path out of `gate` below therefore
-# ends in a status, the two "nothing to analyse" paths included.
+# ⚠ **`SonarCloud` is a required status check, and for a fork's pull request
+# this workflow is its only producer.** A verdict that is never posted is not a
+# pass — it leaves the PR blocked on a context nobody produces. Every path out
+# of `gate` below therefore ends in a status, the "nothing to analyse" one
+# included.
 
 on:
   workflow_run:

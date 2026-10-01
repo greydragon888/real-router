@@ -107,10 +107,10 @@ jobs:
 
       # Does this PR's diff hold anything a code reader reads (#2433)? A release
       # PR's does not — `changeset version` writes manifests, CHANGELOGs and the
-      # lockfile — and neither does a manifest-only bump. `coverage` and
-      # `duplication` below consult this, and so does `sonar-trusted.yml`, which
-      # computes it again from the trusted payload rather than reading it here:
-      # this output travels in an artifact a fork's run writes.
+      # lockfile — and neither does a manifest-only bump. The jobs below read the
+      # answer as `needs.check.outputs.no_source`. `sonar-trusted.yml`, which
+      # analyses a fork's PR, does not: there it would arrive in an artifact the
+      # fork's run writes.
       #
       # `git diff` runs on its OWN line, unpiped, for the reason the step above
       # spells out: piped into the predicate, its failure would be
@@ -1548,8 +1548,9 @@ jobs:
       contents: read
       statuses: write
     steps:
-      # The three arms `sonar-trusted.yml`'s gate decides from artifacts, decided
-      # here from what `check` already published — same verdicts, no API calls.
+      # Decided from what `check` and the pipeline jobs already published, with
+      # no API call. Of these verdicts the fork gate in `sonar-trusted.yml`
+      # reaches one, no coverage produced, by counting artifacts.
       - name: Decide whether there is anything to analyse
         id: decide
         env:

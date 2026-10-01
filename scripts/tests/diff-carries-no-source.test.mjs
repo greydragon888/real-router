@@ -5,7 +5,7 @@
 //       (picked up by the `node:scripts-tests` check, in Repo Lints and in
 //       pre-push)
 //
-// The predicate is consulted by SonarCloud's gate, by Codecov and by jscpd. A
+// The predicate is consulted by the `sonar` job, by Codecov and by jscpd. A
 // false positive — answering "no source" on a diff that has some — is a check
 // silently not run on code that changed, which is the #1127 class: nothing goes
 // red, the report just never happens. So the cells below spend most of their
