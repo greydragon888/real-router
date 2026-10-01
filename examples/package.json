@@ -10,7 +10,7 @@
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@stylistic/eslint-plugin": "5.10.0",
-    "@types/node": "24.13.6",
+    "@types/node": "24.19.0",
     "@typescript-eslint/parser": "8.70.1",
     "@vitest/eslint-plugin": "1.6.27",
     "eslint": "10.11.0",
