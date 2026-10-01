@@ -39,13 +39,16 @@ updates:
       codspeed:
         patterns:
           - "@codspeed/*"
-      # Every patch of the entry, in one PR a week: the float set gets its
-      # patches without a PR per patch. Listed after `react` and `codspeed`,
-      # which keep their members. `babel-preset-solid` peers `solid-js` at its
-      # own version, so its patch installs only beside solid-js's — this group
-      # carries the two together. (IMPLEMENTATION_NOTES "Dependabot carries the
-      # float-set patches".)
+      # The patches of the production dependencies, in one PR a week: the float
+      # set gets its patches without a PR per patch. Production only: a dev
+      # dependency matches `*` here and in `dev-dependencies` equally, and
+      # Dependabot gives such a tie to the group listed first — this one, which
+      # takes no minor, so the minor came as a PR of its own. Dev dependencies
+      # keep their groups, patches and minors together. (IMPLEMENTATION_NOTES
+      # "Dependabot carries the float-set patches" and "The patches group takes
+      # production dependencies only".)
       patches:
+        dependency-type: "production"
         update-types:
           - "patch"
         patterns:
@@ -154,6 +157,12 @@ updates:
       # once the Solid chain takes babel 8.
       - dependency-name: "@babel/*"
         update-types: ["version-update:semver-major"]
+      # babel-preset-solid peers `solid-js` at its own version, so its patch
+      # installs only once solid-js's has landed: tried in the same run, it
+      # fails and fails the run (2026-10-01). It moves by hand with solid-js;
+      # minor/major still come as PRs.
+      - dependency-name: "babel-preset-solid"
+        update-types: ["version-update:semver-patch"]
       # @angular/* — EXACT cross-peer coupling (router@x requires core@x exactly),
       # so ANY single-package bump (patch/minor/major) breaks strictPeerDependencies
       # and can halt the whole npm job (same coupled-peer class as vite above).
@@ -188,9 +197,10 @@ updates:
           - "react-dom"
           - "@types/react"
           - "@types/react-dom"
-      # Every patch of the entry, in one PR a week — the root entry has the
-      # reason. After `real-router` and `react`, which keep their members.
+      # The patches of the production dependencies, in one PR a week — the root
+      # entry has the reason, and why the dev dependencies stay out.
       patches:
+        dependency-type: "production"
         update-types:
           - "patch"
         patterns:

@@ -30,6 +30,21 @@ if (dir) {
 }
 
 export const hooks = {
+  // The root `.pnpmfile.mjs` has the reason: @vue/test-utils, here under
+  // @testing-library/vue, keeps @vue/server-renderer as an optional peer, and a
+  // vue update alone then fails `strictPeerDependencies`. This edits
+  // test-utils' own manifest, so the edge caveat above does not apply.
+  readPackage(pkg) {
+    if (
+      pkg.name === "@vue/test-utils" &&
+      pkg.peerDependencies?.["@vue/server-renderer"]
+    ) {
+      delete pkg.peerDependencies["@vue/server-renderer"];
+      delete pkg.peerDependenciesMeta?.["@vue/server-renderer"];
+    }
+
+    return pkg;
+  },
   updateConfig(config) {
     if (dir) {
       config.overrides = { ...config.overrides, ...tarballs };

@@ -11,6 +11,21 @@ export const hooks = {
       delete pkg.peerDependenciesMeta?.undici;
     }
 
+    // @vue/test-utils declares @vue/server-renderer as an optional peer. The
+    // renderer requires vue at its own exact version, and a lockfile update of
+    // vue alone leaves the peer at the old one, which `strictPeerDependencies`
+    // refuses — the Dependabot runs of 2026-10-01. No test renders through
+    // test-utils' SSR helpers, and vue brings a renderer of its own.
+    // IMPLEMENTATION_NOTES: "The patches group takes production dependencies
+    // only".
+    if (
+      pkg.name === "@vue/test-utils" &&
+      pkg.peerDependencies?.["@vue/server-renderer"]
+    ) {
+      delete pkg.peerDependencies["@vue/server-renderer"];
+      delete pkg.peerDependenciesMeta?.["@vue/server-renderer"];
+    }
+
     return pkg;
   },
 };

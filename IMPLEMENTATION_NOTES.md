@@ -12566,7 +12566,7 @@ The `@angular/build>vite` comments of all three workspaces stop naming the vite 
 
 ## Dependabot stops retrying the bumps it cannot install (2026-09-28)
 
-> **Superseded in part (2026-10-01).** The patch ignore of `babel-preset-solid` is gone: solid-js patches now arrive from Dependabot, and the two move in the `patches` group. See "Dependabot carries the float-set patches".
+> **2026-10-01.** The patch ignore of `babel-preset-solid` left with "Dependabot carries the float-set patches" and came back the same day: the first run tried its patch before solid-js's and failed. See "The patches group takes production dependencies only".
 
 **Problem.** Every run of the Dependabot `/` entry ended in failure, and every run of `/examples` since 27.09 23:00: pnpm refused an update with `ERR_PNPM_PEER_DEP_ISSUES`, Dependabot recorded `dependency_file_not_resolvable` and marked the run failed, although it still opened the updates that resolved.
 
@@ -13236,6 +13236,8 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 
 ## Dependabot carries the float-set patches (2026-10-01)
 
+> **Superseded in part (2026-10-01).** The `patches` group takes production dependencies only, the patch ignore of `babel-preset-solid` is back, and the check below came the same day — a change of `dependabot.yml` starts a run. See "The patches group takes production dependencies only".
+
 **Problem.** Since `af253a813` (2026-07-10) the root and `/examples` entries of `.github/dependabot.yml` ignored the patches of the float set — the UI frameworks and testing libraries declared with `~` — because `pnpm update` was to pull them. Nothing runs `pnpm update` for them: no workflow, script or hook, and CI installs from the frozen lockfile. On 2026-10-01, of the 16 packages of the set that a manifest of the two workspaces declares, 7 lagged a patch in both lockfiles: `preact`, `solid-js`, `svelte`, `vue`, `@testing-library/dom`, `@testing-library/react` and `@testing-library/user-event`. Each lagging version entered the lockfile before its first missing patch was published, and every one of those patches came after the policy — the oldest, `vue` 3.5.40, on 2026-07-16.
 
 **Solution.**
@@ -13252,3 +13254,23 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 - With exact devkit pins, `pnpm update "@angular/*"` moves `@angular/build`, which requires `@angular-devkit/architect` exactly, and leaves the examples' devkit behind — the two generations of #2611. With `~`, one `pnpm update` moves both. The switch changed 14 specifiers in the lockfile and no resolution: 0.2202.0 is the only release of its line.
 
 ⚠ **The first Monday run, 2026-10-05, is the check:** the patches should arrive in one PR per entry and touch only the lockfiles; `solid-js` and `babel-preset-solid` 1.9.15 should arrive together; the runs should end without `dependency_file_not_resolvable`. If `babel-preset-solid` fails beside `solid-js`, its patch ignore comes back and the pair moves by hand, as before.
+
+## The patches group takes production dependencies only (2026-10-01)
+
+**Problem.** The change of "Dependabot carries the float-set patches" (`62bad03b7`) started a run of every entry, and the root and `/examples` runs failed (Actions runs 36841032542 and 36841032694). The patches arrived as intended — #2635 and #2639, the `~` ones as lockfile changes alone — and three things did not:
+
+- A dev dependency matches `*` in `patches` and in `dev-dependencies` equally, and Dependabot gave the tie to the group listed first; the log reads `Skipping @types/node for group 'dev-dependencies' - belongs to more specific group 'patches'`. `patches` takes no minor, so the minors of the examples' dev dependencies arrived as PRs of their own (#2640–#2642) instead of one `dev-dependencies` PR.
+- `babel-preset-solid` was tried before `solid-js` and failed on its peer: `solid-js ^1.9.15` against 1.9.14.
+- `vue` failed in both workspaces. `@vue/test-utils` — in the examples under `@testing-library/vue` — holds `@vue/server-renderer` 3.5.39 as an optional peer, the renderer requires `vue` 3.5.39 exactly, and an update of `vue` alone leaves it behind. No manifest declares the renderer, so Dependabot cannot move it.
+
+**Solution.**
+
+- `patches` takes `dependency-type: "production"` in both entries. Dev dependencies keep their groups, patches and minors together.
+- The patch ignore of `babel-preset-solid` comes back; its patch moves by hand with solid-js, as before.
+- Both `.pnpmfile.mjs` drop the optional `@vue/server-renderer` peer of `@vue/test-utils`; `vue` brings a renderer of its own.
+
+**Why — read and measured.**
+
+- In dependabot-core's group engine a dependency joins each group it matches unless another is more specific, and `*` scores 1 in both groups; the run's log shows the tie going to `patches`.
+- In a worktree, `pnpm update -r vue@3.5.43 --lockfile-only --no-save` failed with the run's error before the hook and passed after it, in both workspaces, leaving one `vue` and one `@vue/server-renderer`. The hook changed the lockfiles by the test-utils snapshots and the `pnpmfileChecksum` alone.
+- With the hook the vue adapter's 485 tests pass, and so do the unit tests of the six examples that use `@testing-library/vue`. No test renders through test-utils' SSR helpers.

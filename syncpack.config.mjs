@@ -51,7 +51,7 @@ export default {
       // governed by the ">= ranges" group above).
       // Float the PATCH (`~`, not `^` — a minor can carry behavioural change and
       // stays reviewed): a patch then moves the lockfile alone, and Dependabot
-      // brings it in the weekly `patches` group without touching the range
+      // brings it every week without touching the range
       // (`increase-if-necessary`, see .github/dependabot.yml).
       // @angular/* is included so the whole framework floats in lockstep: its
       // packages have EXACT cross-peer requirements (router@x needs core@x
