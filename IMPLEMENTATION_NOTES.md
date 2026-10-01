@@ -13274,3 +13274,18 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 - In dependabot-core's group engine a dependency joins each group it matches unless another is more specific, and `*` scores 1 in both groups; the run's log shows the tie going to `patches`.
 - In a worktree, `pnpm update -r vue@3.5.43 --lockfile-only --no-save` failed with the run's error before the hook and passed after it, in both workspaces, leaving one `vue` and one `@vue/server-renderer`. The hook changed the lockfiles by the test-utils snapshots and the `pnpmfileChecksum` alone.
 - With the hook the vue adapter's 485 tests pass, and so do the unit tests of the six examples that use `@testing-library/vue`. No test renders through test-utils' SSR helpers.
+
+## `resolve:dependabot` re-applies the PR's updates after it rebuilds a lockfile (2026-10-01)
+
+**Problem.** Two facts met on #2643 and #2644, the `patches` groups of the root and the examples:
+
+- The dedupe workflow pushed its commit to both — the `vue` patch splits `@vue/*` — and Dependabot resolves conflicts only on a PR nobody altered ("Dependabot will resolve any conflicts with this PR as long as you don't alter it yourself", in each PR's description). The PRs without a dedupe commit were rebased by Dependabot as master moved, and merged; these two conflicted on the lockfile once #2636, #2637, #2638 and #2645 had merged. The workflow did its job — `lint:dedupe` is green on master — and its push is what took the PRs out of Dependabot's hands.
+- `pnpm resolve:dependabot`, the documented way out, rebuilds a conflicted lockfile from the manifests. Under `versioning-strategy: increase-if-necessary` a patch inside `~` changes no manifest, so the rebuild drops the very updates the PR carries and leaves a PR that changes nothing.
+
+**Solution.**
+
+- `scripts/dependabot-updates.mjs` reads the updates off the `updated-dependencies` block Dependabot writes into its commit message; with `--check <lockfile>` it exits 1 when one is not in the lockfile at its version or above.
+- `resolve-dependabot.sh` re-applies them with `pnpm update -r <name>@<version> --no-save` after every lockfile rebuild, and checks them after the final dedupe.
+- The header of `dependabot-dedupe.yml` names the cost of its push; `@dependabot recreate` is the other way out.
+
+**Why — measured on #2643.** On the conflicted branch, the rebuild from master's lockfile held none of the four updates, and `--check` named each with the version the lockfile held instead. With the re-application the lockfile's change set was the original PR's, key for key (39 of 39), and `--check` passed. The module's cells redden when the check is blinded (2 cells) and when a scoped name keeps its quotes (1 cell).

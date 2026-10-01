@@ -4,9 +4,10 @@
 #
 # Rebases the PR branch onto origin/master, auto-resolves package.json conflicts
 # via scripts/resolve-dep-conflicts.mjs (semver-union: newest of each dep),
-# regenerates the lockfile, validates, then STOPS for review and prints the
-# exact force-push + squash-merge commands. Nothing destructive (force-push /
-# merge) happens unless you pass --merge.
+# regenerates the lockfile, re-applies the updates the PR's Dependabot commits
+# name and checks that each survived (scripts/dependabot-updates.mjs), validates,
+# then STOPS for review and prints the exact force-push + squash-merge commands.
+# Nothing destructive (force-push / merge) happens unless you pass --merge.
 #
 # Three workspaces, three lockfiles: the root's, examples/'s and
 # cross-router-bench/'s. Each step runs in the workspace the PR touches;
@@ -63,6 +64,18 @@ case "$BRANCH" in
 esac
 
 git fetch origin "$BRANCH"
+
+# The updates the PR carries, off Dependabot's commit metadata. A bump inside a
+# `~` range changes no manifest, so a lockfile rebuilt from the manifests drops
+# it: each rebuild below re-applies them, and the run ends by checking them.
+UPDATES=()
+while IFS= read -r spec; do
+  if [ -n "$spec" ]; then UPDATES+=("$spec"); fi
+done < <(git log --format=%B "origin/master..origin/$BRANCH" | node "$SCRIPT_DIR/dependabot-updates.mjs")
+if [ "${#UPDATES[@]}" -gt 0 ]; then
+  echo "📋 The PR's updates: ${UPDATES[*]}"
+fi
+
 git checkout -B "$BRANCH" "origin/$BRANCH"
 
 rebase_in_progress() {
@@ -95,6 +108,10 @@ while rebase_in_progress; do
       echo "🔒 Regenerating $lock from merged manifests ..."
       git checkout origin/master -- "$lock"
       pnpm --dir "$(dirname "$lock")" install
+      if [ "${#UPDATES[@]}" -gt 0 ]; then
+        echo "↻ Re-applying the PR's updates in $(dirname "$lock") ..."
+        pnpm --dir "$(dirname "$lock")" update -r "${UPDATES[@]}" --no-save
+      fi
       pnpm --dir "$(dirname "$lock")" dedupe
     fi
   done
@@ -129,6 +146,13 @@ for dir in $WORKSPACES; do
   echo "✅ Verifying dedupe in $dir ..."
   pnpm --dir "$dir" dedupe --check
 done
+if [ "${#UPDATES[@]}" -gt 0 ]; then
+  for dir in $WORKSPACES; do
+    echo "✅ Verifying the PR's updates in $dir ..."
+    git log --format=%B "origin/master..origin/$BRANCH" |
+      node "$SCRIPT_DIR/dependabot-updates.mjs" --check "$dir/pnpm-lock.yaml"
+  done
+fi
 
 for dir in $WORKSPACES; do
   case "$dir" in

@@ -67,6 +67,10 @@ const CLIS = {
     ran: /GITHUB_REPOSITORY is unset/,
   },
   "scripts/codspeed-gate.mjs": { args: [], ran: /CodSpeed: / },
+  "scripts/dependabot-updates.mjs": {
+    args: [],
+    ran: /no updated-dependencies in the input/,
+  },
   "scripts/diff-carries-no-source.mjs": {
     args: [],
     ran: /no changed paths/,

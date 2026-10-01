@@ -48,6 +48,12 @@ name: Dependabot Lockfile Dedupe
 # `github.actor` is the PAT owner, not `dependabot[bot]`, so the job's `if:`
 # skips it; and `pnpm dedupe` is idempotent, so a second pass yields no lockfile
 # diff (`changed=false`) and pushes nothing.
+#
+# ⚠ A push here alters the PR, and Dependabot resolves conflicts only on a PR
+# nobody altered ("as long as you don't alter it yourself", in each PR's
+# description). When a later merge conflicts with it in the lockfile, the
+# conflict stays until `pnpm resolve:dependabot <PR#>` or `@dependabot recreate`
+# (#2643, #2644).
 
 on:
   pull_request:
