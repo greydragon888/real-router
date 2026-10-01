@@ -139,7 +139,6 @@ const NOT_A_CHECK = new Map([
     "examples.yml#examples  node scripts/checkout-tarballs.mjs examples",
     PLANNER,
   ],
-  ["sonar-trusted.yml#gate  node scripts/diff-carries-no-source.mjs", PLANNER],
 
   ["changesets.yml#release  pnpm turbo run bundle", PIPELINE],
   ["ci.yml#pipeline-leaf  pnpm turbo run bundle", PIPELINE],
