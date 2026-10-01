@@ -13242,7 +13242,7 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 
 **Solution.**
 
-- Both entries set `versioning-strategy: increase-if-necessary` and gain a `patches` group — `update-types: ["patch"]`, `patterns: ["*"]` — after the groups that keep their members (`react` and `codspeed` at the root, `real-router` and `react` in the examples). Every patch of an entry arrives in one PR a week.
+- Both entries set `versioning-strategy: increase-if-necessary` and gain a `patches` group — `update-types: ["patch"]`, `patterns: ["*"]` — after the groups that keep their members (`react` and `codspeed` at the root, `real-router` and `react` in the examples). Every patch of an entry arrives in one PR a week (the next entry splits them by dependency type).
 - The float-set patch ignores leave both entries, and so does the patch ignore of `babel-preset-solid`, whose patch now arrives in the same group as `solid-js`'s.
 - `@angular/*` stays ignored entirely in the three npm entries, and `@angular-devkit/*` in the examples. The seven Angular examples that declare `@angular-devkit/*` declare it with `~`, and `examples/CLAUDE.md` § Workspace gives the coordinated update, devkit included.
 
@@ -13253,7 +13253,7 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 - The group answers the reason for the ignore, a PR per patch across the manifests, without dropping the patches. The `react` group already showed that Dependabot resolves, inside a group, a set it cannot move one member at a time (#2336).
 - With exact devkit pins, `pnpm update "@angular/*"` moves `@angular/build`, which requires `@angular-devkit/architect` exactly, and leaves the examples' devkit behind — the two generations of #2611. With `~`, one `pnpm update` moves both. The switch changed 14 specifiers in the lockfile and no resolution: 0.2202.0 is the only release of its line.
 
-⚠ **The first Monday run, 2026-10-05, is the check:** the patches should arrive in one PR per entry and touch only the lockfiles; `solid-js` and `babel-preset-solid` 1.9.15 should arrive together; the runs should end without `dependency_file_not_resolvable`. If `babel-preset-solid` fails beside `solid-js`, its patch ignore comes back and the pair moves by hand, as before.
+⚠ **The check this entry set — one PR per entry — no longer holds:** the next entry splits the patches by dependency type, so an entry gets several group PRs a week. The check of the first scheduled run is there.
 
 ## The patches group takes production dependencies only (2026-10-01)
 
@@ -13274,6 +13274,8 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 - In dependabot-core's group engine a dependency joins each group it matches unless another is more specific, and `*` scores 1 in both groups; the run's log shows the tie going to `patches`.
 - In a worktree, `pnpm update -r vue@3.5.43 --lockfile-only --no-save` failed with the run's error before the hook and passed after it, in both workspaces, leaving one `vue` and one `@vue/server-renderer`. The hook changed the lockfiles by the test-utils snapshots and the `pnpmfileChecksum` alone.
 - With the hook the vue adapter's 485 tests pass, and so do the unit tests of the six examples that use `@testing-library/vue`. No test renders through test-utils' SSR helpers.
+
+⚠ **The first scheduled run, 2026-10-05, is the check:** each patch of the float set arrives in a group PR — `patches` for production dependencies, `react` for `react` and `react-dom`, `testing` for the root's testing libraries, `dev-dependencies` for the other development ones — and changes only the lockfile, as #2638, #2643 and #2644 did. Several PRs per entry are the design: one group for all of them is the `*` tie above. `solid-js` arrives without `babel-preset-solid`, `vue` arrives in both workspaces, and no run ends in `dependency_file_not_resolvable`.
 
 ## `resolve:dependabot` re-applies the PR's updates after it rebuilds a lockfile (2026-10-01)
 
