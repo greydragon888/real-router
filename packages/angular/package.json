@@ -64,7 +64,7 @@
     "@angular/core": "~22.2.0",
     "@angular/platform-browser": "~22.2.0",
     "@real-router/core": "workspace:^",
-    "ng-packagr": "22.2.1",
+    "ng-packagr": "22.2.2",
     "typescript": "6.0.3"
   },
   "peerDependencies": {
