@@ -100,7 +100,8 @@ const FS_READERS = new Set([
  * names its tree after a space (`grep -rl … packages/<name>/src`), and a boundary of
  * `(^|/)` reads that as workspace-local — measured, that was a missed mutation.
  */
-const OTHER_TREES = /(^|[\s/'"`=])(packages|shared|benchmarks|examples)\//u;
+const OTHER_TREES =
+  /(^|[\s/'"`=])(packages|shared|benchmarks|examples|cross-router-bench)\//u;
 
 const UNRESOLVED = Symbol("unresolved");
 
