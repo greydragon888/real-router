@@ -539,6 +539,9 @@ for a hook, `lint:doc-dup` 8, `lint:membership` 14 (#2392) — and 8 of the 11
 non-Dependabot Repo Lints failures since 2026-09-04 came from a step that had no
 hook at the time. Nothing structural refused the next one.
 
+> ⚠ Superseded on 2026-10-01: `scripts/tests/checks-registry.test.mjs` replaces the parity
+> test, and the hooks and Repo Lints run one list. See "One check registry runs the hooks and Repo Lints".
+
 **Solution.** `scripts/ci-hook-parity.test.mjs`, a third meta-test in the family
 of `ci-gate-completeness` (jobs against the gate) and `check-lint-reach`
 (workspaces against the hooks' lint steps). This one pairs checks against the
@@ -1952,6 +1955,9 @@ Enforces conventional commits. Types and scopes defined in `commitlint.config.mj
 - `pnpm turbo run test --filter='!./examples/**'` (includes type-check and lint via turbo task graph, excludes examples)
 - `pnpm lint:e2e` (verifies example e2e directories have spec files)
 
+> ⚠ Superseded on 2026-10-01: the checks are the entries of `scripts/checks.mjs` whose `stages`
+> name `pre-commit`, and the hook calls `scripts/verify.mjs`. See "One check registry runs the hooks and Repo Lints".
+
 ### Pre-push
 
 `.husky/pre-push` runs (artifact validation, NOT a superset of pre-commit):
@@ -1968,6 +1974,10 @@ Enforces conventional commits. Types and scopes defined in `commitlint.config.mj
 - `pnpm lint:audit` (osv-scanner — vulnerability scan against the GHSA database; non-blocking if the binary is missing locally)
 - `pnpm lint:security` (semgrep — diff-aware SAST over shipped `src`; fast local complement to cloud CodeQL; non-blocking if the binary is missing locally — see "Local SAST" below)
 - `pnpm lint:prose` (Vale historiography lint over the Markdown corpus; advisory here — skips without Vale; the authoritative run is CI's Repo Lints)
+
+> ⚠ Superseded on 2026-10-01: the checks are the entries of `scripts/checks.mjs` whose `stages`
+> name `pre-push`, run by `scripts/verify.mjs` between the two blocks of the push guard, and
+> `lint:prose` gates CI in a job of its own. See "One check registry runs the hooks and Repo Lints".
 
 **Rationale:** Pre-commit validates correctness in <2 min so it stays painless on every commit. Pre-push validates artifacts (full build pipeline + dist surface area + dep consistency + GHSA audit) — slower, runs once per push. `lint:deps` lives in **both** layers: pre-commit catches workspace version drift the moment a `package.json` is staged (~1s static check), pre-push acts as the final gate. `lint:package`/`lint:types`/`lint:unused` **also run in CI** now (#813 — see below); only `lint:duplicates`' hard threshold stays pre-push-only (CI keeps an informational jscpd SARIF channel). `lint:audit` was added after PR #643 (see "Local Dependency Audit" below) so contributors can catch CVEs locally before CI Dependency Review flags them.
 
@@ -11899,6 +11909,9 @@ Turbo keys a package's `test` task on `tests/**/*.{ts,tsx}`, so inside core the 
 
 ## pre-push repeats the checks pre-commit runs over the tree (#2548, 2026-09-23)
 
+> ⚠ Superseded on 2026-10-01 in its mechanism: the rule holds as `prePushExempt` in
+> `scripts/checks.mjs`, checked by `checks-registry.test.mjs`. See "One check registry runs the hooks and Repo Lints".
+
 **Problem.** `lint:repo-scans`, `lint:coverage-scope`, `lint:e2e` and the angular `dom-utils` copy check ran in `.husky/pre-commit` and in **Repo Lints**, not in `.husky/pre-push`. git runs no pre-commit for a tree `git rebase` or `git merge` produced, nor for a `--no-verify` commit, and a direct push to `master` reaches no `ci.yml`, so on that path none of them ran. Measured on `b180793a5`: a `--no-verify` commit that planted a line anchor in a skill, dropped a `codecov.yml` component and deleted an example's only e2e spec was refused by each of the three checks run directly, and passed the real pre-push (`git push --dry-run`) with ✅. The build does not stand in for the scans: turbo has no `globalDependencies`, so a change outside a package replays core's cached `test` (121 of 121 cached on that run). `.husky/pre-commit` already gave the reason beside `lint:membership` (#2392), and it had been applied to that one step. The lockfile had the same gap one level down: `scripts/ci-hook-parity.test.mjs` allowlisted `lint:dedupe` as CI-only because pre-commit dedupes a staged lockfile, and a rebased or merged lockfile never passes through that step.
 
 **Solution.** pre-push runs `lint:repo-scans`, `lint:coverage-scope`, `lint:e2e`, `lint:angular-sync` and `lint:dedupe` after `lint:membership`, ahead of the scripts tests and the build. The angular check became the npm script `lint:angular-sync`, so both hooks call it by a name the parity test can read; pre-push runs it unconditionally, because its push guard has already refused a dirty tree. `scripts/ci-hook-parity.test.mjs` gained a second axis: every check pre-commit runs also runs in pre-push, or sits in `PRE_COMMIT_ONLY` with a reason; the map is empty. `lint:dedupe` left `CI_ONLY`.
@@ -13189,3 +13202,25 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 - Seven mutants, each caught by a cell: never skipping, the pattern without `shared/`, without `.semgrep/`, with `src/` one level under a package, `$?` after the pipe, `uvx` without the pin, and a floor that differs from `ci.yml`'s.
 
 ⚠ **The skip pattern must cover the scans' `--include`s.** An include it misses makes a delta there skip its scan, and no check ties the two.
+
+## One check registry runs the hooks and Repo Lints (RFC-1, 2026-10-01)
+
+**Problem.** The same checks stood in three lists — `.husky/pre-commit`, `.husky/pre-push` and the steps of Repo Lints — and `ci-hook-parity.test.mjs` kept them in agreement by reading their text. It paired a hook line with a workflow line by an id read off the command, so it saw no `pnpm turbo run` line and no `node scripts/…` call, and each list carried its own comments on why a step was there. A check that reached one list and not another is the class of #2406 and #2548.
+
+**Solution.**
+
+- **`scripts/checks.mjs`** is the registry, and holds data only: for each check an id, a command run without a shell, its stages (`pre-commit`, `pre-push`, `ci`), what it catches, the binaries it needs (`tools`), the CI contexts it is skipped in (`ciSkip`), where CI runs it outside `verify` (`ciBy`), and why pre-push does not run it (`prePushExempt`).
+- **`scripts/verify.mjs --stage <stage> [--context …]`** runs a stage's checks in the registry's order and stops at the first failure, with its exit code. A missing tool skips its check in a hook, loudly, and fails it in CI with 127. In CI each check runs in a `::group::` and gets a row of the step summary. No check sees the caller's git repository variables, except `GIT_INDEX_FILE` in pre-commit (`scripts/lib/git-env.mjs`).
+- **The hooks keep their mechanics** — the Node and pnpm guards and the auto-dedupe in pre-commit, the push guard in pre-push — and call `verify`. Repo Lints is one step, `verify --stage ci`, after it installs osv-scanner and uv.
+- **`scripts/tests/checks-registry.test.mjs`** replaces the parity test. Its header lists what it holds: root scripts, workflow lines, stages, the hooks and Repo Lints, and the reach of each lint task. `scripts/ci-gate.mjs` decides which jobs gate.
+- **New to CI**, by the owner's decisions: `lint:reach`, `lint:audit` and `lint:security`. `lint:prose` runs on every PR in a job of its own, `prose-lint`, a PR of Markdown alone included.
+
+**Why — measured.**
+
+- On PR #2632 Repo Lints ran the 13 checks of the `ci` stage through `verify`, and `prose-lint` read the whole corpus.
+- PR #2633 planted the failures and was closed: a Vale error in a PR of Markdown alone reddened `prose-lint` and CI Result; a new finding of `.semgrep/rules.yml` reddened `lint:security` after every earlier check of the stage passed, and CI Result with it, while every pipeline job passed.
+- Fifteen mutations of the real tree each redden a cell of `checks-registry.test.mjs`.
+
+⚠ **The gate model reads ci.yml alone.** The other required statuses of the ruleset live in GitHub's settings, so their workflows count as not gating; a check the test does not credit to CI stays in pre-push.
+
+⚠ **`verify` stops at the first failure in CI too.** A PR's author sees one red check; on 2026-09-30 two advisories in lockfiles no package ships reddened `lint:audit` within 40 minutes, and every check after it went unrun.

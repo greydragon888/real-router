@@ -7,11 +7,10 @@
 // turbo, then the heavy linters and the external tools. One order serves every
 // stage, so a stage differs from another only in WHICH checks it runs.
 //
-// ⚠ Until each place calls `verify`, it still runs its own lines, and
-// `scripts/tests/checks-registry-transition.test.mjs` holds this list to the
-// checks those places ran before it (`scripts/tests/fixtures/checks-baseline.json`).
-// A check added before then is written here, in that test's exceptions and as a
-// line in every place that does not call `verify` yet.
+// `scripts/tests/checks-registry.test.mjs` holds the rest of the repository to
+// this list: every root `lint*`/`test*` script and every check line of a
+// workflow is a check here, or is named there as none; the hooks and Repo Lints
+// call `verify` and run nothing else.
 
 /** @typedef {"pre-commit" | "pre-push" | "ci"} Stage */
 

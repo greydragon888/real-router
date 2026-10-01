@@ -1,9 +1,8 @@
 // check-id.mjs — the identifier of the check a command runs.
 //
-// One home for the rule that pairs a hook line, a workflow line and a command
-// of the check registry (`scripts/checks.mjs`): `ci-hook-parity.test.mjs` pairs
-// hooks with workflows by it, and `checks-registry-transition.test.mjs` holds
-// the registry to the checks the hooks and Repo Lints ran before it.
+// One home for the rule that pairs a workflow line, or a root script, with a
+// command of the check registry (`scripts/checks.mjs`): `checks-registry.test.mjs`
+// asks it which check a line runs and which root scripts the registry runs.
 
 /**
  * The identifier of a check, or `undefined` for a command that runs none.
@@ -13,9 +12,9 @@
  * so the hook and the workflow pair by WHAT they run rather than by how the line
  * happens to be written today.
  *
- * `pnpm turbo run <task>` is deliberately not a check here: task-level coverage
- * is `check-lint-reach.mjs`'s axis, and it answers a different question — which
- * workspaces a hook's lint steps read.
+ * `pnpm turbo run <task>` is deliberately not a check here: a turbo line is held
+ * by the tasks it names, which `checks-registry.test.mjs` reads, and
+ * `check-lint-reach.mjs` asks which workspaces they reach.
  *
  * @param {string} command a single shell command
  * @returns {string | undefined}

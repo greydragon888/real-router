@@ -17,9 +17,9 @@
 // workspace; the repo-lints `node --test scripts/tests/*.test.mjs` step picks this
 // file up by glob, so the preventer needs no wiring of its own.
 //
-// Deliberately NOT a YAML library: the two extractors below are single-purpose
-// and fail-closed — if ci.yml is restructured so they can't parse it, the
-// assertions fail and point here, they don't silently pass.
+// Deliberately NOT a YAML library: the extractors of `scripts/ci-gate.mjs` are
+// single-purpose and fail-closed — if ci.yml is restructured so they can't
+// parse it, the assertions fail and point here, they don't silently pass.
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -27,11 +27,16 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import {
+  GATE_JOB,
+  gateReads,
+  parseGateScript,
+  parseJobs,
+  parseNeeds,
+} from "../ci-gate.mjs";
+
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const CI_YML = join(repoRoot, ".github", "workflows", "ci.yml");
-
-/** The aggregator job required by the `protect-master` ruleset. */
-export const GATE_JOB = "ci";
 
 /**
  * Jobs deliberately OUTSIDE the gate. Every entry carries its reason; the
@@ -55,69 +60,6 @@ export const OUTSIDE_GATE = new Map([
 ]);
 
 /**
- * Extract top-level job ids from a workflow YAML text: identifiers indented
- * exactly two spaces under the top-level `jobs:` key.
- */
-export function parseJobs(yaml) {
-  const lines = yaml.split("\n");
-  const start = lines.findIndex((l) => /^jobs:\s*(#.*)?$/.test(l));
-  if (start === -1) return [];
-  const jobs = [];
-  for (const line of lines.slice(start + 1)) {
-    if (/^[^\s#]/.test(line)) break; // next top-level section
-    const m = /^ {2}([A-Za-z_][\w-]*):/.exec(line);
-    if (m) jobs.push(m[1]);
-  }
-  return jobs;
-}
-
-/**
- * Extract the `needs` list of one job. Supports both styles:
- * flow (`needs: [a, b]`) and block (`needs:` + `- a` items).
- * Returns [] when the job has no `needs`.
- */
-export function parseNeeds(yaml, jobId) {
-  const lines = yaml.split("\n");
-  const start = lines.findIndex((l) => l.startsWith(`  ${jobId}:`));
-  if (start === -1) return [];
-  for (let i = start + 1; i < lines.length; i++) {
-    const line = lines[i];
-    if (/^ {2}[A-Za-z_][\w-]*:/.test(line)) break; // next job
-    const flow = /^ {4}needs:\s*\[([^\]]*)\]/.exec(line);
-    if (flow) {
-      return flow[1]
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-    }
-    if (/^ {4}needs:\s*(#.*)?$/.test(line)) {
-      const items = [];
-      for (let j = i + 1; j < lines.length; j++) {
-        const item = /^ {6}- ([\w-]+)\s*(#.*)?$/.exec(lines[j]);
-        if (!item) break;
-        items.push(item[1]);
-      }
-      return items;
-    }
-  }
-  return [];
-}
-
-/**
- * The gate job's own body — the only place where a `needs` entry is actually
- * READ. Sliced from the gate job's key to the next top-level job (or EOF), so it
- * keeps working if a job is ever added after the gate.
- */
-export function parseGateScript(yaml) {
-  const lines = yaml.split("\n");
-  const start = lines.findIndex((l) => l.startsWith(`  ${GATE_JOB}:`));
-  if (start === -1) return "";
-  const rest = lines.slice(start + 1);
-  const end = rest.findIndex((l) => /^ {2}[A-Za-z_][\w-]*:/.test(l));
-  return (end === -1 ? rest : rest.slice(0, end)).join("\n");
-}
-
-/**
  * Pure core of the check — also exercised on fixtures below so the test's
  * discriminating power does not depend on the current (healthy) ci.yml.
  */
@@ -135,11 +77,7 @@ export function findViolations(yaml, outsideGate = OUTSIDE_GATE) {
     // outside the gate — and membership alone cannot see that. All nine are read
     // today, so this is a preventer gap rather than a live bug; #1127 is what a
     // preventer gap looks like once it stops being one.
-    neededButUnread: [...needs].filter(
-      (n) =>
-        !gateScript.includes(`needs.${n}.result`) &&
-        !gateScript.includes(`needs.${n}.outputs`),
-    ),
+    neededButUnread: [...needs].filter((n) => !gateReads(gateScript, n)),
     // The #1127 class: a job whose red X would not block merge.
     ungated: jobs.filter(
       (j) => j !== GATE_JOB && !needs.has(j) && !outsideGate.has(j),
