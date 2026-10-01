@@ -11,8 +11,8 @@
 // of `.changeset/check-changeset.mjs` inside a fixture checkout, from the root
 // and from below it.
 //
-// Stdlib node:test/node:assert only (Node 24) — the repo-lints and pre-push
-// `node --test scripts/tests/*.test.mjs` steps pick this file up by glob.
+// Stdlib node:test/node:assert only (Node 24) — the `node:scripts-tests` check,
+// which pre-push and Repo Lints run, picks this file up by glob.
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";

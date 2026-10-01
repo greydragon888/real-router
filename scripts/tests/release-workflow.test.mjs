@@ -1,7 +1,7 @@
 // release-workflow.test.mjs — meta-tests for the publish path itself.
 //
 // Run:  node --test scripts/tests/release-workflow.test.mjs
-//       (picked up by the `node --test scripts/tests/*.test.mjs` step in ci.yml)
+//       (picked up by the `node:scripts-tests` check, in Repo Lints and in pre-push)
 //
 // Two invariants, both of which fail SILENTLY in production if broken — the
 // same shape as the #1127 class that ci-gate-completeness.test.mjs guards:

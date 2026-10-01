@@ -13,11 +13,11 @@
 // without reading a file — and it was loud only by accident: had "nothing
 // scanned" exited 0, it would have read as a clean audit forever.
 //
-// ⚠ The obvious guard is VACUOUS. A test that runs the real osv-scanner and
-// asserts on its result passes in CI by never running it: this file runs on
-// ubuntu-latest (ci.yml → "Test CI meta", `node --test scripts/tests/*.test.mjs`)
-// and no workflow installs osv-scanner, so the script takes its first branch,
-// `command -v osv-scanner || exit 0`. A guard for a blind gate, itself blind.
+// ⚠ A test of the real osv-scanner would answer for the machine, not for the
+// script. Where no osv-scanner is installed, the script exits 0 at its first
+// branch and the test passes without running it; where one is — Repo Lints
+// installs it — the answer is the advisory database of the day, and an advisory
+// against any lockfile reddens the test.
 //
 // So the scanner is STUBBED: a fake `osv-scanner` first on PATH records its
 // argv and returns a chosen exit code. Every assertion is on the command the
@@ -29,8 +29,8 @@
 // floor, so every test runs AT the boundary. The floor's tests are the last two.
 //
 // Stdlib node:test/node:assert only (Node 24) — scripts/ is not a vitest
-// workspace; the repo-lints `node --test scripts/tests/*.test.mjs` step picks this
-// file up by glob, so the preventer needs no wiring of its own.
+// workspace; the `node:scripts-tests` check, which pre-push and Repo Lints run,
+// picks this file up by glob, so the preventer needs no wiring of its own.
 
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";

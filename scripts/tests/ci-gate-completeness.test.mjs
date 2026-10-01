@@ -14,8 +14,8 @@
 // or be added to OUTSIDE_GATE with a written reason.
 //
 // Stdlib node:test/node:assert only (Node 24) — scripts/ is not a vitest
-// workspace; the repo-lints `node --test scripts/tests/*.test.mjs` step picks this
-// file up by glob, so the preventer needs no wiring of its own.
+// workspace; the `node:scripts-tests` check, which pre-push and Repo Lints run,
+// picks this file up by glob, so the preventer needs no wiring of its own.
 //
 // Deliberately NOT a YAML library: the extractors of `scripts/ci-gate.mjs` are
 // single-purpose and fail-closed — if ci.yml is restructured so they can't

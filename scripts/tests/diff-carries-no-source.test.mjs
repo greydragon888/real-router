@@ -2,8 +2,8 @@
 // checks consult before reading code (#2433).
 //
 // Run:  node --test scripts/tests/diff-carries-no-source.test.mjs
-//       (picked up by the `node --test scripts/tests/*.test.mjs` step in ci.yml and
-//       by the same step in .husky/pre-push)
+//       (picked up by the `node:scripts-tests` check, in Repo Lints and in
+//       pre-push)
 //
 // The predicate is consulted by SonarCloud's gate, by Codecov and by jscpd. A
 // false positive — answering "no source" on a diff that has some — is a check

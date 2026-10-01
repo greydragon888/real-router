@@ -699,16 +699,6 @@ jobs:
           retention-days: 90
 
   # ============================================
-  # REPO-LINTS: repo-global lints (syncpack / pnpm dedupe / coverage-scope /
-  # knip) — not per-package, not affected-scoped, and not turbo-cached (direct
-  # pnpm scripts that re-run every time). Pulled OUT of base + pipeline-leaf into
-  # a standalone job that runs in PARALLEL on both paths, so they no longer
-  # inflate the base→shards Amdahl prefix (R2.6). Needs only install — no build,
-  # no coverage. Mode-independent: runs on every should_run PR; CI gate requires
-  # it (hard, not ok()-skippable).
-  # ============================================
-
-  # ============================================
   # BASE PROPERTIES: the property tier of the base layer, off base-test's
   # critical path (#2429). It used to run inside base-test, behind
   # `test:properties.dependsOn: ["test"]`, which made that job a serial chain —
@@ -756,6 +746,15 @@ jobs:
           name: turbo-summary-base-properties
           path: .turbo/runs/
           retention-days: 90
+
+  # ============================================
+  # REPO-LINTS: the `ci` stage of the check registry, `scripts/checks.mjs`, run
+  # in one step by `scripts/verify.mjs`: repository-wide checks, not per-package
+  # and not turbo-cached. It runs beside the pipeline on both paths, so it adds
+  # nothing to the base→shards Amdahl prefix (R2.6). It needs the install,
+  # osv-scanner and uv, and no build. Every should_run PR runs it, and the CI
+  # gate requires it.
+  # ============================================
   repo-lints:
     name: Repo Lints
     runs-on: ubuntu-latest
