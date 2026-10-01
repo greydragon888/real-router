@@ -33,8 +33,15 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-/** The lint task `.husky/pre-push` runs outside `lint`, which CI already runs. */
-export const LINT_TASKS = ["lint:bench"];
+import { LINT_TASK_ROLES } from "./lint-tasks.mjs";
+
+/**
+ * The lint tasks no pipeline job runs: the "outside-pipeline" keys of
+ * `scripts/lint-tasks.mjs`, which says why a package's `lint` stays out.
+ */
+export const LINT_TASKS = Object.keys(LINT_TASK_ROLES).filter(
+  (task) => LINT_TASK_ROLES[task] === "outside-pipeline",
+);
 
 /** Reasons already covered elsewhere — see the header. */
 export const LOCAL_REASONS = new Set(["DependencyChanged"]);

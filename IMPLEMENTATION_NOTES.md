@@ -13214,12 +13214,14 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 - **The hooks keep their mechanics** — the Node and pnpm guards and the auto-dedupe in pre-commit, the push guard in pre-push — and call `verify`. Repo Lints is one step, `verify --stage ci`, after it installs osv-scanner and uv.
 - **`scripts/tests/checks-registry.test.mjs`** replaces the parity test. Its header lists what it holds: root scripts, workflow lines, stages, the hooks and Repo Lints, and the reach of each lint task. `scripts/ci-gate.mjs` decides which jobs gate.
 - **New to CI**, by the owner's decisions: `lint:reach`, `lint:audit` and `lint:security`. `lint:prose` runs on every PR in a job of its own, `prose-lint`, a PR of Markdown alone included.
+- **The `benchmarks-lint` planner**, `scripts/benchmarks-lint-filter.mjs`, takes its lint tasks from the `outside-pipeline` roles of `scripts/lint-tasks.mjs`, so `lint:reach` and the planner read one table.
 
 **Why — measured.**
 
 - On PR #2632 Repo Lints ran the 13 checks of the `ci` stage through `verify`, and `prose-lint` read the whole corpus.
 - PR #2633 planted the failures and was closed: a Vale error in a PR of Markdown alone reddened `prose-lint` and CI Result; a new finding of `.semgrep/rules.yml` reddened `lint:security` after every earlier check of the stage passed, and CI Result with it, while every pipeline job passed.
 - Fifteen mutations of the real tree each redden a cell of `checks-registry.test.mjs`.
+- The planner's answer holds across the switch to the table: on `343b6f029`, an edit of core's `src`, it plans nothing, and on `eb0231b27`, an edit inside `benchmarks/`, it plans `router-benchmarks`. With `lint` given the `outside-pipeline` role, the first range plans `@real-router/core` and `@real-router/validation-plugin`, and the cell on the real manifests reddens.
 
 ⚠ **The gate model reads ci.yml alone.** The other required statuses of the ruleset live in GitHub's settings, so their workflows count as not gating; a check the test does not credit to CI stays in pre-push.
 
