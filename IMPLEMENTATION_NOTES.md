@@ -13358,6 +13358,7 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 
 - `pnpm lint:workflows` runs actionlint with the CI job's setting, `SHELLCHECK_OPTS=--severity=warning`, and the registry runs it in pre-push with `tools: ["actionlint", "shellcheck"]`.
 - CI keeps its own job. The entry carries no `ciBy`: that job runs a pinned image and no `pnpm` line, and `checks-registry.test.mjs` credits a place only with a line that runs the check.
+- `knip.json` lists `actionlint` in `ignoreBinaries`, beside `tree`: it is a system binary, not a package, and without the entry `lint:unused` reports it as unlisted and fails the same pre-push.
 
 **Why.** Workflow edits are frequent — about two commits a day since July — and half of them skip the PR gate. The cost is one registry entry and half a second per push.
 

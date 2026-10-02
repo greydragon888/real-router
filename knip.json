@@ -213,7 +213,8 @@
   ],
   "ignoreBinaries": [
     "tree",
-    "playwright"
+    "playwright",
+    "actionlint"
   ],
   "ignoreExportsUsedInFile": true
 }
