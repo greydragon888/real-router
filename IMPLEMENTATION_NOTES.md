@@ -13084,6 +13084,8 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 
 ## Codecov gets a report for every master commit (2026-09-29)
 
+> **Corrected (2026-10-02).** Not every master commit: the upload follows each successful Post-Merge Build, which runs once per push, skips a push its `paths-ignore` covers, and is cancelled by a newer push. From `5267b6056` to `be37bc967`, 16 of the 50 master commits got a report.
+
 **Problem.** Codecov compares a pull request with the report of its base commit on master, and master commits had none. Every upload came from the coverage job in `ci.yml`, which runs on pull requests only. Codecov's newest master report was `9159420aa` from 2026-06-03, and Codecov had recorded `main` as the default branch, a branch this repository does not have [measured: api.codecov.io, 2026-09-29]. For four months a PR's Codecov comparison had no base, and nothing reported it: the vitest thresholds and Sonar were the gates that worked.
 
 **Solution.**

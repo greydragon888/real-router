@@ -3,9 +3,11 @@ name: Coverage (master)
 # Codecov compares a pull request with the report of its base commit on master,
 # and master had none: every upload came from the coverage job in `ci.yml`,
 # which runs on pull requests only (IMPLEMENTATION_NOTES "Codecov gets a report
-# for every master commit"). Post-Merge Build runs `test` on every push to
-# master; this workflow restores that run's `coverage/**` from the turbo remote
-# cache and uploads it for the same commit.
+# for every master commit"). After each successful Post-Merge Build, this
+# workflow restores that run's `coverage/**` from the turbo remote cache and
+# uploads it for the commit the run tested. That is not every master commit:
+# Post-Merge Build runs once per push, skips a push its `paths-ignore` covers,
+# and a newer push cancels it.
 on:
   workflow_run:
     workflows: [Post-Merge Build]
