@@ -206,6 +206,17 @@ export const CHECKS = [
     why: "new SAST findings on the branch against .semgrep/rules.yml and p/javascript",
   },
   {
+    // CI lints workflows in `ci.yml#actionlint`, on pull requests only; a push
+    // straight to master meets actionlint here. That job runs a pinned image,
+    // not a `pnpm` line, so `ciBy` cannot name it. Without shellcheck on PATH
+    // actionlint drops its shell checks silently, hence the second tool.
+    id: "lint:workflows",
+    run: ["pnpm", "lint:workflows"],
+    stages: ["pre-push"],
+    tools: ["actionlint", "shellcheck"],
+    why: "workflow errors: expressions, always-true `if:`, untrusted input in `run:`, shell bugs (actionlint)",
+  },
+  {
     id: "lint:prose",
     run: ["pnpm", "lint:prose"],
     stages: ["pre-push"],

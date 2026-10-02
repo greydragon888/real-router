@@ -28,6 +28,7 @@
     "lint:doc-dup": "node scripts/check-doc-duplication.mjs",
     "lint:issue-refs": "node scripts/check-issue-refs.mjs",
     "lint:prose": "bash scripts/check-prose.sh",
+    "lint:workflows": "SHELLCHECK_OPTS=--severity=warning actionlint",
     "lint:membership": "node scripts/check-membership-predicate.mjs",
     "lint:repo-scans": "node scripts/run-repo-scans.mjs",
     "lint:claims": "pnpm -F @real-router/core exec vitest run tests/functional/claim-census-authority-2092.test.ts --coverage.enabled=false",

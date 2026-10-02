@@ -13347,3 +13347,19 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 **Why accept the lag.** The pair ships about twice a year. Tried in one Dependabot run, the satellite fails on its peer before `solid-js` lands and marks the run failed (2026-10-01), so lifting the ignore buys a failed run per joint release, and the transitive copy in the examples still would not move. Automating the bump in `dependabot-dedupe.yml` was weighed and dropped by the owner as machinery for a rare event (2026-10-02). A patch of lag costs compiler fixes, not a break: the older preset peers the older runtime, which the newer one satisfies.
 
 **Measured.** `pnpm lint:dedupe` and `pnpm install --frozen-lockfile` in the root and the examples pass; `@real-router/solid` bundles, and its suite passes, 40 files and 498 tests.
+
+## actionlint runs in pre-push (2026-10-02)
+
+**Problem.** actionlint ran only in `ci.yml`, and `ci.yml` runs on pull requests. An infrastructure change goes straight to master without one, so its workflow edits reached master unlinted: since 2026-07-01, 93 of the 165 master commits that touched `.github/workflows` or `.github/actions` came without a PR, 48 of 93 since 2026-09-01. For those pushes the hooks are the only check (CLAUDE.md), and actionlint was in neither hook.
+
+**Solution.**
+
+- `pnpm lint:workflows` runs actionlint with the CI job's setting, `SHELLCHECK_OPTS=--severity=warning`, and the registry runs it in pre-push with `tools: ["actionlint", "shellcheck"]`.
+- CI keeps its own job. The entry carries no `ciBy`: that job runs a pinned image and no `pnpm` line, and `checks-registry.test.mjs` credits a place only with a line that runs the check.
+
+**Why.** Workflow edits are frequent — about two commits a day since July — and half of them skip the PR gate. The cost is one registry entry and half a second per push.
+
+- ⚠ Without shellcheck on PATH, actionlint skips its shell checks without a word. Listing shellcheck in `tools` turns that into the hook's loud SKIP.
+- ⚠ The local binary moves with Homebrew while CI pins 1.7.8 by digest. A newer actionlint can report what the pinned one does not, and pre-push then stops a push CI would pass: fix the finding or move the pin. Vale has the same trade-off.
+
+**Measured.** Before the change, actionlint with CI's setting found nothing at any of the 165 commits, so the gap had not fired. Each tree was extracted with `git archive` and given `git init`: without `.git` actionlint finds no project and exits 0. Controls: 34 info findings at HEAD without `SHELLCHECK_OPTS`, and 2 on a planted defect. After it: `pnpm lint:workflows` passes on HEAD and fails on the planted defect; `missingTool` names `shellcheck` on a PATH that holds only actionlint; without shellcheck on PATH, actionlint exits 0 on a script whose shellcheck warning it reports when shellcheck is there; `scripts/tests` and `lint:repo-scans` pass.
