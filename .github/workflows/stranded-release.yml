@@ -1,14 +1,14 @@
 name: Stranded Release Watch
 
-# ⚠ This watches for a failure that is SILENT and PERMANENT (#2057). A release
+# ⚠ This watches for a failure that is SILENT and PERMANENT. A release
 # commit allocates a version for every bumped package; if its `Post-Merge Build`
 # is cancelled, `Changesets` never fires and the version exists only in its own
 # CHANGELOG section — no npm release, no tag. `post-merge.yml` now keeps release
 # builds out of the cancelling concurrency group, which is the prevention; this
 # is the detection, because a silent permanent drop deserves both.
 #
-# ⚑ It does NOT reuse the question `.changeset/unpublished-packages.mjs` asks,
-# which #2057 proposed — it imports only that module's not-found classifier.
+# ⚑ It does NOT reuse the question `.changeset/unpublished-packages.mjs` asks —
+# it imports only that module's not-found classifier.
 # That question is "is the CURRENT version published", and the answer
 # heals the moment the next release succeeds — measured, the window on the
 # reproduction was 35 minutes, so a schedule would miss it. This asks a question

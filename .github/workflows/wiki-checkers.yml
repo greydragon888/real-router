@@ -1,11 +1,10 @@
 # The wiki's two checkers — on the pull request that can cause the drift, and on a
-# schedule and a wiki edit as the net underneath (#2466).
+# schedule and a wiki edit as the net underneath.
 #
 # They read BOTH repositories: `check-links.mjs` resolves wiki links against
 # monorepo paths, and `check-messages.mjs` compares every message a page quotes
 # against the literals in `packages/*/src`. So drift arrives from either side, and
-# a rename in the monorepo makes a page wrong with nobody touching the wiki —
-# which is how #2399, #2458 and #2460 happened.
+# a rename in the monorepo makes a page wrong with nobody touching the wiki.
 #
 # **The pull request is where the drift is CAUSED, so that is where the report
 # goes.** The author of a rename has the context and can update the page in a
@@ -14,7 +13,7 @@
 # a finding — deliberately, because a wiki finding cannot be ANSWERED in a monorepo
 # pull request: the wiki is a separate repository with no pull requests, and the
 # page documents `master`, so it is usually correct to fix it once this merges
-# rather than before. #2450 is the precedent for not putting a check at an address
+# rather than before. A check is not put at an address
 # where it cannot be answered; a comment at that address is not a check.
 #
 # On `schedule` and `gollum` the same finding DOES fail the job, because there the
@@ -50,7 +49,7 @@ on:
       # path filter does not follow; `check-messages.mjs` reads it there.
       - "shared/**"
       # `check-messages.mjs` checks its own extractor against this tree before it
-      # reads a page (#2537), so a change here changes the answer it expects.
+      # reads a page, so a change here changes the answer it expects.
       - "packages/core/tests/fixtures/raiser-heads/**"
       # So a change to this workflow is exercised by its own pull request.
       - ".github/workflows/wiki-checkers.yml"

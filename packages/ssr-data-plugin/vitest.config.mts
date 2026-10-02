@@ -14,7 +14,7 @@ const config = mergeConfig(
   }),
 );
 
-// #809 — this package is the coverage owner of shared/ssr.
+// This package is the coverage owner of shared/ssr.
 // Unlike shared/dom-utils and shared/browser-env, shared/ssr has no dedicated
 // owner package (both consumers have their own src), so the measurement rides
 // on this consumer: v8 resolves the `src/shared-ssr` symlink to its
@@ -25,7 +25,7 @@ const config = mergeConfig(
 // base wildcard): a bare `packages/*/src/**` alongside allowExternal would
 // drag the whole aliased workspace graph (core, fsm, …) into the report.
 config.test.coverage.allowExternal = true;
-// #1838: the base config excludes `**/index.ts` (package barrels are pure
+// The base config excludes `**/index.ts` (package barrels are pure
 // re-exports), and the owner configs replace `include` but inherit `exclude` —
 // so all three `shared/*/index.ts` were measured NOWHERE. Proven on the
 // dom-utils owner: a never-called function with a branch appended to

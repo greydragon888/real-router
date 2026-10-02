@@ -3,7 +3,7 @@ import { mergeConfig, defineConfig } from "vitest/config";
 import { commonConfig } from "../../vitest.config.common.mjs";
 import unitConfig from "../../vitest.config.unit.mjs";
 
-// Two-project layout (#1512, RFC `.claude/rfc-1512-aot-unit-coverage-ru.md`):
+// Two-project layout:
 //
 //   - "jit" — the pre-existing suite, transpiled by esbuild exactly as before.
 //     Signal-based initializer APIs (`contentChildren()`, `input()`) are NOT
@@ -26,8 +26,8 @@ export default mergeConfig(
       coverage: {
         // These floors measure angular's own code. `src/dom-utils` is the
         // `shared/dom-utils` symlink, which `vitest.config.unit.mts` leaves
-        // out of every consumer's coverage; react measures it as its owner
-        // (#2552). What keeps the floors below 100 is merge duplicates: the
+        // out of every consumer's coverage; react measures it as its owner.
+        // What keeps the floors below 100 is merge duplicates: the
         // jit (esbuild) and aot (Angular) emits map some statements of
         // dual-tested files (RouteView, RealLink, RealLinkActive) to
         // different ranges, so the merged report keeps uncovered jit-emit

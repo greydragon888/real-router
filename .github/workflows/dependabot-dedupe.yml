@@ -2,7 +2,7 @@ name: Dependabot Lockfile Dedupe
 
 # Runs `pnpm dedupe` on a Dependabot PR branch and pushes the result back, so the
 # required `lint:dedupe` gate (`pnpm dedupe --check`) passes without the manual
-# `pnpm resolve:dependabot <PR#>`. Background: issue #1085.
+# `pnpm resolve:dependabot <PR#>`.
 #
 # WHY it's needed: Dependabot does a minimal lockfile edit and never runs
 # `pnpm dedupe`, so a bump can split a shared transitive subtree into old+new
@@ -19,10 +19,9 @@ name: Dependabot Lockfile Dedupe
 # GITHUB_TOKEN push creates NO workflow run for the new head SHA. The PR then
 # sits on "Expected — waiting for status" forever: strictly worse than the red
 # `lint:dedupe` it was meant to fix, and silent (no red X anywhere).
-# Measured on the only two PRs this workflow ever pushed to:
-#   gh api …/commits/aa7aacf0a/check-runs → 0 check-runs   (bot head, PR #1562)
-#   gh api …/commits/cc909e6da/check-runs → 32 check-runs  (its Dependabot parent)
-# #1368 was closed unmerged; #1562 stayed open. Neither dedupe commit reached master.
+# Measured on the only two PRs this workflow ever pushed to: the bot head had
+# 0 check-runs, its Dependabot parent 32; one PR was closed unmerged and the
+# other stayed open, so neither dedupe commit reached master.
 #
 # A push authenticated with a PAT DOES trigger workflows — the same reason
 # changesets.yml uses PAT_TOKEN for the Release PR. Platform asymmetry to know:
@@ -34,7 +33,7 @@ name: Dependabot Lockfile Dedupe
 # dependabot[bot], so it is an ORDINARY Actions run — full Actions secrets/vars,
 # a superset of what the Dependabot context sees. (Not a Remote-Cache win today:
 # TURBO_TOKEN is already mirrored into the Dependabot secret store, so the
-# "cold Dependabot run" note in ci.yml's leaf-filter comment (#1067) may itself
+# "cold Dependabot run" note in ci.yml's leaf-filter comment may itself
 # be stale — verify before citing it.)
 #
 # Until that secret exists the job still dedupes but REFUSES to push and points
@@ -52,8 +51,7 @@ name: Dependabot Lockfile Dedupe
 # ⚠ A push here alters the PR, and Dependabot resolves conflicts only on a PR
 # nobody altered ("as long as you don't alter it yourself", in each PR's
 # description). When a later merge conflicts with it in the lockfile, the
-# conflict stays until `pnpm resolve:dependabot <PR#>` or `@dependabot recreate`
-# (#2643, #2644).
+# conflict stays until `pnpm resolve:dependabot <PR#>` or `@dependabot recreate`.
 
 on:
   pull_request:

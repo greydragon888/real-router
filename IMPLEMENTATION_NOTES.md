@@ -13366,3 +13366,19 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 - ⚠ The local binary moves with Homebrew while CI pins 1.7.8 by digest. A newer actionlint can report what the pinned one does not, and pre-push then stops a push CI would pass: fix the finding or move the pin. Vale has the same trade-off.
 
 **Measured.** Before the change, actionlint with CI's setting found nothing at any of the 165 commits, so the gap had not fired. Each tree was extracted with `git archive` and given `git init`: without `.git` actionlint finds no project and exits 0. Controls: 34 info findings at HEAD without `SHELLCHECK_OPTS`, and 2 on a planted defect. After it: `pnpm lint:workflows` passes on HEAD and fails on the planted defect; `missingTool` names `shellcheck` on a PATH that holds only actionlint; without shellcheck on PATH, actionlint exits 0 on a script whose shellcheck warning it reports when shellcheck is there; `scripts/tests` and `lint:repo-scans` pass.
+
+## Build configs carry no issue numbers or record references (2026-10-02)
+
+**Problem.** The comments and descriptions of the build configs pointed at records instead of stating what holds: issue and PR numbers, sections of the 2026-08-01 CI/CD audit, revision and phase marks of RFCs (`R2.19`, `Phase 2`), CI run ids, commit SHAs, and documents under `.claude/` that git does not track. A registry `why` reaches every hook and CI log, so the hooks printed lines like `▶ node:scripts-tests — the repository's own tooling tests (#2359)`.
+
+**Solution.** Across the check registry (`scripts/checks.mjs`, `scripts/repo-wide-scans.json`), the git hooks, the GitHub workflows, the setup action, the Dependabot and Dependency Review configs, and the lint, test, bundle, Sonar and Codecov configs, each such reference is removed and its sentence keeps what it states.
+
+- A trailing `(#NNN)` goes. A number that named a thing gives way to the thing's name: `the #1133 guard` → `the check-result guard`, `the #2111 ledger` → `the claim-census ledger`, `#2433's predicate` → `the no-source predicate`.
+- A sentence that existed only to point at a record goes with it; a measured number stays without its run id or commit.
+- Three lint messages in `eslint.config.mjs` and `packages/core/eslint.config.mjs` lost their references as well.
+
+Kept, because none of them points at a record: measurement dates, which say when a number was taken; core's own `§4` / `§5` section labels in `packages/core/eslint.config.mjs`, which `packages/core/src/engine/CLAUDE.md` points at; standard names (`PKCS#12`, `RFC 3339`); the tracked `.claude/rules/docs.md`; the issue example in the commitizen prompt; and the `Cache bust:` line in `vitest.config.common.mts`, a deliberate cache-bust marker.
+
+**Why.** Owner decision: a build config states what holds, and the record of how it came to be lives where CLAUDE.md puts history — this file, changesets, commit messages and issues.
+
+**Measured.** A scan of 266 config files: 249 replacements in 39 files, and none of the reference forms above remains — `ci.yml` alone had 55 lines with an issue number. Of the changed lines, 11 are not comments: the seven `why` strings, three lint messages and one description line. `verify --stage pre-push` passes and actionlint is clean.

@@ -17,7 +17,7 @@ updates:
       # versions are identical. Their peer ranges let `react` move alone
       # (react-dom@X peers `react ^X`, which a newer react satisfies) and stop
       # `react-dom` from moving alone (a newer react-dom peers the newer react,
-      # which strictPeerDependencies refuses). Ungrouped, that produced #2318:
+      # which strictPeerDependencies refuses). Ungrouped, that produced:
       # `react` bumped without `react-dom`, a clean install, and failing React
       # tests — and no `react-dom` PR at all. The exact names outrank the `*`
       # of `patches` and `dev-dependencies`: a dependency joins the most
@@ -110,7 +110,7 @@ updates:
       - dependency-name: "piscina" # override: piscina '>=5.2.0 <6.0.0'
       - dependency-name: "js-yaml" # override: read-yaml-file '>=2.1.0' (GHSA-h67p-54hq-rp68)
       # undici is no dependency of the root: danger installs a 7.x of its own
-      # (`.pnpmfile.mjs`), and jsdom takes 8.x on its own range (#2605). Each
+      # (`.pnpmfile.mjs`), and jsdom takes 8.x on its own range. Each
       # parent's range moves its copy; Dependabot would offer 8.x to both.
       - dependency-name: "undici"
       # @types/node is pinned to the Node.js runtime major (Node 24 — `.nvmrc` is
@@ -136,7 +136,7 @@ updates:
       # @analogjs/vite-plugin-angular, @testing-library/svelte,
       # vitefu — so the `pnpm install --lockfile-only` re-resolve fails with
       # ERR_PNPM_PEER_DEP_ISSUES (strictPeerDependencies: true) and ERRORS THE ENTIRE
-      # npm job (observed: run 28767218145, vite 8.1.3), risking a repo-wide halt.
+      # npm job (observed with vite 8.1.3), risking a repo-wide halt.
       # Block the major only; 7.x patch/minor keep flowing. Lift this when vitest
       # peers vite 8, then bump the vite major manually + together across the
       # ecosystem.
@@ -251,7 +251,7 @@ updates:
       - dependency-name: "@angular/*"
       # @angular-devkit/* is released in lockstep with @angular/cli and
       # @angular/build, which the entry above holds back. Bumped alone it gives
-      # the tree two devkit generations (#2611: 22.2.0 beside the 22.1.8 of
+      # the tree two devkit generations (22.2.0 beside the 22.1.8 of
       # @angular/build), so it moves with them: the manifests declare it with
       # `~`, and the coordinated update names it beside @angular/*.
       - dependency-name: "@angular-devkit/*"
@@ -305,12 +305,12 @@ updates:
     # `/` covers `.github/workflows/**` only. A composite action referenced by a
     # RELATIVE path (`uses: ./.github/actions/setup`) is not a dependency edge
     # Dependabot follows, and its own `uses:` pins live outside that scan — so
-    # they were never bumped. Proof: PR #1531 ("bump actions/setup-node from 6 to
-    # 7") updated six workflow files and left `.github/actions/setup/action.yml`
+    # they were never bumped. Proof: the PR "bump actions/setup-node from 6 to
+    # 7" updated six workflow files and left `.github/actions/setup/action.yml`
     # on v6; `git log -- .github/actions/` shows no dep bump in the directory's
     # history. That action runs in 11 jobs, i.e. the pins most worth updating
     # were the only ones frozen. Listing its directory explicitly puts it in
-    # scope. (2026-08-01 CI/CD audit §1.6.)
+    # scope.
     directories:
       - "/"
       - "/.github/actions/setup"

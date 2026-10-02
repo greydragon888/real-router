@@ -8,8 +8,8 @@ on:
   # have nothing to scan) are skipped at the JOB level via head-ref `if:` below
   # — a job skipped by `if:` reports a "skipped" conclusion, which branch
   # protection treats as a pass, so the required check is satisfied without
-  # running. This mirrors the head-ref gating already used in danger.yml (#811-
-  # era hardening). Dependabot dep PRs change pnpm-lock.yaml too, so they were
+  # running. This mirrors the head-ref gating already used in danger.yml.
+  # Dependabot dep PRs change pnpm-lock.yaml too, so they were
   # never matched by the old `**/package.json` ignore anyway — they keep running.
   pull_request:
     branches: [master]

@@ -9,7 +9,7 @@
  * packages (browser-plugin, hash-plugin, memory-plugin, navigation-plugin,
  * browser-env, angular, preact, react, solid, svelte, vue) whose remote
  * turbo cache entries lacked the LCOV reporter output, causing SonarCloud
- * to report 0% coverage on new code in those packages (#470).
+ * to report 0% coverage on new code in those packages.
  */
 
 import { readdirSync, readFileSync, existsSync } from "node:fs";
@@ -24,7 +24,7 @@ import { defineConfig } from "vitest/config";
  *
  * Replaces the "development" export condition which was removed
  * from package.json exports because Vite resolves it by default
- * and errors for external consumers (#421).
+ * and errors for external consumers.
  */
 function workspaceSourceAliases(): Record<string, string> {
   const root = dirname(fileURLToPath(import.meta.url));
@@ -109,12 +109,12 @@ export const commonConfig = defineConfig({
   // Without this, Vitest resolves via exports → dist and v8
   // coverage can't track source files.
   //
-  // NOTE (Этап 2 RFC): Vitest condition-based resolution with custom
+  // NOTE: Vitest condition-based resolution with custom
   // "@real-router/internal-source" condition will be added here once we identify a
   // condition list that doesn't interfere with external packages (preact,
   // react, vue, svelte) which use non-standard condition orderings. For now
   // we keep the alias-based approach and rely on the tsconfig's customConditions
-  // for TypeScript-side resolution. See .claude/rfc-custom-export-condition-root-fix-ru.md
+  // for TypeScript-side resolution.
   resolve: {
     alias: workspaceSourceAliases(),
   },

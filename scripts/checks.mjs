@@ -59,24 +59,24 @@ export const CHECKS = [
     run: ["pnpm", "lint:coverage-scope"],
     stages: ["pre-commit", "pre-push", "ci"],
     ciSkip: ["dependabot-pr", "no-source"],
-    why: "the Codecov, Sonar, size-limit and turbo scopes match the package tree (#732)",
+    why: "the Codecov, Sonar, size-limit and turbo scopes match the package tree",
   },
   {
     // pre-push runs it too: git runs no pre-commit for a tree `git merge` or
-    // `git rebase` produced, nor for a `--no-verify` commit (#2392, #2548).
+    // `git rebase` produced, nor for a `--no-verify` commit.
     id: "lint:membership",
     run: ["pnpm", "lint:membership"],
     stages: ["pre-commit", "pre-push", "ci"],
     ciSkip: ["dependabot-pr", "no-source"],
-    why: "a record counted with Object.keys and tested with hasOwnProperty or in (#2108)",
+    why: "a record counted with Object.keys and tested with hasOwnProperty or in",
   },
   {
     // A scan of the whole tree cannot sit behind a per-package cache key: a
-    // change in a sibling would replay a pass (#2241).
+    // change in a sibling would replay a pass.
     id: "lint:repo-scans",
     run: ["pnpm", "lint:repo-scans"],
     stages: ["pre-commit", "pre-push", "ci"],
-    why: "every repository-wide scan, listed in scripts/repo-wide-scans.json (#2241)",
+    why: "every repository-wide scan, listed in scripts/repo-wide-scans.json",
   },
   {
     id: "lint:e2e",
@@ -92,7 +92,7 @@ export const CHECKS = [
     // push its fix: the two workflows race on one event, and CI would read the
     // lockfile before the fix lands. The fix's push reruns CI as another
     // author, where the check runs hard; without the token nothing fixes the
-    // lockfile, and the check stays hard (#1085).
+    // lockfile, and the check stays hard.
     id: "lint:dedupe",
     run: ["pnpm", "lint:dedupe"],
     stages: ["pre-push", "ci"],
@@ -119,7 +119,7 @@ export const CHECKS = [
     run: ["node", "--test", "--test-reporter=dot", "scripts/tests/*.test.mjs"],
     stages: ["pre-push", "ci"],
     ciSkip: ["dependabot-pr", "no-source"],
-    why: "the repository's own tooling tests (#2359)",
+    why: "the repository's own tooling tests",
   },
   {
     // Read by the whole task graph, so a diff of manifests alone or a bump of
@@ -128,7 +128,7 @@ export const CHECKS = [
     run: ["pnpm", "lint:reach"],
     stages: ["pre-push", "ci"],
     ciSkip: [],
-    why: "every workspace package is linted, and every tracked code file by its own config (#2370, #2407)",
+    why: "every workspace package is linted, and every tracked code file by its own config",
   },
 
   // ── Turbo ──────────────────────────────────────────────────────────────────
@@ -156,7 +156,7 @@ export const CHECKS = [
       "ci.yml#base-bundle",
       "ci.yml#pipeline-sharded",
     ],
-    why: "the packages build, and their artifacts pass publint and arethetypeswrong (#813)",
+    why: "the packages build, and their artifacts pass publint and arethetypeswrong",
   },
   {
     id: "turbo:lint:bench",
@@ -180,7 +180,7 @@ export const CHECKS = [
     id: "test:stress",
     run: ["pnpm", "test:stress"],
     stages: ["pre-push"],
-    why: "heap and timing stress suites at --concurrency=1, their only gate (#1423)",
+    why: "heap and timing stress suites at --concurrency=1, their only gate",
   },
   {
     id: "lint:unused",

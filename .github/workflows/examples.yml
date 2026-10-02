@@ -15,7 +15,7 @@ concurrency:
 permissions:
   contents: read
 
-# Self-hosted ducktors/turborepo-remote-cache on Cloud Run + Cloudflare R2 (#490).
+# Self-hosted ducktors/turborepo-remote-cache on Cloud Run + Cloudflare R2.
 # The examples build with `pnpm -r`; turbo only bundles the packages they get
 # as tarballs.
 env:
@@ -104,7 +104,7 @@ jobs:
       # runner it skips electron's postinstall, leaving `path.txt` absent. Both
       # `node install.js` and a Node wrapper around @electron/get exit 0 *at the
       # await* on this runner (the download never keeps the event loop alive),
-      # writing no path.txt and bypassing any guard (#812). This script downloads
+      # writing no path.txt and bypassing any guard. This script downloads
       # the release zip with curl (a blocking subprocess), verifies sha256, and
       # extracts — no Node async — so the step cannot go green without a binary.
       - name: Install Electron binary
@@ -121,7 +121,7 @@ jobs:
       # display Electron dies on platform init ("Missing X server or $DISPLAY" →
       # SIGSEGV). Xvfb is preinstalled on ubuntu-latest; depth 24 (Chromium
       # dislikes the 8-bit default). Web examples run headless Chromium and ignore
-      # the display. (#812) One example at a time: the suites share ports.
+      # the display. One example at a time: the suites share ports.
       - name: Run E2E tests
         run: >-
           xvfb-run -a --server-args="-screen 0 1280x1024x24"
@@ -134,7 +134,7 @@ jobs:
           name: playwright-report
           # Examples nest 3-4 levels deep (examples/web/<fw>/<name>/,
           # examples/desktop/electron/<name>/) — a single-level glob matched
-          # nothing, so reports were never uploaded on failure (#812).
+          # nothing, so reports were never uploaded on failure.
           path: |
             examples/**/playwright-report/
             examples/**/test-results/
@@ -144,7 +144,7 @@ jobs:
   # Open/refresh a tracking issue when the scheduled suite fails, so chronic
   # redness can't live unnoticed (the only other signal is an email to the
   # workflow-file author). Skipped on workflow_dispatch to avoid noise during
-  # manual verification runs (#812).
+  # manual verification runs.
   notify-failure:
     name: Open issue on failure
     runs-on: ubuntu-latest
@@ -158,7 +158,7 @@ jobs:
     # schedule/dispatch-only, and the `schedule` clause keeps a manual dispatch
     # from filing issues. (Deliberately NOT copied to post-merge.yml, where
     # `cancel-in-progress: true` cancels superseded runs constantly and `!success()`
-    # would open an issue on every quick second push.) (Audit §4.8.)
+    # would open an issue on every quick second push.)
     if: "!success() && github.event_name == 'schedule'"
     permissions:
       issues: write

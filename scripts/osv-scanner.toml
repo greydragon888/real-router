@@ -85,5 +85,5 @@ reason = "quick-xml < 0.41.0 NsReader allocates unbounded memory for namespace d
 # and 2.1.3 had both shipped while still affected). Re-querying api.osv.dev per version on 08-03
 # answered CLEAN for both, so the condition was genuinely met: the pins in pnpm-workspace.yaml moved
 # to 1.1.17 / 2.1.3, the mirrored `allow-ghsas:` line in codeql.yml lost the id too, and the
-# Dependabot alert (#593, the third channel that neither allowlist touches) closes on the lockfile.
+# Dependabot alert (the third channel that neither allowlist touches) closes on the lockfile.
 # Ask OSV per version before re-adding anything here.

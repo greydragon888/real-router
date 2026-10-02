@@ -4,8 +4,7 @@ name: CodSpeed
 #
 #   job `core`     — the tinybench suite under packages/core/tests/benchmarks/
 #                    wired to @codspeed/tinybench-plugin via fixtures.ts
-#                    (makeBench → withCodSpeed). RFC:
-#                    .claude/core-benchmark-strategy-rfc-ru.md.
+#                    (makeBench → withCodSpeed).
 #   job `adapters` — the six framework suites (react/preact/vue/solid/svelte/
 #                    angular), pure tinybench + vite prebuild under jsdom, PLUS
 #                    `benchmarks/plugin-seam`, which is not an adapter: it is the
@@ -19,7 +18,7 @@ name: CodSpeed
 # Both run under CodSpeed's `simulation` instrument (Valgrind callgrind), so
 # each bench emits deterministic instruction counts instead of wall-clock.
 #
-# ⚑ ONE WORKFLOW IS A REQUIREMENT, NOT A TIDY-UP (#1691). CodSpeed aggregates
+# ⚑ ONE WORKFLOW IS A REQUIREMENT, NOT A TIDY-UP. CodSpeed aggregates
 # the results of several jobs into a single report ONLY when they are "split
 # within a single CI workflow" (docs: Features → Sharded benchmarks). While the
 # adapter suite lived in its own workflow file the two suites produced TWO
@@ -27,7 +26,7 @@ name: CodSpeed
 # other suite SKIPPED — with three visible consequences:
 #   1. the aggregate impact oscillated ±20% between consecutive commits purely
 #      by which run a commit happened to bind to, on trees whose runtime code
-#      was byte-identical (measured on #1689: -19.71% → +19.72% → -20.23%, the
+#      was byte-identical (measured: -19.71% → +19.72% → -20.23%, the
 #      middle pair cancelling to 0.01pp);
 #   2. every core benchmark's BASE value was carried over from an earlier run
 #      ("Skipped result on the base run, the displayed result ran 1 day ago"),
@@ -62,25 +61,25 @@ name: CodSpeed
 # not here — this workflow only runs the suites under instrumentation and
 # uploads.
 
-# ✅ ENABLED — Phase 2 (2026-07-16). History: the gate was disabled (#984,
-# 2026-06-27) because GitHub's heterogeneous `ubuntu-latest` pool landed base
+# ✅ ENABLED. History: the gate was disabled because GitHub's heterogeneous
+# `ubuntu-latest` pool landed base
 # and head on different CPUs (AMD EPYC vs Intel Xeon), so callgrind emitted
 # different instruction counts and every PR red-flagged with phantom
 # ±30–4000% swings (root cause:
-# https://codspeed.io/blog/unrelated-benchmark-regression). Phase 1 moved the
-# job to a dedicated self-hosted VPS (consistent hardware) — but a same-sha
+# https://codspeed.io/blog/unrelated-benchmark-regression). The job moved
+# to a dedicated self-hosted VPS (consistent hardware) — but a same-sha
 # dispatch pair STILL drifted 3/56 (×5.1 / +82% / +41%): the plugin's
 # single-measured-iteration `simulation` mode occasionally drops a full-GC
 # tail into the one measured call. Fixed by BATCHING each task to ~4-6 ms of
 # operations + a pre-run `settleHeap()` (see packages/core/tests/benchmarks/
 # fixtures.ts and IMPLEMENTATION_NOTES "Batched measurements + heap settling");
 # verified 0/56 across three same-code run pairs. The adapter suite was verified
-# the same way in its own Phase 1 (three K-calibration iterations; final same-sha
+# the same way (three K-calibration iterations; final same-sha
 # pair 18/18 unchanged, impact +0.014%). The installer download from codspeed.io
 # is unreachable from the RF VPS, so runner-version is pinned to a cargo-git rev
 # (see the action steps below).
 #
-# Phase 2 (this state): push:[master] seeds/updates the baseline (feature-merge
+# Current state: push:[master] seeds/updates the baseline (feature-merge
 # commits only — release-merge commits are skipped, see the job `if`),
 # pull_request compares against it. The regression threshold / gate semantics live in the
 # CodSpeed project settings, not here; CodSpeed is NOT a required status check,
@@ -88,10 +87,10 @@ name: CodSpeed
 # gates pull_request to same-repo PRs only — fork-PR code never executes on the
 # self-hosted VPS (public-repo RCE / resource-abuse surface).
 #
-# PATH FILTER (2026-08-01 CI/CD audit §3.1). Instruction counts cannot move for a
+# PATH FILTER. Instruction counts cannot move for a
 # change that ships no code, yet every run costs the SINGLE self-hosted runner
-# minutes of EXCLUSIVE time — measured on d766588af (a one-file `.claude/`
-# commit): core 166 s + adapters 264 s = 430 s, on a runner shared with
+# minutes of EXCLUSIVE time — measured on a one-file `.claude/`
+# commit: core 166 s + adapters 264 s = 430 s, on a runner shared with
 # the weekly cross-router bench. Over the 30 days to 2026-08-01,
 # 163 of 517 master commits touched no packages/shared/examples/benchmarks file
 # at all; `.claude/` (97) and `.github/` (52) dominate. Skipping at the `on:`
@@ -154,7 +153,7 @@ on:
         # ⚑ WHY THIS EXISTS: the runner has ONE job slot, and this workflow
         # declares TWO jobs. On a dispatch GitHub hands the slot to `adapters`
         # FIRST, so `core` waits out its full 4 m 14 s before starting —
-        # measured on run 31319433823: adapters 14:48:53 -> 14:53:07, core
+        # measured on one run: adapters 14:48:53 -> 14:53:07, core
         # 14:53:10 -> 14:56:01. The runner is idle of OTHER work the whole time;
         # the queue is the run competing with itself, which is why the delay
         # reproduces on every dispatch. Core's own work is ~2.75 min, so a
@@ -231,7 +230,7 @@ jobs:
               # The newest first-parent ancestor whose own CodSpeed push run
               # finished green. A run the gate skipped counts: it certified that
               # commit equivalent to its own base. Each commit is asked for its
-              # runs by SHA, as the Bundle Size base is (#2396): the run LIST
+              # runs by SHA, as the Bundle Size base is: the run LIST
               # has answered with runs weeks old, and a base that old measures
               # every push.
               # ⚠ On an HTTP error `gh api` prints the error body to stdout, so
@@ -275,7 +274,7 @@ jobs:
     # push-to-master merge run measures anything new:
     #   - pull_request side: skipped by head_ref (changeset-release/*).
     #   - push side: left to `gate`, which answers skip for a range that only
-    #     moves versions and changelogs (measured on 4e737ab5d). A clause keyed
+    #     moves versions and changelogs (measured). A clause keyed
     #     on the merge commit's message is deliberately absent: it could only
     #     skip a release merge the gate asked to RUN — a range whose base a
     #     failed run left stale — and that run would still finish green, so the
@@ -303,14 +302,14 @@ jobs:
       (github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.user.login != 'dependabot[bot]')) &&
       !startsWith(github.head_ref, 'changeset-release/')
-    # Self-hosted VPS runner = consistent hardware, which fixes the #984 cause:
+    # Self-hosted VPS runner = consistent hardware, which removes the cause:
     # GitHub's heterogeneous ubuntu-latest pool put base/head on different CPUs
     # (AMD EPYC vs Intel Xeon) → phantom instruction-count swings.
     runs-on: self-hosted
     # Bound the hold on the single self-hosted runner: measured 163 s (core) and
     # 231 s (adapters) on real runs, so 30 min is ~10x headroom, against an
     # invisible 360-minute default that would park the production VPS for six
-    # hours on a wedged process. (2026-08-01 CI/CD audit §4.8.)
+    # hours on a wedged process.
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -336,11 +335,11 @@ jobs:
         with:
           node-cache: ""
 
-      # ⚑ SETTLE THE SETUP TAIL BEFORE ANY MEASUREMENT (#1711).
+      # ⚑ SETTLE THE SETUP TAIL BEFORE ANY MEASUREMENT.
       #
       # Measured 2026-08-10: the FIRST run on a branch the runner has not seen
       # comes back with `sysSeconds` of 1.4-3.9 s instead of ~0.0002 — six of
-      # six such runs during the #1728 series — while a RE-RUN of the same
+      # six such runs in one series — while a RE-RUN of the same
       # branch is clean, four of four. Three runs on a warm `master` (one push,
       # two dispatches, same SHA) were clean with `cpuTotal` agreeing to four
       # decimals. Only branch novelty differs, so it is not co-tenancy and not
@@ -352,7 +351,7 @@ jobs:
       # of TASK #1 — `navigate/sync-baseline` here, which is why that arc
       # absorbed it every time. A surged run inflates `cpuTotal` by ~4 % and
       # reads exactly like a regression: `sysCount` moves too, the neighbours
-      # look normal, and re-dispatching "fixes" it. That ritual cost the #1728
+      # look normal, and re-dispatching "fixes" it. That ritual cost one
       # investigation roughly thirty re-dispatches.
       #
       # `sync` flushes the dirty pages the install left; the pause lets the
@@ -361,7 +360,7 @@ jobs:
       # is its heaviest… two gc→drain rounds settle that debt outside any
       # measurement window") — one level up, at the job instead of the process.
       #
-      # ⚠ Not a fix for the run-level surge #1711 is otherwise about; it
+      # ⚠ Not a fix for the general run-level surge; it
       # addresses the reproducible first-run-on-a-branch case only. Keep reading
       # `sysSeconds` before trusting any number.
       - name: Settle the setup tail
@@ -381,9 +380,9 @@ jobs:
       - name: Put cargo bin dir on PATH (for cargo-installed codspeed-runner)
         run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
-      # ⚑ SAMPLE THE CGROUP AROUND THE MEASUREMENT (#2376).
+      # ⚑ SAMPLE THE CGROUP AROUND THE MEASUREMENT.
       #
-      # The runner unit carries `MemoryMax=5G` (#1746). Reaching it makes the
+      # The runner unit carries `MemoryMax=5G`. Reaching it makes the
       # kernel force-RECLAIM rather than kill, so `oom_kill` stays 0, the journal
       # records nothing, and the unit's OOMScoreAdjust / OOMPolicy guards never
       # fire — they guard the kill path, and there is no kill. Measured on the
@@ -394,7 +393,7 @@ jobs:
       #
       # Direct reclaim stalls the measured process mid-collection and re-faults
       # its file pages, which moves exactly the components simulation reports.
-      # #2375 is the run where that is the leading explanation: the same commit
+      # It is the leading explanation of one measured case: the same commit
       # measured 27-39 % apart across two runs, with a degenerate call graph on
       # one side, while every CodSpeed health field read clean.
       #
@@ -414,7 +413,7 @@ jobs:
       # ⚠ The set is `getV8Flags()`'s `analysis` branch, and `getInstrumentMode()`
       # maps BOTH `simulation` and `memory` onto it — so `--no-opt`,
       # `--predictable`, `--expose-gc`, fixed seeds and no concurrent sweeping all
-      # apply (#1728 read the switch without the mapping and concluded otherwise).
+      # apply.
       # `--no-opt` is only `--no-turbofan`. What keeps an optimizing tier out of
       # the measured call is `--no-maglev`, which @codspeed/core adds from 6.0 on
       # Node >= 24; core only warns when a flag is missing, so `makeBench` in both
@@ -431,7 +430,7 @@ jobs:
       # Simulation mode does not include system calls in the measurement" — and
       # these navigate arms report ~70 excluded syscalls each, so a percentage
       # here is a share of a quantity a user never experiences on its own.
-      # Whether to move them to `walltime` is the open half of #1691.
+      # Whether to move them to `walltime` is an open question.
       #
       # runner-version: `rev:v4.18.4` forces the action's cargo-install branch
       # (`source $HOME/.cargo/env; cargo install --locked --git
@@ -468,12 +467,12 @@ jobs:
           bash "$GITHUB_WORKSPACE/scripts/cgroup-sample.sh" report \
             "$RUNNER_TEMP/cgroup-before.txt" "$RUNNER_TEMP/cgroup-after.txt" "core hot-path benchmarks"
 
-      # Which sample is this comparison read against, and how old is it (#2375)?
+      # Which sample is this comparison read against, and how old is it?
       # CodSpeed takes the most recent run that HAS data, and the gate skips the
       # benchmark jobs while the measured program is unchanged — so one sample
       # can answer for every pull request opened since. That is the gate working
       # rather than a defect, but the report does not say it: CodSpeed prints a
-      # footnote only when it calls the base *unexpected*, and on #2371 the
+      # footnote only when it calls the base *unexpected*, and on one PR the
       # second run dropped that footnote while keeping the same 13-commit base.
       #
       # ⚠ AFTER the cgroup sampler, never between its two halves — the pair
@@ -510,7 +509,7 @@ jobs:
     # BOTH suites whenever `gate` runs either — which is what CodSpeed's
     # aggregation requires.
     runs-on: self-hosted
-    # Same bound and rationale as `core` (§4.8): measured 231 s here, so 30 min
+    # Same bound and rationale as `core`: measured 231 s here, so 30 min
     # is ~8x headroom instead of the invisible 360-minute default.
     timeout-minutes: 30
     steps:
@@ -554,7 +553,7 @@ jobs:
         # suite resolves @real-router/* to built dist — see vite/base.mts.
         run: pnpm run prebuild:adapter
 
-      # Same cgroup sampler as `core` (#2376) — same unit, same ceiling, same
+      # Same cgroup sampler as `core` — same unit, same ceiling, same
       # exposure. Its rationale is stated once, on the core job's copy.
       - name: Sample cgroup — before
         run: bash "$GITHUB_WORKSPACE/scripts/cgroup-sample.sh" capture "$RUNNER_TEMP/cgroup-before.txt"

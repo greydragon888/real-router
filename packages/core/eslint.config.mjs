@@ -30,7 +30,7 @@ export default [
     },
   },
 
-  // White-box guardrail (audit 2026-06-23, .claude/whitebox-test-audit-2026-06-23.md):
+  // White-box guardrail:
   // FUNCTIONAL tests must exercise the PUBLIC API (@real-router/core, /api,
   // /utils, /validation) — never a relative `src/*` path. This structurally
   // prevents the mutation-shortcut regression class where a survived mutant was
@@ -69,10 +69,10 @@ export default [
       // Folded-in utils primitives keep their own functional suites, which
       // import the module they OWN via a relative ../../../src/utils/* path
       // (frozen fsm copy + dissolved event-emitter + dissolved logger — the
-      // per-router RouterLogger, #724). To be rewritten onto a public surface
+      // per-router RouterLogger). To be rewritten onto a public surface
       // later — see IMPLEMENTATION_NOTES "fsm + event-emitter → core/src/utils".
       "tests/functional/utils/**/*.test.ts",
-      // Structural core-invariant test (#1169): it asserts the FSM engine core
+      // Structural core-invariant test: it asserts the FSM engine core
       // ACTUALLY builds on (src/utils/fsm) exposes no forceState bypass, so
       // it must import FSM from src — the frozen standalone @real-router/fsm copy
       // would give this lock no mutation-discriminating power over the live code.
@@ -86,7 +86,7 @@ export default [
             {
               group: ["**/src", "**/src/**"],
               message:
-                "White-box: functional tests must exercise the public API (@real-router/core, /api, /utils, /validation), not internal src/* paths. If a branch is genuinely unreachable via the public surface, add a documented KEEP-narrow exception to the eslint allowlist in packages/core/eslint.config.mjs. See .claude/whitebox-test-audit-2026-06-23.md.",
+                "White-box: functional tests must exercise the public API (@real-router/core, /api, /utils, /validation), not internal src/* paths. If a branch is genuinely unreachable via the public surface, add a documented KEEP-narrow exception to the eslint allowlist in packages/core/eslint.config.mjs.",
             },
           ],
         },
@@ -101,7 +101,7 @@ export default [
   //    owning module — it runs from the facade, from `internals`, from the
   //    `forwardState` seam, from the `decodeParams` boundary, from `updateRoute`
   //    and from four registration entry points. The rule used to live in two
-  //    files both named `helpers.ts`, which is how #1584's existence
+  //    files both named `helpers.ts`, which is how an existence
   //    precondition landed on one half and not the other.
   //
   //    The boundary that keeps it one place: declared query names arrive as
@@ -109,7 +109,7 @@ export default [
   //    matcher — the same inversion `src/pipeline` makes with its
   //    `RouteResolver` port. Reaching into a namespace or the engine from here
   //    would grow a SECOND derivation of the one registry that both classifies
-  //    and prints (#1556), which is the drift this subsystem exists to end.
+  //    and prints, which is the drift this subsystem exists to end.
   {
     files: ["src/channels/**/*.ts"],
     rules: {
@@ -129,7 +129,7 @@ export default [
                 "**/Router",
               ],
               message:
-                "Subsystem boundary: src/channels/ takes declared query names as DATA, never as a matcher/store. Importing a namespace, the engine or the pipeline here re-creates the second derivation of the one query registry (#1556) — pass `readonly string[]` or a `queryNamesOf` accessor from the caller instead (see `RoutesNamespace/helpers.assertRouteDefaultChannelsFor`).",
+                "Subsystem boundary: src/channels/ takes declared query names as DATA, never as a matcher/store. Importing a namespace, the engine or the pipeline here re-creates the second derivation of the one query registry — pass `readonly string[]` or a `queryNamesOf` accessor from the caller instead (see `RoutesNamespace/helpers.assertRouteDefaultChannelsFor`).",
             },
           ],
         },
@@ -170,7 +170,7 @@ export default [
 
   // ── Engine layer-boundary + white-box tiers (ported from the former
   //    packages/engine/eslint.config.mjs when the routing engine folded into
-  //    core/src/engine, #1510). Globs re-scoped: src/ → src/engine/, tests/ →
+  //    core/src/engine). Globs re-scoped: src/ → src/engine/, tests/ →
   //    tests/engine/. §4 layer-import patterns match RELATIVE internal imports
   //    (unchanged by the fold, so no src/engine prefix); §5 whitebox patterns
   //    match the tests' src/engine paths, so they carry the src/engine/ prefix —

@@ -21,7 +21,7 @@ export default tsEslint.config(
     {
       // ⚠ The measured program. `adapter-bench/apps` build the bundles CodSpeed
       // measures. A fix here must leave the built bundle byte-identical, or the
-      // results stop describing the code (#2390). Each rule below can only be
+      // results stop describing the code. Each rule below can only be
       // satisfied by changing that program — hoisting a closure, dropping a
       // guard, reordering class fields, renaming a component input — so it is
       // off here.

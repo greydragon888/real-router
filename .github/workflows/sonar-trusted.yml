@@ -1,9 +1,9 @@
 name: Sonar (trusted)
 
-# ⚠ **The gate this exists for is one a fork PR cannot pass** (#1868). GitHub
+# ⚠ **The gate this exists for is one a fork PR cannot pass**. GitHub
 # gives a `pull_request` workflow from a fork a read-only token and NO repository
 # secrets, deliberately, so `SONAR_TOKEN` is absent and a scan run from inside
-# `ci.yml` fails at "Secret source: None". Measured on #1857, the only fork PR
+# `ci.yml` fails at "Secret source: None". Measured on the only fork PR
 # this repository has received: every other required check passed and that one
 # did not, so the practical position was "no outside contribution merges without
 # an admin bypass".
@@ -112,7 +112,7 @@ jobs:
     # `ci.yml` triggers on `pull_request` only; the event test keeps this true if
     # a trigger is ever added there. A CI run that did not succeed produced no
     # artifacts to read, and its PR is already blocked by `CI Result`.
-    # ⚠ FORKS ONLY since #2442. A pull request from this repository is analysed
+    # ⚠ FORKS ONLY. A pull request from this repository is analysed
     # inside `ci.yml`, where the secrets are and where the analysis overlaps the
     # tail of the pipeline instead of following it. The two conditions are
     # mirror images on the head repository and `sonar-producer.test.mjs` refuses
@@ -201,7 +201,7 @@ jobs:
       # sits on `Expected` with no way to read why. The reachable death is the
       # download: `pr-meta` is kept for a day, so re-running this workflow later
       # finds it gone. Addressed to `workflow_run.head_sha`, which is the PR's
-      # head commit and not the merge commit (measured on #2166: identical).
+      # head commit and not the merge commit (measured: identical).
       - name: Report a gate that could not decide
         if: failure()
         env:

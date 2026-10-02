@@ -28,7 +28,7 @@ jobs:
     # Unsharded: ONE job runs all 5 cohorts (as per-SCENARIO node processes — see the matrix
     # step) — coherent snapshot, one honest machine stamp (same VPS → identical env stamp).
     #
-    # ⚠ This host is NOT dedicated and NOT low-variance (#1746, measured 2026-09-10 on the
+    # ⚠ This host is NOT dedicated and NOT low-variance (measured 2026-09-10 on the
     # box itself): it is a co-tenant PRODUCTION server (11 GiB + 2 GiB swap) running ~24
     # always-on services —
     # mysql / postgresql / redis / nginx / php-fpm / Next.js apps / bots — and it carries a
@@ -87,14 +87,14 @@ jobs:
         run: node --expose-gc matcher-bench/run.mjs
         working-directory: cross-router-bench
 
-      # Same cgroup sampler as the CodSpeed jobs (#2376) — same host, same unit,
+      # Same cgroup sampler as the CodSpeed jobs — same host, same unit,
       # same `MemoryMax=5G` ceiling, so the same exposure. The rationale is
       # stated once, on `codspeed.yml`'s core job.
       #
       # ⚠ Coarser here by construction: one pair around the whole matrix rather
       # than per cohort, because the loop below is a single step. That answers
       # "did this run reclaim", which is what a discarded snapshot needs;
-      # per-cohort attribution was argued and refused in #1746, on the ground
+      # per-cohort attribution was argued and refused, on the ground
       # that a tainted run is discarded whole.
       - name: Sample cgroup — before
         run: bash "$GITHUB_WORKSPACE/scripts/cgroup-sample.sh" capture "$RUNNER_TEMP/cgroup-before.txt"
@@ -107,16 +107,16 @@ jobs:
         # Cohorts are INDEPENDENT comparisons (react = real-router vs tanstack/react-router;
         # svelte = real-router vs sv-router/mateo-router; …) — their numbers are never
         # cross-compared, so splitting on the cohort boundary loses nothing methodological.
-        # The engine INTERLEAVE that DOES matter (round-robin in one browser session, #1460)
+        # The engine INTERLEAVE that DOES matter (round-robin in one browser session)
         # lives entirely inside a single run-all invocation and is untouched.
         #
         # ⚠ The cap this split was expected to deliver — "peak RSS at ONE cohort (~2–3 GB)" —
         # is REFUTED, three times over: the all-in-one process was OOM-killed at 10.6 GB on
-        # 07-21, and the per-cohort process was killed at 9.6 GB on 08-31 (run 33341557512)
-        # and at 9.07 GB on 09-07 (run 34065154917, angular, 26 min in). The cohort boundary
+        # 07-21, and the per-cohort process was killed at 9.6 GB on 08-31
+        # and at 9.07 GB on 09-07 (angular, 26 min in). The cohort boundary
         # is simply too coarse: an in-process `vite build()` retains ~105 MB RSS per call
         # (measured on this host, linear to 24 builds) and a cohort makes 24-27 of them.
-        # run-all therefore forks ONE PROCESS PER SCENARIO (#1746) — `run-scenario.mjs`, a
+        # run-all therefore forks ONE PROCESS PER SCENARIO — `run-scenario.mjs`, a
         # separate module so an orchestrator and a worker cannot share a fall-through — which
         # is where the real cap comes from: peak 1.0 GB measured for a full angular cohort,
         # against 3.1 GB for the same cohort in the cohort-lifetime form.
@@ -125,7 +125,7 @@ jobs:
         # Provenance is identical across processes on the same machine (commit/cpu/runner/
         # dirty/realRouterCore) and env.date was already per-cell → deck-data unaffected.
         #
-        # FAIL-FAST across cohorts too (#1746). The loop used to carry on "for a
+        # FAIL-FAST across cohorts too. The loop used to carry on "for a
         # full-as-possible snapshot in the log", and that trade no longer holds: `publish` is
         # gated on a fully green job, so a matrix with one failed cell ships NOTHING, and the
         # cohorts after the failure spend up to three hours producing numbers that are already
@@ -150,7 +150,7 @@ jobs:
         # defaults to 360 at the JOB level, so a 600-minute step cap could never
         # fire and the real backstop was an opaque "job cancelled" at 6 h. Keep
         # this strictly below the job value declared above so a hang in the
-        # matrix fails as a named step timeout. (2026-08-01 CI/CD audit §4.5.)
+        # matrix fails as a named step timeout.
         timeout-minutes: 300
         env:
           BENCH_RUNNER: "self-hosted" # machine stamp (env.cpu carries the real CPU model)
@@ -193,7 +193,7 @@ jobs:
       # RME watch — REPORT-ONLY, never fails the run. Breaches surface here (the offenders in
       # this step's log) and in the step summary's RME watch section, but the workflow indicator
       # stays green. Rationale (was an armed gate until 07-19): this is an honest weekly snapshot
-      # on a shared/noisy VM, and the 07-18/19 harness audit showed the armed gate mostly flagged
+      # on a shared/noisy VM, and measurement showed the armed gate mostly flagged
       # TRANSIENT co-tenancy flares — medians healthy across sessions, not real regressions. Real
       # breakage (broken adapter / contaminated run) is already caught by the completeness gate
       # (run-all's exit code = "0 failed cells" → red job). So RME adds only false-reds as a hard
@@ -292,7 +292,7 @@ jobs:
     # `!success()`, not `failure()`: a job stopped by `timeout-minutes` ends as
     # CANCELLED, which `failure()` misses — and a wedged 2.8-hour bench is exactly
     # what the job timeout is for. Cancellation is not routine here
-    # (`cancel-in-progress: false`, schedule/dispatch only). (Audit §4.8.)
+    # (`cancel-in-progress: false`, schedule/dispatch only).
     if: '!success() && github.event_name == ''schedule'''
     permissions:
       issues: write

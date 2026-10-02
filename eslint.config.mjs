@@ -31,7 +31,7 @@ const gitignorePath = path.resolve(
 );
 
 // ============================================
-// COMPONENTS — a .svelte file is TypeScript with markup (#2556)
+// COMPONENTS — a .svelte file is TypeScript with markup
 // ============================================
 const COMPONENT_EXTENSIONS = ["svelte"];
 
@@ -107,7 +107,7 @@ const UNICORN_NON_SHIPPED_OFF = {
   "unicorn/prefer-at": "off",
   "unicorn/prefer-object-from-entries": "off",
   // v68 new recommended rules — idiomatic in non-shipped code, churn with no
-  // shipped value (see .claude/unicorn-v68-rules-audit.md):
+  // shipped value:
   "unicorn/prefer-promise-with-resolvers": "off", // adopted in src; tests build raw Promises
   "unicorn/prefer-continue": "off", // adopted in src; loop style in tests/bench is fine
   "unicorn/consistent-conditional-object-spread": "off",
@@ -259,7 +259,7 @@ const blocks = tsEslint.config(
     // service below. Left unset, the parser infers it from the configs that read
     // a preset off `tseslint.configs`, each of which registers its own directory;
     // `benchmarks/eslint.config.mjs` is one, and with two candidates a file no
-    // block names fails to parse at all (#2390).
+    // block names fails to parse at all.
     languageOptions: {
       parserOptions: { tsconfigRootDir: import.meta.dirname },
     },
@@ -305,17 +305,16 @@ const blocks = tsEslint.config(
       ],
 
       // ============================================
-      // isolate(produce()) GUARD — throw-isolation class (#1477)
+      // isolate(produce()) GUARD — throw-isolation class
       // ============================================
       // An isolation wrapper must receive a RECIPE (a name / thunk), never a
       // pre-produced value: passing a factory/compile CALL as its isolated
       // argument evaluates the produce BEFORE the wrapper's try/catch (JS
       // argument-evaluation order), leaking the produce-throw. This is the
-      // structural preventer for the throw-isolation class (#767 → #798 → #1222
-      // → #1476) that #1039 decreed but never built. Extend the selector list as
+      // structural preventer for the throw-isolation class. Extend the selector list as
       // new isolation wrappers are added — each `<wrapper>(produce())` re-opens
       // the same anti-pattern. (Shape 2 — a lazy `producer().then().catch()`
-      // whose sync throw escapes the async-only `.catch`, #806/#1476 — is not
+      // whose sync throw escapes the async-only `.catch` — is not
       // syntactically distinguishable from any promise chain, so it is guarded by
       // a per-site sync-throw test at each producer, not by this rule.)
       "no-restricted-syntax": [
@@ -324,7 +323,7 @@ const blocks = tsEslint.config(
           selector:
             "CallExpression[callee.name='runHook'][arguments.0.type='CallExpression']",
           message:
-            "isolate(produce()) anti-pattern (#1222/#1477): pass a recipe (the hook NAME), not a produced value, to runHook — `runHook(compileHook(...))` evaluates the factory outside runHook's try/catch and leaks a compile-throw that swallows sibling hooks. Use `runHook(hookName, routeName, toState, fromState)`.",
+            "isolate(produce()) anti-pattern: pass a recipe (the hook NAME), not a produced value, to runHook — `runHook(compileHook(...))` evaluates the factory outside runHook's try/catch and leaks a compile-throw that swallows sibling hooks. Use `runHook(hookName, routeName, toState, fromState)`.",
         },
       ],
 
@@ -521,8 +520,8 @@ const blocks = tsEslint.config(
       "import-x": importX,
     },
     settings: {
-      // Graph-building rules (no-cycle & co.) silently no-op without these
-      // (#1525): import-x's ignore.js defaults valid extensions to
+      // Graph-building rules (no-cycle & co.) silently no-op without these:
+      // import-x's ignore.js defaults valid extensions to
       // ['.js','.mjs','.cjs'], so every `.ts` import TARGET failed the
       // extension check, no module graph was ever built, and the error-level
       // no-cycle below linted a textbook cycle clean. These three settings are
@@ -720,10 +719,6 @@ const blocks = tsEslint.config(
   // ============================================
   // Updated for eslint-plugin-unicorn v75.0.0
   // Changelog: https://github.com/sindresorhus/eslint-plugin-unicorn/releases
-  // v68 audit (38 new rules + prevent-abbreviations→name-replacements rename):
-  // .claude/unicorn-v68-rules-audit.md
-  // v69 audit (12 new rules, all in `recommended`; 3 declined below):
-  // .claude/unicorn-v69-rules-audit.md
   {
     files: ["**/*.ts", "**/*.tsx"],
     plugins: {
@@ -776,7 +771,7 @@ const blocks = tsEslint.config(
       // v64: Disallow unnecessary Iterator#toArray() calls
       "unicorn/no-useless-iterator-to-array": "error",
       // v64: Put simpler condition first in logical expressions. Adopted at warn
-      // in v64 (then clean), but v72 "Fix logic" (#3530) expanded detection to 27
+      // in v64 (then clean), but v72 "Fix logic" expanded detection to 27
       // previously-green sites (16 src). In every hit the "complex" operand is a
       // cheap pure field access or tiny guard, so the short-circuit gain is nil,
       // while reordering hurts readability (e.g. `!isString(x) || x === ""` would
@@ -807,8 +802,7 @@ const blocks = tsEslint.config(
       // rule's rigid `(message, options)` requirement (unsatisfiable without a
       // breaking redesign of RouterError's public API). The dead route-tree error
       // classes it flagged were deleted as genuine cleanup, and `RouterError` got
-      // the one valuable finding (`this.name`) applied standalone. See
-      // .claude/unicorn-v67-rules-audit.md.
+      // the one valuable finding (`this.name`) applied standalone.
       //
       // Security guard against unsafe DOM HTML sinks (innerHTML/outerHTML/
       // insertAdjacentHTML) in dom-utils. 0 prod today — forward-looking XSS
@@ -912,14 +906,13 @@ const blocks = tsEslint.config(
       "unicorn/no-typeof-undefined": "off", // Incompatible with typescript-eslint
       "unicorn/expiring-todo-comments": "off", // Incompatible with ESLint 9.27
 
-      // v65: the new recommended rules were temporarily disabled for the
-      // eslint-plugin-unicorn 64 → 65 bump (#706); #712 migrated the code and
-      // RE-ENABLED 7 of them — they now run at their recommended `error` level
+      // v65: seven of the recommended rules eslint-plugin-unicorn 65 added run
+      // at their recommended `error` level
       // with no override here: no-array-from-fill, no-array-fill-with-reference-type,
       // prefer-includes-over-repeated-comparisons, no-this-outside-of-class,
       // prefer-array-some, consistent-compound-words, better-dom-traversing.
       //
-      // `require-css-escape` is intentionally left OFF (#712 decision). Its whole
+      // `require-css-escape` is intentionally left OFF. Its whole
       // value is preventing CSS-selector injection from UNTRUSTED interpolation —
       // but every site it flagged here is a static constant (the announcer's
       // `data-real-router-announcer` attr) or a test-controlled value (testids,
@@ -932,7 +925,7 @@ const blocks = tsEslint.config(
       "unicorn/require-css-escape": "off",
 
       // ============================================
-      // v66/v67 (#NNN) — DISABLED globally. The 66.0.0 release added ~74 rules and
+      // v66/v67 — DISABLED globally. The 66.0.0 release added ~74 rules and
       // 67.0.0 another ~16; most we adopt via `recommended`. The ones below are
       // declined for the documented reason. Lean adoption: enforce the high-value
       // bug-catchers + safe modernizations in production `src`, decline the rest.
@@ -1011,9 +1004,8 @@ const blocks = tsEslint.config(
       "unicorn/no-declarations-before-early-exit": "off",
 
       // ============================================
-      // v69 (#NNN) — 12 new rules, all land in `recommended`. 9 have zero hits
-      // and are adopted for free as forward-guards. 3 declined (see
-      // .claude/unicorn-v69-rules-audit.md); the two runtime-target-risk ones
+      // v69 — 12 new rules, all land in `recommended`. 9 have zero hits
+      // and are adopted for free as forward-guards. 3 declined; the two runtime-target-risk ones
       // (prefer-set-methods, prefer-promise-try) sit in that subsection above.
       // ============================================
       // `Element#replaceChildren()` is widely supported (safe API, not a runtime
@@ -1027,7 +1019,7 @@ const blocks = tsEslint.config(
       // v70–v72 — 19 new rules, all in `recommended`. 14 have zero hits and are
       // adopted for free as forward-guards. 3 declined below; 2 modernizations
       // (prefer-simplified-conditions, prefer-split-limit) are adopted and
-      // autofixed in place. See .claude/unicorn-v72-rules-audit.md.
+      // autofixed in place.
       // ============================================
       // v72: `.getHTML()` (Element serialization API) is undefined in jsdom@29 —
       // the entire test env. All 37 hits are test assertions reading `.innerHTML`
@@ -1132,7 +1124,7 @@ const blocks = tsEslint.config(
       //    Number("12.5") === 12.5), not float arithmetic
       //  - no-trivial-assertions: intentional `expect(true).toBe(true)` reach
       //    markers in stress/property tests + type-level `Equal` assertions
-      // (prefer-specific-assertions adopted in tests — #915)
+      // (prefer-specific-assertions adopted in tests)
       "sonarjs/no-floating-point-equality": "off",
       "sonarjs/no-trivial-assertions": "off",
 
@@ -1243,7 +1235,7 @@ const blocks = tsEslint.config(
       "@typescript-eslint/explicit-function-return-type": "off",
       "@typescript-eslint/unbound-method": "off", // Conflicts with expect.any() in Vitest
       // vitest's port of unbound-method (on via configs.all). typescript-eslint
-      // 8.65 (#12448) expanded the shared logic to flag member access on UNION
+      // 8.65 expanded the shared logic to flag member access on UNION
       // types, which the vitest variant inherited — now FPs on idiomatic mock
       // reads like `vi.mocked(console[messageLevel])` (method handed to an
       // identity cast, never invoked unbound). Same structural-FP class as the
@@ -1387,7 +1379,7 @@ const blocks = tsEslint.config(
     },
     rules: {
       // ⚠ The project service is OFF above, so EVERY rule that needs a program
-      // must be off too — the preset, never a hand-kept list (#2370). A rule
+      // must be off too — the preset, never a hand-kept list. A rule
       // outside such a list does not merely go unchecked: it aborts the whole
       // run on the first matching file with "you have used a rule which
       // requires type information". `no-array-delete` did exactly that, and
@@ -1410,7 +1402,7 @@ const blocks = tsEslint.config(
       // ⚠ Section 5 applies the type-checked presets to every file but gives a
       // project service only to `*.ts` / `*.tsx`. A plain-JS file that is not
       // ignored meets a typed rule with no program, and ESLint aborts the whole
-      // run rather than skipping the rule (#2370).
+      // run rather than skipping the rule.
       ...tsEslint.configs.disableTypeChecked.rules,
     },
   },

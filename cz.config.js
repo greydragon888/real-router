@@ -37,7 +37,7 @@ export default {
   allowEmptyScopes: true,
   // Must stay false: commitlint.config.mjs enforces `scope-enum` (error on any
   // scope outside SCOPES), so a custom scope typed in `pnpm commit` would then
-  // be rejected by the commit-msg hook. Keep czg in lockstep with the linter (#735).
+  // be rejected by the commit-msg hook. Keep czg in lockstep with the linter.
   allowCustomScopes: false,
   allowBreakingChanges: ["feat", "fix"],
   upperCaseSubject: false,

@@ -36,7 +36,7 @@ fi
 
 # Auto-deduplicate a lockfile that is being committed — the root's, the
 # examples workspace's or the cross-router bench's, each in its own workspace.
-# pnpm add/update don't dedupe automatically (pnpm/pnpm#7258),
+# pnpm add/update don't dedupe automatically,
 # so we do it here to keep the lockfile clean.
 if git diff --cached --name-only | grep -qx 'pnpm-lock.yaml'; then
   echo "🔗 Auto-deduplicating lockfile..."

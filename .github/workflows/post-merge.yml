@@ -23,12 +23,12 @@ on:
 # one: `changesets.yml` fires on a `workflow_run` whose conclusion is
 # `success`, so a cancelled release build means `changeset publish` never runs
 # and the versions that commit allocated exist only in their own CHANGELOG
-# sections — no npm release, no tag (#2057). Measured: 51 such versions across
-# 20 packages, and a 52nd appeared the day after that issue was filed.
+# sections — no npm release, no tag. Measured: 51 such versions across
+# 20 packages, and a 52nd appeared the next day.
 #
 # ⚑ Giving release commits their own group keyed by SHA costs nothing on the
 # ordinary path — those pushes still share one group and still cancel. The
-# alternative #2057 lists first (dropping `cancel-in-progress` outright) pays
+# alternative (dropping `cancel-in-progress` outright) pays
 # for the same protection with a wasted build on every push, which is the
 # thing the setting exists to avoid. The prefix is not a guess:
 # `changesets.yml` sets `commit: "release: version packages…"`, and a
@@ -47,12 +47,12 @@ concurrency:
 permissions:
   contents: read
 
-# Self-hosted ducktors/turborepo-remote-cache on Cloud Run + Cloudflare R2 (#490)
+# Self-hosted ducktors/turborepo-remote-cache on Cloud Run + Cloudflare R2
 env:
   TURBO_API: ${{ vars.TURBO_API }}
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
-  # turbo's OTLP metrics (#1745), as in ci.yml.
+  # turbo's OTLP metrics, as in ci.yml.
   TURBO_EXPERIMENTAL_OTEL_ENABLED: "true"
   TURBO_EXPERIMENTAL_OTEL_PROTOCOL: http-protobuf
   TURBO_EXPERIMENTAL_OTEL_ENDPOINT: ${{ secrets.TELEMETRY_OTLP_ENDPOINT }}
@@ -76,7 +76,7 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
-      # The same stamp as the setup action's (#1745): this job does not use it.
+      # The same stamp as the setup action's: this job does not use it.
       - name: Stamp CI identity for turbo telemetry
         run: |
           cpu="$(awk -F': *' '/^model name/ {print $2; exit}' /proc/cpuinfo 2>/dev/null | tr -c 'A-Za-z0-9._-' '_' | tr -s '_' | sed 's/^_//; s/_$//')"
@@ -101,7 +101,7 @@ jobs:
 
       # `test:stress` intentionally NOT included — mirrors PR CI (`ci.yml`).
       # Leak/race-condition coverage stays in the pre-push hook, which runs
-      # `test:stress` as a dedicated `--concurrency=1` step (#1423). If a leak
+      # `test:stress` as a dedicated `--concurrency=1` step. If a leak
       # ever lands on master through a bot-push that bypasses pre-push (e.g.
       # auto-merged changeset release), re-add `test:stress` to the run line.
       # `lint` is EXPLICIT since it stopped being a `test` dependency — as a
@@ -125,7 +125,7 @@ jobs:
 
       # Publish master's bundle sizes so each PR's `bundle-size` job can diff
       # against them via artifact download — instead of re-checking-out,
-      # re-installing, and re-bundling the base branch on every PR (#734).
+      # re-installing, and re-bundling the base branch on every PR.
       # size-limit exits non-zero when a limit is exceeded but still prints the
       # JSON report, so the exit code is not the signal here — the report is.
       # The step stays green either way (this is a measurement, not a gate), but
@@ -154,7 +154,6 @@ jobs:
   # on master unpublished, with no signal anywhere. Same tracking-issue pattern as
   # examples.yml / cross-router-bench.yml, which already guard their scheduled
   # runs this way. Recovery is a `workflow_dispatch` of Changesets (see its `on:`).
-  # (2026-08-01 CI/CD audit §2.1.)
   notify-failure:
     name: Open issue on failure
     runs-on: ubuntu-latest

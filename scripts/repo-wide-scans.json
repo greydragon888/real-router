@@ -1,6 +1,6 @@
 {
   "why": [
-    "Tests that read the repository BEYOND their own workspace (#2241). Turbo keys a",
+    "Tests that read the repository BEYOND their own workspace. Turbo keys a",
     "package's `test` task on that package's own files, so a scan whose SUBJECT is the",
     "whole tree is replayed from cache whenever a SIBLING changes — and a scan that did",
     "not run is indistinguishable from one that passed.",

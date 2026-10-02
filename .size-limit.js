@@ -40,7 +40,7 @@ export default [
     ignore: ignoreCore,
   },
   // ⚑ The two remaining runtime subpaths, because the entries above are exactly
-  // where the chunking penalty is ZERO (#2210). Each of these files is a
+  // where the chunking penalty is ZERO. Each of these files is a
   // handful of re-export bytes that pulls a whole shared chunk, so a consumer
   // taking one small symbol from core pays multiples of what the symbol costs —
   // and until these lines existed nothing measured it. Neither takes
@@ -101,7 +101,7 @@ export default [
   esm("browser-plugin", "3.8 kB", ignoreCore),
   esm("hash-plugin", "3.8 kB", ignoreCore),
   esm("memory-plugin", "950 B", ignoreCore),
-  // ⚑ `ignoreCore` since #1852, which is what every sibling already had. This
+  // ⚑ `ignoreCore`, which is what every sibling already had. This
   // was the one plugin importing core with `import type` ONLY, so its budget
   // measured the plugin alone by ACCIDENT rather than by configuration; the
   // ingestion primitive (`@real-router/core/utils`) is its first RUNTIME core

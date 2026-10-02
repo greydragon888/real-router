@@ -15,7 +15,6 @@ on:
   # not master's tip. `changeset publish` is idempotent (already-published
   # versions are skipped) and the reconcile step backfills tags/Releases, so a
   # dispatch is safe to fire whenever the chain looks stuck.
-  # (2026-08-01 CI/CD audit §2.1.)
   workflow_dispatch:
 
 # Changesets Workflow for Automated Versioning and Publishing
@@ -38,8 +37,8 @@ on:
 
 # Serialize publishing — never cancel a run mid-flight. cancel-in-progress: true
 # could kill `changeset publish` between npm publish and tag/release creation,
-# leaving packages on npm with no tag/Release (a latent path to the partial
-# state of #731). Queued runs wait; the reconcile step makes them idempotent.
+# leaving packages on npm with no tag/Release (a latent path to a partial
+# release). Queued runs wait; the reconcile step makes them idempotent.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
@@ -51,7 +50,7 @@ permissions:
   # Packages is not used, so no `packages: write` — Releases ride on contents:write)
 
 # Turbo Remote Cache
-# Self-hosted ducktors/turborepo-remote-cache on Cloud Run + Cloudflare R2 (#490)
+# Self-hosted ducktors/turborepo-remote-cache on Cloud Run + Cloudflare R2
 env:
   TURBO_API: ${{ vars.TURBO_API }}
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
@@ -113,7 +112,6 @@ jobs:
       # svelte-package). Publishing is unaffected — `--ignore-scripts` here skips
       # DEPENDENCY lifecycle scripts during install, not our own `version` /
       # prepack scripts that `changeset version` and `pnpm publish` invoke.
-      # (2026-08-01 CI/CD audit §2.2.)
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
 
@@ -200,8 +198,8 @@ jobs:
       #   "one release behind" — and with genuine network/registry failures. A
       #   brand-new package therefore reached `changeset publish`, which died
       #   with a bare 404/403 that named nothing. The script separates the cases
-      #   and emits an ::error:: naming the missing manual step (see item 2 of
-      #   #1596); non-404 failures retry once and then fail loudly instead of
+      #   and emits an ::error:: naming the missing manual step;
+      #   non-404 failures retry once and then fail loudly instead of
       #   being reported as "needs publish".
       # - It ran on EVERY changeset-free push to master (i.e. every infra push,
       #   not just releases): 23 sequential `pnpm view` round-trips, measured at
@@ -232,15 +230,15 @@ jobs:
       # `dependsOn` bundle, which ran above, so they are a cache hit and cost
       # seconds.
       #
-      # ⚑ For those three this is the only check between master and npm (#2452).
+      # ⚑ For those three this is the only check between master and npm.
       # `post-merge.yml` builds and measures sizes, the smoke test lives in
-      # `ci.yml`, i.e. on pull requests — and #2450 took two jobs off the release
+      # `ci.yml`, i.e. on pull requests — and two of them skip the release
       # PR, whose diff cannot give them a subject. A red step HERE means "do not
       # publish", which is the answer a bot PR could not give: the changesets
       # action regenerates that PR from master.
       #
       # ⚠ Failing here leaves the versions committed and unpublished — the state
-      # `stranded-release.yml` watches (#2057). That watch is the backstop; this
+      # `stranded-release.yml` watches. That watch is the backstop; this
       # step failing the run is the alarm, and it is attributable because it is
       # the release run.
       - name: Validate published artifacts (publint + attw)
@@ -262,7 +260,6 @@ jobs:
         id: publish
         # Changesets creates annotated tags (git tag -m) which require tagger identity.
         # Without these env vars, git tag silently fails on some CI runners.
-        # See: https://github.com/changesets/changesets/issues/1621
         env:
           GIT_COMMITTER_NAME: github-actions[bot]
           GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
@@ -274,7 +271,7 @@ jobs:
           # fail the run — but only AFTER tags/Releases for the packages that DID
           # publish are pushed, so a partial publish still records what succeeded.
           # The verdict is enforced by the final "Fail if publish errored" step.
-          # (#811: `|| true` made the step's success hinge on the tag-grep below,
+          # (`|| true` made the step's success hinge on the tag-grep below,
           # not on the publish itself — a partial publish went green.)
           EVENTS="$RUNNER_TEMP/changesets-publish.ndjson"
           set +e
@@ -315,8 +312,8 @@ jobs:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
           HUSKY: 0
         run: |
-          # Push to a one-shot authenticated URL instead of `git remote set-url`
-          # (#735 hardening): `set-url` would write the PAT into .git/config in
+          # Push to a one-shot authenticated URL instead of `git remote set-url`:
+          # `set-url` would write the PAT into .git/config in
           # plaintext for the rest of the job; passing the URL per-push keeps the
           # token in this step's env only, never persisted to disk. GH_TOKEN is a
           # secret, so Actions masks it in logs.
@@ -345,8 +342,8 @@ jobs:
           echo "=== Result: pushed=$PUSHED, missing=$MISSING ==="
 
           # Fallback: if any tags are missing, create them manually pointing at HEAD.
-          # This works around https://github.com/changesets/changesets/issues/1621
-          # where changeset publish silently swallows git tag failures.
+          # This works around `changeset publish` silently swallowing git tag
+          # failures.
           if [ "$MISSING" -gt 0 ]; then
             echo "⚠️ Creating missing tags manually..."
             while IFS= read -r tag; do
@@ -365,8 +362,8 @@ jobs:
       # tag that lacks one, on every run (NOT gated on has_unpublished). The old
       # step was gated `if: has_unpublished == 'true'`; a one-time failure left
       # tags on npm+git with no Release forever, because the next run saw
-      # local==npm (has_unpublished=false) and skipped the whole release path
-      # (#731, 0.56.0 batch). Tag-driven + idempotent: existing releases are
+      # local==npm (has_unpublished=false) and skipped the whole release path.
+      # Tag-driven + idempotent: existing releases are
       # fetched once and skipped, so this can also backfill misses that an
       # earlier failed run dropped. `set -euo pipefail` + per-step `::group::`
       # tracing so a failure is diagnosable (the original exit 128 was not).
@@ -515,7 +512,7 @@ jobs:
 
       # always(): render the summary even when "Fail if publish errored" (below)
       # is about to fail the run, and reflect the ACTUAL publish status — not the
-      # plan. (#811)
+      # plan.
       - name: Summary
         if: always()
         run: |
@@ -550,7 +547,7 @@ jobs:
       # packages that did publish are pushed/reconciled first. A red run on a
       # partial publish is intended: a human re-runs (publish is idempotent —
       # already-published versions are skipped). Skipped when publish didn't run
-      # (Release-PR path) or succeeded — its output is '' / '0' respectively. (#811)
+      # (Release-PR path) or succeeded — its output is '' / '0' respectively.
       - name: Fail if publish errored
         if: always() && steps.publish.outputs.publish_status != '' && steps.publish.outputs.publish_status != '0'
         run: |

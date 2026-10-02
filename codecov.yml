@@ -73,7 +73,7 @@ ignore:
   - "**/__mocks__/**" # Mocks
   - "**/__fixtures__/**" # Fixtures
 
-# Per-package coverage breakdown — Components, NOT flags (#732).
+# Per-package coverage breakdown — Components, NOT flags.
 # Codecov flags only exist if every upload is tagged with them (`flags:`/-F at
 # upload time); our CI does a single untagged upload of all lcov files, so a
 # `flags:` section here would be inert (no per-flag reports → carryforward has
@@ -85,7 +85,7 @@ component_management:
     - component_id: angular
       paths:
         - packages/angular/src/**
-    # browser-env / dom-utils are shared-source owners (#809): their src is a
+    # browser-env / dom-utils are shared-source owners: their src is a
     # symlink, so their coverage lands at the shared/<dir> realpath (CI
     # normalizes the lcov SF paths to repo-root-relative shared/<dir>/…).
     - component_id: browser-env
@@ -145,7 +145,7 @@ component_management:
     - component_id: sources
       paths:
         - packages/sources/src/**
-    # ssr-data-plugin is also the coverage owner of shared/ssr (#809) — no
+    # ssr-data-plugin is also the coverage owner of shared/ssr — no
     # dedicated owner package exists, so the shared sources ride its component.
     - component_id: ssr-data-plugin
       paths:

@@ -83,7 +83,7 @@ export const createConfig = (opts: CreateConfigOptions = {}): UserConfig[] => {
     platform,
 
     // Generate type definitions with declaration maps (.d.ts.map)
-    // Maps .d.ts → .ts source for IDE go-to-definition (#423)
+    // Maps .d.ts → .ts source for IDE go-to-definition
     //
     // ⚠ A package whose `src/` symlinks into `shared/` resolves declaration
     // imports with `tsc`: `oxc` follows the symlink to `shared/…`, the
@@ -126,8 +126,7 @@ export const createConfig = (opts: CreateConfigOptions = {}): UserConfig[] => {
     // on the core pilot — not per ESM/CJS config). Non-tsdown packages (solid =
     // rollup, angular = ng-packagr, svelte = svelte-package) are NOT covered
     // here and declare their own `lint:package` / `lint:types` scripts instead —
-    // all three do since #2155, where angular and svelte had neither and nobody
-    // had run the tools on them. ⚠ Those two pass `--ignore-rules` for findings
+    // all three do. ⚠ Those two pass `--ignore-rules` for findings
     // judged intended against a reference library of the same build (see each
     // package's CLAUDE.md); this config ignores nothing. See
     // IMPLEMENTATION_NOTES "Release-pipeline...".

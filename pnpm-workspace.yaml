@@ -46,8 +46,8 @@ overrides:
   ajv@8: ~8.20.0
   # undici has no entry here. danger 14 declares it both as a dependency and as
   # an optional peer; `.pnpmfile.mjs` drops the peer declaration, so danger
-  # installs a 7.x of its own. jsdom 30 takes 8.x on its own range (#2605;
-  # IMPLEMENTATION_NOTES has the measurements).
+  # installs a 7.x of its own. jsdom 30 takes 8.x on its own range
+  # (IMPLEMENTATION_NOTES has the measurements).
   # At the version @angular/build pins exactly; ng-packagr's `^5.0.0` admits it.
   piscina: '>=5.3.2 <6.0.0'
   # ReDoS in brace-expansion (GHSA-3jxr-9vmj-r5cp, High). Two major lines, @2 and @5, are in the tree
@@ -152,8 +152,8 @@ saveExact: true
 gitTagVersion: true
 # ⚠ `ignore` keeps pnpm-lock.yaml ONE YAML document. Under the default
 # (`download`) pnpm 12 writes its own binaries as a first document ahead of the
-# dependency tree, and GitHub's dependency graph reads only that first document
-# (dependabot-core#15904): Dependency Review, a required check, and Dependabot
+# dependency tree, and GitHub's dependency graph reads only that first document:
+# Dependency Review, a required check, and Dependabot
 # alerts would then see pnpm and nothing else. Measured with pnpm 12.3.4 and
 # 12.4.1: two documents under the default, one under `ignore`.
 # The cost: pnpm no longer switches to the version `packageManager` pins, and

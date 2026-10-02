@@ -12,11 +12,11 @@ import { createIsomorphicConfig } from "../../tsdown.base.js";
 // Why declarations are unbundled: plugins augment `@real-router/core/types`
 // via `declare module`, and TS merges such an augmentation only when the
 // resolved module is the interface's LEXICAL declaration-site — a re-export
-// barrel of any form is a silent no-op (#1519). Bundled dts hoists
+// barrel of any form is a silent no-op. Bundled dts hoists
 // `StateContext` / `NavigationOptions` into a shared chunk (the entry becomes
 // exactly that barrel), silently breaking every plugin's context/options
-// typing for external dist-resolving consumers (#1540, regressed by the #1520
-// fold). `scripts/check-dts-augment-targets.mjs` enforces it after the bundle.
+// typing for external dist-resolving consumers.
+// `scripts/check-dts-augment-targets.mjs` enforces it after the bundle.
 //
 // Why SEQUENTIAL passes rather than one config array: tsdown runs every config
 // in a single `Promise.all`, and pass 1 cannot be stopped from emitting JS for

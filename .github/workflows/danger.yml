@@ -17,8 +17,8 @@ jobs:
     # versions/changelogs). Gate by head-ref, NOT paths-ignore: the old
     # `paths-ignore: **/package.json` skipped the workflow on ANY package.json-only
     # PR — including the exact case `checkLockfileSync` exists to catch (a deps
-    # bump that forgot `pnpm install`), so that check could never fire (#810
-    # audit 1.5). The release branch is `changeset-release/*` (same as ci.yml).
+    # bump that forgot `pnpm install`), so that check could never fire.
+    # The release branch is `changeset-release/*` (same as ci.yml).
     #
     # Dependabot's PRs are skipped by author (IMPLEMENTATION_NOTES "Dependabot
     # PRs skip every metric"). Every rule here is advisory, and the one about

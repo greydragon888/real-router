@@ -52,7 +52,7 @@ allow-dependencies-licenses:
   # "(Apache-2.0 AND CC-BY-NC-ND-4.0 AND MIT) OR ..." — the CC-BY-NC-ND-4.0
   # clause covers only Tauri's brand assets (logos, icons). The CLI source
   # code itself is dual-licensed Apache-2.0 / MIT. devDependency only,
-  # used by the Tauri example apps (#496).
+  # used by the Tauri example apps.
   - pkg:npm/@tauri-apps/cli
   # "BSD-2-Clause AND JSON" — JSON license (Crockford's "Good, not Evil"
   # clause). Functionally permissive; pulled in transitively by Tauri

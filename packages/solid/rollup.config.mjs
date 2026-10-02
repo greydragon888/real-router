@@ -16,7 +16,7 @@ const external = externalFrom(
  * Both entries in ONE input, in every build: rollup then emits each module
  * once, in a chunk both entries import. An input per entry would inline
  * `context.ts` into each of them, and `/ssr`'s hooks would read contexts the
- * main entry's `RouterProvider` never provides (#2583).
+ * main entry's `RouterProvider` never provides.
  */
 const input = { index: "src/index.tsx", ssr: "src/ssr.tsx" };
 
@@ -61,7 +61,7 @@ const compiledJs = {
  * Source bundle — types stripped, JSX kept, published under the `solid`
  * export condition. vite-plugin-solid compiles a dependency that declares it
  * for the consumer's own target (DOM, hydratable or SSR), which is what an SSR
- * build needs: the DOM output above calls `template()` at module load (#2583).
+ * build needs: the DOM output above calls `template()` at module load.
  */
 const sourceJsx = {
   input,

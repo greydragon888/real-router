@@ -42,8 +42,8 @@ runs:
     - name: Setup Node.js
       # Kept in lockstep with the workflows' pin by hand until 2026-08-01: this
       # file was outside Dependabot's scan (see the `directories` note in
-      # dependabot.yml), so it sat on v6 while every workflow moved to v7 in
-      # #1531. Now covered — Dependabot bumps it with the rest.
+      # dependabot.yml), so it sat on v6 while every workflow moved to v7.
+      # Now covered — Dependabot bumps it with the rest.
       uses: actions/setup-node@v7
       with:
         # Read from `.nvmrc` (repo root, resolved against GITHUB_WORKSPACE) so
@@ -55,7 +55,7 @@ runs:
         cache: ${{ inputs.node-cache }}
 
     - name: Stamp CI identity for turbo telemetry
-      # Resource attributes for turbo's OTLP metrics (#1745). Only a workflow
+      # Resource attributes for turbo's OTLP metrics. Only a workflow
       # that sets TURBO_EXPERIMENTAL_OTEL_ENDPOINT exports, so elsewhere this is
       # inert. Every value is bounded: the job plus its matrix suffix, the
       # event, the class of actor, the runner kind, the CPU model and the Node

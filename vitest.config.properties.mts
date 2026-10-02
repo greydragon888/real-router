@@ -47,10 +47,10 @@ export default mergeConfig(
        * contended CI runner does to it.
        *
        * ⚠ **60 s was not "generous headroom" — it was 52×, and a runner reached
-       * 85× (#2107).** Measured 2026-09-05: the slowest cell in the suite,
+       * 85×.** Measured 2026-09-05: the slowest cell in the suite,
        * `utils/logger/callback.properties.ts` → "same parameters give same
        * result", runs **1159 ms** locally. Against 60 s that is 52× headroom.
-       * On the post-merge run of `a9b45fa6c` the same file took **257 s**
+       * On a post-merge run the same file took **257 s**
        * against 4.1 s locally — 63× — and its two slowest cells individually
        * reached 56× and 85×. Both timed out, the post-merge went red, and
        * because `changesets.yml` triggers on a SUCCESSFUL `workflow_run`, the

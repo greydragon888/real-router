@@ -10,7 +10,6 @@ on:
 # inherited whatever `default_workflow_permissions` happens to be — a no-op today
 # (the repo default is `read`), insurance against a future flip of that global
 # setting. `validate-changesets` keeps its own block, which fully overrides this.
-# (2026-08-01 CI/CD audit §4.4.)
 permissions:
   contents: read
 
@@ -52,7 +51,7 @@ jobs:
           # shared/<dir>/*.ts is shipped source too: shared/{browser-env,dom-utils,ssr}
           # is symlinked into 10 public packages, so a change there ships in a
           # release and needs a changeset (turbo hashes it — see turbo.json
-          # `../../shared/**/*.ts`; #810). Only .ts counts, mirroring the turbo
+          # `../../shared/**/*.ts`). Only .ts counts, mirroring the turbo
           # glob: shared docs (CLAUDE.md, .claude/), shared/package.json, and
           # __test-helpers/ (test-only, never bundled) must not trip this
           # REQUIRED gate — a bare `^shared/` did, on docs-only PRs.
@@ -127,7 +126,7 @@ jobs:
           # apart from "no errors": `require()` throws, node exits 1, the `else`
           # branch sets has_issues=false, and this REQUIRED check ("Validate
           # Changesets", protect-master ruleset) goes green having validated
-          # nothing. Same class as #1133. (2026-08-01 CI/CD audit §1.3.)
+          # nothing.
           if ! node -e "const r = require('./changeset-result.json'); if (!Array.isArray(r)) process.exit(1)"; then
             echo "::error::changeset validator produced no parsable JSON — failing closed instead of reporting 'all valid'"
             exit 1

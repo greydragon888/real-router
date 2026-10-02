@@ -15,7 +15,7 @@ const config = mergeConfig(
   }),
 );
 
-// #1065 migration (node -> consumer host): browser-plugin owns the aggregated 100%
+// browser-plugin owns the aggregated 100%
 // coverage of the whole shared/browser-env tree. The white-box unit tests that used
 // to live in the shared test node now live under tests/{functional,property}/
 // browser-env/; browser-plugin's coverage gates the symlinked shared files.
@@ -26,7 +26,7 @@ const config = mergeConfig(
 // `**/shared/browser-env/**` form is grepped by scripts/check-coverage-scope.mjs to
 // identify browser-plugin as the browser-env owner.
 config.test.coverage.allowExternal = true;
-// #1838: the base config excludes `**/index.ts` (package barrels are pure
+// The base config excludes `**/index.ts` (package barrels are pure
 // re-exports), and the owner configs replace `include` but inherit `exclude` —
 // so all three `shared/*/index.ts` were measured NOWHERE. Proven on the
 // dom-utils owner: a never-called function with a branch appended to
