@@ -96,11 +96,13 @@ overrides:
   # records the release-path incident. Raise this line with the highest declared
   # range, never below.
   yaml@2: 2.9.0
-  # Floor at 5.9.2 for GHSA-9rgm-9g3h-6x36 (Medium; 5.3) — denial of service via
-  # malformed input. Transitive via `svelte`, which declares `^5.8.1`, so the floor
-  # holds; `svelte` is a peer of `@real-router/svelte` and is never bundled into it,
-  # which leaves the examples' builds and this audit gate as the exposure.
-  devalue: '>=5.9.2'
+  # Floor at 5.9.3, where every devalue advisory known on 2026-10-02 is fixed
+  # (api.osv.dev answers clean for it). Capped below 6: `svelte`, the only
+  # parent, declares `^5.9.2`, and an override outranks a parent's range — the
+  # open floor let Dependabot's security PRs propose 6.0.2. `svelte` is a peer of
+  # `@real-router/svelte` and is never bundled into it, which leaves the examples'
+  # builds and this audit gate as the exposure.
+  devalue: '>=5.9.3 <6.0.0'
   esbuild: '>=0.28.1'
   # @angular/build depends on an exact vite of its own; this collapses that
   # edge onto the exact vite the example manifests declare, so the tree holds

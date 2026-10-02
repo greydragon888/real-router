@@ -13317,3 +13317,17 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 **Solution.** The two arms are gone, with the three environment variables only they read (`HEAD_BRANCH`, `HEAD_REPO`, `BASE_BRANCH`), the checkout of the predicate and the registry key. The fork gate decides from the run's coverage artifacts alone and executes no script of the repository.
 
 **Why nothing is lost.** Both verdicts live where this repository's pull requests are analysed: the `sonar` job of `ci.yml` reports "Not analysed: dependabot" by the pull request's author and "Not analysed: no source changed" from the `no_source` output of `check`. `actionlint` 1.7.8 is clean on the workflow, and the registry, `sonar-producer` and `sonar-trusted-boundary` tests pass.
+
+## devalue takes the 5.9 patch, and node-forge's advisory is allowlisted (2026-10-02)
+
+**Problem.** Pre-push `lint:audit` went red on two packages. `devalue` 5.9.2, in the root and the examples lockfiles, is affected by seven advisories, three of them High and published on 2026-10-01; 5.9.3 fixes all of them. `node-forge` 1.4.0, in the root lockfile only, is affected by GHSA-86w9-cpqp-85rv (High): published on 2026-09-03, it turned the gate red only after OSV modified it on 2026-10-01 at 21:40Z. Dependabot's security PRs #2647 and #2648 proposed `devalue` 6.0.2.
+
+**Solution.**
+
+- The `devalue` override in both `pnpm-workspace.yaml` becomes `'>=5.9.3 <6.0.0'`, and both lockfiles resolve 5.9.4.
+- GHSA-86w9-cpqp-85rv enters `scripts/osv-scanner.toml` and the mirrored `allow-ghsas:` in `.github/workflows/codeql.yml`.
+
+**Why a cap below 6, and not the security PRs' 6.0.2.** `svelte` 5.57.1, devalue's only parent, declares `devalue: ^5.9.2`. An override outranks a parent's range, so the open floor `>=5.9.2` let Dependabot propose a major that `svelte` never declared. api.osv.dev answers clean for 5.9.3 and 5.9.4.
+
+**Why an allowlist entry for node-forge.** No release fixes it: 1.4.0 is the latest and is affected. Its one dependent is `@sonar/scan` 5.0.1, the root devDependency that `pnpm sonar:local` runs on a developer's machine — no workflow runs it and no published package depends on it. The advisory concerns RSA PKCS#1 v1.5 signature verification, and @sonar/scan calls node-forge only to read a PKCS#12 truststore into PEM certificates, which verifies no signature. Control: the same scan with a copy of the config that lacks the entry reports the advisory and exits 1; with the entry it exits 0.
+

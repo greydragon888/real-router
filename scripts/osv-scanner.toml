@@ -7,6 +7,20 @@
 id = "GHSA-wrw7-89jp-8q8g"
 reason = "glib 0.18.5 VariantStrIter unsoundness (RUSTSEC-2024-0429). Transitive via Tauri 2.x → GTK/WebKit on Linux only, pulled by examples/desktop/tauri/*/src-tauri/. Not in any published @real-router/* package. Tauri 2.x pins glib < 0.20, so the fix can only land via an upstream Tauri bump that re-bases its GTK stack."
 
+# node-forge has no fixed release: every version through 1.4.0, the latest, is
+# affected. Its one dependent here is `@sonar/scan`, the root devDependency that
+# `pnpm sonar:local` runs on a developer's machine — no workflow runs it and no
+# published package depends on it. The advisory is about RSA PKCS#1 v1.5
+# signature verification, and @sonar/scan 5.0.1 calls node-forge only to read a
+# PKCS#12 truststore into PEM certificates (`extractTruststoreCerts` in its
+# `src/request.js`, reached only when `sonar.scanner.truststorePath` is set),
+# which verifies no signature. Drop it when node-forge ships a fix or
+# @sonar/scan stops depending on it — ask api.osv.dev per version.
+
+[[IgnoredVulns]]
+id = "GHSA-86w9-cpqp-85rv"  # node-forge RSA PKCS#1 v1.5 signature verification
+reason = "No fixed node-forge release (<= 1.4.0, the latest). Only dependent: root devDependency @sonar/scan 5.0.1, run locally by `pnpm sonar:local`; it uses node-forge solely to read a PKCS#12 truststore, a path that verifies no signature."
+
 # NOTE (2026-09-10): ten entries stood here — RUSTSEC-2024-0411 through -0420,
 # the gtk-rs unmaintained-crate advisories (gdk, gtk, atk, their -sys crates and
 # gtk3-macros). They are gone, and the way they left is worth one paragraph

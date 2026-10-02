@@ -77,5 +77,9 @@ jobs:
           #   in 0.20.0). Transitive via Tauri 2 → GTK/WebKit bindings on Linux
           #   only, pulled by the desktop example apps under
           #   examples/desktop/tauri/*/src-tauri/. Not in any published package.
-          #   Mirrors scripts/osv-scanner.toml; the two must stay in sync.
-          allow-ghsas: GHSA-wrw7-89jp-8q8g
+          # GHSA-86w9-cpqp-85rv — node-forge (no fixed release). Only via the
+          #   root devDependency @sonar/scan, run locally; it reads a PKCS#12
+          #   truststore with node-forge and verifies no signature. Not in any
+          #   published package.
+          # The list mirrors scripts/osv-scanner.toml; the two must stay in sync.
+          allow-ghsas: GHSA-wrw7-89jp-8q8g, GHSA-86w9-cpqp-85rv
