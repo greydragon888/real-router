@@ -13265,6 +13265,8 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 
 ## The patches group takes production dependencies only (2026-10-01)
 
+> **Superseded in part (2026-10-02).** `babel-preset-solid` does not move by hand with `solid-js`: its patch may trail by one until a minor or major PR moves it — see "babel-preset-solid trails solid-js by a patch".
+
 **Problem.** The change of "Dependabot carries the float-set patches" (`62bad03b7`) started a run of every entry, and the root and `/examples` runs failed (Actions runs 36841032542 and 36841032694). The patches arrived as intended — #2635 and #2639, the `~` ones as lockfile changes alone — and three things did not:
 
 - A dev dependency matches `*` in `patches` and in `dev-dependencies` equally, and Dependabot gave the tie to the group listed first; the log reads `Skipping @types/node for group 'dev-dependencies' - belongs to more specific group 'patches'`. `patches` takes no minor, so the minors of the examples' dev dependencies arrived as PRs of their own (#2640–#2642) instead of one `dev-dependencies` PR.
@@ -13333,3 +13335,15 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 
 **Why an allowlist entry for node-forge.** No release fixes it: 1.4.0 is the latest and is affected. Its one dependent is `@sonar/scan` 5.0.1, the root devDependency that `pnpm sonar:local` runs on a developer's machine — no workflow runs it and no published package depends on it. The advisory concerns RSA PKCS#1 v1.5 signature verification, and @sonar/scan calls node-forge only to read a PKCS#12 truststore into PEM certificates, which verifies no signature. Control: the same scan with a copy of the config that lacks the entry reports the advisory and exits 1; with the entry it exits 0.
 
+## babel-preset-solid trails solid-js by a patch (2026-10-02)
+
+**Problem.** The patch ignore of `babel-preset-solid` (2026-10-01) left its patch to a hand bump together with `solid-js`, and the bump never came: `solid-js` reached 1.9.15 through a Dependabot group while the satellite stayed at 1.9.12 in both lockfiles, though `babel-preset-solid` 1.9.15 had shipped on 2026-08-17, the same day as `solid-js` 1.9.15. Nothing reported the lag: 1.9.12 peers `solid-js ^1.9.12`, which 1.9.15 satisfies. In the examples the satellite is transitive, under `vite-plugin-solid` (`^1.8.4`), so Dependabot's version updates never move it there.
+
+**Solution.**
+
+- One bump: `packages/solid` pins `babel-preset-solid` 1.9.15, `pnpm dedupe` collapses the root's transitive copy onto it, and `pnpm --dir examples update babel-preset-solid` moves the examples'. The JSX compiler under the preset, `babel-plugin-jsx-dom-expressions`, goes from 0.40.7 to 0.40.10.
+- The patch ignore stays, and its comment in `.github/dependabot.yml` states the lag instead of a hand step.
+
+**Why accept the lag.** The pair ships about twice a year. Tried in one Dependabot run, the satellite fails on its peer before `solid-js` lands and marks the run failed (2026-10-01), so lifting the ignore buys a failed run per joint release, and the transitive copy in the examples still would not move. Automating the bump in `dependabot-dedupe.yml` was weighed and dropped by the owner as machinery for a rare event (2026-10-02). A patch of lag costs compiler fixes, not a break: the older preset peers the older runtime, which the newer one satisfies.
+
+**Measured.** `pnpm lint:dedupe` and `pnpm install --frozen-lockfile` in the root and the examples pass; `@real-router/solid` bundles, and its suite passes, 40 files and 498 tests.

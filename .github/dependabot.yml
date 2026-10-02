@@ -160,8 +160,8 @@ updates:
         update-types: ["version-update:semver-major"]
       # babel-preset-solid peers `solid-js` at its own version, so its patch
       # installs only once solid-js's has landed: tried in the same run, it
-      # fails and fails the run (2026-10-01). It moves by hand with solid-js;
-      # minor/major still come as PRs.
+      # fails and fails the run (2026-10-01). So its patch is not proposed, and
+      # it may trail solid-js by a patch until a minor/major PR or a hand bump.
       - dependency-name: "babel-preset-solid"
         update-types: ["version-update:semver-patch"]
       # @angular/* — EXACT cross-peer coupling (router@x requires core@x exactly),
