@@ -13,12 +13,14 @@ jobs:
   danger:
     name: Danger JS
     runs-on: ubuntu-latest
-    # Skip draft PRs and changesets release PRs (the latter only bump
-    # versions/changelogs). Gate by head-ref, NOT paths-ignore: the old
+    # Skip draft PRs and the release PR (it only bumps versions/changelogs).
+    # Gate by head-ref, NOT paths-ignore: the old
     # `paths-ignore: **/package.json` skipped the workflow on ANY package.json-only
     # PR — including the exact case `checkLockfileSync` exists to catch (a deps
     # bump that forgot `pnpm install`), so that check could never fire.
-    # The release branch is `changeset-release/*` (same as ci.yml).
+    # The release PR is `changeset-release/master` from this repository, as in
+    # codeql.yml: the author of a pull request picks its branch name, a fork's
+    # author included.
     #
     # Dependabot's PRs are skipped by author (IMPLEMENTATION_NOTES "Dependabot
     # PRs skip every metric"). Every rule here is advisory, and the one about
@@ -27,7 +29,8 @@ jobs:
     if: >-
       github.event.pull_request.draft == false &&
       github.event.pull_request.user.login != 'dependabot[bot]' &&
-      !startsWith(github.head_ref, 'changeset-release/')
+      !(github.head_ref == 'changeset-release/master' &&
+      github.event.pull_request.head.repo.full_name == github.repository)
     steps:
       - name: Checkout
         uses: actions/checkout@v7

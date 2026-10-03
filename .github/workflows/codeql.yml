@@ -4,11 +4,14 @@ on:
   # No workflow-level paths-ignore: `Dependency Review` is a REQUIRED status
   # check (protect-master ruleset), and a workflow skipped at the `on:` level
   # never reports its check → the PR blocks forever on a pending required check.
-  # Release PRs (`changeset-release/*`, which only bump versions/changelogs and
-  # have nothing to scan) are skipped at the JOB level via head-ref `if:` below
-  # — a job skipped by `if:` reports a "skipped" conclusion, which branch
-  # protection treats as a pass, so the required check is satisfied without
-  # running. This mirrors the head-ref gating already used in danger.yml.
+  # The release PR (which only bumps versions/changelogs and has nothing to
+  # scan) is skipped at the JOB level via the `if:` below — a job skipped by
+  # `if:` reports a "skipped" conclusion, which branch protection treats as a
+  # pass, so the required check is satisfied without running. ⚠ That makes the
+  # skip part of the gate, so it names the release PR exactly:
+  # `changeset-release/master` from this repository. The author of a pull
+  # request picks its branch name, a fork's author included. danger.yml skips
+  # the release PR by the same condition.
   # Dependabot dep PRs change pnpm-lock.yaml too, so they were
   # never matched by the old `**/package.json` ignore anyway — they keep running.
   pull_request:
@@ -20,7 +23,7 @@ jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
-    # Skip release PRs (no code to analyze) and Dependabot's npm PRs, which
+    # Skip the release PR (no code to analyze) and Dependabot's npm PRs, which
     # change manifests and the lockfile but no line CodeQL reads
     # (IMPLEMENTATION_NOTES "Dependabot PRs skip every metric"). A Dependabot
     # GitHub Actions PR still runs: when the bump is this action, this job is
@@ -28,7 +31,8 @@ jobs:
     # CodeQL stays advisory (not a required check), so a skip here can't block.
     if: >-
       github.event_name == 'schedule' ||
-      (!startsWith(github.head_ref, 'changeset-release/') &&
+      (!(github.head_ref == 'changeset-release/master' &&
+      github.event.pull_request.head.repo.full_name == github.repository) &&
       (github.event.pull_request.user.login != 'dependabot[bot]' ||
       startsWith(github.head_ref, 'dependabot/github_actions/')))
     permissions:
@@ -54,11 +58,15 @@ jobs:
   dependency-review:
     name: Dependency Review
     runs-on: ubuntu-latest
-    # Required status check (protect-master). Runs on every non-release PR so a
-    # dependency change is always scanned; skipped on release PRs via head-ref
-    # → "skipped" conclusion → treated as a pass (no deadlock). Not on schedule
-    # (no PR diff to review).
-    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'changeset-release/')
+    # Required status check (protect-master). Runs on every PR but the release
+    # PR, so a dependency change is always scanned; the release PR is skipped →
+    # "skipped" conclusion → treated as a pass (no deadlock). A fork's branch of
+    # any name, and any other branch of this repository, still runs it. Not on
+    # schedule (no PR diff to review).
+    if: >-
+      github.event_name == 'pull_request' &&
+      !(github.head_ref == 'changeset-release/master' &&
+      github.event.pull_request.head.repo.full_name == github.repository)
     permissions:
       contents: read
       pull-requests: write

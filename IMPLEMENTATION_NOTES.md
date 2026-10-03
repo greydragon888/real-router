@@ -13382,3 +13382,12 @@ Kept, because none of them points at a record: measurement dates, which say when
 **Why.** Owner decision: a build config states what holds, and the record of how it came to be lives where CLAUDE.md puts history — this file, changesets, commit messages and issues.
 
 **Measured.** A scan of 266 config files: 249 replacements in 39 files, and none of the reference forms above remains — `ci.yml` alone had 55 lines with an issue number. Of the changed lines, 11 are not comments: the seven `why` strings, three lint messages and one description line. `verify --stage pre-push` passes and actionlint is clean.
+
+## Dependency Review, CodeQL and Danger skip only the release PR itself (2026-10-03)
+
+**Problem.** `codeql.yml` skipped `Dependency Review`, a required status check, and CodeQL, and `danger.yml` skipped Danger, on every pull request whose head branch started with `changeset-release/`. A pull request's author picks its branch name, a fork's author included, and a required check skipped by its `if:` counts as a pass. A fork's pull request from `changeset-release/<anything>` that added a dependency could reach merge without Dependency Review.
+
+**Solution.** The three conditions name the release PR exactly: `github.head_ref == 'changeset-release/master' && github.event.pull_request.head.repo.full_name == github.repository`. Only those with write access push a branch to this repository.
+
+**Why this form.** Every release PR since 2026-06-16 — 368 of them — had that head, and none came from a fork (GitHub API, 2026-10-03); `changesets.yml` passes `changesets/action` no `branch:` input. If the release branch is ever renamed, the release PR stops matching and the three jobs run on it: a failure there is loud, and nothing is skipped by mistake. `ci.yml` asks nothing of the branch name — its no-source predicate reads the diff. `codspeed.yml` keeps its prefix test: its `core` and `adapters` jobs refuse a fork's pull request on their own, so the name there decides only for a branch of this repository.
+
