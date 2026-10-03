@@ -13423,3 +13423,11 @@ Kept, because none of them points at a record: measurement dates, which say when
 - ⚠ A job may be called `__proto__`. Both readings key their maps on a null prototype; on a plain object that job would vanish from both, the readings would agree, and it would pass. The test's `__proto__` cell fails if the plain object returns.
 
 **Measured.** On 75 forms — the mutation list, the reading defects, the YAML lexical channels, the line separators — the double reading has no unsafe green and two loud extra reds, and each form of the mutation list turns green only when its own rule is removed. Seventeen mutants of the module — each rule removed, the cross-check removed, a refusal turned into a skip, the parser's error check dropped, a `${{` check dropped, a trailing comment kept, the null prototype dropped, `.yaml` files left unread, a lossy decode — each fail a cell of the test.
+
+## The root lockfile records the deprecations npm published for packages it locks (2026-10-03)
+
+**Problem.** `lint:dedupe` failed on a Dependabot pull request — `ERR_PNPM_DEDUPE_CHECK_ISSUES`, "The lockfile would be rewritten, but no dependency resolution would change" — while the same check passed locally and on other pull requests with the same base. npm had deprecated 24 packages the root lockfile locks, `@yuku-codegen/binding-*@0.9.4` and `@yuku-parser/binding-*@0.9.4`, which `rolldown-plugin-dts` pulls, and pnpm records a deprecation in the lockfile. A run that fetches fresh metadata wants to add the 24 `deprecated:` fields; a run on metadata cached before the deprecation does not. The verdict depended on the age of the runner's or the machine's metadata cache, not on the tree.
+
+**Solution.** The root lockfile carries the 24 `deprecated:` fields, written by `pnpm dedupe` on fresh metadata; nothing else in it changed. The check passes with an empty metadata cache and with the local one, and metadata without the deprecation leaves the fields in place.
+
+**Why.** The next deprecation of a locked package does the same. Its signature is that message beside a list of deprecated subdependencies: `pnpm_config_cache_dir=$(mktemp -d) pnpm dedupe --check` reproduces it, and the same command without `--check` writes the fields. `pnpm dedupe` takes no `--cache-dir` flag.
