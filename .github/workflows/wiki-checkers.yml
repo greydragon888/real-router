@@ -44,6 +44,7 @@ on:
     # languages look identical and disagree; measured, the git form returns 0 for a
     # tree with 163 matching commits in thirty days.
     paths:
+      - "a3-probe-missing-dir/**"
       - "packages/*/src/**"
       # A shared dir reaches a package's src/ only through a symlink, which a
       # path filter does not follow; `check-messages.mjs` reads it there.
