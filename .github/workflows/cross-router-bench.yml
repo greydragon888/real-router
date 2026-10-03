@@ -39,7 +39,7 @@ jobs:
     # it and no harness module reads it.
     # What the host DOES give is a stable CPU model and a persistent store; what it does not
     # give is isolation. Treat absolute sub-ms numbers accordingly.
-    runs-on: self-hosted # schedule/workflow_dispatch only (no fork-PR) → no self-hosted RCE surface.
+    runs-on: self-hosted # schedule/workflow_dispatch only: self-hosted-triggers.test.mjs refuses a fork-controlled trigger here.
     # Spelled out rather than left to the invisible default (also 360): the
     # matrix step's own cap is set relative to THIS number, and a self-hosted job
     # holding the single shared runner for six hours should be a deliberate

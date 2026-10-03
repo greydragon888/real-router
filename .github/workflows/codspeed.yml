@@ -55,11 +55,17 @@ name: CodSpeed
 # external prerequisite is installing the CodSpeed GitHub App on the repo
 # (https://codspeed.io) so the run has a project to upload to.
 #
-# Push-to-master establishes the baseline; pull_request compares against it.
-# Both run only when the `gate` job finds a change the suites can measure. The
-# regression threshold / gate semantics live in the CodSpeed project settings,
-# not here — this workflow only runs the suites under instrumentation and
-# uploads.
+# Push-to-master establishes the baseline, and only when the `gate` job finds
+# a change the suites can measure. There is no pull_request run while `core`
+# and `adapters` use the self-hosted runner:
+# scripts/tests/self-hosted-triggers.test.mjs refuses a self-hosted job under
+# a trigger a fork controls. The pull_request parts of this file — the fork,
+# Dependabot and release-branch clauses of each job's `if`, the pull_request
+# branch of `Decide` and the base report step — take no effect until then, and
+# the cancel expression is always false; they stay for CodSpeed's own runners.
+# The regression threshold / gate semantics live in the CodSpeed project
+# settings, not here — this workflow only runs the suites under instrumentation
+# and uploads.
 
 # ✅ ENABLED. History: the gate was disabled because GitHub's heterogeneous
 # `ubuntu-latest` pool landed base
@@ -79,13 +85,14 @@ name: CodSpeed
 # is unreachable from the RF VPS, so runner-version is pinned to a cargo-git rev
 # (see the action steps below).
 #
-# Current state: push:[master] seeds/updates the baseline (feature-merge
-# commits only — release-merge commits are skipped, see the job `if`),
-# pull_request compares against it. The regression threshold / gate semantics live in the
-# CodSpeed project settings, not here; CodSpeed is NOT a required status check,
-# so a red comparison informs but does not block merges. SECURITY: the job `if`
-# gates pull_request to same-repo PRs only — fork-PR code never executes on the
-# self-hosted VPS (public-repo RCE / resource-abuse surface).
+# Current state: push:[master] seeds/updates the baseline; `gate` skips a push
+# that only moves versions and changelogs, a release merge among them. The
+# regression threshold / gate semantics live in the CodSpeed project settings,
+# not here; CodSpeed is NOT a required status check, so a red comparison
+# informs but does not block merges. SECURITY: no pull_request run reaches the
+# self-hosted VPS (public-repo RCE / resource-abuse surface) — the workflow has
+# no pull_request trigger, and self-hosted-triggers.test.mjs fails a change
+# that adds one wherever `node:scripts-tests` runs.
 #
 # PATH FILTER. Instruction counts cannot move for a
 # change that ships no code, yet every run costs the SINGLE self-hosted runner
@@ -105,27 +112,6 @@ name: CodSpeed
 # gone with the second workflow file.
 on:
   push:
-    branches: [master]
-    paths-ignore:
-      - "**/*.md"
-      - ".claude/**"
-      - ".github/**"
-      - ".husky/**"
-      - "scripts/**"
-      # ⚠ ONE NARROW addition, and the narrowness is the point.
-      # `packages/**` is otherwise significant by default — a source change can
-      # move the numbers, so the ignore list stays conservative there.
-      # `knip.json` configures dead-code analysis and reaches no runtime.
-      # ⛔ Do NOT widen this to `packages/core/tests/benchmarks/**`: editing a
-      # real bench MUST re-seed the baseline, and swallowing that is how a
-      # comparison silently starts measuring against the wrong reference.
-      - "knip.json"
-      # Each a pnpm workspace with its own lockfile: nothing the suites import
-      # lives there, and `scripts/codspeed-gate.mjs` never answers RUN for a
-      # change confined to them.
-      - "examples/**"
-      - "cross-router-bench/**"
-  pull_request:
     branches: [master]
     paths-ignore:
       - "**/*.md"
@@ -171,12 +157,14 @@ on:
           - core
           - both
 
-# A burst of pushes / PR synchronizes otherwise queues N runs on a runner that
-# executes one job at a time. Supersede PR runs; NEVER cancel a push run — each
-# master push seeds its own baseline and dropping one leaves a hole in the
-# comparison history. One group now covers both suites, which is what we want:
-# they belong to the same run and must be superseded together, or a stale half
-# would upload into the new run's report.
+# One group per ref covers both suites: they belong to the same run and must
+# be superseded together, or a stale half would upload into the new run's
+# report. A running push run is never cancelled — the expression is false for
+# push. GitHub keeps one pending run per group and a newer push replaces it, so
+# in a burst `gate` measures the whole range on the newest commit, from the
+# last push run that finished green. The expression supersedes pull_request
+# runs only, which this workflow takes once its jobs leave the self-hosted
+# runner.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -260,7 +248,9 @@ jobs:
       checks: read
     needs: gate
     # SECURITY (self-hosted + public repo): never run untrusted fork-PR code on
-    # the VPS. The pull_request guard (the second clause) lets push +
+    # the VPS. While this job is self-hosted the workflow has no pull_request
+    # trigger at all (see the header); the guard below is for the day it has
+    # one again. The pull_request guard (the second clause) lets push +
     # workflow_dispatch through unconditionally (they carry no pull_request
     # payload, so its first half is true), and
     # allows a pull_request ONLY when its head is a branch in THIS repo (a
@@ -279,8 +269,8 @@ jobs:
     #     skip a release merge the gate asked to RUN — a range whose base a
     #     failed run left stale — and that run would still finish green, so the
     #     next gate would take the release commit as measured.
-    # A release therefore costs 2 slow runs on the single self-hosted runner:
-    # the feature PR and the feature-merge push, which records the baseline.
+    # A release therefore costs one slow run on the single self-hosted runner:
+    # the feature-merge push, which records the baseline.
     # (github.head_ref is empty on push / workflow_dispatch, so the
     # changeset-release/* clause is a no-op for them.)
     #
@@ -293,9 +283,11 @@ jobs:
     # GATE: the first clause. `gate` answers whether the range reaches the
     # measured program at all; the clauses after it are the event rules above.
     #
-    # ⚠ The `adapters` job below carries this expression VERBATIM. They gate the
-    # same runner on the same events for the same reasons; if you change one,
-    # change both, or a fork PR gains a foothold through the half you forgot.
+    # ⚠ The `adapters` job below carries this guard VERBATIM, after a clause of
+    # its own on the `suites` input. They gate the same runner on the same
+    # events for the same reasons; if you change one,
+    # change both: the half you forgot is the one a fork PR would use once
+    # pull_request runs here again.
     if: >-
       needs.gate.outputs.run == 'true' &&
       (github.event_name != 'pull_request' ||
@@ -505,9 +497,9 @@ jobs:
     # Same self-hosted VPS as the core job: consistent hardware; the runner
     # processes one job at a time, so core/adapters queue, never race.
     # ⚑ The second clause, after the gate's, reads the `suites` input: it only
-    # ever skips this job on a manual dispatch, so push and pull_request run
-    # BOTH suites whenever `gate` runs either — which is what CodSpeed's
-    # aggregation requires.
+    # ever skips this job on a manual dispatch, so every other run takes BOTH
+    # suites whenever `gate` runs either — which is what CodSpeed's aggregation
+    # requires.
     runs-on: self-hosted
     # Same bound and rationale as `core`: measured 231 s here, so 30 min
     # is ~8x headroom instead of the invisible 360-minute default.

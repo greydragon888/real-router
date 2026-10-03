@@ -113,6 +113,13 @@ updates:
       # (`.pnpmfile.mjs`), and jsdom takes 8.x on its own range. Each
       # parent's range moves its copy; Dependabot would offer 8.x to both.
       - dependency-name: "undici"
+      # yaml is a root devDependency for self-hosted-triggers.test.mjs, and the
+      # `yaml@2: $yaml` override (pnpm-workspace.yaml) hands its version to
+      # every 2.x consumer, a major too. A PR that bumps it carries no source,
+      # so `node:scripts-tests` — that test with it — does not run on it in CI;
+      # a bump by hand runs it in pre-push. The name alone ignores security
+      # updates as well.
+      - dependency-name: "yaml"
       # @types/node is pinned to the Node.js runtime major (Node 24 — `.nvmrc` is
       # the source of truth; see the CLAUDE.md toolchain table). Block semver-major:
       # type defs ahead of the runtime let TS resolve Node APIs that don't exist

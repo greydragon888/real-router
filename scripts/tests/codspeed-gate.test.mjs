@@ -333,6 +333,85 @@ test("no base measures, and the CLI fails open on a base it cannot read", () => 
   });
 });
 
+/**
+ * A repository where a branch left master before master moved on: the branch
+ * commits `branchChanges`, then master edits core.
+ */
+function withBranches(branchChanges, use) {
+  const dir = mkdtempSync(join(tmpdir(), "codspeed-gate-"));
+  const git = (...args) =>
+    execFileSync("git", args, {
+      cwd: dir,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+  try {
+    git("init", "-q", "-b", "master");
+    git("config", "user.email", "gate@example.invalid");
+    git("config", "user.name", "gate");
+    git("config", "commit.gpgsign", "false");
+    write(dir, BASE_FILES);
+    git("add", "-A");
+    git("commit", "-q", "-m", "base");
+    git("checkout", "-q", "-b", "feature");
+    write(dir, branchChanges);
+    git("add", "-A");
+    git("commit", "-q", "-m", "branch");
+    git("checkout", "-q", "master");
+    write(dir, {
+      "packages/core/src/index.ts": CORE_SOURCE.replace("= 42", "= 43"),
+    });
+    git("add", "-A");
+    git("commit", "-q", "-m", "master moves on");
+
+    return use({ dir });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("--merge-base measures a branch from where it left master", () => {
+  const cli = (dir, ...flags) =>
+    execFileSync(
+      process.execPath,
+      [SCRIPT, "--root", dir, "--base", "master", "--head", "feature", ...flags],
+      { encoding: "utf8" },
+    );
+  const ranges = (branchChanges) =>
+    withBranches(branchChanges, ({ dir }) => ({
+      fromMergeBase: gate({
+        root: dir,
+        base: "master",
+        head: "feature",
+        mergeBase: true,
+        esbuild,
+      }),
+      fromTip: gate({ root: dir, base: "master", head: "feature", esbuild }),
+      cliFromMergeBase: cli(dir, "--merge-base"),
+      cliFromTip: cli(dir),
+    }));
+
+  // The branch edits a package the suites never load; master edited core.
+  const unmeasured = ranges({
+    "packages/other/src/index.ts": "export const other = 2;\n",
+  });
+
+  assert.equal(unmeasured.fromMergeBase.run, false);
+  assert.equal(unmeasured.fromTip.run, true);
+  assert.match(unmeasured.fromTip.reasons.join("\n"), /is not an ancestor/);
+  // The flag the `pull_request` branch of `Decide` passes reaches `gate`.
+  assert.match(unmeasured.cliFromMergeBase, /^CodSpeed: skip$/m);
+  assert.match(unmeasured.cliFromTip, /^CodSpeed: RUN$/m);
+
+  // Control: a core edit on the branch itself runs from the merge base too.
+  const measured = ranges({
+    "packages/core/src/index.ts": CORE_SOURCE.replace("= 42", "= 44"),
+  });
+
+  assert.equal(measured.fromMergeBase.run, true);
+});
+
 test("packageOf and importedPackages read bare specifiers only", () => {
   assert.equal(packageOf("react-dom/client"), "react-dom");
   assert.equal(packageOf("@angular/core/testing"), "@angular/core");

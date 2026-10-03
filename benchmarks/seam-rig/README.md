@@ -3,8 +3,8 @@
 **Two REFS, one question: what does moving the injection seam cost?** (#1938)
 
 The sibling of `plugin-seam/`, and the two do different jobs. `plugin-seam/` is a
-benchmark: one tree, wired into the CodSpeed run, so a regression on the href
-door is caught on the PR that causes it. This rig compares **two arbitrary refs**
+benchmark: one tree, wired into the CodSpeed run on master, so a regression on
+the href door shows against the last measured master commit. This rig compares **two arbitrary refs**
 — a prototype branch against `master`, an idea against the idea before it — which
 a gate cannot do and which is what a design decision actually needs.
 

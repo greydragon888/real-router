@@ -13312,6 +13312,8 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 
 **Why the `if:` guard stays where it is.** Approval is a judgement on a diff, and the guard is what makes approving a fork PR that touches only benchmark code safe. That holds only while the guard is evaluated before a runner exists: `jobs.<id>.if` "is processed by GitHub Actions, and the job is only sent to the runner if the result is `true`", whereas job outputs "are evaluated on the runner at the end of each job". Moved into an output of `gate` — a job that runs the pull request's `.github/actions/setup` and `scripts/codspeed-gate.mjs`, on a runner whose steps have `sudo` (`ci.yml` calls it in two steps) — the guard would be computed after the pull request's code had run on that machine, and a fork could set it by editing files outside `.github/workflows`. The guard therefore stays in the `if:` of each job, one text in both; today the `VERBATIM` comments are what says so.
 
+> **Updated (2026-10-03).** `codspeed.yml` has no `pull_request` trigger while its jobs are self-hosted, and `self-hosted-triggers.test.mjs` keeps it so ("Self-hosted jobs run only on triggers a fork cannot fire"). The guard stays in the `if:` of each job, one text in both, for CodSpeed's own runners; the `VERBATIM` comments still say so.
+
 **Cost.** One maintainer click per outside fork PR; there are none so far.
 
 ## The fork gate of `sonar-trusted.yml` drops the arms only this repository's pull requests could reach (2026-10-01)
@@ -13403,3 +13405,21 @@ Kept, because none of them points at a record: measurement dates, which say when
 
 **Measured.** Without the entries `bash scripts/check-deps-audit.sh` reports both advisories and exits 1; with them it exits 0 and osv-scanner lists no unused ignore. api.osv.dev answers both advisories for `braces@3.0.3` and `http-cache-semantics@4.2.0`, the latest versions on npm. Drop each entry when its package ships a fix.
 
+## Self-hosted jobs run only on triggers a fork cannot fire (2026-10-03)
+
+**Problem.** What kept fork code off the self-hosted VPS was each job's `if:` and the approval policy for fork pull requests. Nothing read the workflow files for it: a `pull_request` trigger in `codspeed.yml` or `cross-router-bench.yml`, a new workflow with a self-hosted job, or a self-hosted job started by `pull_request_target`, `issue_comment` or `workflow_run` passed every check. A pull request runs its own copy of a workflow, so the `if:` it carries is the pull request's to edit.
+
+**Solution.**
+
+- `scripts/tests/self-hosted-triggers.test.mjs` refuses a job on the self-hosted runner in a workflow started by anything but `schedule`, `workflow_dispatch`, `push` or `workflow_call`, which is judged by its callers. A job counts as off the VPS only when its `runs-on` is one plain label that `HOSTED` matches — a GitHub-hosted runner — or that starts with `codspeed-macro-`, CodSpeed's runners. Anything else — `self-hosted`, an unknown label, an array, a block, `group:`, `labels:`, an expression, an alias, no `runs-on` — counts as the VPS, and so does a job that calls another repository's workflow.
+- The rules judge a model `scripts/runner-labels.mjs` reads twice — by a closed line reader and by the `yaml` parser — and only when both readings agree; a refusal or a disagreement is a finding with the file's name. A file with a lone CR, NEL, LS or PS is refused — actionlint reads `pull_request:` after one of them in a comment as an event, while both readings see a comment — and so is a file with any other control character, a tab included, or one that is not valid UTF-8.
+- `codspeed.yml` has no `pull_request` trigger while `core` and `adapters` are self-hosted. Its fork, Dependabot and release-branch clauses, the `pull_request` branch of `Decide` and the base report step take no effect until then, and the cancel expression is always false; they stay for CodSpeed's own runners. `codspeed-gate.test.mjs` covers the `--merge-base` path that branch takes, through `gate` and through the CLI.
+- `yaml` is a root devDependency at an exact version, and `yaml@2: $yaml` hands that version to every 2.x consumer. Dependabot ignores `yaml`.
+
+**Why.** A defect of a single reader — a comment in column 0, a trailing comment, quotes, a flow mapping, a second document — was a silent pass; with two readings it is a red. The trigger list is closed, so whatever the rules do not read is the VPS or a finding.
+
+- ⚠ The rule reads runner labels from the workflow, not from GitHub: a self-hosted runner registered with a label the rule reads as off the VPS — `ubuntu-…`, `macos-…`, `windows-…`, `codspeed-macro-…` — would pass it. The one runner today carries `self-hosted, Linux, X64`; recheck when a runner is registered.
+- ⚠ The test runs wherever `node:scripts-tests` runs: in pre-push on every push, and in CI inside Repo Lints. Repo Lints does not start on a pull request that changes only Markdown and `.github/**` outside `.github/actions/**`, and `node:scripts-tests` skips Dependabot's pull requests and any diff with no source (`ciSkip`) — a bump of `yaml` among them, so Dependabot leaves `yaml` alone and a bump is made by hand, through pre-push.
+- ⚠ A job may be called `__proto__`. Both readings key their maps on a null prototype; on a plain object that job would vanish from both, the readings would agree, and it would pass. The test's `__proto__` cell fails if the plain object returns.
+
+**Measured.** On 75 forms — the mutation list, the reading defects, the YAML lexical channels, the line separators — the double reading has no unsafe green and two loud extra reds, and each form of the mutation list turns green only when its own rule is removed. Seventeen mutants of the module — each rule removed, the cross-check removed, a refusal turned into a skip, the parser's error check dropped, a `${{` check dropped, a trailing comment kept, the null prototype dropped, `.yaml` files left unread, a lossy decode — each fail a cell of the test.

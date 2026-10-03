@@ -11,10 +11,11 @@
 //    currently supported"), and other workflows here run jobs on the
 //    self-hosted runner (`rg -l 'runs-on: self-hosted' .github/workflows`), so
 //    `runs-on: self-hosted` is one copy-paste away. Moving the release job
-//    there would not fail a PR, would not fail a build — it would fail the
-//    OIDC token exchange at publish time, on master, mid-release, with the
-//    concurrency group holding every queued release behind it. Nothing else
-//    in the repo asserts this.
+//    there would not fail a build — it would fail the OIDC token exchange at
+//    publish time, on master, mid-release, with the concurrency group holding
+//    every queued release behind it. `self-hosted-triggers.test.mjs` refuses
+//    it as well, because `changesets.yml` starts on `workflow_run`; this file
+//    holds the rule for any trigger.
 //
 // 2. `id-token: write` must stay in the workflow's permissions. Removing it
 //    (e.g. while tightening permissions) breaks OIDC publishing exactly as
@@ -42,18 +43,13 @@ import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { classify } from "../../.changeset/unpublished-packages.mjs";
+import { HOSTED } from "../runner-labels.mjs";
 
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const CHANGESETS_YML = join(repoRoot, ".github", "workflows", "changesets.yml");
 
 /** The job that runs `changeset publish`. */
 export const RELEASE_JOB = "release";
-
-/**
- * Labels that identify a GitHub-hosted runner. Anything else — most importantly
- * `self-hosted` and any custom label pointing at it — is a violation.
- */
-const HOSTED = /^(ubuntu|windows|macos)-[\w.]+$/;
 
 /**
  * Extract a job's `runs-on` value from workflow YAML text.
