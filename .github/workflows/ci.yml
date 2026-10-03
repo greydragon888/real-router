@@ -1721,13 +1721,13 @@ jobs:
   ci:
     name: CI Result
     runs-on: ubuntu-latest
-    # ⚠ Sonar is not a job in this file and not on this gate's path.
-    # `sonar-trusted.yml` analyses the PR once this workflow completes and posts
-    # the verdict to the head SHA, where it gates on its own: the
-    # `protect-master` ruleset lists "SonarCloud" as a required status check
-    # beside "CI Result" / "Require Changeset" / "Validate Changesets" /
-    # "Dependency Review". So a red quality gate blocks the merge without its
-    # ~90s scan sitting on this job's critical path.
+    # ⚠ Sonar is not on this gate's path. The `sonar` job above (a pull
+    # request from this repository) or `sonar-trusted.yml` (a fork's, once
+    # this workflow completes) posts the verdict to the head SHA, where it
+    # gates on its own: the `protect-master` ruleset lists "SonarCloud" as a
+    # required status check beside "CI Result" / "Require Changeset" /
+    # "Validate Changesets" / "Dependency Review". So a red quality gate blocks
+    # the merge without its ~90s scan sitting on this job's critical path.
     needs: [check, pipeline-leaf, base-bundle, base-test, base-lint, base-coverage, base-properties, pipeline-sharded, repo-lints, smoke, coverage, actionlint, prose-lint, examples-build, benchmarks-lint, cross-router-lint]
     if: always()
     steps:
@@ -1801,12 +1801,12 @@ jobs:
             exit 1
           fi
 
-          # ok(): success OR skipped. Used ONLY for smoke/coverage (they
-          # legitimately skip on a built==false leaf, and coverage on every
-          # Dependabot PR) and an empty-include
-          # pipeline-sharded — NEVER for the job that DEFINES the active path
-          # (pipeline-leaf / base-bundle + base-test + base-properties), so a real failure there
-          # cannot be masked as a skip.
+          # ok(): success OR skipped — only for a job that may legitimately
+          # skip while the active path ran; its own `if:` says when, and the
+          # path-filtered ones are also explained at the final verdict below.
+          # NEVER for a job that DEFINES the active path — pipeline-leaf, or
+          # every base-* job in sharded mode — so a real failure there cannot
+          # be masked as a skip.
           ok() { [[ "$1" == "success" || "$1" == "skipped" ]]; }
 
           case "$MODE" in
@@ -1821,7 +1821,7 @@ jobs:
 
           # repo-lints runs on every should_run PR in BOTH modes — past the
           # should_run short-circuit above it must have run AND passed (hard
-          # requirement, not ok()-skippable like smoke/sonar).
+          # requirement, not read through ok()).
           # examples-build is ok()-skippable: it runs only when a PR touches an
           # example, which most PRs do not. When it DOES run, a failure is hard.
           # benchmarks-lint likewise: it runs only when a PR edits the

@@ -74,9 +74,9 @@ export function findViolations(yaml, outsideGate = OUTSIDE_GATE) {
     // The OTHER half of the #1127 class. `needs` only makes the gate WAIT for a
     // job; what blocks a merge is what the "Determine result" script reads. A job
     // listed in `needs` whose result is never read is exactly as vacuous as one
-    // outside the gate — and membership alone cannot see that. All nine are read
-    // today, so this is a preventer gap rather than a live bug; #1127 is what a
-    // preventer gap looks like once it stops being one.
+    // outside the gate — and membership alone cannot see that. Every one is read
+    // today (the real-file test asserts it), so this is a preventer gap, not a
+    // live bug; #1127 is what a preventer gap looks like once it stops being one.
     neededButUnread: [...needs].filter((n) => !gateReads(gateScript, n)),
     // The #1127 class: a job whose red X would not block merge.
     ungated: jobs.filter(
