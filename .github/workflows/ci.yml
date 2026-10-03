@@ -64,7 +64,8 @@ jobs:
           # — bumped versions, rewritten CHANGELOGs, consumed changesets — is the
           # one that lands on master, and until it does nothing else checks it
           # (see IMPLEMENTATION_NOTES "Release PRs run the pipeline"). CodeQL,
-          # CodSpeed and danger keep their own head-ref skips.
+          # CodSpeed and danger keep their own head-ref skips, and Repo Lints
+          # skips `lint:audit` on the release PR (`release-pr`).
           #
           # pull_request-only workflow — base/head come straight from the PR event.
           BASE="${{ github.event.pull_request.base.sha }}"
@@ -99,7 +100,7 @@ jobs:
 
           if [ -z "$CODE_CHANGES" ]; then
             echo "should_run=false" >> $GITHUB_OUTPUT
-            echo "📝 Only docs/CI changes detected, skipping CI"
+            echo "📝 Only docs/CI changes detected, skipping the build and test jobs"
           else
             echo "should_run=true" >> $GITHUB_OUTPUT
             echo "🔍 Code changes detected, running full CI"
@@ -751,14 +752,13 @@ jobs:
   # in one step by `scripts/verify.mjs`: repository-wide checks, not per-package
   # and not turbo-cached. It runs beside the pipeline on both paths, so it adds
   # nothing to the base→shards Amdahl prefix. It needs the install,
-  # osv-scanner and uv, and no build. Every should_run PR runs it, and the CI
-  # gate requires it.
+  # osv-scanner and uv, and no build. It runs on every PR, and the CI gate
+  # requires it before the gate's exit for a PR without code.
   # ============================================
   repo-lints:
     name: Repo Lints
     runs-on: ubuntu-latest
     needs: [check]
-    if: needs.check.outputs.should_run == 'true'
     env:
       # Read into the context of the checks step below. The `secrets` context is
       # not usable in an `if:` or an expression of a step, so the presence check
@@ -774,13 +774,15 @@ jobs:
       # this split is in IMPLEMENTATION_NOTES "Dependabot PRs skip every metric".
       DEPENDABOT_PR: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
       # A release PR has the SAME diff shape as a bump — manifests, CHANGELOGs,
-      # the consumed changesets and the lockfile (the no-source predicate) — so it takes
-      # the same split rather than its own: the checks that stay are those whose
-      # subject that shape holds, their `ciSkip` naming neither context. Among
-      # them `lint:deps` judges the peer floors `changeset version` rewrites, and
-      # `lint:dedupe` the lockfile the root `version` script regenerates.
-      # ⚠ Asked of the DIFF, not of the branch name: one source file in a
-      # `changeset-release/*` branch must still reach every check.
+      # the consumed changesets and the lockfile (the no-source predicate) — so it
+      # takes the same split: the checks that stay are those whose subject that
+      # shape holds. Among them `lint:deps` judges the peer floors
+      # `changeset version` rewrites, and `lint:dedupe` the lockfile the root
+      # `version` script regenerates. `lint:audit` reads the lockfile too, but on
+      # a release PR its verdict comes from advisories against packages master
+      # already locks, so `release-pr` (the step below) skips it there.
+      # ⚠ Asked of the DIFF, not of the branch name alone: one source file in
+      # a `changeset-release/*` branch must still reach every check.
       NO_SOURCE: ${{ needs.check.outputs.no_source }}
     steps:
       # Full history: three cells of `diff-carries-no-source.test.mjs` read real
@@ -825,12 +827,29 @@ jobs:
       # and says why. The semgrep pins take effect in the ci stage alone: the
       # version, and a time no dependency may be newer than (RFC 3339 — a bare
       # date is read in the runner's time zone).
+      #
+      # `release-pr` is the release PR: its head is exactly
+      # `changeset-release/master` from this repository, as codeql.yml and
+      # danger.yml name it (they compare without case, bash with it), and its
+      # diff carries no source. A branch name is the PR author's choice, a
+      # fork's author included, and a diff without source is any dependency
+      # bump too. The script appends it rather than `format()`, so that
+      # `verify.test.mjs` executes it, and reads only this step's `env:` —
+      # NO_SOURCE too, which an earlier step's $GITHUB_ENV cannot override here.
       - name: Run the checks
         env:
           VERIFY_CONTEXT: ${{ format('{0},{1},{2}', env.DEPENDABOT_PR == 'true' && 'dependabot-pr' || '', env.NO_SOURCE == 'true' && 'no-source' || '', (github.actor == 'dependabot[bot]' && env.HAS_DEDUPE_FIXER == 'true') && 'dependabot-actor-with-dedupe-fixer' || '') }}
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPO: ${{ github.repository }}
+          NO_SOURCE: ${{ needs.check.outputs.no_source }}
           SEMGREP_VERSION: "1.178.0"
           SEMGREP_EXCLUDE_NEWER: "2026-09-23T21:14:00Z"
-        run: node scripts/verify.mjs --stage ci --context "$VERIFY_CONTEXT"
+        run: |
+          if [[ "$HEAD_REF" == "changeset-release/master" && "$HEAD_REPO" == "$REPO" && "$NO_SOURCE" == "true" ]]; then
+            VERIFY_CONTEXT="$VERIFY_CONTEXT,release-pr"
+          fi
+          node scripts/verify.mjs --stage ci --context "$VERIFY_CONTEXT"
 
   # ============================================
   # PIPELINE-SHARDED: one runner per affected class (mode=sharded). The matrix
@@ -1424,12 +1443,13 @@ jobs:
             core.summary.addRaw(body).write();
 
   # ============================================
-  # WORKFLOW LINT: actionlint — runs on EVERY PR (no should_run gate)
-  # Closes the gap where a PR touching only .github/workflows/*.yml sets
-  # should_run=false → pipeline/smoke/sonar skip → the highest-risk code class
-  # (executable workflows with secret/publish access) merged with ZERO automated
-  # validation. Pinned by digest (rhysd/actionlint 1.7.8); the image bundles
-  # shellcheck + pyflakes, so it also catches shell bugs in `run:` blocks.
+  # WORKFLOW LINT: actionlint — runs on every PR but Dependabot's (no
+  # should_run gate). A PR touching only .github/workflows/*.yml sets
+  # should_run=false → pipeline/smoke/sonar skip, and nothing else in CI runs a
+  # general linter over the syntax, expressions or shell of the highest-risk
+  # code class (executable workflows with secret/publish access). Pinned by
+  # digest (rhysd/actionlint 1.7.8); the image bundles shellcheck + pyflakes,
+  # so it also catches shell bugs in `run:` blocks.
   # SHELLCHECK_OPTS=--severity=warning drops the benign SC2086/SC2001 info/style
   # noise on `>> $GITHUB_OUTPUT`-style writes while keeping warnings, errors, and
   # actionlint's own expression/script-injection checks gating. Result is folded
@@ -1453,9 +1473,8 @@ jobs:
 
 
   # ============================================
-  # PROSE-LINT: Vale over the Markdown a PR changes, on every PR — one of
-  # Markdown alone included: Repo Lints does not start for it (should_run), and
-  # its prose would pass the gate unread. A range that edits the rules
+  # PROSE-LINT: Vale over the Markdown a PR changes, on every PR, a PR of
+  # Markdown alone included. A range that edits the rules
   # (.vale.ini, vale-styles/, scripts/check-prose.sh) lints the whole corpus.
   # No Dependabot skip: a bump changes no Markdown the corpus holds, so the job
   # passes on its own, and so does a release PR, whose CHANGELOGs are out of it.
@@ -1770,11 +1789,19 @@ jobs:
             exit 1
           fi
 
-          # prose-lint runs on every PR, Dependabot's included: a PR of Markdown
-          # alone is the one Repo Lints skips, so its prose is read there or
-          # nowhere. Checked before the short-circuit, like actionlint.
+          # prose-lint runs on every PR, Dependabot's included, and is where CI
+          # runs `lint:prose`, which is not in the ci stage. Checked before the
+          # short-circuit, like actionlint.
           if [[ "${{ needs.prose-lint.result }}" != "success" ]]; then
             echo "❌ prose-lint failed (Markdown prose)"
+            exit 1
+          fi
+
+          # repo-lints runs on every PR, Dependabot's included, and each of its
+          # checks keeps its own `ciSkip`. Required before the short-circuit,
+          # like actionlint, so that its skip fails the gate on every path.
+          if [[ "${{ needs.repo-lints.result }}" != "success" ]]; then
+            echo "❌ repo-lints failed (repository checks)"
             exit 1
           fi
 
@@ -1790,7 +1817,7 @@ jobs:
           fi
 
           if [[ "${{ needs.check.outputs.should_run }}" != "true" ]]; then
-            echo "✅ Skipped — no code changes (actionlint and prose-lint passed)"
+            echo "✅ Skipped — no code changes (actionlint, prose-lint and repo-lints passed)"
             exit 0
           fi
 
@@ -1805,11 +1832,10 @@ jobs:
           SHARDED="${{ needs.pipeline-sharded.result }}"
           SMOKE="${{ needs.smoke.result }}"
           COVERAGE="${{ needs.coverage.result }}"
-          LINTS="${{ needs.repo-lints.result }}"
           EXAMPLES="${{ needs.examples-build.result }}"
           BENCHMARKS_LINT="${{ needs.benchmarks-lint.result }}"
           CROSS_ROUTER_LINT="${{ needs.cross-router-lint.result }}"
-          echo "plan=$PLAN mode=$MODE leaf=$LEAF base_bundle=$BASE_BUNDLE base_test=$BASE_TEST base_lint=$BASE_LINT base_cov=$BASE_COV base_props=$BASE_PROPS sharded=$SHARDED smoke=$SMOKE coverage=$COVERAGE lints=$LINTS examples=$EXAMPLES benchmarks_lint=$BENCHMARKS_LINT cross_router_lint=$CROSS_ROUTER_LINT"
+          echo "plan=$PLAN mode=$MODE leaf=$LEAF base_bundle=$BASE_BUNDLE base_test=$BASE_TEST base_lint=$BASE_LINT base_cov=$BASE_COV base_props=$BASE_PROPS sharded=$SHARDED smoke=$SMOKE coverage=$COVERAGE examples=$EXAMPLES benchmarks_lint=$BENCHMARKS_LINT cross_router_lint=$CROSS_ROUTER_LINT"
 
           # Defensive belt-and-suspenders on the shard-plan output: the aggregate
           # and the check-result guard above already exit on any `check` result
@@ -1837,15 +1863,12 @@ jobs:
               exit 1 ;;
           esac
 
-          # repo-lints runs on every should_run PR in BOTH modes — past the
-          # should_run short-circuit above it must have run AND passed (hard
-          # requirement, not read through ok()).
           # examples-build is ok()-skippable: it runs only when a PR touches an
           # example, which most PRs do not. When it DOES run, a failure is hard.
           # benchmarks-lint likewise: it runs only when a PR edits the
           # benchmarks or a change reaches them from outside;
           # cross-router-lint only when the PR edits cross-router-bench.
-          if [[ "$PATH_OK" == "1" ]] && [[ "$LINTS" == "success" ]] && ok "$SMOKE" && ok "$COVERAGE" && ok "$EXAMPLES" && ok "$BENCHMARKS_LINT" && ok "$CROSS_ROUTER_LINT"; then
+          if [[ "$PATH_OK" == "1" ]] && ok "$SMOKE" && ok "$COVERAGE" && ok "$EXAMPLES" && ok "$BENCHMARKS_LINT" && ok "$CROSS_ROUTER_LINT"; then
             echo "✅ All checks passed"
             exit 0
           fi

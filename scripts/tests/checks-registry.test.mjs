@@ -16,6 +16,8 @@
 //     says why not; an exemption beside a pre-push stage is stale.
 //   - The hooks and Repo Lints call `scripts/verify.mjs` with their own stage
 //     and run no check of their own.
+//   - Every `ciSkip` value is a context `verify` knows, and `lint:audit` alone
+//     skips the release PR (`release-pr`).
 //   - Each lint task runs in a gating ci.yml job whose line no static
 //     `--filter` narrows below the packages that declare the task (#2370).
 //
@@ -32,6 +34,7 @@ import { checkId } from "../check-id.mjs";
 import { CHECKS } from "../checks.mjs";
 import { gatedJobs, parseJobs } from "../ci-gate.mjs";
 import { LINT_TASK_ROLES } from "../lint-tasks.mjs";
+import { CONTEXTS } from "../verify.mjs";
 
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const WORKFLOWS = join(repoRoot, ".github", "workflows");
@@ -1071,6 +1074,23 @@ test("what pre-commit or CI runs also runs in pre-push, or the entry names why n
     "no pre-commit check has its pre-push twin",
   );
   assert.ok(found.ciPairs.length > 0, "no CI check has its pre-push twin");
+});
+
+test("every ciSkip names a context verify knows, and lint:audit alone skips the release PR", () => {
+  assert.deepEqual(
+    CHECKS.flatMap((check) =>
+      (check.ciSkip ?? [])
+        .filter((context) => !CONTEXTS.includes(context))
+        .map((context) => `${check.id}: ${context}`),
+    ),
+    [],
+  );
+  assert.deepEqual(
+    CHECKS.filter((check) => check.ciSkip?.includes("release-pr")).map(
+      (check) => check.id,
+    ),
+    ["lint:audit"],
+  );
 });
 
 test("the hooks and Repo Lints call verify with their stage, and run no check of their own", () => {

@@ -33,6 +33,7 @@ export const CONTEXTS = [
   "dependabot-pr",
   "no-source",
   "dependabot-actor-with-dedupe-fixer",
+  "release-pr",
 ];
 
 const USAGE =

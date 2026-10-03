@@ -305,7 +305,7 @@ const SKIP_FORBIDDEN = {
   check: "always",
   "prose-lint": "always",
   actionlint: "always but on a Dependabot pull request",
-  "repo-lints": "when should_run",
+  "repo-lints": "always",
   "pipeline-leaf": "when should_run, in leaf mode",
   "base-bundle": "when should_run, in sharded mode",
   "base-test": "when should_run, in sharded mode",
@@ -323,7 +323,6 @@ const SKIP_FORBIDDEN = {
 const SKIP_RULES = {
   always: () => true,
   "always but on a Dependabot pull request": (context) => !context.dependabot,
-  "when should_run": (context) => context.shouldRun === "true",
   "when should_run, in leaf mode": (context) =>
     context.shouldRun === "true" && context.mode === "leaf",
   "when should_run, in sharded mode": (context) =>
@@ -641,6 +640,15 @@ const OPEN_FORMS = {
     inGate("    steps:\n", "    defaults:\n      run:\n        shell: bash {0}\n    steps:\n"),
   "workflow-level defaults": () =>
     CI.replace(/^jobs:\n/m, "defaults:\n  run:\n    shell: bash {0}\n\njobs:\n"),
+  "workflow-level defaults, quoted": () =>
+    CI.replace(/^jobs:\n/m, '"defaults":\n  run:\n    shell: bash {0}\n\njobs:\n'),
+  "workflow-level defaults behind a BOM": () =>
+    CI.replace(/^jobs:\n/m, "\uFEFFdefaults:\n  run:\n    shell: bash {0}\n\njobs:\n"),
+  "BASH_ENV in the workflow's env": () => CI.replace(/^env:\n/m, "env:\n  BASH_ENV: ./x.sh\n"),
+  "the workflow's env in flow style": () =>
+    `${CI.slice(0, CI.indexOf("\nenv:\n") + 1)}env: { BASH_ENV: ./x.sh }\n${CI.slice(CI.indexOf("\njobs:\n") + 1)}`,
+  "BASH_ENV in the step's env": () =>
+    inGate("          NEEDS: ${{ toJSON(needs) }}\n", "          NEEDS: ${{ toJSON(needs) }}\n          BASH_ENV: ./x.sh\n"),
   "no if: always()": () => inGate("    if: always()\n", ""),
   "if: always() as an expression": () =>
     inGate("    if: always()\n", "    if: ${{ always() }}\n"),

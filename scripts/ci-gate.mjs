@@ -5,7 +5,8 @@
 // job in `needs` that neither passed nor was skipped, and the reads that follow
 // decide whose skip is forbidden. `ci-gate-completeness.test.mjs` holds every
 // ci.yml job to that and executes the script, and `checks-registry.test.mjs`
-// asks it where CI runs a check.
+// asks it where CI runs a check. `verify.test.mjs` takes the closed reading of
+// the workflow's top level from here for the step of Repo Lints it executes.
 //
 // Stdlib only, and deliberately not a YAML library: each extractor reads one
 // shape and returns nothing for a shape it cannot read, so a restructured
@@ -90,26 +91,96 @@ export function parseGateScript(yaml) {
 /** The keys the gate job may carry; anything else changes how it runs. */
 const GATE_JOB_KEYS = new Set(["name", "runs-on", "needs", "if", "steps"]);
 
+/** The names the gate step's `env:` may set; any other would reach its shell unread. */
+const GATE_STEP_ENV = new Set(["DEPENDABOT_PR", "NEEDS"]);
+
+/** The names ci.yml's top-level `env:` may set: turbo's settings, which no shell reads. */
+const WORKFLOW_ENV = /^TURBO_[A-Z0-9_]+$/;
+
+/**
+ * The top-level keys of ci.yml. Any other, `defaults:` among them, changes how
+ * a step runs.
+ */
+const WORKFLOW_KEYS = new Set([
+  "name",
+  "on",
+  "concurrency",
+  "permissions",
+  "env",
+  "jobs",
+]);
+
+/**
+ * Whether every top-level line of a workflow is a blank, a comment or a plain
+ * key of {@link WORKFLOW_KEYS}: a quoted, spaced or complex key is refused
+ * rather than read, so `defaults:` cannot arrive in another spelling. Only an
+ * ASCII space indents; a line led by any other character, a BOM or a tab
+ * among them, is a top-level line.
+ *
+ * @param {string} yaml
+ * @returns {boolean}
+ */
+export function topLevelKeysClosed(yaml) {
+  return yaml.split("\n").every((line) => {
+    if (line === "" || line.startsWith(" ") || line.startsWith("#"))
+      return true;
+    const key = /^([a-z-]+):(?: |$)/.exec(line);
+    return key !== null && WORKFLOW_KEYS.has(key[1]);
+  });
+}
+
+/**
+ * Whether ci.yml's top-level `env:`, if it has one, is one block of
+ * `NAME: value` lines whose names {@link WORKFLOW_ENV} admits. `BASH_ENV`,
+ * `SHELLOPTS` and every other variable a shell reads at startup are refused
+ * with every other name, and so is an `env:` written in flow style.
+ *
+ * @param {string} yaml
+ * @returns {boolean}
+ */
+export function workflowEnvClosed(yaml) {
+  const lines = yaml.split("\n");
+  const starts = lines.flatMap((line, i) =>
+    line.startsWith("env:") ? [i] : [],
+  );
+
+  if (starts.length === 0) return true;
+  if (starts.length > 1 || lines[starts[0]] !== "env:") return false;
+
+  for (let i = starts[0] + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line !== "" && !line.startsWith(" ") && !line.startsWith("#")) break;
+    if (/^ *$/.test(line) || /^ *#/.test(line)) continue;
+    const entry = /^ {2}([A-Z_][A-Z0-9_]*): (.+)$/.exec(line);
+    if (!entry || !WORKFLOW_ENV.test(entry[1])) return false;
+  }
+
+  return true;
+}
+
 /**
  * The gate's `Determine result` step in the one shape the test executes, read
  * from a gate job that is closed as well: its keys are `name`, `runs-on`,
  * `needs`, `if: always()` and `steps`, its one step is the step name, `env:`
- * on the next line with one `NAME: value` per line, then `run: |`, and the
- * workflow has no `defaults:`. Any other shape returns `undefined`, and the
- * test that reads it fails — a `shell:`, a `continue-on-error:`, a step `if:`
- * or a missing `if: always()` would each change the verdict GitHub reports.
+ * on the next line with one `NAME: value` per line of the names
+ * {@link GATE_STEP_ENV} admits, then `run: |`. The workflow's top-level keys
+ * are plain ones of a closed list, with no `defaults:` among them, and its
+ * `env:` sets only turbo's names. Any other shape returns `undefined`, and the
+ * test that reads it fails — a `shell:`, a `continue-on-error:`, a step `if:`,
+ * a missing `if: always()` or a `BASH_ENV` would each change the verdict
+ * GitHub reports.
  *
  * @param {string} yaml
  * @returns {{ env: Record<string, string>, run: string } | undefined}
  */
 export function parseGateStep(yaml) {
-  if (/^defaults:/m.test(yaml)) return undefined;
+  if (!topLevelKeysClosed(yaml) || !workflowEnvClosed(yaml)) return undefined;
 
   const lines = parseGateScript(yaml).split("\n");
   let always = false;
 
   for (const line of lines) {
-    if (!/^ {4}\S/.test(line) || /^ {4}#/.test(line)) continue;
+    if (!/^ {4}[^ ]/.test(line) || /^ {4}#/.test(line)) continue;
 
     const key = /^ {4}([a-z-]+):(.*)$/.exec(line);
 
@@ -134,9 +205,9 @@ export function parseGateStep(yaml) {
   const env = {};
   let i = step + 2;
 
-  for (; i < lines.length && /^ {10}\S/.test(lines[i]); i++) {
+  for (; i < lines.length && /^ {10}[^ ]/.test(lines[i]); i++) {
     const m = /^ {10}([A-Z_][A-Z0-9_]*): (.+)$/.exec(lines[i]);
-    if (!m) return undefined;
+    if (!m || !GATE_STEP_ENV.has(m[1])) return undefined;
     env[m[1]] = m[2];
   }
 
@@ -146,7 +217,7 @@ export function parseGateStep(yaml) {
 
   for (i++; i < lines.length; i++) {
     const line = lines[i];
-    if (line.trim() === "") {
+    if (/^ *$/.test(line)) {
       run.push("");
       continue;
     }
@@ -155,7 +226,7 @@ export function parseGateStep(yaml) {
   }
 
   // The step is the job's last text: no key after `run`, no second step.
-  if (lines.slice(i).some((line) => line.trim() !== "")) return undefined;
+  if (lines.slice(i).some((line) => !/^ *$/.test(line))) return undefined;
 
   while (run.length > 0 && run.at(-1) === "") run.pop();
 
