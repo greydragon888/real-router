@@ -656,3 +656,5 @@ The navigate path is heavily optimized:
 - `IMPLEMENTATION_NOTES.md` — infrastructure and tooling decisions
 - [Wiki](https://github.com/greydragon888/real-router/wiki) — full user documentation
 - [Glossary](https://github.com/greydragon888/real-router/wiki/glossary) — project-specific terminology
+
+<!-- A3 probe: a pull request of Markdown alone runs Repo Lints. Closed without merge. -->
