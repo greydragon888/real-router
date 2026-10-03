@@ -85,12 +85,12 @@ jobs:
           # `grep … || true` its failure was indistinguishable from "no files changed"
           # (grep on empty input exits 1, the guard swallows it) — the step then
           # SUCCEEDED with should_run=false and the required gate printed
-          # "✅ Skipped — no code changes" without running anything. The check-result guard
-          # can't catch that: it fires on check.result != success, and this variant
-          # keeps the job green. `set -o pipefail` would NOT fix it either — the
+          # "✅ Skipped — no code changes" without running anything. The gate can't
+          # catch that: it fails on a `check` result other than success, and this
+          # variant keeps the job green. `set -o pipefail` would NOT fix it either — the
           # trailing `|| true` still swallows the pipeline status. Splitting the two
           # commands is what makes a git failure fail the step (bash -e), which then
-          # turns the gate red via the check-result guard.
+          # turns the gate red: its aggregate fails on a failed `check`.
           ALL_CHANGED=$(git diff --name-only "$BASE" "$HEAD")
           CHANGED=$(printf '%s\n' "$ALL_CHANGED" | grep -vE '\.md$' || true)
           NON_GH=$(printf '%s\n' "$CHANGED" | grep -vE '^\.github/' || true)
@@ -1734,7 +1734,27 @@ jobs:
       - name: Determine result
         env:
           DEPENDABOT_PR: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
+          NEEDS: ${{ toJSON(needs) }}
         run: |
+          # Every job the gate waits for must have passed or been skipped: a
+          # failure, a cancellation or any other result fails the gate here,
+          # before a branch below can leave a job unread. Whose skip is
+          # forbidden is decided below; ci-gate-completeness.test.mjs runs this
+          # script over every result of every job and holds it to its table.
+          # `--slurp` with the one-object guard turns an empty or malformed
+          # context into an error, not into zero inputs that print nothing.
+          NOT_PASSED=$(jq -r --slurp '
+            if length == 1 and (.[0] | type) == "object" and (.[0] | length) > 0
+            then .[0] | to_entries[]
+              | select(.value.result != "success" and .value.result != "skipped")
+              | "\(.key): \(.value.result)"
+            else error("the needs context is not one non-empty JSON object") end' <<<"$NEEDS")
+          if [[ -n "$NOT_PASSED" ]]; then
+            echo "❌ jobs that neither passed nor were skipped:"
+            echo "$NOT_PASSED"
+            exit 1
+          fi
+
           # actionlint runs on every PR but Dependabot's (no should_run gate), so
           # check it before the docs/CI-only short-circuit — that's the whole point:
           # a workflow-only PR must not pass the gate without workflow
@@ -1759,13 +1779,11 @@ jobs:
           fi
 
           # check must have SUCCEEDED before ANY of its outputs can be trusted.
-          # A check that dies before the change-detection step writes should_run
-          # (transient checkout/diff failure) leaves should_run empty — which the
-          # docs-only short-circuit below would otherwise read as a green skip,
-          # passing this required gate while check is RED and every functional job
-          # was skipped (vacuous pass). Placed before the short-circuit so
-          # the empty-output case is caught; also subsumes the old "plan step
-          # died" case (check.result=failure either way).
+          # The aggregate above fails a failed or cancelled check; a skipped one
+          # passes it, and its outputs are empty — which the docs-only
+          # short-circuit below would read as a green skip, passing this required
+          # gate while every functional job was skipped (vacuous pass). So this
+          # guard stays before the short-circuit.
           if [[ "${{ needs.check.result }}" != "success" ]]; then
             echo "❌ check job failed — cannot trust its outputs (mode/should_run)"
             exit 1
@@ -1793,9 +1811,9 @@ jobs:
           CROSS_ROUTER_LINT="${{ needs.cross-router-lint.result }}"
           echo "plan=$PLAN mode=$MODE leaf=$LEAF base_bundle=$BASE_BUNDLE base_test=$BASE_TEST base_lint=$BASE_LINT base_cov=$BASE_COV base_props=$BASE_PROPS sharded=$SHARDED smoke=$SMOKE coverage=$COVERAGE lints=$LINTS examples=$EXAMPLES benchmarks_lint=$BENCHMARKS_LINT cross_router_lint=$CROSS_ROUTER_LINT"
 
-          # Defensive belt-and-suspenders on the shard-plan output: the
-          # check-result guard at the top of this step already exits on any check
-          # failure, so this is now redundant — kept as a cheap guard.
+          # Defensive belt-and-suspenders on the shard-plan output: the aggregate
+          # and the check-result guard above already exit on any `check` result
+          # but success, so this never fires — kept as a cheap guard.
           if [[ "$PLAN" != "success" ]]; then
             echo "❌ check / shard plan failed"
             exit 1

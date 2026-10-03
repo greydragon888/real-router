@@ -13431,3 +13431,20 @@ Kept, because none of them points at a record: measurement dates, which say when
 **Solution.** The root lockfile carries the 24 `deprecated:` fields, written by `pnpm dedupe` on fresh metadata; nothing else in it changed. The check passes with an empty metadata cache and with the local one, and metadata without the deprecation leaves the fields in place.
 
 **Why.** The next deprecation of a locked package does the same. Its signature is that message beside a list of deprecated subdependencies: `pnpm_config_cache_dir=$(mktemp -d) pnpm dedupe --check` reproduces it, and the same command without `--check` writes the fields. `pnpm dedupe` takes no `--cache-dir` flag.
+
+## The gate fails on any job in needs that neither passed nor was skipped (2026-10-03)
+
+**Problem.** The `CI Result` gate read the results of its `needs` one by one, and some reads sat after the exit on `should_run` or in the branch of the other mode (`leaf` or `sharded`). A job the script did not read on a path could fail or be cancelled while the gate stayed green. No such state was reachable — the planning steps of `check` run only when `should_run` is `true`, so the jobs they gate are skipped otherwise — but an edit to a job's `if:` or to a planning step would have opened one without a word.
+
+**Solution.**
+
+- The first action of `Determine result` reads `toJSON(needs)` with `jq --slurp` and fails on any job whose result is neither `success` nor `skipped`, an unknown result included. A context that is not one non-empty JSON object is an error, `jq` missing from PATH exits 127, and `bash -e` turns both red.
+- The rest of the script decides whose skip is forbidden. `ci-gate-completeness.test.mjs` holds it to a table — for each job in `needs`, when its skip fails the gate — and executes the step as the runner does: expressions substituted into the text, `env:` values exported, `bash -e`. An expression outside the closed set the harness knows is refused, and a job in `needs` without a row fails the test.
+- `scripts/ci-gate.mjs` reads the gate job closed: its keys are `name`, `runs-on`, `needs`, `if: always()` and `steps`, its one step carries only `env:` and `run: |`, and the workflow has no `defaults:`. A `shell:`, a `continue-on-error:` or a step `if:` would change the verdict GitHub reports while the test still ran the script under `bash -e`, so each is a refusal.
+
+**Why.** With the aggregate the order of the reads does not matter for a failure or a cancellation, and only the table decides a skip. A rule that judged `if:` text by its form, the alternative, kept losing to forms GitHub reads differently.
+
+- ⚠ `--slurp` is load-bearing: without it an empty context is zero inputs, `jq` prints nothing and exits 0, and the gate passes. The corrupted-context cell of the test fails if the flag goes.
+- ⚠ The gate job's `if: always()` is load-bearing too: without it GitHub skips the gate when a need fails, and a skipped job "will not prevent a pull request from merging, even if it is a required check". The closed reader refuses the job without it.
+
+**Measured.** 3,120 states — three `should_run` values, four modes, Dependabot or not, two base states, every job in each of five results — run in about 12 s and add about a second to `node:scripts-tests`, whose files run in parallel. Sixteen mutants each fail a cell: the aggregate removed, a blacklist of `failure`, of `failure` and `cancelled`, an allow-list that lets `null` or `neutral` through, the aggregate after the exit, no `--slurp` behind a type guard, a need without a row, a requirement moved past the exit, an unknown expression, and the six open forms of the job — a step `continue-on-error`, `shell: bash {0}`, a step `if:`, `defaults:` on the job or the workflow, no `if: always()`.

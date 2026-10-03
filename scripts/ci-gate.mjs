@@ -1,9 +1,11 @@
 // ci-gate.mjs — what the `CI Result` gate of ci.yml waits for and reads.
 //
 // A job gates a pull request when the gate job lists it in `needs` and the
-// gate's script reads its result or outputs: `needs` alone only makes the gate
-// wait. `ci-gate-completeness.test.mjs` holds every ci.yml job to that, and
-// `checks-registry.test.mjs` asks it where CI runs a check.
+// gate's script reads it: the aggregate at the top of the script fails on any
+// job in `needs` that neither passed nor was skipped, and the reads that follow
+// decide whose skip is forbidden. `ci-gate-completeness.test.mjs` holds every
+// ci.yml job to that and executes the script, and `checks-registry.test.mjs`
+// asks it where CI runs a check.
 //
 // Stdlib only, and deliberately not a YAML library: each extractor reads one
 // shape and returns nothing for a shape it cannot read, so a restructured
@@ -83,6 +85,81 @@ export function parseGateScript(yaml) {
   const rest = lines.slice(start + 1);
   const end = rest.findIndex((l) => /^ {2}[A-Za-z_][\w-]*:/.test(l));
   return (end === -1 ? rest : rest.slice(0, end)).join("\n");
+}
+
+/** The keys the gate job may carry; anything else changes how it runs. */
+const GATE_JOB_KEYS = new Set(["name", "runs-on", "needs", "if", "steps"]);
+
+/**
+ * The gate's `Determine result` step in the one shape the test executes, read
+ * from a gate job that is closed as well: its keys are `name`, `runs-on`,
+ * `needs`, `if: always()` and `steps`, its one step is the step name, `env:`
+ * on the next line with one `NAME: value` per line, then `run: |`, and the
+ * workflow has no `defaults:`. Any other shape returns `undefined`, and the
+ * test that reads it fails — a `shell:`, a `continue-on-error:`, a step `if:`
+ * or a missing `if: always()` would each change the verdict GitHub reports.
+ *
+ * @param {string} yaml
+ * @returns {{ env: Record<string, string>, run: string } | undefined}
+ */
+export function parseGateStep(yaml) {
+  if (/^defaults:/m.test(yaml)) return undefined;
+
+  const lines = parseGateScript(yaml).split("\n");
+  let always = false;
+
+  for (const line of lines) {
+    if (!/^ {4}\S/.test(line) || /^ {4}#/.test(line)) continue;
+
+    const key = /^ {4}([a-z-]+):(.*)$/.exec(line);
+
+    if (!key || !GATE_JOB_KEYS.has(key[1])) return undefined;
+    if (key[1] === "if") {
+      if (key[2].trim() !== "always()") return undefined;
+      always = true;
+    }
+  }
+
+  const step = lines.indexOf("    steps:") + 1;
+
+  if (
+    !always ||
+    step === 0 ||
+    lines[step] !== "      - name: Determine result" ||
+    lines[step + 1] !== "        env:"
+  ) {
+    return undefined;
+  }
+
+  const env = {};
+  let i = step + 2;
+
+  for (; i < lines.length && /^ {10}\S/.test(lines[i]); i++) {
+    const m = /^ {10}([A-Z_][A-Z0-9_]*): (.+)$/.exec(lines[i]);
+    if (!m) return undefined;
+    env[m[1]] = m[2];
+  }
+
+  if (lines[i] !== "        run: |") return undefined;
+
+  const run = [];
+
+  for (i++; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim() === "") {
+      run.push("");
+      continue;
+    }
+    if (!line.startsWith("          ")) break;
+    run.push(line.slice(10));
+  }
+
+  // The step is the job's last text: no key after `run`, no second step.
+  if (lines.slice(i).some((line) => line.trim() !== "")) return undefined;
+
+  while (run.length > 0 && run.at(-1) === "") run.pop();
+
+  return { env, run: `${run.join("\n")}\n` };
 }
 
 /**
