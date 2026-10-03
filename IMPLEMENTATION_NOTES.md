@@ -13391,3 +13391,15 @@ Kept, because none of them points at a record: measurement dates, which say when
 
 **Why this form.** Every release PR since 2026-06-16 — 368 of them — had that head, and none came from a fork (GitHub API, 2026-10-03); `changesets.yml` passes `changesets/action` no `branch:` input. If the release branch is ever renamed, the release PR stops matching and the three jobs run on it: a failure there is loud, and nothing is skipped by mistake. `ci.yml` asks nothing of the branch name — its no-source predicate reads the diff. `codspeed.yml` keeps its prefix test: its `core` and `adapters` jobs refuse a fork's pull request on their own, so the name there decides only for a branch of this repository.
 
+## braces and http-cache-semantics are allowlisted: neither has a fixed release (2026-10-03)
+
+**Problem.** Pre-push `lint:audit` went red on two High advisories, both published on 2026-09-18 and turned into failures only after OSV modified them on 2026-10-02 at 22:45Z. GHSA-vfj7-8cjw-p6xm affects `braces` up to 3.0.3, in the root lockfile; GHSA-ch52-4w7c-c8xp affects `http-cache-semantics` up to 4.2.0, in the examples lockfile. Each range ends at the package's latest release, so there is nothing to bump to.
+
+**Solution.** Both ids enter `scripts/osv-scanner.toml` and the mirrored `allow-ghsas:` in `.github/workflows/codeql.yml`.
+
+**Why an allowlist entry for braces.** Its one path is the root devDependency `danger` 14.0.7 → `micromatch` 4.0.8 → `braces`. The advisory is a stack-exhaustion DoS through deeply nested brace patterns, and `danger` calls `micromatch` in two places only — `danger.git.fileMatch` and `danger.git.linesOfCode` — each expanding patterns the dangerfile passes. `dangerfile.ts` calls neither, so `braces` never expands anything here, and no published package depends on it.
+
+**Why an allowlist entry for http-cache-semantics.** Its one path is `electron-builder` 26.15.3, a devDependency of the three Electron examples, → `@electron/get` 3.1.0 → `got` 11.8.6 → `cacheable-request` 7.0.4. The advisory concerns `max-stale` handling in a cache shared between users. `got` builds a `cacheable-request` cache only when it is given a `cache` option; `electron-builder` builds its download options from a timeout, a proxy agent, a progress callback and the project's own download options, and none of the three examples sets download options. The examples are never published.
+
+**Measured.** Without the entries `bash scripts/check-deps-audit.sh` reports both advisories and exits 1; with them it exits 0 and osv-scanner lists no unused ignore. api.osv.dev answers both advisories for `braces@3.0.3` and `http-cache-semantics@4.2.0`, the latest versions on npm. Drop each entry when its package ships a fix.
+

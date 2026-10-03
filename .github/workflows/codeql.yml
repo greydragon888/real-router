@@ -89,5 +89,13 @@ jobs:
           #   root devDependency @sonar/scan, run locally; it reads a PKCS#12
           #   truststore with node-forge and verifies no signature. Not in any
           #   published package.
+          # GHSA-vfj7-8cjw-p6xm — braces (no fixed release). Only via micromatch
+          #   under the root devDependency danger, which expands only the
+          #   patterns a dangerfile passes to fileMatch and linesOfCode; ours
+          #   calls neither. Not in any published package.
+          # GHSA-ch52-4w7c-c8xp — http-cache-semantics (no fixed release). Only
+          #   in the examples, via electron-builder → @electron/get → got 11,
+          #   whose HTTP cache needs a `cache` option nobody passes. Not in any
+          #   published package.
           # The list mirrors scripts/osv-scanner.toml; the two must stay in sync.
-          allow-ghsas: GHSA-wrw7-89jp-8q8g, GHSA-86w9-cpqp-85rv
+          allow-ghsas: GHSA-wrw7-89jp-8q8g, GHSA-86w9-cpqp-85rv, GHSA-vfj7-8cjw-p6xm, GHSA-ch52-4w7c-c8xp

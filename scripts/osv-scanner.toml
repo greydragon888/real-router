@@ -21,6 +21,29 @@ reason = "glib 0.18.5 VariantStrIter unsoundness (RUSTSEC-2024-0429). Transitive
 id = "GHSA-86w9-cpqp-85rv"  # node-forge RSA PKCS#1 v1.5 signature verification
 reason = "No fixed node-forge release (<= 1.4.0, the latest). Only dependent: root devDependency @sonar/scan 5.0.1, run locally by `pnpm sonar:local`; it uses node-forge solely to read a PKCS#12 truststore, a path that verifies no signature."
 
+# braces has no fixed release: every version through 3.0.3, the latest, is
+# affected. It arrives only through micromatch 4.0.8 under the root
+# devDependency `danger`, and danger calls micromatch only to expand the
+# patterns a dangerfile passes to `danger.git.fileMatch` and
+# `danger.git.linesOfCode` — dangerfile.ts calls neither. No published package
+# depends on it. Drop it when braces ships a fix — ask api.osv.dev per version.
+
+[[IgnoredVulns]]
+id = "GHSA-vfj7-8cjw-p6xm"  # braces stack-exhaustion DoS through deeply nested patterns
+reason = "No fixed braces release (<= 3.0.3, the latest). Only path: root devDependency danger 14.0.7 -> micromatch 4.0.8, which expands only the patterns a dangerfile passes to fileMatch and linesOfCode; dangerfile.ts calls neither. Not in any published @real-router/* package."
+
+# http-cache-semantics has no fixed release: every version through 4.2.0, the
+# latest, is affected. It arrives only in the examples lockfile, through
+# electron-builder (a devDependency of the three Electron examples) ->
+# @electron/get -> got 11 -> cacheable-request. got builds that HTTP cache only
+# when it is given a `cache` option; electron-builder gives it none, and the
+# examples configure no download options. The examples are never published.
+# Drop it when http-cache-semantics ships a fix — ask api.osv.dev per version.
+
+[[IgnoredVulns]]
+id = "GHSA-ch52-4w7c-c8xp"  # http-cache-semantics max-stale cross-user disclosure
+reason = "No fixed http-cache-semantics release (<= 4.2.0, the latest). Only path: electron-builder 26.15.3 (devDependency of examples/desktop/electron/*) -> @electron/get 3.1.0 -> got 11.8.6 -> cacheable-request 7.0.4; got builds that HTTP cache only when given a `cache` option, which neither electron-builder nor the examples pass. examples/ is never published."
+
 # NOTE (2026-09-10): ten entries stood here — RUSTSEC-2024-0411 through -0420,
 # the gtk-rs unmaintained-crate advisories (gdk, gtk, atk, their -sys crates and
 # gtk3-macros). They are gone, and the way they left is worth one paragraph
