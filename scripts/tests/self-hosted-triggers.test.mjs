@@ -87,9 +87,7 @@ const TRIGGERS = {
 };
 
 for (const [name, on] of Object.entries(TRIGGERS)) {
-  const event = name.includes("[")
-    ? "pull_request"
-    : name.replace("on: ", "");
+  const event = name.includes("[") ? "pull_request" : name.replace("on: ", "");
 
   test(`red: a self-hosted job under ${name}`, () => {
     assertRed(
@@ -135,7 +133,10 @@ test("red: a workflow file that is not valid UTF-8 is refused", () => {
   ]);
 
   withWorkflowsDir({ "zz.yml": bytes }, (dir) => {
-    assert.throws(() => readWorkflows(dir), /^Error: zz\.yml: not valid UTF-8$/);
+    assert.throws(
+      () => readWorkflows(dir),
+      /^Error: zz\.yml: not valid UTF-8$/,
+    );
   });
 });
 
@@ -200,12 +201,17 @@ test("red: pull_request added to cross-router-bench.yml", () => {
   );
 
   assert.notEqual(text, REAL["cross-router-bench.yml"]);
-  assertRed({ "cross-router-bench.yml": text }, "cross-router-bench.yml", "under pull_request");
+  assertRed(
+    { "cross-router-bench.yml": text },
+    "cross-router-bench.yml",
+    "under pull_request",
+  );
 });
 
 for (const [name, insert] of Object.entries({
   "": "  pull_request:\n",
-  ", after a comment in column 0": "# compare against master\n  pull_request:\n",
+  ", after a comment in column 0":
+    "# compare against master\n  pull_request:\n",
 })) {
   test(`red: pull_request back in codspeed.yml while its jobs are self-hosted${name}`, () => {
     const text = REAL["codspeed.yml"].replace(
@@ -248,7 +254,10 @@ const READINGS = {
     "yaml parser: 2 YAML documents",
   ],
   "a duplicate on: key": [
-    workflow("on:\n  push:\non:\n  pull_request:\n", job("bench", "self-hosted")),
+    workflow(
+      "on:\n  push:\non:\n  pull_request:\n",
+      job("bench", "self-hosted"),
+    ),
     "yaml parser: Map keys must be unique",
   ],
 };
@@ -261,6 +270,7 @@ for (const [name, [text, reason]] of Object.entries(READINGS)) {
 
 for (const [name, separator] of Object.entries({
   "a lone CR": "\r",
+  "a tab": "\t",
   NEL: "\u0085",
   LS: "\u2028",
   PS: "\u2029",
@@ -283,7 +293,10 @@ test("red: a line reader that loses an event disagrees with the parser", () => {
   const reader = (text) => {
     const model = textModel(text);
 
-    return { ...model, events: model.events.filter((event) => event !== "pull_request") };
+    return {
+      ...model,
+      events: model.events.filter((event) => event !== "pull_request"),
+    };
   };
   const findings = judge(
     { ...REAL, "zz.yml": VPS_ON_PR("self-hosted") },
@@ -291,7 +304,9 @@ test("red: a line reader that loses an event disagrees with the parser", () => {
   );
 
   assert.ok(
-    findings.some((finding) => finding.startsWith("zz.yml: the readings disagree")),
+    findings.some((finding) =>
+      finding.startsWith("zz.yml: the readings disagree"),
+    ),
     findings.join("\n"),
   );
 });

@@ -13471,8 +13471,21 @@ Kept, because none of them points at a record: measurement dates, which say when
 - ⚠ Nothing in CI audits a release PR's lockfile: `lint:audit` skips it, and so does Dependency Review in `codeql.yml`. The same lockfile is audited by the next pull request's Repo Lints and by pre-push.
 - ⚠ Repo Lints' run is now on the path of every pull request without code: p50 76 s, p90 93 s, where the gate of such a pull request closed p50 22 s after the run started (GitHub API, 2026-10-03).
 - ⚠ An advisory window now reddens a pull request of Markdown and `.github/**` alone too, Dependabot's GitHub Actions bumps included: Repo Lints runs `lint:audit` on them.
-- ⚠ What earlier steps of Repo Lints write to `$GITHUB_ENV` or `$GITHUB_PATH` the test does not read; `.github/actions/setup` writes one variable there.
+- ⚠ What earlier steps of Repo Lints write to `$GITHUB_ENV` or `$GITHUB_PATH` the test does not read: `.github/actions/setup`, the `pnpm/action-setup` it calls and `astral-sh/setup-uv` write there.
 
 **Measured.** The gate test still enumerates 3,120 states. Four mutants each fail it: the requirement moved past the exit (32 states disagree, each with `repo-lints` skipped and `should_run` not `true`), the requirement removed, a skip read as a pass, the table row back to a rule that allows the skip. Its reader refuses fifteen forms of the job and the workflow, among them `defaults:` quoted or behind a BOM, `BASH_ENV` in the workflow's or the step's `env:`, and an `env:` in flow style. In `verify.test.mjs` the three mutants of the condition — the branch compared by prefix, no repository comparison, no diff condition — are each refused or add exactly their own cell; the context overwritten or never appended, `HEAD_REPO` bound to `github.repository`, `HEAD_REF` bound to `github.base_ref`, the step's NO_SOURCE set to `"true"`, a fourth `format()` field, and `release-pr` missing from `CONTEXTS` each fail a cell. Nineteen shapes of the workflow, the job, the step or the script are refused, among them a command, a file test or a shell option in the condition, `SHELLOPTS` in the job's `env:`, and the job binding NO_SOURCE otherwise than the step. Two controls stay green: the step's `env:` lines reordered, and the conditions of the `if` reordered. In `checks-registry.test.mjs`, `lint:audit` losing `release-pr`, another check gaining it, and a misspelt context each fail.
 
 On CI, after the push: PR #2660, of Markdown alone, ran all 13 checks of the `ci` stage in Repo Lints in 109 s and passed, and `CI Result` reported "Skipped — no code changes (actionlint, prose-lint and repo-lints passed)" 133 s after the run started. PR #2661 added a `paths:` entry naming no directory to `wiki-checkers.yml` and was pushed with `--no-verify`: Repo Lints failed in `node:scripts-tests` on that entry, and `CI Result` failed at its aggregate with `repo-lints: failure`. Both were closed. Neither run exports turbo metrics: the pipeline skipped, and Repo Lints runs turbo as a dry run only.
+
+## The gate test holds the `needs` of every job the gate waits for inside the gate's `needs` (2026-10-04)
+
+**Problem.** The gate's aggregate fails on a job in its `needs` that failed or was cancelled, and its table decides which skips pass. A job in `needs` that itself needed a job outside them was skipped when that job failed, and the gate read the skip, which the table may allow. Measured in `/code-review-rfc` of RFC-4: with `examples-build` needing `bundle-size`, every test stayed green, and a failed `bundle-size` would have passed the gate without the examples built. No job had such an edge.
+
+**Solution.**
+
+- `ci-gate-completeness.test.mjs` fails on any edge into a job of the gate's `needs` from a job outside them, with a fixture cell for the form.
+- The gate's step and Repo Lints' step are read by one function, `readLastStep` in `scripts/ci-gate.mjs`. The two copies had begun to differ in what may follow the script. The gate's step still has to be the first under `steps:`.
+
+**Why.** The rule is the transitive half of the aggregate: every job whose failure can skip a job the gate waits for is one the gate waits for, so the failure reaches the gate as a failure.
+
+**Measured.** The rule removed, and `examples-build` needing `bundle-size` in the real `ci.yml`, each fail a cell. Without the name list or the tail check in `readLastStep`, cells of both readers fail, and so does a step placed before the gate's.

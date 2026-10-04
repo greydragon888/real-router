@@ -206,7 +206,7 @@ export function textModel(text) {
  *
  * @param {string} text a workflow file
  */
-export function parserModel(text) {
+function parserModel(text) {
   const documents = YAML.parseAllDocuments(text);
 
   if (documents.length !== 1) {
@@ -325,14 +325,18 @@ export function judge(files, { reader = textModel } = {}) {
       const target = localTarget(job);
 
       if (target !== null && !Object.hasOwn(files, target)) {
-        findings.push(`${file}#${id}: uses: ${job.uses} names no workflow file`);
+        findings.push(
+          `${file}#${id}: uses: ${job.uses} names no workflow file`,
+        );
       }
     }
   }
 
   const callers = (file) =>
     Object.keys(model).filter((caller) =>
-      Object.values(model[caller].jobs).some((job) => localTarget(job) === file),
+      Object.values(model[caller].jobs).some(
+        (job) => localTarget(job) === file,
+      ),
     );
   const triggers = (file, seen = new Set()) => {
     if (seen.has(file) || !Object.hasOwn(model, file)) {
@@ -371,7 +375,7 @@ export function judge(files, { reader = textModel } = {}) {
 }
 
 /** A workflow name the reader takes: `.yml` and `.yaml` alike. */
-export const isWorkflowFile = (name) => /\.ya?ml$/.test(name);
+const isWorkflowFile = (name) => /\.ya?ml$/.test(name);
 
 /**
  * Every workflow file of a directory, by name. A file that is not valid UTF-8

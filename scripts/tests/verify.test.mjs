@@ -32,7 +32,7 @@ import { delimiter, dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { topLevelKeysClosed, workflowEnvClosed } from "../ci-gate.mjs";
+import { readLastStep, topLevelKeysClosed, workflowEnvClosed } from "../ci-gate.mjs";
 import { localEnvVars } from "../lib/git-env.mjs";
 
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
@@ -449,7 +449,8 @@ test("--context skips in CI the checks whose ciSkip names it, before looking for
 // variables, and closes the names every `env:` above it may set: a variable a
 // shell reads at startup would change the script and is not one of them.
 // ⚠ What earlier steps of the job write to $GITHUB_ENV or $GITHUB_PATH is not
-// read; `.github/actions/setup` writes one variable there.
+// read: `.github/actions/setup`, the `pnpm/action-setup` it calls and
+// `astral-sh/setup-uv` write there.
 
 const CI = readFileSync(join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");
 const REPOSITORY = "greydragon888/real-router";
@@ -522,10 +523,10 @@ function scriptClosed(script, env) {
  * Repo Lints' `Run the checks` step in the one shape the cells execute. The
  * workflow's top-level keys and its `env:` names are closed (`scripts/ci-gate.mjs`),
  * the job's keys are those above, every `env:` holds one `NAME: value` per
- * line of the names its list admits, the step is the job's last and carries
- * only `env:` and `run: |`, the script is in its closed form, and the job binds
- * NO_SOURCE, which the `format()` reads, as the step does. Only an ASCII space
- * indents. Any other shape returns `undefined`.
+ * line of the names its list admits, the step is read by `readLastStep`, the
+ * script is in its closed form, and the job binds NO_SOURCE, which the
+ * `format()` reads, as the step does. Only an ASCII space indents. Any other
+ * shape returns `undefined`.
  *
  * @param {string} yaml the text of ci.yml
  * @returns {{ env: Record<string, string>, run: string } | undefined}
@@ -553,39 +554,11 @@ function parseChecksStep(yaml) {
   }
 
   const at = job.indexOf("      - name: Run the checks");
-  if (at === -1 || job[at + 1] !== "        env:") return undefined;
+  const step = at === -1 ? undefined : readLastStep(job, at, CHECKS_STEP_ENV);
 
-  const env = {};
-  let i = at + 2;
+  if (!step || jobEnv.NO_SOURCE !== step.env.NO_SOURCE) return undefined;
 
-  for (; i < job.length && /^ {10}[^ ]/.test(job[i]); i++) {
-    const entry = /^ {10}([A-Z_][A-Z0-9_]*): (.+)$/.exec(job[i]);
-    if (!entry || !CHECKS_STEP_ENV.has(entry[1])) return undefined;
-    env[entry[1]] = entry[2];
-  }
-
-  if (job[i] !== "        run: |" || jobEnv.NO_SOURCE !== env.NO_SOURCE) return undefined;
-
-  const run = [];
-
-  for (i++; i < job.length; i++) {
-    const line = job[i];
-    if (isBlank(line)) {
-      run.push("");
-      continue;
-    }
-    if (!line.startsWith("          ")) break;
-    run.push(line.slice(10));
-  }
-
-  // The step is the job's last: only blank lines and comments follow its script.
-  if (job.slice(i).some((line) => !isBlank(line) && !isComment(line))) return undefined;
-
-  while (run.length > 0 && run.at(-1) === "") run.pop();
-
-  const script = `${run.join("\n")}\n`;
-
-  return scriptClosed(script, env) ? { env, run: script } : undefined;
+  return scriptClosed(step.run, step.env) ? step : undefined;
 }
 
 /** What the runner puts in place of an expression in one cell; any other is refused. */

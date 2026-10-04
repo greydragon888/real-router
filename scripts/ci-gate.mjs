@@ -159,16 +159,62 @@ export function workflowEnvClosed(yaml) {
 }
 
 /**
+ * A job's step in the one shape the tests execute: its `- name:` line at
+ * `at`, `env:` on the next line with one `NAME: value` per line of the names
+ * `allowedEnv` admits, then `run: |`, and after the script nothing but blank
+ * lines and comments, so the step is the job's last. Only an ASCII space
+ * indents. Any other shape returns `undefined`.
+ *
+ * @param {string[]} job the lines of the job below its key
+ * @param {number} at the index of the step's `- name:` line
+ * @param {Set<string>} allowedEnv
+ * @returns {{ env: Record<string, string>, run: string } | undefined}
+ */
+export function readLastStep(job, at, allowedEnv) {
+  if (job[at + 1] !== "        env:") return undefined;
+
+  const env = {};
+  let i = at + 2;
+
+  for (; i < job.length && /^ {10}[^ ]/.test(job[i]); i++) {
+    const m = /^ {10}([A-Z_][A-Z0-9_]*): (.+)$/.exec(job[i]);
+    if (!m || !allowedEnv.has(m[1])) return undefined;
+    env[m[1]] = m[2];
+  }
+
+  if (job[i] !== "        run: |") return undefined;
+
+  const run = [];
+
+  for (i++; i < job.length; i++) {
+    const line = job[i];
+    if (/^ *$/.test(line)) {
+      run.push("");
+      continue;
+    }
+    if (!line.startsWith("          ")) break;
+    run.push(line.slice(10));
+  }
+
+  if (job.slice(i).some((line) => !/^ *$/.test(line) && !/^ *#/.test(line))) {
+    return undefined;
+  }
+
+  while (run.length > 0 && run.at(-1) === "") run.pop();
+
+  return { env, run: `${run.join("\n")}\n` };
+}
+
+/**
  * The gate's `Determine result` step in the one shape the test executes, read
  * from a gate job that is closed as well: its keys are `name`, `runs-on`,
- * `needs`, `if: always()` and `steps`, its one step is the step name, `env:`
- * on the next line with one `NAME: value` per line of the names
- * {@link GATE_STEP_ENV} admits, then `run: |`. The workflow's top-level keys
- * are plain ones of a closed list, with no `defaults:` among them, and its
- * `env:` sets only turbo's names. Any other shape returns `undefined`, and the
- * test that reads it fails — a `shell:`, a `continue-on-error:`, a step `if:`,
- * a missing `if: always()` or a `BASH_ENV` would each change the verdict
- * GitHub reports.
+ * `needs`, `if: always()` and `steps`, and its one step, first under
+ * `steps:`, is read by {@link readLastStep} with the names
+ * {@link GATE_STEP_ENV} admits. The workflow's top-level keys are plain ones of
+ * a closed list, with no `defaults:` among them, and its `env:` sets only
+ * turbo's names. Any other shape returns `undefined`, and the test that reads
+ * it fails — a `shell:`, a `continue-on-error:`, a step `if:`, a missing
+ * `if: always()` or a `BASH_ENV` would each change the verdict GitHub reports.
  *
  * @param {string} yaml
  * @returns {{ env: Record<string, string>, run: string } | undefined}
@@ -196,41 +242,12 @@ export function parseGateStep(yaml) {
   if (
     !always ||
     step === 0 ||
-    lines[step] !== "      - name: Determine result" ||
-    lines[step + 1] !== "        env:"
+    lines[step] !== "      - name: Determine result"
   ) {
     return undefined;
   }
 
-  const env = {};
-  let i = step + 2;
-
-  for (; i < lines.length && /^ {10}[^ ]/.test(lines[i]); i++) {
-    const m = /^ {10}([A-Z_][A-Z0-9_]*): (.+)$/.exec(lines[i]);
-    if (!m || !GATE_STEP_ENV.has(m[1])) return undefined;
-    env[m[1]] = m[2];
-  }
-
-  if (lines[i] !== "        run: |") return undefined;
-
-  const run = [];
-
-  for (i++; i < lines.length; i++) {
-    const line = lines[i];
-    if (/^ *$/.test(line)) {
-      run.push("");
-      continue;
-    }
-    if (!line.startsWith("          ")) break;
-    run.push(line.slice(10));
-  }
-
-  // The step is the job's last text: no key after `run`, no second step.
-  if (lines.slice(i).some((line) => !/^ *$/.test(line))) return undefined;
-
-  while (run.length > 0 && run.at(-1) === "") run.pop();
-
-  return { env, run: `${run.join("\n")}\n` };
+  return readLastStep(lines, step, GATE_STEP_ENV);
 }
 
 /**

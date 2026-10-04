@@ -375,7 +375,16 @@ test("--merge-base measures a branch from where it left master", () => {
   const cli = (dir, ...flags) =>
     execFileSync(
       process.execPath,
-      [SCRIPT, "--root", dir, "--base", "master", "--head", "feature", ...flags],
+      [
+        SCRIPT,
+        "--root",
+        dir,
+        "--base",
+        "master",
+        "--head",
+        "feature",
+        ...flags,
+      ],
       { encoding: "utf8" },
     );
   const ranges = (branchChanges) =>

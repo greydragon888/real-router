@@ -88,6 +88,14 @@ export function findViolations(yaml, outsideGate = OUTSIDE_GATE) {
     ),
     // needs entries pointing at nothing (job renamed/removed under the gate).
     unknownNeeds: [...needs].filter((n) => !jobs.includes(n)),
+    // A job in `needs` that needs a job outside them is SKIPPED when that one
+    // fails, and the gate reads the skip, which its table may allow. Every
+    // edge into a job the gate waits for starts inside the gate's `needs`.
+    needsOutsideGate: [...needs].flatMap((n) =>
+      parseNeeds(yaml, n)
+        .filter((d) => !needs.has(d))
+        .map((d) => `${n} → ${d}`),
+    ),
     // Allowlist hygiene: entry gone from ci.yml, or actually wired after all.
     staleAllowlist: [...outsideGate.keys()].filter((j) => !jobs.includes(j)),
     allowlistedButWired: [...outsideGate.keys()].filter((j) => needs.has(j)),
@@ -123,6 +131,16 @@ test("fixture: fully wired workflow has no violations", () => {
   assert.deepEqual(v.unknownNeeds, []);
   assert.deepEqual(v.staleAllowlist, []);
   assert.deepEqual(v.allowlistedButWired, []);
+  assert.deepEqual(v.needsOutsideGate, []);
+});
+
+test("fixture: a gated job that needs a job outside the gate's needs is caught", () => {
+  const mutated = FIXTURE.replace(
+    "  coverage:\n    needs: [check]\n",
+    "  coverage:\n    needs: [check, bundle-size]\n",
+  );
+  const v = findViolations(mutated, new Map([["bundle-size", "info-only"]]));
+  assert.deepEqual(v.needsOutsideGate, ["coverage → bundle-size"]);
 });
 
 test("fixture: the #1127 mutation (job dropped from the gate's needs) is caught", () => {
@@ -241,6 +259,17 @@ test("ci.yml: every job the gate waits for is also READ by it (#1127, other half
   assert.ok(
     parseGateScript(readFileSync(CI_YML, "utf8")).includes("Determine result"),
     "parseGateScript() no longer captures the gate's step — ci.yml layout changed?",
+  );
+});
+
+test("ci.yml: every job the gate waits for needs only jobs the gate waits for", () => {
+  assert.deepEqual(
+    real.needsOutsideGate,
+    [],
+    `edge(s) [${real.needsOutsideGate.join(", ")}] lead into a job the gate ` +
+      "waits for from one it does not: when that one fails, GitHub skips the " +
+      "job, and the gate reads a skip it may allow. Add the upstream job to " +
+      `'${GATE_JOB}'.needs, with a row in SKIP_FORBIDDEN.`,
   );
 });
 
@@ -384,7 +413,9 @@ function evaluate(expression, { context, results, needsJson }) {
     );
   }
 
-  if (expression === "github.event.pull_request.user.login == 'dependabot[bot]'") {
+  if (
+    expression === "github.event.pull_request.user.login == 'dependabot[bot]'"
+  ) {
     return String(context.dependabot);
   }
 
@@ -418,7 +449,8 @@ function substitute(text, state) {
 
     if (end >= text.length) throw new Error("an unterminated ${{");
 
-    out += text.slice(at, open) + evaluate(text.slice(open + 3, end).trim(), state);
+    out +=
+      text.slice(at, open) + evaluate(text.slice(open + 3, end).trim(), state);
     at = end + 2;
   }
 }
@@ -441,7 +473,10 @@ function exitCodes(step, states, env = process.env) {
 
       for (const state of chunk) {
         const exports = Object.entries(step.env)
-          .map(([name, value]) => `export ${name}=${quote(substitute(value, state))}`)
+          .map(
+            ([name, value]) =>
+              `export ${name}=${quote(substitute(value, state))}`,
+          )
           .join("\n");
 
         script += `(\n${exports}\nset -e\n${substitute(step.run, state)}) >/dev/null 2>&1\necho "exit:$?"\n`;
@@ -451,13 +486,21 @@ function exitCodes(step, states, env = process.env) {
 
       writeFileSync(file, script);
 
-      const out = spawnSync(BASH, [file], { encoding: "utf8", env, maxBuffer: 1 << 26 });
+      const out = spawnSync(BASH, [file], {
+        encoding: "utf8",
+        env,
+        maxBuffer: 1 << 26,
+      });
       const got = out.stdout
         .split("\n")
         .filter((line) => line.startsWith("exit:"))
         .map((line) => Number(line.slice("exit:".length)));
 
-      assert.equal(got.length, chunk.length, `bash ran ${got.length} of ${chunk.length} states`);
+      assert.equal(
+        got.length,
+        chunk.length,
+        `bash ran ${got.length} of ${chunk.length} states`,
+      );
       codes.push(...got);
     }
 
@@ -493,7 +536,8 @@ function states() {
           const variants = [base];
 
           for (const job of NEEDS) {
-            for (const result of RESULTS) variants.push({ ...base, [job]: result });
+            for (const result of RESULTS)
+              variants.push({ ...base, [job]: result });
           }
 
           for (const results of variants) {
@@ -550,10 +594,10 @@ test("a corrupted needs context fails the gate", () => {
     '{"check":{"result":"success"}}{"check":{"result":"success"}}',
     '{"check":{}}',
   ];
-  const codes = exitCodes(
-    STEP,
-    [{ context, results }, ...corrupted.map((needsJson) => ({ context, results, needsJson }))],
-  );
+  const codes = exitCodes(STEP, [
+    { context, results },
+    ...corrupted.map((needsJson) => ({ context, results, needsJson })),
+  ]);
 
   assert.equal(codes[0], 0, "the control state must pass");
   assert.ok(
@@ -605,7 +649,11 @@ test("the subshell form agrees with `bash -e` — through the aggregate, jq's er
     const codes = exitCodes(STEP, sample);
 
     sample.forEach((state, i) => {
-      assert.equal(viaBashE(state, process.env.PATH), codes[i], `state ${i} differs`);
+      assert.equal(
+        viaBashE(state, process.env.PATH),
+        codes[i],
+        `state ${i} differs`,
+      );
     });
     assert.equal(viaBashE(sample[0], empty), 127, "a missing jq must exit 127");
     assert.deepEqual(codes.slice(-3), [1, 5, 5], "the aggregate's own exits");
@@ -620,35 +668,57 @@ function inGate(from, to) {
   const at = CI.indexOf("\n  ci:\n");
   const gate = CI.slice(at);
 
-  assert.equal(gate.split(from).length, 2, `not exactly once in the gate job: ${from}`);
+  assert.equal(
+    gate.split(from).length,
+    2,
+    `not exactly once in the gate job: ${from}`,
+  );
 
   return CI.slice(0, at) + gate.replace(from, () => to);
 }
 
 const OPEN_FORMS = {
-  "a step-level continue-on-error": () => `${CI.trimEnd()}\n        continue-on-error: true\n`,
+  "a step-level continue-on-error": () =>
+    `${CI.trimEnd()}\n        continue-on-error: true\n`,
   "a step-level shell": () => `${CI.trimEnd()}\n        shell: bash {0}\n`,
   "a step-level if:": () =>
     inGate(
       "      - name: Determine result\n",
       "      - name: Determine result\n        if: github.event.pull_request.user.login != 'dependabot[bot]'\n",
     ),
-  "a second step": () => `${CI.trimEnd()}\n      - name: Extra\n        run: echo\n`,
+  "a second step": () =>
+    `${CI.trimEnd()}\n      - name: Extra\n        run: echo\n`,
   "a job-level continue-on-error": () =>
     inGate("    steps:\n", "    continue-on-error: true\n    steps:\n"),
   "job-level defaults": () =>
-    inGate("    steps:\n", "    defaults:\n      run:\n        shell: bash {0}\n    steps:\n"),
+    inGate(
+      "    steps:\n",
+      "    defaults:\n      run:\n        shell: bash {0}\n    steps:\n",
+    ),
   "workflow-level defaults": () =>
-    CI.replace(/^jobs:\n/m, "defaults:\n  run:\n    shell: bash {0}\n\njobs:\n"),
+    CI.replace(
+      /^jobs:\n/m,
+      "defaults:\n  run:\n    shell: bash {0}\n\njobs:\n",
+    ),
   "workflow-level defaults, quoted": () =>
-    CI.replace(/^jobs:\n/m, '"defaults":\n  run:\n    shell: bash {0}\n\njobs:\n'),
+    CI.replace(
+      /^jobs:\n/m,
+      '"defaults":\n  run:\n    shell: bash {0}\n\njobs:\n',
+    ),
   "workflow-level defaults behind a BOM": () =>
-    CI.replace(/^jobs:\n/m, "\uFEFFdefaults:\n  run:\n    shell: bash {0}\n\njobs:\n"),
-  "BASH_ENV in the workflow's env": () => CI.replace(/^env:\n/m, "env:\n  BASH_ENV: ./x.sh\n"),
+    CI.replace(
+      /^jobs:\n/m,
+      "\uFEFFdefaults:\n  run:\n    shell: bash {0}\n\njobs:\n",
+    ),
+  "BASH_ENV in the workflow's env": () =>
+    CI.replace(/^env:\n/m, "env:\n  BASH_ENV: ./x.sh\n"),
   "the workflow's env in flow style": () =>
     `${CI.slice(0, CI.indexOf("\nenv:\n") + 1)}env: { BASH_ENV: ./x.sh }\n${CI.slice(CI.indexOf("\njobs:\n") + 1)}`,
   "BASH_ENV in the step's env": () =>
-    inGate("          NEEDS: ${{ toJSON(needs) }}\n", "          NEEDS: ${{ toJSON(needs) }}\n          BASH_ENV: ./x.sh\n"),
+    inGate(
+      "          NEEDS: ${{ toJSON(needs) }}\n",
+      "          NEEDS: ${{ toJSON(needs) }}\n          BASH_ENV: ./x.sh\n",
+    ),
   "no if: always()": () => inGate("    if: always()\n", ""),
   "if: always() as an expression": () =>
     inGate("    if: always()\n", "    if: ${{ always() }}\n"),
