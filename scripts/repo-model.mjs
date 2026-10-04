@@ -1,12 +1,14 @@
 // The package walk the repository's scripts share: one record per directory
 // under `packages/` that holds a `package.json`.
 //
-// ⚠ Imports only `node:` built-ins and relative paths, and reads the tree's
-// files as text. The fork path of the SonarCloud check (`sonar-trusted.yml`)
-// runs it from `.trusted/`, a checkout of `master`, in a working directory that
-// holds the pull request's tree, where a bare or `#` specifier can resolve into
-// the pull request's own `node_modules` or `package.json`.
-// `scripts/tests/sonar-trusted-boundary.test.mjs` refuses such a specifier.
+// ⚠ Imports only relative paths and the built-ins the fork path allows, and
+// reads the tree's files as text. The fork path of the SonarCloud check
+// (`sonar-trusted.yml`) runs it from `.trusted/`, a checkout of `master`, in a
+// working directory that holds the pull request's tree, where a bare or `#`
+// specifier can resolve into the pull request's own `node_modules` or
+// `package.json`, and a built-in that starts or loads code starts it from that
+// tree. `BUILTINS` in `scripts/tests/sonar-trusted-boundary.test.mjs` names the
+// built-ins allowed there, and the test refuses every other load.
 //
 // ⚠ Not in `scripts/lib/`: that directory is an input of the `test`, `lint` and
 // most `type-check` tasks of every package, and no task loads this module, so

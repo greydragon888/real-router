@@ -122,14 +122,26 @@ const BUILTINS = new Set(["node:fs", "node:path", "node:url"]);
 /** A relative specifier: the closure follows it. */
 const RELATIVE = /^\.{1,2}\//;
 
-/** Names whose use loads code this reader cannot follow. */
-const REFUSED_NAMES = new Set(["require", "createRequire", "eval", "Function"]);
+/**
+ * Names whose use loads code this reader cannot follow: `process` reaches any
+ * built-in through `getBuiltinModule`, and a native addon through `dlopen` and
+ * `binding`, with no specifier at all.
+ */
+const REFUSED_NAMES = new Set([
+  "require",
+  "createRequire",
+  "eval",
+  "Function",
+  "getBuiltinModule",
+  "dlopen",
+  "binding",
+]);
 
 /**
  * What a module loads: the specifier of every static import, re-export and
  * `import()` with a literal argument, and the loads read no further —
- * `import()` with any other argument, `require`, `createRequire`, `eval`,
- * `Function`, and a source that does not parse.
+ * `import()` with any other argument, a name in `REFUSED_NAMES`, and a source
+ * that does not parse.
  *
  * @param {string} source
  * @returns {{ specifiers: string[], refused: string[] }}
@@ -438,6 +450,12 @@ const OUTSIDE_LOADS = {
   ],
   eval: ['eval("1");', "uses eval"],
   "new Function": ['const f = new Function("return 1");', "uses Function"],
+  "process.getBuiltinModule": [
+    'const { spawnSync } = process.getBuiltinModule("node:child_process");',
+    "uses getBuiltinModule",
+  ],
+  "process.dlopen": ['process.dlopen(module, "./addon.node");', "uses dlopen"],
+  "process.binding": ['const fs = process.binding("fs");', "uses binding"],
   "a source that does not parse": [
     "export const = ;",
     "uses syntax it cannot parse",

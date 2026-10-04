@@ -27,11 +27,21 @@ const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const FULL =
   "thresholds: { statements: 100, branches: 100, functions: 100, lines: 100 }\n";
 
+/** A package with tests whose vitest config holds `thresholds`. */
+const phantomOn = (key, thresholds) => ({
+  [`packages/phantom-${key}/package.json`]: JSON.stringify({
+    name: `@fx/phantom-${key}`,
+  }),
+  [`packages/phantom-${key}/src/index.ts`]: "export const one = 1;\n",
+  [`packages/phantom-${key}/tests/one.test.ts`]: "\n",
+  [`packages/phantom-${key}/vitest.config.mts`]: thresholds,
+});
+
 /**
- * A plain package, one without tests, a phantom one, one whose `src/` is a
- * symlink, one whose manifest does not parse, one with a coverage directory
- * but no `lcov.info`, a directory without `package.json`, and a file beside
- * them.
+ * A plain package, one without tests, phantom ones — each with one threshold
+ * lowered — one whose `src/` is a symlink, one whose manifest does not parse,
+ * one with a coverage directory but no `lcov.info`, a directory without
+ * `package.json`, and a file beside them.
  */
 const FIXTURE = {
   "packages/broken/package.json": "{\n",
@@ -52,6 +62,18 @@ const FIXTURE = {
   "packages/phantom/vitest.config.mts":
     "thresholds: { statements: 100, branches: 94, functions: 100, lines: 100 }\n",
   "packages/linked/package.json": JSON.stringify({ name: "@fx/linked" }),
+  ...phantomOn(
+    "functions",
+    "thresholds: { statements: 100, branches: 100, functions: 99, lines: 100 }\n",
+  ),
+  ...phantomOn(
+    "lines",
+    "thresholds: { statements: 100, branches: 100, functions: 100, lines: 99 }\n",
+  ),
+  ...phantomOn(
+    "statements",
+    "thresholds: { statements: 99, branches: 100, functions: 100, lines: 100 }\n",
+  ),
   "packages/partial/package.json": JSON.stringify({ name: "@fx/partial" }),
   "packages/partial/src/index.ts": "export const partial = 1;\n",
   "packages/partial/coverage/index.html": "\n",
@@ -98,6 +120,21 @@ test("the walk reads each kind of package in the fixture", () => {
       record("linked", { hasRealSrc: false }),
       record("partial", {}),
       record("phantom", {
+        hasTests: true,
+        hasVitestConfig: true,
+        isPhantom: true,
+      }),
+      record("phantom-functions", {
+        hasTests: true,
+        hasVitestConfig: true,
+        isPhantom: true,
+      }),
+      record("phantom-lines", {
+        hasTests: true,
+        hasVitestConfig: true,
+        isPhantom: true,
+      }),
+      record("phantom-statements", {
         hasTests: true,
         hasVitestConfig: true,
         isPhantom: true,

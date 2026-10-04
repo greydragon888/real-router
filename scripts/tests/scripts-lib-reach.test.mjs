@@ -6,8 +6,9 @@
 // turbo keys a task on the files its `inputs` name. Of `scripts/`, only
 // `scripts/lib/**` is named, and only by some tasks: `test` and `lint` of every
 // package, `type-check` of the packages whose configuration is not core's, and
-// core's `type-check:tests`; `bundle` names none of it. So two things can go
-// wrong, and this test fails on each:
+// `type-check:tests` of core's configuration (core and the five packages that
+// extend it); `bundle`, `test:properties` and `test:stress` name none of it. So
+// two things can go wrong, and this test fails on each:
 //
 //   - a module in `scripts/lib/` that no task loads changes none of their
 //     results, yet an edit to it re-keys every task that names the directory;
@@ -15,17 +16,23 @@
 //     replay the task's old result after an edit to the module.
 //
 // The keys are turbo's own: `turbo run <every cached task> --dry=json` lists the
-// files of each task's key. A file of a key that loads a module of `scripts/`
-// must find that module in the same key, and every module in `scripts/lib/`
+// files of each task's key, over the workspaces `turbo ls` lists. Every code
+// file of a key is read. A module of `scripts/` it loads, and that module's
+// declaration file, must be in the same key, and every module in `scripts/lib/`
 // must be loaded so, directly or through another one there. Loads are read
 // with the TypeScript parser, so a path named in a comment or a string is no
-// load; a load whose target this cannot read fails, except in a registered
-// repo-wide scan (`scripts/repo-wide-scans.json`), which `lint:repo-scans` runs
-// outside turbo in every gate.
+// load. A load whose target this cannot read fails, unless the file is a
+// registered repo-wide scan (`scripts/repo-wide-scans.json`), which
+// `lint:repo-scans` runs outside turbo in every gate, or is in `COMPUTED_LOADS`
+// with its reason.
+//
+// ⚠ What this does not read: a component file (`.vue`, `.svelte`) is checked
+// only for the word `scripts`, and a module named by a configuration string —
+// Vitest's `setupFiles` or `globalSetup` — is no import at all.
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, posix } from "node:path";
 import { test } from "node:test";
@@ -50,6 +57,9 @@ const KIND = {
   ".jsx": ts.ScriptKind.JSX,
 };
 
+/** A component format the parser does not read. */
+const COMPONENT = /\.(?:vue|svelte)$/;
+
 /** Vitest's calls that load the module they name. */
 const VI_LOADERS = new Set([
   "mock",
@@ -60,10 +70,23 @@ const VI_LOADERS = new Set([
   "importMock",
 ]);
 
+/** The files that may load by a path this test cannot read, and why each may. */
+const COMPUTED_LOADS = new Map([
+  [
+    "packages/angular/scripts/finalize-dist-manifest.mjs",
+    "resolves the package's own name from its dist/ through createRequire, and loads nothing",
+  ],
+  [
+    "packages/core/tests/functional/validation-bundle-isolation.test.ts",
+    "loads rolldown from tsdown's own dependency tree",
+  ],
+]);
+
 /**
  * What a source loads: the repository paths of its relative loads, and a note
  * for each load whose target it cannot read — `import()`, `require` or a
- * Vitest loader given a computed path, and `createRequire`.
+ * Vitest loader given a computed path, `require` passed around, `createRequire`
+ * and `import.meta.glob`.
  *
  * @param {string} path repository-relative
  * @param {string} source
@@ -84,13 +107,13 @@ export function loadsOf(path, source) {
       paths.push(posix.normalize(posix.join(posix.dirname(path), specifier)));
     }
   };
-  const literal = (node) =>
-    node !== undefined && ts.isStringLiteralLike(node) ? node.text : undefined;
   const take = (node, what) => {
-    const specifier = literal(node);
-    if (specifier === undefined) unread.push(`${what} of a computed path`);
-    else add(specifier);
+    if (node !== undefined && ts.isStringLiteralLike(node)) add(node.text);
+    else unread.push(`${what} of a computed path`);
   };
+  const isImportCall = (node) =>
+    ts.isCallExpression(node) &&
+    node.expression.kind === ts.SyntaxKind.ImportKeyword;
 
   for (const reference of file.referencedFiles) {
     add(
@@ -116,21 +139,49 @@ export function loadsOf(path, source) {
         ts.isLiteralTypeNode(node.argument) ? node.argument.literal : undefined,
         "a type `import()`",
       );
-    } else if (ts.isCallExpression(node)) {
-      const callee = node.expression;
-      if (callee.kind === ts.SyntaxKind.ImportKeyword) {
-        take(node.arguments[0], "`import()`");
-      } else if (ts.isIdentifier(callee) && callee.text === "require") {
-        take(node.arguments[0], "`require`");
-      } else if (ts.isIdentifier(callee) && callee.text === "createRequire") {
-        unread.push("`createRequire`");
-      } else if (
-        ts.isPropertyAccessExpression(callee) &&
-        ts.isIdentifier(callee.expression) &&
-        callee.expression.text === "vi" &&
-        VI_LOADERS.has(callee.name.text)
+    } else if (isImportCall(node)) {
+      take(node.arguments[0], "`import()`");
+    } else if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression)
+    ) {
+      const { expression: owner, name } = node.expression;
+      if (
+        ts.isIdentifier(owner) &&
+        owner.text === "vi" &&
+        VI_LOADERS.has(name.text)
       ) {
-        take(node.arguments[0], `\`vi.${callee.name.text}\``);
+        // `vi.mock(import("…"))` names its module by the `import()`, read below.
+        const [argument] = node.arguments;
+        if (argument === undefined || !isImportCall(argument)) {
+          take(argument, `\`vi.${name.text}\``);
+        }
+      } else if (
+        ts.isMetaProperty(owner) &&
+        owner.keywordToken === ts.SyntaxKind.ImportKeyword &&
+        name.text.startsWith("glob")
+      ) {
+        unread.push("`import.meta.glob`");
+      }
+    } else if (ts.isIdentifier(node) && node.text === "createRequire") {
+      unread.push("`createRequire`");
+    } else if (ts.isIdentifier(node) && node.text === "require") {
+      const { parent } = node;
+      if (ts.isCallExpression(parent) && parent.expression === node) {
+        take(parent.arguments[0], "`require`");
+      } else if (
+        !(
+          ts.isPropertyAccessExpression(parent) &&
+          parent.expression === node &&
+          parent.name.text === "resolve"
+        ) &&
+        !(
+          !ts.isPropertyAccessExpression(parent) &&
+          "name" in parent &&
+          parent.name === node
+        )
+      ) {
+        unread.push("`require` passed around");
       }
     }
     ts.forEachChild(node, visit);
@@ -146,14 +197,14 @@ export function loadsOf(path, source) {
  *
  * @param {{ id: string, keyed: Set<string> }[]} tasks the tasks that run, each
  *   with the repository paths of its key
- * @param {string[]} named the tracked code files that name `scripts/`: only
- *   they, and the modules under it, can load a module of it by a path
  * @param {string[]} lib the tracked files under `scripts/lib/`
  * @param {Set<string>} scans the registered repo-wide scans
+ * @param {Map<string, string>} computed the files that may load by a computed
+ *   path, each with its reason
  * @param {(path: string) => string} read file text by repository-relative path
  * @returns {string[]}
  */
-export function findViolations(tasks, named, lib, scans, read) {
+export function findViolations(tasks, lib, scans, computed, read) {
   const violations = new Set();
   const modules = new Set(lib.filter((path) => !path.endsWith(".d.mts")));
 
@@ -164,25 +215,29 @@ export function findViolations(tasks, named, lib, scans, read) {
     }
   }
 
-  const readable = new Map();
+  const parsed = new Map();
   const loads = (path) => {
-    if (!readable.has(path)) {
-      readable.set(
+    if (!parsed.has(path)) {
+      parsed.set(
         path,
         KIND[posix.extname(path)] === undefined
-          ? undefined
+          ? /\bscripts\b/.test(read(path))
+            ? undefined
+            : { paths: [], unread: [] }
           : loadsOf(path, read(path)),
       );
     }
-    return readable.get(path);
+    return parsed.get(path);
   };
-  const roots = new Set(named.filter((path) => !path.startsWith(SCRIPTS)));
+  const isRoot = (path) =>
+    !path.startsWith(SCRIPTS) &&
+    (KIND[posix.extname(path)] !== undefined || COMPONENT.test(path));
   const loaded = new Set();
 
   for (const task of tasks) {
     // A module of scripts/lib/ is followed only once something loads it, so
     // one that loads another does not make either loaded.
-    const queue = [...task.keyed].filter((path) => roots.has(path));
+    const queue = [...task.keyed].filter(isRoot);
     const seen = new Set();
     while (queue.length > 0) {
       const file = queue.shift();
@@ -192,13 +247,13 @@ export function findViolations(tasks, named, lib, scans, read) {
       const found = loads(file);
       if (found === undefined) {
         violations.add(
-          `${file} names ${SCRIPTS} in a file this test does not parse`,
+          `${file} names scripts in a file this test does not parse`,
         );
         continue;
       }
-      if (found.unread.length > 0 && !scans.has(file)) {
+      if (found.unread.length > 0 && !scans.has(file) && !computed.has(file)) {
         violations.add(
-          `${file} loads by ${found.unread[0]}, so this test cannot tell what it loads — load by a literal path, or register the file as a repo-wide scan`,
+          `${file} loads by ${found.unread[0]}, so this test cannot tell what it loads — load by a literal path, or name the file in COMPUTED_LOADS with the reason`,
         );
       }
       for (const path of found.paths) {
@@ -210,10 +265,15 @@ export function findViolations(tasks, named, lib, scans, read) {
           );
           continue;
         }
-        if (modules.has(path)) {
-          queue.push(path);
-          const twin = path.replace(/\.mjs$/, ".d.mts");
-          if (lib.includes(twin)) queue.push(twin);
+        if (!modules.has(path)) continue;
+        queue.push(path);
+        const twin = path.replace(/\.mjs$/, ".d.mts");
+        if (!lib.includes(twin)) continue;
+        if (task.keyed.has(twin)) queue.push(twin);
+        else {
+          violations.add(
+            `${task.id} reads ${file}, which loads ${path}, and its declaration ${twin} is not in its key — the type checker and typed lint read it`,
+          );
         }
       }
     }
@@ -223,6 +283,13 @@ export function findViolations(tasks, named, lib, scans, read) {
     if (!loaded.has(path)) {
       violations.add(
         `${path}: no task loads it — every edit to ${LIB} re-keys every task that names it, so a module only scripts read lives in ${SCRIPTS}`,
+      );
+    }
+  }
+  for (const [path, reason] of computed) {
+    if (!(parsed.get(path)?.unread.length > 0)) {
+      violations.add(
+        `COMPUTED_LOADS names ${path} (${reason}), but no task reads a load by a computed path there — remove the entry`,
       );
     }
   }
@@ -240,18 +307,39 @@ const git = (...args) =>
 
 const readRepo = (path) => readFileSync(join(repoRoot, path), "utf8");
 
+const TURBO = join(repoRoot, "node_modules", ".bin", "turbo");
+
+/** turbo with no remote cache and no telemetry, writing nothing to the repo. */
+const turbo = (args, cacheDir) =>
+  execFileSync(
+    TURBO,
+    [...args, ...(cacheDir ? ["--cache-dir", cacheDir] : [])],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024,
+      env: Object.fromEntries(
+        Object.entries(process.env).filter(
+          ([key]) => !key.startsWith("TURBO_"),
+        ),
+      ),
+    },
+  );
+
 /**
  * Every task turbo would run with a cache, with its key. The task names are
- * every cached task of the root's and the packages' `turbo.json`; a package
- * without the script is listed with `<NONEXISTENT>` and runs nothing.
+ * every cached task of the `turbo.json` at the root and in each workspace `turbo
+ * ls` lists; a package without the script is listed with `<NONEXISTENT>` and
+ * runs nothing.
  *
  * @returns {{ id: string, keyed: Set<string> }[]}
  */
 function cachedTasks() {
+  const workspaces = JSON.parse(turbo(["ls", "--output=json"])).packages.items;
   const configs = [
     "turbo.json",
-    ...git("ls-files", "--", ":(glob)packages/*/turbo.json"),
-  ];
+    ...workspaces.map((workspace) => `${workspace.path}/turbo.json`),
+  ].filter((config) => existsSync(join(repoRoot, config)));
   const names = new Set();
   for (const config of configs) {
     for (const [name, task] of Object.entries(
@@ -261,26 +349,21 @@ function cachedTasks() {
     }
   }
 
+  // A key also names whatever an earlier local run left under an input glob
+  // (`.svelte-kit/`, `.vitest-cache/`); a clean checkout, as in CI, has none of
+  // it, so only tracked files are read.
+  const tracked = new Set(git("ls-files"));
   const cacheDir = mkdtempSync(join(tmpdir(), "scripts-lib-reach-"));
   try {
-    const env = Object.fromEntries(
-      Object.entries(process.env).filter(([key]) => !key.startsWith("TURBO_")),
-    );
-    const dry = JSON.parse(
-      execFileSync(
-        join(repoRoot, "node_modules", ".bin", "turbo"),
-        ["run", ...names, "--dry=json", "--cache-dir", cacheDir],
-        { cwd: repoRoot, encoding: "utf8", env, maxBuffer: 64 * 1024 * 1024 },
-      ),
-    );
+    const dry = JSON.parse(turbo(["run", ...names, "--dry=json"], cacheDir));
     return dry.tasks
       .filter((task) => task.command !== "<NONEXISTENT>")
       .map((task) => ({
         id: task.taskId,
         keyed: new Set(
-          Object.keys(task.inputs).map((path) =>
-            posix.normalize(posix.join(task.directory, path)),
-          ),
+          Object.keys(task.inputs)
+            .map((path) => posix.normalize(posix.join(task.directory, path)))
+            .filter((path) => tracked.has(path)),
         ),
       }));
   } finally {
@@ -294,24 +377,26 @@ const SCANS = new Set(
   ),
 );
 
-/** A file that can hold an import: script code and the two component formats. */
-const CODE = /\.(?:[cm]?[jt]sx?|vue|svelte)$/;
-
-const repository = () => ({
-  tasks: cachedTasks(),
-  named: git("grep", "-l", "-F", SCRIPTS).filter((path) => CODE.test(path)),
-  lib: git("ls-files", "--", "scripts/lib"),
-});
+/** The repository's tasks and `scripts/lib/`, read once for both cells. */
+let repositoryRead;
+const repository = () =>
+  (repositoryRead ??= {
+    tasks: cachedTasks(),
+    lib: git("ls-files", "--", "scripts/lib"),
+  });
 
 test("every module of scripts/ a cached task loads is in its key, and scripts/lib/ holds no other", () => {
-  const { tasks, named, lib } = repository();
+  const { tasks, lib } = repository();
 
   assert.ok(lib.length > 0, `git lists nothing under ${LIB}`);
-  assert.deepEqual(findViolations(tasks, named, lib, SCANS, readRepo), []);
+  assert.deepEqual(
+    findViolations(tasks, lib, SCANS, COMPUTED_LOADS, readRepo),
+    [],
+  );
 });
 
-test("CONTROL — on the repository, the keys are turbo's and the scan exemption is what admits a computed load", () => {
-  const { tasks, named, lib } = repository();
+test("CONTROL — on the repository, the keys are turbo's, and the exemptions are what admit the computed loads", () => {
+  const { tasks, lib } = repository();
   const coreTest = tasks.find((task) => task.id === "@real-router/core#test");
 
   // A key read from turbo: core's test is keyed on the module its tests load.
@@ -321,11 +406,27 @@ test("CONTROL — on the repository, the keys are turbo's and the scan exemption
       "packages/core/tests/functional/message-prefix-authority-1845.test.ts",
     ),
   );
-  // repo-scan-authority-2241 loads scripts/checks.mjs by a computed path.
-  const withoutScans = findViolations(tasks, named, lib, new Set(), readRepo);
-  assert.deepEqual(withoutScans, [
-    "packages/core/tests/functional/repo-scan-authority-2241.test.ts loads by `import()` of a computed path, so this test cannot tell what it loads — load by a literal path, or register the file as a repo-wide scan",
-  ]);
+  // Without the exemptions, exactly the files they name fail, and only by
+  // loads this test cannot read — two of them hold no `scripts/` at all.
+  const computed = (file, how) =>
+    `${file} loads by ${how}, so this test cannot tell what it loads — load by a literal path, or name the file in COMPUTED_LOADS with the reason`;
+  assert.deepEqual(
+    findViolations(tasks, lib, new Set(), new Map(), readRepo).sort(),
+    [
+      computed(
+        "packages/angular/scripts/finalize-dist-manifest.mjs",
+        "`createRequire`",
+      ),
+      computed(
+        "packages/core/tests/functional/repo-scan-authority-2241.test.ts",
+        "`import()` of a computed path",
+      ),
+      computed(
+        "packages/core/tests/functional/validation-bundle-isolation.test.ts",
+        "`createRequire`",
+      ),
+    ],
+  );
 });
 
 // ── Fixtures: a sound tree, and each way it can break.
@@ -345,16 +446,8 @@ const check = ({
   tasks = [{ id: "a#test", keyed: new Set(TEST_KEY) }],
   lib = LIB_FILES,
   scans = new Set(),
-} = {}) =>
-  findViolations(
-    tasks,
-    Object.keys(files).filter(
-      (path) => !path.startsWith(SCRIPTS) && files[path].includes(SCRIPTS),
-    ),
-    lib,
-    scans,
-    (path) => files[path],
-  );
+  computed = new Map(),
+} = {}) => findViolations(tasks, lib, scans, computed, (path) => files[path]);
 
 const unloaded = (path) =>
   `${path}: no task loads it — every edit to ${LIB} re-keys every task that names it, so a module only scripts read lives in ${SCRIPTS}`;
@@ -362,8 +455,8 @@ const unloaded = (path) =>
 const unkeyed = (task, file, path) =>
   `${task} reads ${file}, which loads ${path}, and ${path} is not in its key — a module a package task loads lives in ${LIB}, and the task's inputs name it`;
 
-const computed = (file, how) =>
-  `${file} loads by ${how} of a computed path, so this test cannot tell what it loads — load by a literal path, or register the file as a repo-wide scan`;
+const unread = (file, how) =>
+  `${file} loads by ${how}, so this test cannot tell what it loads — load by a literal path, or name the file in COMPUTED_LOADS with the reason`;
 
 test("fixture: the sound tree passes, the inner module through the one the test imports", () => {
   assert.deepEqual(check(), []);
@@ -375,6 +468,8 @@ for (const [name, text] of Object.entries({
   "a type `import()`":
     'type T = typeof import("../../../scripts/lib/used.mjs");\n',
   "`vi.mock`": 'vi.mock("../../../scripts/lib/used.mjs");\n',
+  "`vi.mock` of an `import()`":
+    'vi.mock(import("../../../scripts/lib/used.mjs"), async (original) => original());\n',
   "`vi.importActual`":
     'await vi.importActual("../../../scripts/lib/used.mjs");\n',
   "a literal `require`":
@@ -385,6 +480,11 @@ for (const [name, text] of Object.entries({
     assert.deepEqual(check({ files: { ...FILES, [TEST]: text } }), []);
   });
 }
+
+test("fixture: `require.resolve` and a key named require load nothing", () => {
+  const text = `${FILES[TEST]}const where = require.resolve("pkg");\nconst options = { require: true };\n`;
+  assert.deepEqual(check({ files: { ...FILES, [TEST]: text } }), []);
+});
 
 test("fixture: a module no task loads is refused", () => {
   const files = {
@@ -428,6 +528,15 @@ test("fixture: a task whose key misses the module a file of it loads is refused"
   );
 });
 
+test("fixture: a task whose key misses the declaration of a module it loads is refused", () => {
+  const keyed = new Set(
+    TEST_KEY.filter((path) => path !== "scripts/lib/used.d.mts"),
+  );
+  assert.deepEqual(check({ tasks: [{ id: "a#lint", keyed }] }), [
+    `a#lint reads ${TEST}, which loads scripts/lib/used.mjs, and its declaration scripts/lib/used.d.mts is not in its key — the type checker and typed lint read it`,
+  ]);
+});
+
 test("fixture: a file that loads a module of scripts/ outside scripts/lib/ is refused", () => {
   const files = {
     ...FILES,
@@ -452,25 +561,40 @@ test("fixture: a loaded module of scripts/lib/, or its declaration, that loads o
   }
 });
 
-test("fixture: a load by a computed path is refused, unless the file is a registered scan", () => {
+test("fixture: a load this test cannot read is refused, though the file never writes scripts/", () => {
   for (const [how, line] of [
-    ["`import()`", "await import(`../../../scripts/${name}.mjs`);"],
-    ["`require`", "require(path.join(root, 'scripts/x.mjs'));"],
-    ["`vi.mock`", "vi.mock(path.join(root, 'scripts/x.mjs'));"],
+    [
+      "`import()` of a computed path",
+      'await import(join(ROOT, "scripts", "x.mjs"));',
+    ],
+    [
+      "`require` of a computed path",
+      'require(join(ROOT, "scripts", "x.mjs"));',
+    ],
+    [
+      "`vi.mock` of a computed path",
+      'vi.mock(join(ROOT, "scripts", "x.mjs"));',
+    ],
+    ["`createRequire`", "const load = module.createRequire(import.meta.url);"],
+    ["`require` passed around", "const load = require;"],
+    [
+      "`import.meta.glob`",
+      'const all = import.meta.glob("../../../scripts/*.mjs");',
+    ],
   ]) {
     const files = { ...FILES, [TEST]: `${FILES[TEST]}${line}\n` };
-    assert.deepEqual(check({ files }), [computed(TEST, how)]);
+    assert.deepEqual(check({ files }), [unread(TEST, how)]);
     assert.deepEqual(check({ files, scans: new Set([TEST]) }), []);
+    assert.deepEqual(
+      check({ files, computed: new Map([[TEST, "a reason"]]) }),
+      [],
+    );
   }
 });
 
-test("fixture: createRequire is refused", () => {
-  const files = {
-    ...FILES,
-    [TEST]: `${FILES[TEST]}const load = createRequire(import.meta.url);\n`,
-  };
-  assert.deepEqual(check({ files }), [
-    `${TEST} loads by \`createRequire\`, so this test cannot tell what it loads — load by a literal path, or register the file as a repo-wide scan`,
+test("fixture: an exemption for a file that loads nothing it cannot read is refused", () => {
+  assert.deepEqual(check({ computed: new Map([[TEST, "a reason"]]) }), [
+    `COMPUTED_LOADS names ${TEST} (a reason), but no task reads a load by a computed path there — remove the entry`,
   ]);
 });
 
@@ -480,14 +604,18 @@ test("fixture: a declaration file without its module is refused", () => {
   ]);
 });
 
-test("fixture: a file of a key that names scripts/ and is not code this test parses is refused", () => {
+test("fixture: a component of a key that names scripts is refused, and one that does not is read as loading nothing", () => {
   const VIEW = "packages/a/src/View.svelte";
-  const files = { ...FILES, [VIEW]: "<script>// scripts/lib</script>\n" };
+  const tasks = [{ id: "a#test", keyed: new Set([...TEST_KEY, VIEW]) }];
   assert.deepEqual(
     check({
-      files,
-      tasks: [{ id: "a#test", keyed: new Set([...TEST_KEY, VIEW]) }],
+      files: { ...FILES, [VIEW]: "<script>// scripts/lib</script>\n" },
+      tasks,
     }),
-    [`${VIEW} names ${SCRIPTS} in a file this test does not parse`],
+    [`${VIEW} names scripts in a file this test does not parse`],
+  );
+  assert.deepEqual(
+    check({ files: { ...FILES, [VIEW]: "<p>view</p>\n" }, tasks }),
+    [],
   );
 });
