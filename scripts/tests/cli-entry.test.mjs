@@ -94,6 +94,11 @@ const CLIS = {
     args: [],
     ran: /REFUSALS with a bracketed head: \d+/,
   },
+  // Without a mode flag it prints its usage and reads and writes nothing.
+  "scripts/sync-config.mjs": {
+    args: [],
+    ran: /usage: sync-config\.mjs --check \| --write/,
+  },
   "scripts/verify.mjs": { args: [], ran: /usage: verify\.mjs --stage/ },
   ".changeset/changelog-notes.mjs": {
     args: [],
