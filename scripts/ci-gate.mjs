@@ -16,7 +16,7 @@
 // nothing at all, `parseJobs` with no `jobs:`, is caught by the floors those
 // tests set on the real tree.
 
-import { REFUSED_CHARACTERS } from "./lib/refused-characters.mjs";
+import { REFUSED_CHARACTERS } from "./refused-characters.mjs";
 
 /** The aggregator job the `protect-master` ruleset requires: `CI Result`. */
 export const GATE_JOB = "ci";

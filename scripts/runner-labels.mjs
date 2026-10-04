@@ -14,7 +14,7 @@ import { join } from "node:path";
 
 import * as YAML from "yaml";
 
-import { REFUSED_CHARACTERS } from "./lib/refused-characters.mjs";
+import { REFUSED_CHARACTERS } from "./refused-characters.mjs";
 
 /** A GitHub-hosted runner label: `ubuntu-latest`, `macos-14`, `windows-2022`. */
 export const HOSTED = /^(ubuntu|windows|macos)-[\w.]+$/;

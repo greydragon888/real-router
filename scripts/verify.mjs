@@ -11,7 +11,7 @@
 // stops a hook and a failed step stops a GitHub job.
 //
 //   - Each check runs without a shell, and without git's repository variables
-//     except GIT_INDEX_FILE in pre-commit (`scripts/lib/git-env.mjs`).
+//     except GIT_INDEX_FILE in pre-commit (`scripts/git-env.mjs`).
 //   - Each check sees VERIFY_STAGE, the stage it runs in.
 //   - A tool of `tools` that is not on PATH: a loud SKIP in a hook, a FAIL
 //     (exit 127) in CI. An element that is a list is alternatives.
@@ -26,7 +26,7 @@ import { constants as osConstants } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { gitEnvForStage } from "./lib/git-env.mjs";
+import { gitEnvForStage } from "./git-env.mjs";
 
 export const STAGES = ["pre-commit", "pre-push", "ci"];
 export const CONTEXTS = [

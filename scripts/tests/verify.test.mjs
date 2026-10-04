@@ -33,12 +33,12 @@ import { after, test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { jobLines, readLastStep, topLevelKeysClosed, workflowEnvClosed } from "../ci-gate.mjs";
-import { REFUSED_CHARACTERS } from "../lib/refused-characters.mjs";
-import { localEnvVars } from "../lib/git-env.mjs";
+import { REFUSED_CHARACTERS } from "../refused-characters.mjs";
+import { localEnvVars } from "../git-env.mjs";
 
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const VERIFY = join(repoRoot, "scripts", "verify.mjs");
-const GIT_ENV_MODULE = pathToFileURL(join(repoRoot, "scripts", "lib", "git-env.mjs")).href;
+const GIT_ENV_MODULE = pathToFileURL(join(repoRoot, "scripts", "git-env.mjs")).href;
 
 const DROPPED = new Set(["GITHUB_ACTIONS", "GITHUB_STEP_SUMMARY", "VERIFY_STAGE"]);
 const ENV = {

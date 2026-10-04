@@ -13224,6 +13224,8 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 
 ## One check registry runs the hooks and Repo Lints (RFC-1, 2026-10-01)
 
+> **Updated (2026-10-04).** `git-env.mjs` is in `scripts/`, not `scripts/lib/`: "Modules only `scripts/` reads stay out of `scripts/lib/`".
+
 **Problem.** The same checks stood in three lists — `.husky/pre-commit`, `.husky/pre-push` and the steps of Repo Lints — and `ci-hook-parity.test.mjs` kept them in agreement by reading their text. It paired a hook line with a workflow line by an id read off the command, so it saw no `pnpm turbo run` line and no `node scripts/…` call, and each list carried its own comments on why a step was there. A check that reached one list and not another is the class of #2406 and #2548.
 
 **Solution.**
@@ -13479,6 +13481,8 @@ On CI, after the push: PR #2660, of Markdown alone, ran all 13 checks of the `ci
 
 ## The gate test holds the `needs` of every job the gate waits for inside the gate's `needs` (2026-10-04)
 
+> **Updated (2026-10-04).** `refused-characters.mjs` is in `scripts/`, not `scripts/lib/`: "Modules only `scripts/` reads stay out of `scripts/lib/`".
+
 **Problem.** The gate's aggregate fails on a job in its `needs` that failed or was cancelled, and its table decides which skips pass. A job in `needs` that itself needed a job outside them was skipped when that job failed, and the gate read the skip, which the table may allow. Measured in `/code-review-rfc` of RFC-4: with `examples-build` needing `bundle-size`, every test stayed green, and a failed `bundle-size` would have passed the gate without the examples built. No job had such an edge.
 
 **Solution.**
@@ -13493,3 +13497,16 @@ On CI, after the push: PR #2660, of Markdown alone, ran all 13 checks of the `ci
 **Why.** The rule is the transitive half of the aggregate: every job whose failure can skip a job the gate waits for is one the gate waits for, so the failure reaches the gate as a failure.
 
 **Measured.** The rule removed fails a cell. In the real `ci.yml`, `examples-build` needing `bundle-size` fails the test in each of six forms — a flow sequence on one line and over several, a scalar, a block, a block with a comment between items, a quoted item — and HEAD passes; a `ci.yml` Prettier reformatted, three `needs:` over several lines among them, passes the gate and `verify` tests. `continue-on-error` hidden in a comment behind a CR, a NEL or an LS is refused by both step readers. The pairs bring the enumeration to 3,290 states, 170 of them pairs; a gate that passes when two such jobs are both skipped survives without them and fails with them. Each other hardening's mutant fails a cell. Without the name list or the tail check in `readLastStep`, cells of both readers fail, and so does a step placed before the gate's.
+
+## Modules only `scripts/` reads stay out of `scripts/lib/` (2026-10-04)
+
+**Problem.** `scripts/lib/**` is an input of the `test`, `type-check`, `lint` and `lint:fix` tasks of every package, because package tests import `scripts/lib/raiser-head.mjs` ("Why the input" in "One parse for every reader of a raiser head"). Two modules there were read by `scripts/` alone: `git-env.mjs`, which `verify.mjs` imports, and `refused-characters.mjs`, which the workflow readers import. An edit to either changed the result of no package task and the key of all of them. Measured on the push of `e749ef241`, the first to carry `refused-characters.mjs`: Post-Merge Build #1572 ran 93 of its 121 tasks and took 11 min 32 s, where the push before it replayed all 121 in 23 s. A `turbo run build --dry=json` pair on `7d0b5477f` and `e749ef241` gives 69 tasks whose inputs differ by that file alone and 57 more that differ through their dependencies; the global hash is the same.
+
+**Solution.**
+
+- Both modules move to `scripts/`, and their imports follow.
+- `scripts/tests/scripts-lib-reach.test.mjs` fails on a module in `scripts/lib/` that nothing outside `scripts/` loads, directly or through a loaded module there, and on a declaration file there without its module. It reads imports with the TypeScript parser, so a path in a comment or a string is no import.
+
+**Why a guard, not a narrower input.** The inputs could name `raiser-head.mjs` alone. A module a package test starts to import would then be missing from the key, and turbo would replay the old result of that test without a word. The guard fails instead, at the commit that puts a module only scripts read into `scripts/lib/`.
+
+**Measured.** The guard fails on the tree before the move, naming exactly the two modules, and passes after it; each of its ten mutants fails a cell. Moving `refused-characters.mjs` alone would have returned all 156 task keys of the build to those of `7d0b5477f`, which the remote cache holds. With both modules moved, `scripts/lib/` holds a set of files no build has keyed, and 126 of the 156 keys change, so the next build runs those tasks once. Moving `git-env.mjs` at its next edit would have cost nothing extra; the owner chose to move it now.
