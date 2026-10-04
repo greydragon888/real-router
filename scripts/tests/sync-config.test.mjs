@@ -421,6 +421,7 @@ test("a source the region cannot read fails the run and names the region", () =>
 for (const [name, line, message] of [
   ["a line break", "a\nb", /renders a line it cannot hold/],
   ["a carriage return", "x\r", /renders a line it cannot hold/],
+  ["a byte-order mark", "\uFEFFx", /renders a line it cannot hold/],
   ["a marker", open("modules"), /renders a line it cannot hold/],
   [
     "a line shallower than its markers",
@@ -536,6 +537,7 @@ test("a hook's git variables do not reach the scan for markers", () => {
 
 for (const [name, text] of [
   ["CRLF line endings", PROPS_LINES.join("\r\n")],
+  ["a byte-order mark", `\uFEFF${PROPS_LINES.join("\n")}`],
   [
     "a tab",
     PROPS_LINES.join("\n").replace("sonar.sources=src", "sonar.sources=\tsrc"),
@@ -555,7 +557,7 @@ for (const [name, text] of [
   test(`a region file holding ${name} fails the run`, () => {
     refused(
       { ...tree({ yaml: yamlOutOfStep }), [PROPS]: text },
-      /holds a line break other than LF, or a control character/,
+      /holds a line break other than LF, a byte-order mark or a control character/,
     );
   });
 }

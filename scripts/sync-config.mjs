@@ -159,7 +159,7 @@ const quiet = (line) => line.trim() === "" || /^\s*[#!]/.test(line);
  * @param {Map<string, string[]>} rendered each region's lines, as it will hold them
  * @returns {string[]}
  */
-export function propertiesProblems(file, lines, spans, rendered) {
+function propertiesProblems(file, lines, spans, rendered) {
   const problems = [];
   const keys = new Map();
 
@@ -256,7 +256,9 @@ export function lineDiff(actual, expected) {
   return out;
 }
 
-const utf8 = new TextDecoder("utf-8", { fatal: true });
+// `ignoreBOM` keeps a byte-order mark in the text, where the check below
+// refuses it: the default drops it, and a rewrite would lose it.
+const utf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
 /**
  * The tracked files of `root` that hold a line that could be a marker. git runs
@@ -289,7 +291,7 @@ function filesWithMarkers(root) {
  * @param {Region[]} regions
  * @returns {{ problems: string[], drifts: { file: string, name: string, diff: string[] }[], updates: Map<string, string>, files: number }}
  */
-export function sync(root, regions) {
+function sync(root, regions) {
   const problems = [];
   const drifts = [];
   const updates = new Map();
@@ -320,9 +322,13 @@ export function sync(root, regions) {
     }
     // A CRLF file passes REFUSED_CHARACTERS, but a rewrite would leave its
     // regions on LF and the rest on CRLF.
-    if (text.includes("\r") || REFUSED_CHARACTERS.test(text)) {
+    if (
+      text.includes("\r") ||
+      text.includes("\uFEFF") ||
+      REFUSED_CHARACTERS.test(text)
+    ) {
       problems.push(
-        `${file}: holds a line break other than LF, or a control character, so its lines cannot be read`,
+        `${file}: holds a line break other than LF, a byte-order mark or a control character, so its lines cannot be read`,
       );
       continue;
     }
@@ -358,6 +364,7 @@ export function sync(root, regions) {
           typeof line !== "string" ||
           line.includes("\n") ||
           line.includes("\r") ||
+          line.includes("\uFEFF") ||
           REFUSED_CHARACTERS.test(line) ||
           mentionsMarker(line),
       );

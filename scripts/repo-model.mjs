@@ -8,7 +8,8 @@
 // specifier can resolve into the pull request's own `node_modules` or
 // `package.json`, and a built-in that starts or loads code starts it from that
 // tree. `BUILTINS` in `scripts/tests/sonar-trusted-boundary.test.mjs` names the
-// built-ins allowed there, and the test refuses every other load.
+// built-ins allowed there, and the test refuses the other loads it can name;
+// one through a computed member, such as `process["dlopen"]`, it does not see.
 //
 // ⚠ Not in `scripts/lib/`: that directory is an input of the `test`, `lint` and
 // most `type-check` tasks of every package, and no task loads this module, so

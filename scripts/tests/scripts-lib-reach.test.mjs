@@ -27,8 +27,9 @@
 // with its reason.
 //
 // ⚠ What this does not read: a component file (`.vue`, `.svelte`) is checked
-// only for the word `scripts`, and a module named by a configuration string —
-// Vitest's `setupFiles` or `globalSetup` — is no import at all.
+// only for the word `scripts`, a module named by a configuration string —
+// Vitest's `setupFiles` or `globalSetup` — is no import at all, and a file of
+// `scripts/` that a task reads as text or starts as a process is no load.
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -475,6 +476,11 @@ for (const [name, text] of Object.entries({
   "a literal `require`":
     'const used = require("../../../scripts/lib/used.mjs");\n',
   "a literal `import()`": 'await import("../../../scripts/lib/used.mjs");\n',
+  // TypeScript reads a triple-slash directive only above the first statement.
+  "a `/// <reference path>`":
+    '/// <reference path="../../../scripts/lib/used.mjs" />\n',
+  "an `import = require`":
+    'import used = require("../../../scripts/lib/used.mjs");\n',
 })) {
   test(`fixture: ${name} loads the module`, () => {
     assert.deepEqual(check({ files: { ...FILES, [TEST]: text } }), []);

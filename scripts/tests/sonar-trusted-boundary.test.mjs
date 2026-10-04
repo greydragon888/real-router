@@ -125,7 +125,9 @@ const RELATIVE = /^\.{1,2}\//;
 /**
  * Names whose use loads code this reader cannot follow: `process` reaches any
  * built-in through `getBuiltinModule`, and a native addon through `dlopen` and
- * `binding`, with no specifier at all.
+ * `binding`, with no specifier at all. A name is matched as an identifier, so
+ * a computed member such as `process["dlopen"]` goes unseen; the closure's
+ * code comes from `master`.
  */
 const REFUSED_NAMES = new Set([
   "require",
