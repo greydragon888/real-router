@@ -9650,7 +9650,7 @@ All 22 new mutants come from `CallExpression`, the `empty-expression-mutator` th
 
 ## The #2092 ledger keys on one claim instead of one file, and gains a refresh path (2026-09-06)
 
-> **Updated (2026-10-04).** The parser is `scripts/lib/claim-paragraphs.mjs`: a module a package test imports lives in `scripts/lib/`, an input of the test — "`scripts/lib/` holds exactly the modules of `scripts/` a package task loads".
+> **Updated (2026-10-04).** The parser is `scripts/lib/claim-paragraphs.mjs`: a module a package test imports lives in `scripts/lib/`, an input of the test — "A task's key holds every module of `scripts/` it loads, and `scripts/lib/` holds only such modules".
 
 **Problem.** `claim-census-authority-2092.test.ts` stored one hash per file — sha1 over that file's claim paragraphs joined together. That cannot distinguish an EDITED claim from an ADDED one: both move the single hash, and both say the same thing, "re-read this file". For source files the difference rarely matters, since their claims change when their code does. For `IMPLEMENTATION_NOTES.md` it matters constantly — CLAUDE.md requires an entry for every infrastructure change, so the file grows on a schedule the tripwire cannot tell from decay. Measured over one session: five of nine commits refreshed that row, and every one of them had only appended prose that the same commit had just written.
 
@@ -10916,6 +10916,8 @@ at `types/index.ts`; after it, none. The config's `basePath` evaluates to
 `packages/core`.
 
 ## Solid's bundle keeps every declared dependency external, and the rule comes from its manifest (#2300, 2026-09-13)
+
+> **Updated (2026-10-04).** `claim-paragraphs.d.mts` is in `scripts/lib/`: "A task's key holds every module of `scripts/` it loads, and `scripts/lib/` holds only such modules".
 
 ### Problem
 
@@ -12886,7 +12888,7 @@ It surfaced as `navigate/pre-commit-listener` going from 11.9 to 7.4 ms between 
 
 ## Core's `type-check` checks `src` only; its tests have `type-check:tests` (2026-09-28)
 
-> **Updated (2026-10-04).** `../../scripts/*.d.mts` is no longer an input: the one declaration file it matched moved to `scripts/lib/` with its module — "`scripts/lib/` holds exactly the modules of `scripts/` a package task loads".
+> **Updated (2026-10-04).** `../../scripts/*.d.mts` is no longer an input: the one declaration file it matched moved to `scripts/lib/` with its module — "A task's key holds every module of `scripts/` it loads, and `scripts/lib/` holds only such modules".
 
 **Problem.** Every package's `type-check` and `lint` depend on `^type-check` (#2432), so a dependent's key carries core's `type-check` key. That task checked one program over `src` and `tests`, and its inputs added `../../shared/**` and `../../scripts/lib/**`. A change to a core test or benchmark therefore re-keyed `type-check`, `lint`, `test` and `test:properties` in every package: 100 of 125 tasks for `6cab282d8`, a benchmark edit, against 4 for `1b7b0fc43`, a navigation-plugin test (`--dry=json`). The telemetry holds three such post-merge runs over 25–28.09, 592–888 s each, with all 23 `bundle` tasks hit and the other 92 missed. Since 29.08, 82 of the 205 commits on `master` that changed a `.ts` file in core changed none under `src/`.
 
@@ -13228,7 +13230,7 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 
 ## One check registry runs the hooks and Repo Lints (RFC-1, 2026-10-01)
 
-> **Updated (2026-10-04).** `git-env.mjs` is in `scripts/`, not `scripts/lib/`: "`scripts/lib/` holds exactly the modules of `scripts/` a package task loads".
+> **Updated (2026-10-04).** `git-env.mjs` is in `scripts/`, not `scripts/lib/`: "A task's key holds every module of `scripts/` it loads, and `scripts/lib/` holds only such modules".
 
 **Problem.** The same checks stood in three lists — `.husky/pre-commit`, `.husky/pre-push` and the steps of Repo Lints — and `ci-hook-parity.test.mjs` kept them in agreement by reading their text. It paired a hook line with a workflow line by an id read off the command, so it saw no `pnpm turbo run` line and no `node scripts/…` call, and each list carried its own comments on why a step was there. A check that reached one list and not another is the class of #2406 and #2548.
 
@@ -13485,7 +13487,7 @@ On CI, after the push: PR #2660, of Markdown alone, ran all 13 checks of the `ci
 
 ## The gate test holds the `needs` of every job the gate waits for inside the gate's `needs` (2026-10-04)
 
-> **Updated (2026-10-04).** `refused-characters.mjs` is in `scripts/`, not `scripts/lib/`: "`scripts/lib/` holds exactly the modules of `scripts/` a package task loads".
+> **Updated (2026-10-04).** `refused-characters.mjs` is in `scripts/`, not `scripts/lib/`: "A task's key holds every module of `scripts/` it loads, and `scripts/lib/` holds only such modules".
 
 **Problem.** The gate's aggregate fails on a job in its `needs` that failed or was cancelled, and its table decides which skips pass. A job in `needs` that itself needed a job outside them was skipped when that job failed, and the gate read the skip, which the table may allow. Measured in `/code-review-rfc` of RFC-4: with `examples-build` needing `bundle-size`, every test stayed green, and a failed `bundle-size` would have passed the gate without the examples built. No job had such an edge.
 
@@ -13502,18 +13504,20 @@ On CI, after the push: PR #2660, of Markdown alone, ran all 13 checks of the `ci
 
 **Measured.** The rule removed fails a cell. In the real `ci.yml`, `examples-build` needing `bundle-size` fails the test in each of six forms — a flow sequence on one line and over several, a scalar, a block, a block with a comment between items, a quoted item — and HEAD passes; a `ci.yml` Prettier reformatted, three `needs:` over several lines among them, passes the gate and `verify` tests. `continue-on-error` hidden in a comment behind a CR, a NEL or an LS is refused by both step readers. The pairs bring the enumeration to 3,290 states, 170 of them pairs; a gate that passes when two such jobs are both skipped survives without them and fails with them. Each other hardening's mutant fails a cell. Without the name list or the tail check in `readLastStep`, cells of both readers fail, and so does a step placed before the gate's.
 
-## `scripts/lib/` holds exactly the modules of `scripts/` a package task loads (2026-10-04)
+## A task's key holds every module of `scripts/` it loads, and `scripts/lib/` holds only such modules (2026-10-04)
 
-**Problem.** `scripts/lib/**` is an input of the `test`, `type-check`, `lint` and `lint:fix` tasks of every package, because package tests import `scripts/lib/raiser-head.mjs` ("Why the input" in "One parse for every reader of a raiser head"); no other file of `scripts/` is. The two had drifted apart in both directions:
+**Problem.** turbo keys a task on the files its `inputs` name, and of `scripts/` they name only `scripts/lib/**`: `test` and `lint` of every package, `type-check` of the packages whose configuration is not core's, and core's `type-check:tests` ("Why the input" in "One parse for every reader of a raiser head"). `bundle`, `test:properties`, `test:stress` and core's `type-check` name none of it. The modules and the inputs had drifted apart both ways:
 
-- Two modules there were read by `scripts/` alone: `git-env.mjs`, which `verify.mjs` imports, and `refused-characters.mjs`, which the workflow readers import. An edit to either changed the result of no package task and the key of all of them. Measured on the push of `e749ef241`, the first to carry `refused-characters.mjs`: Post-Merge Build #1572 ran 93 of its 121 tasks and took 11 min 32 s, where the push before it replayed all 121 in 23 s. A `turbo run build --dry=json` pair on `7d0b5477f` and `e749ef241` gives 69 tasks whose inputs differ by that file alone and 57 more that differ through their dependencies; the global hash is the same.
-- A module outside it was loaded by a package test: core's claim-census test imports `scripts/claim-paragraphs.mjs`, which was no input of `core#test`. Measured with `--dry=json`: an edit to it left the key of `core#test` unchanged, so turbo would have replayed the old result of the test, while an edit to `scripts/lib/raiser-head.mjs`, the control, changed it.
+- `git-env.mjs` and `refused-characters.mjs` sat in `scripts/lib/` though only scripts read them, so an edit to either changed no task's result and the key of every task that names the directory. Measured on the push of `e749ef241`, the first to carry `refused-characters.mjs`: Post-Merge Build #1572 ran 93 of its 121 tasks and took 11 min 32 s, where the push before it replayed all 121 in 23 s. A `turbo run build --dry=json` pair on `7d0b5477f` and `e749ef241` gives 69 tasks whose inputs differ by that file alone and 57 more that differ through their dependencies; the global hash is the same.
+- core's claim-census test imported `scripts/claim-paragraphs.mjs`, which no input of `core#test` named: an edit to it left the key unchanged [`--dry=json`], so `core#test` would have replayed its cached copy of the test. No verdict was lost, because the test is a registered repo-wide scan, and `lint:repo-scans` runs it outside turbo in every gate.
 
 **Solution.**
 
-- `git-env.mjs` and `refused-characters.mjs` move to `scripts/`, `claim-paragraphs.mjs` and its declaration file to `scripts/lib/`, and the imports follow. Core's `type-check:tests` drops the input `../../scripts/*.d.mts`, which matched only that declaration file.
-- `scripts/tests/scripts-lib-reach.test.mjs` holds both directions over the files a package task reads: those of the root's workspaces (`pnpm-workspace.yaml`) and the root's global inputs (`turbo.json`). It fails on a module in `scripts/lib/` none of them loads, directly or through a loaded module there; on an import into `scripts/` outside `scripts/lib/` from one of them or from a loaded module of `scripts/lib/`; and on a declaration file in `scripts/lib/` without its module. It reads imports with the TypeScript parser, so a path in a comment or a string is no import.
+- `git-env.mjs` and `refused-characters.mjs` move to `scripts/`; `claim-paragraphs.mjs` and its declaration move to `scripts/lib/`, and core's `type-check:tests` drops the input `../../scripts/*.d.mts`, which matched only that declaration.
+- `scripts/tests/scripts-lib-reach.test.mjs` reads the key of every cached task that runs from `turbo run <every cached task> --dry=json`. A file of a key that loads a module of `scripts/` must find that module in the same key, and every module in `scripts/lib/` must be loaded so, directly or through another one there. It reads loads with the TypeScript parser: an import or re-export, a type `import()`, `import = require`, `/// <reference path>`, and `import()`, `require` and Vitest's module loaders with a literal path. A path in a comment or a string is no load. A computed path, or `createRequire`, fails the test, except in a registered repo-wide scan: `repo-scan-authority-2241` loads `scripts/checks.mjs` that way, and `lint:repo-scans` runs it.
 
-**Why a guard, not a narrower input.** The inputs could name each module a package loads. A module a package test starts to import would then stay out of the key until someone added it, and turbo would replay the old result of that test without a word. The guard fails instead, at the commit that breaks either direction.
+**Why the keys from turbo.** The inputs differ by task, so "the files of a workspace" is not one key: a build script of core that imports from `scripts/lib/` is read by `core#bundle`, whose key names none of it. turbo's resolved inputs answer per task, and they change when the inputs do.
 
-**Measured.** The guard fails on the tree before each move, naming exactly the modules involved, and passes after it; each of its thirteen mutants fails a cell, and so does each defect planted back into the real tree. After the moves, an edit to `scripts/lib/claim-paragraphs.mjs` changes the keys of `core#test` and `core#type-check:tests`. Moving `refused-characters.mjs` alone would have returned all 156 task keys of the build to those of `7d0b5477f`, which the remote cache holds. With the other moves, every one of the 156 keys changes, so the next build runs every task once; moving `git-env.mjs` at its next edit would have cost nothing extra, and the owner chose to move it now.
+**Why a guard, not a narrower input.** The inputs could name each module a package loads. A module a package test starts to import would then stay out of the key until someone added it, and turbo would replay the old result without a word; the guard fails at that commit. Keeping `claim-paragraphs.mjs` in `scripts/lib/` has a price: an edit to it re-keys every task that names the directory, and the module has had two commits.
+
+**Measured.** The guard fails on the tree before the moves, naming `git-env.mjs` and `refused-characters.mjs`, and passes after them. Each of its sixteen mutants fails a cell, and each defect planted back into the tree fails it: `git-env.mjs` back in `scripts/lib/`; a test of core that is no registered scan importing `scripts/claim-paragraphs.mjs`; core's build script importing from `scripts/lib/`; and, without the scan's registration, the computed load of `repo-scan-authority-2241`. After the moves, an edit to `scripts/lib/claim-paragraphs.mjs` changes the keys of `core#test` and `core#type-check:tests`. Moving `refused-characters.mjs` alone would have returned all 156 task keys of the build to those of `7d0b5477f`, which the remote cache holds; with the other moves every one of them changes, so the next build runs every task once. Moving `git-env.mjs` at its next edit would have cost nothing extra, and the owner chose to move it now.
