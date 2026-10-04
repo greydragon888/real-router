@@ -76,6 +76,8 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       # `--ignore-scripts`: `check-messages.mjs` needs exactly one thing from the
       # install — `node_modules/typescript/lib/typescript.js`, which it imports by

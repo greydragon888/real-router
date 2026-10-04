@@ -47,6 +47,8 @@ jobs:
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       # pnpm + Node 24 + `pnpm install --frozen-lockfile` of cross-router-bench ONLY: it is
       # a pnpm workspace of its own, and nothing it runs reads the root's node_modules.
       - uses: ./.github/actions/setup
@@ -350,6 +352,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
@@ -364,6 +368,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup

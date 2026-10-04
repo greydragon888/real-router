@@ -28,13 +28,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Check for source changes requiring changeset
         id: check
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
           # Get files changed in PR
-          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          CHANGED=$(git diff --name-only "origin/$BASE_REF...HEAD")
 
           PUBLIC_PACKAGES=""
           for dir in packages/*/; do
@@ -104,10 +107,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Validate changesets
         id: validate
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
           # Single source of truth: .changeset/check-changeset.mjs — the SAME
           # validator the pre-push hook runs (lint:changeset). `--json` emits
@@ -134,7 +140,7 @@ jobs:
 
           # Did THIS PR add/modify changesets? Scopes the stale-comment cleanup
           # (so a docs-only PR doesn't churn comments).
-          CHANGESETS=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" -- '.changeset/*.md' | grep -v README.md || true)
+          CHANGESETS=$(git diff --name-only "origin/$BASE_REF...HEAD" -- '.changeset/*.md' | grep -v README.md || true)
           if [ -n "$CHANGESETS" ]; then
             echo "has_changesets=true" >> "$GITHUB_OUTPUT"
           else

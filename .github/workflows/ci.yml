@@ -55,6 +55,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Check for code changes
@@ -148,9 +149,9 @@ jobs:
       # `turbo query affected`). Runs only when there is code to build; for
       # docs/CI-only PRs `mode`/`matrix` stay empty and every downstream
       # `if: …mode == …` job is skipped.
-      - name: Fetch master for Turbo comparison
+      - name: Point master at origin/master for Turbo comparison
         if: steps.changes.outputs.should_run == 'true' && github.event_name == 'pull_request'
-        run: git fetch origin master:master
+        run: git branch -f master origin/master
 
       # Minimal install: turbo builds the affected graph from package.json +
       # lockfile, not node_modules. --ignore-scripts is safe — @turbo/<platform>
@@ -244,11 +245,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 0
 
-      - name: Fetch master for Turbo comparison
+      - name: Point master at origin/master for Turbo comparison
         if: github.event_name == 'pull_request'
-        run: git fetch origin master:master
+        run: git branch -f master origin/master
 
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
@@ -420,11 +422,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 0
 
-      - name: Fetch master for Turbo comparison
+      - name: Point master at origin/master for Turbo comparison
         if: github.event_name == 'pull_request'
-        run: git fetch origin master:master
+        run: git branch -f master origin/master
 
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
@@ -483,11 +486,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 0
 
-      - name: Fetch master for Turbo comparison
+      - name: Point master at origin/master for Turbo comparison
         if: github.event_name == 'pull_request'
-        run: git fetch origin master:master
+        run: git branch -f master origin/master
 
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
@@ -600,6 +604,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
@@ -658,11 +664,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 0
 
-      - name: Fetch master for Turbo comparison
+      - name: Point master at origin/master for Turbo comparison
         if: github.event_name == 'pull_request'
-        run: git fetch origin master:master
+        run: git branch -f master origin/master
 
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
@@ -720,11 +727,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 0
 
-      - name: Fetch master for Turbo comparison
+      - name: Point master at origin/master for Turbo comparison
         if: github.event_name == 'pull_request'
-        run: git fetch origin master:master
+        run: git branch -f master origin/master
 
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
@@ -792,6 +800,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Setup (pnpm + Node + install)
@@ -880,11 +889,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 0
 
-      - name: Fetch master for Turbo comparison
+      - name: Point master at origin/master for Turbo comparison
         if: github.event_name == 'pull_request'
-        run: git fetch origin master:master
+        run: git branch -f master origin/master
 
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
@@ -980,6 +990,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
@@ -1017,6 +1029,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
@@ -1045,6 +1059,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
@@ -1097,6 +1113,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
@@ -1141,6 +1159,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       # Pin Node for the --emit script (fs-only, no pnpm install) instead of
       # relying on the runner image's system node.
@@ -1257,6 +1277,8 @@ jobs:
       #    below (`pnpm turbo run bundle --filter='./packages/*'`).
       - name: Checkout PR
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       # Merge dist from whichever path ran (dist-leaf OR dist-base + dist-<shard>);
       # the cache-fill bundle step below fills any non-affected packages.
@@ -1463,6 +1485,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Run actionlint
         uses: docker://rhysd/actionlint@sha256:96d4a8c87dbbfb3bdd324f8fdc285fc3df5261e2decc619a4dd7e8ee52bbfd46
@@ -1488,10 +1512,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 2
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v6.1.0
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -1641,6 +1666,7 @@ jobs:
         if: steps.decide.outputs.analyse == 'true'
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
           # Sonar blames the changed lines; a shallow tree has nothing to blame.
           fetch-depth: 0
 

@@ -46,11 +46,8 @@ on:
     workflows: [CI]
     types: [completed]
 
-# Least privilege: read the triggering run's artifacts, write one commit status.
-permissions:
-  contents: read
-  actions: read
-  statuses: write
+# Least privilege: none for the workflow; each job names the ones it uses.
+permissions: {}
 
 concurrency:
   group: sonar-trusted-${{ github.event.workflow_run.head_sha }}
@@ -92,6 +89,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
           # `cancelled` is usually the concurrency group retiring a commit a
@@ -101,17 +99,20 @@ jobs:
           else
             WHY="Not analysed: CI failed"
           fi
-          gh api "repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_sha }}" \
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$HEAD_SHA" \
             -f state=success \
             -f context="$STATUS_CONTEXT" \
             -f description="$WHY" \
-            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 
   # Owns the two verdicts that need no scanner. Split from `sonar` because a job
   # cannot end early and still report: a skip has to be a different job's success.
   gate:
     name: Sonar gate
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      statuses: write
     # `ci.yml` triggers on `pull_request` only; the event test keeps this true if
     # a trigger is ever added there. A CI run that did not succeed produced no
     # artifacts to read, and its PR is already blocked by `CI Result`.
@@ -168,7 +169,7 @@ jobs:
           # said this by skipping, and GitHub read a skip as a pass; said here it
           # has to be an explicit success. The `gh api` failure is NOT swallowed:
           # only the empty `grep` is, or an outage would report a green gate.
-          NAMES=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID/artifacts" \
+          NAMES=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts" \
             --paginate --jq '.artifacts[].name')
           FOUND=$(printf '%s\n' "$NAMES" | grep -c '^coverage-reports-' || true)
           if [[ "$FOUND" -eq 0 ]]; then
@@ -182,23 +183,26 @@ jobs:
         if: steps.decide.outputs.analyse != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ steps.meta.outputs.sha }}
+          WHY: ${{ steps.decide.outputs.why }}
         run: |
-          gh api "repos/${{ github.repository }}/statuses/${{ steps.meta.outputs.sha }}" \
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" \
             -f state=success \
             -f context="$STATUS_CONTEXT" \
-            -f description="${{ steps.decide.outputs.why }}" \
-            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            -f description="$WHY" \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 
       - name: Report pending
         if: steps.decide.outputs.analyse == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ steps.meta.outputs.sha }}
         run: |
-          gh api "repos/${{ github.repository }}/statuses/${{ steps.meta.outputs.sha }}" \
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" \
             -f state=pending \
             -f context="$STATUS_CONTEXT" \
             -f description='Analysis running' \
-            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 
       # ⚠ A `gate` that dies posts nothing, and nothing is not a pass — the PR
       # sits on `Expected` with no way to read why. The reachable death is the
@@ -209,18 +213,23 @@ jobs:
         if: failure()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          gh api "repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_sha }}" \
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$HEAD_SHA" \
             -f state=failure \
             -f context="$STATUS_CONTEXT" \
             -f description='Could not read which commit to analyse' \
-            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 
   sonar:
     name: Sonar (trusted)
     needs: gate
     if: needs.gate.outputs.analyse == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      statuses: write
     steps:
       # ── The PR's tree, as DATA. Nothing here is executed.
       - name: Checkout PR head
@@ -298,22 +307,26 @@ jobs:
         id: scope
         run: node .trusted/scripts/check-coverage-scope.mjs --emit >> "$GITHUB_OUTPUT"
 
-      # ⚠ Every value below reaches the scanner's ARGV, and every one of them was
-      # read off the PR's own tree — `packages/<name>/src` from a directory the
-      # PR can name, `projectVersion` from a file it can write. A space in either
-      # splits into a second argument, and a `-Dsonar.host.url` arriving that way
-      # would send the analysis, authenticated with `SONAR_TOKEN`, wherever the
-      # PR asked. Refused rather than escaped: a path and a version have no
-      # reason to carry anything outside this set.
+      # ⚠ Every value below reaches the scanner's ARGV, and the PR shapes each
+      # one — `packages/<name>/src` from a directory it can name,
+      # `projectVersion` from a file it can write, the branch by its name. The
+      # action splits `args` at any whitespace, a no-break space included, and
+      # a branch name may hold one, so whitespace in any of them makes a second
+      # argument: a `-Dsonar.host.url` arriving that way would send the
+      # analysis, authenticated with `SONAR_TOKEN`, wherever the PR asked, and a
+      # `-Dsonar.qualitygate.wait=false` would pass the gate whatever it found.
+      # Refused rather than escaped: a path, a version and a branch name have
+      # no reason to carry anything outside this set.
       - name: Refuse scanner arguments the PR could have shaped
         env:
           VERSION: ${{ steps.version.outputs.version }}
           SOURCES: ${{ steps.scope.outputs.sources }}
           TESTS: ${{ steps.scope.outputs.tests }}
           REPORTS: ${{ steps.scope.outputs.reports }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
           set -euo pipefail
-          for value in "$VERSION" "$SOURCES" "$TESTS" "$REPORTS"; do
+          for value in "$VERSION" "$SOURCES" "$TESTS" "$REPORTS" "$BRANCH"; do
             if [[ ! "$value" =~ ^[A-Za-z0-9._,/+-]+$ ]]; then
               echo "::error::scanner argument carries an unexpected character: $value"
               exit 1
@@ -349,9 +362,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           STATE: ${{ job.status == 'success' && 'success' || 'failure' }}
+          SHA: ${{ needs.gate.outputs.sha }}
         run: |
-          gh api "repos/${{ github.repository }}/statuses/${{ needs.gate.outputs.sha }}" \
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" \
             -f state="$STATE" \
             -f context="$STATUS_CONTEXT" \
             -f description="Quality gate: $STATE" \
-            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

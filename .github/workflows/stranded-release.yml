@@ -35,6 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          persist-credentials: false
           # ⚠ Tags are half the evidence — the guard refuses to run without
           # them rather than reporting every published version as untagged.
           fetch-depth: 0

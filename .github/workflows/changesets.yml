@@ -43,11 +43,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
-permissions:
-  contents: write
-  pull-requests: write
-  id-token: write # Required for OIDC Trusted Publishing (npm registry; GitHub
-  # Packages is not used, so no `packages: write` — Releases ride on contents:write)
+# Each job names its permissions.
+permissions: {}
 
 # Turbo Remote Cache
 # Self-hosted ducktors/turborepo-remote-cache on Cloud Run + Cloudflare R2
@@ -60,6 +57,11 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write # Required for OIDC Trusted Publishing (npm registry; GitHub
+      # Packages is not used, so no `packages: write` — Releases ride on contents:write)
     # A hung step (e.g. a stalled npm/OIDC exchange) would otherwise hold the
     # job for the 6h default — and with concurrency cancel-in-progress: false
     # it also blocks every queued release behind it. The job ran 29-92 s in the
@@ -90,7 +92,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6.1.0
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -310,6 +312,7 @@ jobs:
         if: steps.publish.outputs.new_tags != ''
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          NEW_TAGS: ${{ steps.publish.outputs.new_tags }}
           HUSKY: 0
         run: |
           # Push to a one-shot authenticated URL instead of `git remote set-url`:
@@ -317,7 +320,7 @@ jobs:
           # plaintext for the rest of the job; passing the URL per-push keeps the
           # token in this step's env only, never persisted to disk. GH_TOKEN is a
           # secret, so Actions masks it in logs.
-          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
           echo "=== Tags after changeset publish ==="
           echo "Total local tags: $(git tag -l | wc -l)"
@@ -337,7 +340,7 @@ jobs:
               echo "⚠️ Tag $tag NOT found locally — changeset publish failed to create it"
               MISSING=$((MISSING + 1))
             fi
-          done <<< "${{ steps.publish.outputs.new_tags }}"
+          done <<< "$NEW_TAGS"
 
           echo "=== Result: pushed=$PUSHED, missing=$MISSING ==="
 
@@ -354,7 +357,7 @@ jobs:
                 git push "$REMOTE" "refs/tags/$tag:refs/tags/$tag"
                 PUSHED=$((PUSHED + 1))
               fi
-            done <<< "${{ steps.publish.outputs.new_tags }}"
+            done <<< "$NEW_TAGS"
             echo "=== After fallback: pushed=$PUSHED ==="
           fi
 

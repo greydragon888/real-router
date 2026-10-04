@@ -2231,6 +2231,8 @@ The grouping parens `\( … \)` are **load-bearing**: `find … -path A -o -path
 
 ### pnpm/action-setup
 
+> **Updated (2026-10-04).** The call sites are pinned by the commit `v6.1.0` names, with the tag in a comment beside it ("Workflows pin third-party actions by commit, keep expressions out of `run:`, and leave no token behind").
+
 Every call site is pinned to `pnpm/action-setup@v6.1.0` and passes no `version` input: v5 introduced auto-detection from the `packageManager` field in root `package.json`, and v6 preserved it. ⚠ The call sites are deliberately not enumerated here — `grep -rn 'pnpm/action-setup' .github/` owns that list, and the copy this line used to carry had gone stale in both directions (it named `codeql.yml`, which has none, and missed the composite action in `.github/actions/setup/`).
 
 ⚠ **The exact minor is the point, not tidiness.** pnpm 12 support landed in v6.1.0, and upstream has not moved the floating `v6` tag to it — dereferenced to commits, `v6` still resolves to v6.0.10's. So "bumping `packageManager` is enough" holds only within a pnpm major: across one, a `@v6` call site installs a launcher that cannot bootstrap the new pin, and every job fails at its setup step. v6.1.0 leaves the v11-and-earlier bootstrap path unchanged, so it costs nothing before that day.
@@ -4117,6 +4119,8 @@ mdfind -onlyin ./node_modules "kMDItemFSName == '*.ts'" | wc -l
 ## Supply-Chain Security
 
 ### GitHub Actions Pinned by SHA
+
+> **Updated (2026-10-04).** `pnpm/action-setup` and `CodSpeedHQ/action` stood on tags against this rule and are pinned by commit now. The table below is a snapshot; `grep -rn "uses:" .github` gives today's pins ("Workflows pin third-party actions by commit, keep expressions out of `run:`, and leave no token behind").
 
 Third-party (non-GitHub) actions are pinned to commit SHAs instead of mutable tags. GitHub-official actions (`actions/checkout`, `actions/setup-node`, etc.) use mutable version tags since GitHub's own actions are considered trusted.
 
@@ -8329,6 +8333,8 @@ The deck already renders every scenario the REPORTs did, from the same `results/
 
 ## Release-path meta-tests: the runner and `id-token` are load-bearing and unguarded (#1596, 2026-07-30)
 
+> **Updated (2026-10-04).** `id-token: write` sits in the release job's own permissions now, and the test reads the job's effective permissions ("Workflows pin third-party actions by commit, keep expressions out of `run:`, and leave no token behind").
+
 **Problem.** Two properties of `changesets.yml` are required for OIDC publishing to work at all, and breaking either fails _nothing_ until a release is mid-flight on master. (1) npm trusted publishing supports **GitHub-hosted runners only** — and this repo has four `runs-on: self-hosted` jobs (`codspeed` × 2 — `core` and `adapters` — `examples`, `cross-router-bench`) one copy-paste away from the release job, which would then fail the OIDC exchange while the `cancel-in-progress: false` concurrency group holds every queued release behind it. (2) `id-token: write` in the workflow's permissions — an obvious casualty of a future "tighten permissions" pass. Nothing asserted either.
 
 **Solution.** `scripts/release-workflow.test.mjs`, picked up by the existing `node --test scripts/*.test.mjs` step in `ci.yml`. Same shape as `ci-gate-completeness.test.mjs` (the #1127-class guard it is modelled on): single-purpose regex extractors rather than a YAML library, fail-closed, with **fixture-level mutation tests first** — self-hosted runner, a custom runner label (not just the literal `self-hosted`), a dropped `id-token: write`, and a renamed release job each proven to fail the check — so a green run against the healthy file means something. The file also unit-tests `classify()` from `unpublished-packages.mjs`, including the specific regression that motivated it (`classify(v, null) !== classify(v, "0.0.0")`).
@@ -10028,6 +10034,8 @@ CodSpeed bundles and all six configs build on vite 8, but building is not the sa
 scoring the same. A re-baseline on a quiet machine is outstanding.
 
 ## A required check a fork PR cannot pass, and the two GitHub facts that shape the fix (2026-09-10)
+
+> **Updated (2026-10-04).** The refused values are five: the branch name, which reaches the same command line as `-Dsonar.pullrequest.branch`, joins the four below ("Workflows pin third-party actions by commit, keep expressions out of `run:`, and leave no token behind").
 
 **Problem.** `SonarCloud` is a required check in the `protect-master` ruleset and
 lives in exactly one place — `ci.yml`, whose only trigger is `pull_request`. A
@@ -13582,3 +13590,35 @@ On CI, after the push: PR #2660, of Markdown alone, ran all 13 checks of the `ci
 **Why delete rather than generate.** RFC-3 first meant to generate the components from the package walk. A generated list that the owner does not read still costs a mechanism and its tests, so the owner chose to delete it.
 
 **Verified.** `pnpm lint:coverage-scope` and `check-coverage-scope.test.mjs` pass, and the test's control runs on a tree without `codecov.yml`, so a script that still read the file would fail it. `codecov.io/validate` accepts the file. Before this commit Codecov's API listed 25 components for the master report of `60b0fa523`, with project coverage at 99.58 % over 375 files. The master report of `9ede09e08` lists none (`components/?sha=` returns `[]`), with the same project coverage: 99.58 % over 375 files and 10,628 lines. No package code changed in between, and Post-Merge took all 121 tasks from cache.
+
+## Workflows pin third-party actions by commit, keep expressions out of `run:`, and leave no token behind (2026-10-04)
+
+**Problem.** zizmor 1.30.1, a security linter for GitHub Actions, run once offline over `.github/` in its default persona, reported 193 findings. Most were the repository's own policy or deliberate design. These were not:
+
+- The rule of "GitHub Actions Pinned by SHA" — a third-party action is pinned by commit — was broken at eight sites: `pnpm/action-setup@v6.1.0` at six and `CodSpeedHQ/action@v5.2.1` at two. Their owners can move those tags.
+- Five `${{ }}` expansions sat inside `run:` scripts: `github.base_ref` in `changeset-check.yml`, `github.event.workflow_run.head_sha` in `sonar-trusted.yml`, and the inputs of the `setup` action in its install step. None carries text a pull request controls today, but an expansion inside a script becomes part of its code.
+- `dependabot-dedupe.yml` admitted its job on `github.actor == 'dependabot[bot]'`. The actor is whoever triggered the run, not who opened the pull request.
+- `sonar-trusted.yml` granted `statuses: write` to the whole workflow instead of to its jobs. In its pedantic persona zizmor names `changesets.yml` and `danger.yml` too; each has one job, so there the grant moves without changing what any job holds, and a job added later inherits nothing.
+- 34 checkouts left the job's token configured for git for every later step — `actions/checkout` keeps it in a file under `$RUNNER_TEMP` that `.git/config` includes — though none of those jobs pushes.
+
+zizmor did not report one more: `sonar-trusted.yml` holds four scanner arguments a fork can shape to a set of characters, but not the fifth, the branch name, which reaches the same command line through `-Dsonar.pullrequest.branch`. The scan action splits its `args` at any whitespace (`string-argv` 0.3.2), a no-break space included, and git accepts that character in a branch name. So a fork branch named `fix`, U+00A0, `-Dsonar.qualitygate.wait=false` reached the scanner with that last part as an argument of its own, and the required check passed whatever the quality gate found.
+
+**Solution.**
+
+- Both actions are pinned by the commit their tag names, with the tag in a comment beside it, as the other third-party actions are.
+- The five, and six informational ones beside them — four in `sonar-trusted.yml`, two in the step of `changesets.yml` that holds the PAT — reach their scripts through `env:`. GitHub's own values come from its default variables: `GITHUB_REPOSITORY`, `GITHUB_SERVER_URL`, `GITHUB_RUN_ID`.
+- The dedupe job asks `github.event.pull_request.user.login`, and keeps `github.actor` beside it: the author is what admits the job, and the actor keeps it to runs Dependabot started, the only ones that get the Dependabot secret its push needs. So the rerun its own push starts, and a human's push to the branch, still skip it, as `lint:dedupe`'s skip in `ci.yml` expects.
+- The three workflows grant nothing (`permissions: {}`), and each job names what it uses. `release-workflow.test.mjs` reads the release job's effective permissions: its own block, which replaces the workflow's, or the workflow's when it has none.
+- `persist-credentials: false` on every checkout but the dedupe job's, whose push uses the persisted token. Seven jobs then fetched `master` for Turbo's comparison, anonymously; their checkouts already hold `origin/master` (`fetch-depth: 0`), so `git branch -f master origin/master` replaces the fetch, without the network.
+- The branch name joins the refused-character check of the scanner arguments. A fork branch with a character outside the set fails its Sonar check, with the value in the log.
+
+**What stays.** zizmor's other findings are deliberate:
+
+- 94 references to GitHub's own actions by version tag, which the pinning rule allows;
+- 11 informational expansions of values that GitHub or this repository's own steps produce: in `changesets.yml`, outputs of its own steps in its summary and `::error::` lines; in `ci.yml`, the outputs of `check` that the gate's script reads, which `ci-gate-completeness.test.mjs` executes;
+- three `workflow_run` triggers: two start only from Post-Merge Build on master, and the third is the fork path, which runs base-repository code only;
+- one write to `$GITHUB_ENV` in `changesets.yml`: the tags this job made GitHub Releases for, on master;
+- one checkout that keeps its credentials, the dedupe job's, and the actor half of its condition;
+- 24 local actions referenced as `./`. GitHub's `$/`, which reads an action of the same repository from the commit instead of the working directory, waits for actionlint: 1.7.12, its latest release, refuses it.
+
+**Measured.** After the change, the same run reports 139 findings, and the deliberate ones above are all of them but four: the Dependabot entries keep its default three-day cooldown, where zizmor asks for seven. The same run online, with a token, finds no impostor commit, version mismatch or known-vulnerable action; a control that pins `pnpm/action-setup` to a SHA the repository does not hold gets both an `impostor-commit` and a `ref-version-mismatch`. `actionlint` and all of `scripts/tests` pass.

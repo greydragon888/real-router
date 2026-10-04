@@ -17,9 +17,10 @@
 //    it as well, because `changesets.yml` starts on `workflow_run`; this file
 //    holds the rule for any trigger.
 //
-// 2. `id-token: write` must stay in the workflow's permissions. Removing it
-//    (e.g. while tightening permissions) breaks OIDC publishing exactly as
-//    thoroughly, and just as invisibly.
+// 2. `id-token: write` must stay in the release job's permissions: its own
+//    `permissions:` block, or the workflow's when the job declares none.
+//    Removing it (e.g. while tightening permissions) breaks OIDC publishing
+//    exactly as thoroughly, and just as invisibly.
 //
 // Stdlib node:test/node:assert only (Node 24) — scripts/ is not a vitest
 // workspace. Deliberately NOT a YAML library, matching ci-gate-completeness:
@@ -71,22 +72,44 @@ export function parseRunsOn(yaml, jobId) {
 }
 
 /**
- * Extract the top-level `permissions:` keys granted `write`.
+ * The keys of the `permissions:` block opened at `lines[at]` granted `write`,
+ * their indent being `indent`. A scalar on the key's line (`{}`,
+ * `write-all`) grants nothing here, so a check on it fails closed.
  *
- * @param {string} yaml
+ * @param {string[]} lines
+ * @param {number} at
+ * @param {number} indent
  * @returns {string[]}
  */
-export function parseWritePermissions(yaml) {
-  const lines = yaml.split("\n");
-  const start = lines.findIndex((l) => /^permissions:\s*(#.*)?$/.test(l));
-  if (start === -1) return [];
+function writeKeys(lines, at, indent) {
   const granted = [];
-  for (const line of lines.slice(start + 1)) {
-    if (/^[^\s#]/.test(line)) break; // next top-level section
-    const m = /^ {2}([a-z-]+):\s*write\b/.exec(line);
+  for (const line of lines.slice(at + 1)) {
+    const text = line.trimStart();
+    if (text === "" || text.startsWith("#")) continue;
+    if (line.length - text.length < indent) break; // the block ended
+    const m = new RegExp(`^ {${indent}}([a-z-]+):\\s*write\\b`).exec(line);
     if (m) granted.push(m[1]);
   }
   return granted;
+}
+
+/**
+ * The permissions a job is granted `write`: its own `permissions:` block,
+ * which replaces the workflow's whole, or the workflow's when it has none.
+ *
+ * @param {string} yaml
+ * @param {string} jobId
+ * @returns {string[]}
+ */
+export function parseWritePermissions(yaml, jobId) {
+  const lines = yaml.split("\n");
+  const job = lines.findIndex((l) => l.startsWith(`  ${jobId}:`));
+  for (let i = job + 1; job !== -1 && i < lines.length; i++) {
+    if (/^ {2}[A-Za-z_][\w-]*:/.test(lines[i])) break; // next job
+    if (/^ {4}permissions:/.test(lines[i])) return writeKeys(lines, i, 6);
+  }
+  const top = lines.findIndex((l) => /^permissions:/.test(l));
+  return top === -1 ? [] : writeKeys(lines, top, 2);
 }
 
 // --------------------------------------------------------------------------
@@ -96,21 +119,34 @@ export function parseWritePermissions(yaml) {
 // --------------------------------------------------------------------------
 
 const FIXTURE = `name: Changesets
-permissions:
-  contents: write
-  pull-requests: write
-  id-token: write # for OIDC
+permissions: {}
 jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # a comment inside the block, at the job's indent
+
+      pull-requests: write
+      id-token: write # for OIDC
     timeout-minutes: 30
+    steps:
+      - run: echo write: not a permission
+  other:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
 `;
 
 test("fixture: healthy workflow passes both invariants", () => {
   assert.equal(parseRunsOn(FIXTURE, RELEASE_JOB), "ubuntu-latest");
   assert.match(parseRunsOn(FIXTURE, RELEASE_JOB), HOSTED);
-  assert.ok(parseWritePermissions(FIXTURE).includes("id-token"));
+  assert.deepEqual(parseWritePermissions(FIXTURE, RELEASE_JOB), [
+    "contents",
+    "pull-requests",
+    "id-token",
+  ]);
 });
 
 test("fixture: release job moved to a self-hosted runner is caught", () => {
@@ -130,8 +166,51 @@ test("fixture: a custom runner label is caught too (not just the literal 'self-h
 });
 
 test("fixture: dropping id-token: write is caught", () => {
-  const mutated = FIXTURE.replace("  id-token: write # for OIDC\n", "");
-  assert.ok(!parseWritePermissions(mutated).includes("id-token"));
+  const mutated = FIXTURE.replace("      id-token: write # for OIDC\n", "");
+  assert.ok(!parseWritePermissions(mutated, RELEASE_JOB).includes("id-token"));
+});
+
+test("fixture: the workflow's grant does not count for a job with its own block", () => {
+  const mutated = FIXTURE.replace(
+    "permissions: {}\n",
+    "permissions:\n  id-token: write\n",
+  ).replace("      id-token: write # for OIDC\n", "");
+  assert.ok(!parseWritePermissions(mutated, RELEASE_JOB).includes("id-token"));
+});
+
+test("fixture: a job without its own block takes the workflow's", () => {
+  const mutated = FIXTURE.replace(
+    "permissions: {}\n",
+    "permissions:\n  id-token: write\n",
+  ).replace(/    permissions:\n(?:(?: {4}#.*| {6}.*|)\n)+?(?= {4}timeout)/, "");
+  assert.deepEqual(parseWritePermissions(mutated, RELEASE_JOB), ["id-token"]);
+});
+
+test("fixture: a later job's grant does not leak into the release job's block", () => {
+  const mutated = FIXTURE.replace("      id-token: write # for OIDC\n", "");
+  assert.deepEqual(parseWritePermissions(mutated, RELEASE_JOB), [
+    "contents",
+    "pull-requests",
+  ]);
+});
+
+test("fixture: a later job's block does not stand in for a release job without one", () => {
+  const mutated = FIXTURE.replace(
+    /    permissions:\n(?:(?: {4}#.*| {6}.*|)\n)+?(?= {4}timeout)/,
+    "",
+  );
+  assert.deepEqual(parseWritePermissions(mutated, RELEASE_JOB), []);
+});
+
+test("fixture: a scalar grant such as write-all fails closed", () => {
+  const mutated = FIXTURE.replace(
+    "permissions: {}\n",
+    "permissions:\n  id-token: write\n",
+  ).replace(
+    /    permissions:\n(?:(?: {4}#.*| {6}.*|)\n)+?(?= {4}timeout)/,
+    "    permissions: write-all\n",
+  );
+  assert.deepEqual(parseWritePermissions(mutated, RELEASE_JOB), []);
 });
 
 test("fixture: a renamed release job is caught (parser fails closed)", () => {
@@ -165,8 +244,8 @@ test("changesets.yml: the release job runs on a GitHub-hosted runner", () => {
 
 test("changesets.yml: id-token: write is still granted (OIDC publishing)", () => {
   assert.ok(
-    parseWritePermissions(real).includes("id-token"),
-    "id-token: write is missing from changesets.yml permissions — OIDC " +
+    parseWritePermissions(real, RELEASE_JOB).includes("id-token"),
+    "id-token: write is missing from the release job's permissions — OIDC " +
       "trusted publishing cannot mint a token without it, and every publish " +
       "would fall back to (nonexistent) token auth.",
   );

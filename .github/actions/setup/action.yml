@@ -37,7 +37,7 @@ runs:
       # pnpm 12 pin, and the failure would surface on the setup step of every job
       # the day `packageManager` moves. v6.1.0 keeps the v11-and-earlier bootstrap
       # path unchanged, so it is a no-op until then. Dependabot bumps it from here.
-      uses: pnpm/action-setup@v6.1.0
+      uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
     - name: Setup Node.js
       # Kept in lockstep with the workflows' pin by hand until 2026-08-01: this
@@ -94,6 +94,8 @@ runs:
     - name: Install dependencies
       shell: bash
       working-directory: ${{ inputs.working-directory }}
+      env:
+        INSTALL_ARGS: ${{ inputs.install-args }}
       # Unquoted on purpose: install-args may carry multiple flags that must
       # word-split (e.g. `--frozen-lockfile --ignore-scripts`).
-      run: pnpm install ${{ inputs.install-args }}
+      run: pnpm install $INSTALL_ARGS
