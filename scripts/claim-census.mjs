@@ -24,7 +24,11 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { claimHashes, claimParagraphs, isMarkdown } from "./claim-paragraphs.mjs";
+import {
+  claimHashes,
+  claimParagraphs,
+  isMarkdown,
+} from "./lib/claim-paragraphs.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const LEDGER = join(

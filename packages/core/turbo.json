@@ -20,7 +20,6 @@
         "src/**/*.ts",
         "tests/**/*.ts",
         "../../scripts/lib/**",
-        "../../scripts/*.d.mts",
         "tsconfig.json",
         "!$TURBO_ROOT$/eslint.config.*",
         "!$TURBO_ROOT$/prettier.config.*",

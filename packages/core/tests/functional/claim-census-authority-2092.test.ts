@@ -8,7 +8,7 @@ import {
   claimHashes,
   claimParagraphs,
   isMarkdown,
-} from "../../../../scripts/claim-paragraphs.mjs";
+} from "../../../../scripts/lib/claim-paragraphs.mjs";
 
 /**
  * The census ledger for #2092 — which `⚠`/`⚑` claims have been READ, and a
