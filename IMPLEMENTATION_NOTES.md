@@ -13073,6 +13073,8 @@ A Dependabot run and a human one land on the same `pr` series: no label tells th
 
 ## The trusted Sonar job ran code from the fork's tree (2026-09-29)
 
+> **Updated (2026-10-04).** The boundary test also holds every module of the closure to `node:` and relative specifiers, and `scripts/repo-model.mjs` joins the sparse checkout: "The package walk is one module, `scripts/repo-model.mjs`".
+
 **Problem.** `sonar-trusted.yml` holds `statuses: write` and gives `SONAR_TOKEN` to its scan step, over a fork's tree checked out as data. Two of its steps executed that tree:
 
 - The job copied `scripts/check-coverage-scope.mjs` from `master`, but the script imports `./coverage-owner.mjs`, and that module stayed the fork's copy. The import dates from `44f11bb63` (2026-08-26), the workflow from `93c73f51f` (#1868, 2026-09-10).
@@ -13521,3 +13523,22 @@ On CI, after the push: PR #2660, of Markdown alone, ran all 13 checks of the `ci
 **Why a guard, not a narrower input.** The inputs could name each module a package loads. A module a package test starts to import would then stay out of the key until someone added it, and turbo would replay the old result without a word; the guard fails at that commit. Keeping `claim-paragraphs.mjs` in `scripts/lib/` has a price: an edit to it re-keys every task that names the directory, and the module has had two commits.
 
 **Measured.** The guard fails on the tree before the moves, naming `git-env.mjs` and `refused-characters.mjs`, and passes after them. Each of its sixteen mutants fails a cell, and each defect planted back into the tree fails it: `git-env.mjs` back in `scripts/lib/`; a test of core that is no registered scan importing `scripts/claim-paragraphs.mjs`; core's build script importing from `scripts/lib/`; and, without the scan's registration, the computed load of `repo-scan-authority-2241`. After the moves, an edit to `scripts/lib/claim-paragraphs.mjs` changes the keys of `core#test` and `core#type-check:tests`. Moving `refused-characters.mjs` alone would have returned all 156 task keys of the build to those of `7d0b5477f`, which the remote cache holds; with the other moves every one of them changes, so the next build runs every task once. Moving `git-env.mjs` at its next edit would have cost nothing extra, and the owner chose to move it now.
+
+## The package walk is one module, `scripts/repo-model.mjs` (2026-10-04)
+
+**Problem.** Which directories under `packages/` are packages, and for each whether it is public, has tests, its own vitest config, a real `src/`, a coverage threshold below 100 and an lcov report, was answered by top-level code of `check-coverage-scope.mjs`. The next steps of RFC-3 derive Sonar's coverage exclusions and check the `workspace:^` entries from the same answers, in other scripts, and a second walk would be a second answer to the same questions.
+
+**Solution.**
+
+- `scripts/repo-model.mjs` exports `packages(root)`: one record per directory under `<root>/packages` that holds a `package.json`, sorted by name, with `name`, `dir`, `public`, `hasTests`, `hasVitestConfig`, `hasRealSrc`, `isPhantom` and `hasLcov`. The root has no default, since a wrong one would shrink the list without a word, and a tree without `packages/` throws instead of returning an empty list. `check-coverage-scope.mjs` reads its records.
+- The module is in `scripts/`, because no task loads it (the previous entry).
+- The fork path of the SonarCloud check runs `check-coverage-scope.mjs` from `.trusted/`, so the module joins that sparse checkout. `sonar-trusted-boundary.test.mjs` now also holds every module of that closure to relative specifiers and three built-ins, `node:fs`, `node:path` and `node:url`. It refuses a bare or `#` specifier, an absolute path and a `file:` URL, any other built-in, and `import()` with a non-literal argument, `require`, `createRequire`, `eval`, `Function` and a module the parser cannot read. The modules are read with the TypeScript parser, which also gives the closure its relative imports, so a specifier in a comment or a string is no load.
+
+**Why only relative paths and three built-ins.** The fork path runs base-repository code in a working directory that holds the pull request's tree. A bare name that is no built-in resolves in that tree's `node_modules`: `fs` is a built-in either way, but `test` is one only as `node:test`. A `#` name resolves through the `imports` of the tree's `package.json`, and an absolute path or a `file:` URL can point anywhere. A built-in that starts or loads code, such as `child_process`, `worker_threads`, `module` or `vm`, does it from the working directory: a `Worker` given `./w.mjs` from a script in `.trusted/scripts/` ran the tree's `w.mjs`. `eval` and `Function` can build a load the parser does not see. The three built-ins only read files and paths, and they are all the closure needs.
+
+**Measured.**
+
+- `pnpm lint:coverage-scope` and `node scripts/check-coverage-scope.mjs --emit` print the same stdout and stderr, byte for byte, before and after, with all 23 `coverage/lcov.info` present.
+- Without the sparse entry the boundary test fails, naming `scripts/repo-model.mjs`; with it, the test passes.
+- Each of the sixteen refused forms, planted in the deepest module of the fixture closure, fails the test with its one line.
+- 32 of 33 mutants of the module, of the scope script's reading of it and of the boundary test fail a cell. The one that survives drops `.sort()`: Node's `readdirSync` already returns names in byte order, on APFS, overlayfs and tmpfs alike, so the sort keeps the order the walk promises without leaning on that.

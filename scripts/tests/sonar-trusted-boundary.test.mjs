@@ -8,16 +8,28 @@
 // data. A step that executes the fork's code can reach both through
 // `$GITHUB_ENV` and `$GITHUB_PATH`. The job therefore runs trusted scripts IN
 // PLACE from `.trusted/`, a sparse checkout of `master`, where their imports
-// resolve too, and reads the fork's files as text.
+// resolve too, and reads the fork's files as text. Any other specifier can
+// resolve in the fork's tree instead: a bare name that is no built-in from its
+// `node_modules` (`test` is a built-in only as `node:test`), a `#` name from the
+// `imports` of its `package.json`, an absolute path or a `file:` URL from
+// anywhere. A built-in that starts or loads code — `child_process`,
+// `worker_threads`, `module`, `vm` — would start it from the working
+// directory, which is the fork's tree. So the closure loads by relative path,
+// and of the built-ins only those in `BUILTINS`; `eval` and `Function`, which
+// can build a load this reader does not see, are refused as well.
 //
-// Stdlib only and no YAML library, like the other workflow tests here: the
-// extractors are single-purpose and fail on a shape they cannot read.
+// The workflow is read with stdlib extractors and no YAML library, like the
+// other workflow tests here: single-purpose, failing on a shape they cannot
+// read. The modules are read with the TypeScript parser, so a specifier in a
+// comment or a string is not a load.
 
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, posix } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+
+import ts from "typescript";
 
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const WORKFLOW = join(repoRoot, ".github", "workflows", "sonar-trusted.yml");
@@ -104,23 +116,59 @@ export function runCommands(body) {
   return commands.filter((command) => !command.startsWith("#"));
 }
 
+/** The built-ins the closure may load: none of them starts or loads code. */
+const BUILTINS = new Set(["node:fs", "node:path", "node:url"]);
+
+/** A relative specifier: the closure follows it. */
+const RELATIVE = /^\.{1,2}\//;
+
+/** Names whose use loads code this reader cannot follow. */
+const REFUSED_NAMES = new Set(["require", "createRequire", "eval", "Function"]);
+
 /**
- * Relative module specifiers a source imports, re-exports or requires.
+ * What a module loads: the specifier of every static import, re-export and
+ * `import()` with a literal argument, and the loads read no further —
+ * `import()` with any other argument, `require`, `createRequire`, `eval`,
+ * `Function`, and a source that does not parse.
  *
  * @param {string} source
- * @returns {string[]}
+ * @returns {{ specifiers: string[], refused: string[] }}
  */
-export function relativeSpecifiers(source) {
-  const found = new Set();
-  const patterns = [
-    /\b(?:import|export)\s[^"'`;]*?\bfrom\s*["'](\.{1,2}\/[^"']+)["']/g,
-    /\bimport\s*["'](\.{1,2}\/[^"']+)["']/g,
-    /\b(?:import|require)\s*\(\s*["'](\.{1,2}\/[^"']+)["']\s*\)/g,
-  ];
-  for (const pattern of patterns) {
-    for (const match of source.matchAll(pattern)) found.add(match[1]);
-  }
-  return [...found];
+export function moduleLoads(source) {
+  const file = ts.createSourceFile(
+    "module.mjs",
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.JS,
+  );
+  const specifiers = new Set();
+  const refused = new Set();
+  if (file.parseDiagnostics.length > 0) refused.add("syntax it cannot parse");
+
+  const visit = (node) => {
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+      if (node.moduleSpecifier !== undefined) {
+        specifiers.add(node.moduleSpecifier.text);
+      }
+    } else if (
+      ts.isCallExpression(node) &&
+      node.expression.kind === ts.SyntaxKind.ImportKeyword
+    ) {
+      const [argument] = node.arguments;
+      if (argument !== undefined && ts.isStringLiteralLike(argument)) {
+        specifiers.add(argument.text);
+      } else {
+        refused.add("import() with a non-literal argument");
+      }
+    } else if (ts.isIdentifier(node) && REFUSED_NAMES.has(node.text)) {
+      refused.add(node.text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+
+  return { specifiers: [...specifiers], refused: [...refused] };
 }
 
 /**
@@ -143,7 +191,8 @@ export function importClosure(entries, read) {
       continue;
     }
     seen.add(file);
-    for (const specifier of relativeSpecifiers(text)) {
+    for (const specifier of moduleLoads(text).specifiers) {
+      if (!RELATIVE.test(specifier)) continue;
       queue.push(posix.normalize(posix.join(posix.dirname(file), specifier)));
     }
   }
@@ -208,6 +257,20 @@ export function findViolations(yaml, read) {
     }
   }
 
+  // ...and none of them may load a module from anywhere but there.
+  for (const file of closure) {
+    const { specifiers, refused } = moduleLoads(read(file));
+    for (const specifier of specifiers) {
+      if (RELATIVE.test(specifier) || BUILTINS.has(specifier)) continue;
+      violations.push(
+        specifier.startsWith("node:")
+          ? `${file} loads "${specifier}" — of the built-ins only ${[...BUILTINS].join(", ")} are allowed here: one that starts or loads code would start it from the working directory, the PR's tree`
+          : `${file} loads "${specifier}" — only a relative specifier or ${[...BUILTINS].join(", ")} is allowed here: any other can resolve in the PR's tree`,
+      );
+    }
+    for (const load of refused) violations.push(`${file} uses ${load}`);
+  }
+
   // A `.trusted/` the fork's tree carries must be gone before the checkout.
   const clearAt = body.search(
     new RegExp(`\\brm -rf ${TRUSTED.replace(".", "\\.")}\\b`),
@@ -240,7 +303,8 @@ test("the trusted Sonar job runs base-repository code only", () => {
 const FIXTURE_FILES = {
   "scripts/scope.mjs": 'import { owner } from "./owner.mjs";\n',
   "scripts/owner.mjs": 'export { deep } from "./deep/leaf.mjs";\n',
-  "scripts/deep/leaf.mjs": "export const deep = 1;\n",
+  "scripts/deep/leaf.mjs":
+    'import { join } from "node:path";\nexport const deep = join("a");\n',
 };
 const readFixture = (path) => FIXTURE_FILES[path];
 
@@ -319,19 +383,111 @@ test("fixture: a missing clear step is refused", () => {
   );
 });
 
-test("relativeSpecifiers reads every import form the scripts use", () => {
+// Each way a module in the closure could load code from outside `.trusted/`,
+// planted in the deepest module of the sound fixture, and the one line that
+// names it.
+const OUTSIDE_LOADS = {
+  "a bare specifier": [
+    'import YAML from "yaml";',
+    'loads "yaml" — only a relative specifier or node:fs, node:path, node:url is allowed here: any other can resolve in the PR\'s tree',
+  ],
+  "a built-in without node:": [
+    'import { readFileSync } from "fs";',
+    'loads "fs" — only a relative specifier or node:fs, node:path, node:url is allowed here: any other can resolve in the PR\'s tree',
+  ],
+  "a # specifier": [
+    'import { x } from "#lib/x.mjs";',
+    'loads "#lib/x.mjs" — only a relative specifier or node:fs, node:path, node:url is allowed here: any other can resolve in the PR\'s tree',
+  ],
+  "an absolute path": [
+    'import { x } from "/home/runner/work/x.mjs";',
+    'loads "/home/runner/work/x.mjs" — only a relative specifier or node:fs, node:path, node:url is allowed here: any other can resolve in the PR\'s tree',
+  ],
+  "a file: URL": [
+    'import { x } from "file:///home/runner/work/x.mjs";',
+    'loads "file:///home/runner/work/x.mjs" — only a relative specifier or node:fs, node:path, node:url is allowed here: any other can resolve in the PR\'s tree',
+  ],
+  "a bare side-effect import": [
+    'import "pkg";',
+    'loads "pkg" — only a relative specifier or node:fs, node:path, node:url is allowed here: any other can resolve in the PR\'s tree',
+  ],
+  "a bare re-export": [
+    'export * from "pkg";',
+    'loads "pkg" — only a relative specifier or node:fs, node:path, node:url is allowed here: any other can resolve in the PR\'s tree',
+  ],
+  "import() of a bare specifier": [
+    'await import("pkg");',
+    'loads "pkg" — only a relative specifier or node:fs, node:path, node:url is allowed here: any other can resolve in the PR\'s tree',
+  ],
+  "import() with a non-literal argument": [
+    'const name = "./leaf.mjs";\nawait import(name);',
+    "uses import() with a non-literal argument",
+  ],
+  require: ['const x = require("./x.cjs");', "uses require"],
+  createRequire: [
+    "const load = createRequire(import.meta.url);",
+    "uses createRequire",
+  ],
+  "a built-in that starts code, node:child_process": [
+    'import { spawnSync } from "node:child_process";',
+    'loads "node:child_process" — of the built-ins only node:fs, node:path, node:url are allowed here: one that starts or loads code would start it from the working directory, the PR\'s tree',
+  ],
+  "a built-in that loads code, node:worker_threads": [
+    'import { Worker } from "node:worker_threads";',
+    'loads "node:worker_threads" — of the built-ins only node:fs, node:path, node:url are allowed here: one that starts or loads code would start it from the working directory, the PR\'s tree',
+  ],
+  eval: ['eval("1");', "uses eval"],
+  "new Function": ['const f = new Function("return 1");', "uses Function"],
+  "a source that does not parse": [
+    "export const = ;",
+    "uses syntax it cannot parse",
+  ],
+};
+
+for (const [name, [code, line]] of Object.entries(OUTSIDE_LOADS)) {
+  test(`fixture: ${name} in the closure is refused`, () => {
+    const files = {
+      ...FIXTURE_FILES,
+      "scripts/deep/leaf.mjs": `${FIXTURE_FILES["scripts/deep/leaf.mjs"]}${code}\n`,
+    };
+    assert.deepEqual(
+      findViolations(fixture(SOUND), (path) => files[path]),
+      [`scripts/deep/leaf.mjs ${line}`],
+    );
+  });
+}
+
+test("moduleLoads reads every load form, and a comment or a string is no load", () => {
   assert.deepEqual(
-    relativeSpecifiers(
+    moduleLoads(
       [
         'import { a } from "./a.mjs";',
         'import b from "../b.mjs";',
         'import "./side.mjs";',
         'export { c } from "./c.mjs";',
         'const d = await import("./d.mjs");',
-        'const e = require("./e.cjs");',
+        "const t = await import(`./t.mjs`);",
+        'import data from "./data.json" with { type: "json" };',
         'import { f } from "node:fs";',
+        'const e = require("./e.cjs");',
+        '// import { ghost } from "yaml";',
+        '/* await import("pkg"); */',
+        "const text = \"import x from 'pkg'\";",
+        "const meta = import.meta.url;",
       ].join("\n"),
-    ).sort(),
-    ["../b.mjs", "./a.mjs", "./c.mjs", "./d.mjs", "./e.cjs", "./side.mjs"],
+    ),
+    {
+      specifiers: [
+        "./a.mjs",
+        "../b.mjs",
+        "./side.mjs",
+        "./c.mjs",
+        "./d.mjs",
+        "./t.mjs",
+        "./data.json",
+        "node:fs",
+      ],
+      refused: ["require"],
+    },
   );
 });

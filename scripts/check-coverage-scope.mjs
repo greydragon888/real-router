@@ -50,8 +50,9 @@
  *
  * Emit mode (`--emit`, used by ci.yml's coverage job and sonar-trusted.yml):
  *   prints `sources=…`, `tests=…`, `reports=…` lines for `$GITHUB_OUTPUT`,
- *   computed from the same filesystem walk the checks use — the CI scope and
- *   the drift guard cannot disagree by construction. stdout carries only the
+ *   computed from the same package walk the checks use
+ *   (`scripts/repo-model.mjs`) — the CI scope and the drift guard cannot
+ *   disagree by construction. stdout carries only the
  *   key=value lines; all human/diagnostic output goes to stderr.
  */
 
@@ -65,6 +66,7 @@ import {
 import { dirname, join, relative, resolve } from "node:path";
 
 import { declaresSharedOwner } from "./coverage-owner.mjs";
+import * as repoModel from "./repo-model.mjs";
 
 const ROOT = process.cwd();
 const PKG_DIR = join(ROOT, "packages");
@@ -92,39 +94,15 @@ const isRealDir = (p) => {
 const errors = [];
 
 // --- Enumerate scope from the filesystem -------------------------------------
-const packages = readdirSync(PKG_DIR)
-  .filter((name) => existsSync(join(PKG_DIR, name, "package.json")))
-  .sort();
+// The package walk is `scripts/repo-model.mjs`; the checks below read its
+// records by directory name.
+const model = new Map(repoModel.packages(ROOT).map((pkg) => [pkg.name, pkg]));
+const packages = [...model.keys()];
 
-const hasTests = (name) => existsSync(join(PKG_DIR, name, "tests"));
-const hasRealSrc = (name) => isRealDir(join(PKG_DIR, name, "src"));
-
-/** npm-public = not `private: true` in package.json (the same notion smoke,
- * changesets and publint use to decide a package ships). */
-const isPublic = (name) => {
-  try {
-    return (
-      JSON.parse(readFileSync(join(PKG_DIR, name, "package.json"), "utf8"))
-        .private !== true
-    );
-  } catch {
-    return false;
-  }
-};
-
-/** Phantom = a vitest threshold below 100 (compiler-generated phantom code). */
-const isPhantom = (name) => {
-  const cfg = join(PKG_DIR, name, "vitest.config.mts");
-  if (!existsSync(cfg)) return false;
-  const text = readFileSync(cfg, "utf8");
-  // Match `branches: 94`, `functions: 84`, `lines: 99`, `statements: 100`, …
-  const re = /\b(?:branches|functions|lines|statements):\s*(\d+)/g;
-  let m;
-  while ((m = re.exec(text)) !== null) {
-    if (Number(m[1]) < 100) return true;
-  }
-  return false;
-};
+const hasTests = (name) => model.get(name).hasTests;
+const hasRealSrc = (name) => model.get(name).hasRealSrc;
+const isPublic = (name) => model.get(name).public;
+const isPhantom = (name) => model.get(name).isPhantom;
 
 const sharedDirs = existsSync(SHARED_DIR)
   ? readdirSync(SHARED_DIR)
@@ -159,8 +137,8 @@ const sonarTests = coverageProducing.map((p) => `packages/${p}/tests`);
 // in their packages/*/coverage/lcov.info (paths normalized to shared/… in CI) —
 // there is no separate shared/coverage/lcov.info anymore.
 const lcovReports = packages
-  .map((p) => `packages/${p}/coverage/lcov.info`)
-  .filter((p) => existsSync(join(ROOT, p)));
+  .filter((p) => model.get(p).hasLcov)
+  .map((p) => `packages/${p}/coverage/lcov.info`);
 
 // --- Check 1: codecov.yml components ⇔ coverage-producing packages ----------
 const codecov = read("codecov.yml");
@@ -226,7 +204,7 @@ for (const entry of exclusions) {
 }
 
 const ownerConfigs = packages
-  .filter((p) => existsSync(join(PKG_DIR, p, "vitest.config.mts")))
+  .filter((p) => model.get(p).hasVitestConfig)
   .map((p) => ({
     pkg: p,
     text: readFileSync(join(PKG_DIR, p, "vitest.config.mts"), "utf8"),
@@ -312,7 +290,7 @@ for (const dir of sharedDirs) {
 
 // --- Check 3: phantom detection must be able to see every package -----------
 for (const pkg of coverageProducing) {
-  if (!existsSync(join(PKG_DIR, pkg, "vitest.config.mts"))) {
+  if (!model.get(pkg).hasVitestConfig) {
     errors.push(
       `packages/${pkg}: has tests/ but no vitest.config.mts — phantom detection reads only that file (and the scaffold convention requires it)`,
     );

@@ -28,7 +28,10 @@ name: Sonar (trusted)
 # can be a symlink to a `.js` file, and `require` executes it. There is no
 # `pnpm install`, so no lifecycle script from the PR runs, and the scanner parses
 # the source rather than executing it. `scripts/tests/sonar-trusted-boundary.test.mjs`
-# holds the sparse list to the import closure of what the job runs.
+# holds the sparse list to the import closure of what the job runs, and every
+# import in that closure to a relative path or one of three built-ins
+# (`node:fs`, `node:path`, `node:url`): any other can resolve in the PR's tree,
+# or start code from it.
 # `ci.yml`'s own comment names the trap this avoids: a workflow with
 # `pull-requests: write` executing attacker-shaped JS.
 #
@@ -246,6 +249,7 @@ jobs:
             sonar-project.properties
             scripts/check-coverage-scope.mjs
             scripts/coverage-owner.mjs
+            scripts/repo-model.mjs
           sparse-checkout-cone-mode: false
 
       # The scanner reads its config from the working directory, so this one
