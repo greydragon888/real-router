@@ -2252,6 +2252,8 @@ Every call site is pinned to `pnpm/action-setup@v6.1.0` and passes no `version` 
 
 ### Coverage scope is generated, not hardcoded (#732)
 
+> **Updated (2026-10-04).** `codecov.yml` has no components and check 1 is gone; the Codecov upload list is still the `reports=` line of `--emit`: "Codecov has no components".
+
 **Problem.** The external quality gates' scope lived in three hand-maintained lists that were never
 updated as packages were added: Codecov's `files:` in `ci.yml` (16 stale paths, several _private_),
 `codecov.yml` `flags:` (17), and `sonar-project.properties` `sonar.sources` (11). Result: of 25
@@ -2394,6 +2396,8 @@ test set. Coverage is unaffected — it comes from the lcov `reportPaths`, and t
 `sonar.test.exclusions`, so widening it is self-contained.
 
 ### Shared sources are owner-measured at 100% (#809)
+
+> **Updated (2026-10-04).** Check 2b no longer asks for a `codecov.yml` component path per shared dir: "Codecov has no components".
 
 **Problem.** The #732 residual above: `shared/{browser-env,dom-utils,ssr}` code shipped in every
 consumer bundle but was **measured nowhere** — v8 resolves a symlinked `src` to its `shared/`
@@ -7316,6 +7320,8 @@ The `/mutation-score` workflow had the model hand-write a throwaway node script 
 The disable-safety verdict is a **pure structural function** of the report — "does mutator X have a Killed sibling on this line?" — computed exactly the way Stryker's `disable next-line` behaves (mutator-level, column-blind). Automating it removes a class of silent error (losing a kill by suppressing a still-partly-killed mutator) that prose guidance could only warn about. **Critically, the tool flags only STRUCTURAL safety, never equivalence:** DISABLE-SAFE means "you _may_ suppress without losing a kill," not "this is an equivalent." The skill still mandates empirical proof (inject the mutation → full suite green) before any disable, so the tool cannot induce disable-theater — it narrows _where_ to look, the model still proves _whether_. The score formula and the column-aware grouping match the skill verbatim, making the tool a faithful executable of what was previously re-authored ad-hoc each run.
 
 ## Local SonarCloud parity: `scripts/sonar-local.sh` (`pnpm sonar:local`)
+
+> **Updated (2026-10-04).** The drift guard no longer checks `codecov.yml`: "Codecov has no components".
 
 ### Problem
 
@@ -13560,3 +13566,17 @@ On CI, after the push: PR #2660, of Markdown alone, ran all 13 checks of the `ci
 **Why every other marker state is an error.** A region that silently disappears or doubles — a marker lost in a merge, a block pasted twice, a file copied with its markers — would leave `--check` comparing nothing, or the wrong lines, and passing. In a `.properties` file a duplicate key below a region, or a line continuing into its marker, would change what the consumer reads while `--check` passes.
 
 **Measured.** `scripts/tests/sync-config.test.mjs` runs on fixture git work trees with `packages/`. A region rendered from `packages(root)` follows a new package; an edited, deleted or added line inside a region fails `--check`, which writes nothing; `--write` rewrites only the regions, and a second `--write` changes nothing; each marker state, lookalike line and properties case fails the run, with nothing written while another region is out of step. 31 of 32 mutants of the script fail a cell. The survivor writes on `--check`, which returns on a difference before the write and has nothing to write without one.
+
+## Codecov has no components (2026-10-04)
+
+**Problem.** `codecov.yml` listed 25 components: one per package with tests, `browser-env` and `dom-utils` under their own names, and `shared/ssr/**` inside the `ssr-data-plugin` component. Two checks of `check-coverage-scope.mjs` held them to the tree: check 1 asked for a component per package with `tests/` and refused one named after neither such a package nor a shared dir, and check 2b asked for a `shared/<dir>/**` component path per shared dir. Components carry no status and the pull request comment leaves them out, and by the owner's decision of 2026-10-01 the Components tab is not used. So a new package with tests failed `lint:coverage-scope` until it got a component, which fed neither a status nor the comment.
+
+**Solution.**
+
+- `component_management` leaves `codecov.yml`. The comment above it keeps its warning: CI uploads every lcov once and untagged, so a `flags:` section would be inert.
+- Check 1 and the Codecov half of check 2b leave the script, with their cells in `check-coverage-scope.test.mjs`, whose fixture has no `codecov.yml` now. The other checks keep their numbers, which other files cite. The prose that named the Codecov check follows: the `why` of `lint:coverage-scope` in `scripts/checks.mjs`, two comments in `ci.yml`, the comments in `sonar-local.sh` and `fix-lcov-paths.sh`, the script's header and success line, and the root configs that `.claude/commands/audit-rfc.md` says hold package lists. The hint after the drift lines no longer names a file to edit, since each line says what drifted.
+- What Codecov receives does not change. The upload list is the `reports=` line of `--emit`, every `coverage/lcov.info` the run produced, and the project and file coverage need no components.
+
+**Why delete rather than generate.** RFC-3 first meant to generate the components from the package walk. A generated list that the owner does not read still costs a mechanism and its tests, so the owner chose to delete it.
+
+**Verified so far.** `pnpm lint:coverage-scope` and `check-coverage-scope.test.mjs` pass, and the test's control runs on a tree without `codecov.yml`, so a script that still read the file would fail it. `codecov.io/validate` accepts the file. Before this commit Codecov's API listed 25 components for the master report of `60b0fa523`, with project coverage at 99.58 % over 375 files. The first master report after this lands is the end-to-end check: no components, and, if no package code changed in between, the same project coverage.

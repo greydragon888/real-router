@@ -44,7 +44,7 @@ pnpm test
 
 # 1 + 2: projectVersion + analysis scope (mirrors CI "Get version" / "Compute
 # Sonar scope"). --emit prints `sources=…`, `tests=…`, `reports=…` lines — the
-# same source of truth that guards codecov.yml / sonar-project.properties.
+# same source of truth that guards sonar-project.properties.
 echo "📐 resolving version + scope..."
 VERSION="$(node -p 'require("./packages/core/package.json").version')"
 SCOPE="$(node scripts/check-coverage-scope.mjs --emit)"

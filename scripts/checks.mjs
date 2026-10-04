@@ -61,7 +61,7 @@ export const CHECKS = [
     run: ["pnpm", "lint:coverage-scope"],
     stages: ["pre-commit", "pre-push", "ci"],
     ciSkip: ["dependabot-pr", "no-source"],
-    why: "the Codecov, Sonar, size-limit and turbo scopes match the package tree",
+    why: "the Sonar, size-limit and turbo scopes match the package tree",
   },
   {
     // pre-push runs it too: git runs no pre-commit for a tree `git merge` or

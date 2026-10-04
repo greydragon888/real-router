@@ -301,20 +301,6 @@ const acceptedTree = () => ({
     "config.test.coverage.allowExternal = true;\n" +
     'config.test.coverage.include = ["src/**/*.ts", "../../shared/dx/**/*.ts"];\n',
   "shared/dx/index.ts": "export const dx = 1;\n",
-  "codecov.yml": [
-    "component_management:",
-    "  individual_components:",
-    "    - component_id: a",
-    "      paths:",
-    "        - packages/a/**",
-    "    - component_id: owner",
-    "      paths:",
-    "        - packages/owner/**",
-    "    - component_id: dx",
-    "      paths:",
-    "        - shared/dx/**",
-    "",
-  ].join("\n"),
   "sonar-project.properties":
     "sonar.coverage.exclusions=packages/b/src/**,packages/svelte/src/**\n",
   ".size-limit.js":
@@ -395,7 +381,7 @@ test("CONTROL — the script accepts the tree every drift cell departs from", ()
   assert.equal(run.status, 0, run.stderr);
   assert.match(
     run.stderr,
-    /✓ Coverage scope in sync: 2 components, 2 Sonar coverage-exclusions \(b, svelte\); 3 public packages size-tracked \(exceptions: svelte\); shared\/ consumers keyed on their dir: 1; code outside src\/: none \(4 packages, 1 src\/ links into shared\/\)\./,
+    /✓ Coverage scope in sync: 2 Sonar coverage-exclusions \(b, svelte\); 3 public packages size-tracked \(exceptions: svelte\); shared\/ consumers keyed on their dir: 1; code outside src\/: none \(4 packages, 1 src\/ links into shared\/\)\./,
   );
 });
 
@@ -478,32 +464,8 @@ test("package-root config files and scripts/ hold code legitimately", () => {
   assert.equal(run.status, 0, run.stderr);
 });
 
-const withoutLine = (text, line) => {
-  assert.ok(text.includes(line), `fixture has no line ${JSON.stringify(line)}`);
-
-  return text.replace(line, "");
-};
-
 /** One planted departure per line the report can print. */
 const DRIFTS = [
-  {
-    name: "a package with tests but no codecov component",
-    plant: (tree) => {
-      tree["codecov.yml"] = withoutLine(
-        tree["codecov.yml"],
-        "    - component_id: a\n      paths:\n        - packages/a/**\n",
-      );
-    },
-    line: /codecov\.yml: package "a" has tests\/ \(produces coverage\) but has no entry/,
-  },
-  {
-    name: "a codecov component nothing produces coverage for",
-    plant: (tree) => {
-      tree["codecov.yml"] +=
-        "    - component_id: ghost\n      paths:\n        - packages/ghost/**\n";
-    },
-    line: /codecov\.yml: component "ghost" has no coverage-producing package/,
-  },
   {
     name: "a package without tests missing from the Sonar coverage exclusions",
     plant: (tree) => {
@@ -548,16 +510,6 @@ const DRIFTS = [
         'config.test.coverage.include = ["src/**/*.ts"];\n';
     },
     line: /shared\/dx: no measuring owner/,
-  },
-  {
-    name: "a shared dir no codecov component path routes",
-    plant: (tree) => {
-      tree["codecov.yml"] = tree["codecov.yml"].replace(
-        "        - shared/dx/**\n",
-        "        - shared/other/**\n",
-      );
-    },
-    line: /codecov\.yml: no component path "shared\/dx\/\*\*"/,
   },
   {
     // Without the symlink the owner links no shared dir, so its turbo.json goes

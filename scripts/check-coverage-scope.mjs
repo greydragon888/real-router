@@ -6,12 +6,9 @@
  * sync with the package set because their scope lived in hand-maintained lists.
  * This script is now the SINGLE source of truth for that scope:
  *
- * Check mode (default, `pnpm lint:coverage-scope` — both hooks + CI pipeline):
- *   1. `codecov.yml` `component_management.individual_components` — must list
- *      exactly the coverage-producing packages (ones with a `tests/` dir).
- *      (Components, not flags: Codecov flags only exist when uploads are tagged
- *      with them, and CI does a single untagged upload — a `flags:` section
- *      would be inert.)
+ * Check mode (default, `pnpm lint:coverage-scope` — both hooks + CI pipeline).
+ * The checks keep the numbers other files cite them by, so the list starts
+ * at 2:
  *   2. `sonar-project.properties` `sonar.coverage.exclusions` — must exclude
  *      exactly the packages whose `src/` legitimately lacks a clean lcov
  *      (no-tests → no lcov at all; phantom code → lowered vitest thresholds).
@@ -22,20 +19,22 @@
  *      include in the owner's vitest.config.mts), and the CI "Fix coverage
  *      paths" step normalizes the owner lcov SF paths to repo-root-relative
  *      shared/<dir>/… — so Sonar scores shared sources from real lcov.
- *   2b. Every shared/<dir> must have a measuring owner vitest config AND a
- *      codecov.yml component path `shared/<dir>/**` — a new shared dir cannot
- *      silently reopen the pre-#809 blind spot.
+ *   2b. Every shared/<dir> must have a measuring owner vitest config — a new
+ *      shared dir cannot silently reopen the pre-#809 blind spot.
+ *   2c. The owner passes the `src/<alias>/` symlink that leads to the dir in
+ *      its `lint` and `lint:fix` scripts: ESLint does not descend into a
+ *      symlinked directory while walking `src/`, so without it the dir goes
+ *      unlinted.
  *   3. Every tests-having package has its own `vitest.config.mts` — phantom
  *      detection reads only that file, so its absence must be loud, not a
  *      silent fail-open.
  *   4. `.size-limit.js` — every **npm-public** package (`private !== true`) has
  *      a bundle-size entry, unless it is in SIZE_LIMIT_EXCEPTIONS with a reason
- *      (svelte: no single ESM bundle). Both directions are asserted. This
- *      closes the "list-drift"
- *      class the codecov/sonar checks address — the SAME question "is this
- *      package public?" must be answered consistently by every per-package list,
- *      not independently (a package can otherwise be public on npm + a codecov
- *      component + smoke-tested yet silently absent from size tracking).
+ *      (svelte: no single ESM bundle). Both directions are asserted: a public
+ *      package with neither an entry nor an exception fails, and so does an
+ *      exception for a package that has an entry, is private or is not a
+ *      package. Without it a package can be public on npm and smoke-tested
+ *      yet silently absent from size tracking.
  *   5. `turbo.json` — every package whose `src/` symlinks `shared/<dir>` lists
  *      `../../shared/<dir>/` in the inputs of its cached tasks, in its own
  *      `turbo.json`; no other package and not the root lists `shared/` there.
@@ -113,7 +112,7 @@ const sharedDirs = existsSync(SHARED_DIR)
           // Generated / non-source dirs excluded defensively: `shared/coverage`
           // is transient lcov output (gitignored); `shared/tests` was the shared
           // test node's spec dir, removed in #1065/#1086. Neither is a shipped
-          // source dir with a measuring owner or codecov component.
+          // source dir with a measuring owner.
           n !== "tests" &&
           n !== "coverage" &&
           isRealDir(join(SHARED_DIR, n)),
@@ -139,31 +138,6 @@ const sonarTests = coverageProducing.map((p) => `packages/${p}/tests`);
 const lcovReports = packages
   .filter((p) => model.get(p).hasLcov)
   .map((p) => `packages/${p}/coverage/lcov.info`);
-
-// --- Check 1: codecov.yml components ⇔ coverage-producing packages ----------
-const codecov = read("codecov.yml");
-const declaredComponents = new Set(
-  [...codecov.matchAll(/^ {4}- component_id: ([\w-]+)$/gm)].map((m) => m[1]),
-);
-
-for (const pkg of coverageProducing) {
-  if (!declaredComponents.has(pkg)) {
-    errors.push(
-      `codecov.yml: package "${pkg}" has tests/ (produces coverage) but has no entry under component_management.individual_components`,
-    );
-  }
-}
-for (const comp of declaredComponents) {
-  // A component is valid if it maps to a coverage-producing package OR to a
-  // shared source dir (#1065: browser-env/dom-utils are no longer wrapper
-  // packages — their coverage lands at shared/<dir>/… and codecov routes those
-  // components by `shared/<dir>/**` paths).
-  if (!coverageProducing.includes(comp) && !sharedDirs.includes(comp)) {
-    errors.push(
-      `codecov.yml: component "${comp}" has no coverage-producing package (stale — remove it)`,
-    );
-  }
-}
 
 // --- Check 2: sonar.coverage.exclusions ⇔ no-test/phantom packages ----------
 const sonar = read("sonar-project.properties");
@@ -194,7 +168,7 @@ for (const entry of exclusions) {
 // Each shared dir is owner-measured (allowExternal + shared/<dir> include in
 // some package's vitest.config.mts) and its lcov is normalized to shared/<dir>
 // paths in CI — so a sonar coverage-exclusion would silently un-score it, and
-// a shared dir without an owner or codecov routing reopens the blind spot.
+// a shared dir without an owner reopens the blind spot.
 for (const entry of exclusions) {
   if (entry === "shared/**" || entry.startsWith("shared/")) {
     errors.push(
@@ -227,11 +201,6 @@ for (const dir of sharedDirs) {
   if (!owner) {
     errors.push(
       `shared/${dir}: no measuring owner — no packages/*/vitest.config.mts sets coverage.allowExternal with a "**/shared/${dir}/**" include (see #809; without an owner this dir is measured nowhere)`,
-    );
-  }
-  if (!codecov.includes(`shared/${dir}/**`)) {
-    errors.push(
-      `codecov.yml: no component path "shared/${dir}/**" — the owner's lcov lands at shared/${dir}/… after CI path normalization and would not be attributed to any component`,
     );
   }
 
@@ -560,9 +529,8 @@ if (errors.length > 0) {
   console.error("✖ Coverage-scope drift detected (#732):\n");
   for (const e of errors) console.error(`  - ${e}`);
   console.error(
-    "\nFix: add/remove the package under component_management.individual_components in" +
-      "\ncodecov.yml and/or in sonar.coverage.exclusions in sonar-project.properties." +
-      "\nSee scripts/check-coverage-scope.mjs.",
+    "\nEach line above says what drifted. The checks are described at the top" +
+      "\nof scripts/check-coverage-scope.mjs.",
   );
   process.exit(1);
 }
@@ -586,7 +554,7 @@ if (emitMode) {
 } else {
   const publicCount = packages.filter(isPublic).length;
   console.error(
-    `✓ Coverage scope in sync: ${coverageProducing.length} components, ` +
+    `✓ Coverage scope in sync: ` +
       `${mustCoverageExclude.length} Sonar coverage-exclusions (${mustCoverageExclude.join(", ")}); ` +
       `${publicCount} public packages size-tracked (exceptions: ${[...SIZE_LIMIT_EXCEPTIONS.keys()].join(", ")}); ` +
       `shared/ consumers keyed on their dir: ${sharedConsumers}; ` +

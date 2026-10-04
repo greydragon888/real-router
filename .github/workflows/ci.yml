@@ -1183,10 +1183,10 @@ jobs:
 
       # Collect every produced lcov dynamically — a hardcoded `files:` list drifts
       # out of sync as packages are added: it had 16 stale paths (several
-      # private) and missed ~14 public packages. The scope comes from the same
-      # script that guards codecov.yml/sonar-project.properties (--emit mode),
-      # so the CI scope and the drift guard cannot disagree. The script fails
-      # loudly if no lcov.info exists after the artifact download.
+      # private) and missed ~14 public packages. The list comes from
+      # `check-coverage-scope.mjs --emit`: the `coverage/lcov.info` of every
+      # package that has one. It fails loudly if there is none after the
+      # artifact download.
       - name: Collect coverage reports
         id: lcov
         run: node scripts/check-coverage-scope.mjs --emit >> "$GITHUB_OUTPUT"
@@ -1678,9 +1678,9 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       # Generate analysis scope from the filesystem — the same
-      # `check-coverage-scope.mjs --emit` that guards codecov.yml and
-      # sonar-project.properties, so the CI scope and the drift guard cannot
-      # disagree. Scanner CLI args override the properties file.
+      # `check-coverage-scope.mjs --emit` that guards sonar-project.properties,
+      # so the CI scope and the drift guard cannot disagree. Scanner CLI args
+      # override the properties file.
       - name: Compute Sonar scope
         id: scope
         if: steps.decide.outputs.analyse == 'true'

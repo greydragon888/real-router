@@ -21,7 +21,7 @@ find packages shared -path '*/coverage/lcov.info' -print0 2>/dev/null |
     sed -i "s|^SF:|SF:${pkg_dir}/|" "$lcov"
     # Shared-source owners (#809) emit SF:../../shared/<dir>/x.ts — the prefix
     # above turns those into packages/<owner>/../../shared/…; collapse the
-    # parent-dir hops to repo-root-relative shared/<dir>/x.ts so Codecov
-    # components and Sonar score them at their real location.
+    # parent-dir hops to repo-root-relative shared/<dir>/x.ts so Codecov and
+    # Sonar score them at their real location.
     sed -i -E 's|^SF:packages/[^/]+/\.\./\.\./|SF:|' "$lcov"
   done
