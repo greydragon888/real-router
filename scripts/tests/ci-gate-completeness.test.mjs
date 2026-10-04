@@ -180,7 +180,58 @@ for (const [name, form] of Object.entries(NEEDS_FORMS)) {
   });
 }
 
+// A key GitHub reads, written other than plainly: each is refused, never read
+// as absent.
+const REFUSED_KEYS = {
+  "a quoted job key": [
+    (f) => f.replace("  ci:\n", '  "zz-extra":\n    runs-on: x\n  ci:\n'),
+    /a job key parseJobs does not read: "zz-extra":/,
+  ],
+  "a space before a job key's colon": [
+    (f) => f.replace("  ci:\n", "  zz-extra :\n    runs-on: x\n  ci:\n"),
+    /a job key parseJobs does not read: zz-extra :/,
+  ],
+  "a quoted needs key in a gated job": [
+    (f) =>
+      f.replace(
+        "  coverage:\n    needs: [check]\n",
+        '  coverage:\n    "needs": [check, bundle-size]\n',
+      ),
+    /job coverage has a key written in a form this does not read/,
+  ],
+  "a space before the colon of needs": [
+    (f) =>
+      f.replace(
+        "  coverage:\n    needs: [check]\n",
+        "  coverage:\n    needs : [check, bundle-size]\n",
+      ),
+    /job coverage has a key written in a form this does not read/,
+  ],
+  "a quoted continue-on-error": [
+    (f) =>
+      f.replace(
+        "  coverage:\n    needs: [check]\n",
+        '  coverage:\n    needs: [check]\n    "continue-on-error": true\n',
+      ),
+    /job coverage has a key written in a form this does not read/,
+  ],
+};
+
+for (const [name, [mutate, refusal]] of Object.entries(REFUSED_KEYS)) {
+  test(`fixture: ${name} is refused, not read as absent`, () => {
+    const mutated = mutate(FIXTURE);
+    assert.notEqual(mutated, FIXTURE);
+    assert.throws(
+      () => findViolations(mutated, new Map([["bundle-size", "info-only"]])),
+      refusal,
+    );
+  });
+}
+
 const REFUSED_NEEDS = {
+  "a block item deeper than the list":
+    "    needs:\n      - check\n        - bundle-size\n",
+  "a key with nothing below it at the end of the job": "    needs:\n",
   "an alias": "    needs: *upstream\n",
   "an anchor": "    needs: &upstream [check]\n",
   "a tag": "    needs: !!seq [check]\n",
@@ -767,6 +818,13 @@ function inGate(from, to) {
 }
 
 const OPEN_FORMS = {
+  "name: continued on the next line": () =>
+    inGate("    name: CI Result\n", "    name: CI Result\n      x\n"),
+  "runs-on: continued on the next line": () =>
+    inGate(
+      "    runs-on: ubuntu-latest\n",
+      "    runs-on: ubuntu-latest\n      x\n",
+    ),
   "if: always() continued on the next line": () =>
     inGate("    if: always()\n", "    if: always()\n      && false\n"),
   "continue-on-error hidden in a comment behind CR": () =>

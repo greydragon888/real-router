@@ -1,10 +1,9 @@
 // refused-characters.mjs — what a line reader of workflow YAML refuses.
 //
-// `scripts/runner-labels.mjs` and the step readers of `scripts/ci-gate.mjs` read a
-// workflow line by line, split at LF. A character some YAML readers take for a
-// line break and others do not — a lone CR, NEL, LS, PS; actionlint takes them
-// so — makes one such line two for those readers, so a key hidden in a comment
-// behind it would go unread here.
+// The line readers of workflows split at LF. A character some YAML readers take
+// for a line break and others do not — a lone CR, NEL, LS, PS; actionlint takes
+// them so — makes one such line two for those readers, so a key hidden in a
+// comment behind it would go unread by a line reader.
 
 /**
  * A lone CR, NEL, LS or PS, and the other control characters, a tab included.

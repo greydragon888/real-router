@@ -32,7 +32,7 @@ import { delimiter, dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { readLastStep, topLevelKeysClosed, workflowEnvClosed } from "../ci-gate.mjs";
+import { jobLines, readLastStep, topLevelKeysClosed, workflowEnvClosed } from "../ci-gate.mjs";
 import { REFUSED_CHARACTERS } from "../lib/refused-characters.mjs";
 import { localEnvVars } from "../lib/git-env.mjs";
 
@@ -490,15 +490,6 @@ const OTHER_CONTEXTS =
 const isBlank = (line) => /^ *$/.test(line);
 const isComment = (line) => /^ *#/.test(line);
 
-/** The lines of Repo Lints, from its key to the next job or top-level key. */
-function checksJobLines(yaml) {
-  const lines = yaml.split("\n");
-  const start = lines.indexOf("  repo-lints:");
-  if (start === -1) return undefined;
-  const end = lines.findIndex((line, i) => i > start && /^ {0,2}[^ #]/.test(line));
-  return { lines, start, end: end === -1 ? lines.length : end };
-}
-
 /**
  * Whether a script is in its one closed form: `if [[ … ]]; then` over
  * `&&`-joined equalities of a quoted step variable and a quoted plain literal
@@ -544,9 +535,13 @@ function parseChecksStep(yaml) {
     return undefined;
   }
 
-  const found = checksJobLines(yaml);
-  if (!found) return undefined;
-  const job = found.lines.slice(found.start + 1, found.end);
+  let job;
+  try {
+    job = jobLines(yaml, "repo-lints");
+  } catch {
+    return undefined;
+  }
+  if (!job) return undefined;
   const jobEnv = {};
   let inEnv = false;
 
@@ -670,7 +665,9 @@ test("release-pr is the context of one cell: changeset-release/master, this repo
 
 /** ci.yml with one change inside Repo Lints, which must occur once there. */
 function inChecksJob(from, to) {
-  const { lines, start, end } = checksJobLines(CI);
+  const lines = CI.split("\n");
+  const start = lines.indexOf("  repo-lints:");
+  const end = start + 1 + jobLines(CI, "repo-lints").length;
   const job = lines.slice(start + 1, end).join("\n");
 
   assert.equal(job.split(from).length, 2, `not exactly once in Repo Lints: ${from}`);
@@ -737,6 +734,11 @@ const CHECKS_STEP_FORMS = {
     inChecksJob("          if [[ ", "          shopt -s nocasematch\n          if [[ "),
   "the step no longer binding NO_SOURCE": () =>
     inChecksJob("          NO_SOURCE: ${{ needs.check.outputs.no_source }}\n", ""),
+  "the job binding HAS_DEDUPE_FIXER to a constant": () =>
+    inChecksJob(
+      "      HAS_DEDUPE_FIXER: ${{ secrets.DEPENDABOT_PUSH_TOKEN != '' }}\n",
+      '      HAS_DEDUPE_FIXER: "true"\n',
+    ),
   "the job binding DEPENDABOT_PR to a constant": () =>
     inChecksJob(
       "      DEPENDABOT_PR: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}\n",

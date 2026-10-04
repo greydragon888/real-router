@@ -9,9 +9,10 @@
 // the workflow's top level from here for the step of Repo Lints it executes.
 //
 // Stdlib only, and deliberately not a YAML library: each extractor reads the
-// forms it names and refuses the rest — `parseNeeds` throws naming the job,
-// `parseGateStep` returns `undefined` — so a restructured ci.yml fails the
-// tests that read it rather than passing them. An extractor that finds
+// forms it names and refuses the rest — a job key or a key of a job's body
+// written other than plainly throws, `parseNeeds` throws naming the job on a
+// value it does not read, `parseGateStep` returns `undefined` — so a
+// restructured ci.yml fails the tests that read it rather than passing them. An extractor that finds
 // nothing at all, `parseJobs` with no `jobs:`, is caught by the floors those
 // tests set on the real tree.
 
@@ -22,7 +23,10 @@ export const GATE_JOB = "ci";
 
 /**
  * Extract top-level job ids from a workflow YAML text: identifiers indented
- * exactly two spaces under the top-level `jobs:` key.
+ * exactly two spaces under the top-level `jobs:` key, written plainly. A line
+ * at that indent that is not a comment and not `  <id>:` — a quoted id, a space
+ * before the colon — throws: GitHub reads it as a job, and a job this skipped
+ * would stand outside every check of the gate.
  *
  * @param {string} yaml
  * @returns {string[]}
@@ -34,15 +38,20 @@ export function parseJobs(yaml) {
   const jobs = [];
   for (const line of lines.slice(start + 1)) {
     if (/^[^\s#]/.test(line)) break; // next top-level section
-    const m = /^ {2}([A-Za-z_][\w-]*):/.exec(line);
-    if (m) jobs.push(m[1]);
+    if (!/^ {2}[^ #]/.test(line)) continue;
+    const m = /^ {2}([A-Za-z_][\w-]*):(?: |$)/.exec(line);
+    if (!m)
+      throw new Error(`a job key parseJobs does not read: ${line.trim()}`);
+    jobs.push(m[1]);
   }
   return jobs;
 }
 
 /**
  * The lines of one job below its key, up to the next job or top-level key, or
- * `undefined` when the workflow has no such job.
+ * `undefined` when the workflow has no such job. Every key of the job's body is
+ * read in its plain form, `    <key>:`; a quoted key or a space before the
+ * colon throws, naming the job, since GitHub reads it as the same key.
  *
  * @param {string} yaml
  * @param {string} jobId
@@ -54,7 +63,18 @@ export function jobLines(yaml, jobId) {
   if (start === -1) return undefined;
 
   const next = lines.findIndex((l, i) => i > start && /^ {0,2}[^ #]/.test(l));
-  return lines.slice(start + 1, next === -1 ? lines.length : next);
+  const job = lines.slice(start + 1, next === -1 ? lines.length : next);
+  const odd = job.find(
+    (l) => /^ {4}[^ #]/.test(l) && !/^ {4}[a-z][a-z-]*:(?: |$)/.test(l),
+  );
+
+  if (odd !== undefined) {
+    throw new Error(
+      `job ${jobId} has a key written in a form this does not read: ${odd.trim()}`,
+    );
+  }
+
+  return job;
 }
 
 /** A job id as `needs` names it: plain, or in single or double quotes. */
@@ -102,7 +122,6 @@ export function parseNeeds(yaml, jobId) {
       if (i >= job.length || !/^ {5}/.test(job[i])) refuse();
       text += ` ${withoutComment(job[i])}`;
     }
-    if (!text.startsWith("[")) refuse();
     return names(
       text
         .slice(1, -1)
@@ -140,19 +159,15 @@ export function parseNeeds(yaml, jobId) {
 
 /**
  * The gate job's own body — the only place where a `needs` entry is actually
- * READ. Sliced from the gate job's key to the next top-level job (or EOF), so it
- * keeps working if a job is ever added after the gate.
+ * READ. Sliced by {@link jobLines}, from the gate job's key to the next job or
+ * top-level key, so it keeps working if a job is ever added after the gate; a
+ * key of the body written other than plainly throws there.
  *
  * @param {string} yaml
  * @returns {string}
  */
 export function parseGateScript(yaml) {
-  const lines = yaml.split("\n");
-  const start = lines.findIndex((l) => l.startsWith(`  ${GATE_JOB}:`));
-  if (start === -1) return "";
-  const rest = lines.slice(start + 1);
-  const end = rest.findIndex((l) => /^ {2}[A-Za-z_][\w-]*:/.test(l));
-  return (end === -1 ? rest : rest.slice(0, end)).join("\n");
+  return (jobLines(yaml, GATE_JOB) ?? []).join("\n");
 }
 
 /** The keys the gate job may carry; anything else changes how it runs. */
@@ -297,7 +312,12 @@ export function parseGateStep(yaml) {
     return undefined;
   }
 
-  const lines = parseGateScript(yaml).split("\n");
+  let lines;
+  try {
+    lines = parseGateScript(yaml).split("\n");
+  } catch {
+    return undefined;
+  }
   let always = false;
 
   let scalar = false;
