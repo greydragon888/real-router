@@ -221,8 +221,9 @@ test("fixture: allowlist hygiene — stale and redundantly-wired entries are cau
 });
 
 test("fixture: a needs job whose result is never READ is caught (#1127, other half)", () => {
-  // The gate still waits for `coverage`, but nothing consults its verdict — the
-  // exact shape #1127 had, one step further in than membership can see.
+  // The gate still waits for `coverage`, and its aggregate fails on a failure
+  // there, but no line of the script reads it, so nothing decides whether its
+  // skip may pass — one step further in than membership can see (#1127).
   const mutated = FIXTURE.replace(
     '          COVERAGE="${{ needs.coverage.result }}"\n',
     "",
@@ -294,9 +295,9 @@ test("ci.yml: every job the gate waits for is also READ by it (#1127, other half
     real.neededButUnread,
     [],
     `job(s) [${real.neededButUnread.join(", ")}] are in '${GATE_JOB}'.needs but ` +
-      "their result is never read in the 'Determine result' script — the gate " +
-      "WAITS for them and then ignores the verdict, which is as vacuous as not " +
-      "gating them at all. Read `needs.<job>.result` (or an output) there, or " +
+      "their result is never read in the 'Determine result' script — the " +
+      "aggregate fails them on a failure or a cancellation, but nothing decides " +
+      "whether their skip may pass. Read `needs.<job>.result` (or an output) there, or " +
       "drop the job from `needs` and allowlist it in OUTSIDE_GATE.",
   );
   // Parser sanity: a restructured gate job must not degrade into "empty script",
