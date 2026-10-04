@@ -33,6 +33,7 @@ import { after, test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { readLastStep, topLevelKeysClosed, workflowEnvClosed } from "../ci-gate.mjs";
+import { REFUSED_CHARACTERS } from "../lib/refused-characters.mjs";
 import { localEnvVars } from "../lib/git-env.mjs";
 
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
@@ -525,14 +526,17 @@ function scriptClosed(script, env) {
  * the job's keys are those above, every `env:` holds one `NAME: value` per
  * line of the names its list admits, the step is read by `readLastStep`, the
  * script is in its closed form, and the job binds NO_SOURCE, which the
- * `format()` reads, as the step does. Only an ASCII space indents. Any other
- * shape returns `undefined`.
+ * `format()` reads, as the step does. Only an ASCII space indents, and a
+ * character `REFUSED_CHARACTERS` names is refused anywhere in the file. Any
+ * other shape returns `undefined`.
  *
  * @param {string} yaml the text of ci.yml
  * @returns {{ env: Record<string, string>, run: string } | undefined}
  */
 function parseChecksStep(yaml) {
-  if (!topLevelKeysClosed(yaml) || !workflowEnvClosed(yaml)) return undefined;
+  if (REFUSED_CHARACTERS.test(yaml) || !topLevelKeysClosed(yaml) || !workflowEnvClosed(yaml)) {
+    return undefined;
+  }
 
   const found = checksJobLines(yaml);
   if (!found) return undefined;
@@ -672,6 +676,12 @@ function inChecksJob(from, to) {
 const LAST_LINE = '          node scripts/verify.mjs --stage ci --context "$VERIFY_CONTEXT"\n';
 
 const CHECKS_STEP_FORMS = {
+  "continue-on-error hidden in a comment behind CR": () =>
+    inChecksJob(LAST_LINE, `${LAST_LINE}        # note\r        continue-on-error: true\n`),
+  "continue-on-error hidden in a comment behind NEL": () =>
+    inChecksJob(LAST_LINE, `${LAST_LINE}        # note\u0085        continue-on-error: true\n`),
+  "continue-on-error hidden in a comment behind LS": () =>
+    inChecksJob(LAST_LINE, `${LAST_LINE}        # note\u2028        continue-on-error: true\n`),
   "a job-level if:": () =>
     inChecksJob(
       "    needs: [check]\n",

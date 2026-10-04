@@ -14,6 +14,8 @@ import { join } from "node:path";
 
 import * as YAML from "yaml";
 
+import { REFUSED_CHARACTERS } from "./lib/refused-characters.mjs";
+
 /** A GitHub-hosted runner label: `ubuntu-latest`, `macos-14`, `windows-2022`. */
 export const HOSTED = /^(ubuntu|windows|macos)-[\w.]+$/;
 
@@ -27,15 +29,6 @@ const FORK_PROOF = new Set([
 
 /** A value the rules cannot read as one plain label. */
 const OTHER = "<other>";
-
-/**
- * Characters some YAML readers take for a line break and others do not — a
- * lone CR, NEL, LS, PS — and the other control characters, a tab included. A
- * file with any of them is refused: a refusal is cheaper than choosing whose
- * reading is right.
- */
-const REFUSED_CHARACTERS =
-  /\r(?!\n)|[\u0000-\u0009\u000B\u000C\u000E-\u001F\u007F-\u009F\u2028\u2029]/;
 
 const LOCAL_WORKFLOW = "./.github/workflows/";
 

@@ -13483,9 +13483,11 @@ On CI, after the push: PR #2660, of Markdown alone, ran all 13 checks of the `ci
 
 **Solution.**
 
-- `ci-gate-completeness.test.mjs` fails on any edge into a job of the gate's `needs` from a job outside them, with a fixture cell for the form.
+- `ci-gate-completeness.test.mjs` fails on any edge into a job of the gate's `needs` from a job outside them.
+- `parseNeeds` reads `needs` in every form GitHub accepts that the repository writes: a scalar, a flow sequence on one line or over several (Prettier's wrap of a long one), and a block sequence, an item plain or quoted, a comment after any line. On any other form it throws, naming the job. It used to read the flow sequence on one line and the block sequence only, and answered `[]` for the rest, so an edge written over several lines read as no edge.
+- The step readers refuse a workflow holding a lone CR, NEL, LS or PS, or another control character: they split at LF, and a key hidden in a comment behind such a character is a line of its own for a reader that breaks there. The rule is `scripts/lib/refused-characters.mjs`, shared with the self-hosted trigger reader.
 - The gate's step and Repo Lints' step are read by one function, `readLastStep` in `scripts/ci-gate.mjs`. The two copies had begun to differ in what may follow the script. The gate's step still has to be the first under `steps:`.
 
 **Why.** The rule is the transitive half of the aggregate: every job whose failure can skip a job the gate waits for is one the gate waits for, so the failure reaches the gate as a failure.
 
-**Measured.** The rule removed, and `examples-build` needing `bundle-size` in the real `ci.yml`, each fail a cell. Without the name list or the tail check in `readLastStep`, cells of both readers fail, and so does a step placed before the gate's.
+**Measured.** The rule removed fails a cell. In the real `ci.yml`, `examples-build` needing `bundle-size` fails the test in each of six forms — a flow sequence on one line and over several, a scalar, a block, a block with a comment between items, a quoted item — and HEAD passes; a `ci.yml` Prettier reformatted, three `needs:` over several lines among them, passes the gate and `verify` tests. `continue-on-error` hidden in a comment behind a CR, a NEL or an LS is refused by both step readers. Without the name list or the tail check in `readLastStep`, cells of both readers fail, and so does a step placed before the gate's.

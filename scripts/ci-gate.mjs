@@ -8,9 +8,14 @@
 // asks it where CI runs a check. `verify.test.mjs` takes the closed reading of
 // the workflow's top level from here for the step of Repo Lints it executes.
 //
-// Stdlib only, and deliberately not a YAML library: each extractor reads one
-// shape and returns nothing for a shape it cannot read, so a restructured
-// ci.yml fails the tests that read it rather than passing them.
+// Stdlib only, and deliberately not a YAML library: each extractor reads the
+// forms it names and refuses the rest — `parseNeeds` throws naming the job,
+// `parseGateStep` returns `undefined` — so a restructured ci.yml fails the
+// tests that read it rather than passing them. An extractor that finds
+// nothing at all, `parseJobs` with no `jobs:`, is caught by the floors those
+// tests set on the real tree.
+
+import { REFUSED_CHARACTERS } from "./lib/refused-characters.mjs";
 
 /** The aggregator job the `protect-master` ruleset requires: `CI Result`. */
 export const GATE_JOB = "ci";
@@ -35,10 +40,21 @@ export function parseJobs(yaml) {
   return jobs;
 }
 
+/** A job id as `needs` names it: plain, or in single or double quotes. */
+const NEED = /^(?:([A-Za-z_][\w-]*)|'([A-Za-z_][\w-]*)'|"([A-Za-z_][\w-]*)")$/;
+
+const withoutComment = (text) => text.replace(/(^|\s)#.*$/, "").trim();
+const isBlankOrComment = (line) => /^ *$/.test(line) || /^ *#/.test(line);
+
 /**
- * Extract the `needs` list of one job. Supports both styles:
- * flow (`needs: [a, b]`) and block (`needs:` + `- a` items).
- * Returns [] when the job has no `needs`.
+ * Extract the `needs` list of one job, in the forms GitHub accepts that this
+ * repository writes: a scalar (`needs: a`), a flow sequence on one line
+ * (`needs: [a, b]`) or over several (`needs:`, then `[`, the items and `]`, as
+ * Prettier wraps a long one), and a block sequence (`needs:`, then `- a`
+ * lines). An item is plain or quoted, and a comment may follow any line.
+ * Returns [] when the job has no `needs:` key. A `needs:` written any other way
+ * — an anchor, an alias, a tag, a form not listed here — throws an error that
+ * names the job, so a list this cannot read is never taken for an empty one.
  *
  * @param {string} yaml
  * @param {string} jobId
@@ -48,27 +64,64 @@ export function parseNeeds(yaml, jobId) {
   const lines = yaml.split("\n");
   const start = lines.findIndex((l) => l.startsWith(`  ${jobId}:`));
   if (start === -1) return [];
-  for (let i = start + 1; i < lines.length; i++) {
-    const line = lines[i];
-    if (/^ {2}[A-Za-z_][\w-]*:/.test(line)) break; // next job
-    const flow = /^ {4}needs:\s*\[([^\]]*)\]/.exec(line);
-    if (flow) {
-      return flow[1]
+
+  const next = lines.findIndex((l, i) => i > start && /^ {0,2}[^ #]/.test(l));
+  const job = lines.slice(start + 1, next === -1 ? lines.length : next);
+  const keys = job.flatMap((l, i) => (/^ {4}needs:/.test(l) ? [i] : []));
+  const refuse = () => {
+    throw new Error(
+      `the needs of job ${jobId} are written in a form parseNeeds does not read`,
+    );
+  };
+
+  if (keys.length === 0) return [];
+  if (keys.length > 1) refuse();
+
+  const names = (items) => {
+    const read = items.map((item) => NEED.exec(item.trim()));
+    if (read.some((m) => m === null)) refuse();
+    return read.map((m) => m[1] ?? m[2] ?? m[3]);
+  };
+  const flow = (from, text) => {
+    let i = from;
+    for (; !text.endsWith("]"); i++) {
+      if (i >= job.length || !/^ {5}/.test(job[i])) refuse();
+      text += ` ${withoutComment(job[i])}`;
+    }
+    if (!text.startsWith("[")) refuse();
+    return names(
+      text
+        .slice(1, -1)
         .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-    }
-    if (/^ {4}needs:\s*(#.*)?$/.test(line)) {
-      const items = [];
-      for (let j = i + 1; j < lines.length; j++) {
-        const item = /^ {6}- ([\w-]+)\s*(#.*)?$/.exec(lines[j]);
-        if (!item) break;
-        items.push(item[1]);
-      }
-      return items;
-    }
+        .filter((item) => item.trim() !== ""),
+    );
+  };
+
+  const at = keys[0];
+  const rest = withoutComment(job[at].slice("    needs:".length));
+
+  if (rest.startsWith("[")) return flow(at + 1, rest);
+  if (rest !== "") return names([rest]);
+
+  let i = at + 1;
+  while (i < job.length && isBlankOrComment(job[i])) i++;
+  if (i >= job.length) refuse();
+  if (withoutComment(job[i]).startsWith("[") && /^ {5}/.test(job[i])) {
+    return flow(i + 1, withoutComment(job[i]));
   }
-  return [];
+
+  const items = [];
+  for (; i < job.length; i++) {
+    if (isBlankOrComment(job[i])) continue;
+    const item = /^ {6}- (.+)$/.exec(job[i]);
+    if (!item) {
+      if (/^ {5}/.test(job[i])) refuse();
+      break;
+    }
+    items.push(withoutComment(item[1]));
+  }
+  if (items.length === 0) refuse();
+  return names(items);
 }
 
 /**
@@ -211,16 +264,24 @@ export function readLastStep(job, at, allowedEnv) {
  * `needs`, `if: always()` and `steps`, and its one step, first under
  * `steps:`, is read by {@link readLastStep} with the names
  * {@link GATE_STEP_ENV} admits. The workflow's top-level keys are plain ones of
- * a closed list, with no `defaults:` among them, and its `env:` sets only
- * turbo's names. Any other shape returns `undefined`, and the test that reads
- * it fails — a `shell:`, a `continue-on-error:`, a step `if:`, a missing
- * `if: always()` or a `BASH_ENV` would each change the verdict GitHub reports.
+ * a closed list, with no `defaults:` among them, its `env:` sets only turbo's
+ * names, and it holds none of the characters `REFUSED_CHARACTERS` names, which
+ * could hide a key from a reader that splits at LF. Any other shape returns
+ * `undefined`, and the test that reads it fails — a `shell:`, a
+ * `continue-on-error:`, a step `if:`, a missing `if: always()` or a `BASH_ENV`
+ * would each change the verdict GitHub reports.
  *
  * @param {string} yaml
  * @returns {{ env: Record<string, string>, run: string } | undefined}
  */
 export function parseGateStep(yaml) {
-  if (!topLevelKeysClosed(yaml) || !workflowEnvClosed(yaml)) return undefined;
+  if (
+    REFUSED_CHARACTERS.test(yaml) ||
+    !topLevelKeysClosed(yaml) ||
+    !workflowEnvClosed(yaml)
+  ) {
+    return undefined;
+  }
 
   const lines = parseGateScript(yaml).split("\n");
   let always = false;

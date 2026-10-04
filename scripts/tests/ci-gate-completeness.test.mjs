@@ -17,9 +17,10 @@
 // workspace; the `node:scripts-tests` check, which pre-push and Repo Lints run,
 // picks this file up by glob, so the preventer needs no wiring of its own.
 //
-// Deliberately NOT a YAML library: the extractors of `scripts/ci-gate.mjs` are
-// single-purpose and fail-closed — if ci.yml is restructured so they can't
-// parse it, the assertions fail and point here, they don't silently pass.
+// Deliberately NOT a YAML library: the extractors of `scripts/ci-gate.mjs` read
+// the forms they name and refuse the rest, and the floors below catch one that
+// reads nothing — if ci.yml is restructured so they can't parse it, the
+// assertions fail and point here, they don't silently pass.
 
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -134,14 +135,58 @@ test("fixture: fully wired workflow has no violations", () => {
   assert.deepEqual(v.needsOutsideGate, []);
 });
 
-test("fixture: a gated job that needs a job outside the gate's needs is caught", () => {
-  const mutated = FIXTURE.replace(
-    "  coverage:\n    needs: [check]\n",
-    "  coverage:\n    needs: [check, bundle-size]\n",
-  );
-  const v = findViolations(mutated, new Map([["bundle-size", "info-only"]]));
-  assert.deepEqual(v.needsOutsideGate, ["coverage → bundle-size"]);
-});
+// The edge coverage → bundle-size in every form GitHub accepts that parseNeeds
+// reads, and the forms it refuses, which must name the job rather than read as
+// "no needs".
+const NEEDS_FORMS = {
+  "flow on one line": "    needs: [check, bundle-size]\n",
+  "flow over several lines":
+    "    needs:\n      [\n        check,\n        bundle-size,\n      ]\n",
+  "flow opened on the key's line": "    needs: [check,\n      bundle-size]\n",
+  scalar: "    needs: bundle-size\n",
+  block: "    needs:\n      - check\n      - bundle-size\n",
+  "block with a comment between items":
+    "    needs:\n      - check\n      # the size comment\n      - bundle-size # informational\n",
+  "a quoted item": "    needs: [check, 'bundle-size']\n",
+};
+
+for (const [name, form] of Object.entries(NEEDS_FORMS)) {
+  test(`fixture: a gated job that needs a job outside the gate is caught — ${name}`, () => {
+    const mutated = FIXTURE.replace(
+      "  coverage:\n    needs: [check]\n",
+      `  coverage:\n${form}`,
+    );
+    assert.notEqual(mutated, FIXTURE);
+    const v = findViolations(mutated, new Map([["bundle-size", "info-only"]]));
+    assert.deepEqual(v.needsOutsideGate, ["coverage → bundle-size"]);
+  });
+}
+
+const REFUSED_NEEDS = {
+  "an alias": "    needs: *upstream\n",
+  "an anchor": "    needs: &upstream [check]\n",
+  "a tag": "    needs: !!seq [check]\n",
+  "a flow sequence never closed":
+    "    needs:\n      [\n        check,\n    runs-on: x\n",
+  "a key with no list": "    needs:\n    runs-on: x\n",
+  "a block item that is not a name":
+    "    needs:\n      - check\n      - [bundle-size]\n",
+  "a second needs key": "    needs: [check]\n    needs: [bundle-size]\n",
+};
+
+for (const [name, form] of Object.entries(REFUSED_NEEDS)) {
+  test(`fixture: needs written as ${name} is refused, naming the job`, () => {
+    const mutated = FIXTURE.replace(
+      "  coverage:\n    needs: [check]\n",
+      `  coverage:\n${form}`,
+    );
+    assert.notEqual(mutated, FIXTURE);
+    assert.throws(
+      () => findViolations(mutated, new Map([["bundle-size", "info-only"]])),
+      /the needs of job coverage are written in a form parseNeeds does not read/,
+    );
+  });
+}
 
 test("fixture: the #1127 mutation (job dropped from the gate's needs) is caught", () => {
   const mutated = FIXTURE.replace("needs: [check, coverage]", "needs: [check]");
@@ -678,6 +723,21 @@ function inGate(from, to) {
 }
 
 const OPEN_FORMS = {
+  "continue-on-error hidden in a comment behind CR": () =>
+    inGate(
+      "    steps:\n",
+      "    # note\r    continue-on-error: true\n    steps:\n",
+    ),
+  "continue-on-error hidden in a comment behind NEL": () =>
+    inGate(
+      "    steps:\n",
+      "    # note\u0085    continue-on-error: true\n    steps:\n",
+    ),
+  "continue-on-error hidden in a comment behind LS": () =>
+    inGate(
+      "    steps:\n",
+      "    # note\u2028    continue-on-error: true\n    steps:\n",
+    ),
   "a step-level continue-on-error": () =>
     `${CI.trimEnd()}\n        continue-on-error: true\n`,
   "a step-level shell": () => `${CI.trimEnd()}\n        shell: bash {0}\n`,
