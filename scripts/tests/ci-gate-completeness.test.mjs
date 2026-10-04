@@ -4,8 +4,10 @@
 // Run:  node --test scripts/tests/ci-gate-completeness.test.mjs
 //
 // Why this exists (debt-map axis A6, the #1127 class): the repo's gate model
-// is "one required status check" — the `ci` job aggregates every other job via
-// `needs` and the branch ruleset requires only that context. The model's
+// is "one required status check for the pipeline" — the `ci` job aggregates
+// every other job via `needs`, and the branch ruleset requires that context
+// beside the ones that gate on their own (`gh api
+// repos/greydragon888/real-router/rules/branches/master` lists them). The model's
 // failure mode is silent: a job NOT listed in the gate's `needs` can go red
 // while the PR stays mergeable (#1127: `coverage` ran the R2.4 shard-integrity
 // guard, failed loudly, and gated nothing). Nothing structural prevented the
