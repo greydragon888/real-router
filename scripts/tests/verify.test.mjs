@@ -463,6 +463,12 @@ const CHECKS_JOB_KEYS = new Set(["name", "runs-on", "needs", "env", "steps"]);
 /** The names Repo Lints' `env:` may set. */
 const CHECKS_JOB_ENV = new Set(["HAS_DEDUPE_FIXER", "DEPENDABOT_PR", "NO_SOURCE"]);
 
+/** The job's bindings the `format()` reads, as `evaluate` takes them. */
+const CHECKS_JOB_BINDINGS = {
+  HAS_DEDUPE_FIXER: "${{ secrets.DEPENDABOT_PUSH_TOKEN != '' }}",
+  DEPENDABOT_PR: "${{ github.event.pull_request.user.login == 'dependabot[bot]' }}",
+};
+
 /** The names the step's `env:` may set. */
 const CHECKS_STEP_ENV = new Set([
   "VERIFY_CONTEXT",
@@ -561,6 +567,9 @@ function parseChecksStep(yaml) {
   const step = at === -1 ? undefined : readLastStep(job, at, CHECKS_STEP_ENV);
 
   if (!step || jobEnv.NO_SOURCE !== step.env.NO_SOURCE) return undefined;
+  if (Object.entries(CHECKS_JOB_BINDINGS).some(([name, value]) => jobEnv[name] !== value)) {
+    return undefined;
+  }
 
   return scriptClosed(step.run, step.env) ? step : undefined;
 }
@@ -728,6 +737,11 @@ const CHECKS_STEP_FORMS = {
     inChecksJob("          if [[ ", "          shopt -s nocasematch\n          if [[ "),
   "the step no longer binding NO_SOURCE": () =>
     inChecksJob("          NO_SOURCE: ${{ needs.check.outputs.no_source }}\n", ""),
+  "the job binding DEPENDABOT_PR to a constant": () =>
+    inChecksJob(
+      "      DEPENDABOT_PR: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}\n",
+      '      DEPENDABOT_PR: "true"\n',
+    ),
   "the job binding NO_SOURCE otherwise than the step": () =>
     inChecksJob(
       "\n      NO_SOURCE: ${{ needs.check.outputs.no_source }}\n",

@@ -69,6 +69,10 @@ const RULES = {
   "an unknown label": VPS_ON_PR("bench-vps"),
   "no runs-on": workflow(PR, "  bench:\n    steps:\n      - run: echo\n"),
   "a job named __proto__": workflow(PR, job("__proto__", "self-hosted")),
+  "a job named __proto__ beside a hosted one": workflow(
+    PR,
+    job("lint", "ubuntu-latest") + job("__proto__", "self-hosted"),
+  ),
 };
 
 for (const [name, text] of Object.entries(RULES)) {
@@ -123,6 +127,15 @@ test("red: a .yaml file is read from the directory too", () => {
       assertRed(files, "zz.yaml", "under pull_request");
     },
   );
+});
+
+test("red: a .YML file is read too, whatever the case of its extension", () => {
+  withWorkflowsDir({ "zz.YML": VPS_ON_PR("self-hosted") }, (dir) => {
+    const files = readWorkflows(dir);
+
+    assert.deepEqual(Object.keys(files), ["zz.YML"]);
+    assertRed(files, "zz.YML", "under pull_request");
+  });
 });
 
 test("red: a workflow file that is not valid UTF-8 is refused", () => {
@@ -228,6 +241,10 @@ const READINGS = {
   "indent 4": [
     "name: x\non:\n    pull_request:\njobs:\n    bench:\n        runs-on: self-hosted\n",
     "line reader: a job body before any job key",
+  ],
+  "a quoted event key after a plain one": [
+    workflow('on:\n  push:\n  "pull_request":\n', job("bench", "self-hosted")),
+    "line reader: a line under on: not read",
   ],
   "a quoted event key": [
     workflow('on:\n  "pull_request":\n', job("bench", "self-hosted")),

@@ -367,8 +367,12 @@ export function judge(files, { reader = textModel } = {}) {
   return findings;
 }
 
-/** A workflow name the reader takes: `.yml` and `.yaml` alike. */
-const isWorkflowFile = (name) => /\.ya?ml$/.test(name);
+/**
+ * A workflow name the reader takes: `.yml` and `.yaml` alike, in any case —
+ * whether GitHub runs a `.YML` file is not established, and reading one costs
+ * nothing.
+ */
+const isWorkflowFile = (name) => /\.ya?ml$/i.test(name);
 
 /**
  * Every workflow file of a directory, by name. A file that is not valid UTF-8

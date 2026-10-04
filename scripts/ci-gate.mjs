@@ -40,6 +40,23 @@ export function parseJobs(yaml) {
   return jobs;
 }
 
+/**
+ * The lines of one job below its key, up to the next job or top-level key, or
+ * `undefined` when the workflow has no such job.
+ *
+ * @param {string} yaml
+ * @param {string} jobId
+ * @returns {string[] | undefined}
+ */
+export function jobLines(yaml, jobId) {
+  const lines = yaml.split("\n");
+  const start = lines.findIndex((l) => l.startsWith(`  ${jobId}:`));
+  if (start === -1) return undefined;
+
+  const next = lines.findIndex((l, i) => i > start && /^ {0,2}[^ #]/.test(l));
+  return lines.slice(start + 1, next === -1 ? lines.length : next);
+}
+
 /** A job id as `needs` names it: plain, or in single or double quotes. */
 const NEED = /^(?:([A-Za-z_][\w-]*)|'([A-Za-z_][\w-]*)'|"([A-Za-z_][\w-]*)")$/;
 
@@ -61,12 +78,9 @@ const isBlankOrComment = (line) => /^ *$/.test(line) || /^ *#/.test(line);
  * @returns {string[]}
  */
 export function parseNeeds(yaml, jobId) {
-  const lines = yaml.split("\n");
-  const start = lines.findIndex((l) => l.startsWith(`  ${jobId}:`));
-  if (start === -1) return [];
+  const job = jobLines(yaml, jobId);
+  if (job === undefined) return [];
 
-  const next = lines.findIndex((l, i) => i > start && /^ {0,2}[^ #]/.test(l));
-  const job = lines.slice(start + 1, next === -1 ? lines.length : next);
   const keys = job.flatMap((l, i) => (/^ {4}needs:/.test(l) ? [i] : []));
   const refuse = () => {
     throw new Error(
@@ -286,7 +300,17 @@ export function parseGateStep(yaml) {
   const lines = parseGateScript(yaml).split("\n");
   let always = false;
 
+  let scalar = false;
+
   for (const line of lines) {
+    // A line deeper than the keys continues the key above it: the list of
+    // `needs:` or `steps:`, never the value of `name:`, `runs-on:` or `if:`,
+    // which YAML would fold into the scalar — `if: always()` and a next line
+    // `&& false` would skip the gate, and a skipped gate reports success.
+    if (/^ {5,}\S/.test(line)) {
+      if (scalar) return undefined;
+      continue;
+    }
     if (!/^ {4}[^ ]/.test(line) || /^ {4}#/.test(line)) continue;
 
     const key = /^ {4}([a-z-]+):(.*)$/.exec(line);
@@ -296,6 +320,7 @@ export function parseGateStep(yaml) {
       if (key[2].trim() !== "always()") return undefined;
       always = true;
     }
+    scalar = key[1] === "name" || key[1] === "runs-on" || key[1] === "if";
   }
 
   const step = lines.indexOf("    steps:") + 1;

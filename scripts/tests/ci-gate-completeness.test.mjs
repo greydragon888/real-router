@@ -34,6 +34,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   GATE_JOB,
+  jobLines,
   gateReads,
   parseGateScript,
   parseGateStep,
@@ -94,6 +95,11 @@ export function findViolations(yaml, outsideGate = OUTSIDE_GATE) {
     // A job in `needs` that needs a job outside them is SKIPPED when that one
     // fails, and the gate reads the skip, which its table may allow. Every
     // edge into a job the gate waits for starts inside the gate's `needs`.
+    // A job-level `continue-on-error` may let a failed job report as passed:
+    // what GitHub puts in `needs.<job>.result` then, its docs do not say.
+    continueOnError: [...needs].filter((n) =>
+      (jobLines(yaml, n) ?? []).some((l) => /^ {4}continue-on-error:/.test(l)),
+    ),
     needsOutsideGate: [...needs].flatMap((n) =>
       parseNeeds(yaml, n)
         .filter((d) => !needs.has(d))
@@ -135,6 +141,16 @@ test("fixture: fully wired workflow has no violations", () => {
   assert.deepEqual(v.staleAllowlist, []);
   assert.deepEqual(v.allowlistedButWired, []);
   assert.deepEqual(v.needsOutsideGate, []);
+  assert.deepEqual(v.continueOnError, []);
+});
+
+test("fixture: a gated job with a job-level continue-on-error is caught", () => {
+  const mutated = FIXTURE.replace(
+    "  coverage:\n    needs: [check]\n",
+    "  coverage:\n    needs: [check]\n    continue-on-error: true\n",
+  );
+  const v = findViolations(mutated, new Map([["bundle-size", "info-only"]]));
+  assert.deepEqual(v.continueOnError, ["coverage"]);
 });
 
 // The edge coverage → bundle-size in every form GitHub accepts that parseNeeds
@@ -318,6 +334,15 @@ test("ci.yml: every job the gate waits for needs only jobs the gate waits for", 
       "waits for from one it does not: when that one fails, GitHub skips the " +
       "job, and the gate reads a skip it may allow. Add the upstream job to " +
       `'${GATE_JOB}'.needs, with a row in SKIP_FORBIDDEN.`,
+  );
+});
+
+test("ci.yml: no job the gate waits for carries a job-level continue-on-error", () => {
+  assert.deepEqual(
+    real.continueOnError,
+    [],
+    `job(s) [${real.continueOnError.join(", ")}] in '${GATE_JOB}'.needs carry ` +
+      "`continue-on-error`: a failure there may reach the gate as a pass.",
   );
 });
 
@@ -580,6 +605,22 @@ function states() {
           ),
         ];
 
+        // Pairs: two jobs whose skip is forbidden here, both skipped, so a
+        // script that only fails on one skip at a time is caught too.
+        const forbidden = NEEDS.filter((job) =>
+          SKIP_RULES[SKIP_FORBIDDEN[job]](context),
+        );
+        for (let a = 0; a < forbidden.length; a++) {
+          for (let b = a + 1; b < forbidden.length; b++) {
+            const results = {
+              ...bases[0],
+              [forbidden[a]]: "skipped",
+              [forbidden[b]]: "skipped",
+            };
+            all.set(JSON.stringify([context, results]), { context, results });
+          }
+        }
+
         for (const base of bases) {
           const variants = [base];
 
@@ -726,6 +767,8 @@ function inGate(from, to) {
 }
 
 const OPEN_FORMS = {
+  "if: always() continued on the next line": () =>
+    inGate("    if: always()\n", "    if: always()\n      && false\n"),
   "continue-on-error hidden in a comment behind CR": () =>
     inGate(
       "    steps:\n",
