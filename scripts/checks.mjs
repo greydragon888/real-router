@@ -15,7 +15,9 @@
 /** @typedef {"pre-commit" | "pre-push" | "ci"} Stage */
 
 /**
- * The CI contexts a check can be skipped in, named by `verify --context`:
+ * The CI contexts a check can be skipped in. In CI, `contextsOf` in
+ * `verify.mjs` derives them from the run's facts; `verify --context` names
+ * them by hand:
  * `dependabot-pr` — a PR Dependabot opened; `no-source` — a diff that carries no
  * source; `dependabot-actor-with-dedupe-fixer` — a run Dependabot started while
  * the lockfile fixer can push (`dependabot-dedupe.yml`); `release-pr` — the

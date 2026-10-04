@@ -17,6 +17,8 @@
 //     (exit 127) in CI. An element that is a list is alternatives.
 //   - --context names the CI contexts of this run: a check whose `ciSkip` names
 //     one of them is skipped, with the reason, before its tools are looked for.
+//     In CI without --context, `contextsOf` derives them from the facts the
+//     step passes in its env.
 //   - In CI each check runs in a `::group::`, and $GITHUB_STEP_SUMMARY gets a
 //     table of what ran.
 
@@ -36,6 +38,59 @@ export const CONTEXTS = [
   "release-pr",
 ];
 
+/** The names `contextsOf` reads: the facts Repo Lints' step passes in its env. */
+export const CONTEXT_FACTS = [
+  "PR_AUTHOR",
+  "ACTOR",
+  "HAS_DEDUPE_FIXER",
+  "HEAD_REF",
+  "HEAD_REPO",
+  "REPO",
+  "NO_SOURCE",
+];
+
+const DEPENDABOT = "dependabot[bot]";
+
+/**
+ * The CI contexts a run matches, from the facts in `env`. A fact that is unset
+ * counts as false.
+ *
+ *   - `dependabot-pr`: Dependabot opened the pull request (PR_AUTHOR).
+ *   - `no-source`: its diff carries no source (NO_SOURCE, the `check` job's
+ *     output).
+ *   - `dependabot-actor-with-dedupe-fixer`: Dependabot started the run, and the
+ *     lockfile fixer can push (ACTOR, HAS_DEDUPE_FIXER).
+ *   - `release-pr`: the release PR — its head is exactly
+ *     `changeset-release/master`, compared with case, from this repository,
+ *     and its diff carries no source (HEAD_REF, HEAD_REPO, REPO, NO_SOURCE). A
+ *     branch name is the author's choice, a fork's author included, and a diff
+ *     without source is any dependency bump too, so neither decides alone: one
+ *     source file in the release branch still reaches every check.
+ *
+ * @param {Record<string, string | undefined>} env
+ * @returns {string[]}
+ */
+export function contextsOf(env) {
+  const noSource = env.NO_SOURCE === "true";
+  const contexts = [];
+
+  if (env.PR_AUTHOR === DEPENDABOT) contexts.push("dependabot-pr");
+  if (noSource) contexts.push("no-source");
+  if (env.ACTOR === DEPENDABOT && env.HAS_DEDUPE_FIXER === "true") {
+    contexts.push("dependabot-actor-with-dedupe-fixer");
+  }
+  if (
+    env.HEAD_REF === "changeset-release/master" &&
+    Boolean(env.REPO) &&
+    env.HEAD_REPO === env.REPO &&
+    noSource
+  ) {
+    contexts.push("release-pr");
+  }
+
+  return contexts;
+}
+
 const USAGE =
   "usage: verify.mjs --stage <pre-commit|pre-push|ci> " +
   "[--context <skip>[,<skip>…]] [--registry <file>]";
@@ -44,11 +99,11 @@ class UsageError extends Error {}
 
 /**
  * @param {string[]} argv
- * @returns {{ stage: string, context: string[], registry?: string }}
+ * @returns {{ stage: string, context?: string[], registry?: string }}
  */
 export function parseArgs(argv) {
-  /** @type {{ stage?: string, context: string[], registry?: string }} */
-  const args = { context: [] };
+  /** @type {{ stage?: string, context?: string[], registry?: string }} */
+  const args = {};
 
   for (let i = 0; i < argv.length; i += 2) {
     const [flag, value] = [argv[i], argv[i + 1]];
@@ -62,13 +117,13 @@ export function parseArgs(argv) {
   if (!STAGES.includes(args.stage ?? "")) {
     throw new UsageError(`--stage must be one of ${STAGES.join(", ")}`);
   }
-  for (const context of args.context) {
+  for (const context of args.context ?? []) {
     if (!CONTEXTS.includes(context)) {
       throw new UsageError(`unknown --context: ${context}`);
     }
   }
 
-  return /** @type {{ stage: string, context: string[], registry?: string }} */ (
+  return /** @type {{ stage: string, context?: string[], registry?: string }} */ (
     args
   );
 }
@@ -194,6 +249,8 @@ async function main(argv) {
 
   const inCi = args.stage === "ci";
   const env = { ...gitEnvForStage(args.stage, process.env), VERIFY_STAGE: args.stage };
+  const context = args.context ?? (inCi ? contextsOf(process.env) : []);
+  if (inCi) console.log(`CI contexts: ${context.join(", ") || "none"}`);
 
   /** @type {[string, string, string][]} */
   const rows = [];
@@ -202,7 +259,7 @@ async function main(argv) {
   for (const { check, action, reason } of plan(
     CHECKS,
     args.stage,
-    args.context,
+    context,
     process.env.PATH,
   )) {
     if (failed) {

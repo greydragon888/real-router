@@ -35,12 +35,14 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { jobLines, readLastStep, topLevelKeysClosed, workflowEnvClosed } from "../ci-gate.mjs";
 import { REFUSED_CHARACTERS } from "../refused-characters.mjs";
 import { localEnvVars } from "../git-env.mjs";
+import { CONTEXT_FACTS, CONTEXTS, contextsOf } from "../verify.mjs";
 
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const VERIFY = join(repoRoot, "scripts", "verify.mjs");
 const GIT_ENV_MODULE = pathToFileURL(join(repoRoot, "scripts", "git-env.mjs")).href;
 
-const DROPPED = new Set(["GITHUB_ACTIONS", "GITHUB_STEP_SUMMARY", "VERIFY_STAGE"]);
+// Repo Lints runs this file with the run's facts in its env; a cell passes its own.
+const DROPPED = new Set(["GITHUB_ACTIONS", "GITHUB_STEP_SUMMARY", "VERIFY_STAGE", ...CONTEXT_FACTS]);
 const ENV = {
   ...Object.fromEntries(
     Object.entries(process.env).filter(
@@ -440,92 +442,49 @@ test("--context skips in CI the checks whose ciSkip names it, before looking for
   assert.equal(read(log), "deps\ndocs\ndeps\n");
 });
 
-// ── The release-pr context of Repo Lints ─────────────────────────────────────
+// ── The CI contexts of Repo Lints ────────────────────────────────────────────
 //
-// The `Run the checks` step of ci.yml appends `release-pr` to the context in
-// its script. The cells run that script under `bash -e` with the step's `env:`
-// and nothing else: each value evaluated through a closed set of expressions,
-// and on PATH only a `node` that prints the arguments `verify` would get. The
-// reader takes the script in one closed form that reads only the step's
-// variables, and closes the names every `env:` above it may set: a variable a
-// shell reads at startup would change the script and is not one of them.
+// `contextsOf` in verify.mjs derives a run's contexts from the facts the
+// `Run the checks` step of ci.yml passes in its `env:`, and the cells below
+// hold its table. The wiring is read closed: the workflow's top-level keys and
+// `env:` names, the job's keys — it has no `env:` of its own — and the step,
+// whose `env:` is exactly the facts, each bound to its one expression, and
+// semgrep's pins, and whose script is exactly the call of `verify`. A variable
+// a shell or node reads at startup is not one of those names.
 // ⚠ What earlier steps of the job write to $GITHUB_ENV or $GITHUB_PATH is not
 // read: `.github/actions/setup`, the `pnpm/action-setup` it calls and
-// `astral-sh/setup-uv` write there.
+// `astral-sh/setup-uv` write there. The step's own `env:` wins over
+// $GITHUB_ENV for the names it sets.
 
 const CI = readFileSync(join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");
 const REPOSITORY = "greydragon888/real-router";
-const BASH = execFileSync("bash", ["-c", "command -v bash"], { encoding: "utf8" }).trim();
 
 /** The keys Repo Lints may carry; any other changes how its step runs, or whether. */
-const CHECKS_JOB_KEYS = new Set(["name", "runs-on", "needs", "env", "steps"]);
+const CHECKS_JOB_KEYS = new Set(["name", "runs-on", "needs", "steps"]);
 
-/** The names Repo Lints' `env:` may set. */
-const CHECKS_JOB_ENV = new Set(["HAS_DEDUPE_FIXER", "DEPENDABOT_PR", "NO_SOURCE"]);
-
-/** The job's bindings the `format()` reads, as `evaluate` takes them. */
-const CHECKS_JOB_BINDINGS = {
+/** The step's `env:`: each fact `contextsOf` reads, bound to its expression, and semgrep's pins. */
+const CHECKS_STEP_ENV = {
+  PR_AUTHOR: "${{ github.event.pull_request.user.login }}",
+  ACTOR: "${{ github.actor }}",
   HAS_DEDUPE_FIXER: "${{ secrets.DEPENDABOT_PUSH_TOKEN != '' }}",
-  DEPENDABOT_PR: "${{ github.event.pull_request.user.login == 'dependabot[bot]' }}",
+  HEAD_REF: "${{ github.head_ref }}",
+  HEAD_REPO: "${{ github.event.pull_request.head.repo.full_name }}",
+  REPO: "${{ github.repository }}",
+  NO_SOURCE: "${{ needs.check.outputs.no_source }}",
+  SEMGREP_VERSION: /^"\d+\.\d+\.\d+"$/,
+  SEMGREP_EXCLUDE_NEWER: /^"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ"$/,
 };
 
-/** The names the step's `env:` may set. */
-const CHECKS_STEP_ENV = new Set([
-  "VERIFY_CONTEXT",
-  "HEAD_REF",
-  "HEAD_REPO",
-  "REPO",
-  "NO_SOURCE",
-  "SEMGREP_VERSION",
-  "SEMGREP_EXCLUDE_NEWER",
-]);
-
-/** The `format()` of the step's other contexts, as ci.yml writes it. */
-const OTHER_CONTEXTS =
-  "format('{0},{1},{2}', env.DEPENDABOT_PR == 'true' && 'dependabot-pr' || '', " +
-  "env.NO_SOURCE == 'true' && 'no-source' || '', " +
-  "(github.actor == 'dependabot[bot]' && env.HAS_DEDUPE_FIXER == 'true') && " +
-  "'dependabot-actor-with-dedupe-fixer' || '')";
-
-const isBlank = (line) => /^ *$/.test(line);
-const isComment = (line) => /^ *#/.test(line);
+/** The step's script. */
+const CHECKS_SCRIPT = "node scripts/verify.mjs --stage ci\n";
 
 /**
- * Whether a script is in its one closed form: `if [[ … ]]; then` over
- * `&&`-joined equalities of a quoted step variable and a quoted plain literal
- * or another step variable, one line appending a context to VERIFY_CONTEXT,
- * `fi`, and the call of `verify`. A command, a pipe, a redirection, `||`, a
- * file test, a shell option or an expression falls outside it.
- */
-function scriptClosed(script, env) {
-  const lines = script.split("\n").slice(0, -1);
-  const head = /^if \[\[ (.+) \]\]; then$/.exec(lines[0] ?? "");
-  const bound = (name) => name === undefined || Object.hasOwn(env, name);
-
-  return (
-    lines.length === 4 &&
-    head !== null &&
-    head[1].split(" && ").every((part) => {
-      const equality =
-        /^"\$([A-Z_][A-Z0-9_]*)" == (?:"\$([A-Z_][A-Z0-9_]*)"|"[A-Za-z0-9/._-]+")$/.exec(part);
-      return equality !== null && bound(equality[1]) && bound(equality[2]);
-    }) &&
-    /^ {2}VERIFY_CONTEXT="\$VERIFY_CONTEXT,[a-z-]+"$/.test(lines[1]) &&
-    lines[2] === "fi" &&
-    lines[3] === 'node scripts/verify.mjs --stage ci --context "$VERIFY_CONTEXT"' &&
-    bound("VERIFY_CONTEXT")
-  );
-}
-
-/**
- * Repo Lints' `Run the checks` step in the one shape the cells execute. The
- * workflow's top-level keys and its `env:` names are closed (`scripts/ci-gate.mjs`),
- * the job's keys are those above, every `env:` holds one `NAME: value` per
- * line of the names its list admits, the step is read by `readLastStep`, the
- * script is in its closed form, and the job binds NO_SOURCE, which the
- * `format()` reads, as the step does. Only an ASCII space indents, and a
- * character `REFUSED_CHARACTERS` names is refused anywhere in the file. Any
- * other shape returns `undefined`.
+ * Repo Lints' `Run the checks` step, read closed. The workflow holds none of
+ * the characters `REFUSED_CHARACTERS` names, its top-level keys and `env:`
+ * names are closed (`scripts/ci-gate.mjs`), the job's keys are those above,
+ * the step is read by `readLastStep` with the names of `CHECKS_STEP_ENV`, each
+ * bound as it says, and its script is `CHECKS_SCRIPT`. Any other shape returns
+ * `undefined`.
  *
  * @param {string} yaml the text of ci.yml
  * @returns {{ env: Record<string, string>, run: string } | undefined}
@@ -542,85 +501,85 @@ function parseChecksStep(yaml) {
     return undefined;
   }
   if (!job) return undefined;
-  const jobEnv = {};
-  let inEnv = false;
 
   for (const line of job) {
-    if (/^ {4}[^ #]/.test(line)) {
-      const key = /^ {4}([a-z-]+):/.exec(line);
-      if (!key || !CHECKS_JOB_KEYS.has(key[1])) return undefined;
-      inEnv = line === "    env:";
-      continue;
-    }
-    if (!inEnv || isBlank(line) || isComment(line)) continue;
-    const entry = /^ {6}([A-Z_][A-Z0-9_]*): (.+)$/.exec(line);
-    if (!entry || !CHECKS_JOB_ENV.has(entry[1])) return undefined;
-    jobEnv[entry[1]] = entry[2];
+    if (!/^ {4}[^ #]/.test(line)) continue;
+    const key = /^ {4}([a-z-]+):/.exec(line);
+    if (!key || !CHECKS_JOB_KEYS.has(key[1])) return undefined;
   }
 
   const at = job.indexOf("      - name: Run the checks");
-  const step = at === -1 ? undefined : readLastStep(job, at, CHECKS_STEP_ENV);
+  const names = Object.keys(CHECKS_STEP_ENV);
+  const step = at === -1 ? undefined : readLastStep(job, at, new Set(names));
 
-  if (!step || jobEnv.NO_SOURCE !== step.env.NO_SOURCE) return undefined;
-  if (Object.entries(CHECKS_JOB_BINDINGS).some(([name, value]) => jobEnv[name] !== value)) {
-    return undefined;
+  if (!step || step.run !== CHECKS_SCRIPT) return undefined;
+  if (Object.keys(step.env).length !== names.length) return undefined;
+
+  for (const [name, bound] of Object.entries(CHECKS_STEP_ENV)) {
+    const value = step.env[name];
+    if (value === undefined) return undefined;
+    if (bound instanceof RegExp ? !bound.test(value) : value !== bound) return undefined;
   }
 
-  return scriptClosed(step.run, step.env) ? step : undefined;
+  return step;
 }
 
-/** What the runner puts in place of an expression in one cell; any other is refused. */
-function evaluate(expression, cell) {
-  if (expression === "github.head_ref") return cell.branch;
-  if (expression === "github.event.pull_request.head.repo.full_name") return cell.headRepo;
-  if (expression === "github.repository") return REPOSITORY;
-  if (expression === "needs.check.outputs.no_source") return String(cell.noSource);
-  // On a pull request Dependabot neither opened nor started, where the job's
-  // NO_SOURCE is the same output as the step's.
-  if (expression === OTHER_CONTEXTS) return `,${cell.noSource ? "no-source" : ""},`;
-  throw new Error(`the harness does not know the expression: ${expression}`);
-}
+/** Every fact set, the way the release PR of a run Dependabot started would set them. */
+const ALL_FACTS = {
+  PR_AUTHOR: "dependabot[bot]",
+  ACTOR: "dependabot[bot]",
+  HAS_DEDUPE_FIXER: "true",
+  HEAD_REF: "changeset-release/master",
+  HEAD_REPO: REPOSITORY,
+  REPO: REPOSITORY,
+  NO_SOURCE: "true",
+};
 
-/** An `env:` value as the runner sets it: one whole expression, or a double-quoted literal. */
-function envValue(text, cell) {
-  const expression = /^\$\{\{ (.+) \}\}$/.exec(text);
-  if (expression) return evaluate(expression[1], cell);
-  if (/^"[^"\\]*"$/.test(text) && !text.includes("${{")) return text.slice(1, -1);
-  throw new Error(`the harness does not read the value: ${text}`);
-}
+test("Repo Lints' step binds the facts and calls verify, and nothing else", () => {
+  assert.ok(parseChecksStep(CI), "parseChecksStep() could not read Repo Lints' `Run the checks` step");
+});
 
-let nodeStub;
+test("contextsOf reads exactly the facts the step binds, and can name every context verify knows", () => {
+  // Read with every fact set and with none: a read behind `&&` shows in the
+  // first, one behind `||` in the second.
+  const read = new Set();
+  const recording = (facts) =>
+    new Proxy(facts, {
+      get(target, name) {
+        read.add(name);
+        return target[name];
+      },
+    });
+  const contexts = contextsOf(recording(ALL_FACTS));
+  contextsOf(recording({}));
 
-/** The contexts the step passes to `verify` in one cell. */
-function checksStepContexts(step, cell) {
-  if (!nodeStub) {
-    nodeStub = fresh("node-stub");
-    writeFileSync(join(nodeStub, "node"), "#!/bin/sh\nprintf '%s\\n' \"$@\"\n");
-    chmodSync(join(nodeStub, "node"), 0o755);
+  assert.deepEqual([...read].sort(), [...CONTEXT_FACTS].sort());
+  assert.deepEqual(
+    Object.keys(CHECKS_STEP_ENV).filter((name) => !name.startsWith("SEMGREP_")).sort(),
+    [...CONTEXT_FACTS].sort(),
+  );
+  assert.deepEqual(contexts, CONTEXTS);
+});
+
+test("each context holds on its own facts, and an unset fact is false", () => {
+  assert.deepEqual(contextsOf({}), []);
+  assert.deepEqual(contextsOf({ PR_AUTHOR: "dependabot[bot]" }), ["dependabot-pr"]);
+  assert.deepEqual(contextsOf({ PR_AUTHOR: "octocat" }), []);
+  assert.deepEqual(contextsOf({ NO_SOURCE: "true" }), ["no-source"]);
+  assert.deepEqual(contextsOf({ NO_SOURCE: "false" }), []);
+  for (const [actor, fixer, expected] of [
+    ["dependabot[bot]", "true", ["dependabot-actor-with-dedupe-fixer"]],
+    ["dependabot[bot]", "false", []],
+    ["octocat", "true", []],
+    ["octocat", "false", []],
+  ]) {
+    assert.deepEqual(contextsOf({ ACTOR: actor, HAS_DEDUPE_FIXER: fixer }), expected, `${actor}, fixer ${fixer}`);
   }
-
-  const env = { PATH: nodeStub };
-
-  for (const [name, text] of Object.entries(step.env)) {
-    env[name] = envValue(text, cell);
-  }
-
-  const file = join(fresh("checks-step"), "step.sh");
-  writeFileSync(file, step.run);
-
-  const run = spawnSync(BASH, ["-e", file], { env, encoding: "utf8" });
-  assert.equal(run.status, 0, run.stdout + run.stderr);
-
-  const args = run.stdout.split("\n").slice(0, -1);
-  assert.deepEqual(args.slice(0, -1), ["scripts/verify.mjs", "--stage", "ci", "--context"]);
-
-  return args.at(-1).split(",").filter(Boolean);
-}
+  // Two unset repositories are not one repository.
+  assert.deepEqual(contextsOf({ HEAD_REF: "changeset-release/master", NO_SOURCE: "true" }), ["no-source"]);
+});
 
 test("release-pr is the context of one cell: changeset-release/master, this repository, no source", () => {
-  const step = parseChecksStep(CI);
-  assert.ok(step, "parseChecksStep() could not read Repo Lints' `Run the checks` step");
-
   const cells = [];
   for (const branch of [
     "changeset-release/master",
@@ -631,7 +590,13 @@ test("release-pr is the context of one cell: changeset-release/master, this repo
     for (const headRepo of [REPOSITORY, "someone/real-router"]) {
       for (const noSource of [true, false]) {
         const cell = { branch, headRepo, noSource };
-        cells.push({ cell, contexts: checksStepContexts(step, cell) });
+        const contexts = contextsOf({
+          HEAD_REF: branch,
+          HEAD_REPO: headRepo,
+          REPO: REPOSITORY,
+          NO_SOURCE: String(noSource),
+        });
+        cells.push({ cell, contexts });
       }
     }
   }
@@ -645,22 +610,35 @@ test("release-pr is the context of one cell: changeset-release/master, this repo
     assert.deepEqual(
       contexts.filter((context) => context !== "release-pr"),
       cell.noSource ? ["no-source"] : [],
-      "the contexts from format() pass through",
     );
   }
+});
 
-  // verify knows the context, and skips a check whose ciSkip names it.
-  const log = join(fresh("release-pr"), "log");
+test("in CI without --context, verify takes the contexts from the facts in its env", () => {
+  const log = join(fresh("ci-facts"), "log");
   const file = registry([
     writes("audit", log, "audit\n", ["ci"], { ciSkip: ["release-pr"] }),
     writes("deps", log, "deps\n", ["ci"]),
   ]);
-  const release = cells.find(({ contexts }) => contexts.includes("release-pr")).contexts;
-  const ci = verify(["--stage", "ci", "--context", release.join(","), "--registry", file]);
+  const facts = {
+    HEAD_REF: "changeset-release/master",
+    HEAD_REPO: REPOSITORY,
+    REPO: REPOSITORY,
+    NO_SOURCE: "true",
+  };
 
+  const ci = verify(["--stage", "ci", "--registry", file], { env: facts });
   assert.equal(ci.status, 0, ci.stdout + ci.stderr);
+  assert.match(ci.stdout, /CI contexts: no-source, release-pr/);
   assert.match(ci.stdout, /SKIP audit: ciSkip release-pr/);
   assert.equal(read(log), "deps\n");
+
+  // --context, when given, is the whole answer, and the facts are not asked.
+  const given = verify(["--stage", "ci", "--context", "no-source", "--registry", file], {
+    env: facts,
+  });
+  assert.equal(given.status, 0, given.stdout + given.stderr);
+  assert.doesNotMatch(given.stdout, /SKIP audit/);
 });
 
 /** ci.yml with one change inside Repo Lints, which must occur once there. */
@@ -679,7 +657,7 @@ function inChecksJob(from, to) {
   ].join("\n");
 }
 
-const LAST_LINE = '          node scripts/verify.mjs --stage ci --context "$VERIFY_CONTEXT"\n';
+const LAST_LINE = "          node scripts/verify.mjs --stage ci\n";
 
 const CHECKS_STEP_FORMS = {
   "continue-on-error hidden in a comment behind CR": () =>
@@ -702,8 +680,6 @@ const CHECKS_STEP_FORMS = {
   "workflow-level defaults behind a BOM": () =>
     CI.replace(/^jobs:\n/m, "\uFEFFdefaults:\n  run:\n    shell: sh\n\njobs:\n"),
   "BASH_ENV in the workflow's env": () => CI.replace(/^env:\n/m, "env:\n  BASH_ENV: ./x.sh\n"),
-  "SHELLOPTS in the job's env": () =>
-    inChecksJob("\n    env:\n", "\n    env:\n      SHELLOPTS: nocasematch\n"),
   "BASH_ENV in the step's env": () =>
     inChecksJob(
       "          REPO: ${{ github.repository }}\n",
@@ -722,33 +698,19 @@ const CHECKS_STEP_FORMS = {
     inChecksJob(LAST_LINE, `${LAST_LINE}\n      - name: Extra\n        run: echo\n`),
   "an expression in the script": () =>
     inChecksJob(LAST_LINE, `          echo '\${{ github.sha }}'\n${LAST_LINE}`),
-  "the script reading what the job binds": () =>
-    inChecksJob(LAST_LINE, `          echo "$HAS_DEDUPE_FIXER"\n${LAST_LINE}`),
-  "a command in the condition": () =>
-    inChecksJob(
-      " ]]; then\n",
-      " ]] || git rev-parse -q --verify refs/remotes/origin/changeset-release/master; then\n",
-    ),
-  "a file test in the condition": () => inChecksJob(" ]]; then\n", " && -f .release ]]; then\n"),
-  "a shell option before the condition": () =>
-    inChecksJob("          if [[ ", "          shopt -s nocasematch\n          if [[ "),
-  "the step no longer binding NO_SOURCE": () =>
+  "an env of the job": () =>
+    inChecksJob("    needs: [check]\n", "    needs: [check]\n    env:\n      SHELLOPTS: nocasematch\n"),
+  "a fact the step no longer binds": () =>
     inChecksJob("          NO_SOURCE: ${{ needs.check.outputs.no_source }}\n", ""),
-  "the job binding HAS_DEDUPE_FIXER to a constant": () =>
+  "a fact bound to another expression": () =>
+    inChecksJob("          HEAD_REF: ${{ github.head_ref }}\n", "          HEAD_REF: ${{ github.ref_name }}\n"),
+  "a fact bound to a constant": () =>
     inChecksJob(
-      "      HAS_DEDUPE_FIXER: ${{ secrets.DEPENDABOT_PUSH_TOKEN != '' }}\n",
-      '      HAS_DEDUPE_FIXER: "true"\n',
+      "          HAS_DEDUPE_FIXER: ${{ secrets.DEPENDABOT_PUSH_TOKEN != '' }}\n",
+      '          HAS_DEDUPE_FIXER: "true"\n',
     ),
-  "the job binding DEPENDABOT_PR to a constant": () =>
-    inChecksJob(
-      "      DEPENDABOT_PR: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}\n",
-      '      DEPENDABOT_PR: "true"\n',
-    ),
-  "the job binding NO_SOURCE otherwise than the step": () =>
-    inChecksJob(
-      "\n      NO_SOURCE: ${{ needs.check.outputs.no_source }}\n",
-      '\n      NO_SOURCE: "true"\n',
-    ),
+  "a --context that would replace the facts": () =>
+    inChecksJob(LAST_LINE, '          node scripts/verify.mjs --stage ci --context ""\n'),
 };
 
 for (const [name, mutate] of Object.entries(CHECKS_STEP_FORMS)) {
@@ -760,19 +722,6 @@ for (const [name, mutate] of Object.entries(CHECKS_STEP_FORMS)) {
     assert.equal(parseChecksStep(mutated), undefined);
   });
 }
-
-test("a value the harness does not read is refused, not guessed", () => {
-  const cell = { branch: "b", headRepo: REPOSITORY, noSource: true };
-
-  assert.throws(() => envValue("${{ github.sha }}", cell), /does not know the expression: github\.sha/);
-  assert.throws(
-    () => envValue("${{ format('{0},release-pr', '') }}", cell),
-    /does not know the expression: format/,
-  );
-  assert.throws(() => envValue('"${{ github.head_ref }}"', cell), /does not read the value/);
-  assert.throws(() => envValue("plain", cell), /does not read the value/);
-  assert.equal(envValue('"1.178.0"', cell), "1.178.0");
-});
 
 // ── CI output ────────────────────────────────────────────────────────────────
 

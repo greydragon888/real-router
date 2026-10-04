@@ -13483,6 +13483,8 @@ Kept, because none of them points at a record: measurement dates, which say when
 
 ## Repo Lints runs on every pull request, and the release PR skips `lint:audit` (2026-10-03)
 
+> **Updated (2026-10-04).** The contexts come from `contextsOf` in `scripts/verify.mjs` now, fed by the facts the step passes; the script below and the harness that ran it are gone ("Repo Lints passes the run's facts, and `verify.mjs` derives the CI contexts").
+
 **Problem.** Repo Lints ran only when `check` found code in the diff (`should_run`). On a pull request of Markdown and `.github/**` outside `.github/actions/**` it did not start, so no check of the `ci` stage ran in CI. Among them is `node:scripts-tests`, whose tests read `.github`, the self-hosted trigger rule included. A workflow edit that turned one of them red passed `CI Result` as "Skipped — no code changes". Since release PRs started taking the pipeline on 2026-09-16, such runs were 15 of 274 pull-request runs of `ci.yml`, 11 of them Dependabot's (GitHub API, to 2026-10-03). Separately, `lint:audit`, in CI since 2026-09-30 with release PRs included, fails every run that reaches it from the moment OSV records an advisory against a locked package until the tree is fixed or the advisory allowlisted, so a release could stall on an advisory its release PR did not bring.
 
 **Solution.**
@@ -13622,3 +13624,17 @@ zizmor did not report one more: `sonar-trusted.yml` holds four scanner arguments
 - 24 local actions referenced as `./`. GitHub's `$/`, which reads an action of the same repository from the commit instead of the working directory, waits for actionlint: 1.7.12, its latest release, refuses it.
 
 **Measured.** After the change, the same run reports 139 findings, and the deliberate ones above are all of them but four: the Dependabot entries keep its default three-day cooldown, where zizmor asks for seven. The same run online, with a token, finds no impostor commit, version mismatch or known-vulnerable action; a control that pins `pnpm/action-setup` to a SHA the repository does not hold gets both an `impostor-commit` and a `ref-version-mismatch`. `actionlint` and all of `scripts/tests` pass.
+
+## Repo Lints passes the run's facts, and `verify.mjs` derives the CI contexts (2026-10-04)
+
+**Problem.** Repo Lints' step "Run the checks" decided the CI contexts in the workflow: `release-pr` in a fragment of its `run:` script, the other three in a `format()` expression of its `env:`. `verify.test.mjs` tested that decision the only way a script in a workflow can be tested — by running it under `bash` with the values the runner would give it. So the test held a closed grammar of the script, an evaluator of the expressions it knew, and closed lists of every `env:` above the step, and two review rounds widened them, each time by a form of input the runner could differ in.
+
+**Solution.**
+
+- `contextsOf(env)` in `scripts/verify.mjs` derives the four contexts from seven facts: the pull request's author, the run's actor, whether the lockfile fixer can push, the head ref, the head repository, this repository, and whether the diff carries source. `CONTEXT_FACTS` names them. `verify --stage ci` without `--context` asks `contextsOf` and prints the contexts it got; `--context` still names them by hand.
+- The step passes the facts in its own `env:`, which an earlier step's `$GITHUB_ENV` cannot override, and its script is the one line `node scripts/verify.mjs --stage ci`. The job has no `env:` of its own.
+- `verify.test.mjs` holds the table of `contextsOf` directly: each context on its own facts, an unset fact as false, the 16 cells of `release-pr`, and that it reads exactly the facts the step binds. The step is still read closed — the workflow's keys and `env:` names, the job's keys, the step's `env:` exactly the facts bound to their expressions, its script exactly the call — but nothing executes it.
+
+**Why.** A decision in a workflow's script is tested by executing the script, and every way the runner's input can differ becomes a form the test has to close. In a module it is a function of its inputs, and the workflow only passes them.
+
+**Measured.** 11 mutants of `contextsOf` and of the choice between `--context` and the facts each fail a cell. One of them, a read of a fact the step does not bind, failed only once the reads were recorded with every fact set and with none: a read behind `||` shows only when the left side is false.
