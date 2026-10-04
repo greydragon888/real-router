@@ -2,6 +2,7 @@
 
 import type { LoggerPluginConfig } from "./types";
 
+/** The context the plugin logs under. */
 export const LOGGER_CONTEXT = "logger-plugin";
 
 export const ERROR_PREFIX = `[@real-router/${LOGGER_CONTEXT}]`;
