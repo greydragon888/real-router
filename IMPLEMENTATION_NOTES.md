@@ -2959,6 +2959,8 @@ The three low-severity residuals left open by the 2026-07-03 audit wave (re-audi
 
 ### CI gate needs-completeness meta-test — the structural preventer for the #1127 class
 
+> **Updated (2026-10-04).** The extractors read through the `yaml` parser now, held closed by `scripts/closed-yaml.mjs`: at 383 lines, and after three rounds of fixes for forms they read otherwise than GitHub, "the extractors are ~30 lines and fail closed" no longer held ("The gate and Repo Lints read ci.yml through the `yaml` parser, closed").
+
 **Problem.** The gate model is "one required status check": the `ci` (CI Result) job aggregates every other ci.yml job via `needs` + explicit result checks, and the `protect-master` ruleset requires only that context. The model's failure mode is silent and recurrent: a job not wired into the gate's `needs` goes red while the PR stays mergeable. It already happened once (#1127 — `coverage` with the R2.4 shard-integrity guard ran, failed loudly, gated nothing), and nothing structural prevented the next occurrence: a job added tomorrow is outside the gate _by default_, `actionlint` cannot flag it (an unwired job is perfectly valid YAML), and review has to notice an _absence_. This is debt-map axis A6 ("every CI layer derives its own model of what must run; model-vs-reality drift defaults to silent green") — the per-site fixes landed as #1127/#1133/#1128 above, this is the class preventer.
 
 **Solution.** `scripts/ci-gate-completeness.test.mjs` — stdlib `node:test`, picked up automatically by the existing repo-lints glob step (`node --test scripts/*.test.mjs`, renamed "Test CI meta …"), so the preventer needed zero wiring of its own. Two single-purpose fail-closed extractors (top-level job ids; the gate's `needs` in flow and block styles) feed a pure `findViolations()` that asserts: (1) every job is in the gate's `needs` or in the in-test `OUTSIDE_GATE` allowlist, each entry carrying a written reason (today: `duplication` — informational jscpd SARIF channel, the hard threshold deliberately lives pre-push-only per #813; `bundle-size` — informational size-limit PR comment, "not a gate" by design per infra-review W4 §3.4); (2) the gate's `needs` reference existing jobs only (catches renames under the gate); (3) the allowlist is current — an entry that disappeared from ci.yml _or_ got wired into `needs` after all fails the test. Fixtures inside the same file exercise every violation kind, so the check's discriminating power does not depend on the current (healthy) ci.yml.
@@ -13466,6 +13468,8 @@ Kept, because none of them points at a record: measurement dates, which say when
 
 ## The gate fails on any job in needs that neither passed nor was skipped (2026-10-03)
 
+> **Updated (2026-10-04).** `lastStep` reads the gate's step through the `yaml` parser: its keys are `name`, `env` and `run`, and its script is a literal block in any chomping or indentation — `|`, `|-`, `|+`, `|2` ("The gate and Repo Lints read ci.yml through the `yaml` parser, closed").
+
 **Problem.** The `CI Result` gate read the results of its `needs` one by one, and some reads sat after the exit on `should_run` or in the branch of the other mode (`leaf` or `sharded`). A job the script did not read on a path could fail or be cancelled while the gate stayed green. No such state was reachable — the planning steps of `check` run only when `should_run` is `true`, so the jobs they gate are skipped otherwise — but an edit to a job's `if:` or to a planning step would have opened one without a word.
 
 **Solution.**
@@ -13506,6 +13510,8 @@ Kept, because none of them points at a record: measurement dates, which say when
 On CI, after the push: PR #2660, of Markdown alone, ran all 13 checks of the `ci` stage in Repo Lints in 109 s and passed, and `CI Result` reported "Skipped — no code changes (actionlint, prose-lint and repo-lints passed)" 133 s after the run started. PR #2661 added a `paths:` entry naming no directory to `wiki-checkers.yml` and was pushed with `--no-verify`: Repo Lints failed in `node:scripts-tests` on that entry, and `CI Result` failed at its aggregate with `repo-lints: failure`. Both were closed. Neither run exported turbo metrics: the pipeline skipped, and Repo Lints runs turbo only for dry runs and queries.
 
 ## The gate test holds the `needs` of every job the gate waits for inside the gate's `needs` (2026-10-04)
+
+> **Updated (2026-10-04).** `parseNeeds` reads `needs` through the `yaml` parser: a form is read or refused, never read as none; `readLastStep` gave way to `lastStep` ("The gate and Repo Lints read ci.yml through the `yaml` parser, closed").
 
 > **Updated (2026-10-04).** `refused-characters.mjs` is in `scripts/`, not `scripts/lib/`: "A task's key holds every module of `scripts/` it loads, and `scripts/lib/` holds only such modules".
 
@@ -13638,3 +13644,25 @@ zizmor did not report one more: `sonar-trusted.yml` holds four scanner arguments
 **Why.** A decision in a workflow's script is tested by executing the script, and every way the runner's input can differ becomes a form the test has to close. In a module it is a function of its inputs, and the workflow only passes them.
 
 **Measured.** 11 mutants of `contextsOf` and of the choice between `--context` and the facts each fail a cell. One of them, a read of a fact the step does not bind, failed only once the reads were recorded with every fact set and with none: a read behind `||` shows only when the left side is false.
+
+## The gate and Repo Lints read ci.yml through the `yaml` parser, closed (2026-10-04)
+
+**Problem.** `scripts/ci-gate.mjs` read ci.yml line by line — `parseJobs`, `jobLines`, `parseNeeds`, `readLastStep`, `parseGateStep`, `topLevelKeysClosed`, `workflowEnvClosed`. The #1127 entry chose that over a YAML library: "the extractors are ~30 lines and fail closed". They had grown to 383 lines, and three rounds of fixes in one day answered forms the audits of RFC-4 found them reading otherwise than GitHub: a multi-line or scalar `needs` read as none, and a key behind a lone CR, NEL, LS or PS went unread; a quoted key, or one with a space before its colon, read as absent; a continuation line under `if: always()` could have skipped the gate. Each round extended the grammar by the forms just found, or refused them.
+
+**Solution.**
+
+- `scripts/closed-yaml.mjs` reads a document with the `yaml` parser and refuses each form GitHub's reader may take otherwise and each form the readers here do not read:
+  - a lone CR, NEL, LS or PS, at which GitHub's scanner breaks a line and `yaml` does not, and a tab or another control character (`REFUSED_CHARACTERS`, which the line readers of workflows share);
+  - a BOM or a no-break space: content to every reader, and invisible;
+  - a directive, a text that is not one document, a parse error or warning, a duplicate key;
+  - an alias, an anchor, an explicit tag, a merge key and a key that is not a scalar. GitHub reads anchors and aliases; the readers here take each node as written.
+
+  A refusal at a node names the keys above it.
+- `scripts/ci-gate.mjs` reads through it. A key quoted or with a space before its colon is read as that key, so a quoted job id, `"needs":`, `needs :` and `"continue-on-error":` carry their violations into the test like any other key. What a reader takes is still held to a closed shape: a job id and a `needs` item are identifiers; the gate job has only its five keys, its name is the context the ruleset requires, its `runs-on` has the form of a GitHub-hosted label, its `if:` is a plain `always()`, and it has one step; a step the tests read has the keys `name`, `env` and `run`, an `env:` that is a mapping of the names it admits, with values as the file writes them, quotes included (`sourceOf`), and a literal block for its script. The workflow's `env:` must be a mapping too: an expression in its place — the runner's workflow schema admits one; not tried on a run — is refused.
+- `jobLines` and `readLastStep` give way to `jobKeys` and `lastStep`, through which `verify.test.mjs` reads Repo Lints' step.
+
+**Why the parser now.** The case for the line reader was its size: a few lines that fail closed. It was neither small nor closed any more. A parser reads every spelling of a key alike, so the class of misread keys goes. What stays is a short list in one place: the characters GitHub's scanner breaks a line at and `yaml` does not, and the forms the readers here do not read. Plain values need no list: GitHub's workflow reader (`YamlObjectReader.cs` in actions/runner) types them by the YAML 1.2 core schema, as `yaml` does, so `yes`, `on` and `0777` read alike in both.
+
+**Scope.** Every tracked YAML file of `.github` must read closed: a cell of `closed-yaml.test.mjs` reads them all, and `checks-registry.test.mjs` reads the jobs of every workflow through `parseJobs`. An anchor, an alias, a tag or a merge key in any workflow is therefore red, though GitHub reads the first two. The other workflow tests stay line readers.
+
+**Measured.** All 24 tracked YAML files of `.github` read closed. `closed-yaml.test.mjs` holds each refused form, and neighbours still read: plain values typed as GitHub types them, `on` as a key, CRLF line ends. In the gate test the five key spellings are read and their violations caught; the `needs` forms stay refused, five of them now by the module — an alias, an anchor and a tag by path, an unclosed flow sequence and a second `needs` key in the parser's own words. New cells cover a step before `Determine result`, a folded script, a job id that is not an identifier, a read of a job's result outside the gate job, an `env:` given as an expression at either level, a quoted `if:` and a gate job that is not a mapping. 38 mutants of the two modules each fail a cell.

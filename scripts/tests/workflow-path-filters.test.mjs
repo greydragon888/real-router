@@ -7,10 +7,10 @@
 // failure, so this reads all of them: the literal part of each pattern, up to
 // its first glob character, must exist in the tree.
 //
-// Deliberately NOT a YAML library, like the other workflow tests here: one shape
-// is read, a `paths:` or `paths-ignore:` key followed by a block list. A key
-// written any other way is refused rather than skipped, so a filter this cannot
-// read is never counted as one that passed.
+// Deliberately NOT a YAML library: one shape is read, a `paths:` or
+// `paths-ignore:` key followed by a block list. A key written any other way is
+// refused rather than skipped, so a filter this cannot read is never counted
+// as one that passed.
 
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";

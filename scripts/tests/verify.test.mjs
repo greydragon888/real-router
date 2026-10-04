@@ -32,8 +32,7 @@ import { delimiter, dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { jobLines, readLastStep, topLevelKeysClosed, workflowEnvClosed } from "../ci-gate.mjs";
-import { REFUSED_CHARACTERS } from "../refused-characters.mjs";
+import { jobKeys, lastStep, topLevelKeysClosed, workflowEnvClosed } from "../ci-gate.mjs";
 import { localEnvVars } from "../git-env.mjs";
 import { CONTEXT_FACTS, CONTEXTS, contextsOf } from "../verify.mjs";
 
@@ -479,10 +478,10 @@ const CHECKS_STEP_ENV = {
 const CHECKS_SCRIPT = "node scripts/verify.mjs --stage ci\n";
 
 /**
- * Repo Lints' `Run the checks` step, read closed. The workflow holds none of
- * the characters `REFUSED_CHARACTERS` names, its top-level keys and `env:`
+ * Repo Lints' `Run the checks` step, read closed. The workflow reads closed
+ * (`readClosedYaml`), its top-level keys and `env:`
  * names are closed (`scripts/ci-gate.mjs`), the job's keys are those above,
- * the step is read by `readLastStep` with the names of `CHECKS_STEP_ENV`, each
+ * the step is read by `lastStep` with the names of `CHECKS_STEP_ENV`, each
  * bound as it says, and its script is `CHECKS_SCRIPT`. Any other shape returns
  * `undefined`.
  *
@@ -490,27 +489,18 @@ const CHECKS_SCRIPT = "node scripts/verify.mjs --stage ci\n";
  * @returns {{ env: Record<string, string>, run: string } | undefined}
  */
 function parseChecksStep(yaml) {
-  if (REFUSED_CHARACTERS.test(yaml) || !topLevelKeysClosed(yaml) || !workflowEnvClosed(yaml)) {
-    return undefined;
-  }
+  if (!topLevelKeysClosed(yaml) || !workflowEnvClosed(yaml)) return undefined;
 
-  let job;
+  let keys;
   try {
-    job = jobLines(yaml, "repo-lints");
+    keys = jobKeys(yaml, "repo-lints");
   } catch {
     return undefined;
   }
-  if (!job) return undefined;
+  if (!keys || !keys.every((key) => CHECKS_JOB_KEYS.has(key))) return undefined;
 
-  for (const line of job) {
-    if (!/^ {4}[^ #]/.test(line)) continue;
-    const key = /^ {4}([a-z-]+):/.exec(line);
-    if (!key || !CHECKS_JOB_KEYS.has(key[1])) return undefined;
-  }
-
-  const at = job.indexOf("      - name: Run the checks");
   const names = Object.keys(CHECKS_STEP_ENV);
-  const step = at === -1 ? undefined : readLastStep(job, at, new Set(names));
+  const step = lastStep(yaml, "repo-lints", "Run the checks", new Set(names));
 
   if (!step || step.run !== CHECKS_SCRIPT) return undefined;
   if (Object.keys(step.env).length !== names.length) return undefined;
@@ -643,18 +633,17 @@ test("in CI without --context, verify takes the contexts from the facts in its e
 
 /** ci.yml with one change inside Repo Lints, which must occur once there. */
 function inChecksJob(from, to) {
-  const lines = CI.split("\n");
-  const start = lines.indexOf("  repo-lints:");
-  const end = start + 1 + jobLines(CI, "repo-lints").length;
-  const job = lines.slice(start + 1, end).join("\n");
+  const key = "\n  repo-lints:\n";
+  const start = CI.indexOf(key) + key.length;
+  // The job ends at the next line a job key or a top-level key leads.
+  const next = /\n {0,2}[^\s#]/g;
+  next.lastIndex = start - 1;
+  const end = next.exec(CI)?.index ?? CI.length;
+  const job = CI.slice(start, end);
 
   assert.equal(job.split(from).length, 2, `not exactly once in Repo Lints: ${from}`);
 
-  return [
-    ...lines.slice(0, start + 1),
-    job.replace(from, () => to),
-    ...lines.slice(end),
-  ].join("\n");
+  return CI.slice(0, start) + job.replace(from, () => to) + CI.slice(end);
 }
 
 const LAST_LINE = "          node scripts/verify.mjs --stage ci\n";

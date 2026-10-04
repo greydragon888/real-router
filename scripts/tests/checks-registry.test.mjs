@@ -21,8 +21,10 @@
 //   - Each lint task runs in a gating ci.yml job whose line no static
 //     `--filter` narrows below the packages that declare the task (#2370).
 //
-// Stdlib only, and not a YAML library: each extractor reads one shape, and the
-// floors on the real tree catch an extractor that reads nothing.
+// The extractors here are line readers of one shape each; the jobs of each
+// workflow and the gate's come from `ci-gate.mjs`, which reads through the
+// `yaml` parser. The floors on the real tree catch an extractor that reads
+// nothing.
 
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -616,11 +618,12 @@ function workspacePackages(root) {
 /** Lines, gating places and places of a set of workflows, by file name. */
 function readWorkflows(files) {
   const entries = Object.entries(files);
+  const ci = files["ci.yml"];
+
+  assert.ok(ci !== undefined, "the workflows read hold no ci.yml");
   return {
     lines: entries.flatMap(([file, yaml]) => workflowLines(file, yaml)),
-    gated: new Set(
-      gatedJobs(files["ci.yml"] ?? "").map((job) => `ci.yml#${job}`),
-    ),
+    gated: new Set(gatedJobs(ci).map((job) => `ci.yml#${job}`)),
     places: new Set(
       entries.flatMap(([file, yaml]) =>
         parseJobs(yaml).map((job) => `${file}#${job}`),

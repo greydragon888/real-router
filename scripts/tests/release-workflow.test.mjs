@@ -23,10 +23,9 @@
 //    exactly as thoroughly, and just as invisibly.
 //
 // Stdlib node:test/node:assert only (Node 24) — scripts/ is not a vitest
-// workspace. Deliberately NOT a YAML library, matching ci-gate-completeness:
-// the extractors are single-purpose and fail-closed, so a restructured
-// changesets.yml makes the assertions fail and point here rather than
-// silently pass.
+// workspace. Deliberately NOT a YAML library: the extractors are
+// single-purpose and fail-closed, so a restructured changesets.yml makes the
+// assertions fail and point here rather than silently pass.
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";

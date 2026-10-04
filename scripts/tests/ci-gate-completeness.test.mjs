@@ -19,10 +19,11 @@
 // workspace; the `node:scripts-tests` check, which pre-push and Repo Lints run,
 // picks this file up by glob, so the preventer needs no wiring of its own.
 //
-// Deliberately NOT a YAML library: the extractors of `scripts/ci-gate.mjs` read
-// the forms they name and refuse the rest, and the floors below catch one that
-// reads nothing — if ci.yml is restructured so they can't parse it, the
-// assertions fail and point here, they don't silently pass.
+// The extractors of `scripts/ci-gate.mjs` read the workflow through the
+// `yaml` parser, closed (`scripts/closed-yaml.mjs`): a key in any spelling
+// GitHub reads is read, a form two readers may take differently is refused,
+// and a value an extractor does not read throws, naming the job. The floors
+// below catch one that reads nothing.
 
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -34,7 +35,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   GATE_JOB,
-  jobLines,
+  jobKeys,
   gateReads,
   parseGateScript,
   parseGateStep,
@@ -98,7 +99,7 @@ export function findViolations(yaml, outsideGate = OUTSIDE_GATE) {
     // A job-level `continue-on-error` may let a failed job report as passed:
     // what GitHub puts in `needs.<job>.result` then, its docs do not say.
     continueOnError: [...needs].filter((n) =>
-      (jobLines(yaml, n) ?? []).some((l) => /^ {4}continue-on-error:/.test(l)),
+      (jobKeys(yaml, n) ?? []).includes("continue-on-error"),
     ),
     needsOutsideGate: [...needs].flatMap((n) =>
       parseNeeds(yaml, n)
@@ -154,8 +155,8 @@ test("fixture: a gated job with a job-level continue-on-error is caught", () => 
 });
 
 // The edge coverage → bundle-size in every form GitHub accepts that parseNeeds
-// reads, and the forms it refuses, which must name the job rather than read as
-// "no needs".
+// reads, and the forms refused rather than read as "no needs": by parseNeeds,
+// naming the job, or by the module, by path or in the parser's words.
 const NEEDS_FORMS = {
   "flow on one line": "    needs: [check, bundle-size]\n",
   "flow over several lines":
@@ -180,16 +181,16 @@ for (const [name, form] of Object.entries(NEEDS_FORMS)) {
   });
 }
 
-// A key GitHub reads, written other than plainly: each is refused, never read
-// as absent.
-const REFUSED_KEYS = {
+// A key GitHub reads, written other than plainly, is read as that key, so the
+// violation it carries is caught like any other.
+const READ_KEYS = {
   "a quoted job key": [
     (f) => f.replace("  ci:\n", '  "zz-extra":\n    runs-on: x\n  ci:\n'),
-    /a job key parseJobs does not read: "zz-extra":/,
+    (v) => assert.deepEqual(v.ungated, ["zz-extra"]),
   ],
   "a space before a job key's colon": [
     (f) => f.replace("  ci:\n", "  zz-extra :\n    runs-on: x\n  ci:\n"),
-    /a job key parseJobs does not read: zz-extra :/,
+    (v) => assert.deepEqual(v.ungated, ["zz-extra"]),
   ],
   "a quoted needs key in a gated job": [
     (f) =>
@@ -197,7 +198,7 @@ const REFUSED_KEYS = {
         "  coverage:\n    needs: [check]\n",
         '  coverage:\n    "needs": [check, bundle-size]\n',
       ),
-    /job coverage has a key written in a form this does not read/,
+    (v) => assert.deepEqual(v.needsOutsideGate, ["coverage → bundle-size"]),
   ],
   "a space before the colon of needs": [
     (f) =>
@@ -205,7 +206,7 @@ const REFUSED_KEYS = {
         "  coverage:\n    needs: [check]\n",
         "  coverage:\n    needs : [check, bundle-size]\n",
       ),
-    /job coverage has a key written in a form this does not read/,
+    (v) => assert.deepEqual(v.needsOutsideGate, ["coverage → bundle-size"]),
   ],
   "a quoted continue-on-error": [
     (f) =>
@@ -213,13 +214,57 @@ const REFUSED_KEYS = {
         "  coverage:\n    needs: [check]\n",
         '  coverage:\n    needs: [check]\n    "continue-on-error": true\n',
       ),
-    /job coverage has a key written in a form this does not read/,
+    (v) => assert.deepEqual(v.continueOnError, ["coverage"]),
   ],
 };
 
-for (const [name, [mutate, refusal]] of Object.entries(REFUSED_KEYS)) {
-  test(`fixture: ${name} is refused, not read as absent`, () => {
+for (const [name, [mutate, caught]] of Object.entries(READ_KEYS)) {
+  test(`fixture: ${name} is read as that key, and its violation is caught`, () => {
     const mutated = mutate(FIXTURE);
+    assert.notEqual(mutated, FIXTURE);
+    caught(findViolations(mutated, new Map([["bundle-size", "info-only"]])));
+  });
+}
+
+const NOT_READ =
+  /the needs of job coverage are written in a form parseNeeds does not read/;
+
+const REFUSED_NEEDS = {
+  "a block item deeper than the list": [
+    "    needs:\n      - check\n        - bundle-size\n",
+    NOT_READ,
+  ],
+  "a key with nothing below it at the end of the job": [
+    "    needs:\n",
+    NOT_READ,
+  ],
+  "an alias": ["    needs: *upstream\n", /an alias at jobs\.coverage\.needs/],
+  "an anchor": [
+    "    needs: &upstream [check]\n",
+    /an anchor at jobs\.coverage\.needs/,
+  ],
+  "a tag": ["    needs: !!seq [check]\n", /a tag at jobs\.coverage\.needs/],
+  "a flow sequence never closed": [
+    "    needs:\n      [\n        check,\n    runs-on: x\n",
+    /line \d+/,
+  ],
+  "a key with no list": ["    needs:\n    runs-on: x\n", NOT_READ],
+  "a block item that is not a name": [
+    "    needs:\n      - check\n      - [bundle-size]\n",
+    NOT_READ,
+  ],
+  "a second needs key": [
+    "    needs: [check]\n    needs: [bundle-size]\n",
+    /Map keys must be unique/,
+  ],
+};
+
+for (const [name, [form, refusal]] of Object.entries(REFUSED_NEEDS)) {
+  test(`fixture: needs written as ${name} is refused`, () => {
+    const mutated = FIXTURE.replace(
+      "  coverage:\n    needs: [check]\n",
+      `  coverage:\n${form}`,
+    );
     assert.notEqual(mutated, FIXTURE);
     assert.throws(
       () => findViolations(mutated, new Map([["bundle-size", "info-only"]])),
@@ -228,34 +273,16 @@ for (const [name, [mutate, refusal]] of Object.entries(REFUSED_KEYS)) {
   });
 }
 
-const REFUSED_NEEDS = {
-  "a block item deeper than the list":
-    "    needs:\n      - check\n        - bundle-size\n",
-  "a key with nothing below it at the end of the job": "    needs:\n",
-  "an alias": "    needs: *upstream\n",
-  "an anchor": "    needs: &upstream [check]\n",
-  "a tag": "    needs: !!seq [check]\n",
-  "a flow sequence never closed":
-    "    needs:\n      [\n        check,\n    runs-on: x\n",
-  "a key with no list": "    needs:\n    runs-on: x\n",
-  "a block item that is not a name":
-    "    needs:\n      - check\n      - [bundle-size]\n",
-  "a second needs key": "    needs: [check]\n    needs: [bundle-size]\n",
-};
-
-for (const [name, form] of Object.entries(REFUSED_NEEDS)) {
-  test(`fixture: needs written as ${name} is refused, naming the job`, () => {
-    const mutated = FIXTURE.replace(
-      "  coverage:\n    needs: [check]\n",
-      `  coverage:\n${form}`,
-    );
-    assert.notEqual(mutated, FIXTURE);
-    assert.throws(
-      () => findViolations(mutated, new Map([["bundle-size", "info-only"]])),
-      /the needs of job coverage are written in a form parseNeeds does not read/,
-    );
-  });
-}
+test("fixture: a job id that is not an identifier is refused, not read", () => {
+  const mutated = FIXTURE.replace(
+    "  ci:\n",
+    '  "zz extra":\n    runs-on: x\n  ci:\n',
+  );
+  assert.throws(
+    () => findViolations(mutated),
+    /a job id parseJobs does not read: zz extra/,
+  );
+});
 
 test("fixture: the #1127 mutation (job dropped from the gate's needs) is caught", () => {
   const mutated = FIXTURE.replace("needs: [check, coverage]", "needs: [check]");
@@ -301,6 +328,31 @@ test("fixture: a needs job whose result is never READ is caught (#1127, other ha
   assert.deepEqual(v.neededButUnread, ["coverage"]);
   // …and membership alone still reports everything as fine, which is the point.
   assert.deepEqual(v.ungated, []);
+});
+
+test("fixture: a read outside the gate's own job is not the gate's", () => {
+  // The gate's script is its job's text alone, so a job before or after it that
+  // reads coverage's result leaves coverage unread by the gate.
+  const unread = FIXTURE.replace(
+    '          COVERAGE="${{ needs.coverage.result }}"\n',
+    "",
+  );
+  const reader =
+    '  report:\n    needs: [coverage]\n    steps:\n      - run: echo "${{ needs.coverage.result }}"\n';
+  const outside = new Map([
+    ["bundle-size", "info-only"],
+    ["report", "reads coverage"],
+  ]);
+
+  for (const mutated of [
+    unread.replace("  ci:\n", `${reader}  ci:\n`),
+    `${unread}${reader}`,
+  ]) {
+    assert.notEqual(mutated, unread);
+    assert.deepEqual(findViolations(mutated, outside).neededButUnread, [
+      "coverage",
+    ]);
+  }
 });
 
 test("fixture: reading a job's OUTPUTS counts as gating it, not only .result", () => {
@@ -852,6 +904,12 @@ const OPEN_FORMS = {
     ),
   "a second step": () =>
     `${CI.trimEnd()}\n      - name: Extra\n        run: echo\n`,
+  "a step before it": () =>
+    inGate(
+      "      - name: Determine result\n",
+      "      - name: Before\n        run: echo\n      - name: Determine result\n",
+    ),
+  "a folded script": () => inGate("        run: |\n", "        run: >\n"),
   "a job-level continue-on-error": () =>
     inGate("    steps:\n", "    continue-on-error: true\n    steps:\n"),
   "job-level defaults": () =>
@@ -886,6 +944,17 @@ const OPEN_FORMS = {
   "no if: always()": () => inGate("    if: always()\n", ""),
   "if: always() as an expression": () =>
     inGate("    if: always()\n", "    if: ${{ always() }}\n"),
+  "the workflow's env as an expression": () =>
+    CI.slice(0, CI.indexOf("\nenv:\n") + 1) +
+    `env: \${{ fromJSON('{"BASH_ENV":"./x.sh"}') }}\n` +
+    CI.slice(CI.indexOf("\njobs:\n") + 1),
+  "the step's env as an expression": () =>
+    inGate(
+      "        env:\n          DEPENDABOT_PR: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}\n          NEEDS: ${{ toJSON(needs) }}\n",
+      `        env: \${{ fromJSON('{"BASH_ENV":"./x.sh"}') }}\n`,
+    ),
+  "if: always() quoted": () =>
+    inGate("    if: always()\n", '    if: "always()"\n'),
   "a quoted job-level key": () =>
     inGate("    steps:\n", '    "continue-on-error": true\n    steps:\n'),
 };
@@ -899,6 +968,10 @@ for (const [name, mutate] of Object.entries(OPEN_FORMS)) {
     assert.equal(parseGateStep(mutated), undefined);
   });
 }
+
+test("a gate job that is not a mapping is refused, not thrown", () => {
+  assert.equal(parseGateStep("jobs:\n  ci: x\n"), undefined);
+});
 
 test("an expression the harness does not know is refused, not guessed", () => {
   assert.throws(

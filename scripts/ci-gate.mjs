@@ -6,168 +6,143 @@
 // decide whose skip is forbidden. `ci-gate-completeness.test.mjs` holds every
 // ci.yml job to that and executes the script, and `checks-registry.test.mjs`
 // asks it where CI runs a check. `verify.test.mjs` takes the closed reading of
-// the workflow's top level from here for the step of Repo Lints it executes.
+// the workflow's top level and of a job's last step from here for Repo Lints.
 //
-// Stdlib only, and deliberately not a YAML library: each extractor reads the
-// forms it names and refuses the rest — a job key or a key of a job's body
-// written other than plainly throws, `parseNeeds` throws naming the job on a
-// value it does not read, `parseGateStep` returns `undefined` — so a
-// restructured ci.yml fails the tests that read it rather than passing them. An extractor that finds
-// nothing at all, `parseJobs` with no `jobs:`, is caught by the floors those
-// tests set on the real tree.
+// A workflow is read by `readClosedYaml` (`closed-yaml.mjs`): the `yaml`
+// parser, which refuses each form GitHub's reader may take otherwise and each
+// form the readers here do not read. A key quoted or with a space before its
+// colon is read as that key, and what a reader here needs is held to a closed
+// shape on top: `parseJobs` and `parseNeeds` throw, naming the job, on a value
+// they do not read, `parseGateStep` and `lastStep` return `undefined`. A form
+// is read or refused, never read as none. An extractor that finds nothing at
+// all, `parseJobs` with no `jobs:`, is caught by the floors the tests set on
+// the real tree.
 
-import { REFUSED_CHARACTERS } from "./refused-characters.mjs";
+import { isMap, isScalar, isSeq } from "yaml";
+
+import { readClosedYaml, sourceOf } from "./closed-yaml.mjs";
+import { HOSTED } from "./runner-labels.mjs";
 
 /** The aggregator job the `protect-master` ruleset requires: `CI Result`. */
 export const GATE_JOB = "ci";
 
+/** The gate job's name: the context the `protect-master` ruleset requires. */
+const GATE_NAME = "CI Result";
+
+/** A job id, as `jobs:` and `needs` name it. */
+const ID = /^[A-Za-z_][\w-]*$/;
+
+/** The documents read so far, by text: each extractor reads the same ci.yml. */
+const read = new Map();
+
 /**
- * Extract top-level job ids from a workflow YAML text: identifiers indented
- * exactly two spaces under the top-level `jobs:` key, written plainly. A line
- * at that indent that is not a comment and not `  <id>:` — a quoted id, a space
- * before the colon — throws: GitHub reads it as a job, and a job this skipped
- * would stand outside every check of the gate.
+ * @param {string} yaml
+ * @returns {import("yaml").Document.Parsed}
+ */
+function workflow(yaml) {
+  if (!read.has(yaml)) read.set(yaml, readClosedYaml(yaml));
+  return /** @type {import("yaml").Document.Parsed} */ (read.get(yaml));
+}
+
+/**
+ * The `jobs:` mapping, or `undefined` when the workflow has none.
+ *
+ * @param {string} yaml
+ * @returns {import("yaml").YAMLMap | undefined}
+ */
+function jobsOf(yaml) {
+  const jobs = workflow(yaml).get("jobs", true);
+  if (jobs === undefined) return undefined;
+  if (!isMap(jobs)) throw new Error("jobs: is not a mapping");
+  return jobs;
+}
+
+/**
+ * One job's mapping, or `undefined` when the workflow has no such job.
+ *
+ * @param {string} yaml
+ * @param {string} jobId
+ * @returns {import("yaml").YAMLMap | undefined}
+ */
+function jobOf(yaml, jobId) {
+  const job = jobsOf(yaml)?.get(jobId, true);
+  if (job === undefined) return undefined;
+  if (!isMap(job)) throw new Error(`job ${jobId} is not a mapping`);
+  return job;
+}
+
+/**
+ * The ids of a workflow's jobs. An id that is not a plain identifier throws.
  *
  * @param {string} yaml
  * @returns {string[]}
  */
 export function parseJobs(yaml) {
-  const lines = yaml.split("\n");
-  const start = lines.findIndex((l) => /^jobs:\s*(#.*)?$/.test(l));
-  if (start === -1) return [];
-  const jobs = [];
-  for (const line of lines.slice(start + 1)) {
-    if (/^[^\s#]/.test(line)) break; // next top-level section
-    if (!/^ {2}[^ #]/.test(line)) continue;
-    const m = /^ {2}([A-Za-z_][\w-]*):(?: |$)/.exec(line);
-    if (!m)
-      throw new Error(`a job key parseJobs does not read: ${line.trim()}`);
-    jobs.push(m[1]);
-  }
-  return jobs;
+  return (jobsOf(yaml)?.items ?? []).map((pair) => {
+    const id = /** @type {import("yaml").Scalar} */ (pair.key).value;
+    if (typeof id !== "string" || !ID.test(id)) {
+      throw new Error(`a job id parseJobs does not read: ${String(id)}`);
+    }
+    return id;
+  });
 }
 
 /**
- * The lines of one job below its key, up to the next job or top-level key, or
- * `undefined` when the workflow has no such job. Every key of the job's body is
- * read in its plain form, `    <key>:`; a quoted key or a space before the
- * colon throws, naming the job, since GitHub reads it as the same key.
+ * The keys of one job, or `undefined` when the workflow has no such job.
  *
  * @param {string} yaml
  * @param {string} jobId
  * @returns {string[] | undefined}
  */
-export function jobLines(yaml, jobId) {
-  const lines = yaml.split("\n");
-  const start = lines.findIndex((l) => l.startsWith(`  ${jobId}:`));
-  if (start === -1) return undefined;
-
-  const next = lines.findIndex((l, i) => i > start && /^ {0,2}[^ #]/.test(l));
-  const job = lines.slice(start + 1, next === -1 ? lines.length : next);
-  const odd = job.find(
-    (l) => /^ {4}[^ #]/.test(l) && !/^ {4}[a-z][a-z-]*:(?: |$)/.test(l),
+export function jobKeys(yaml, jobId) {
+  return jobOf(yaml, jobId)?.items.map((pair) =>
+    String(/** @type {import("yaml").Scalar} */ (pair.key).value),
   );
-
-  if (odd !== undefined) {
-    throw new Error(
-      `job ${jobId} has a key written in a form this does not read: ${odd.trim()}`,
-    );
-  }
-
-  return job;
 }
 
-/** A job id as `needs` names it: plain, or in single or double quotes. */
-const NEED = /^(?:([A-Za-z_][\w-]*)|'([A-Za-z_][\w-]*)'|"([A-Za-z_][\w-]*)")$/;
-
-const withoutComment = (text) => text.replace(/(^|\s)#.*$/, "").trim();
-const isBlankOrComment = (line) => /^ *$/.test(line) || /^ *#/.test(line);
-
 /**
- * Extract the `needs` list of one job, in the forms GitHub accepts that this
- * repository writes: a scalar (`needs: a`), a flow sequence on one line
- * (`needs: [a, b]`) or over several (`needs:`, then `[`, the items and `]`, as
- * Prettier wraps a long one), and a block sequence (`needs:`, then `- a`
- * lines). An item is plain or quoted, and a comment may follow any line.
- * Returns [] when the job has no `needs:` key. A `needs:` written any other way
- * — an anchor, an alias, a tag, a form not listed here — throws an error that
- * names the job, so a list this cannot read is never taken for an empty one.
+ * The `needs` of one job: a job id, or a sequence of them; [] when the job has
+ * no `needs:`. Any other value — none, a mapping, an item that is not a job
+ * id — throws an error that names the job, so a list this cannot read is
+ * never taken for an empty one.
  *
  * @param {string} yaml
  * @param {string} jobId
  * @returns {string[]}
  */
 export function parseNeeds(yaml, jobId) {
-  const job = jobLines(yaml, jobId);
-  if (job === undefined) return [];
+  const job = jobOf(yaml, jobId);
+  if (job === undefined || !job.has("needs")) return [];
 
-  const keys = job.flatMap((l, i) => (/^ {4}needs:/.test(l) ? [i] : []));
   const refuse = () => {
     throw new Error(
       `the needs of job ${jobId} are written in a form parseNeeds does not read`,
     );
   };
+  const needs = job.get("needs", true);
+  const items = isScalar(needs)
+    ? [needs]
+    : isSeq(needs)
+      ? needs.items
+      : refuse();
 
-  if (keys.length === 0) return [];
-  if (keys.length > 1) refuse();
-
-  const names = (items) => {
-    const read = items.map((item) => NEED.exec(item.trim()));
-    if (read.some((m) => m === null)) refuse();
-    return read.map((m) => m[1] ?? m[2] ?? m[3]);
-  };
-  const flow = (from, text) => {
-    let i = from;
-    for (; !text.endsWith("]"); i++) {
-      if (i >= job.length || !/^ {5}/.test(job[i])) refuse();
-      text += ` ${withoutComment(job[i])}`;
-    }
-    return names(
-      text
-        .slice(1, -1)
-        .split(",")
-        .filter((item) => item.trim() !== ""),
-    );
-  };
-
-  const at = keys[0];
-  const rest = withoutComment(job[at].slice("    needs:".length));
-
-  if (rest.startsWith("[")) return flow(at + 1, rest);
-  if (rest !== "") return names([rest]);
-
-  let i = at + 1;
-  while (i < job.length && isBlankOrComment(job[i])) i++;
-  if (i >= job.length) refuse();
-  if (withoutComment(job[i]).startsWith("[") && /^ {5}/.test(job[i])) {
-    return flow(i + 1, withoutComment(job[i]));
-  }
-
-  const items = [];
-  for (; i < job.length; i++) {
-    if (isBlankOrComment(job[i])) continue;
-    const item = /^ {6}- (.+)$/.exec(job[i]);
-    if (!item) {
-      if (/^ {5}/.test(job[i])) refuse();
-      break;
-    }
-    items.push(withoutComment(item[1]));
-  }
-  if (items.length === 0) refuse();
-  return names(items);
+  return items.map((item) =>
+    isScalar(item) && typeof item.value === "string" && ID.test(item.value)
+      ? item.value
+      : refuse(),
+  );
 }
 
 /**
- * The gate job's own body — the only place where a `needs` entry is actually
- * READ. Sliced by {@link jobLines}, from the gate job's key to the next job or
- * top-level key, so it keeps working if a job is ever added after the gate; a
- * key of the body written other than plainly throws there.
+ * The gate job's own text — the only place where a `needs` entry is actually
+ * READ: what the job's mapping spans in the file, its script included.
  *
  * @param {string} yaml
  * @returns {string}
  */
 export function parseGateScript(yaml) {
-  return (jobLines(yaml, GATE_JOB) ?? []).join("\n");
+  const gate = jobOf(yaml, GATE_JOB);
+  return gate?.range ? yaml.slice(gate.range[0], gate.range[2]) : "";
 }
 
 /** The keys the gate job may carry; anything else changes how it runs. */
@@ -193,167 +168,150 @@ const WORKFLOW_KEYS = new Set([
 ]);
 
 /**
- * Whether every top-level line of a workflow is a blank, a comment or a plain
- * key of {@link WORKFLOW_KEYS}: a quoted, spaced or complex key is refused
- * rather than read, so `defaults:` cannot arrive in another spelling. Only an
- * ASCII space indents; a line led by any other character, a BOM or a tab
- * among them, is a top-level line.
+ * Whether a workflow reads closed and every top-level key is one of
+ * {@link WORKFLOW_KEYS}, in whatever spelling.
  *
  * @param {string} yaml
  * @returns {boolean}
  */
 export function topLevelKeysClosed(yaml) {
-  return yaml.split("\n").every((line) => {
-    if (line === "" || line.startsWith(" ") || line.startsWith("#"))
-      return true;
-    const key = /^([a-z-]+):(?: |$)/.exec(line);
-    return key !== null && WORKFLOW_KEYS.has(key[1]);
-  });
+  let contents;
+  try {
+    contents = workflow(yaml).contents;
+  } catch {
+    return false;
+  }
+  return (
+    isMap(contents) &&
+    contents.items.every(
+      (pair) => isScalar(pair.key) && WORKFLOW_KEYS.has(String(pair.key.value)),
+    )
+  );
 }
 
 /**
- * Whether ci.yml's top-level `env:`, if it has one, is one block of
- * `NAME: value` lines whose names {@link WORKFLOW_ENV} admits. `BASH_ENV`,
- * `SHELLOPTS` and every other variable a shell reads at startup are refused
- * with every other name, and so is an `env:` written in flow style.
+ * Whether a workflow's top-level `env:`, if it has one, is a mapping whose
+ * names {@link WORKFLOW_ENV} admits. `BASH_ENV`, `SHELLOPTS` and every other
+ * variable a shell reads at startup are refused with every other name.
  *
  * @param {string} yaml
  * @returns {boolean}
  */
 export function workflowEnvClosed(yaml) {
-  const lines = yaml.split("\n");
-  const starts = lines.flatMap((line, i) =>
-    line.startsWith("env:") ? [i] : [],
-  );
-
-  if (starts.length === 0) return true;
-  if (starts.length > 1 || lines[starts[0]] !== "env:") return false;
-
-  for (let i = starts[0] + 1; i < lines.length; i++) {
-    const line = lines[i];
-    if (line !== "" && !line.startsWith(" ") && !line.startsWith("#")) break;
-    if (/^ *$/.test(line) || /^ *#/.test(line)) continue;
-    const entry = /^ {2}([A-Z_][A-Z0-9_]*): (.+)$/.exec(line);
-    if (!entry || !WORKFLOW_ENV.test(entry[1])) return false;
+  let env;
+  try {
+    env = workflow(yaml).get("env", true);
+  } catch {
+    return false;
   }
-
-  return true;
+  if (env === undefined) return true;
+  return (
+    isMap(env) &&
+    env.items.every(
+      (pair) =>
+        isScalar(pair.key) &&
+        WORKFLOW_ENV.test(String(pair.key.value)) &&
+        isScalar(pair.value),
+    )
+  );
 }
 
 /**
- * A job's step in the one shape the tests execute: its `- name:` line at
- * `at`, `env:` on the next line with one `NAME: value` per line of the names
- * `allowedEnv` admits, then `run: |`, and after the script nothing but blank
- * lines and comments, so the step is the job's last. Only an ASCII space
- * indents. Any other shape returns `undefined`.
+ * A job's last step, in the one shape the tests read: its keys `name`, `env`
+ * and `run`, in that order, its name `name`, its `env:` a mapping of names
+ * `allowedEnv` admits, and its `run:` a literal block. The `env:` values come
+ * back as the file writes them, quotes included. Any other shape, a job the
+ * workflow lacks or a workflow that does not read closed returns `undefined`.
  *
- * @param {string[]} job the lines of the job below its key
- * @param {number} at the index of the step's `- name:` line
+ * @param {string} yaml
+ * @param {string} jobId
+ * @param {string} name
  * @param {Set<string>} allowedEnv
  * @returns {{ env: Record<string, string>, run: string } | undefined}
  */
-export function readLastStep(job, at, allowedEnv) {
-  if (job[at + 1] !== "        env:") return undefined;
-
-  const env = {};
-  let i = at + 2;
-
-  for (; i < job.length && /^ {10}[^ ]/.test(job[i]); i++) {
-    const m = /^ {10}([A-Z_][A-Z0-9_]*): (.+)$/.exec(job[i]);
-    if (!m || !allowedEnv.has(m[1])) return undefined;
-    env[m[1]] = m[2];
-  }
-
-  if (job[i] !== "        run: |") return undefined;
-
-  const run = [];
-
-  for (i++; i < job.length; i++) {
-    const line = job[i];
-    if (/^ *$/.test(line)) {
-      run.push("");
-      continue;
-    }
-    if (!line.startsWith("          ")) break;
-    run.push(line.slice(10));
-  }
-
-  if (job.slice(i).some((line) => !/^ *$/.test(line) && !/^ *#/.test(line))) {
+export function lastStep(yaml, jobId, name, allowedEnv) {
+  let job;
+  try {
+    job = jobOf(yaml, jobId);
+  } catch {
     return undefined;
   }
 
-  while (run.length > 0 && run.at(-1) === "") run.pop();
+  const steps = job?.get("steps", true);
+  const step = isSeq(steps) ? steps.items.at(-1) : undefined;
+  if (!isMap(step)) return undefined;
 
-  return { env, run: `${run.join("\n")}\n` };
+  const keys = step.items.map((pair) =>
+    isScalar(pair.key) ? pair.key.value : undefined,
+  );
+  if (keys.join(",") !== "name,env,run" || step.get("name") !== name) {
+    return undefined;
+  }
+
+  const env = step.get("env", true);
+  if (!isMap(env)) return undefined;
+
+  /** @type {Record<string, string>} */
+  const values = {};
+
+  for (const pair of env.items) {
+    const key = isScalar(pair.key) ? String(pair.key.value) : "";
+    if (!allowedEnv.has(key) || !isScalar(pair.value)) return undefined;
+    values[key] = sourceOf(yaml, pair.value);
+  }
+
+  const run = step.get("run", true);
+  if (!isScalar(run) || run.type !== "BLOCK_LITERAL") return undefined;
+
+  return { env: values, run: String(run.value) };
 }
 
 /**
  * The gate's `Determine result` step in the one shape the test executes, read
  * from a gate job that is closed as well: its keys are `name`, `runs-on`,
- * `needs`, `if: always()` and `steps`, and its one step, first under
- * `steps:`, is read by {@link readLastStep} with the names
- * {@link GATE_STEP_ENV} admits. The workflow's top-level keys are plain ones of
- * a closed list, with no `defaults:` among them, its `env:` sets only turbo's
- * names, and it holds none of the characters `REFUSED_CHARACTERS` names, which
- * could hide a key from a reader that splits at LF. Any other shape returns
- * `undefined`, and the test that reads it fails — a `shell:`, a
- * `continue-on-error:`, a step `if:`, a missing `if: always()` or a `BASH_ENV`
- * would each change the verdict GitHub reports.
+ * `needs`, `if` and `steps`, its name is the context the ruleset requires, its
+ * `runs-on` has the form of a GitHub-hosted label ({@link HOSTED}), its `if:`
+ * is the plain `always()`, and its one step is read by {@link lastStep} with
+ * the names {@link GATE_STEP_ENV} admits. The workflow's top-level keys are of
+ * a closed list, with no `defaults:` among them, and its `env:` is a mapping
+ * that sets only turbo's names. Any other shape returns `undefined`, and the
+ * test that reads it fails — a `shell:`, a `continue-on-error:`, a step `if:`,
+ * an `if:` that is not `always()` or a `BASH_ENV` would each change the verdict
+ * GitHub reports, and a name the ruleset does not require leaves the required
+ * context unreported.
  *
  * @param {string} yaml
  * @returns {{ env: Record<string, string>, run: string } | undefined}
  */
 export function parseGateStep(yaml) {
-  if (
-    REFUSED_CHARACTERS.test(yaml) ||
-    !topLevelKeysClosed(yaml) ||
-    !workflowEnvClosed(yaml)
-  ) {
-    return undefined;
-  }
+  if (!topLevelKeysClosed(yaml) || !workflowEnvClosed(yaml)) return undefined;
 
-  let lines;
+  let gate;
   try {
-    lines = parseGateScript(yaml).split("\n");
+    gate = jobOf(yaml, GATE_JOB);
   } catch {
     return undefined;
   }
-  let always = false;
+  if (gate === undefined) return undefined;
 
-  let scalar = false;
-
-  for (const line of lines) {
-    // A line deeper than the keys continues the key above it: the list of
-    // `needs:` or `steps:`, never the value of `name:`, `runs-on:` or `if:`,
-    // which YAML would fold into the scalar — `if: always()` and a next line
-    // `&& false` would skip the gate, and a skipped gate reports success.
-    if (/^ {5,}\S/.test(line)) {
-      if (scalar) return undefined;
-      continue;
-    }
-    if (!/^ {4}[^ ]/.test(line) || /^ {4}#/.test(line)) continue;
-
-    const key = /^ {4}([a-z-]+):(.*)$/.exec(line);
-
-    if (!key || !GATE_JOB_KEYS.has(key[1])) return undefined;
-    if (key[1] === "if") {
-      if (key[2].trim() !== "always()") return undefined;
-      always = true;
-    }
-    scalar = key[1] === "name" || key[1] === "runs-on" || key[1] === "if";
-  }
-
-  const step = lines.indexOf("    steps:") + 1;
+  const keys = jobKeys(yaml, GATE_JOB) ?? [];
+  const steps = gate.get("steps", true);
+  const condition = gate.get("if", true);
 
   if (
-    !always ||
-    step === 0 ||
-    lines[step] !== "      - name: Determine result"
+    !keys.every((key) => GATE_JOB_KEYS.has(key)) ||
+    gate.get("name") !== GATE_NAME ||
+    !HOSTED.test(String(gate.get("runs-on"))) ||
+    !isScalar(condition) ||
+    condition.type !== "PLAIN" ||
+    condition.value !== "always()" ||
+    !isSeq(steps) ||
+    steps.items.length !== 1
   ) {
     return undefined;
   }
 
-  return readLastStep(lines, step, GATE_STEP_ENV);
+  return lastStep(yaml, GATE_JOB, "Determine result", GATE_STEP_ENV);
 }
 
 /**
