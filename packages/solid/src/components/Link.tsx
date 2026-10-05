@@ -61,12 +61,6 @@ export function Link<P extends Params = Params>(
   // sentinel identity when consumer omits the field). The new check is
   // explicit: "fast path kicks in when consumer did not supply routeParams".
   const useFastPath =
-    // An empty `routeName` is a misuse (matches no route). It must NOT take the
-    // routeSelector fast path, whose unstarted sentinel (`route?.name ?? ""`)
-    // makes `isRouteActive("", "") === true` — a misused empty-name Link would
-    // light up before `router.start()`. Route it to the slow path instead, which
-    // reads `router.isActiveRoute("") === false` in every router state (#1427).
-    local.routeName !== "" &&
     local.to === undefined &&
     local.hash === undefined &&
     !local.activeStrict &&
@@ -105,7 +99,20 @@ export function Link<P extends Params = Params>(
   );
 
   const isActive = useFastPath
-    ? () => ctx.routeSelector(local.routeName ?? "")
+    ? () => {
+        // An empty or absent name matches no route (#1427). It is answered here,
+        // where the name is read on every change, rather than asked of the
+        // routeSelector, whose unstarted sentinel (`route?.name ?? ""`) makes
+        // `isRouteActive("", "") === true`; so the Link agrees with
+        // `router.isActiveRoute("") === false` in every router state.
+        const name = local.routeName;
+
+        if (!name) {
+          return false;
+        }
+
+        return ctx.routeSelector(name);
+      }
     : createSignalFromSource(
         createActiveRouteSource(
           router,

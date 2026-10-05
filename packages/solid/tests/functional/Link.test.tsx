@@ -125,8 +125,8 @@ describe("Link component", () => {
       // answer is router.isActiveRoute("") === false. Solid's Link fast path went
       // through the routeSelector, whose unstarted sentinel (route?.name ?? "")
       // makes isRouteActive("", "") === true → a misused empty-name Link lit up
-      // before router.start(). The routeName !== "" guard in useFastPath routes an
-      // empty name to the slow createActiveRouteSource (reads router.isActiveRoute("")).
+      // before router.start(). The fast-path accessor answers an empty name
+      // itself — false, as router.isActiveRoute("") does — without asking the selector.
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const unstarted = createTestRouterWithADefaultRouter();
 
@@ -145,6 +145,64 @@ describe("Link component", () => {
 
       errorSpy.mockRestore();
     });
+
+    // #1427 — the same misuse arrives by two more paths: a Link given no name at
+    // all (only a JS caller can, the types require `routeName` or `to`), and a
+    // Link whose name is unset after it mounted. Each must agree with
+    // router.isActiveRoute("") === false while the router is unstarted.
+    it("a Link with neither routeName nor to is inactive on an unstarted router (#1427)", () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const unstarted = createTestRouterWithADefaultRouter();
+
+      render(() => (
+        <RouterProvider router={unstarted}>
+          {/* @ts-expect-error — the union requires `routeName` or `to`; a JS caller can omit both */}
+          <Link activeClassName="active" data-testid="no-target-link">
+            None
+          </Link>
+        </RouterProvider>
+      ));
+
+      expect(screen.getByTestId("no-target-link")).not.toHaveClass("active");
+
+      errorSpy.mockRestore();
+    });
+
+    it.each([
+      ["an empty string", ""],
+      ["undefined", undefined],
+    ])(
+      "a Link whose routeName becomes %s after mount stays inactive on an unstarted router (#1427)",
+      (_label, unset) => {
+        const errorSpy = vi
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
+        const unstarted = createTestRouterWithADefaultRouter();
+        const [name, setName] = createSignal<string | undefined>("home");
+
+        render(() => (
+          <RouterProvider router={unstarted}>
+            {/* `!` only narrows the type: the signal does reach undefined, and
+                that is what this test hands the Link. */}
+            <Link
+              routeName={name()!}
+              activeClassName="active"
+              data-testid="unset-link"
+            >
+              Unset
+            </Link>
+          </RouterProvider>
+        ));
+
+        expect(screen.getByTestId("unset-link")).not.toHaveClass("active");
+
+        setName(unset);
+
+        expect(screen.getByTestId("unset-link")).not.toHaveClass("active");
+
+        errorSpy.mockRestore();
+      },
+    );
 
     it("should set active class with route params", async () => {
       const linkRouteName = "items.item";

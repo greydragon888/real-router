@@ -489,13 +489,13 @@ preclude a strict never-union).
 
 `<Link routeName="">` is a misuse pattern (an empty name matches no route). The
 canonical answer is `router.isActiveRoute("") === false`, and the Link honors it
-in **every** state. The `useFastPath` predicate (`components/Link.tsx`) guards
-`routeName !== ""`, so an empty name skips the `routeSelector` fast path — whose
-unstarted sentinel (`routeSignal().route?.name ?? ""`) would otherwise make
-`isRouteActive("", "") === true` and light the Link up before `router.start()` —
-and falls to the slow `createActiveRouteSource`, which reads
-`router.isActiveRoute("") === false` whether the router is unstarted, stopped, or
-on a real route.
+in **every** state, however the empty name arrives: `""` at mount, no name at all
+(only a JS caller can — the types require `routeName` or `to`), or a name unset to
+`""` or `undefined` after mount. The fast-path accessor (`components/Link.tsx`)
+reads the name on every change and answers an empty one itself, as `false`,
+rather than ask the `routeSelector`, whose unstarted sentinel
+(`routeSignal().route?.name ?? ""`) would make `isRouteActive("", "") === true`
+and light the Link up before `router.start()`.
 
 ```tsx
 // A misused empty-name Link is never active (tracks router.isActiveRoute("")):
@@ -508,10 +508,10 @@ on a real route.
 The `isRouteActive` helper itself is **unchanged** — `isRouteActive("", "")` still
 returns `true` (its edge cases stay property-locked in
 `tests/property/routerProvider.properties.ts`, whose Invariant 7 pins only the
-non-empty arms). The guard lives at the Link level (`useFastPath`), routing the
-misuse to the canonical slow path. Locked by `tests/functional/Link.test.tsx`
-(unstarted empty-name inactive) + `tests/integration/Link.test.tsx` (inactive
-before **and** after start).
+non-empty arms). The guard lives at the Link level, in the fast-path accessor.
+Locked by `tests/functional/Link.test.tsx` (unstarted: `""` at mount, no name, a
+name unset after mount) + `tests/integration/Link.test.tsx` (inactive before
+**and** after start).
 
 ### Link Props Are Captured at Init (Slow Path)
 
