@@ -307,6 +307,72 @@ describe("Link component", () => {
     );
   });
 
+  describe("descriptor form `to` (#1548)", () => {
+    // A `to`-only Link supplies no channel props, so it must not draw the
+    // warning about mixing the two forms.
+    let warnSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      warnSpy.mockRestore();
+    });
+
+    it("builds the href from the descriptor", () => {
+      renderWithRouter(router, Link, {
+        to: { name: "users.view", params: { id: "7" } },
+      });
+
+      expect(document.querySelector("a")!.getAttribute("href")).toBe(
+        "/users/7",
+      );
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it("lights up on the descriptor's route", async () => {
+      renderWithRouter(router, Link, {
+        to: { name: "users.view", params: { id: "7" } },
+        activeClassName: "active",
+      });
+
+      const link = document.querySelector("a")!;
+
+      expect(link.classList.contains("active")).toBe(false);
+
+      await router.navigate("users.view", { id: "7" });
+      flushSync();
+
+      expect(link.classList.contains("active")).toBe(true);
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it("navigates with the descriptor's name, params and search", async () => {
+      vi.spyOn(router, "navigate");
+
+      renderWithRouter(router, Link, {
+        to: {
+          name: "users.view",
+          params: { id: "7" },
+          search: { tab: "posts" },
+        },
+      });
+
+      await userEvent.click(document.querySelector("a")!);
+
+      expect(router.navigate).toHaveBeenCalledTimes(1);
+
+      const [name, params, search] = vi.mocked(router.navigate).mock
+        .calls[0] as [string, object, object];
+
+      expect(name).toBe("users.view");
+      expect(params).toStrictEqual({ id: "7" });
+      expect(search).toStrictEqual({ tab: "posts" });
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+  });
+
   describe("URL Building", () => {
     it("should use buildPath when router has no buildUrl", async () => {
       const routerWithoutBuildUrl = createRouter([

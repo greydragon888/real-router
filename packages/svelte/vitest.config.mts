@@ -15,11 +15,12 @@ export default mergeConfig(
       setupFiles: "./tests/setup.ts",
       coverage: {
         include: ["src/**/*.{ts,svelte,svelte.ts}"],
+        // One branch no test reaches: the `?? ''` the compiler writes around the
+        // text interpolation `{state.error.message}` in Lazy.svelte, which only an
+        // Error without a message would take. The other metrics take the global
+        // 100.
         thresholds: {
-          statements: 100,
-          branches: 96,
-          functions: 93,
-          lines: 100,
+          branches: 99,
         },
       },
     },

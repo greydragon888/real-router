@@ -4545,7 +4545,7 @@ Architecture and design: [`packages/react/ARCHITECTURE.md`](packages/react/ARCHI
 
 ### Coverage Threshold Exceptions
 
-> **Updated (2026-10-05).** Vue is no longer an exception: its gaps were untested branches, and it now runs on the global 100 % thresholds ("Vue reaches full coverage: its gaps were untested branches", at the end of this file).
+> **Updated (2026-10-05).** Vue is no longer an exception: its gaps were untested branches, and it now runs on the global 100 % thresholds ("Vue reaches full coverage: its gaps were untested branches"). Svelte keeps only `branches: 99`, for one branch its compiler writes ("Svelte: three of its four gaps were the untested `to` form of `<Link>`"). Both entries are at the end of this file.
 
 Framework compilers generate code that v8 coverage tracks but tests can't reach:
 
@@ -13831,3 +13831,13 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 **Why these tests.** Each holds a behaviour a plausible change breaks, and a mutant of the source turns its cell red: without the `idx !== -1` guard, a second release runs `splice(-1, 1)` and takes the router on top; without `?? []`, the boundary spreads `undefined`; without the `Array.isArray` guard, `for…of` over an object throws; and without the `?? ""` fallback, a `to`-only Link draws the warning about mixing the two forms — the descriptor tests assert there is none. Six mutants, six red.
 
 **Measured (2026-10-05).** After: statements 411/411, branches 203/203, functions 114/114, lines 400/400.
+
+## Svelte: three of its four gaps were the untested `to` form of `<Link>` (2026-10-05)
+
+**Problem.** Svelte's thresholds stood at `branches: 96, functions: 93`, put down to the compiler's `$derived`/`$props` transforms. Measured before this change: statements 303/303, lines 267/267, functions 93/93, branches 128/132. Three of the four missing branches were the `routeName ?? ""` fallback of `Link.svelte` — at mount, in the href and on click — which no test reached because none rendered the descriptor form (`to`, #1548). The fourth is in `Lazy.svelte`: the compiler writes `{state.error.message}` as `` `…${error.message ?? ''}` ``, and only an Error without a message takes the `''`.
+
+**Solution.** Tests of the descriptor form in `Link.test.ts`, the same three as Vue's: the href, the active state and the arguments of the navigation, each asserting that a `to`-only Link draws no warning about mixing the two forms. Svelte's override keeps `branches: 99` alone, with the compiler's branch named beside it; the other metrics take the global 100. Svelte stays in `sonar.coverage.exclusions`, as check 2 of `check-coverage-scope.mjs` requires of a package with a lowered threshold.
+
+**Why.** Without each `?? ""` the Link passes `undefined` as the route name and draws the warning; three mutants, three red. A test for the compiler's `''` would need an Error whose message is not a string, which `Lazy` does not produce.
+
+**Measured (2026-10-05).** After: statements 303/303, branches 131/132, functions 93/93, lines 267/267.
