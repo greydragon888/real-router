@@ -18,6 +18,7 @@
 
 import { fc, test } from "@fast-check/vitest";
 import { UNKNOWN_ROUTE } from "@real-router/core";
+import { startsWithSegment } from "@real-router/route-utils";
 import { describe, expect } from "vitest";
 
 import { NUM_RUNS, arbAlphaSegmentName, arbDottedName } from "./helpers";
@@ -28,7 +29,6 @@ import {
 } from "../../src/components/RouteView/components";
 import {
   collectElements,
-  isSegmentMatch,
   materializeWinner,
   pickWinner,
 } from "../../src/components/RouteView/helpers";
@@ -36,6 +36,22 @@ import { isRouteActive } from "../../src/RouterProvider";
 
 import type { RouteViewMarker } from "../../src/components/RouteView/components";
 import type { JSX } from "solid-js";
+
+/**
+ * The reference matcher `pickWinner`'s candidate cache is held to: equality
+ * when `exact`, otherwise a dot-bounded prefix.
+ */
+function isSegmentMatch(
+  routeName: string,
+  fullSegmentName: string,
+  exact: boolean,
+): boolean {
+  if (exact) {
+    return routeName === fullSegmentName;
+  }
+
+  return startsWithSegment(routeName, fullSegmentName);
+}
 
 // `buildRenderList` was the pre-#1094 production API: it returned the rendered
 // child list (length ≤ 1) that `RouteView` mounted. After #1094 the component

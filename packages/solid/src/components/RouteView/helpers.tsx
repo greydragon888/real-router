@@ -1,5 +1,4 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
-import { startsWithSegment } from "@real-router/route-utils";
 import { Suspense } from "solid-js";
 
 import { MATCH_MARKER, NOT_FOUND_MARKER, SELF_MARKER } from "./components";
@@ -11,18 +10,6 @@ import type {
   SelfMarker,
 } from "./components";
 import type { JSX } from "solid-js";
-
-export function isSegmentMatch(
-  routeName: string,
-  fullSegmentName: string,
-  exact: boolean,
-): boolean {
-  if (exact) {
-    return routeName === fullSegmentName;
-  }
-
-  return startsWithSegment(routeName, fullSegmentName);
-}
 
 // §8.1 audit fix (LOW #9) — three isXxxMarker functions had identical
 // structure differing only by the Symbol checked. `isMarker` parameterizes
@@ -97,14 +84,12 @@ function renderSelf(self: SelfMarker): JSX.Element {
   );
 }
 
-// Sprint G (audit-8 §8b HIGH #4) — pre-computed candidate cache.
-// `pickWinner` runs per navigation × N RouteView mounted; the hot inner
-// loop matches Match markers against the active route. Before Sprint G,
-// that match path went through `isSegmentMatch` (and `startsWithSegment`
-// from route-utils) per marker — string compare, startsWith, dot-boundary
-// check. Now we pre-compute a Set of `fullSegmentName` values that COULD
-// match the current routeName (either exact or as a dot-bounded prefix)
-// and reduce the per-marker match to a `Set.has` + one equality check.
+// Pre-computed candidate cache. `pickWinner` runs per navigation × N mounted
+// RouteViews, and its inner loop matches Match markers against the active
+// route. A marker matches when its `fullSegmentName` is the routeName itself or
+// a dot-bounded ancestor of it; the candidates are computed once per routeName
+// as a Set, so the per-marker match is a `Set.has` and one equality check.
+// `tests/property/routeView.properties.ts` holds it to a reference matcher.
 //
 // Cache key: `routeName` alone (#1094). The lookup content is a pure
 // function of routeName — `exactCandidate` IS routeName and

@@ -1,3 +1,4 @@
+import { getLifecycleApi } from "@real-router/core/api";
 import { createActiveRouteSource } from "@real-router/sources";
 import { render, screen } from "@solidjs/testing-library";
 import { fireEvent } from "@testing-library/dom";
@@ -219,6 +220,38 @@ describe("link directive", () => {
   });
 
   describe("click handler", () => {
+    it("swallows a navigation the router rejects", async () => {
+      // The guard, not a spy on navigate, shows the navigation was tried: a spy
+      // subscribes to the promise navigate returns and would handle its
+      // rejection itself.
+      const guard = vi.fn(() => false);
+
+      getLifecycleApi(router).addActivateGuard("one-more-test", () => guard);
+      const unhandled = vi.fn();
+
+      process.on("unhandledRejection", unhandled);
+
+      try {
+        render(
+          () => (
+            <a use:link={{ routeName: "one-more-test" }} data-testid="link">
+              Test
+            </a>
+          ),
+          { wrapper },
+        );
+
+        await user.click(screen.getByTestId("link"));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(guard).toHaveBeenCalledTimes(1);
+        expect(router.getState()?.name).toBe("test");
+        expect(unhandled).not.toHaveBeenCalled();
+      } finally {
+        process.off("unhandledRejection", unhandled);
+      }
+    });
+
     it("should navigate on left click", async () => {
       render(
         () => (

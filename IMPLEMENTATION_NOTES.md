@@ -4543,9 +4543,11 @@ Architecture and design: [`packages/react/ARCHITECTURE.md`](packages/react/ARCHI
 - rollup-plugin-dts for bundled type declarations
 - Coverage: `branches: 90` threshold due to babel-generated phantom branches
 
+> **Updated (2026-10-05).** Solid runs on the global 100 % thresholds: the untaken branches came from the hot-reload code the test transform appended, not from babel-preset-solid ("Solid: its phantom branches were the test transform's hot-reload code", at the end of this file).
+
 ### Coverage Threshold Exceptions
 
-> **Updated (2026-10-05).** Vue is no longer an exception: its gaps were untested branches, and it now runs on the global 100 % thresholds ("Vue reaches full coverage: its gaps were untested branches"). Svelte keeps only `branches: 99`, for one branch its compiler writes ("Svelte: three of its four gaps were the untested `to` form of `<Link>`"). Both entries are at the end of this file.
+> **Updated (2026-10-05).** Vue and Solid are no longer exceptions and run on the global 100 % thresholds: Vue's gaps were untested branches ("Vue reaches full coverage: its gaps were untested branches"), and Solid's untaken branches came from the hot-reload code its test transform appended ("Solid: its phantom branches were the test transform's hot-reload code"). Svelte keeps only `branches: 99`, for one branch its compiler writes ("Svelte: three of its four gaps were the untested `to` form of `<Link>`"). The entries are at the end of this file.
 
 Framework compilers generate code that v8 coverage tracks but tests can't reach:
 
@@ -13853,3 +13855,22 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 - four jit tests that pin the jit ceiling failed, as expected.
 
 **Decision.** Not done: the 100 % came from dropping two thirds of the code from the measurement. The floors stay; the package's `vitest.config.mts` comment, `CLAUDE.md` and `ARCHITECTURE.md` now say the aot copy cannot record those lines, rather than that it covers them. The aot tests still run those paths and assert what they produce: the fallback resolution of `RouteView` (S1, S2, M1, M2), its `matchEntries` (M3), and the directives' pure-href refresh, class change and same-snapshot early return.
+
+## Solid: its phantom branches were the test transform's hot-reload code (2026-10-05)
+
+**Problem.** Solid's thresholds stood at `statements: 99, lines: 99, functions: 95, branches: 90`, put down to babel-preset-solid's output and to JSX thunks. Codecov counted 15 of its lines: one untaken `if` at the closing brace of each of 11 component modules, three lines of `isSegmentMatch`, and a `?? ""` in `Link`. The 11 were not babel's: `vite-plugin-solid` with its defaults appends solid-refresh's `if (import.meta.hot) { … }` to every module under a dev server, which is what Vitest runs, and coverage maps that block's untaken side to the end of the component. The package does not ship it. `isSegmentMatch` was no longer called by `RouteView` — only the property tests used it, as the reference for the candidate cache. And the `?? ""` led to a bug.
+
+**Solution.**
+
+- `solidPlugin({ hot: false })` in `vitest.config.mts`: the components run as they ship, without solid-refresh's proxies, and the appended block is gone.
+- `isSegmentMatch` moved into `tests/property/routeView.properties.ts`, the only reader.
+- The fast-path accessor of `<Link>` answers an empty or absent name itself, as `false`. A Link given no name at all, or one whose name was unset to `""` or `undefined` after it mounted, lit up while the router was unstarted: the #1427 guard ran only at mount, and only for `""`.
+- A test of `use:link` on a navigation a guard refuses covers the directive's `.catch(() => {})`.
+- Solid's coverage override is gone, so the global 100 % thresholds apply, and `packages/solid/src/**` has left `sonar.coverage.exclusions`, as check 2 of `check-coverage-scope.mjs` requires.
+
+**Why.**
+
+- Turning hot reload off removes code the package does not ship from the measurement; it hides no line of the package's own.
+- Mutants: dropping the empty-name answer turns the `#1427` cells red, and turning hot reload back on fails the branch threshold (93.92 %). Dropping the directive's `.catch` is equivalent: core leaves no rejection of a navigation unhandled when the caller drops its promise — measured with a control, a dropped `Promise.reject` in the same probe was reported. The test of `use:link` gives the guard, not a spy, as proof the navigation ran: a spy on `navigate` subscribes to the promise it returns and handles the rejection itself.
+
+**Measured (2026-10-05).** After: statements 327/327, branches 159/159, functions 107/107, lines 307/307.
