@@ -28,8 +28,8 @@
 // PATH loses each directory that holds a real uvx or semgrep for the same
 // reason.
 //
-// Stdlib node:test/node:assert only (Node 24) — the `node:scripts-tests` check,
-// which pre-push and Repo Lints run, picks this file up by glob.
+// Stdlib node:test/node:assert only (Node 24) — `scripts/scripts-tests.mjs`,
+// which pre-push and Repo Lints run, picks this file up from `scripts/tests/`.
 
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";

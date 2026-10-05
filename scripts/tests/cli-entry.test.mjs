@@ -14,7 +14,7 @@
 //     space and must show what its main() prints, and importing it must print
 //     nothing.
 //
-// Runs in pre-push and Repo Lints via `node --test scripts/tests/*.test.mjs`.
+// `scripts/scripts-tests.mjs` runs it in pre-push and Repo Lints.
 
 import { execFileSync, spawnSync } from "node:child_process";
 import {
@@ -93,6 +93,10 @@ const CLIS = {
   "scripts/refusal-census.mjs": {
     args: [],
     ran: /REFUSALS with a bracketed head: \d+/,
+  },
+  "scripts/scripts-tests.mjs": {
+    args: [],
+    ran: /usage: scripts-tests\.mjs guards \| tooling \[--here\]/,
   },
   // Without a mode flag it prints its usage and reads and writes nothing.
   "scripts/sync-config.mjs": {

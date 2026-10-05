@@ -29,8 +29,9 @@
 // floor, so every test runs AT the boundary. The floor's tests are the last two.
 //
 // Stdlib node:test/node:assert only (Node 24) — scripts/ is not a vitest
-// workspace; the `node:scripts-tests` check, which pre-push and Repo Lints run,
-// picks this file up by glob, so the preventer needs no wiring of its own.
+// workspace; `scripts/scripts-tests.mjs`, which pre-push and Repo Lints run,
+// picks this file up from `scripts/tests/`, so the preventer needs no wiring of
+// its own.
 
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";

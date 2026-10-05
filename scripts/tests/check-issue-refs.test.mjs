@@ -10,8 +10,8 @@
 // distinction the first draft of the pattern got wrong.
 //
 // Stdlib node:test/node:assert only (Node 24) — scripts/ is not a vitest
-// workspace; the `node:scripts-tests` check, which pre-push and Repo Lints run,
-// picks this file up by glob.
+// workspace; `scripts/scripts-tests.mjs`, which pre-push and Repo Lints run,
+// picks this file up from `scripts/tests/`.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";

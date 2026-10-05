@@ -10,7 +10,7 @@
 // package has a lint task, and the executor layer asks the turbo entries of the
 // pre-push stage of the check registry whether they run it.
 //
-// Runs in the repo-lints CI job via `node --test scripts/tests/*.test.mjs`.
+// `scripts/scripts-tests.mjs` runs it in pre-push and Repo Lints.
 
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";

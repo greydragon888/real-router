@@ -12,8 +12,8 @@
 // inside a fixture checkout, the way a direct call does: by a path relative to
 // the working directory, from the root and from below it.
 //
-// Stdlib node:test/node:assert only (Node 24) — the `node:scripts-tests` check,
-// which pre-push and Repo Lints run, picks this file up by glob.
+// Stdlib node:test/node:assert only (Node 24) — `scripts/scripts-tests.mjs`,
+// which pre-push and Repo Lints run, picks this file up from `scripts/tests/`.
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";

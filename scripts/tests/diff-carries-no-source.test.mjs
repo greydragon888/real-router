@@ -2,8 +2,7 @@
 // checks consult before reading code (#2433).
 //
 // Run:  node --test scripts/tests/diff-carries-no-source.test.mjs
-//       (picked up by the `node:scripts-tests` check, in Repo Lints and in
-//       pre-push)
+//       (run by `scripts/scripts-tests.mjs`, in Repo Lints and in pre-push)
 //
 // The predicate is consulted by the `sonar` job, by Codecov and by jscpd. A
 // false positive — answering "no source" on a diff that has some — is a check

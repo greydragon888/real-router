@@ -757,8 +757,9 @@ jobs:
 
   # ============================================
   # REPO-LINTS: the `ci` stage of the check registry, `scripts/checks.mjs`, run
-  # in one step by `scripts/verify.mjs`: repository-wide checks, not per-package
-  # and not turbo-cached. It runs beside the pipeline on both paths, so it adds
+  # in one step by `scripts/verify.mjs`: repository-wide checks, not per-package;
+  # of them only the tooling tests of `scripts/tests/` run as a turbo task,
+  # `//#test:tooling`, cached. It runs beside the pipeline on both paths, so it adds
   # nothing to the base→shards Amdahl prefix. It needs the install,
   # osv-scanner and uv, and no build. It runs on every PR, and the CI gate
   # requires it before the gate's exit for a PR without code.

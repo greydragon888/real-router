@@ -13,7 +13,7 @@
 // red there after a real dependency change means re-reading the pin, not
 // weakening it.
 //
-// Runs in the repo-lints CI job via `node --test scripts/tests/*.test.mjs`.
+// `scripts/scripts-tests.mjs` runs it in pre-push and Repo Lints.
 
 import { execFileSync } from "node:child_process";
 import {

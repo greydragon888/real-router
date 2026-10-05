@@ -20,8 +20,8 @@
 // standing warning that this graph may not be cleaned by trace coverage. A
 // diagram that under-draws the table is an argument for deleting live edges.
 //
-// Runs in the repo-lints CI job via `node --test scripts/tests/*.test.mjs` — no
-// wiring needed. Reads the table through the TypeScript AST rather than by
+// `scripts/scripts-tests.mjs` runs it in pre-push and Repo Lints — no wiring
+// needed. Reads the table through the TypeScript AST rather than by
 // regex, because the table mixes two edge forms (a bare target and
 // `{ target, when?, update? }`) and a line-oriented parser silently drops the
 // second one — the first draft of the audit script did exactly that and

@@ -92,7 +92,7 @@ name: CodSpeed
 # informs but does not block merges. SECURITY: no pull_request run reaches the
 # self-hosted VPS (public-repo RCE / resource-abuse surface) — the workflow has
 # no pull_request trigger, and self-hosted-triggers.test.mjs fails a change
-# that adds one wherever `node:scripts-tests` runs.
+# that adds one wherever `node:scripts-tooling` runs.
 #
 # PATH FILTER. Instruction counts cannot move for a
 # change that ships no code, yet every run costs the SINGLE self-hosted runner

@@ -5,7 +5,7 @@
 // input here — a fixture that MUST red — plus the negative control that must
 // stay green. If a future edit makes a threshold inert, the matching case flips.
 //
-// Runs in the repo-lints CI job via `node --test scripts/tests/*.test.mjs`.
+// `scripts/scripts-tests.mjs` runs it in pre-push and Repo Lints.
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";

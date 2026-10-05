@@ -118,12 +118,21 @@ export const CHECKS = [
     why: "copy-paste above the jscpd threshold",
   },
   {
-    // Node expands the pattern itself: the command runs without a shell.
-    id: "node:scripts-tests",
-    run: ["node", "--test", "--test-reporter=dot", "scripts/tests/*.test.mjs"],
+    // `scripts/scripts-tests.mjs` splits `scripts/tests/` by what a test reads.
+    id: "node:scripts-guards",
+    run: ["node", "scripts/scripts-tests.mjs", "guards"],
     stages: ["pre-push", "ci"],
     ciSkip: ["dependabot-pr", "no-source"],
-    why: "the repository's own tooling tests",
+    why: "the tests of scripts/ that read package code, the file list, the history or the workspace",
+  },
+  {
+    // The turbo task `//#test:tooling`, run in a copy that holds its inputs
+    // alone.
+    id: "node:scripts-tooling",
+    run: ["node", "scripts/scripts-tests.mjs", "tooling"],
+    stages: ["pre-push", "ci"],
+    ciSkip: ["dependabot-pr", "no-source"],
+    why: "the tests of the repository's tooling, replayed from turbo's cache while their inputs are unchanged",
   },
   {
     // Read by the whole task graph, so a diff of manifests alone or a bump of

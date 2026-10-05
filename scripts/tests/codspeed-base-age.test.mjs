@@ -1,7 +1,7 @@
 // codspeed-base-age.test.mjs — meta-tests for the base-provenance line (#2375).
 //
 // Run:  node --test scripts/tests/codspeed-base-age.test.mjs
-//       (the `node:scripts-tests` check, in Repo Lints and in pre-push)
+//       (run by `scripts/scripts-tests.mjs`, in Repo Lints and in pre-push)
 //
 // The failure that matters is not a wrong number, it is a reassuring one: a
 // report that names a fresh base when the base is old leaves the reader more

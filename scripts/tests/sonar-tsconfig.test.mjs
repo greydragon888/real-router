@@ -14,7 +14,7 @@
 //      #2440, 0 of 32 real `shared/` paths with them, 32 of 32 without, and
 //      Sonar then falls back to `merged compiler options` for those files.
 //
-// Runs in the repo-lints CI job via `node --test scripts/tests/*.test.mjs`.
+// `scripts/scripts-tests.mjs` runs it in pre-push and Repo Lints.
 
 import { existsSync, lstatSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";

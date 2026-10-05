@@ -2,8 +2,7 @@
 // check that a rebuilt lockfile still holds them.
 //
 // Run:  node --test scripts/tests/dependabot-updates.test.mjs
-//       (picked up by the `node:scripts-tests` check, in Repo Lints and in
-//       pre-push)
+//       (run by `scripts/scripts-tests.mjs`, in Repo Lints and in pre-push)
 //
 // `resolve-dependabot.sh` rebuilds a conflicted lockfile from the manifests. A
 // bump inside a `~` range changes no manifest, so the rebuild alone drops it and

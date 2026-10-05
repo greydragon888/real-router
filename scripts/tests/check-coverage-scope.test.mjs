@@ -16,7 +16,7 @@
 // too and the script exits 1, so it was never an always-green script — it was
 // testing prose.
 //
-// Runs in the repo-lints CI job via `node --test scripts/tests/*.test.mjs`.
+// `scripts/scripts-tests.mjs` runs it in pre-push and Repo Lints.
 
 import { spawnSync } from "node:child_process";
 import {

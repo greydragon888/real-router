@@ -15,7 +15,7 @@
 // membership test on `b` is ordinary code and must NOT be reported; the same
 // two halves aimed at one object must be, however far apart they sit.
 //
-// Runs in the repo-lints CI job via `node --test scripts/tests/*.test.mjs`.
+// `scripts/scripts-tests.mjs` runs it in pre-push and Repo Lints.
 
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";

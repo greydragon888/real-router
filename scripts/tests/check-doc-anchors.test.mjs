@@ -13,7 +13,7 @@
 // many the repository has, and it keeps the target and the doc in directories
 // of their own, as they were in the checkout.
 //
-// Runs in the repo-lints CI job via `node --test scripts/tests/*.test.mjs`.
+// `scripts/scripts-tests.mjs` runs it in pre-push and Repo Lints.
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";

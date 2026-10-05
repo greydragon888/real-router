@@ -2,7 +2,7 @@
 // context, whichever repository a pull request comes from (#2442).
 //
 // Run:  node --test scripts/tests/sonar-producer.test.mjs
-//       (the `node:scripts-tests` check, in Repo Lints and in pre-push)
+//       (run by `scripts/scripts-tests.mjs`, in Repo Lints and in pre-push)
 //
 // `SonarCloud` is required by the `protect-master` ruleset beside `CI Result`.
 // Two workflows can now post it: `ci.yml`'s `sonar` job for a pull request from

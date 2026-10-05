@@ -2,7 +2,7 @@
 // exactly once, on the merged report, by a job the gate hard-requires (#2429).
 //
 // Run:  node --test scripts/tests/coverage-threshold-authority.test.mjs
-//       (the `node:scripts-tests` check, in Repo Lints and in pre-push)
+//       (run by `scripts/scripts-tests.mjs`, in Repo Lints and in pre-push)
 //
 // `base-test` runs `vitest --shard=i/4`, and a shard sees only its quarter:
 // measured, shard 1 of 4 reports 85.64 % (3519/4109) because the other three

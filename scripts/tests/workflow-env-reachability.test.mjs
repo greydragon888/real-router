@@ -17,8 +17,9 @@
 // three env scopes can answer.
 //
 // Stdlib node:test/node:assert only (Node 24) — `scripts/` is not a vitest
-// workspace, and the `node:scripts-tests` check, which pre-push and Repo Lints
-// run, picks this file up by glob, so it needs no wiring of its own.
+// workspace, and `scripts/scripts-tests.mjs`, which pre-push and Repo Lints
+// run, picks this file up from `scripts/tests/`, so it needs no wiring of its
+// own.
 //
 // Deliberately NOT a YAML library: the extractors below are single-purpose and
 // fail-closed — the floors at the bottom fail if this stops parsing the

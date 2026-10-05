@@ -15,8 +15,8 @@
 //                  for an accidental copy. Enforced only for existence (a
 //                  stale registry fails loudly).
 //
-// Runs in the repo-lints CI job via `node --test scripts/tests/*.test.mjs` — no
-// wiring needed. Sonar/jscpd CPD-exclude these files (sonar-project.properties,
+// `scripts/scripts-tests.mjs` runs it in pre-push and Repo Lints — no wiring
+// needed. Sonar/jscpd CPD-exclude these files (sonar-project.properties,
 // .jscpd.json — see #1523); THIS test is the actual drift guard.
 //
 // Stdlib node:test/node:assert only (Node 24) — scripts/ is not a vitest

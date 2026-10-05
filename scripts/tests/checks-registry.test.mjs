@@ -84,6 +84,10 @@ const NOT_A_GATE = new Map([
   ["test:agent", TEST_VARIANT],
   ["test:leaks", TEST_VARIANT],
   ["test:changed", TEST_VARIANT],
+  [
+    "test:tooling",
+    "the command of the turbo task `//#test:tooling`, which the registry runs through `scripts/scripts-tests.mjs tooling`",
+  ],
   ["lint:fix", WRITES],
   ["lint:deps:fix", WRITES],
   ["lint:claims", ONE_SCAN],

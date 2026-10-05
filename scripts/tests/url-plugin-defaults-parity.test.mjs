@@ -27,8 +27,8 @@
 // the shared object is a legitimate product decision and keeps this file green
 // — the invariant is single-sourcing, not `false`.
 //
-// Runs in the repo-lints CI job via `node --test scripts/tests/*.test.mjs` — picked
-// up by glob, no wiring of its own. Reads through the TypeScript AST rather
+// `scripts/scripts-tests.mjs` runs it in pre-push and Repo Lints — found in
+// `scripts/tests/`, no wiring of its own. Reads through the TypeScript AST rather
 // than by regex: `{ ...shared, k: v }` is order-sensitive (a later key wins),
 // and a line-oriented parser cannot see that the override came after the
 // spread, which is precisely the mutation this guard exists to catch.

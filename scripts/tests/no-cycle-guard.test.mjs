@@ -21,8 +21,8 @@
 // config's directory, and the test asserts the mirror's file gets the same
 // rules, settings and parser options as the real path.
 //
-// Runs in the repo-lints CI job via `node --test scripts/tests/*.test.mjs` (no
-// wiring). Keep this file to ONE lint run.
+// `scripts/scripts-tests.mjs` runs it in pre-push and Repo Lints (no wiring).
+// Keep this file to ONE lint run.
 
 import assert from "node:assert/strict";
 import {

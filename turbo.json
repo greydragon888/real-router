@@ -183,6 +183,24 @@
       "outputs": [],
       "inputs": ["dist/**", "package.json"],
       "cache": true
+    },
+    "//#test:tooling": {
+      "inputs": [
+        "scripts/**",
+        ".github/**",
+        ".husky/*",
+        ".changeset/*.mjs",
+        "package.json",
+        "turbo.json",
+        "!$TURBO_ROOT$/eslint.config.*",
+        "!$TURBO_ROOT$/prettier.config.*",
+        "!$TURBO_ROOT$/tsdown.base.*",
+        "!$TURBO_ROOT$/vitest.config.*"
+      ],
+      "env": ["TOOLING_RUNTIME", "CI", "ImageOS", "ImageVersion"],
+      "outputs": [],
+      "outputLogs": "errors-only",
+      "cache": true
     }
   }
 }
