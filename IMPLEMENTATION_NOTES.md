@@ -2254,6 +2254,8 @@ Every call site is pinned to `pnpm/action-setup@v6.1.0` and passes no `version` 
 
 ### Coverage scope is generated, not hardcoded (#732)
 
+> **Updated (2026-10-05).** `packages/vue/src/**` has left `sonar.coverage.exclusions`: Vue runs on the global 100 % thresholds ("Vue reaches full coverage: its gaps were untested branches", at the end of this file).
+
 > **Updated (2026-10-04).** `codecov.yml` has no components and check 1 is gone; the Codecov upload list is still the `reports=` line of `--emit`: "Codecov has no components".
 
 **Problem.** The external quality gates' scope lived in three hand-maintained lists that were never
@@ -4542,6 +4544,8 @@ Architecture and design: [`packages/react/ARCHITECTURE.md`](packages/react/ARCHI
 - Coverage: `branches: 90` threshold due to babel-generated phantom branches
 
 ### Coverage Threshold Exceptions
+
+> **Updated (2026-10-05).** Vue is no longer an exception: its gaps were untested branches, and it now runs on the global 100 % thresholds ("Vue reaches full coverage: its gaps were untested branches", at the end of this file).
 
 Framework compilers generate code that v8 coverage tracks but tests can't reach:
 
@@ -13812,3 +13816,18 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 **Measured (2026-10-05).** On the tree, the first `--write` changes the text of every entry, drops `**/tests/**` and adds the four entries only jscpd had: `packages/*/src/dom-utils/**`, `browser-env/**`, `shared-ssr/**` and `**/*.d.ts`. Under the scan roots the translated list leaves out the same 54 of 546 tracked files as the hand list without `**/tests/**`, and no form under the roots is refused. Of 62 mutants of the module, the test and `.jscpd.json`, 61 turn a cell red; the other, `5.0` for `minLines`, leaves jscpd on its default, which is 5.
 
 `pnpm sonar:local` before the step, on `0bca029a3` in a clean worktree, and after it, on `488f40a84`: duplication is computed for the same 346 files and 112 have no blocks; after it, the log's exclusions for duplication are the translated entries, without `**/tests/**`. The files Sonar leaves out as ignored by git were 114 in the clean worktree and 123 in the main checkout, which holds nine notes under `.claude/` that git ignores.
+
+## Vue reaches full coverage: its gaps were untested branches (2026-10-05)
+
+**Problem.** Codecov put the repository at 99.58 %: 44 lines, all of them in four framework adapters. Vue's six were branches no test took, and its thresholds were lowered for a reason that no longer held — `branches: 95, functions: 97`, put down to `defineComponent`'s type guards. Measured before this change: statements 411/411, lines 400/400, functions 114/114, branches 197/203. The six branches:
+
+- the descriptor form of `<Link>` (`to`, #1548) was never rendered, so the `routeName ?? ""` fallback of the active watch, the href and the click never ran;
+- an `onClick` attribute that is neither a function nor an array, which `invokeAttributesOnClick` skips;
+- a `<RouterErrorBoundary>` without children, where `slots.default?.()` gives `undefined`;
+- a release of the directive router stack run when its router is no longer on the stack.
+
+**Solution.** A test for each, in `Link.test.ts`, `RouterErrorBoundary.test.ts` and `vLink.test.ts`. Vue's coverage override is gone, so the global 100 % thresholds apply, and `packages/vue/src/**` has left `sonar.coverage.exclusions`, as check 2 of `check-coverage-scope.mjs` requires of a package with tests and full thresholds.
+
+**Why these tests.** Each holds a behaviour a plausible change breaks, and a mutant of the source turns its cell red: without the `idx !== -1` guard, a second release runs `splice(-1, 1)` and takes the router on top; without `?? []`, the boundary spreads `undefined`; without the `Array.isArray` guard, `for…of` over an object throws; and without the `?? ""` fallback, a `to`-only Link draws the warning about mixing the two forms — the descriptor tests assert there is none. Six mutants, six red.
+
+**Measured (2026-10-05).** After: statements 411/411, branches 203/203, functions 114/114, lines 400/400.

@@ -8,14 +8,6 @@ export default mergeConfig(
       environment: "jsdom",
       include: ["./tests/**/*.test.ts"],
       setupFiles: "./tests/setup.ts",
-      coverage: {
-        thresholds: {
-          statements: 100,
-          branches: 95,
-          functions: 97,
-          lines: 100,
-        },
-      },
     },
   }),
 );

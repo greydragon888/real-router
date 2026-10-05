@@ -80,6 +80,31 @@ describe("RouterErrorBoundary", () => {
     expect(wrapper.find("[data-testid='fallback']").exists()).toBe(true);
   });
 
+  it("renders the fallback alone when it has no children", async () => {
+    const lifecycle = getLifecycleApi(router);
+
+    lifecycle.addActivateGuard("dashboard", () => () => false);
+
+    const wrapper = mountWithProvider(router, () =>
+      h(RouterErrorBoundary, {
+        fallback: (error: RouterError) =>
+          h("div", { "data-testid": "fallback" }, error.code),
+      }),
+    );
+
+    expect(wrapper.find("[data-testid='fallback']").exists()).toBe(false);
+
+    await expect(router.navigate("dashboard")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
+
+    await flushPromises();
+
+    expect(wrapper.find("[data-testid='fallback']").text()).toBe(
+      errorCodes.CANNOT_ACTIVATE,
+    );
+  });
+
   it("fallback receives correct RouterError", async () => {
     const lifecycle = getLifecycleApi(router);
 

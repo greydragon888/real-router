@@ -330,6 +330,22 @@ describe("Link component", () => {
   });
 
   describe("clickHandler", () => {
+    it("ignores an onClick attribute that is neither a function nor an array, and navigates", async () => {
+      vi.spyOn(router, "navigate");
+
+      const wrapper = mountLink(router, {
+        routeName: "one-more-test",
+        onClick: { handleEvent: vi.fn() },
+      });
+
+      await wrapper.find("a").trigger("click");
+
+      expect(router.navigate).toHaveBeenCalledTimes(1);
+      expect(
+        (router.navigate as ReturnType<typeof vi.fn>).mock.calls[0]?.[0],
+      ).toBe("one-more-test");
+    });
+
     it("should prevent navigation on non-left click", async () => {
       vi.spyOn(router, "navigate");
 
@@ -615,6 +631,69 @@ describe("Link component", () => {
         expect(router.navigate).toHaveBeenCalledTimes(1);
       },
     );
+  });
+
+  describe("descriptor form `to` (#1548)", () => {
+    // A `to`-only Link supplies no channel props, so it must not draw the
+    // warning about mixing the two forms.
+    let warnSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      warnSpy.mockRestore();
+    });
+
+    it("builds the href from the descriptor", () => {
+      const wrapper = mountLink(router, {
+        to: { name: "users.view", params: { id: "7" } },
+      });
+
+      expect(wrapper.find("a").attributes("href")).toBe("/users/7");
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it("lights up on the descriptor's route", async () => {
+      const wrapper = mountLink(router, {
+        to: { name: "users.view", params: { id: "7" } },
+        activeClassName: "active",
+      });
+
+      expect(wrapper.find("a").classes()).not.toContain("active");
+
+      await router.navigate("users.view", { id: "7" });
+      await flushPromises();
+
+      expect(wrapper.find("a").classes()).toContain("active");
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it("navigates with the descriptor's name, params and search", async () => {
+      vi.spyOn(router, "navigate");
+
+      const wrapper = mountLink(router, {
+        to: {
+          name: "users.view",
+          params: { id: "7" },
+          search: { tab: "posts" },
+        },
+      });
+
+      await wrapper.find("a").trigger("click");
+
+      expect(router.navigate).toHaveBeenCalledTimes(1);
+
+      const [name, params, search] = (
+        router.navigate as ReturnType<typeof vi.fn>
+      ).mock.calls[0] as [string, object, object];
+
+      expect(name).toBe("users.view");
+      expect(params).toStrictEqual({ id: "7" });
+      expect(search).toStrictEqual({ tab: "posts" });
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe("URL Building", () => {

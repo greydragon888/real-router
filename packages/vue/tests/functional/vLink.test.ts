@@ -217,6 +217,30 @@ describe("v-link directive", () => {
       // Restore router for other tests
       setDirectiveRouter(router);
     });
+
+    it("a release run a second time leaves the routers pushed after it in place", () => {
+      setDirectiveRouter(null);
+
+      const a = createRouter([{ name: "a", path: "/a" }]);
+      const b = createRouter([{ name: "b", path: "/b" }]);
+
+      const releaseA = pushDirectiveRouter(a);
+
+      releaseA();
+
+      const releaseB = pushDirectiveRouter(b);
+
+      // A is off the stack: the second call finds nothing to remove, and must
+      // not take B, the top, with it.
+      releaseA();
+
+      expect(getDirectiveRouter()).toBe(b);
+
+      releaseB();
+      a.stop();
+      b.stop();
+      setDirectiveRouter(router);
+    });
   });
 
   describe("invalid binding values (defensive)", () => {
