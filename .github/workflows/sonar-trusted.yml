@@ -31,7 +31,13 @@ name: Sonar (trusted)
 # holds the sparse list to the import closure of what the job runs, and every
 # import in that closure to a relative path or one of three built-ins
 # (`node:fs`, `node:path`, `node:url`): any other can resolve in the PR's tree,
-# or start code from it.
+# or start code from it. The script runs on `master`'s Node (`.trusted/.nvmrc`)
+# under Node's permission model, with no grant but reading the workspace: a
+# write, to `$GITHUB_ENV` and `$GITHUB_PATH` too, a child process, a worker,
+# an addon and WASI are refused at run time. That is a second layer, not the
+# first: Node calls the model a seat belt, not a defence against malicious
+# code, a read follows a symlink out of the workspace, and the network is
+# not restricted.
 # `ci.yml`'s own comment names the trap this avoids: a workflow with
 # `pull-requests: write` executing attacker-shaped JS.
 #
@@ -255,6 +261,7 @@ jobs:
           path: .trusted
           persist-credentials: false
           sparse-checkout: |
+            .nvmrc
             sonar-project.properties
             scripts/check-coverage-scope.mjs
             scripts/coverage-owner.mjs
@@ -270,10 +277,14 @@ jobs:
           rm -f sonar-project.properties
           cp .trusted/sonar-project.properties sonar-project.properties
 
+      # `master`'s `.nvmrc`: the PR's would choose which Node runs the trusted
+      # script, and so which permission model holds it. No package-manager
+      # cache: it reads the working directory's `package.json`, the PR's.
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version-file: .nvmrc
+          node-version-file: .trusted/.nvmrc
+          package-manager-cache: false
 
       - name: Download coverage artifacts
         uses: actions/download-artifact@v8
@@ -302,10 +313,15 @@ jobs:
 
       # Same derivation as `ci.yml`'s job used, run from the TRUSTED copy — the
       # script walks the working directory, which is the PR's tree, so its
-      # OUTPUT is data.
+      # OUTPUT is data. Under the permission model it is granted reads of the
+      # workspace and nothing else, so it writes nothing: the shell appends
+      # what it prints. `NODE_OPTIONS` is cleared, since options there would
+      # widen the flags.
       - name: Compute Sonar scope
         id: scope
-        run: node .trusted/scripts/check-coverage-scope.mjs --emit >> "$GITHUB_OUTPUT"
+        env:
+          NODE_OPTIONS: ""
+        run: node --permission --allow-fs-read="$GITHUB_WORKSPACE" .trusted/scripts/check-coverage-scope.mjs --emit >> "$GITHUB_OUTPUT"
 
       # ⚠ Every value below reaches the scanner's ARGV, and the PR shapes each
       # one — `packages/<name>/src` from a directory it can name,

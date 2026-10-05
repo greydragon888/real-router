@@ -13089,6 +13089,8 @@ A Dependabot run and a human one land on the same `pr` series: no label tells th
 
 ## The trusted Sonar job ran code from the fork's tree (2026-09-29)
 
+> **Updated (2026-10-05).** The script now runs on `master`'s Node under Node's permission model, a second layer under this entry's static test ("The fork path runs `master`'s Node under Node's permission model").
+
 > **Updated (2026-10-04).** The boundary test also holds every module of the closure to relative specifiers and three built-ins, and `scripts/repo-model.mjs` joins the sparse checkout: "The package walk is one module, `scripts/repo-model.mjs`".
 
 **Problem.** `sonar-trusted.yml` holds `statuses: write` and gives `SONAR_TOKEN` to its scan step, over a fork's tree checked out as data. Two of its steps executed that tree:
@@ -13647,6 +13649,8 @@ zizmor did not report one more: `sonar-trusted.yml` holds four scanner arguments
 
 ## The gate and Repo Lints read ci.yml through the `yaml` parser, closed (2026-10-04)
 
+> **Updated (2026-10-05).** `sonar-trusted-boundary.test.mjs` reads the fork's job through the parser too ("The fork path runs `master`'s Node under Node's permission model").
+
 **Problem.** `scripts/ci-gate.mjs` read ci.yml line by line — `parseJobs`, `jobLines`, `parseNeeds`, `readLastStep`, `parseGateStep`, `topLevelKeysClosed`, `workflowEnvClosed`. The #1127 entry chose that over a YAML library: "the extractors are ~30 lines and fail closed". They had grown to 383 lines, and three rounds of fixes in one day answered forms the audits of RFC-4 found them reading otherwise than GitHub: a multi-line or scalar `needs` read as none, and a key behind a lone CR, NEL, LS or PS went unread; a quoted key, or one with a space before its colon, read as absent; a continuation line under `if: always()` could have skipped the gate. Each round extended the grammar by the forms just found, or refused them.
 
 **Solution.**
@@ -13666,3 +13670,30 @@ zizmor did not report one more: `sonar-trusted.yml` holds four scanner arguments
 **Scope.** Every tracked YAML file of `.github` must read closed: a cell of `closed-yaml.test.mjs` reads them all, and `checks-registry.test.mjs` reads the jobs of every workflow through `parseJobs`. An anchor, an alias, a tag or a merge key in any workflow is therefore red, though GitHub reads the first two. The other workflow tests stay line readers.
 
 **Measured.** All 24 tracked YAML files of `.github` read closed. `closed-yaml.test.mjs` holds each refused form, and neighbours still read: plain values typed as GitHub types them, `on` as a key, CRLF line ends. In the gate test the five key spellings are read and their violations caught; the `needs` forms stay refused, five of them now by the module — an alias, an anchor and a tag by path, an unclosed flow sequence and a second `needs` key in the parser's own words. New cells cover a step before `Determine result`, a folded script, a job id that is not an identifier, a read of a job's result outside the gate job, an `env:` given as an expression at either level, a quoted `if:` and a gate job that is not a mapping. 38 mutants of the two modules each fail a cell.
+
+## The fork path runs `master`'s Node under Node's permission model (2026-10-05)
+
+**Problem.** The boundary of `sonar-trusted.yml` — it executes only base-repository code, and the PR's tree is data — was held statically. `sonar-trusted-boundary.test.mjs` refuses each way a module of the closure could load code from outside `.trusted/`, one form at a time, and names what it cannot see, a computed member such as `process["dlopen"]`. It reads loads, not what the loaded code does: a write through `node:fs`, a built-in the closure may load, passes every rule. What runs the closure was read loosely. A regular expression looked for a script path right after `node`, so a flag before the script hid the line from it, and a preload, an env file, a second command on the line and `NODE_OPTIONS` went unread. Where `.trusted/` came from was not read at all. And `actions/setup-node` read Node's version from the PR's `.nvmrc`, so the PR chose the runtime of the code that holds the boundary; its package-manager cache, on by default, reads the PR's `package.json` too.
+
+**Solution.**
+
+- The scope step runs `node --permission --allow-fs-read="$GITHUB_WORKSPACE" .trusted/scripts/check-coverage-scope.mjs --emit` with `NODE_OPTIONS` cleared. Under the permission model the script is granted reads and nothing else, so it writes nothing; the shell appends what it prints to `$GITHUB_OUTPUT`.
+- `setup-node` reads `.trusted/.nvmrc`, which joins the sparse checkout, with `package-manager-cache: false`.
+- `sonar-trusted-boundary.test.mjs` reads the job through the `yaml` parser and holds what runs the closure closed:
+  - one step goes into `.trusted/`: `actions/checkout` of the default branch, with no other repository, no token left behind and the sparse list; it comes after the step that clears `.trusted/`;
+  - one `setup-node` step, with exactly those two inputs, after that checkout;
+  - the job's actions are a closed list of five;
+  - a shell line that names Node is the one form — `node` with exactly those flags and a script under `.trusted/` whose path climbs nowhere — in a step after the setup, with that one line, no key beyond `name`, `id`, `env` and `run`, and an `env:` that clears `NODE_OPTIONS` alone;
+  - neither the job nor the workflow sets `defaults:`, and the workflow's `env:` names are a closed list.
+- The other `run:` lines are read for what can be read of a shell line. None names `$GITHUB_ENV` or `$GITHUB_PATH`, starts a package manager, runs, sources or hands `bash` or `sh` a file outside `.trusted/`, or touches `.trusted/` but to clear it and copy out of it.
+- Cells run Node:
+  - the scope script with and without the flags over the real tree, in its check mode, whose answers must be equal;
+  - the same in the job's layout — its sparse list copied into `.trusted/` over a small fork tree with a coverage report — through the emit branch;
+  - seven capabilities under the flags, each with a control without them and each matched to its own refusal;
+  - the flags with `NODE_OPTIONS` set, which widens them.
+
+  Colour is off in these runs: the refusals are matched as text, and `node --test` sets `FORCE_COLOR` under a terminal.
+
+**Why.** Measured on Node 24.18.1 (macOS); the first independent review checked the refusals and the scope line on Linux, Node 24.21.0. Under the flags, a write is refused, inside the workspace too, and so are a child process, a worker, a native addon, WASI and `process.binding`. So is `import()` of a module outside the workspace, through a symlink as well: the module loader checks the real path. `NODE_OPTIONS=--allow-fs-write=*` lifts the write refusal, which is why the step clears it. The scope script prints the same lines with and without the flags. The second independent review's 20 planted departures, run again on the final text, are each refused but three: the two that are sound — `NODE_OPTIONS: ''`, a lockfile named in a command — and another interpreter, which the test says it does not read. 33 mutants of the workflow, the test and the script each fail a cell; a write through `node:fs` in the emit branch passes every static rule and fails the cell in the job's layout.
+
+**Limits.** The permission model is the second layer, not the first. Node's documentation calls it a seat belt for trusted code and says malicious code can bypass it. A read follows a symlink out of the workspace — `readFileSync` through one did, in the probe — and the network is not restricted. The script has to read the PR's tree, so `import()` of a file inside it stays the static test's concern. A `run:` line that hands a file of the fork's tree to another interpreter, `python3` say, is not read. The fork path runs only for a pull request from a fork; its first run there is still to come.
