@@ -416,13 +416,27 @@ test("CONTROL — on the repository, check 6 walks every package and every src/ 
   );
 });
 
-test("generated and dot-directories are not walked", () => {
+test("generated and dot-directories and symlinks are not walked", () => {
   const run = runScript({
+    links: [
+      ["shared/extra", "dx"],
+      ["packages/linked", "a/src"],
+    ],
     plant: (tree) => {
       tree["packages/a/dist/index.js"] = "\n";
       tree["packages/a/coverage/lcov-report/prettify.js"] = "\n";
       tree["packages/a/node_modules/x/index.js"] = "\n";
       tree["packages/a/.turbo/cache.js"] = "\n";
+      // What a removed package leaves on a machine: no manifest, its
+      // generated directories, a file that is not code.
+      tree["packages/gone/node_modules/x/index.js"] = "\n";
+      tree["packages/gone/dist/index.js"] = "\n";
+      tree["packages/gone/.turbo/cache.js"] = "\n";
+      tree["packages/notes.md"] = "\n";
+      tree["shared/node_modules/x/index.js"] = "\n";
+      tree["shared/coverage/lcov-report/prettify.js"] = "\n";
+      tree["shared/.claude/hook.js"] = "\n";
+      tree["shared/package.json"] = "{}\n";
     },
   });
 
@@ -694,6 +708,36 @@ const DRIFTS = [
     name: "a symlink at the package root",
     links: [["packages/b/vendor", "../a/src"]],
     line: /packages\/b\/vendor: a symlink outside src\//,
+  },
+  {
+    name: "code directly in packages/",
+    plant: (tree) => {
+      tree["packages/stray.ts"] = "export const stray = 1;\n";
+    },
+    line: /packages\/stray\.ts: code in packages\/ outside a package directory \(packages\/<name>\/ with a package\.json\)/,
+  },
+  {
+    // jscpd reads it through `packages/*/src/`; Sonar's scope skips it.
+    name: "code in a directory of packages/ without a package.json",
+    plant: (tree) => {
+      tree["packages/ghost/src/stray.ts"] = "export const stray = 1;\n";
+    },
+    line: /packages\/ghost\/src\/stray\.ts: code in packages\/ outside a package directory \(packages\/<name>\/ with a package\.json\)/,
+  },
+  {
+    name: "code directly in shared/",
+    plant: (tree) => {
+      tree["shared/stray.ts"] = "export const stray = 1;\n";
+    },
+    line: /shared\/stray\.ts: code in shared\/ outside its source directories/,
+  },
+  {
+    // `shared/tests/` is left out of the source directories by name.
+    name: "code under shared/tests/",
+    plant: (tree) => {
+      tree["shared/tests/stray.ts"] = "export const stray = 1;\n";
+    },
+    line: /shared\/tests\/stray\.ts: code in shared\/ outside its source directories/,
   },
   {
     name: "a size-limit exception that is private",

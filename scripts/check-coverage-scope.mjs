@@ -44,8 +44,11 @@
  *      `@real-router/internal-source` target in `exports` is under `./src/`,
  *      no code file sits outside `src/`, `tests/`, `scripts/` and the
  *      package-root config files, and every symlink under `src/` leads into a
- *      `shared/<dir>`. The code roots are then `packages/<pkg>/src` and
- *      `shared/<dir>`, and nothing else.
+ *      `shared/<dir>`. No code file sits in `packages/` outside a package
+ *      directory — `packages/<name>/` with a `package.json` — nor in
+ *      `shared/` outside its source directories; `shared/tests/` is not one.
+ *      The code roots are then `packages/<pkg>/src` and `shared/<dir>`, and
+ *      nothing else.
  *
  * Emit mode (`--emit`, used by ci.yml's coverage job and sonar-trusted.yml):
  *   prints `sources=…`, `tests=…`, `reports=…` lines for `$GITHUB_OUTPUT`,
@@ -422,7 +425,7 @@ for (const task of KEYED_TASKS) {
   }
 }
 
-// --- Check 6: every package's code lives under src/ ---------------------------
+// --- Check 6: code lives in the code roots alone ------------------------------
 // Tools name a package's code `src/` in many independent lists — coverage,
 // Sonar, CodeQL, jscpd, semgrep, knip, ESLint blocks, the changeset gate — and
 // a list is blind to code anywhere else (#2627). So the layout is what is
@@ -522,6 +525,49 @@ for (const pkg of packages) {
         `${rel(link)}: a symlink under src/ that leads to ${rel(target)}, not into shared/`,
       );
     }
+  }
+}
+
+// Code beside the packages and beside the source directories of `shared/` is
+// under no code root: jscpd reads all of `shared/` and every `packages/*/src/`,
+// Sonar only the code roots. Like the rest of this script the walk reads the
+// disk, not git — the fork path runs the script with no child process
+// (`sonar-trusted-boundary.test.mjs`) — so a file git ignores is walked too.
+
+/**
+ * Code files under `dir`, leaving out the directories `skip` names at its top
+ * and generated and dot-directories at any depth; a symlink is never followed.
+ *
+ * @param {string} dir
+ * @param {Set<string>} skip
+ * @returns {string[]}
+ */
+const strayCode = (dir, skip) =>
+  readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+
+    if (entry.isDirectory()) {
+      return skip.has(entry.name) ||
+        GENERATED_DIRS.has(entry.name) ||
+        entry.name.startsWith(".")
+        ? []
+        : strayCode(path, new Set());
+    }
+
+    return entry.isFile() && CODE_FILE.test(entry.name) ? [path] : [];
+  });
+
+for (const file of strayCode(PKG_DIR, new Set(packages))) {
+  errors.push(
+    `${relative(ROOT, file)}: code in packages/ outside a package directory (packages/<name>/ with a package.json)`,
+  );
+}
+
+if (existsSync(SHARED_DIR)) {
+  for (const file of strayCode(SHARED_DIR, new Set(sharedDirs))) {
+    errors.push(
+      `${relative(ROOT, file)}: code in shared/ outside its source directories`,
+    );
   }
 }
 
