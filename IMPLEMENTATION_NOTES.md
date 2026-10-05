@@ -13904,3 +13904,16 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 **Why.** The layout names two code roots, and a list that covers both covers all code only while nothing sits elsewhere; the check that holds the layout now looks wherever code could sit but generated and dot-directories and symlinks. Recording the gap instead would have left the equality of jscpd's and Sonar's duplication scopes on a rule nothing checked.
 
 **Measured (2026-10-05).** Eight mutants — either walk dropped, generated or dot-directories walked, `shared/tests/` or a directory without a manifest skipped, every file taken for code, a symlink followed — each fail a cell of `check-coverage-scope.test.mjs`; the repository passes.
+
+## Five advisories: four leave the lockfiles within their parents' ranges, seroval's is allowlisted (2026-10-06)
+
+**Problem.** `lint:audit` stopped a push on 2026-10-06 at GHSA-rj75-hqrm-r3gf — postcss-selector-parser below 7.1.6 (medium, published 2026-10-05), in the root and examples lockfiles. A later run listed four more: GHSA-68fv-2mgg-jv7q, source-map-js below 1.2.2 (high), in all three lockfiles; GHSA-jqcg-44mw-7w3h, proxy-addr below 2.0.8 (critical), and GHSA-wr44-6hxh-3jwq, joi 18 below 18.2.9 (medium), in the examples; and GHSA-jp82-f5mq-hwhp, seroval through 1.6.2 (high), in all three. The source-map-js and joi advisories were published in September, and the push's run had not listed them.
+
+**Solution.**
+
+- `pnpm update <package>` in each workspace moves four of them within the ranges their parents declare: postcss-selector-parser 7.1.5 → 7.1.6 (svelte-eslint-parser `^7.0.0`), source-map-js 1.2.1 → 1.2.2, proxy-addr 2.0.7 → 2.0.8 (express 5.2.1, `^2.0.7`), joi 18.2.8 → 18.2.9 (wait-on 9.1.0, `^18.2.3`). No manifest or override changes.
+- seroval's fix, 1.6.3, is outside the `~1.5.4` that solid-js 1.9.15 pins, and solid-js has no newer 1.9 release. GHSA-jp82-f5mq-hwhp goes to `scripts/osv-scanner.toml` and to `allow-ghsas` in `codeql.yml`, with the reason and the condition to drop it.
+
+**Why.** The seroval flaw is in its JSON deserializer, `fromJSON` and `fromCrossJSON`. solid-js 1.9.15 imports only `Serializer`, `Feature` and `getCrossReferenceHeader`, in its server build, and no code in the repository imports seroval. It reaches tests, benchmarks, the examples and cross-router-bench, none of them published, and @real-router/solid takes solid-js as a peer. An override to 1.6.3 would put under solid-js a seroval outside the range it declares.
+
+**Measured (2026-10-06).** Each lockfile changes only those packages' entries, and the integrity of every new version matches the registry. `pnpm dedupe --check` passes in the three workspaces, and `lint:audit` reports no issues.
