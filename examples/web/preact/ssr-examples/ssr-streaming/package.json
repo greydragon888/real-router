@@ -18,7 +18,7 @@
     "@real-router/ssr-utils": "*",
     "express": "5.2.1",
     "preact": "~10.29.7",
-    "preact-render-to-string": "~6.7.0"
+    "preact-render-to-string": "~6.8.0"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
