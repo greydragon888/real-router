@@ -16,7 +16,7 @@
     "@real-router/browser-plugin": "*",
     "@real-router/core": "*",
     "@real-router/preact": "*",
-    "preact": "~10.29.7"
+    "preact": "~11.0.0"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

@@ -4,7 +4,7 @@
   "private": true,
   "dependencies": {
     "@real-router/preact": "*",
-    "preact": "~10.29.7"
+    "preact": "~11.0.0"
   },
   "scripts": {
     "lint:example": "eslint --cache shared/ --max-warnings 0"

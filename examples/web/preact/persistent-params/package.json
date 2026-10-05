@@ -15,7 +15,7 @@
     "@real-router/core": "*",
     "@real-router/persistent-params-plugin": "*",
     "@real-router/preact": "*",
-    "preact": "~10.29.7"
+    "preact": "~11.0.0"
   },
   "devDependencies": {
     "@preact/preset-vite": "2.10.6",

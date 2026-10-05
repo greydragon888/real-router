@@ -16,7 +16,7 @@
     "@real-router/core": "*",
     "@real-router/preact": "*",
     "motion": "13.4.6",
-    "preact": "~10.29.7"
+    "preact": "~11.0.0"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

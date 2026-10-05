@@ -21,7 +21,7 @@
     "@real-router/preact": "*",
     "@real-router/preload-plugin": "*",
     "@real-router/search-schema-plugin": "*",
-    "preact": "~10.29.7",
+    "preact": "~11.0.0",
     "zod": "4.6.5"
   },
   "devDependencies": {
