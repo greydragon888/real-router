@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-10-05]
+
+### @real-router/solid@0.26.1
+
+### Patch Changes
+
+- [#2681](https://github.com/greydragon888/real-router/pull/2681) [`73ecb2e`](https://github.com/greydragon888/real-router/commit/73ecb2eaaa2961d931d633c62560c5ae5a4273a0) Thanks [@greydragon888](https://github.com/greydragon888)! - An empty or absent `routeName` lights no `<Link>` up before `router.start()` ([#1427](https://github.com/greydragon888/real-router/issues/1427))
+
+  A `<Link>` given no route name at all — only a JS caller can write one, the types require `routeName` or `to` — or one whose `routeName` was unset to `""` or `undefined` after it mounted, was marked active while the router was unstarted. The Link now answers an empty or absent name itself, as `false`, in every router state, as `router.isActiveRoute("")` does.
+
 ## [2026-09-30]
 
 ### @real-router/angular@0.24.2
