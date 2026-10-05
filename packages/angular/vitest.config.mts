@@ -27,13 +27,16 @@ export default mergeConfig(
         // These floors measure angular's own code. `src/dom-utils` is the
         // `shared/dom-utils` symlink, which `vitest.config.unit.mts` leaves
         // out of every consumer's coverage; react measures it as its owner.
-        // What keeps the floors below 100 is merge duplicates: the
-        // jit (esbuild) and aot (Angular) emits map some statements of
-        // dual-tested files (RouteView, RealLink, RealLinkActive) to
-        // different ranges, so the merged report keeps uncovered jit-emit
-        // twins of lines the aot map covers (verify with
-        // `pnpm test --project aot`) — plus a few AOT-emit phantom branches.
-        // The floors are measured and locked to catch regressions.
+        // What keeps the floors below 100: the dual-tested files (RouteView,
+        // RealLink, RealLinkActive) reach the merged report twice. The jit
+        // (esbuild) copy maps every statement, the paths only AOT runs
+        // among them, and those stay untaken; the aot (Angular) copy maps few
+        // statements and does not hold those lines, so it cannot show them
+        // run — the aot tests assert what the paths produce. Compiling these
+        // files with the Angular compiler in the jit project too only makes
+        // the jit copy as coarse (IMPLEMENTATION_NOTES, "Angular keeps its
+        // coverage floors"). The floors are measured and locked to catch
+        // regressions.
         thresholds: {
           statements: 96,
           branches: 86,

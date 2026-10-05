@@ -13841,3 +13841,15 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 **Why.** Without each `?? ""` the Link passes `undefined` as the route name and draws the warning; three mutants, three red. A test for the compiler's `''` would need an Error whose message is not a string, which `Lazy` does not produce.
 
 **Measured (2026-10-05).** After: statements 303/303, branches 131/132, functions 93/93, lines 267/267.
+
+## Angular keeps its coverage floors: the aot copy cannot record the paths only AOT runs (2026-10-05)
+
+**Problem.** After Vue, Svelte and Solid, Codecov's remaining Angular lines — 19, in `RouteView.ts`, `RealLink.ts` and `RealLinkActive.ts` — looked like jit-emit twins of lines the aot project covers, as the package's notes said. Measured, the aot side covers nothing there: the Angular emit maps few statements. Of `RouteView.ts`, the aot coverage map holds statements on 19 lines, the merged report on 54, and of the lines Codecov counts as uncovered only one is among the 19. `pnpm test --project aot` shows no gap on those lines because its map does not hold them.
+
+**Probe.** Compiling the three files with the Angular compiler in the jit project as well, so that both projects emit them alike:
+
+- the merged report read 100 % — on 276 statements instead of 399; `RouteView.ts` fell from 67 statements to 20, `RealLink.ts` from 61 to 14, `RealLinkActive.ts` from 33 to 10;
+- `sourceMap` and `inlineSources` in `tsconfig.spec.aot.json` changed none of the counts;
+- four jit tests that pin the jit ceiling failed, as expected.
+
+**Decision.** Not done: the 100 % came from dropping two thirds of the code from the measurement. The floors stay; the package's `vitest.config.mts` comment, `CLAUDE.md` and `ARCHITECTURE.md` now say the aot copy cannot record those lines, rather than that it covers them. The aot tests still run those paths and assert what they produce: the fallback resolution of `RouteView` (S1, S2, M1, M2), its `matchEntries` (M3), and the directives' pure-href refresh, class change and same-snapshot early return.

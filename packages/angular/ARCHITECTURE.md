@@ -307,9 +307,9 @@ tests/
 
 **Two vitest projects, one run (#1512):** `vitest.config.mts` declares `test.projects` — `jit` (the whole suite, esbuild-transpiled; `contentChildren` queries stay empty there) and `aot` (only `tests/aot/**`, compiled by `@analogjs/vite-plugin-angular` with full Ivy, where the queries populate for real). Coverage is a root-only option, so both projects merge into a single report and AOT-only hits count toward the thresholds — this is what allows `RouteView`'s fallback resolution to be covered without a `v8 ignore`.
 
-**Coverage thresholds:** 98% statements, 94% branches, 99% functions, 98% lines (enforced in `vitest.config.mts`; measured floors — see the config comment for the actuals and the merge-duplicate caveat).
+**Coverage thresholds:** measured floors, enforced in `vitest.config.mts` — see the config comment for the merge-duplicate caveat.
 
-**Why not 100%:** every semantic path is executed and asserted in the two-project run (#1512 layers 1-2 closed the ordinary gaps in the jit suite and the signal-input paths in the aot project). The residual percentage is a measurement artifact: files tested in BOTH projects keep uncovered jit-emit "twins" of lines the aot map covers (the two compilers map statements to different ranges), plus a few AOT-emit phantom branches (angular#64583 class). See CLAUDE.md "Coverage Ceiling" for the full analysis and why evicting tests into the aot project wholesale is deliberately not pursued.
+**Why not 100%:** every semantic path is executed and asserted in the two-project run (#1512 layers 1-2 closed the ordinary gaps in the jit suite and the signal-input paths in the aot project). The residual percentage is a measurement artifact: files tested in BOTH projects reach the merged report twice — the jit copy keeps the paths only AOT runs untaken, and the aot copy's coverage map is too coarse to record them — plus a few AOT-emit phantom branches (angular#64583 class). See CLAUDE.md "Coverage Ceiling" for the full analysis and why evicting tests into the aot project wholesale is deliberately not pursued.
 
 ## See Also
 
