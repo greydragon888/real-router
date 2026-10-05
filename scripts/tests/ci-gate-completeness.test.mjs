@@ -910,7 +910,11 @@ const OPEN_FORMS = {
       "      - name: Determine result\n",
       "      - name: Before\n        run: echo\n      - name: Determine result\n",
     ),
-  "a folded script": () => inGate("        run: |\n", "        run: >\n"),
+  "a folded script": () =>
+    inGate(
+      "        run: | # zizmor: ignore[template-injection] outputs of the check job\n",
+      "        run: > # zizmor: ignore[template-injection] outputs of the check job\n",
+    ),
   "a job-level continue-on-error": () =>
     inGate("    steps:\n", "    continue-on-error: true\n    steps:\n"),
   "job-level defaults": () =>

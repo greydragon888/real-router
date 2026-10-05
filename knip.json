@@ -214,7 +214,8 @@
   "ignoreBinaries": [
     "tree",
     "playwright",
-    "actionlint"
+    "actionlint",
+    "uvx"
   ],
   "ignoreExportsUsedInFile": true
 }

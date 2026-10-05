@@ -379,7 +379,7 @@ jobs:
         timeout-minutes: 5
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
+        run: | # zizmor: ignore[github-env] the released tags, on master
           set -euo pipefail
 
           echo "::group::Fetch tags + existing releases"
@@ -518,7 +518,7 @@ jobs:
       # plan.
       - name: Summary
         if: always()
-        run: |
+        run: | # zizmor: ignore[template-injection] outputs of its own steps
           echo "## Changesets Workflow Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           # Empty count = the job died before "Check for changesets" ran (this
@@ -553,7 +553,7 @@ jobs:
       # (Release-PR path) or succeeded — its output is '' / '0' respectively.
       - name: Fail if publish errored
         if: always() && steps.publish.outputs.publish_status != '' && steps.publish.outputs.publish_status != '0'
-        run: |
+        run: | # zizmor: ignore[template-injection] outputs of its own steps
           # Post-mortem: name the gap instead of "see the log" — list the
           # planned packages whose local version is still absent from npm.
           # Re-uses the same classifier as the preflight above (one source of

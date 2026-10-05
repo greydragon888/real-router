@@ -82,7 +82,7 @@ jobs:
     # bot check on it alone can be satisfied by someone else. The actor check
     # keeps the job to runs Dependabot started, the only ones that get the
     # Dependabot secret the push needs.
-    if: >-
+    if: >- # zizmor: ignore[bot-conditions] the author admits, the actor narrows
       github.event.pull_request.user.login == 'dependabot[bot]' &&
       github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
@@ -92,7 +92,7 @@ jobs:
       HAS_PUSH_TOKEN: ${{ secrets.DEPENDABOT_PUSH_TOKEN != '' }}
     steps:
       - name: Checkout PR branch
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7 # zizmor: ignore[artipacked] its push uses the kept token
         with:
           # Dependabot branches live in this repo (not a fork), so head_ref is
           # pushable. The token has to be the PAT: checkout persists it as the

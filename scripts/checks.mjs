@@ -221,6 +221,15 @@ export const CHECKS = [
     why: "new SAST findings on the branch against .semgrep/rules.yml and p/javascript",
   },
   {
+    // No skip: a diff without code can change this command itself, in
+    // `package.json`, and Dependabot's bump of an action is a `dependabot-pr`.
+    id: "lint:workflow-security",
+    run: ["pnpm", "lint:workflow-security"],
+    stages: ["pre-push", "ci"],
+    tools: ["uvx"],
+    why: "security findings in the workflows, the setup action and dependabot.yml, against .github/zizmor.yml (zizmor)",
+  },
+  {
     // CI lints workflows in `ci.yml#actionlint`, on pull requests only; a push
     // straight to master meets actionlint here. That job runs a pinned image,
     // not a `pnpm` line, so `ciBy` cannot name it. Without shellcheck on PATH

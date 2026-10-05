@@ -8,6 +8,10 @@ updates:
       day: "monday"
       time: "04:00"
     open-pull-requests-limit: 10
+    # A release waits seven days before Dependabot proposes it; a security
+    # update does not wait. Without the key Dependabot waits three days.
+    cooldown:
+      default-days: 7
     # A requirement that already allows the new version stays as it is, and only
     # the lockfile moves; any other is raised, as `increase` does. So a patch of
     # a dependency declared with `~` (syncpack.config.mjs) touches no manifest.
@@ -191,6 +195,9 @@ updates:
       day: "monday"
       time: "04:00"
     open-pull-requests-limit: 10
+    # Seven days, as in the root entry.
+    cooldown:
+      default-days: 7
     # A patch inside a `~` range moves the lockfile alone, as in the root entry.
     versioning-strategy: increase-if-necessary
     groups:
@@ -273,6 +280,9 @@ updates:
       interval: "monthly"
       time: "04:00"
     open-pull-requests-limit: 5
+    # Seven days, as in the root entry.
+    cooldown:
+      default-days: 7
     groups:
       # react + react-dom move in lockstep — the root block has the reason.
       react:
@@ -325,6 +335,9 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "04:00"
+    # Seven days, as in the root entry.
+    cooldown:
+      default-days: 7
     reviewers:
       - "greydragon888"
     assignees:

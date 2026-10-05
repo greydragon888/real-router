@@ -13607,6 +13607,8 @@ On CI, after the push: PR #2660, of Markdown alone, ran all 13 checks of the `ci
 
 ## Workflows pin third-party actions by commit, keep expressions out of `run:`, and leave no token behind (2026-10-04)
 
+> **Updated (2026-10-05).** zizmor runs in the registry now, against `.github/zizmor.yml`, and the four Dependabot entries wait seven days ("zizmor guards the workflows from the registry, and Dependabot waits seven days").
+
 **Problem.** zizmor 1.30.1, a security linter for GitHub Actions, run once offline over `.github/` in its default persona, reported 193 findings. Most were the repository's own policy or deliberate design. These were not:
 
 - The rule of "GitHub Actions Pinned by SHA" — a third-party action is pinned by commit — was broken at eight sites: `pnpm/action-setup@v6.1.0` at six and `CodSpeedHQ/action@v5.2.1` at two. Their owners can move those tags.
@@ -13726,3 +13728,34 @@ zizmor did not report one more: `sonar-trusted.yml` holds four scanner arguments
 In the main checkout a push that leaves the tooling alone now spends about 8 s on `scripts/tests/` instead of 35 s. One that changes it spends about 7 s more than before, since the two groups run one after the other. The weekly uncached run the plan named is not needed: the tools' versions and the runner's image are in the key.
 
 **Limits.** The copy and the key do not hold the network, which no test of the task reaches — the npm and pnpm the publish tests run are stubs on PATH. The key holds four variables, `TOOLING_RUNTIME`, `CI`, `ImageOS` and `ImageVersion`; turbo hands the tests more without keying them, `LANG`, `HOME` and `PATH` among them. A path through the linked `node_modules` reaches the root, the link's parent. On a development machine the other tools the scripts run — `sed`, `awk`, `grep` — enter the key only through the OS release. turbo hashes a file's content, not its mode, so a change of mode alone replays the last verdict. `path.matchesGlob` matches no dot segment with `*` or `**` and turbo does, so a dotfile under an input glob fails the comparison by name until the matcher learns it. A test of the task that only checks that something is absent passes vacuously in the copy instead of failing; the floors most of them set on what they read are what catches that.
+
+## zizmor guards the workflows from the registry, and Dependabot waits seven days (2026-10-05)
+
+**Problem.** zizmor ran once, by hand ("Workflows pin third-party actions by commit, keep expressions out of `run:`, and leave no token behind"), and nothing kept its findings from coming back. actionlint, in pre-push and in `ci.yml#actionlint`, refuses a pull request's text expanded inside a workflow's `run:`, but not inside the setup action, not one passed on through a step's output, and none of zizmor's other audits: a third-party action pinned by tag, a privileged trigger, a token a checkout keeps, a condition on the actor. And the four entries of `.github/dependabot.yml` set no `cooldown`, so Dependabot proposed a release three days after it appeared — its default for version updates since 2026-07-14 — where zizmor asks for seven.
+
+**Solution.**
+
+- `lint:workflow-security` runs zizmor 1.30.1 through `uvx`, resolved from what PyPI held on 2026-09-10 (`--exclude-newer`), offline, over the workflows, the setup action and `dependabot.yml`. It fails on any finding, and on a file zizmor cannot read (`--strict-collection`). The registry runs it in pre-push and in Repo Lints, with no skip: a diff without code can change the command itself, in `package.json`, and Dependabot's bump of an action is a `dependabot-pr`.
+- A deliberate finding carries `# zizmor: ignore[<audit>]` on its line: `github-env` on the step of `changesets.yml` that records the tags it released; `template-injection` on that workflow's summary and failure steps and on the gate's step in `ci.yml`, expansions of outputs of their own workflow's steps and jobs; `bot-conditions` and `artipacked` on the dedupe job's condition and checkout.
+- `.github/zizmor.yml` holds the rest: GitHub's actions by any ref and any other by full commit (`unpinned-uses`), the three `workflow_run` workflows exempt from `dangerous-triggers`, and `self-repository` off. `zizmor-config.test.mjs` holds the exempt files and each one's `on:` block.
+- Every entry of `dependabot.yml` sets `cooldown: default-days: 7`; security updates do not wait. `dependabot-cooldown.test.mjs` holds every entry to a `cooldown` of `default-days` alone, from 7 to 90 days.
+- knip ignores the binary `uvx`, which the script calls and no package provides.
+
+**Why.**
+
+- An ignore on a line covers that finding alone. An ignore in the config names a file and covers every later finding of its audit there: a second `$GITHUB_ENV` write in `changesets.yml`, a second condition on the actor or a second checkout keeping its token in the dedupe workflow passed with one.
+- `dangerous-triggers` reports a workflow's whole `on:` block, so even an ignore on a line would cover a trigger added later; the test refuses any change to those three blocks instead.
+- No severity floor: zizmor rates an expansion of anything but `github.*`, `env.*`, `inputs.*` and `matrix.*` informational, so a floor at low let a pull request's title through once a step passed it on as an output.
+- `--strict-collection`: without it zizmor skips a file it cannot read — a syntax error, a value of the wrong type — with a warning, and passes.
+- `--config`: without it zizmor 1.30.1 reads the configuration of the first directory above whose `.git` is a directory, which in a worktree inside the checkout is the checkout's copy.
+- `--exclude-newer`: zizmor 1.30.1 has no dependencies and its files were uploaded on 2026-09-09, so a file added to the release later cannot enter the run.
+- Offline, the run reads the files alone, needs no token and gives one verdict anywhere. The online audits — an impostor commit, a moved tag, a known-vulnerable action — found nothing on 2026-10-04 and stay a run by hand.
+- zizmor's `dependabot-cooldown` audit returns at the first entry that waits long enough, so a later entry without a `cooldown`, or at six days, passes it; the test reads every entry. A per-update-type count or an `include`/`exclude` list can shorten the wait for some releases, and the GitHub Actions ecosystem takes `default-days` alone, so the test refuses those forms rather than read them.
+
+**Limits.**
+
+- A new zizmor release arrives by hand: Dependabot does not read the version in a script line.
+- Repo Lints fetches zizmor from PyPI on every pull request, the release PR and Dependabot's included; PyPI out of reach turns the check red.
+- The seven days hold the examples' own `@real-router/*` group too: a release reaches the examples' lockfile through Dependabot a week after it is published at the earliest.
+
+**Measured (2026-10-05).** zizmor 1.30.1, the latest release on PyPI, reports nothing on the tree, 17 findings ignored on their lines or by the exemption. Without the config it reports 121: 94 references by tag to GitHub's own actions, 24 `self-repository` and the three exempt triggers. Each of 24 mutants fails the run or a test, among them: the cooldown dropped from each entry, or set to six days; a third-party action by tag; each ignore on a line dropped; a second `$GITHUB_ENV` write in `changesets.yml`; a second actor condition and a second checkout keeping its token in the dedupe workflow; a pull request's title passed on through a step's output, and expanded in the setup action's `run:`, which actionlint passes; `pull_request_target` in an exempt workflow; an unreadable workflow carrying an injection. Two probes: without `--strict-collection` that unreadable workflow passes, and a cutoff a day before the upload resolves no zizmor.

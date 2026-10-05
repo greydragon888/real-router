@@ -1,0 +1,25 @@
+# zizmor, the security linter for GitHub Actions: `pnpm lint:workflow-security`
+# runs it offline over the workflows, the setup action and dependabot.yml. It
+# fails on any finding, and on a file it cannot read (`--strict-collection`).
+# `--config` names this file: zizmor 1.30.1 otherwise reads the configuration
+# of the first directory above whose `.git` is a directory, which in a worktree
+# inside the checkout is the checkout's copy.
+#
+# A deliberate finding carries `# zizmor: ignore[<audit>]` on its line, which
+# covers it alone. `dangerous-triggers` reports a workflow's whole `on:` block,
+# so its exemption names files; `zizmor-config.test.mjs` holds their triggers.
+rules:
+  # `actions/*` and `github/*` by any ref, any other action by full commit.
+  unpinned-uses:
+    config:
+      policies:
+        "actions/*": ref-pin
+        "github/*": ref-pin
+        "*": hash-pin
+  # `workflow_run`: two of them start only from Post-Merge Build on master, and
+  # the fork path runs base-repository code only.
+  dangerous-triggers:
+    ignore: [changesets.yml, coverage-master.yml, sonar-trusted.yml]
+  # `$/` for an action of this repository waits for actionlint, which refuses it.
+  self-repository:
+    disable: true

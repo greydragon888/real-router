@@ -796,10 +796,12 @@ jobs:
           sudo install -m 0755 /tmp/osv-scanner /usr/local/bin/osv-scanner
           osv-scanner --version
 
-      # lint:security runs semgrep through uvx, which fetches it only when the
-      # check runs, so a skipped check downloads nothing. No cache: semgrep that
-      # cannot be fetched is red, and uv's `enable-cache: auto` would keep
-      # ~570 MB of it under one key on every pull request.
+      # lint:security and lint:workflow-security run semgrep and zizmor through
+      # uvx, which fetches each only when its check runs: a skipped semgrep
+      # downloads nothing, and zizmor, which no context skips, is fetched on
+      # every pull request. No cache: a tool that cannot be fetched is red, and
+      # uv's `enable-cache: auto` would keep ~570 MB of semgrep under one key on
+      # every pull request.
       - name: Install uv
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
@@ -1758,7 +1760,7 @@ jobs:
         env:
           DEPENDABOT_PR: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
           NEEDS: ${{ toJSON(needs) }}
-        run: |
+        run: | # zizmor: ignore[template-injection] outputs of the check job
           # Every job the gate waits for must have passed or been skipped: a
           # failure, a cancellation or any other result fails the gate here,
           # before a branch below can leave a job unread. Whose skip is
