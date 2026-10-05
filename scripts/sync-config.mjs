@@ -30,6 +30,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { render as cpdExclusions } from "./cpd-exclusions.mjs";
 import { withoutGitEnv } from "./git-env.mjs";
 import { REFUSED_CHARACTERS } from "./refused-characters.mjs";
 
@@ -44,7 +45,14 @@ import { REFUSED_CHARACTERS } from "./refused-characters.mjs";
  */
 
 /** @type {Region[]} The regions this script keeps. */
-export const REGIONS = [];
+export const REGIONS = [
+  {
+    name: "cpd-exclusions",
+    file: "sonar-project.properties",
+    source: ".jscpd.json",
+    render: cpdExclusions,
+  },
+];
 
 const NAME = "[a-z0-9][a-z0-9-]*";
 const OPEN = new RegExp(`^( *)# >>> sync-config: (${NAME}) — (.+)$`);

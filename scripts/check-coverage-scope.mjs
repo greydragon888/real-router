@@ -77,9 +77,10 @@ const emitMode = process.argv.includes("--emit");
 const read = (p) => readFileSync(join(ROOT, p), "utf8");
 
 /**
- * A real (non-symlink) directory — mirrors what sonar-scanner indexes (it does
- * not follow symlinked dirs), so symlinked src (browser-env, dom-utils → shared/)
- * stays out of sonar.sources; the shared/* real dirs are added instead.
+ * A real (non-symlink) directory — mirrors what sonar-scanner analyses (it
+ * leaves the files behind a symlinked dir out, as ignored by git), so symlinked
+ * src (browser-env, dom-utils → shared/) stays out of sonar.sources; the
+ * shared/* real dirs are added instead.
  * @param {string} p
  */
 const isRealDir = (p) => {

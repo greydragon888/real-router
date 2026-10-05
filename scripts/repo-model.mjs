@@ -31,7 +31,8 @@ import { join } from "node:path";
  *   coverage
  * @property {boolean} hasVitestConfig it has its own `vitest.config.mts`
  * @property {boolean} hasRealSrc its `src/` is a directory, not a symlink:
- *   sonar-scanner does not follow a symlinked directory
+ *   sonar-scanner leaves the files behind a symlinked directory out, as
+ *   ignored by git
  * @property {boolean} isPhantom a coverage threshold in its
  *   `vitest.config.mts` is below 100 — compiler-generated code no test reaches
  * @property {boolean} hasLcov its `coverage/lcov.info` exists

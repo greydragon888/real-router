@@ -59,6 +59,12 @@ export const CHECKS = [
     why: "dependency versions agree across the workspace (syncpack)",
   },
   {
+    id: "lint:config-sync",
+    run: ["pnpm", "lint:config-sync"],
+    stages: ["pre-commit", "pre-push", "ci"],
+    why: "the generated regions of configuration files match their sources, and the sources hold only forms the generator reads (scripts/sync-config.mjs)",
+  },
+  {
     id: "lint:coverage-scope",
     run: ["pnpm", "lint:coverage-scope"],
     stages: ["pre-commit", "pre-push", "ci"],

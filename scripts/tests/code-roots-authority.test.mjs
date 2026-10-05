@@ -7,13 +7,12 @@
 // `scripts/check-coverage-scope.mjs` holds that there are no others. A glob,
 // regex or path prefix that names the src root across packages — or the
 // `packages/` root that holds it — does not reach `shared/`: the
-// shared dirs enter a package's `src/` only through symlinks. Node's `globSync`
-// and CodeQL's extractor do not follow them, and the lists whose tool does
-// follow them exclude the aliases so each file is read once (`.jscpd.json`,
-// `tsconfig.sonar.json`). So a file that names the src root repo-wide must name
-// the shared root in CODE as well — a comment does not count — or carry a named
-// exemption below that says why shared/ is not its business. A new list is
-// held to this the day it lands.
+// shared dirs enter a package's `src/` only through symlinks. Node's `globSync`,
+// CodeQL's extractor and jscpd do not follow them, and `tsconfig.sonar.json`,
+// whose tool does, excludes the aliases so each file is read once. So a file
+// that names the src root repo-wide must name the shared root in CODE as well —
+// a comment does not count — or carry a named exemption below that says why
+// shared/ is not its business. A new list is held to this the day it lands.
 //
 // What counts as naming the root is the shapes in SRC_ROOT and SHARED_ROOT.
 // Lists that name one package's `src/` (`src/**` in a turbo input, a vitest

@@ -1,4 +1,13 @@
 {
+  "//": [
+    "sonar-project.properties takes sonar.cpd.exclusions from ignore below, each entry translated into a Sonar pattern by scripts/sync-config.mjs: change the entries here.",
+    "packages/preact/src/**: the Preact adapter, a deliberate parallel of the React one.",
+    "packages/hash-plugin/src/**: a deliberate parallel of browser-plugin.",
+    "packages/*/src/dom-utils/**, browser-env/** and shared-ssr/**: symbolic links to directories of shared/, which is scanned itself. Neither jscpd nor Sonar reads a file through them; the entries keep it so.",
+    "packages/*/src/**/*.react-server.ts and packages/react/src/legacy.ts, legacy.ssr.ts and ink.ts: entry points of other subpaths and export conditions, which re-export what the main entry does.",
+    "packages/validation-plugin/src/type-guards/** and shared/browser-env/state-guard.ts: twins copied by design, which scripts/tests/twin-lockstep.test.mjs keeps in step.",
+    "**/*.d.ts: declaration files, which hold types and no code that runs, and which SonarJS leaves out by default."
+  ],
   "threshold": 2,
   "failOnEmpty": true,
   "minLines": 5,

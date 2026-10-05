@@ -61,6 +61,7 @@ export const GUARDS = new Set([
   "code-roots-authority",
   "codspeed-gate",
   "component-lint-config",
+  "cpd-exclusions",
   "diff-carries-no-source",
   "examples-plan",
   "fsm-diagram-parity",

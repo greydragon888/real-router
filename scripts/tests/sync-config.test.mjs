@@ -632,7 +632,7 @@ test("lineDiff marks what --check prints", () => {
 test("the regions this repository keeps", () => {
   assert.deepEqual(
     REGIONS.map((region) => `${region.file}#${region.name}`),
-    [],
+    ["sonar-project.properties#cpd-exclusions"],
   );
 });
 
