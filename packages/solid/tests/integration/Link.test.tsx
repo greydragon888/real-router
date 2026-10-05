@@ -359,9 +359,9 @@ describe("Link - Integration Tests", () => {
     // An empty routeName is a misuse (matches no route). Before #1427 the Link
     // fast path went through the routeSelector, whose unstarted sentinel
     // (`route?.name ?? ""`) made `isRouteActive("", "") === true` — the Link lit
-    // up before `router.start()`. The `routeName !== ""` guard in `useFastPath`
-    // now routes an empty name to the slow `createActiveRouteSource`, so the Link
-    // tracks the canonical `router.isActiveRoute("") === false` in EVERY state.
+    // up before `router.start()`. The fast-path accessor answers an empty name
+    // itself, without asking the selector, so the Link tracks the canonical
+    // `router.isActiveRoute("") === false` in EVERY state.
     it("Link routeName='' is INACTIVE before router.start()", () => {
       // Stop the router so it has no active route (the sentinel state).
       router.stop();
