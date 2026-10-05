@@ -7,7 +7,10 @@
 // The cells of `toRegexp` hold the answers Sonar's `WildcardPattern` class gave
 // for the same pairs; the matrix runs jscpd itself as the gate runs it, in a
 // directory outside any git repository, where no ignore file of git can leave
-// a fixture file out.
+// a fixture file out. jscpd also judges the repository's `.jscpd.json`: it
+// names the configuration it takes and reports a value of another type or a
+// file it fails to parse, and its verdict on the fixture's clones shows the
+// threshold in force.
 
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -197,9 +200,10 @@ const FILES = [
  *
  * @param {string} root
  * @param {string[]} [ignore]
+ * @param {string[]} [said] given, takes what jscpd prints
  * @returns {Set<string>}
  */
-function analysed(root, ignore) {
+function analysed(root, ignore, said) {
   const out = mkdtempSync(join(tmpdir(), "cpd-exclusions-report-"));
   try {
     const args = [];
@@ -240,8 +244,9 @@ function analysed(root, ignore) {
         out,
         "--no-tips",
       ],
-      { cwd: root, stdio: "ignore" },
+      { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
     );
+    said?.push(run.stdout, run.stderr);
     assert.ok(run.status === 0 || run.status === 1, `jscpd: ${run.status}`);
     const report = JSON.parse(
       readFileSync(join(out, "jscpd-report.json"), "utf8"),
@@ -330,8 +335,30 @@ test("given the repository's .jscpd.json, jscpd leaves out what the translated l
   const root = fixture(FILES);
   try {
     copyFileSync(join(ROOT, ".jscpd.json"), join(root, ".jscpd.json"));
+    const said = [];
+    const files = analysed(root, undefined, said);
 
-    assert.deepEqual([...analysed(root)].sort(), kept.sort());
+    // jscpd names the configuration it takes, and reports a value of another
+    // type, or a file it fails to parse, as `config file .jscpd.json`; a file
+    // that is not UTF-8 it drops without a word, and then names none.
+    assert.match(said.join("\n"), /Using config from \.jscpd\.json/);
+    assert.doesNotMatch(said.join("\n"), /config file \.jscpd\.json/);
+    // A `null` it takes as unset without a word. The fixture's clones are over
+    // the threshold, so the gate's verdict shows one in force.
+    assert.match(said.join("\n"), /over threshold \(\d+(?:\.\d+)?%\)/);
+    assert.deepEqual([...files].sort(), kept.sort());
+
+    // The control: this jscpd reports a value it drops in that form.
+    writeFileSync(
+      join(root, ".jscpd.json"),
+      JSON.stringify({
+        ...JSON.parse(readFileSync(join(ROOT, ".jscpd.json"), "utf8")),
+        threshold: "2%",
+      }),
+    );
+    const control = [];
+    analysed(root, undefined, control);
+    assert.match(control.join("\n"), /config file \.jscpd\.json/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

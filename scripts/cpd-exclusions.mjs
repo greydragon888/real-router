@@ -17,11 +17,14 @@
 // What the translation does not carry is refused, not read: a character other
 // than a letter, a digit, `.`, `_`, `-`, `/` or `*`, `**` that is not a whole
 // segment, and an empty, `.` or `..` segment. So are the other ways one of the
-// two could leave a file out under the scan roots: a `.jscpd.json` jscpd would
-// not read as it is read here, a key, a `format` or an `absolute` of it, a
-// `lint:duplicates` command or a line of `sonar-project.properties` other than
-// the ones named here, and a tracked file outside the forms `refusedFiles`
-// accepts.
+// two could leave a file out under the scan roots: a `.jscpd.json` that is not
+// UTF-8 or holds a byte-order mark or a lone surrogate, a key, a `format` or an
+// `absolute` of it, a `lint:duplicates` command or a line of
+// `sonar-project.properties` other than the ones named here, and a tracked file
+// outside the forms `refusedFiles` accepts. `JSON.parse` takes more than jscpd
+// 5.3.2 does — a number out of jscpd's range or nesting 130 deep drops the whole
+// file there, a value of another type drops that value — so the test has jscpd
+// judge this repository's `.jscpd.json` itself.
 
 import { execFileSync } from "node:child_process";
 import { lstatSync, readFileSync, statSync } from "node:fs";
@@ -218,7 +221,7 @@ const strings = (value) =>
       : [];
 
 /**
- * `.jscpd.json`, read as jscpd reads it — UTF-8 without a byte-order mark,
+ * `.jscpd.json`, decoded as jscpd decodes it — UTF-8 without a byte-order mark,
  * every string well formed; on anything else jscpd drops the whole file — and
  * held to the keys, the formats, the `absolute` and the `ignore` shape this
  * knows. With `absolute`, jscpd would match an entry against the absolute path.
