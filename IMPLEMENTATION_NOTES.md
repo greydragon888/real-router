@@ -12933,6 +12933,19 @@ It surfaced as `navigate/pre-commit-listener` going from 11.9 to 7.4 ms between 
 - The reduction was run on four `cpuinfo` samples: AMD EPYC, an Intel model with `(R)` and `@`, a KVM model with a comma, and a file without the line.
 - Every job identity's series now splits by the models the hosted pool hands out. The next analysis checks the active series against the 10k budget.
 
+**Measured (2026-10-05).** From 2026-09-24, when the telemetry began, to 2026-10-05: the series that received a sample within a window, summed over all 50 metric names — `count(count_over_time(<name>[W]))` per name, since one `max_over_time` over every name drops `__name__` and collides.
+
+| Window                                 | Peak since 2026-09-25        | 2026-10-05, Dependabot's weekly run |
+| -------------------------------------- | ---------------------------- | ----------------------------------- |
+| 20 min — Grafana Cloud's active series | 5,755 (2026-10-01 11:05 UTC) | 4,567                               |
+| 1 h                                    | 6,650                        | 5,088                               |
+| 2 h                                    | 8,368                        | 7,996                               |
+| 3 h                                    | 8,895                        | 7,996                               |
+
+- One point exceeded 10k: 11,151 on 2026-09-24, before the task histogram became a sum and a count ("Per-task duration reaches Grafana as a sum and a count, not a histogram").
+- At the 2026-10-01 peak `turbo_task_cache_events_total` held 1,390 series: the same task streams over six CPU models, from 681 on the AMD EPYC 7763 to 59 on an Intel Xeon 8370C. The run-duration histogram's buckets peaked at 1,152 series.
+- Which window the Free plan's ingest limit counts is not measured here: `grafanacloud_instance_active_series` and the discarded samples live in the usage data source, which the read token does not reach. The 20-minute peak leaves about 4,200 series of headroom, the 3-hour peak about 1,100.
+
 ## `sources` takes core's `type-check` split through `extends` (2026-09-29)
 
 **Problem.** `@real-router/sources` sits upstream of the six adapters, and its `type-check` checked one program over `src` and `tests` — the shape core had before "Core's `type-check` checks `src` only; its tests have `type-check:tests`". A change to a `sources` test re-keyed 28 of 116 tasks, among them the adapters' `type-check`, `lint`, `test` and `test:properties` (`--dry=json`). Since 29.08, 5 of the 12 commits that changed a `.ts` file in `sources` changed none under `src/`.
