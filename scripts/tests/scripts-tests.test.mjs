@@ -7,7 +7,8 @@
 // the task, or a cache hit could replay a verdict over a file the key missed.
 // The cells compare the two, show that turbo's key moves with the tools'
 // versions and the runner's image, and run a test that reads beyond the
-// inputs: it passes in place and fails in the copy.
+// inputs: it passes in place and fails in the copy. A test `TOOLING` does not
+// name runs in place.
 
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -28,8 +29,8 @@ import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
-  GUARDS,
   TASK,
+  TOOLING,
   runHere,
   runtime,
   taskInputs,
@@ -98,11 +99,11 @@ function dryTask(env) {
   }
 }
 
-test("GUARDS names only test files that exist", () => {
-  for (const name of GUARDS) {
+test("TOOLING names only test files that exist", () => {
+  for (const name of TOOLING) {
     assert.ok(
       existsSync(join(ROOT, "scripts", "tests", `${name}.test.mjs`)),
-      `GUARDS names ${name}, which scripts/tests/ does not hold`,
+      `TOOLING names ${name}, which scripts/tests/ does not hold`,
     );
   }
 });
@@ -119,15 +120,35 @@ test("the two groups split scripts/tests/ between them", () => {
   const name = (file) =>
     file.slice("scripts/tests/".length, -".test.mjs".length);
   assert.ok(
-    guards.every((file) => GUARDS.has(name(file))),
-    guards.join(),
-  );
-  assert.ok(
-    tooling.every((file) => !GUARDS.has(name(file))),
+    tooling.every((file) => TOOLING.has(name(file))),
     tooling.join(),
   );
-  assert.equal(guards.length, GUARDS.size);
+  assert.ok(
+    guards.every((file) => !TOOLING.has(name(file))),
+    guards.join(),
+  );
+  assert.equal(tooling.length, TOOLING.size);
   assert.ok(tooling.length >= 20, `only ${tooling.length} tooling tests`);
+});
+
+test("a test the tooling set does not name lands in the guards group", () => {
+  const root = mkdtempSync(join(tmpdir(), "scripts-tests-(new)-"));
+  const named = [...TOOLING][0];
+  try {
+    mkdirSync(join(root, "scripts", "tests"), { recursive: true });
+    for (const name of [named, "new-test"]) {
+      writeFileSync(join(root, "scripts", "tests", `${name}.test.mjs`), "");
+    }
+
+    assert.deepEqual(testsOf("guards", root, new Set([named])), [
+      "scripts/tests/new-test.test.mjs",
+    ]);
+    assert.deepEqual(testsOf("tooling", root, new Set([named])), [
+      `scripts/tests/${named}.test.mjs`,
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("the copy holds exactly what turbo hashes for the task", () => {
@@ -332,6 +353,20 @@ function fixture(read, through) {
   return root;
 }
 
+/**
+ * The names of every test a fixture holds, so its copy runs each of them: a set
+ * written by hand could leave one out.
+ *
+ * @param {string} root
+ * @returns {Set<string>}
+ */
+const testsIn = (root) =>
+  new Set(
+    readdirSync(join(root, "scripts", "tests"))
+      .filter((file) => file.endsWith(".test.mjs"))
+      .map((file) => file.slice(0, -".test.mjs".length)),
+  );
+
 test("a test that reads beyond the task's inputs fails in the copy, and passes in place", () => {
   for (const [read, through, inCopy] of [
     ["scripts/data.txt", "location", 0],
@@ -356,13 +391,41 @@ test("a test that reads beyond the task's inputs fails in the copy, and passes i
       // The copy's run gets this runner's `NODE_TEST_CONTEXT` too, and must
       // drop it.
       assert.equal(
-        runHere(root, "ignore", { ...process.env, ...from }),
+        runHere(root, "ignore", { ...process.env, ...from }, testsIn(root)),
         inCopy,
         `${read} through ${through}, in the copy`,
       );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  }
+});
+
+test("a name in the tooling set without a test file is refused", () => {
+  const root = fixture("scripts/data.txt", "location");
+  try {
+    assert.throws(
+      () => testsOf("tooling", root, new Set(["reads", "ghost"])),
+      /no test file for ghost in scripts\/tests/,
+    );
+    assert.throws(
+      () => runHere(root, "ignore", process.env, new Set(["ghost"])),
+      /no test file for ghost/,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a group without a test file is refused, not left to node's own search", () => {
+  const root = fixture("scripts/data.txt", "location");
+  try {
+    assert.throws(
+      () => runHere(root, "ignore", process.env, new Set()),
+      /no test file to run/,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
@@ -402,7 +465,7 @@ test("the copy's repository takes none of the caller's git config, ignore file o
       );
       try {
         assert.equal(
-          runHere(root, "ignore", { ...process.env, ...arm }),
+          runHere(root, "ignore", { ...process.env, ...arm }, testsIn(root)),
           0,
           Object.keys(arm).join(),
         );
@@ -446,7 +509,7 @@ test("the copy's run gets the copy as PWD, no CI run's variables and pnpm's inst
   };
   delete env.pnpm_config_verify_deps_before_run;
   try {
-    assert.equal(runHere(root, "ignore", env), 0);
+    assert.equal(runHere(root, "ignore", env, testsIn(root)), 0);
   } finally {
     rmSync(link, { force: true });
     rmSync(root, { recursive: true, force: true });

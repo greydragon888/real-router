@@ -13727,6 +13727,8 @@ zizmor did not report one more: `sonar-trusted.yml` holds four scanner arguments
 
 ## The tooling tests of `scripts/tests/` replay from turbo's cache while their inputs hold (2026-10-05)
 
+> **Updated (2026-10-05).** The default is the other way now: `TOOLING` names the tests the task runs, and a new test runs in place. A test that finds what it checks by a listing can pass in the copy over an empty set, so the copy need not show such a test misplaced ("A new test of `scripts/tests/` runs in place until `TOOLING` names it").
+
 **Problem.** `node:scripts-tests` ran every file of `scripts/tests/` on every push and, in Repo Lints, on every pull request: 49 files, 114 s one after another, 35 s in parallel on the development machine and 33 s in CI. On the two pull requests measured, Repo Lints finished last of the jobs `CI Result` waits for, so on a light pull request those seconds were the pull request's own. Most of the time goes to tests of the repository's tooling — the gate script under `bash`, the semgrep wrapper, the lint-reach census — whose inputs change far less often than the code, and a push that touched only a package ran them again unchanged.
 
 **Solution.**
@@ -13874,3 +13876,17 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 - Mutants: dropping the empty-name answer turns the `#1427` cells red, and turning hot reload back on fails the branch threshold (93.92 %). Dropping the directive's `.catch` is equivalent: core leaves no rejection of a navigation unhandled when the caller drops its promise — measured with a control, a dropped `Promise.reject` in the same probe was reported. The test of `use:link` gives the guard, not a spy, as proof the navigation ran: a spy on `navigate` subscribes to the promise it returns and handles the rejection itself.
 
 **Measured (2026-10-05).** After: statements 327/327, branches 159/159, functions 107/107, lines 307/307.
+
+## A new test of `scripts/tests/` runs in place until `TOOLING` names it (2026-10-05)
+
+**Problem.** The split of `scripts/tests/` named the tests that run in place, `GUARDS`, and sent every other one to the tooling task, which runs it in a copy of the task's inputs and replays its verdict from turbo's cache. The copy was to show a test placed there by mistake: one that reads a file beyond the inputs fails in it. A test that finds what it checks by a listing can pass: git's file list and a glob in the copy hold only the inputs, and a check over an empty set passes unless it asks for a member. A review found it with a prototype of a planned workspace test, which lists the tracked `pnpm-workspace.yaml` files and checks `pmOnFail` in each. In place it finds three, and it fails when `examples/pnpm-workspace.yaml` loses the setting; in the copy, with the same change, it finds none, and the whole group exits 0. The task's key does not move with that file either, since it is not an input, so a pull request that changed only it would have replayed the last verdict.
+
+**Solution.**
+
+- `TOOLING` names the tests the task runs, and every other test of `scripts/tests/` — a new one too — runs in place and uncached under `node:scripts-guards`. A test reaches the cache only by being named there.
+- `testsOf` and `runHere` take the set of names that makes the tooling group; a name without a test file is refused, since it would run nothing. The fixtures of `scripts-tests.test.mjs` take the names from their own files, so a fixture's test cannot be left out of the set its copy runs.
+- A group without a file is refused: `node --test` given no file looks for tests under its directory by itself.
+
+**Why.** A test in the wrong group costs seconds in place; in the copy, it can cost its verdict without a sign. The 27 tests the task runs were checked for it: traced, they list only inputs — `.github/`, `.github/workflows/` and `scripts/tests/` — with the same results in place and in the copy, and the copy runs the same 500 tests as a run in place, none skipped.
+
+**Measured (2026-10-05).** Of seven mutants of the split, six fail a cell of `scripts-tests.test.mjs`: the groups swapped, the refusal of an empty group dropped, a name in `TOOLING` with no file, a test `TOOLING` does not name sent to the task, `runHere` running `TOOLING` in place of the set it is given, and the refusal of a name without a test file dropped. The seventh, a test taken out of `TOOLING`, runs in place: the safe side. `node --test` given no file ran the test it found under its directory (Node 24.18.1).

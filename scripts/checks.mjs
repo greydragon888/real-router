@@ -129,7 +129,7 @@ export const CHECKS = [
     run: ["node", "scripts/scripts-tests.mjs", "guards"],
     stages: ["pre-push", "ci"],
     ciSkip: ["dependabot-pr", "no-source"],
-    why: "the tests of scripts/ that read package code, the file list, the history or the workspace",
+    why: "the tests of scripts/ that TOOLING does not name: those that read package code, the file list, the history or the workspace, and a new one",
   },
   {
     // The turbo task `//#test:tooling`, run in a copy that holds its inputs

@@ -6,20 +6,24 @@
 //   node scripts/scripts-tests.mjs tooling         # the turbo task `//#test:tooling`
 //   node scripts/scripts-tests.mjs tooling --here  # that task's own command
 //
-// `GUARDS` read the repository beyond its tooling — package code, the whole
-// file list, the history, the workspace through pnpm or turbo — and run
-// uncached. Every other test reads only what the turbo task `//#test:tooling`
-// names as its inputs in `turbo.json`, so a run that leaves those files alone
-// replays the group's last verdict from turbo's cache.
+// `TOOLING` names the tests that read only what the turbo task
+// `//#test:tooling` names as its inputs in `turbo.json`, so a run that leaves
+// those files alone replays the group's last verdict from turbo's cache. Every
+// other test runs in place and uncached: one that reads package code, the whole
+// file list, the history or the workspace through pnpm or turbo, and a new one
+// until `TOOLING` names it.
 //
 // The task runs its tests in a copy of its inputs, a git repository of its own
 // with `node_modules` linked in. Their environment names the copy wherever it
 // named the root and holds no `GITHUB_*` or `RUNNER_*` variable, so a test that
-// reads beyond the inputs fails there rather than pass on a stale entry —
-// except through the link, whose parent is the root. A new test that reads
-// package code goes in `GUARDS`. The key also holds what no input does: the
-// versions of Node, bash, git and jq and the OS release (`TOOLING_RUNTIME`),
-// and a GitHub runner's image (`ImageOS`, `ImageVersion`).
+// reads a file beyond the inputs fails there rather than pass on a stale entry
+// — except through the link, whose parent is the root. ⚠ A test that finds
+// what it checks by a listing — git's file list, a glob — gets only the inputs
+// in the copy and can pass having checked nothing, so `TOOLING` takes a test
+// only when all it reads is an input. The key also holds what no input does:
+// the versions of Node, bash, git and jq and the OS release
+// (`TOOLING_RUNTIME`), and a GitHub runner's image (`ImageOS`,
+// `ImageVersion`).
 
 import { execFileSync, spawnSync } from "node:child_process";
 import {
@@ -47,51 +51,63 @@ const TESTS = "scripts/tests";
 export const TASK = "//#test:tooling";
 
 /**
- * The tests that read the repository beyond its tooling, and so run
- * uncached. Every other test of `scripts/tests/` runs in the tooling task.
+ * The tests that read only the tooling task's inputs, and so run as that
+ * task. Every other test of `scripts/tests/` runs in place and uncached.
  */
-export const GUARDS = new Set([
-  "benchmarks-lint-filter",
-  "build-matrix",
-  "check-coverage-scope",
-  "check-membership-predicate",
-  "checkout-tarballs",
-  "checks-registry",
-  "cli-entry",
-  "code-roots-authority",
-  "codspeed-gate",
-  "component-lint-config",
-  "cpd-exclusions",
-  "diff-carries-no-source",
-  "examples-plan",
-  "fsm-diagram-parity",
-  "no-cycle-guard",
-  "raiser-text-equality",
-  "refusal-census",
-  "repo-model",
-  "scripts-lib-reach",
-  "scripts-tests",
-  "sonar-trusted-boundary",
-  "sonar-tsconfig",
-  "sync-config",
-  "twin-lockstep",
-  "url-plugin-defaults-parity",
-  "workflow-path-filters",
+export const TOOLING = new Set([
+  "bundle-size-base",
+  "check-changeset",
+  "check-deps-audit",
+  "check-doc-anchors",
+  "check-doc-duplication",
+  "check-e2e-specs",
+  "check-issue-refs",
+  "check-lint-reach",
+  "check-prose",
+  "check-published-versions",
+  "check-semgrep",
+  "ci-gate-completeness",
+  "closed-yaml",
+  "codspeed-base-age",
+  "coverage-threshold-authority",
+  "dependabot-cooldown",
+  "dependabot-updates",
+  "fixture-isolation",
+  "pre-push-guard",
+  "release-workflow",
+  "run-repo-scans",
+  "self-hosted-triggers",
+  "sonar-producer",
+  "verify",
+  "workflow-env-reachability",
+  "workflow-run-names",
+  "zizmor-config",
 ]);
 
 /**
- * The test files of a group, relative to `root`.
+ * The test files of a group, relative to `root`. A name in `tooling` without a
+ * test file is refused: it would run nothing.
  *
  * @param {"guards" | "tooling"} group
  * @param {string} root
+ * @param {Set<string>} tooling the names of the tooling group's tests
  * @returns {string[]}
  */
-export function testsOf(group, root = ROOT) {
-  return readdirSync(join(root, TESTS))
-    .filter((file) => file.endsWith(".test.mjs"))
+export function testsOf(group, root = ROOT, tooling = TOOLING) {
+  const files = readdirSync(join(root, TESTS)).filter((file) =>
+    file.endsWith(".test.mjs"),
+  );
+  const missing = [...tooling].filter(
+    (name) => !files.includes(`${name}.test.mjs`),
+  );
+  if (missing.length > 0) {
+    throw new Error(`no test file for ${missing.join(", ")} in ${TESTS}`);
+  }
+  return files
     .filter(
       (file) =>
-        GUARDS.has(file.slice(0, -".test.mjs".length)) === (group === "guards"),
+        tooling.has(file.slice(0, -".test.mjs".length)) ===
+        (group === "tooling"),
     )
     .sort()
     .map((file) => `${TESTS}/${file}`);
@@ -153,6 +169,24 @@ const ownRun = (env) =>
   Object.fromEntries(
     Object.entries(env).filter(([key]) => key !== "NODE_TEST_CONTEXT"),
   );
+
+/**
+ * `node --test` over `files`. A run without a file is refused: `node --test`
+ * given none looks for tests under its directory by itself.
+ *
+ * @param {string[]} files
+ * @param {import("node:child_process").SpawnSyncOptions} options
+ */
+function nodeTest(files, options) {
+  if (files.length === 0) {
+    throw new Error("no test file to run: node --test would look for its own");
+  }
+  return spawnSync(
+    process.execPath,
+    ["--test", "--test-reporter=dot", ...files],
+    options,
+  );
+}
 
 /**
  * `env` for the run in the copy, from a nested run's:
@@ -217,9 +251,15 @@ export function runtime() {
  * @param {"inherit" | "ignore"} stdio
  * @param {NodeJS.ProcessEnv} env the environment the tests get, pointed at
  *   the copy
+ * @param {Set<string>} tooling the names of the tests to run there
  * @returns {number} the exit code of the tests
  */
-export function runHere(root = ROOT, stdio = "inherit", env = process.env) {
+export function runHere(
+  root = ROOT,
+  stdio = "inherit",
+  env = process.env,
+  tooling = TOOLING,
+) {
   const box = realpathSync(mkdtempSync(join(tmpdir(), "tooling-tests-")));
   try {
     for (const file of taskInputs(root)) {
@@ -254,11 +294,11 @@ export function runHere(root = ROOT, stdio = "inherit", env = process.env) {
       "inputs",
     );
 
-    const run = spawnSync(
-      process.execPath,
-      ["--test", "--test-reporter=dot", ...testsOf("tooling", root)],
-      { cwd: box, stdio, env: boxEnv(env, root, box) },
-    );
+    const run = nodeTest(testsOf("tooling", root, tooling), {
+      cwd: box,
+      stdio,
+      env: boxEnv(env, root, box),
+    });
     return run.status ?? 1;
   } finally {
     rmSync(box, { recursive: true, force: true });
@@ -267,11 +307,11 @@ export function runHere(root = ROOT, stdio = "inherit", env = process.env) {
 
 /** Runs the guards in place. */
 function runGuards() {
-  const run = spawnSync(
-    process.execPath,
-    ["--test", "--test-reporter=dot", ...testsOf("guards")],
-    { cwd: ROOT, stdio: "inherit", env: ownRun(process.env) },
-  );
+  const run = nodeTest(testsOf("guards"), {
+    cwd: ROOT,
+    stdio: "inherit",
+    env: ownRun(process.env),
+  });
   return run.status ?? 1;
 }
 
