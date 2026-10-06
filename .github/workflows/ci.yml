@@ -818,10 +818,11 @@ jobs:
       # behind the split is in IMPLEMENTATION_NOTES "Dependabot PRs skip every
       # metric".
       #
-      # HAS_DEDUPE_FIXER resolves from the Dependabot secret store on a run
-      # Dependabot started, the only store such a run can see, and is empty on
-      # every other run — the one the dedupe workflow's PAT push retriggers
-      # included — so its context holds only where the fixer can push.
+      # HAS_DEDUPE_FIXER asks the Dependabot secret store on a run Dependabot
+      # started, the only store such a run can see. On every other run — the one
+      # the dedupe workflow's PAT push retriggers included — the secret is empty
+      # and the variable `false`, so its context holds only where the fixer can
+      # push.
       #
       # The semgrep pins take effect in the ci stage alone: the version, and a
       # time no dependency may be newer than (RFC 3339 — a bare date is read in

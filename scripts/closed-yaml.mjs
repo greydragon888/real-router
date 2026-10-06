@@ -70,18 +70,13 @@ export function readClosedYaml(text) {
 
   if (problem) throw new ClosedYamlError(problem.message);
 
-  // `visit` hands a scalar to `Scalar` alone, so both visitors ask this.
-  const refuseMarks = (node, path) => {
-    if (node.anchor) throw new ClosedYamlError(`an anchor at ${where(path)}`);
-    if (node.tag) throw new ClosedYamlError(`a tag at ${where(path)}`);
-  };
-
   visit(doc, {
     Alias(_, node, path) {
       throw new ClosedYamlError(`an alias at ${where(path)}`);
     },
     Node(_, node, path) {
-      refuseMarks(node, path);
+      if (node.anchor) throw new ClosedYamlError(`an anchor at ${where(path)}`);
+      if (node.tag) throw new ClosedYamlError(`a tag at ${where(path)}`);
     },
     Pair(_, pair, path) {
       if (!isScalar(pair.key)) {
@@ -92,9 +87,6 @@ export function readClosedYaml(text) {
       if (pair.key.value === "<<") {
         throw new ClosedYamlError(`a merge key at ${where(path)}`);
       }
-    },
-    Scalar(_, node, path) {
-      refuseMarks(node, path);
     },
   });
 

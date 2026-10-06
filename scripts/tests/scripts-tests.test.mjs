@@ -3,12 +3,12 @@
 //
 // Run:  node --test scripts/tests/scripts-tests.test.mjs
 //
-// The copy the tooling task runs in must hold exactly what turbo hashes for
-// the task, or a cache hit could replay a verdict over a file the key missed.
-// The cells compare the two, show that turbo's key moves with the tools'
-// versions and the runner's image, and run a test that reads beyond the
-// inputs: it passes in place and fails in the copy. A test `TOOLING` does not
-// name runs in place.
+// The copy the tooling task runs in must hold exactly what turbo hashes for the
+// task, or a cache hit could replay a verdict over a file the key missed. The
+// cells compare the two, show that turbo's key moves with the tools' versions
+// and the runner's image, and run a test that reads beyond the inputs, or lists
+// and requires a file beyond them: it passes in place and fails in the copy. A
+// test `TOOLING` does not name runs in place.
 
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -312,14 +312,14 @@ test("the task's command refuses a run whose key lacks the tools' versions", () 
 });
 
 /**
- * A repository whose tooling task names `scripts/**`, with one test that
- * reads `read` from the root — found through the test's own location, or
+ * A repository whose tooling task names `scripts/**`, the file `read`, and one
+ * test that reads it from the root — found through the test's own location, or
  * through `READ_FROM`, which names the root twice as `PATH` does under pnpm —
- * and the file it reads. The root's name holds characters a regular
- * expression would read.
+ * or that lists the files of its directory and requires `read` among them. The
+ * root's name holds characters a regular expression would read.
  *
  * @param {string} read the path the test reads, from the root
- * @param {"location" | "env"} through
+ * @param {"location" | "env" | "listing"} through
  * @returns {string}
  */
 function fixture(read, through) {
@@ -337,17 +337,29 @@ function fixture(read, through) {
     through === "env"
       ? `join(process.env.READ_FROM.split(${JSON.stringify(delimiter)})[1], ${JSON.stringify(read)})`
       : `new URL("../../${read}", import.meta.url)`;
+  const dir = dirname(read);
   put(
     "scripts/tests/reads.test.mjs",
-    [
-      'import { readFileSync } from "node:fs";',
-      'import { join } from "node:path";',
-      'import { test } from "node:test";',
-      `test("reads ${read}", () => {`,
-      `  readFileSync(${path});`,
-      "});",
-      "",
-    ].join("\n"),
+    (through === "listing"
+      ? [
+          'import assert from "node:assert/strict";',
+          'import { globSync } from "node:fs";',
+          'import { test } from "node:test";',
+          'import { fileURLToPath } from "node:url";',
+          `test("lists ${dir}", () => {`,
+          '  const cwd = fileURLToPath(new URL("../../", import.meta.url));',
+          `  assert.deepEqual(globSync("${dir}/*.txt", { cwd }), ["${read}"]);`,
+          "});",
+        ]
+      : [
+          'import { readFileSync } from "node:fs";',
+          'import { join } from "node:path";',
+          'import { test } from "node:test";',
+          `test("reads ${read}", () => {`,
+          `  readFileSync(${path});`,
+          "});",
+        ]
+    ).join("\n") + "\n",
   );
   execFileSync("git", ["init", "-q"], { cwd: root, env: GIT });
   return root;
@@ -367,12 +379,16 @@ const testsIn = (root) =>
       .map((file) => file.slice(0, -".test.mjs".length)),
   );
 
-test("a test that reads beyond the task's inputs fails in the copy, and passes in place", () => {
+test("a test that reads, or lists and requires, a file beyond the task's inputs fails in the copy, and passes in place", () => {
+  // A listing in the copy finds only the inputs: a test that requires what it
+  // lists fails there, and one that does not can pass having checked nothing.
   for (const [read, through, inCopy] of [
     ["scripts/data.txt", "location", 0],
     ["other/data.txt", "location", 1],
     ["scripts/data.txt", "env", 0],
     ["other/data.txt", "env", 1],
+    ["scripts/data.txt", "listing", 0],
+    ["other/data.txt", "listing", 1],
   ]) {
     const root = fixture(read, through);
     const from = { READ_FROM: [root, root].join(delimiter) };
@@ -398,40 +414,6 @@ test("a test that reads beyond the task's inputs fails in the copy, and passes i
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
-  }
-});
-
-test("a test that requires a file it lists beyond the task's inputs fails in the copy, and passes in place", () => {
-  // A listing in the copy finds only the inputs: a test that requires what it
-  // lists fails there, and one that does not can pass having checked nothing.
-  const root = fixture("scripts/data.txt", "location");
-  mkdirSync(join(root, "other"));
-  writeFileSync(join(root, "other", "data.txt"), "data\n");
-  writeFileSync(
-    join(root, "scripts", "tests", "lists.test.mjs"),
-    [
-      'import assert from "node:assert/strict";',
-      'import { globSync } from "node:fs";',
-      'import { test } from "node:test";',
-      'import { fileURLToPath } from "node:url";',
-      'test("lists other/", () => {',
-      '  const cwd = fileURLToPath(new URL("../../", import.meta.url));',
-      '  assert.deepEqual(globSync("other/*.txt", { cwd }), ["other/data.txt"]);',
-      "});",
-      "",
-    ].join("\n"),
-  );
-  try {
-    const inPlace = spawnSync(
-      process.execPath,
-      ["--test", "scripts/tests/lists.test.mjs"],
-      { cwd: root, encoding: "utf8", env: NESTED },
-    );
-
-    assert.equal(inPlace.status, 0, inPlace.stdout);
-    assert.equal(runHere(root, "ignore", process.env, new Set(["lists"])), 1);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
   }
 });
 

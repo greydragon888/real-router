@@ -17,13 +17,16 @@
 // with `node_modules` linked in. Their environment names the copy wherever it
 // named the root and holds no `GITHUB_*` or `RUNNER_*` variable, so a test that
 // reads a file beyond the inputs fails there rather than pass on a stale entry
-// — except through the link, whose parent is the root. ⚠ A test that finds
-// what it checks by a listing — git's file list, a glob — gets only the inputs
-// in the copy and can pass having checked nothing, so `TOOLING` takes a test
-// only when all it reads is an input. The key also holds what no input does:
+// — except through the link, whose parent is the root. ⚠ A test that finds what
+// it checks by a listing — git's file list, a glob — gets only the inputs in
+// the copy and can pass having checked nothing, so `TOOLING` takes a test only
+// when all it reads is an input, and a test of `TOOLING` that comes to list
+// beyond the inputs leaves it: nothing here sees the change, and the key does
+// not move with the files it would list. The key also holds what no input does:
 // the versions of Node, bash, git and jq and the OS release
-// (`TOOLING_RUNTIME`), and a GitHub runner's image (`ImageOS`,
-// `ImageVersion`).
+// (`TOOLING_RUNTIME`), a GitHub runner's image (`ImageOS`, `ImageVersion`), and
+// turbo's hash of the root's external dependencies, so a bump in the root
+// lockfile runs the group again.
 
 import { execFileSync, spawnSync } from "node:child_process";
 import {

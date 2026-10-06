@@ -258,6 +258,7 @@ const REFUSED_NEEDS = {
     "    needs: [check]\n    needs: [bundle-size]\n",
     /Map keys must be unique/,
   ],
+  "a mapping": ["    needs:\n      check: true\n", NOT_READ],
 };
 
 for (const [name, [form, refusal]] of Object.entries(REFUSED_NEEDS)) {
@@ -273,6 +274,13 @@ for (const [name, [form, refusal]] of Object.entries(REFUSED_NEEDS)) {
     );
   });
 }
+
+test("fixture: jobs written as other than a mapping is refused, not read as no jobs", () => {
+  assert.throws(
+    () => parseNeeds("on: push\njobs: [ci]\n", "ci"),
+    /jobs: is not a mapping/,
+  );
+});
 
 test("fixture: a job id that is not an identifier is refused, not read", () => {
   const mutated = FIXTURE.replace(

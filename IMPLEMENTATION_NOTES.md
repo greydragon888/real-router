@@ -13727,6 +13727,8 @@ zizmor did not report one more: `sonar-trusted.yml` holds four scanner arguments
 
 ## The tooling tests of `scripts/tests/` replay from turbo's cache while their inputs hold (2026-10-05)
 
+> **Updated (2026-10-06).** The key also moves with turbo's hash of the root's external dependencies: the root lockfile with smol-toml 1.8.0 gave the task another hash than with 1.9.0, and the same lockfile gave the same hash back.
+
 > **Updated (2026-10-05).** The default is the other way now: `TOOLING` names the tests the task runs, and a new test runs in place. A test that finds what it checks by a listing can pass in the copy over an empty set, so the copy need not show such a test misplaced ("A new test of `scripts/tests/` runs in place until `TOOLING` names it").
 
 **Problem.** `node:scripts-tests` ran every file of `scripts/tests/` on every push and, in Repo Lints, on every pull request: 49 files, 114 s one after another, 35 s in parallel on the development machine and 33 s in CI. On the two pull requests measured, Repo Lints finished last of the jobs `CI Result` waits for, so on a light pull request those seconds were the pull request's own. Most of the time goes to tests of the repository's tooling — the gate script under `bash`, the semgrep wrapper, the lint-reach census — whose inputs change far less often than the code, and a push that touched only a package ran them again unchanged.
@@ -13893,7 +13895,7 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 - `testsOf` and `runHere` take the set of names that makes the tooling group; a name without a test file is refused, since it would run nothing. The fixtures of `scripts-tests.test.mjs` take the names from their own files, so a fixture's test cannot be left out of the set its copy runs.
 - A group without a file is refused: `node --test` given no file looks for tests under its directory by itself.
 
-**Why.** A test in the wrong group costs seconds in place; in the copy, it can cost its verdict without a sign. The 27 tests the task runs were checked for it: traced, they list only inputs — `.github/`, `.github/workflows/` and `scripts/tests/` — with the same results in place and in the copy, and the copy runs the same 500 tests as a run in place, none skipped.
+**Why.** A test in the wrong group costs seconds in place; in the copy, it can cost its verdict without a sign. The 27 tests the task runs were checked for it: traced, they list only inputs — `.github/`, `.github/workflows/` and `scripts/tests/` — with the same results in place and in the copy, and the copy runs the same 500 tests as a run in place, none skipped. A test already in `TOOLING` that comes to list beyond the inputs is the same risk, and nothing here sees the change: such a test leaves `TOOLING`.
 
 **Measured (2026-10-05).** Of seven mutants of the split, six fail a cell of `scripts-tests.test.mjs`: the groups swapped, the refusal of an empty group dropped, a name in `TOOLING` with no file, a test `TOOLING` does not name sent to the task, `runHere` running `TOOLING` in place of the set it is given, and the refusal of a name without a test file dropped. The seventh, a test taken out of `TOOLING`, runs in place: the safe side. `node --test` given no file ran the test it found under its directory (Node 24.18.1). A cell holds the other side of the copy: a test that lists a file beyond the inputs and requires it fails there and passes in place.
 
