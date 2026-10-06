@@ -58,6 +58,29 @@ reason = "No fixed http-cache-semantics release (<= 4.2.0, the latest). Only pat
 id = "GHSA-jp82-f5mq-hwhp"  # seroval memory exhaustion through a TypedArray length in its JSON
 reason = "Fixed in seroval 1.6.3, outside solid-js 1.9.15's ~1.5.4; solid-js has no newer 1.9 release. Only via solid-js: root devDependencies (@real-router/solid tests, benchmarks), the Solid examples, cross-router-bench; none published, and @real-router/solid takes solid-js as a peer. The flaw is in fromJSON/fromCrossJSON; solid-js imports only seroval's serializer, and nothing here imports seroval."
 
+# A second seroval advisory, also in `fromJSON` — a deserialized fulfilled
+# Promise can invoke a plugin-produced callable through thenable assimilation —
+# is fixed in 1.6.2, again outside solid-js 1.9.15's `~1.5.4`. The entry above
+# holds for it word for word: solid-js imports only seroval's serializer, and
+# nothing here imports seroval. Drop it with the entry above.
+
+[[IgnoredVulns]]
+id = "GHSA-p6vx-979v-rg4c"  # seroval fromJSON thenable assimilation invokes plugin-produced callables
+reason = "Fixed in seroval 1.6.2, outside solid-js 1.9.15's ~1.5.4; solid-js has no newer 1.9 release. The same paths as GHSA-jp82-f5mq-hwhp: solid-js in root devDependencies, the Solid examples and cross-router-bench; none published. The flaw is in fromJSON; solid-js imports only seroval's serializer, and nothing here imports seroval."
+
+# sprintf-js has no fixed release: every version through 1.1.3, the latest, is
+# affected. It arrives only in the examples lockfile, through electron-builder
+# (a devDependency of the three Electron examples) -> @electron/get ->
+# global-agent 3.0.0 -> roarr 2.15.4. The advisory needs a format string an
+# attacker controls; roarr formats the message its caller passes, and
+# global-agent passes only its own literals, none with a precision specifier.
+# The examples are never published. Drop it when sprintf-js ships a fix or the
+# chain stops pulling it — ask api.osv.dev per version.
+
+[[IgnoredVulns]]
+id = "GHSA-hp3w-g68c-fv3c"  # sprintf-js DoS through unbounded precision specifiers
+reason = "No fixed sprintf-js release (<= 1.1.3, the latest). Only path: electron-builder 26.15.3 (devDependency of examples/desktop/electron/*) -> @electron/get 3.1.0 -> global-agent 3.0.0 -> roarr 2.15.4, whose format strings are global-agent's own literals, none with a precision specifier. examples/ is never published."
+
 # NOTE (2026-09-10): ten entries stood here — RUSTSEC-2024-0411 through -0420,
 # the gtk-rs unmaintained-crate advisories (gdk, gtk, atk, their -sys crates and
 # gtk3-macros). They are gone, and the way they left is worth one paragraph

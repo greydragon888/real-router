@@ -106,5 +106,11 @@ jobs:
           #   the examples and cross-router-bench; solid-js uses seroval's
           #   serializer, and the flaw is in its JSON deserializer. Not in any
           #   published package.
+          # GHSA-p6vx-979v-rg4c — seroval again (fixed in 1.6.2, outside the same
+          #   ~1.5.4), also in its JSON deserializer; the same paths and reason.
+          # GHSA-hp3w-g68c-fv3c — sprintf-js (no fixed release). Only in the
+          #   examples, via electron-builder → @electron/get → global-agent →
+          #   roarr, whose format strings are global-agent's own literals. Not
+          #   in any published package.
           # The list mirrors scripts/osv-scanner.toml; the two must stay in sync.
-          allow-ghsas: GHSA-wrw7-89jp-8q8g, GHSA-86w9-cpqp-85rv, GHSA-vfj7-8cjw-p6xm, GHSA-ch52-4w7c-c8xp, GHSA-jp82-f5mq-hwhp
+          allow-ghsas: GHSA-wrw7-89jp-8q8g, GHSA-86w9-cpqp-85rv, GHSA-vfj7-8cjw-p6xm, GHSA-ch52-4w7c-c8xp, GHSA-jp82-f5mq-hwhp, GHSA-p6vx-979v-rg4c, GHSA-hp3w-g68c-fv3c

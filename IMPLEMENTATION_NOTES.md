@@ -13929,3 +13929,16 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 **Why.** The file holds no `null` today, and the generator refuses a form that does not exist rather than read it, as it does elsewhere. Recording the gap instead would have left six settings of the duplicates gate free to change without a sign.
 
 **Measured (2026-10-06).** jscpd printed no diagnostic for a `null` in any of the twelve keys, and every run matched the run without that key: on the repository, on a fixture of clones over the threshold and on a scan of no files. The exit code changed on `threshold` with the clones, on `failOnEmpty` with no files and on `ignore` on the repository. With the check off, the new cell fails, and so does a check that names only the first key set to `null`; `lint:config-sync` passes on the repository.
+
+## Three more advisories: smol-toml takes 1.9.0, seroval's second and sprintf-js's are allowlisted (2026-10-06)
+
+**Problem.** After the entry above was committed, `lint:audit` listed three more: GHSA-p6vx-979v-rg4c, seroval through 1.6.0 (critical, published 2026-10-05), in all three lockfiles; GHSA-r4xh-jqrq-34v2, smol-toml through 1.8.0 (medium), in the root; and GHSA-hp3w-g68c-fv3c, sprintf-js through 1.1.3 (medium, published in September), in the examples.
+
+**Solution.**
+
+- `pnpm update smol-toml` moves knip's copy from 1.8.0 to 1.9.0, within knip 6.38.0's `^1.8.0`.
+- The second seroval advisory is again in `fromJSON`, fixed in 1.6.2 — outside the `~1.5.4` solid-js 1.9.15 pins — and the reason that allowlisted the first holds for it word for word.
+- sprintf-js has no fixed release. It comes only through electron-builder → @electron/get → global-agent 3.0.0 → roarr 2.15.4 in the three Electron examples' devDependencies, and the advisory needs a format string an attacker controls: roarr formats the message its caller passes, and every one global-agent passes is its own literal, none with a precision specifier.
+- Both go to `scripts/osv-scanner.toml` and to `allow-ghsas` in `codeql.yml`, each with its reason and the condition to drop it.
+
+**Measured (2026-10-06).** The root lockfile changes only smol-toml's entries, and 1.9.0's integrity matches the registry; sprintf-js 1.1.3 is its latest release; the two allowlists hold the same seven ids in the same order, and `lint:audit` reports no issues.
