@@ -1767,6 +1767,9 @@ jobs:
           # before a branch below can leave a job unread. Whose skip is
           # forbidden is decided below; ci-gate-completeness.test.mjs runs this
           # script over every result of every job and holds it to its table.
+          # It reads the script closed too (`scripts/gate-script.mjs`): only
+          # this step's env and the variables set here, only the forms used
+          # here — a new form fails the test until the reader takes it.
           # `--slurp` with the one-object guard turns an empty or malformed
           # context into an error, not into zero inputs that print nothing.
           NOT_PASSED=$(jq -r --slurp '

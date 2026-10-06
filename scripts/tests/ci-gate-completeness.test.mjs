@@ -43,6 +43,7 @@ import {
   parseJobs,
   parseNeeds,
 } from "../ci-gate.mjs";
+import { readGateScript } from "../gate-script.mjs";
 
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const CI_YML = join(repoRoot, ".github", "workflows", "ci.yml");
@@ -510,8 +511,10 @@ test("ci.yml: OUTSIDE_GATE allowlist is current", () => {
 // neither passed nor was skipped; the rest decides whose skip is forbidden.
 // SKIP_FORBIDDEN is that decision as a table — a job in `needs` without a row
 // fails, because classifying a job is a list, not a reading of its `if:` — and
-// the script runs as the runner runs it: expressions substituted into its
-// text, `env:` values exported, under `bash -e`.
+// the script runs with the expressions substituted into its text and the
+// step's `env:` exported, under `bash -e`, in an environment of `PATH` alone.
+// What else the runner gives a script, the closed reading at the end of this
+// file keeps it from reading.
 // --------------------------------------------------------------------------
 
 /** When a skip of each job in the gate's `needs` fails the gate. */
@@ -646,7 +649,7 @@ const BASH = execFileSync("bash", ["-c", "command -v bash"], {
 }).trim();
 
 /** Each state's exit code, many states per `bash` process, one subshell each. */
-function exitCodes(step, states, env = process.env) {
+function exitCodes(step, states, env = { PATH: process.env.PATH }) {
   const dir = mkdtempSync(join(tmpdir(), "ci-gate-"));
 
   try {
@@ -991,4 +994,232 @@ test("an expression the harness does not know is refused, not guessed", () => {
     () => substitute("echo ${{ github.sha }}", { context: {}, results: {} }),
     /does not know the expression: github\.sha/,
   );
+});
+
+// --------------------------------------------------------------------------
+// The gate's script, read closed (`scripts/gate-script.mjs`). The table above
+// sees what the harness passes; on GitHub the script sees more — the runner's
+// variables, the workflow's `env:`, the event file — and a branch on any of
+// them would pass every state. So it reads its step's `env:` and its own
+// variables, calls echo, exit, its functions and the aggregate's jq, and
+// every other form is refused by name.
+// --------------------------------------------------------------------------
+
+const STEP_ENV = Object.keys(STEP.env);
+
+test("the gate's script reads only what its step passes and what it sets, and calls only its closed list", () => {
+  const { reads, calls } = readGateScript(STEP.run, STEP_ENV);
+
+  assert.deepEqual(
+    STEP_ENV.filter((name) => !reads.has(name)),
+    [],
+    "a variable the step passes that the reader did not see read",
+  );
+  assert.ok(calls.has("jq"), "the reader did not see the aggregate's jq");
+});
+
+const AGGREGATE_END = '  echo "$NOT_PASSED"\n  exit 1\nfi\n';
+const MODE_SET = 'MODE="${{ needs.check.outputs.mode }}"\n';
+
+/** The script with `lines` after `anchor`, which must occur once in it. */
+function inserted(anchor, lines) {
+  assert.equal(
+    STEP.run.split(anchor).length,
+    2,
+    `not exactly once in the script: ${anchor}`,
+  );
+  return STEP.run.replace(anchor, () => `${anchor}${lines}\n`);
+}
+
+const after = (lines) => inserted(AGGREGATE_END, lines);
+
+/** The script with one change in the aggregate's jq program. */
+function inProgram(from, to) {
+  assert.equal(STEP.run.split(from).length, 2, `not exactly once: ${from}`);
+  return STEP.run.replace(from, () => to);
+}
+
+const OUTSIDE_THE_LIST = {
+  "a variable of the runner": [
+    after('if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then exit 0; fi'),
+    /reads \$GITHUB_EVENT_NAME, which neither its step passes nor it sets/,
+  ],
+  "a variable of the workflow's env": [
+    after('if [[ -z "$TURBO_TOKEN" ]]; then exit 0; fi'),
+    /reads \$TURBO_TOKEN, which neither its step passes nor it sets/,
+  ],
+  "a default expansion": [
+    after('case "${GITHUB_ACTOR:-}" in *"[bot]") exit 0 ;; esac'),
+    /expands a form it does not use: "\$\{GITHUB_ACTOR:-\}"/,
+  ],
+  "an indirect expansion": [
+    after('X="NEEDS"\necho "${!X}"'),
+    /expands a form it does not use: "\$\{!X\}"/,
+  ],
+  "a special parameter": [
+    after('echo "$?"'),
+    /expands a form it does not use: "\$\?"/,
+  ],
+  "a command substitution inside quotes": [
+    after('echo "$(printenv GITHUB_ACTOR)"'),
+    /expands a form it does not use: "\$\(printenv"/,
+  ],
+  "an expansion outside quotes": [
+    after("echo $NOT_PASSED"),
+    /expands outside double quotes: "\$NOT_PASSED"/,
+  ],
+  printenv: [
+    after("printenv GITHUB_HEAD_REF"),
+    /calls printenv, which is outside its closed list/,
+  ],
+  source: [
+    after('source "$NEEDS"'),
+    /calls source, which is outside its closed list/,
+  ],
+  eval: [
+    after('eval "exit 0"'),
+    /calls eval, which is outside its closed list/,
+  ],
+  "a read of a file": [
+    after('cat "/proc/self/environ"'),
+    /calls cat, which is outside its closed list/,
+  ],
+  "jq outside an assignment": [
+    after('jq -e ".pull_request.draft" "$NEEDS"'),
+    /calls jq outside the value of an assignment/,
+  ],
+  "jq with a file in place of its input": [
+    after(`X=$(jq -r '.' "$NEEDS")`),
+    /gives jq the word "\$NEEDS" where its <<< input belongs/,
+  ],
+  "jq with no input": [
+    after("X=$(jq -n '1')"),
+    /passes jq the word -n where its single-quoted program belongs/,
+  ],
+  "env in the jq program": [
+    inProgram(
+      "if length == 1",
+      "if (env.GITHUB_ACTOR | length) > 0 and length == 1",
+    ),
+    /calls jq's env, which is outside its closed list/,
+  ],
+  "$ENV in the jq program": [
+    inProgram("if length == 1", "if ($ENV | length) > 0 and length == 1"),
+    /has a jq character it does not use: "\$"/,
+  ],
+  "input in the jq program": [
+    inProgram(".[0] | to_entries[]", "input | to_entries[]"),
+    /calls jq's input, which is outside its closed list/,
+  ],
+  "a write to the step summary": [
+    after('echo "x" >> "$GITHUB_STEP_SUMMARY"'),
+    /uses a character it does not: ">"/,
+  ],
+  "a here-doc": [after('echo "x" <<EOF'), /uses a character it does not: "<"/],
+  "a pipe": [
+    after('echo "x" | grep -q "x"'),
+    /uses a character it does not: "\|"/,
+  ],
+  "a background job": [after("exit 0 &"), /uses a character it does not: "&"/],
+  "a backtick": [after('X="`id`"'), /quotes a `/],
+  "a # inside a word": [
+    after('echo "x"#; source "$NEEDS"'),
+    /has a # inside a word, which the shell takes for text/,
+  ],
+  "a glob in an argument": [after("echo *"), /passes echo the word \*$/],
+  "a subshell": [after("( exit 0 )"), /has "\(" where a command belongs/],
+  elif: [
+    inserted(
+      MODE_SET,
+      'if [[ -n "$MODE" ]]; then exit 0; elif [[ -z "$MODE" ]]; then exit 1; fi',
+    ),
+    /uses elif/,
+  ],
+  "an unquoted operand": [
+    inserted(MODE_SET, 'if [[ "$MODE" == leaf ]]; then exit 0; fi'),
+    /has the word leaf where a double-quoted operand belongs/,
+  ],
+  "a file test": [
+    inserted(MODE_SET, 'if [[ -f "$MODE" ]]; then exit 0; fi'),
+    /has the word -f where a double-quoted operand belongs/,
+  ],
+  "a read before its variable is set": [
+    after('echo "$LATER"\nLATER="x"'),
+    /reads \$LATER, which neither its step passes nor it sets/,
+  ],
+  "$1 outside a function": [after('echo "$1"'), /reads \$1 outside a function/],
+  "exit with a variable": [
+    after('exit "$NOT_PASSED"'),
+    /exits with something other than a number/,
+  ],
+  "a variable set in front of a command": [
+    after('X="1" echo "x"'),
+    /sets a variable in front of a command/,
+  ],
+  PATH: [
+    after('PATH="/tmp"'),
+    /sets PATH, which decides what jq runs or loads/,
+  ],
+  HOME: [
+    after('HOME="/tmp"'),
+    /sets HOME, which decides what jq runs or loads/,
+  ],
+  "a reserved word after a command without a separator": [
+    after('if [[ -n "$NEEDS" ]]; then exit 0 fi'),
+    /has the word fi after a command without ; or a line end/,
+  ],
+  "a closing brace after a command without a separator": [
+    after("{ exit 0 }"),
+    /has the word \} after a command without ; or a line end/,
+  ],
+  "an empty body": [
+    after('if [[ -n "$NEEDS" ]]; then\nfi'),
+    /has the word fi where a command belongs/,
+  ],
+  "a function named after a command": [
+    after("echo() { exit 0; }"),
+    /defines a function named echo/,
+  ],
+  "a tab": [
+    after('echo\t"x"'),
+    /has a control character, a tab or a line separator/,
+  ],
+  "a no-break space": [
+    after('echo\u00a0"x"'),
+    /uses a character it does not: "\u00a0"/,
+  ],
+};
+
+for (const [name, [script, refusal]] of Object.entries(OUTSIDE_THE_LIST)) {
+  test(`the gate's script is read closed: ${name} is refused`, () => {
+    assert.notEqual(script, STEP.run);
+    assert.throws(() => readGateScript(script, STEP_ENV), refusal);
+  });
+}
+
+test("the closed reading is a rule of forms: blocks swapped, or a new job in today's shapes, still read", () => {
+  const prose = STEP.run.slice(
+    STEP.run.indexOf("# prose-lint runs on every PR"),
+    STEP.run.indexOf("# repo-lints runs on every PR"),
+  );
+  const repoLints = STEP.run.slice(
+    STEP.run.indexOf("# repo-lints runs on every PR"),
+    STEP.run.indexOf("# check must have SUCCEEDED"),
+  );
+  const swapped = STEP.run.replace(prose + repoLints, () => repoLints + prose);
+  const lastResult =
+    'CROSS_ROUTER_LINT="${{ needs.cross-router-lint.result }}"\n';
+  const lastOk = 'ok "$CROSS_ROUTER_LINT"; then';
+  const newJob = inserted(
+    lastResult,
+    'NEW_JOB="${{ needs.new-job.result }}"',
+  ).replace(lastOk, () => 'ok "$CROSS_ROUTER_LINT" && ok "$NEW_JOB"; then');
+
+  for (const [label, script] of [
+    ["blocks swapped", swapped],
+    ["a new job", newJob],
+  ]) {
+    assert.notEqual(script, STEP.run, label);
+    assert.doesNotThrow(() => readGateScript(script, STEP_ENV), label);
+  }
 });

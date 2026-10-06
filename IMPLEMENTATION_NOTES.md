@@ -13493,6 +13493,8 @@ Kept, because none of them points at a record: measurement dates, which say when
 
 ## The gate fails on any job in needs that neither passed nor was skipped (2026-10-03)
 
+> **Updated (2026-10-06).** The test does not execute the script as the runner does: it passes the substituted expressions and the step's `env:`, in an environment of `PATH` alone, while the runner gives a script its own variables, the workflow's `env:` and the event file. A closed reading keeps the script from reading them ("The gate's script reads only its step's env and what it sets").
+
 > **Updated (2026-10-04).** `lastStep` reads the gate's step through the `yaml` parser: its keys are `name`, `env` and `run`, and its script is a literal block in any chomping or indentation — `|`, `|-`, `|+`, `|2` ("The gate and Repo Lints read ci.yml through the `yaml` parser, closed").
 
 **Problem.** The `CI Result` gate read the results of its `needs` one by one, and some reads sat after the exit on `should_run` or in the branch of the other mode (`leaf` or `sharded`). A job the script did not read on a path could fail or be cancelled while the gate stayed green. No such state was reachable — the planning steps of `check` run only when `should_run` is `true`, so the jobs they gate are skipped otherwise — but an edit to a job's `if:` or to a planning step would have opened one without a word.
@@ -13958,3 +13960,20 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 - Cells hold the class: a `run` key in quotes, a job key in quotes and a folded script are read, and a `run` that is not a string is refused; the path-filter control reads a quoted key and a flow list and refuses a scalar. The real-tree cell requires the filter its header names among those it reads, so a walk that finds nothing fails.
 
 **Measured (2026-10-06).** Every workflow reads closed. On the real tree the parser and the line reader find the same 39 command lines but five: the folded scripts, which the line reader cut at their first line. Five mutants each fail a cell: the line reader restored in the registry test — the three cells of the class, and two of the real tree, whose keys of folded commands no longer match —, a `run` that is not a string skipped, a filter key in quotes skipped, a filter walk that finds nothing, and a scalar filter read as one entry.
+
+## The gate's script reads only its step's env and what it sets (2026-10-06)
+
+**Problem.** `ci-gate-completeness.test.mjs` executes the gate's script over every state of its table, and the table sees only what the harness passes: the expressions it substitutes and the step's `env:`. The runner gives a script more — its `GITHUB_*` and `RUNNER_*` variables, the workflow's `env:`, the event file — and a line that branched on any of them passed the test. The reconciliation of RFC-4 found `if [[ "${GITHUB_EVENT_NAME:-}" == "pull_request" ]]; then exit 0; fi` and `case "${GITHUB_ACTOR:-}" in *"[bot]") exit 0 ;; esac` green in all 75 tests of the file, the second a form `.github/actions/setup` and `post-merge.yml` already use. On GitHub either would pass every skip the table forbids, the first on every pull request. The harness ran the script in the test's own environment, so in place on CI the first was red by accident; in the copy the tooling tests run in, which holds no `GITHUB_*` or `RUNNER_*`, it passed as well.
+
+**Solution.**
+
+- `scripts/gate-script.mjs` reads the script closed. It reads the variables its step passes and its own, each set before its first read, and `$1`–`$9` inside a function it defines; every expansion sits in double quotes. It calls `echo`, `exit` with a number, its own functions and `jq` in one form, the value of an assignment: `-r` and `--slurp`, a single-quoted program of a closed vocabulary with no `$` or `@`, and `<<<` from a variable its step passes. Its constructs are `if`, `case`, `[[ ]]` with `==`, `!=`, `-n` and `-z` over double-quoted words, `{ }`, `&&`, `||` and a function. It names no variable of its own `PATH` or `HOME`, which decide which `jq` runs and which `$HOME/.jq` it sources. Any other form throws, naming it.
+- The test holds today's script to it, with a cell per refused form, the reconciliation's branches among them, and two controls that read: the script with two blocks swapped, and with a new job in today's shapes.
+- The harness runs the script in an environment of `PATH` and the step's `env:`, so its verdict is the same locally, in place and in the copy.
+
+**Why.** A list of refused forms stays open, and each review names the next form; a list of the forms read is closed. Repo Lints' fragment, executed by a harness of the same kind, took two review rounds of one form each until its script was read as a closed grammar ("Repo Lints runs on every pull request, and the release PR skips `lint:audit`"); the gate's script was never held to that.
+
+- ⚠ A form the script needs and the reader does not take fails the test until the reader takes it. That is the point: the table of cells names a rule for each form.
+- ⚠ `jq` sources the runner's `$HOME/.jq` if it is a file, and the test cannot see that file: the script sets no `HOME` and the harness runs `jq` without one. That the runner image has none is an assumption, not a measurement.
+
+**Measured (2026-10-06).** On today's script the reader sees every variable the step passes read and the aggregate's `jq` called. 40 cells refuse a form each, among them `printenv`, `source`, `eval`, `${!…}`, `env` and `$ENV` in the program, a write to `$GITHUB_STEP_SUMMARY`, a `#` inside a word that hides a command, `PATH` or `HOME` set, a reserved word with no `;` before it, which bash takes for an argument, and an empty body. Seventeen mutants of the reader, one rule removed each, fail the cell of their rule, and the reconciliation's five branches written into `ci.yml` fail the test.
