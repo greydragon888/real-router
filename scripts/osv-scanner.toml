@@ -45,18 +45,20 @@ id = "GHSA-ch52-4w7c-c8xp"  # http-cache-semantics max-stale cross-user disclosu
 reason = "No fixed http-cache-semantics release (<= 4.2.0, the latest). Only path: electron-builder 26.15.3 (devDependency of examples/desktop/electron/*) -> @electron/get 3.1.0 -> got 11.8.6 -> cacheable-request 7.0.4; got builds that HTTP cache only when given a `cache` option, which neither electron-builder nor the examples pass. examples/ is never published."
 
 # seroval's fix, 1.6.3, is outside the range solid-js 1.9.15 pins (`~1.5.4`,
-# with seroval-plugins), and solid-js has no newer 1.9 release. seroval is in
-# the three lockfiles only through solid-js: in the root for @real-router/solid's
-# tests and the benchmarks, in examples/ for the Solid examples, in
-# cross-router-bench for its Solid app — none published, and @real-router/solid
-# takes solid-js as a peer. The advisory is in deserializing seroval JSON
-# (`fromJSON`, `fromCrossJSON`); solid-js imports only seroval's serializer, in
-# its server build, and no code here imports seroval. Drop it when solid-js takes
-# a seroval past 1.6.2 — ask api.osv.dev per version.
+# with seroval-plugins), and solid-js has no newer 1.9 release. The affected
+# seroval is in the three lockfiles only through solid-js: in the root for
+# @real-router/solid's tests and the benchmarks, in examples/ for the Solid
+# examples, in cross-router-bench for its Solid app — none published, and
+# @real-router/solid takes solid-js as a peer. cross-router-bench also holds
+# seroval 1.6.7, through @tanstack/router-core, which this advisory does not
+# affect. The advisory is in deserializing seroval JSON (`fromJSON`,
+# `fromCrossJSON`); solid-js imports only seroval's serializer, in its server
+# build, and no code here imports seroval. Drop it when solid-js takes a
+# seroval past 1.6.2 — ask api.osv.dev per version.
 
 [[IgnoredVulns]]
 id = "GHSA-jp82-f5mq-hwhp"  # seroval memory exhaustion through a TypedArray length in its JSON
-reason = "Fixed in seroval 1.6.3, outside solid-js 1.9.15's ~1.5.4; solid-js has no newer 1.9 release. Only via solid-js: root devDependencies (@real-router/solid tests, benchmarks), the Solid examples, cross-router-bench; none published, and @real-router/solid takes solid-js as a peer. The flaw is in fromJSON/fromCrossJSON; solid-js imports only seroval's serializer, and nothing here imports seroval."
+reason = "Fixed in seroval 1.6.3, outside solid-js 1.9.15's ~1.5.4; solid-js has no newer 1.9 release. The affected copy comes only via solid-js: root devDependencies (@real-router/solid tests, benchmarks), the Solid examples, cross-router-bench (whose seroval 1.6.7, via @tanstack/router-core, is past the fix); none published, and @real-router/solid takes solid-js as a peer. The flaw is in fromJSON/fromCrossJSON; solid-js imports only seroval's serializer, and nothing here imports seroval."
 
 # A second seroval advisory, also in `fromJSON` — a deserialized fulfilled
 # Promise can invoke a plugin-produced callable through thenable assimilation —

@@ -102,10 +102,10 @@ jobs:
           #   whose HTTP cache needs a `cache` option nobody passes. Not in any
           #   published package.
           # GHSA-jp82-f5mq-hwhp — seroval (fixed in 1.6.3, outside the ~1.5.4
-          #   solid-js 1.9.15 pins). Only through solid-js, in tests, benchmarks,
-          #   the examples and cross-router-bench; solid-js uses seroval's
-          #   serializer, and the flaw is in its JSON deserializer. Not in any
-          #   published package.
+          #   solid-js 1.9.15 pins). The affected copy comes only through
+          #   solid-js, in tests, benchmarks, the examples and
+          #   cross-router-bench; solid-js uses seroval's serializer, and the
+          #   flaw is in its JSON deserializer. Not in any published package.
           # GHSA-p6vx-979v-rg4c — seroval again (fixed in 1.6.2, outside the same
           #   ~1.5.4), also in its JSON deserializer; the same paths and reason.
           # GHSA-hp3w-g68c-fv3c — sprintf-js (no fixed release). Only in the
