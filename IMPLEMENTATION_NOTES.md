@@ -2973,6 +2973,8 @@ The three low-severity residuals left open by the 2026-07-03 audit wave (re-audi
 
 ### 2026-08-01 CI/CD audit fixes — dedupe push blocked the merge + `check` failed open
 
+> **Updated (2026-10-06).** The classification moved into `scripts/diff-carries-no-code.mjs`, and the step takes "no code" only from its exact answer line, over `git diff --no-renames`: a crash, a run that never answers, an empty diff and a renamed code path now run the pipeline. The `grep` below read an empty answer — a crashed or silent `grep`, an empty diff — as no code ("The check job's skip facts come from a predicate's exact answer").
+
 Two findings from the deep CI/CD audit (§1.1 and §1.2), fixed straight on master (infra —
 no changeset). Both are the same shape as the #1133 class: a mechanism that looks like a
 gate but resolves to "nothing happened". (That audit was merged into
@@ -13994,3 +13996,22 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 **Why.** Each cell holds a link of the chain from a check's verdict to the tests it ran. A diff of `package.json` alone is no source, so CI meets a change to the task's command on the next pull request that carries source; pre-push meets it at once.
 
 **Measured (2026-10-06).** The byte reading agrees with the parser on all 61 block `run:` of the workflows and fails on each of twelve misreadings by a stand-in parser, among them comment lines dropped, the block cut at a blank line, chomping kept or stripped, blank lines collapsed, the final newline lost at the end of a file, `\(` lost and a line ending in `:` dropped. Each link's mutant fails the cell of its link: `tools: ["jq"]`, the task's command set to `true`, the tooling check's `run` set to the guards', the guards check's `run` set to `true`, `return 0` for either group, and `runGuards` dropping the status.
+
+## The check job's skip facts come from a predicate's exact answer (2026-10-06)
+
+**Problem.** Two outputs of `ci.yml`'s `check` job decide what CI skips. With `should_run` not `true` the gate requires no job of the pipeline to have run; with `no_source` true Repo Lints skips the checks whose `ciSkip` names `no-source`. No test held either producer: the reconciliation of RFC-4 found the `no_source` step unheld, and `should_run` came from an inline `grep` classification no test read. Each failed toward the skip. The `source` step took exit 0 for "no source", so a predicate that exited 0 without answering skipped the checks: run under bash with `node` exiting 0 at once, it answered `no_source=true` on a diff with code in it. The `changes` step read an empty `grep` output as no code, so a crashed or silent `grep`, or an empty diff, answered `should_run=false`. And `git diff --name-only` lists a renamed file under its new path alone, so code moved into Markdown read as Markdown.
+
+**Solution.**
+
+- `scripts/diff-carries-no-code.mjs` answers `should_run`: no code when every changed path is Markdown or a file under `.github/` outside `.github/actions/`; an empty diff is code. Neither predicate trims a path, since git prints a name as it is.
+- Both steps list the diff with `--no-renames` and take the skip only from the predicate's exact answer line, `NO_CODE` or `NO_SOURCE`. A crash, a silent run, an empty diff and a renamed code path take the side that runs the checks, and a missing answer is a warning. `git diff` stays on its own line, so its failure fails the step, and with it `check` and the gate.
+- `diff-carries-no-code.test.mjs` holds the predicate, pins both steps and the job's outputs, and runs the steps under bash with `git` and `node` replaced. Its `git` gives the old path of a rename only with `--no-renames`, so a step without the flag fails a cell, not only the pin.
+- It runs as `node:skip-facts`, a check no CI context skips: both `scripts/tests` groups skip on `no-source`, so a step that answered "no source" wrongly would otherwise skip the test that holds it. Pre-push runs it in `node:scripts-guards`, and `checks-registry.test.mjs` holds the check.
+- The new line has its `NOT_A_CHECK` key, and the predicate its entry in `cli-entry.test.mjs`.
+
+**Why.** A fact that skips work fails toward the work, and the test that holds it runs where the fact cannot skip it.
+
+- ⚠ The classification is the old one, path for path. What changed is its input and the empty case: a rename lists its old path as well, and a pull request with no changed path runs the pipeline.
+- ⚠ The two steps run on the runner image's Node, before the job's setup, and the tests on the repository's. A predicate that used an API the image's Node lacks would crash there, and every pull request would run the checks behind a warning.
+
+**Measured (2026-10-06).** From `f35a73e7d` back over 1500 commits of master, the steps as they are and as they were answer alike on every diff, 326 of them no code. Mutants each fail a cell beyond the pin: the steps as they were, a step without `|| true`, a prefix match, `--no-renames` dropped, the warning dropped, the job's output set to a literal, `.github/actions/` or `.github/` anywhere counted as no code, a name ending in `md` counted as Markdown, a predicate that trims, an empty diff counted as no code, and the holder skipped on `no-source`.

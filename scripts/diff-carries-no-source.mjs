@@ -24,6 +24,9 @@
 // `changeset-release/*` is what it is called, not what it holds; one source file
 // in it must still reach the code readers.
 
+/** The line that answers "no source". */
+export const NO_SOURCE = "no source in this diff";
+
 /**
  * A path that holds no code: a manifest, a CHANGELOG, a changeset, the lockfile.
  *
@@ -37,7 +40,7 @@ export const isManifestOnlyPath = (path) =>
   /(^|\/)package\.json$/.test(path) ||
   /(^|\/)CHANGELOG\.md$/.test(path);
 
-const cleaned = (paths) => paths.map((p) => p.trim()).filter(Boolean);
+const cleaned = (paths) => paths.filter((p) => p !== "");
 
 /**
  * Whether the diff holds nothing a code reader reads.
@@ -63,7 +66,7 @@ export function main(stdin) {
   const paths = stdin.split("\n");
 
   if (carriesNoSource(paths)) {
-    process.stdout.write("no source in this diff\n");
+    process.stdout.write(`${NO_SOURCE}\n`);
     return 0;
   }
 

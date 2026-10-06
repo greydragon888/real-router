@@ -4,9 +4,9 @@
 // A hand-written comparison of `process.argv[1]` with the module's own URL or
 // file name fails through a symlinked or space-carrying path: Node resolves a
 // main module's symlinks and escapes a space in its URL, so the comparison is
-// false, main() never runs, and the script exits 0 without a word. Every caller
-// reads that as "nothing to do" — no source in the diff, no examples to lint,
-// no benchmark to run. Two nets hold the class:
+// false, main() never runs, and the script exits 0 without a word. A caller
+// that reads the exit code takes that for "nothing to do" — no examples to
+// lint, no benchmark to run. Two nets hold the class:
 //
 //   - a scan of the tracked scripts refuses any hand-written comparison, and
 //     every file that uses `import.meta.main` must be in `CLIS` below;
@@ -72,6 +72,10 @@ const CLIS = {
     ran: /no updated-dependencies in the input/,
   },
   "scripts/diff-carries-no-source.mjs": {
+    args: [],
+    ran: /no changed paths/,
+  },
+  "scripts/diff-carries-no-code.mjs": {
     args: [],
     ran: /no changed paths/,
   },

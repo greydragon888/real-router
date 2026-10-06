@@ -137,8 +137,12 @@ test("an empty diff answers false — nothing changed is not an answer", () => {
   assert.equal(carriesNoSource(["", "  ", "\t"]), false);
 });
 
-test("blank lines around real paths do not change the answer", () => {
-  assert.equal(carriesNoSource(["", "pnpm-lock.yaml", "  "]), true);
+test("blank lines around real paths do not change the answer, and a name of spaces is a path", () => {
+  assert.equal(carriesNoSource(["", "pnpm-lock.yaml", ""]), true);
+  // git prints a name as it is: one of spaces, or with a space at either end,
+  // is that name and no manifest.
+  assert.equal(carriesNoSource(["pnpm-lock.yaml", "  "]), false);
+  assert.equal(carriesNoSource(["package.json "]), false);
   assert.equal(
     carriesNoSource(["", "packages/core/src/a.ts", "pnpm-lock.yaml"]),
     false,

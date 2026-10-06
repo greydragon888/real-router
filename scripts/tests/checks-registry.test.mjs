@@ -121,6 +121,7 @@ const NOT_A_GATE = new Map([
  */
 const NOT_A_CHECK = new Map([
   ["ci.yml#check  node scripts/diff-carries-no-source.mjs", PLANNER],
+  ["ci.yml#check  node scripts/diff-carries-no-code.mjs", PLANNER],
   ["ci.yml#check  node scripts/build-matrix.mjs", PLANNER],
   [
     "ci.yml#check  node scripts/benchmarks-lint-filter.mjs HEAD^1 HEAD",
@@ -1192,6 +1193,20 @@ test("node:scripts-tooling runs scripts-tests.mjs tooling — held here, in the 
     "scripts/scripts-tests.mjs",
     "tooling",
   ]);
+});
+
+test("node:skip-facts runs the test of the skip facts in CI, in every context", () => {
+  // Both scripts/tests groups skip on `no-source`, so the test that holds the
+  // step answering `no_source` runs where no context skips it.
+  const holder = CHECKS.find((each) => each.id === "node:skip-facts");
+
+  assert.deepEqual(holder?.run, [
+    "node",
+    "--test",
+    "scripts/tests/diff-carries-no-code.test.mjs",
+  ]);
+  assert.ok(holder.stages.includes("ci"), "node:skip-facts runs in CI");
+  assert.deepEqual(holder.ciSkip, [], "no CI context skips node:skip-facts");
 });
 
 test("the hooks and Repo Lints call verify with their stage, and run no check of their own", () => {
