@@ -21,10 +21,12 @@
 // UTF-8 or holds a byte-order mark or a lone surrogate, a key, a `format` or an
 // `absolute` of it, a `lint:duplicates` command or a line of
 // `sonar-project.properties` other than the ones named here, and a tracked file
-// outside the forms `refusedFiles` accepts. `JSON.parse` takes more than jscpd
-// 5.3.2 does — a number out of jscpd's range or nesting 130 deep drops the whole
-// file there, a value of another type drops that value — so the test has jscpd
-// judge this repository's `.jscpd.json` itself.
+// outside the forms `refusedFiles` accepts. A key set to `null` is refused too:
+// jscpd takes it as unset without a word, and on `threshold` that takes the
+// gate's threshold off. `JSON.parse` takes more than jscpd 5.3.2 does — a
+// number out of jscpd's range or nesting 130 deep drops the whole file there, a
+// value of another type drops that value — so the test has jscpd judge this
+// repository's `.jscpd.json` itself.
 
 import { execFileSync } from "node:child_process";
 import { lstatSync, readFileSync, statSync } from "node:fs";
@@ -224,7 +226,8 @@ const strings = (value) =>
  * `.jscpd.json`, decoded as jscpd decodes it — UTF-8 without a byte-order mark,
  * every string well formed; on anything else jscpd drops the whole file — and
  * held to the keys, the formats, the `absolute` and the `ignore` shape this
- * knows. With `absolute`, jscpd would match an entry against the absolute path.
+ * knows, with no key set to `null`, which jscpd takes as unset without a word.
+ * With `absolute`, jscpd would match an entry against the absolute path.
  *
  * @param {string} root
  * @returns {{ ignore: string[] }}
@@ -253,6 +256,12 @@ function readJscpd(root) {
   if (keys.join() !== JSCPD_KEYS.join()) {
     throw new Error(
       `.jscpd.json: holds the keys ${keys.join(", ")}, where this knows ${JSCPD_KEYS.join(", ")}`,
+    );
+  }
+  const unset = keys.filter((key) => config[key] === null);
+  if (unset.length > 0) {
+    throw new Error(
+      `.jscpd.json: ${unset.join(", ")} set to null, which jscpd takes as unset without a word`,
     );
   }
   if (JSON.stringify(config.format) !== JSON.stringify(FORMAT)) {

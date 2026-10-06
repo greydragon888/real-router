@@ -378,6 +378,13 @@ function repository(change = {}) {
   const config = Object.fromEntries(JSCPD_KEYS.map((key) => [key, null]));
   Object.assign(config, {
     "//": ["reasons"],
+    threshold: 2,
+    failOnEmpty: true,
+    minLines: 5,
+    minTokens: 70,
+    similarity: 0.9,
+    mode: "weak",
+    reporters: ["console"],
     format: FORMAT,
     absolute: false,
     gitignore: true,
@@ -412,6 +419,29 @@ function repository(change = {}) {
   change.after?.(root);
   return root;
 }
+
+test("a key set to null is refused by name: jscpd takes it as unset without a word", () => {
+  for (const key of JSCPD_KEYS) {
+    const root = repository({ jscpd: (c) => ({ ...c, [key]: null }) });
+    try {
+      assert.throws(
+        () => render(root),
+        new RegExp(`\\.jscpd\\.json: ${RegExp.escape(key)} set to null`),
+        key,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+  const root = repository({
+    jscpd: (c) => ({ ...c, minLines: null, threshold: null }),
+  });
+  try {
+    assert.throws(() => render(root), /minLines, threshold set to null/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test("render translates the entries of a repository it knows", () => {
   const root = repository();

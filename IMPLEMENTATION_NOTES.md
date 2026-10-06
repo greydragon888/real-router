@@ -13789,6 +13789,8 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 
 > **Updated (2026-10-05).** Check 6 of `check-coverage-scope.mjs` refuses code directly in `packages/` or `shared/`, under `shared/tests/` and in a directory of `packages/` without a `package.json`, so in the third limit below "check 6 … looks at none of them" no longer holds: check 6 refuses all three, and code directly in `packages/` too ("Check 6 refuses code beside the packages and beside the source directories of `shared/`").
 
+> **Updated (2026-10-06).** The generator refuses a key set to `null`, so in the first banner of this entry "a `null` in `minLines`, `minTokens`, `similarity`, `mode`, `reporters` or `failOnEmpty` leaves that key on jscpd's default unseen" no longer holds ("The generator refuses a key of `.jscpd.json` set to `null`").
+
 **Problem.** Two hand-kept lists named the exclusions of two duplication detectors: `ignore` in `.jscpd.json`, for jscpd and the pre-push gate, and `sonar.cpd.exclusions`, for SonarCloud's duplication on new code. A comment above the Sonar line asked to keep them in lockstep, and nothing held it: four jscpd entries were missing from Sonar's list, and Sonar's carried `**/tests/**`, which its duplication never reads. Nor would a faithful copy have held, because the two tools read one pattern differently. jscpd matches each entry, and the entry behind `**/`, against the path as it walks it from a scan root given on its command line; its `*` crosses `/`, and every leading `/` is dropped. Sonar matches against the path from the project root; its `*` stays within a segment and its `**` crosses `/`. Copied as written, `legacy.ts`, `src/**` and `packages/*/legacy.ts` leave out 5, 24 and 4 files of a fixture in jscpd, and none in Sonar.
 
 **Solution.**
@@ -13917,3 +13919,13 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 **Why.** The seroval flaw is in its JSON deserializer, `fromJSON` and `fromCrossJSON`. solid-js 1.9.15 imports only `Serializer`, `Feature` and `getCrossReferenceHeader`, in its server build, and no code in the repository imports seroval. It reaches tests, benchmarks, the examples and cross-router-bench, none of them published, and @real-router/solid takes solid-js as a peer. An override to 1.6.3 would put under solid-js a seroval outside the range it declares.
 
 **Measured (2026-10-06).** Each lockfile changes only those packages' entries, and the integrity of every new version matches the registry. `pnpm dedupe --check` passes in the three workspaces, and `lint:audit` reports no issues.
+
+## The generator refuses a key of `.jscpd.json` set to `null` (2026-10-06)
+
+**Problem.** jscpd 5.3.2 takes a `null` in `.jscpd.json` as unset, in every key, without a word: it prints `Using config from .jscpd.json` and no `config file .jscpd.json` line. On `threshold` that takes the gate's threshold off; on `minLines`, `minTokens`, `similarity`, `mode`, `reporters` or `failOnEmpty` it leaves the key on jscpd's default. `JSON.parse` takes the `null`. The generator refused it on `format`, `absolute` and `ignore`, which it holds by value, and the cell that has jscpd judge the repository's file caught it on `threshold`, through the gate's verdict; on `minLines`, `minTokens`, `similarity`, `mode`, `reporters` and `failOnEmpty` nothing saw it.
+
+**Solution.** `readJscpd` refuses a key set to `null` and names it. The test's fixtures set every key to a value, and one cell sets each key of `JSCPD_KEYS` to `null` in turn.
+
+**Why.** The file holds no `null` today, and the generator refuses a form that does not exist rather than read it, as it does elsewhere. Recording the gap instead would have left six settings of the duplicates gate free to change without a sign.
+
+**Measured (2026-10-06).** jscpd printed no diagnostic for a `null` in any of the twelve keys, and every run matched the run without that key: on the repository, on a fixture of clones over the threshold and on a scan of no files. The exit code changed on `threshold` with the clones, on `failOnEmpty` with no files and on `ignore` on the repository. With the check off, the new cell fails, and so does a check that names only the first key set to `null`; `lint:config-sync` passes on the repository.
