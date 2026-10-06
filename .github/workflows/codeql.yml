@@ -112,5 +112,10 @@ jobs:
           #   examples, via electron-builder → @electron/get → global-agent →
           #   roarr, whose format strings are global-agent's own literals. Not
           #   in any published package.
+          # GHSA-pqg4-j6r4-53mv — shell-quote (fixed in 1.11.0, outside the
+          #   exact 1.9.0 concurrently 10.0.5 pins). Only in the examples, via
+          #   concurrently, which calls quote() only under
+          #   --passthrough-arguments; the examples' scripts do not pass it.
+          #   Not in any published package.
           # The list mirrors scripts/osv-scanner.toml; the two must stay in sync.
-          allow-ghsas: GHSA-wrw7-89jp-8q8g, GHSA-86w9-cpqp-85rv, GHSA-vfj7-8cjw-p6xm, GHSA-ch52-4w7c-c8xp, GHSA-jp82-f5mq-hwhp, GHSA-p6vx-979v-rg4c, GHSA-hp3w-g68c-fv3c
+          allow-ghsas: GHSA-wrw7-89jp-8q8g, GHSA-86w9-cpqp-85rv, GHSA-vfj7-8cjw-p6xm, GHSA-ch52-4w7c-c8xp, GHSA-jp82-f5mq-hwhp, GHSA-p6vx-979v-rg4c, GHSA-hp3w-g68c-fv3c, GHSA-pqg4-j6r4-53mv

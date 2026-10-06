@@ -83,6 +83,20 @@ reason = "Fixed in seroval 1.6.2, outside solid-js 1.9.15's ~1.5.4; solid-js has
 id = "GHSA-hp3w-g68c-fv3c"  # sprintf-js DoS through unbounded precision specifiers
 reason = "No fixed sprintf-js release (<= 1.1.3, the latest). Only path: electron-builder 26.15.3 (devDependency of examples/desktop/electron/*) -> @electron/get 3.1.0 -> global-agent 3.0.0 -> roarr 2.15.4, whose format strings are global-agent's own literals, none with a precision specifier. examples/ is never published."
 
+# shell-quote's fix, 1.11.0, is outside the 1.9.0 that concurrently 10.0.5
+# pins exactly, and concurrently has no newer release. It arrives only in the
+# examples lockfile, through concurrently, a devDependency of the three
+# Electron examples (the root's copy, under launch-editor, takes 1.12.0). The
+# advisory needs `quote()` over tokens an attacker controls; concurrently calls
+# `quote()` only to expand passthrough arguments, which it reads only under
+# `--passthrough-arguments`, and the examples' `dev` scripts do not pass it.
+# The examples are never published. Drop it when concurrently takes
+# shell-quote 1.11.0 or later — ask api.osv.dev per version.
+
+[[IgnoredVulns]]
+id = "GHSA-pqg4-j6r4-53mv"  # shell-quote quote() command injection through a line terminator after a comment token
+reason = "Fixed in shell-quote 1.11.0, outside the exact 1.9.0 concurrently 10.0.5 pins; concurrently has no newer release. Only path: concurrently 10.0.5 (devDependency of examples/desktop/electron/*), which calls quote() only under --passthrough-arguments, and the examples' dev scripts do not pass it. examples/ is never published."
+
 # NOTE (2026-09-10): ten entries stood here — RUSTSEC-2024-0411 through -0420,
 # the gtk-rs unmaintained-crate advisories (gdk, gtk, atk, their -sys crates and
 # gtk3-macros). They are gone, and the way they left is worth one paragraph

@@ -14044,3 +14044,16 @@ Three rounds of review of the fix found the same order of the text in two more p
 - ⚠ `BASH_SETS` and `BUILTINS` are the lists of bash 5.2 and 3.2, and a later bash may add to either. The `BASH` prefix takes new variables named so; another variable the script reads fails the read-back test on the bash that runs it, which in CI runs on the gate's image, `ubuntu-latest`. A new builtin has no such test.
 
 **Measured (2026-10-06).** All 138 tests of the file pass, and the file takes about half a second more: in five alternating pairs, 12.5–12.7 s before the change and 13.0–13.5 s after. Each of 29 mutants fails the cells of its rule: the rule removed (8 cells); each place left unmarked (`&&`/`||` 3, a function 1, `case` 1, `if` 4, `{ }` 1); `PATH_OK=0` removed; a variable its step passes not counted as set; a later assignment refused too; a function defined anywhere (2); a builtin's name allowed, or `eval` off the list; `command_not_found_handle` allowed; a line end inside `$( )` dropped; a `;` skipped where a list opens; bash's variables allowed to be set, or read when passed; no `BASH` prefix; `LINENO` off the list; the read-back ignoring the name; each kind of literal not kept; the preset dropped by the harness; no names preset; the turn stuck on one value; the table run without the presets, with nothing, or with presets that export nothing. With the rule removed, the reconciliation's branch in a function, in an `if` and on a `case` pattern each fails the table through the presets; with bash's checks removed, a branch on `LINENO` fails the read-back test.
+
+## shell-quote takes 1.12.0 in the root, and the examples' copy is allowlisted (2026-10-06)
+
+**Problem.** `lint:audit` failed on GHSA-pqg4-j6r4-53mv, shell-quote 1.8.4 through 1.10.x (critical, published 2026-10-06): `quote()` passes a line terminator in a token after a `{ comment }` token into the command it builds. It listed 1.10.0 in the root lockfile and 1.9.0 in the examples'.
+
+**Solution.**
+
+- `pnpm update shell-quote` moves the root's copy, under launch-editor 2.14.1 (`^1.8.4`, through `@changesets/cli`), from 1.10.0 to 1.12.0. pnpm resolves a transitive dependency as a fresh install would and takes no version on the command line for it, so 1.11.0, the first fixed release, would have needed an override.
+- concurrently 10.0.5, a devDependency of the three Electron examples, pins shell-quote 1.9.0 exactly and has no newer release. It calls `quote()` only in the parser it adds under `--passthrough-arguments`, and the examples' `dev` scripts do not pass it. The id goes to `scripts/osv-scanner.toml` and to `allow-ghsas` in `codeql.yml`, with its reason and the condition to drop it.
+
+**Why.** An override of shell-quote under concurrently would put a version outside the one it pins, which the seroval entry above declines to do under solid-js for the same reason.
+
+**Measured (2026-10-06).** The root lockfile changes only shell-quote's entries, and 1.12.0's integrity matches the registry; concurrently 10.0.5 is its latest release; the two allowlists hold the same eight ids in the same order, and `lint:audit` reports no issues.
