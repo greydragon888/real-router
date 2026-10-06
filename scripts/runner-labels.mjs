@@ -1,8 +1,9 @@
 // runner-labels.mjs — which runner a workflow job lands on, and which events
 // start it. `self-hosted-triggers.test.mjs` judges the model below: a job on
 // the self-hosted runner runs only under triggers a fork cannot fire.
-// `HOSTED` is shared with `release-workflow.test.mjs`; a test file is never
-// imported, because importing it would run its tests.
+// `HOSTED` is shared with `release-workflow.test.mjs` and with `ci-gate.mjs`,
+// which holds the gate job to a hosted label; a test file is never imported,
+// because importing it would run its tests.
 //
 // Each workflow is read twice — by the closed line reader here and by the
 // `yaml` parser — and only a model both readings agree on is judged. A

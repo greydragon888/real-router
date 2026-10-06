@@ -161,17 +161,16 @@ jobs:
         if: steps.check.outputs.tip_changesets_count != '0'
         uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
-          # v2 (the line built for Changesets 3) renamed every input this step
-          # passes — version → version-script, title → pr-title, commit →
-          # commit-message — and removed setupGitUser. Bumping `uses:` alone, as
-          # Dependabot proposes, is therefore NOT a no-op: unknown inputs are
-          # ignored, so the step would silently fall back to a bare
-          # `changeset version` (skipping sync-version / aggregate-changelog)
-          # under the default "Version Packages" title.
+          # The inputs this step passes go by their v2 names: version-script,
+          # pr-title, commit-message. An input under a renamed v1 name — version,
+          # title, commit, branch and three more — or commitMode fails the step
+          # before it starts when it carries a value (the action's
+          # `throwOnRenamedInputs`, `throwOnRemovedCommitModeInput`).
           #
-          # v2 also stopped reading the GITHUB_TOKEN env var; a custom token has
-          # to come through this input. Still the PAT rather than the job token,
-          # for the original reason: a GITHUB_TOKEN-authored PR triggers no CI.
+          # v2 takes the token from this input, and a GITHUB_TOKEN env var that
+          # differs from it fails the step. Still the PAT rather than the job
+          # token, for the original reason: a GITHUB_TOKEN-authored PR triggers
+          # no CI.
           github-token: ${{ secrets.PAT_TOKEN }}
           version-script: pnpm run version
           pr-title: "release: version packages${{ steps.refs.outputs.refs }}"

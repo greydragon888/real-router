@@ -10,8 +10,8 @@
 // fork path of the SonarCloud check (`sonar-trusted.yml` waits for "CI") and the
 // master coverage upload (`coverage-master.yml`).
 //
-// Stdlib only and no YAML library, like the other workflow tests here: the
-// extractors are single-purpose and fail on a shape they cannot read.
+// Stdlib only and no YAML library: the extractors are single-purpose and fail
+// on a shape they cannot read.
 
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";

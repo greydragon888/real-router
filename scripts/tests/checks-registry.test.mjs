@@ -1174,6 +1174,26 @@ test("every ciSkip names a context verify knows, and lint:audit alone skips the 
   );
 });
 
+test("the scripts/tests groups list no tools: in a hook a missing tool skips the whole group", () => {
+  for (const id of ["node:scripts-guards", "node:scripts-tooling"]) {
+    const check = CHECKS.find((each) => each.id === id);
+
+    assert.ok(check, `the registry holds no ${id}`);
+    assert.equal(check.tools, undefined, `${id} lists tools`);
+  }
+});
+
+test("node:scripts-tooling runs scripts-tests.mjs tooling — held here, in the group it does not run", () => {
+  // `verify.test.mjs`, in the tooling group, holds the guards group's command.
+  const tooling = CHECKS.find((each) => each.id === "node:scripts-tooling");
+
+  assert.deepEqual(tooling?.run, [
+    "node",
+    "scripts/scripts-tests.mjs",
+    "tooling",
+  ]);
+});
+
 test("the hooks and Repo Lints call verify with their stage, and run no check of their own", () => {
   for (const hook of ["pre-commit", "pre-push"]) {
     assert.deepEqual(

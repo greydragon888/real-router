@@ -14,6 +14,7 @@ import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
   chmodSync,
+  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -151,6 +152,17 @@ test("a test the tooling set does not name lands in the guards group", () => {
   }
 });
 
+test("the tooling task's command is the tooling group's", () => {
+  // `node:scripts-tooling` is turbo's verdict on this command alone, so a
+  // command that runs no test would pass it. A diff of `package.json` alone is
+  // no source, so in CI this cell meets such a change on the next pull request
+  // that carries source; pre-push meets it at once.
+  assert.equal(
+    dryTask({ TOOLING_RUNTIME: "same" }).command,
+    "node scripts/scripts-tests.mjs tooling --here",
+  );
+});
+
 test("the copy holds exactly what turbo hashes for the task", () => {
   // turbo hashes as well what git ignores under an input glob, where a local
   // run left it: such a file moves the key and costs a miss, not a stale
@@ -285,6 +297,56 @@ test("the tooling command says so when pnpm does not run", () => {
     assert.match(run.stderr, /pnpm ENOENT/);
   } finally {
     rmSync(empty, { recursive: true, force: true });
+  }
+});
+
+test("scripts-tests.mjs tooling --here runs the tooling group: a failing tooling test fails it, a failing guard does not", () => {
+  const first = [...TOOLING][0];
+
+  for (const [failing, status] of [
+    [undefined, 0],
+    [first, 1],
+    ["a-guard", 0],
+  ]) {
+    const root = mkdtempSync(join(tmpdir(), "tooling-group-"));
+
+    try {
+      mkdirSync(join(root, "scripts", "tests"), { recursive: true });
+      for (const file of ["scripts-tests.mjs", "git-env.mjs"]) {
+        copyFileSync(join(ROOT, "scripts", file), join(root, "scripts", file));
+      }
+      writeFileSync(
+        join(root, "turbo.json"),
+        JSON.stringify({ tasks: { [TASK]: { inputs: ["scripts/**"] } } }),
+      );
+      for (const name of [...TOOLING, "a-guard"]) {
+        writeFileSync(
+          join(root, "scripts", "tests", `${name}.test.mjs`),
+          [
+            'import { test } from "node:test";',
+            `test(${JSON.stringify(name)}, () => {`,
+            failing === name ? '  throw new Error("red");' : "",
+            "});",
+            "",
+          ].join("\n"),
+        );
+      }
+      execFileSync("git", ["init", "-q"], { cwd: root, env: GIT });
+
+      const run = spawnSync(
+        process.execPath,
+        [join(root, "scripts", "scripts-tests.mjs"), "tooling", "--here"],
+        { encoding: "utf8", env: { ...NESTED, TOOLING_RUNTIME: runtime() } },
+      );
+
+      assert.equal(
+        run.status,
+        status,
+        `${failing}: ${run.stdout}${run.stderr}`,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 });
 

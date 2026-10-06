@@ -16,6 +16,8 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { isMap, isScalar } from "yaml";
+
 import { ClosedYamlError, readClosedYaml, sourceOf } from "../closed-yaml.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -113,6 +115,132 @@ for (const [name, [text, value]] of Object.entries(READ)) {
     assert.deepEqual(readClosedYaml(text).toJS(), value);
   });
 }
+
+test("a literal block with a comment after its indicator, a blank line and a quote inside quotes reads to exactly its text", () => {
+  // Forms the gate's block uses, on a fixture; every block of the workflows
+  // themselves is held against its own bytes below.
+  const text = [
+    "jobs:",
+    "  ci:",
+    "    steps:",
+    "      - name: Determine result",
+    "        env:",
+    "          NEEDS: ${{ toJSON(needs) }}",
+    "        run: | # a comment after the indicator",
+    "          # a comment line",
+    '          A="${{ needs.check.result }}"',
+    "",
+    '          if [[ "$A" != "success" ]]; then',
+    "            echo \"❌ unknown mode '$A'\"",
+    "            exit 1",
+    "          fi",
+    "      - run: echo",
+    "",
+  ].join("\n");
+
+  assert.equal(
+    readClosedYaml(text).getIn(["jobs", "ci", "steps", 0, "run"]),
+    [
+      "# a comment line",
+      'A="${{ needs.check.result }}"',
+      "",
+      'if [[ "$A" != "success" ]]; then',
+      "  echo \"❌ unknown mode '$A'\"",
+      "  exit 1",
+      "fi",
+      "",
+    ].join("\n"),
+  );
+});
+
+/**
+ * A block scalar read from its own bytes rather than by the parser: `|` with
+ * clip chomping, and `>-` of one plain paragraph — the headers the workflows
+ * use. Any other header or shape throws.
+ *
+ * @param {string} source the block as the file writes it, from its header
+ * @returns {string}
+ */
+function fromBytes(source) {
+  const [header, ...rest] = source.split("\n");
+  const lines = rest.at(-1) === "" ? rest.slice(0, -1) : rest;
+  const content = lines.find((line) => line.trim() !== "");
+
+  if (content === undefined) throw new Error("an empty block");
+
+  const indent = /^ */.exec(content)[0].length;
+  const body = lines.map((line) => {
+    if (/^ *$/.test(line) && line.length <= indent) return "";
+    if (!line.startsWith(" ".repeat(indent))) {
+      throw new Error(`a line outside the block's indentation: ${line}`);
+    }
+    return line.slice(indent);
+  });
+
+  while (body.length > 0 && body.at(-1) === "") body.pop();
+  if (/^\|(?: +#.*)?$/.test(header)) return `${body.join("\n")}\n`;
+  if (/^>-(?: +#.*)?$/.test(header)) {
+    if (body.some((line) => line === "" || line.startsWith(" "))) {
+      throw new Error("a folded block of more than one plain paragraph");
+    }
+    return body.join(" ");
+  }
+  throw new Error(`a block header the reading does not take: ${header}`);
+}
+
+test("every block run: of the workflows reads the same through the parser and through its own bytes", () => {
+  // The gate's script, Repo Lints' step and every test that reads a workflow
+  // through the parser take a `run:` from `yaml` alone; a version that reads
+  // one of these blocks otherwise disagrees with its bytes here.
+  const files = execFileSync(
+    "git",
+    ["ls-files", "-z", "--", ".github/workflows"],
+    { cwd: ROOT, encoding: "utf8" },
+  )
+    .split("\0")
+    .filter((file) => /\.ya?ml$/.test(file));
+  const headers = new Set();
+  let blocks = 0;
+
+  for (const file of files) {
+    const text = readFileSync(join(ROOT, file), "utf8");
+    const jobs = readClosedYaml(text).get("jobs", true);
+
+    for (const { value: job } of jobs?.items ?? []) {
+      for (const step of job.get("steps", true)?.items ?? []) {
+        const run = isMap(step) ? step.get("run", true) : undefined;
+
+        if (!isScalar(run) || !run.type.startsWith("BLOCK")) continue;
+
+        const source = sourceOf(text, run);
+
+        headers.add(source.split("\n")[0].replace(/ +#.*$/, ""));
+        assert.equal(fromBytes(source), run.value, `${file}: ${source}`);
+        blocks++;
+      }
+    }
+  }
+
+  // Each branch of the byte reading meets a block of the real tree.
+  for (const header of ["|", ">-"]) {
+    assert.ok(headers.has(header), `no ${header} block read`);
+  }
+  assert.ok(blocks >= 50, `only ${blocks} blocks`);
+});
+
+test("the byte reading refuses a header and a shape it does not read", () => {
+  for (const [source, refusal] of [
+    ["|-\n  a\n", /a block header the reading does not take: \|-/],
+    ["|2\n  a\n", /a block header the reading does not take/],
+    [">\n  a\n", /a block header the reading does not take/],
+    [">-\n  a\n\n  b\n", /a folded block of more than one plain paragraph/],
+    [">-\n  a\n    b\n", /a folded block of more than one plain paragraph/],
+    ["|\n  a\n b\n", /a line outside the block's indentation/],
+    ["|\n\n", /an empty block/],
+  ]) {
+    assert.throws(() => fromBytes(source), refusal, JSON.stringify(source));
+  }
+});
 
 test("sourceOf gives a value as the file writes it, quotes included", () => {
   const text = 'a: "1.0"\nb: plain\nc: ${{ x }}\n';
