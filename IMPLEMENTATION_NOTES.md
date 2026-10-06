@@ -13678,6 +13678,8 @@ zizmor did not report one more: `sonar-trusted.yml` holds four scanner arguments
 
 > **Updated (2026-10-05).** `sonar-trusted-boundary.test.mjs` reads the fork's job through the parser too ("The fork path runs `master`'s Node under Node's permission model").
 
+> **Updated (2026-10-06).** `checks-registry.test.mjs` reads each job's `run` scripts, and `workflow-path-filters.test.mjs` the trigger filters, through the parser as well, so the last sentence of the Scope below no longer holds for them ("The registry and path-filter tests read the workflows through the closed parser").
+
 **Problem.** `scripts/ci-gate.mjs` read ci.yml line by line — `parseJobs`, `jobLines`, `parseNeeds`, `readLastStep`, `parseGateStep`, `topLevelKeysClosed`, `workflowEnvClosed`. The #1127 entry chose that over a YAML library: "the extractors are ~30 lines and fail closed". They had grown to 383 lines, and three rounds of fixes in one day answered forms the audits of RFC-4 found them reading otherwise than GitHub: a multi-line or scalar `needs` read as none, and a key behind a lone CR, NEL, LS or PS went unread; a quoted key, or one with a space before its colon, read as absent; a continuation line under `if: always()` could have skipped the gate. Each round extended the grammar by the forms just found, or refused them.
 
 **Solution.**
@@ -13944,3 +13946,15 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 - Both go to `scripts/osv-scanner.toml` and to `allow-ghsas` in `codeql.yml`, each with its reason and the condition to drop it.
 
 **Measured (2026-10-06).** The root lockfile changes only smol-toml's entries, and 1.9.0's integrity matches the registry; sprintf-js 1.1.3 is its latest release; the two allowlists hold the same seven ids in the same order, and `lint:audit` reports no issues.
+
+## The registry and path-filter tests read the workflows through the closed parser (2026-10-06)
+
+**Problem.** A code review of the CI-guards wave found the class the gate's reader closed alive in two tests that stayed line readers. `workflow-path-filters.test.mjs` found a filter by `paths:` at the start of a line, so `"paths":` in quotes was skipped — though its header promised that a key written otherwise is refused — and a filter naming a missing directory passed. `checks-registry.test.mjs` took a workflow's commands from the lines under `jobs:`, so a `"run":` key or a job key in quotes carried a check past the registry's rule, and a folded script it read only to its first line.
+
+**Solution.**
+
+- Both read the workflows through `readClosedYaml`: the registry test the `run` of each step of each job, the path-filter test `paths` and `paths-ignore` under each event of `on`. A form neither reads — `jobs:`, a job, its `steps` or a step not of its shape, a `run` that is not a string, a filter that is not a list of strings — is refused.
+- A folded script reads as the shell gets it, on one line, so the three `NOT_A_CHECK` keys of folded commands name the whole command, `--filter='!./benchmarks'` included.
+- Cells hold the class: a `run` key in quotes, a job key in quotes and a folded script are read, and a `run` that is not a string is refused; the path-filter control reads a quoted key and a flow list and refuses a scalar. The real-tree cell requires the filter its header names among those it reads, so a walk that finds nothing fails.
+
+**Measured (2026-10-06).** Every workflow reads closed. On the real tree the parser and the line reader find the same 39 command lines but five: the folded scripts, which the line reader cut at their first line. Five mutants each fail a cell: the line reader restored in the registry test — the three cells of the class, and two of the real tree, whose keys of folded commands no longer match —, a `run` that is not a string skipped, a filter key in quotes skipped, a filter walk that finds nothing, and a scalar filter read as one entry.

@@ -21,10 +21,10 @@
 //   - Each lint task runs in a gating ci.yml job whose line no static
 //     `--filter` narrows below the packages that declare the task (#2370).
 //
-// The extractors here are line readers of one shape each; the jobs of each
-// workflow and the gate's come from `ci-gate.mjs`, which reads through the
-// `yaml` parser. The floors on the real tree catch an extractor that reads
-// nothing.
+// The workflows are read by the `yaml` parser, closed (`scripts/closed-yaml.mjs`):
+// the `run` scripts of each job here, the jobs of each workflow and the gate's
+// in `ci-gate.mjs`, so a key in quotes or a folded script reads as GitHub reads
+// it. The floors on the real tree catch an extractor that reads nothing.
 
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -32,7 +32,10 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { isMap, isScalar, isSeq } from "yaml";
+
 import { checkId } from "../check-id.mjs";
+import { readClosedYaml } from "../closed-yaml.mjs";
 import { CHECKS } from "../checks.mjs";
 import { gatedJobs, parseJobs } from "../ci-gate.mjs";
 import { LINT_TASK_ROLES } from "../lint-tasks.mjs";
@@ -150,7 +153,10 @@ const NOT_A_CHECK = new Map([
   ],
 
   ["changesets.yml#release  pnpm turbo run bundle", PIPELINE],
-  ["ci.yml#pipeline-leaf  pnpm turbo run bundle", PIPELINE],
+  [
+    "ci.yml#pipeline-leaf  pnpm turbo run bundle $LEAF_FILTER --filter='!./benchmarks' --summarize",
+    PIPELINE,
+  ],
   [
     "ci.yml#base-bundle  pnpm turbo run bundle --filter='@real-router/core...' --summarize",
     PIPELINE,
@@ -175,7 +181,7 @@ const NOT_A_CHECK = new Map([
   ],
 
   [
-    "changesets.yml#release  pnpm turbo run lint:package lint:types",
+    "changesets.yml#release  pnpm turbo run lint:package lint:types --filter='!./benchmarks'",
     AFTER_THE_FACT,
   ],
   ["cross-router-bench.yml#bench  pnpm lint:spec-parity", AFTER_THE_FACT],
@@ -192,7 +198,7 @@ const NOT_A_CHECK = new Map([
     AFTER_THE_FACT,
   ],
   [
-    "post-merge.yml#build  pnpm turbo run bundle test test:properties lint",
+    "post-merge.yml#build  pnpm turbo run bundle test test:properties lint --summarize",
     AFTER_THE_FACT,
   ],
   [
@@ -224,8 +230,8 @@ const commandOf = (text) =>
     .trim();
 
 /**
- * The command lines of a text: trimmed, without a YAML list marker or a
- * `run:` key, without comments.
+ * The command lines of a shell text: trimmed, without blank lines and
+ * comments.
  *
  * @param {string} text
  * @returns {string[]}
@@ -233,13 +239,45 @@ const commandOf = (text) =>
 function commandLines(text) {
   return text
     .split("\n")
-    .map((raw) =>
-      raw
-        .trim()
-        .replace(/^- /, "")
-        .replace(/^run:\s*/, ""),
-    )
+    .map((raw) => raw.trim())
     .filter((line) => line && !line.startsWith("#"));
+}
+
+/**
+ * The `run` scripts of each job of a workflow, in order. A form this does not
+ * read — `jobs:`, a job, its `steps` or a step not of its shape, a `run` that
+ * is not a string — is refused, so a script it cannot read is never taken for
+ * one that runs no check.
+ *
+ * @param {string} yaml
+ * @returns {Map<string, string[]>}
+ */
+function jobScripts(yaml) {
+  const jobs = readClosedYaml(yaml).get("jobs", true);
+  const scripts = new Map();
+  if (jobs === undefined) return scripts;
+  if (!isMap(jobs)) throw new Error("jobs: is not a mapping");
+  for (const { key, value: job } of jobs.items) {
+    if (!isMap(job)) throw new Error(`job ${key.value} is not a mapping`);
+    const steps = job.get("steps", true);
+    if (steps !== undefined && !isSeq(steps)) {
+      throw new Error(`the steps of job ${key.value} are not a sequence`);
+    }
+    const runs = [];
+    for (const step of steps?.items ?? []) {
+      if (!isMap(step)) {
+        throw new Error(`a step of job ${key.value} is not a mapping`);
+      }
+      const run = step.get("run", true);
+      if (run === undefined) continue;
+      if (!isScalar(run) || typeof run.value !== "string") {
+        throw new Error(`a run of job ${key.value} is not a string`);
+      }
+      runs.push(run.value);
+    }
+    scripts.set(String(key.value), runs);
+  }
+  return scripts;
 }
 
 /**
@@ -251,31 +289,19 @@ function commandLines(text) {
  * @returns {{ place: string, form: string, command: string }[]}
  */
 function workflowLines(file, yaml) {
-  const text = yaml.split("\n");
-  const start = text.findIndex((l) => /^jobs:\s*(#.*)?$/.test(l));
-  if (start === -1) return [];
-
   const found = [];
-  let job;
-  for (const raw of text.slice(start + 1)) {
-    if (/^[^\s#]/.test(raw)) break; // next top-level section
-    const key = /^ {2}([A-Za-z_][\w-]*):/.exec(raw);
-    if (key) {
-      job = key[1];
-      continue;
-    }
-    const [line] = commandLines(raw);
-    if (line === undefined || job === undefined) continue;
-
+  for (const [job, runs] of jobScripts(yaml)) {
     const place = `${file}#${job}`;
-    const form = FORMS.find(([, shape]) => shape.test(line))?.[0];
-    if (form) {
-      found.push({ place, form, command: commandOf(line) });
-      continue;
-    }
-    const embedded = EMBEDDED_NODE.exec(line);
-    if (embedded) {
-      found.push({ place, form: "node", command: commandOf(embedded[1]) });
+    for (const line of runs.flatMap(commandLines)) {
+      const form = FORMS.find(([, shape]) => shape.test(line))?.[0];
+      if (form) {
+        found.push({ place, form, command: commandOf(line) });
+        continue;
+      }
+      const embedded = EMBEDDED_NODE.exec(line);
+      if (embedded) {
+        found.push({ place, form: "node", command: commandOf(embedded[1]) });
+      }
     }
   }
   return found;
@@ -497,16 +523,11 @@ function findSurfaceViolations(text) {
   };
 }
 
-/** The body of one job of a workflow, from its key to the next job. */
-function jobBody(yaml, job) {
-  const lines = yaml.split("\n");
-  const start = lines.findIndex((l) => l.startsWith(`  ${job}:`));
-  if (start === -1) return "";
-  const rest = lines.slice(start + 1);
-  const end = rest.findIndex(
-    (l) => /^ {2}[A-Za-z_][\w-]*:/.test(l) || /^[^\s#]/.test(l),
-  );
-  return (end === -1 ? rest : rest.slice(0, end)).join("\n");
+/** The `run` scripts of one job of a workflow, joined; a job it lacks throws. */
+function jobScript(yaml, job) {
+  const runs = jobScripts(yaml).get(job);
+  if (runs === undefined) throw new Error(`the workflow has no job ${job}`);
+  return runs.join("\n");
 }
 
 /**
@@ -748,6 +769,59 @@ test("fixture: a node scripts/ line without an entry reds, at the start of a lin
     "ci.yml#leaf  node scripts/z.mjs",
     "ci.yml#later  node scripts/emb.mjs",
   ]);
+});
+
+// A key in quotes, a job key in quotes and a folded script read as GitHub
+// reads them, so the line each carries is held like any other.
+const READ_AS_GITHUB = {
+  "a run key in quotes": [
+    (ci) =>
+      ci.replace(
+        "      - run: pnpm lint:late\n",
+        '      - "run": pnpm lint:x\n',
+      ),
+    "ci.yml#later  pnpm lint:x",
+  ],
+  "a job key in quotes": [
+    (ci) =>
+      ci
+        .replace("  later:\n", '  "later":\n')
+        .replace("pnpm lint:late", "pnpm lint:x"),
+    "ci.yml#later  pnpm lint:x",
+  ],
+  "a folded script": [
+    (ci) =>
+      ci.replace(
+        "      - run: pnpm lint:late\n",
+        "      - run: >\n          pnpm lint:x\n          --strict\n",
+      ),
+    "ci.yml#later  pnpm lint:x --strict",
+  ],
+};
+
+for (const [name, [mutate, line]] of Object.entries(READ_AS_GITHUB)) {
+  test(`fixture: ${name} is read, and the line it runs is held`, () => {
+    const ci = mutate(CI);
+    assert.notEqual(ci, CI);
+    assert.deepEqual(
+      lineRule({ ci, notACheck: withoutListed("ci.yml#later  pnpm lint:late") })
+        .unlisted,
+      [line],
+    );
+  });
+}
+
+test("fixture: a run that is not a string is refused, not read as no command", () => {
+  assert.throws(
+    () =>
+      lineRule({
+        ci: CI.replace(
+          "      - run: pnpm lint:late\n",
+          "      - run: [pnpm lint:x]\n",
+        ),
+      }),
+    /a run of job later is not a string/,
+  );
 });
 
 test("fixture: a turbo line without check tasks reds unless NOT_A_CHECK names it", () => {
@@ -1112,7 +1186,7 @@ test("the hooks and Repo Lints call verify with their stage, and run no check of
   }
   assert.deepEqual(
     findSurfaceViolations(
-      jobBody(workflowFiles["ci.yml"], CHECKS_JOB.split("#")[1]),
+      jobScript(workflowFiles["ci.yml"], CHECKS_JOB.split("#")[1]),
     ),
     { stages: ["ci"], others: [] },
     CHECKS_JOB,

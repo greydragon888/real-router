@@ -7,10 +7,10 @@
 // failure, so this reads all of them: the literal part of each pattern, up to
 // its first glob character, must exist in the tree.
 //
-// Deliberately NOT a YAML library: one shape is read, a `paths:` or
-// `paths-ignore:` key followed by a block list. A key written any other way is
-// refused rather than skipped, so a filter this cannot read is never counted
-// as one that passed.
+// The workflows are read by the `yaml` parser, closed (`scripts/closed-yaml.mjs`),
+// so a filter key in quotes or a flow list reads as GitHub reads it. A filter
+// whose value is not a list of strings is refused rather than skipped, so a
+// filter this cannot read is never counted as one that passed.
 
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -18,38 +18,44 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { isMap, isScalar, isSeq } from "yaml";
+
+import { readClosedYaml } from "../closed-yaml.mjs";
+
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const WORKFLOWS = join(ROOT, ".github/workflows");
 
-/** Every `paths:` / `paths-ignore:` key in `text`, with the entries it lists. */
+/**
+ * Every `paths:` / `paths-ignore:` filter of a workflow's triggers, with the
+ * entries it lists; a value that is not a list of strings lists none.
+ */
 function pathFilterKeys(text) {
-  const lines = text.split("\n");
+  const on = readClosedYaml(text).get("on", true);
   const keys = [];
 
-  for (let at = 0; at < lines.length; at++) {
-    const key = /^(\s*)(paths|paths-ignore):(.*)$/u.exec(lines[at]);
+  // `on: push` and `on: [push, pull_request]` carry no filter.
+  if (!isMap(on)) return keys;
 
-    if (key === null) continue;
+  for (const { key: event, value } of on.items) {
+    if (!isMap(value)) continue;
 
-    const entries = [];
-    // A value on the key's own line is a flow list or a scalar, which this does
-    // not read — the entries stay empty and the key is refused below.
-    const inline = key[3].replace(/#.*$/u, "").trim();
+    for (const key of ["paths", "paths-ignore"]) {
+      const node = value.get(key, true);
 
-    for (let next = at + 1; inline === "" && next < lines.length; next++) {
-      const line = lines[next];
+      if (node === undefined) continue;
 
-      if (line.trim() === "" || /^\s*#/u.test(line)) continue;
-      if (line.length - line.trimStart().length <= key[1].length) break;
+      const read =
+        isSeq(node) &&
+        node.items.every(
+          (item) => isScalar(item) && typeof item.value === "string",
+        );
 
-      const item = /^\s*-\s*["']?([^"'#]+?)["']?\s*(?:#.*)?$/u.exec(line);
-
-      if (item === null) break;
-
-      entries.push(item[1]);
+      keys.push({
+        where: `on.${event.value}.${key}`,
+        key,
+        entries: read ? node.items.map((item) => item.value) : [],
+      });
     }
-
-    keys.push({ line: at + 1, key: key[2], entries });
   }
 
   return keys;
@@ -74,14 +80,15 @@ const staleEntries = (keys, root) =>
 test("every workflow path filter names something that exists", () => {
   const stale = [];
   const unread = [];
+  const read = [];
 
   for (const file of readdirSync(WORKFLOWS).filter((name) =>
     /\.ya?ml$/u.test(name),
   )) {
     const keys = pathFilterKeys(readFileSync(join(WORKFLOWS, file), "utf8"));
 
-    for (const { line, key, entries } of keys) {
-      if (entries.length === 0) unread.push(`${file}:${line} ${key}`);
+    for (const { where, entries } of keys) {
+      (entries.length === 0 ? unread : read).push(`${file} ${where}`);
     }
 
     for (const pattern of staleEntries(keys, ROOT)) {
@@ -91,9 +98,14 @@ test("every workflow path filter names something that exists", () => {
 
   assert.deepEqual(unread, [], "a filter key this test cannot read");
   assert.deepEqual(stale, []);
+  // The walk reaches the filters: the one the header names is among them.
+  assert.ok(
+    read.includes("wiki-checkers.yml on.pull_request.paths"),
+    read.join("\n"),
+  );
 });
 
-test("CONTROL — a moved directory is stale, a glob-only pattern is not, a flow list is refused", () => {
+test("CONTROL — a moved directory is stale, a glob-only pattern is not, a quoted key and a flow list are read, a scalar is refused", () => {
   const keys = pathFilterKeys(
     [
       "on:",
@@ -105,23 +117,26 @@ test("CONTROL — a moved directory is stale, a glob-only pattern is not, a flow
       "    paths-ignore:",
       '      - "**/*.md"',
       "  push:",
-      '    paths: ["scripts/**"]',
-      "jobs:",
+      '    "paths": ["scripts/**"]',
+      "  pull_request_target:",
+      '    paths: "scripts/**"',
+      "jobs: {}",
     ].join("\n"),
   );
 
   assert.deepEqual(
-    keys.map(({ key, entries }) => [key, entries]),
+    keys.map(({ where, entries }) => [where, entries]),
     [
       [
-        "paths",
+        "on.pull_request.paths",
         [
           "packages/core/tests/fixtures/no-such-directory/**",
           "packages/*/src/**",
         ],
       ],
-      ["paths-ignore", ["**/*.md"]],
-      ["paths", []],
+      ["on.pull_request.paths-ignore", ["**/*.md"]],
+      ["on.push.paths", ["scripts/**"]],
+      ["on.pull_request_target.paths", []],
     ],
   );
   assert.deepEqual(staleEntries(keys, ROOT), [
