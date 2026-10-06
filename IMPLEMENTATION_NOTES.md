@@ -13895,7 +13895,7 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 
 **Why.** A test in the wrong group costs seconds in place; in the copy, it can cost its verdict without a sign. The 27 tests the task runs were checked for it: traced, they list only inputs — `.github/`, `.github/workflows/` and `scripts/tests/` — with the same results in place and in the copy, and the copy runs the same 500 tests as a run in place, none skipped.
 
-**Measured (2026-10-05).** Of seven mutants of the split, six fail a cell of `scripts-tests.test.mjs`: the groups swapped, the refusal of an empty group dropped, a name in `TOOLING` with no file, a test `TOOLING` does not name sent to the task, `runHere` running `TOOLING` in place of the set it is given, and the refusal of a name without a test file dropped. The seventh, a test taken out of `TOOLING`, runs in place: the safe side. `node --test` given no file ran the test it found under its directory (Node 24.18.1).
+**Measured (2026-10-05).** Of seven mutants of the split, six fail a cell of `scripts-tests.test.mjs`: the groups swapped, the refusal of an empty group dropped, a name in `TOOLING` with no file, a test `TOOLING` does not name sent to the task, `runHere` running `TOOLING` in place of the set it is given, and the refusal of a name without a test file dropped. The seventh, a test taken out of `TOOLING`, runs in place: the safe side. `node --test` given no file ran the test it found under its directory (Node 24.18.1). A cell holds the other side of the copy: a test that lists a file beyond the inputs and requires it fails there and passes in place.
 
 ## Check 6 refuses code beside the packages and beside the source directories of `shared/` (2026-10-05)
 

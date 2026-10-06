@@ -401,6 +401,40 @@ test("a test that reads beyond the task's inputs fails in the copy, and passes i
   }
 });
 
+test("a test that requires a file it lists beyond the task's inputs fails in the copy, and passes in place", () => {
+  // A listing in the copy finds only the inputs: a test that requires what it
+  // lists fails there, and one that does not can pass having checked nothing.
+  const root = fixture("scripts/data.txt", "location");
+  mkdirSync(join(root, "other"));
+  writeFileSync(join(root, "other", "data.txt"), "data\n");
+  writeFileSync(
+    join(root, "scripts", "tests", "lists.test.mjs"),
+    [
+      'import assert from "node:assert/strict";',
+      'import { globSync } from "node:fs";',
+      'import { test } from "node:test";',
+      'import { fileURLToPath } from "node:url";',
+      'test("lists other/", () => {',
+      '  const cwd = fileURLToPath(new URL("../../", import.meta.url));',
+      '  assert.deepEqual(globSync("other/*.txt", { cwd }), ["other/data.txt"]);',
+      "});",
+      "",
+    ].join("\n"),
+  );
+  try {
+    const inPlace = spawnSync(
+      process.execPath,
+      ["--test", "scripts/tests/lists.test.mjs"],
+      { cwd: root, encoding: "utf8", env: NESTED },
+    );
+
+    assert.equal(inPlace.status, 0, inPlace.stdout);
+    assert.equal(runHere(root, "ignore", process.env, new Set(["lists"])), 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("a name in the tooling set without a test file is refused", () => {
   const root = fixture("scripts/data.txt", "location");
   try {
