@@ -512,9 +512,10 @@ test("ci.yml: OUTSIDE_GATE allowlist is current", () => {
 // SKIP_FORBIDDEN is that decision as a table — a job in `needs` without a row
 // fails, because classifying a job is a list, not a reading of its `if:` — and
 // the script runs with the expressions substituted into its text and the
-// step's `env:` exported, under `bash -e`, in an environment of `PATH` alone.
-// What else the runner gives a script, the closed reading at the end of this
-// file keeps it from reading.
+// step's `env:` exported, under `bash -e`, in an environment of `PATH` alone;
+// the table adds presets of the variables the script reads and its step does
+// not pass. What else the runner gives a script, the closed reading at the end
+// of this file keeps it from reading.
 // --------------------------------------------------------------------------
 
 /** When a skip of each job in the gate's `needs` fails the gate. */
@@ -648,9 +649,24 @@ const BASH = execFileSync("bash", ["-c", "command -v bash"], {
   encoding: "utf8",
 }).trim();
 
-/** Each state's exit code, many states per `bash` process, one subshell each. */
-function exitCodes(step, states, env = { PATH: process.env.PATH }) {
+/**
+ * Runs the states, many per `bash` process, one subshell each, and gives each
+ * one's exit code. `preset(i)` is what the subshell of the i-th state exports
+ * before the step's `env:`: the variables the script finds set when it
+ * starts. `seen` holds, a line per state, what the variables of `watch` held
+ * as the script started, `<unset>` for one that was not set.
+ */
+function runStates(
+  step,
+  states,
+  { env = { PATH: process.env.PATH }, preset = () => "", watch = [] } = {},
+) {
   const dir = mkdtempSync(join(tmpdir(), "ci-gate-"));
+  const seenFile = join(dir, "seen");
+  const look =
+    watch.length === 0
+      ? ""
+      : `printf '%s\\n' "${watch.map((name) => `\${${name}-<unset>}`).join("|")}" >>${quote(seenFile)}\n`;
 
   try {
     const codes = [];
@@ -659,7 +675,7 @@ function exitCodes(step, states, env = { PATH: process.env.PATH }) {
       const chunk = states.slice(from, from + 400);
       let script = "set +e\n";
 
-      for (const state of chunk) {
+      for (const [k, state] of chunk.entries()) {
         const exports = Object.entries(step.env)
           .map(
             ([name, value]) =>
@@ -667,7 +683,7 @@ function exitCodes(step, states, env = { PATH: process.env.PATH }) {
           )
           .join("\n");
 
-        script += `(\n${exports}\nset -e\n${substitute(step.run, state)}) >/dev/null 2>&1\necho "exit:$?"\n`;
+        script += `(\n${preset(from + k)}${exports}\n${look}set -e\n${substitute(step.run, state)}) >/dev/null 2>&1\necho "exit:$?"\n`;
       }
 
       const file = join(dir, "states.sh");
@@ -692,14 +708,24 @@ function exitCodes(step, states, env = { PATH: process.env.PATH }) {
       codes.push(...got);
     }
 
-    return codes;
+    const seen =
+      watch.length === 0
+        ? []
+        : readFileSync(seenFile, "utf8").split("\n").slice(0, -1);
+
+    return { codes, seen };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 }
 
+/** Each state's exit code. */
+const exitCodes = (step, states, env, preset) =>
+  runStates(step, states, { env, preset }).codes;
+
 const CI = readFileSync(CI_YML, "utf8");
 const STEP = parseGateStep(CI);
+const STEP_ENV = Object.keys(STEP.env);
 const NEEDS = parseNeeds(CI, GATE_JOB);
 
 /** Every context × two base states × every job in every result. */
@@ -764,25 +790,81 @@ test("the gate step is read in its one shape, and the table names every job it w
   );
 });
 
-test("the gate's verdict matches the table in every state", () => {
+/**
+ * What the variables the script reads and its step does not pass hold when it
+ * starts, one value per state in turn: nothing, the empty string, or a literal
+ * the script compares with. On GitHub such a name may be set already — the
+ * runner's `CI`, the workflow's `env:` — and a script that read one before
+ * setting it would take that value. One value per state is a sample: a branch
+ * that only a few states reach may never meet the value that flips it, and
+ * the closed reading, not the presets, holds such a branch.
+ */
+function presets() {
+  const { reads, literals } = readGateScript(STEP.run, STEP_ENV);
+  const names = [...reads].filter((name) => !STEP_ENV.includes(name));
+  const values = [undefined, ...new Set(["", ...literals])];
+  const preset = (i) => {
+    const value = values[i % values.length];
+    return value === undefined
+      ? ""
+      : names.map((name) => `export ${name}=${quote(value)}\n`).join("");
+  };
+
+  return { names, values, preset };
+}
+
+test("the gate's verdict matches the table in every state, its own variables preset in turn to the values it compares with", () => {
   const all = states();
-  const codes = exitCodes(STEP, all);
+  const { names, values, preset } = presets();
+  const { codes, seen } = runStates(STEP, all, { preset, watch: names });
   const wrong = all
-    .map((state, i) => ({ state, code: codes[i], want: expected(state) }))
+    .map((state, i) => ({ state, i, code: codes[i], want: expected(state) }))
     .filter(({ code, want }) => (code === 0) !== want);
+  const started = all.map((_, i) =>
+    names.map(() => values[i % values.length] ?? "<unset>").join("|"),
+  );
 
   assert.ok(all.length > 2000, `only ${all.length} states enumerated`);
+  assert.ok(names.includes("PATH_OK"), "the reader did not see PATH_OK read");
+  assert.ok(values.length > 2, "the reader kept no literal to preset");
+  assert.equal(
+    started.filter((line, i) => seen[i] !== line).length,
+    0,
+    "states whose script did not start with its turn of the presets",
+  );
   assert.deepEqual(
-    wrong.slice(0, 3).map(({ state, code, want }) => ({
+    wrong.slice(0, 3).map(({ state, i, code, want }) => ({
       context: state.context,
       notSuccess: Object.fromEntries(
         Object.entries(state.results).filter(([, r]) => r !== "success"),
       ),
+      preset: values[i % values.length] ?? "nothing",
       exit: code,
       wantPass: want,
     })),
     [],
     `${wrong.length} state(s) where the gate disagrees with the table`,
+  );
+});
+
+test("a preset reaches the script: a branch on a variable it never sets moves the verdict", () => {
+  const probe = {
+    ...STEP,
+    run: after('if [[ "$CI" == "true" ]]; then exit 0; fi'),
+  };
+  const state = {
+    context: { shouldRun: "true", mode: "leaf", dependabot: false },
+    results: {
+      ...Object.fromEntries(NEEDS.map((job) => [job, "success"])),
+      "pipeline-leaf": "skipped",
+    },
+  };
+
+  assert.equal(expected(state), false);
+  assert.deepEqual(exitCodes(probe, [state]), [1]);
+  assert.deepEqual(
+    exitCodes(probe, [state], undefined, () => `export CI=${quote("true")}\n`),
+    [0],
   );
 });
 
@@ -1001,13 +1083,13 @@ test("an expression the harness does not know is refused, not guessed", () => {
 // sees what the harness passes; on GitHub the script sees more — the runner's
 // variables, the workflow's `env:`, the event file — and a branch on any of
 // them would pass every state. So it reads its step's `env:` and its own
-// variables, calls echo, exit, its functions and the aggregate's jq, and
-// every other form is refused by name.
+// variables, each first set at its top level and none of bash's own; it calls
+// echo, exit, the aggregate's jq and its functions, each defined at its top
+// level under a name no bash builtin takes; every other form is refused by
+// name.
 // --------------------------------------------------------------------------
 
-const STEP_ENV = Object.keys(STEP.env);
-
-test("the gate's script reads only what its step passes and what it sets, and calls only its closed list", () => {
+test("the gate's script reads only what its step passes and what it first sets at its top level, and calls only its closed list", () => {
   const { reads, calls } = readGateScript(STEP.run, STEP_ENV);
 
   assert.deepEqual(
@@ -1147,6 +1229,96 @@ const OUTSIDE_THE_LIST = {
     after('echo "$LATER"\nLATER="x"'),
     /reads \$LATER, which neither its step passes nor it sets/,
   ],
+  "a variable first set in a function it never calls": [
+    after(
+      'ci_default() { CI="false"; }\nif [[ "$CI" == "true" ]]; then exit 0; fi',
+    ),
+    /sets CI first inside a function, not at its top level/,
+  ],
+  "a variable first set in an if without an else": [
+    after(
+      'if [[ "$NEEDS" == "x" ]]; then CI="false"; fi\nif [[ "$CI" == "true" ]]; then exit 0; fi',
+    ),
+    /sets CI first inside an if, not at its top level/,
+  ],
+  "a variable first set in an else": [
+    after(
+      'if [[ "$NEEDS" == "x" ]]; then exit 1; else CI="false"; fi\nif [[ "$CI" == "true" ]]; then exit 0; fi',
+    ),
+    /sets CI first inside an if, not at its top level/,
+  ],
+  "a variable first set in an if's condition": [
+    after(
+      'if CI="false"; then echo "x"; fi\nif [[ "$CI" == "true" ]]; then exit 0; fi',
+    ),
+    /sets CI first inside an if, not at its top level/,
+  ],
+  "a variable first set in a case branch": [
+    after(
+      'case "$NEEDS" in\n  x) CI="false" ;;\nesac\nif [[ "$CI" == "true" ]]; then exit 0; fi',
+    ),
+    /sets CI first inside a case branch, not at its top level/,
+  ],
+  "a variable first set after &&": [
+    after(
+      '[[ "$NEEDS" == "x" ]] && CI="false"\nif [[ "$CI" == "true" ]]; then exit 0; fi',
+    ),
+    /sets CI first inside an && or \|\| arm, not at its top level/,
+  ],
+  "a variable first set after ||": [
+    after(
+      '[[ "$NEEDS" != "x" ]] || CI="false"\nif [[ "$CI" == "true" ]]; then exit 0; fi',
+    ),
+    /sets CI first inside an && or \|\| arm, not at its top level/,
+  ],
+  "a variable first set in a { } group": [
+    after('{ CI="false"; }\nif [[ "$CI" == "true" ]]; then exit 0; fi'),
+    /sets CI first inside a \{ \} group, not at its top level/,
+  ],
+  "a function defined in a branch that may not run": [
+    after(
+      'if [[ "$DEPENDABOT_PR" == "never" ]]; then printenv() { exit 1; }; fi\nif printenv "CI"; then exit 0; fi',
+    ),
+    /defines printenv inside an if, not at its top level/,
+  ],
+  "a function defined after &&": [
+    after(
+      '[[ "$DEPENDABOT_PR" == "never" ]] && printenv() { exit 1; }\nif printenv "CI"; then exit 0; fi',
+    ),
+    /defines printenv inside an && or \|\| arm, not at its top level/,
+  ],
+  "a function named after a builtin, which posix mode runs in its place": [
+    after(
+      'eval() { exit 1; }\nPOSIXLY_CORRECT="y"\nif eval "printenv CI"; then exit 0; fi',
+    ),
+    /defines a function named eval/,
+  ],
+  "the function bash calls in place of a command it does not find": [
+    after("command_not_found_handle() { exit 0; }"),
+    /defines a function named command_not_found_handle/,
+  ],
+  "a line end inside $( ), where bash ends the command": [
+    after(`X=$(jq\n'type' <<<"$NEEDS")`),
+    /ends a line inside \$\( \)/,
+  ],
+  "a ; that opens a list": [
+    after('if [[ -n "$NEEDS" ]]; then ; exit 0; fi'),
+    /has ";" where a command belongs/,
+  ],
+  "a variable bash sets itself": [
+    after('LINENO="0"\nif [[ "$LINENO" == "40" ]]; then exit 0; fi'),
+    /sets LINENO, which bash sets itself/,
+  ],
+  "the last argument, _": [
+    after('_="x"\nif [[ "$_" == "x" ]]; then exit 0; fi'),
+    /sets _, which bash sets itself/,
+  ],
+  "a variable whose name starts with BASH": [
+    after(
+      'BASH_MONOSECONDS="0"\nif [[ "$BASH_MONOSECONDS" == "0" ]]; then exit 0; fi',
+    ),
+    /sets BASH_MONOSECONDS, which bash sets itself/,
+  ],
   "$1 outside a function": [after('echo "$1"'), /reads \$1 outside a function/],
   "exit with a variable": [
     after('exit "$NOT_PASSED"'),
@@ -1197,7 +1369,18 @@ for (const [name, [script, refusal]] of Object.entries(OUTSIDE_THE_LIST)) {
   });
 }
 
-test("the closed reading is a rule of forms: blocks swapped, or a new job in today's shapes, still read", () => {
+test("the gate's script is read closed: a variable bash sets itself is refused even when its step passes it", () => {
+  assert.throws(
+    () =>
+      readGateScript(after('if [[ "$SECONDS" == "0" ]]; then exit 0; fi'), [
+        ...STEP_ENV,
+        "SECONDS",
+      ]),
+    /reads \$SECONDS, which bash sets itself/,
+  );
+});
+
+test("the closed reading is a rule of forms: blocks swapped, a new job in today's shapes, or a variable set again in a branch, still read", () => {
   const prose = STEP.run.slice(
     STEP.run.indexOf("# prose-lint runs on every PR"),
     STEP.run.indexOf("# repo-lints runs on every PR"),
@@ -1214,12 +1397,50 @@ test("the closed reading is a rule of forms: blocks swapped, or a new job in tod
     lastResult,
     'NEW_JOB="${{ needs.new-job.result }}"',
   ).replace(lastOk, () => 'ok "$CROSS_ROUTER_LINT" && ok "$NEW_JOB"; then');
+  const setAgain = after(
+    'X="a"\nif [[ "$NEEDS" == "x" ]]; then X="b"; fi\n[[ "$NEEDS" == "y" ]] && X="c"\nf() { X="d"; }\nf\necho "$X"',
+  );
+  const passedSetAgain = after(
+    'if [[ "$NEEDS" == "x" ]]; then DEPENDABOT_PR="false"; fi',
+  );
 
   for (const [label, script] of [
     ["blocks swapped", swapped],
     ["a new job", newJob],
+    ["a variable set again in a branch, an arm and a function", setAgain],
+    ["a variable its step passes, set in a branch", passedSetAgain],
   ]) {
     assert.notEqual(script, STEP.run, label);
     assert.doesNotThrow(() => readGateScript(script, STEP_ENV), label);
   }
+});
+
+test("the reader keeps the literals the script compares with: in [[ ]], as a case pattern and as a function's argument", () => {
+  const { literals } = readGateScript(
+    after(
+      'is() { [[ "$1" == "$2" ]]; }\nif is "$NEEDS" "pull_request"; then exit 0; fi',
+    ),
+    STEP_ENV,
+  );
+
+  for (const literal of ["success", "leaf", "pull_request"]) {
+    assert.ok(literals.has(literal), literal);
+  }
+});
+
+test("each variable the script reads and sets reads back what it set in this bash, as LINENO does not", () => {
+  const { reads } = readGateScript(STEP.run, STEP_ENV);
+  const own = [...reads].filter((name) => !STEP_ENV.includes(name));
+  const readBack = (name) =>
+    spawnSync(BASH, ["-c", `${name}="gate-sentinel"; printf '%s' "$${name}"`], {
+      encoding: "utf8",
+      env: { PATH: process.env.PATH },
+    }).stdout;
+
+  assert.ok(own.includes("PATH_OK"), "the reader did not see PATH_OK read");
+  assert.deepEqual(
+    own.filter((name) => readBack(name) !== "gate-sentinel"),
+    [],
+  );
+  assert.notEqual(readBack("LINENO"), "gate-sentinel");
 });

@@ -9,13 +9,25 @@
 // the script is read as a closed list of the forms it uses, and any other form
 // throws, naming it:
 //
-//   - it reads the variables its step passes and its own, each set before its
-//     first read, and `$1`–`$9` inside a function it defines; every expansion
-//     sits in double quotes;
+//   - it reads the variables its step passes and its own, and `$1`–`$9` inside
+//     a function it defines; every expansion of a variable sits in double
+//     quotes;
+//   - it sets a variable of its own first at its top level, as the first
+//     command of its `&&`/`||` list and before any read of it — not inside an
+//     `if`, a `case` branch, a `{ }` group or a function, nor in a later arm —
+//     so every path that reads the variable has set it; a variable its step
+//     passes is set already;
+//   - it neither reads nor sets a variable bash sets itself (`BASH_SETS`, and
+//     any name that starts with `BASH`): a read of one need not return what
+//     the script or its step set;
 //   - it calls `echo`, `exit` with a number, its own functions, and `jq` in
-//     one form, the value of an assignment: `$(jq [-r] [--slurp] '<program>'
-//     <<<"$<a variable its step passes>")`, the program's words from
-//     `JQ_WORDS`;
+//     one form, the value of an assignment on one line: `$(jq [-r] [--slurp]
+//     '<program>' <<<"$<a variable its step passes>")`, the program's words
+//     from `JQ_WORDS`;
+//   - it defines a function at its top level, like a variable's first
+//     assignment, under a name no bash builtin takes (`BUILTINS`) and not the
+//     one bash calls by itself, so a call of one runs the script's function
+//     and nothing else;
 //   - it names no variable of its own `PATH` or `HOME`: the first decides
 //     which `jq` runs, the second which `$HOME/.jq` it sources.
 //
@@ -54,6 +66,127 @@ const RESERVED = new Set([
 
 /** A variable of the script's own may not take these names. */
 const STEERING = new Set(["PATH", "HOME"]);
+
+/**
+ * The variables bash sets itself whose names do not start with `BASH`, as
+ * `compgen -v` lists them in bash 5.2 and 3.2 started in an empty environment:
+ * at the top level, inside a function, and after `[[ =~ ]]`, `read` and
+ * `getopts`. A read of one need not return what was set: `LINENO` gives the
+ * line, `SECONDS` the time, `_` the last argument.
+ */
+const BASH_SETS = new Set([
+  "COMP_WORDBREAKS",
+  "DIRSTACK",
+  "EPOCHREALTIME",
+  "EPOCHSECONDS",
+  "EUID",
+  "FUNCNAME",
+  "GROUPS",
+  "HISTCMD",
+  "HOSTNAME",
+  "HOSTTYPE",
+  "IFS",
+  "LINENO",
+  "MACHTYPE",
+  "OPTARG",
+  "OPTERR",
+  "OPTIND",
+  "OSTYPE",
+  "PATH",
+  "PIPESTATUS",
+  "PPID",
+  "PS4",
+  "PWD",
+  "RANDOM",
+  "REPLY",
+  "SECONDS",
+  "SHELL",
+  "SHELLOPTS",
+  "SHLVL",
+  "SRANDOM",
+  "TERM",
+  "UID",
+  "_",
+]);
+
+/** Whether bash sets a variable of this name itself. */
+const bashSets = (name) => BASH_SETS.has(name) || name.startsWith("BASH");
+
+/**
+ * The function bash calls by itself: from bash 4, a command that is not found
+ * runs it in its place.
+ */
+const CALLED_BY_BASH = "command_not_found_handle";
+
+/**
+ * The builtins of bash 5.2 and 3.2, as `compgen -b` lists them. A function of
+ * the script's own takes none of these names: in posix mode, which setting
+ * `POSIXLY_CORRECT` turns on, a special builtin runs in place of a function
+ * of its name.
+ */
+const BUILTINS = new Set([
+  ".",
+  ":",
+  "[",
+  "alias",
+  "bg",
+  "bind",
+  "break",
+  "builtin",
+  "caller",
+  "cd",
+  "command",
+  "compgen",
+  "complete",
+  "compopt",
+  "continue",
+  "declare",
+  "dirs",
+  "disown",
+  "echo",
+  "enable",
+  "eval",
+  "exec",
+  "exit",
+  "export",
+  "false",
+  "fc",
+  "fg",
+  "getopts",
+  "hash",
+  "help",
+  "history",
+  "jobs",
+  "kill",
+  "let",
+  "local",
+  "logout",
+  "mapfile",
+  "popd",
+  "printf",
+  "pushd",
+  "pwd",
+  "read",
+  "readarray",
+  "readonly",
+  "return",
+  "set",
+  "shift",
+  "shopt",
+  "source",
+  "suspend",
+  "test",
+  "times",
+  "trap",
+  "true",
+  "type",
+  "typeset",
+  "ulimit",
+  "umask",
+  "unalias",
+  "unset",
+  "wait",
+]);
 
 /** The words of the `jq` program, field names aside. */
 const JQ_WORDS = new Set([
@@ -332,12 +465,13 @@ function readJqProgram(program) {
 }
 
 /**
- * What the gate's script reads and calls. A form outside the closed list
- * throws an error that names it.
+ * What the gate's script reads and calls, and the literals it compares with
+ * in `[[ ]]` and `case`. A form outside the closed list throws an error that
+ * names it.
  *
  * @param {string} run the step's `run:`
  * @param {Iterable<string>} stepEnv the names its `env:` binds
- * @returns {{ reads: Set<string>, calls: Set<string> }}
+ * @returns {{ reads: Set<string>, calls: Set<string>, literals: Set<string> }}
  */
 export function readGateScript(run, stepEnv) {
   if (REFUSED_CHARACTERS.test(run)) {
@@ -349,9 +483,19 @@ export function readGateScript(run, stepEnv) {
   const functions = new Set();
   const reads = new Set();
   const calls = new Set();
+  const literals = new Set();
+  /** What a command stands inside, the innermost last; empty at the top level. */
+  const within = [];
   const { tokens } = lex(run);
   let at = 0;
   let inFunction = false;
+
+  /** Reads `read` inside `place`. */
+  const inside = (place, read) => {
+    within.push(place);
+    read();
+    within.pop();
+  };
 
   const peek = () => tokens[at];
   const next = () => tokens[at++];
@@ -370,6 +514,9 @@ export function readGateScript(run, stepEnv) {
     if (part.type === "positional") {
       if (!inFunction) refuse(`reads $${part.name} outside a function`);
     } else if (part.type === "read") {
+      if (bashSets(part.name)) {
+        refuse(`reads $${part.name}, which bash sets itself`);
+      }
       if (!passed.has(part.name) && !assigned.has(part.name)) {
         refuse(
           `reads $${part.name}, which neither its step passes nor it sets`,
@@ -393,7 +540,11 @@ export function readGateScript(run, stepEnv) {
   };
 
   const jqCall = (subst) => {
-    const inner = subst.tokens.filter((token) => token.type !== "newline");
+    // bash ends a command at a line end inside `$( )`.
+    if (subst.tokens.some((token) => token.type === "newline")) {
+      refuse("ends a line inside $( )");
+    }
+    const inner = subst.tokens;
     if (plain(inner[0]) !== "jq") {
       refuse(`substitutes ${describe(inner[0])}, not jq`);
     }
@@ -439,6 +590,7 @@ export function readGateScript(run, stepEnv) {
     if (STEERING.has(name)) {
       refuse(`sets ${name}, which decides what jq runs or loads`);
     }
+    if (bashSets(name)) refuse(`sets ${name}, which bash sets itself`);
     if (rest !== "") {
       if (!/^[0-9]+$/.test(rest) || value.length > 0) {
         refuse(`sets ${name} to a form it does not use`);
@@ -450,8 +602,37 @@ export function readGateScript(run, stepEnv) {
     } else {
       refuse(`sets ${name} to a form it does not use`);
     }
+    if (!assigned.has(name) && !passed.has(name) && within.length > 0) {
+      refuse(
+        `sets ${name} first inside ${within.at(-1)}, not at its top level`,
+      );
+    }
     assigned.add(name);
     return true;
+  };
+
+  /** Keeps a word that expands nothing among the literals. */
+  const keepLiteral = (token) => {
+    const text = [];
+    for (const segment of token.segments) {
+      if (segment.type === "word") {
+        text.push(segment.value);
+      } else if (
+        segment.type === "dq" &&
+        segment.parts.every((part) => part.type === "text")
+      ) {
+        text.push(segment.parts.map((part) => part.value).join(""));
+      } else {
+        return;
+      }
+    }
+    literals.add(text.join(""));
+  };
+
+  /** A double-quoted operand of `[[ ]]`; a literal one is kept. */
+  const operand = (token) => {
+    quoted(token, "operand");
+    keepLiteral(token);
   };
 
   const test = () => {
@@ -461,14 +642,14 @@ export function readGateScript(run, stepEnv) {
       if (word === "-n" || word === "-z") {
         quoted(next(), "operand");
       } else {
-        quoted(token, "operand");
+        operand(token);
         const op = plain(next());
         if (op !== "==" && op !== "!=") {
           refuse(
             `compares with ${op ?? "a form"} it does not use inside [[ ]]`,
           );
         }
-        quoted(next(), "operand");
+        operand(next());
       }
       const after = peek();
       if (plain(after) === "]]") {
@@ -493,15 +674,17 @@ export function readGateScript(run, stepEnv) {
     }
     if (word === "if") {
       at++;
-      list(["then"]);
-      expect("then");
-      list(["else", "elif", "fi"]);
-      if (plain(peek()) === "elif") refuse("uses elif");
-      if (plain(peek()) === "else") {
-        at++;
-        list(["fi"]);
-      }
-      expect("fi");
+      inside("an if", () => {
+        list(["then"]);
+        expect("then");
+        list(["else", "elif", "fi"]);
+        if (plain(peek()) === "elif") refuse("uses elif");
+        if (plain(peek()) === "else") {
+          at++;
+          list(["fi"]);
+        }
+        expect("fi");
+      });
       return;
     }
     if (word === "case") {
@@ -514,8 +697,9 @@ export function readGateScript(run, stepEnv) {
         if (!/^(?:[a-z][a-z_-]*|\*)$/.test(plain(pattern) ?? "")) {
           refuse(`has a case pattern it does not use: ${describe(pattern)}`);
         }
+        if (plain(pattern) !== "*") literals.add(plain(pattern));
         if (!isOp(next(), ")")) refuse("has a case pattern without its )");
-        list([], [";;"], true);
+        inside("a case branch", () => list([], [";;"], true));
         if (!isOp(next(), ";;")) refuse("ends a case branch without ;;");
         skipLineEnds();
       }
@@ -524,7 +708,7 @@ export function readGateScript(run, stepEnv) {
     }
     if (word === "{") {
       at++;
-      list(["}"]);
+      inside("a { } group", () => list(["}"]));
       expect("}");
       return;
     }
@@ -532,12 +716,17 @@ export function readGateScript(run, stepEnv) {
       if (
         RESERVED.has(word) ||
         CALLS.has(word) ||
+        BUILTINS.has(word) ||
         word === "jq" ||
+        word === CALLED_BY_BASH ||
         functions.has(word)
       ) {
         refuse(`defines a function named ${word}`);
       }
       if (inFunction) refuse("defines a function inside a function");
+      if (within.length > 0) {
+        refuse(`defines ${word} inside ${within.at(-1)}, not at its top level`);
+      }
       at++;
       if (!isOp(next(), "(") || !isOp(next(), ")")) {
         refuse(`defines ${word} in a form it does not use`);
@@ -546,7 +735,7 @@ export function readGateScript(run, stepEnv) {
       functions.add(word);
       inFunction = true;
       at++;
-      list(["}"]);
+      inside("a function", () => list(["}"]));
       expect("}");
       inFunction = false;
       return;
@@ -584,6 +773,8 @@ export function readGateScript(run, stepEnv) {
           refuse(`passes ${word} ${describe(argument)}`);
         }
       }
+      // A function's arguments are what its `[[ ]]` compares `$1`–`$9` with.
+      if (functions.has(word)) keepLiteral(argument);
     }
     calls.add(word);
   };
@@ -593,21 +784,21 @@ export function readGateScript(run, stepEnv) {
     while (isOp(peek(), "&&") || isOp(peek(), "||")) {
       at++;
       skipLineEnds();
-      command();
+      inside("an && or || arm", command);
     }
   };
 
   /**
    * Commands up to a word of `stopWords`, an operator of `stopOps` or the end.
    * As bash reads it, a reserved word ends the list only after `;` or a line
-   * end, and the list holds a command unless `empty` allows none — a case
-   * branch may be empty, a body may not.
+   * end, a `;` stands only after a command, and the list holds a command
+   * unless `empty` allows none — a case branch may be empty, a body may not.
    */
   function list(stopWords, stopOps = [], empty = false) {
     let commands = 0;
 
     for (;;) {
-      while (peek()?.type === "newline" || isOp(peek(), ";")) at++;
+      skipLineEnds();
       const token = peek();
       if (
         token === undefined ||
@@ -622,9 +813,11 @@ export function readGateScript(run, stepEnv) {
       andOr();
       commands++;
       const after = peek();
-      if (after === undefined || after.type === "newline" || isOp(after, ";")) {
+      if (isOp(after, ";")) {
+        at++;
         continue;
       }
+      if (after === undefined || after.type === "newline") continue;
       if (after.type === "op" && stopOps.includes(after.value)) return;
       refuse(`has ${describe(after)} after a command without ; or a line end`);
     }
@@ -633,5 +826,5 @@ export function readGateScript(run, stepEnv) {
   list([]);
   if (at !== tokens.length) refuse(`has ${describe(peek())} it does not read`);
 
-  return { reads, calls };
+  return { reads, calls, literals };
 }
