@@ -21,6 +21,7 @@
 
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   chmodSync,
   copyFileSync,
@@ -42,6 +43,7 @@ import {
   topLevelKeysClosed,
   workflowEnvClosed,
 } from "../ci-gate.mjs";
+import { CLEAN_ENV } from "../check-id.mjs";
 import { CHECKS } from "../checks.mjs";
 import { readClosedYaml } from "../closed-yaml.mjs";
 import { localEnvVars } from "../git-env.mjs";
@@ -529,10 +531,13 @@ test("--context skips in CI the checks whose ciSkip names it, before looking for
 // whose `env:` is exactly the facts, each bound to its one expression, and
 // semgrep's pins, and whose script is exactly the call of `verify`. A variable
 // a shell or node reads at startup is not one of those names.
-// ⚠ What earlier steps of the job write to $GITHUB_ENV or $GITHUB_PATH is not
-// read: `.github/actions/setup`, the `pnpm/action-setup` it calls and
-// `astral-sh/setup-uv` write there. The step's own `env:` wins over
-// $GITHUB_ENV for the names it sets.
+// What earlier steps of the job write to $GITHUB_ENV reaches this step, whose
+// own `env:` wins only for the names it sets. The steps before the skip
+// machinery's, and those of `.github/actions/setup`, are held key for key
+// below, so the setup action's stamp is the one line of this repository that
+// writes there. ⚠ What the actions they call write — `actions/checkout`,
+// `pnpm/action-setup`, `actions/setup-node`, `astral-sh/setup-uv` — and what
+// `pnpm install` runs is not read.
 
 const CI = readFileSync(
   join(repoRoot, ".github", "workflows", "ci.yml"),
@@ -616,23 +621,271 @@ test("Repo Lints' step binds the facts and calls verify, and nothing else", () =
 });
 
 test("Repo Lints runs node:skip-facts in a step of its own before verify, and nothing in it can keep it from failing", () => {
-  // The step before `Run the checks`: its name and a plain one-line `run:`
-  // with the check's command, no other key. An `if:`, a
-  // `continue-on-error:` or an `env:` could keep its tests from failing the
-  // job.
+  // The step before `Run the checks`: its name, `shell: sh` and a plain
+  // one-line `run:` — the check's command behind `CLEAN_ENV` — and no other
+  // key. An `if:`, a `continue-on-error:` or an `env:` could keep its tests
+  // from failing the job; `sh` reads no BASH_ENV, and `CLEAN_ENV` hands node
+  // PATH and HOME alone, so what an earlier step writes to $GITHUB_ENV cannot.
   const steps = readClosedYaml(CI).getIn(["jobs", "repo-lints", "steps"], true);
   const step = steps.items.at(-2);
   const run = step.get("run", true);
 
   assert.deepEqual(
     step.items.map((pair) => String(pair.key.value)),
-    ["name", "run"],
+    ["name", "shell", "run"],
   );
   assert.equal(step.get("name"), "Hold the skip machinery");
+  assert.equal(step.get("shell"), "sh");
   assert.equal(run.type, "PLAIN");
   assert.equal(
     run.value,
-    CHECKS.find((check) => check.id === "node:skip-facts").run.join(" "),
+    CLEAN_ENV +
+      CHECKS.find((check) => check.id === "node:skip-facts").run.join(" "),
+  );
+});
+
+test("the step's command keeps a failing suite failing under an injected NODE_OPTIONS or BASH_ENV, where a bare node --test and bash would not", () => {
+  // What a step above, or the setup action, could write to $GITHUB_ENV: a
+  // NODE_OPTIONS that filters every test out, or a BASH_ENV that exits at
+  // once. A failing suite stands in for the step's own.
+  const dir = fresh("hold");
+  const suite = join(dir, "fails.test.mjs");
+  const payload = join(dir, "exit.sh");
+  writeFileSync(
+    suite,
+    'import { test } from "node:test";\ntest("fails", () => {\n  throw new Error("ran");\n});\n',
+  );
+  writeFileSync(payload, "exit 0\n");
+  const step = readClosedYaml(CI)
+    .getIn(["jobs", "repo-lints", "steps"], true)
+    .items.at(-2);
+  const command = String(step.get("run")).replace(
+    / node --test .*$/,
+    ` node --test ${suite}`,
+  );
+  // As the runner runs a step: its text in a file, `sh -e {0}`. Under `-c`,
+  // with stdin a socket and no SHLVL, bash takes itself for a shell rshd
+  // started and reads ~/.bashrc in place of BASH_ENV.
+  let scripts = 0;
+  const status = (shell, text) => {
+    const script = join(dir, `step-${++scripts}.sh`);
+    writeFileSync(script, `${text}\n`);
+    return spawnSync(shell, ["-e", script], {
+      env: {
+        PATH: process.env.PATH,
+        HOME: process.env.HOME,
+        NODE_OPTIONS: "--test-skip-pattern=.",
+        BASH_ENV: payload,
+      },
+      stdio: "ignore",
+    }).status;
+  };
+
+  assert.ok(command.startsWith(CLEAN_ENV), command);
+  assert.notEqual(status("sh", command), 0, "the step's command under sh");
+  assert.equal(
+    status("sh", `node --test ${suite}`),
+    0,
+    "control: a bare node --test, which NODE_OPTIONS filters",
+  );
+  assert.equal(
+    status("bash", command),
+    0,
+    "control: the same command under bash, which reads BASH_ENV",
+  );
+});
+
+/** The setup action every job of ci.yml calls. */
+const SETUP = readFileSync(
+  join(repoRoot, ".github", "actions", "setup", "action.yml"),
+  "utf8",
+);
+
+const sha256 = (text) => createHash("sha256").update(text).digest("hex");
+
+/**
+ * A step as the rule below holds it: each key, a `uses:` up to its `@` — so a
+ * new version of an action passes — the names of its `env:` and `with:`, and
+ * the sha256 of its `run:`; everything else by value.
+ */
+const stepShape = (step) =>
+  Object.fromEntries(
+    Object.entries(step).map(([key, value]) => {
+      if (key === "uses") return [key, String(value).split("@")[0]];
+      if (key === "env" || key === "with") return [key, Object.keys(value)];
+      if (key === "run") return [key, sha256(String(value))];
+      return [key, value];
+    }),
+  );
+
+/** The steps of Repo Lints before the skip machinery's, and of the setup action, as `stepShape` reads them. */
+function stepsBeforeHold(ci, setup) {
+  const steps = readClosedYaml(ci).toJS().jobs["repo-lints"].steps;
+  return {
+    job: steps.slice(0, -2).map(stepShape),
+    setup: readClosedYaml(setup).toJS().runs.steps.map(stepShape),
+  };
+}
+
+/**
+ * Every step that runs before the skip machinery's: none can write to
+ * $GITHUB_ENV or $GITHUB_PATH but the setup action's stamp, whose text the
+ * sha256 holds. A changed `run:` is a new hash here.
+ */
+const BEFORE_HOLD = {
+  job: [
+    {
+      name: "Checkout",
+      uses: "actions/checkout",
+      with: ["persist-credentials", "fetch-depth"],
+    },
+    { name: "Setup (pnpm + Node + install)", uses: "./.github/actions/setup" },
+    {
+      name: "Install osv-scanner",
+      env: ["OSV_SCANNER_VERSION", "OSV_SCANNER_SHA256"],
+      run: "101603b3224185249b70fac12c0e78763c0b9f066677f953d4f3c337949845c2",
+    },
+    {
+      name: "Install uv",
+      uses: "astral-sh/setup-uv",
+      with: ["version", "enable-cache"],
+    },
+  ],
+  setup: [
+    { name: "Install pnpm", uses: "pnpm/action-setup" },
+    {
+      name: "Setup Node.js",
+      uses: "actions/setup-node",
+      with: ["node-version-file", "cache"],
+    },
+    {
+      name: "Stamp CI identity for turbo telemetry",
+      shell: "bash",
+      run: "66d3697fafa80dbcf5b72cf19c473a10922073e9b7fc5c49672e8ed401f566e6",
+    },
+    {
+      name: "Install dependencies",
+      shell: "bash",
+      "working-directory": "${{ inputs.working-directory }}",
+      env: ["INSTALL_ARGS"],
+      run: "d9092cf7a4abd1a395409defb31f75067b34194b114c6fe4463df6f9b2cbe831",
+    },
+  ],
+};
+
+test("the steps before the skip machinery's, and the setup action's, are these, key for key: none writes to the environment it inherits but the stamp", () => {
+  assert.deepEqual(stepsBeforeHold(CI, SETUP), BEFORE_HOLD);
+});
+
+const HOLD_LINE = "      - name: Hold the skip machinery\n";
+const STAMP_END = '        } >> "$GITHUB_ENV"\n';
+const once = (text, anchor, replacement) => {
+  assert.equal(text.split(anchor).length, 2, `anchor: ${anchor}`);
+  return text.replace(anchor, () => replacement);
+};
+const EXPORT = 'echo "NODE_OPTIONS=--test-skip-pattern=." >> "$GITHUB_ENV"';
+
+for (const [name, ci, setup] of [
+  [
+    "a step above writing NODE_OPTIONS to $GITHUB_ENV",
+    once(
+      CI,
+      HOLD_LINE,
+      `      - name: Tune node\n        run: ${EXPORT}\n\n${HOLD_LINE}`,
+    ),
+    SETUP,
+  ],
+  [
+    "a step above exporting it through actions/github-script",
+    once(
+      CI,
+      HOLD_LINE,
+      `      - name: Tune node\n        uses: actions/github-script@v7\n        with:\n          script: core.exportVariable('NODE_OPTIONS', '--test-skip-pattern=.')\n\n${HOLD_LINE}`,
+    ),
+    SETUP,
+  ],
+  [
+    "the osv-scanner step writing it",
+    once(
+      CI,
+      "          osv-scanner --version\n",
+      `          osv-scanner --version\n          ${EXPORT}\n`,
+    ),
+    SETUP,
+  ],
+  [
+    "the setup action's stamp writing it",
+    CI,
+    once(
+      SETUP,
+      STAMP_END,
+      `          printf 'NODE_OPTIONS=--test-skip-pattern=.\\n'\n${STAMP_END}`,
+    ),
+  ],
+  [
+    "a step appended to the setup action writing it",
+    CI,
+    `${SETUP}\n    - name: Tune node\n      shell: bash\n      run: ${EXPORT}\n`,
+  ],
+]) {
+  test(`the steps before the skip machinery's are held: ${name} is refused`, () => {
+    assert.notDeepEqual(stepsBeforeHold(ci, setup), BEFORE_HOLD);
+  });
+}
+
+test("the steps before the skip machinery's are held up to each action's version", () => {
+  const bumped = (text) => text.replace(/(uses: [\w./-]+)@[\w.-]+/g, "$1@v99");
+
+  assert.notEqual(bumped(CI), CI);
+  assert.notEqual(bumped(SETUP), SETUP);
+  assert.deepEqual(stepsBeforeHold(bumped(CI), bumped(SETUP)), BEFORE_HOLD);
+});
+
+test("the setup action's stamp writes one variable to $GITHUB_ENV, whatever its matrix suffix holds", () => {
+  // The suffix comes from a job's env, a workflow's `TURBO_*` too: a line
+  // break in it would start a variable of its own, NODE_OPTIONS say.
+  const { run } = readClosedYaml(SETUP)
+    .toJS()
+    .runs.steps.find(
+      (step) => step.name === "Stamp CI identity for turbo telemetry",
+    );
+  const written = (text) => {
+    const dir = fresh("stamp");
+    const file = join(dir, "github-env");
+    const script = join(dir, "stamp.sh");
+    writeFileSync(file, "");
+    writeFileSync(script, text);
+    const stamp = spawnSync("bash", ["-e", script], {
+      env: {
+        PATH: process.env.PATH,
+        GITHUB_ENV: file,
+        GITHUB_JOB: "repo-lints",
+        GITHUB_EVENT_NAME: "pull_request",
+        GITHUB_ACTOR: "someone",
+        RUNNER_ENVIRONMENT: "github-hosted",
+        TURBO_TELEMETRY_JOB_SUFFIX: "x\nNODE_OPTIONS=--test-skip-pattern=.\nZ=",
+      },
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    assert.equal(stamp.status, 0, stamp.stderr);
+    return readFileSync(file, "utf8").split("\n").filter(Boolean);
+  };
+  const lines = written(run);
+
+  assert.equal(lines.length, 1, lines.join("\n"));
+  assert.match(
+    lines[0],
+    /^TURBO_EXPERIMENTAL_OTEL_RESOURCE=service\.name=turbo,/,
+  );
+  assert.ok(
+    written(
+      run.replace(
+        '"${suffix:+-${suffix}}"',
+        '"${TURBO_TELEMETRY_JOB_SUFFIX:+-${TURBO_TELEMETRY_JOB_SUFFIX}}"',
+      ),
+    ).length > 1,
+    "control: the suffix written as it comes adds variables",
   );
 });
 

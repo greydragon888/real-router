@@ -66,6 +66,8 @@ runs:
       # regression. It sits under `ci.*` because the collector turns only
       # `ci.*` and `process.runtime.version` into labels. The model is reduced
       # to `[A-Za-z0-9._-]`, since a comma or `=` in it would split the list.
+      # The matrix suffix is reduced the same way: it comes from a job's env,
+      # and a line break in it would start a variable of its own here.
       #
       # `ci.actor` tells a Dependabot run from a human one, which share the
       # `pr` series otherwise. It is the class of `GITHUB_ACTOR`, not the
@@ -75,6 +77,7 @@ runs:
       shell: bash
       run: |
         cpu="$(awk -F': *' '/^model name/ {print $2; exit}' /proc/cpuinfo 2>/dev/null | tr -c 'A-Za-z0-9._-' '_' | tr -s '_' | sed 's/^_//; s/_$//')"
+        suffix="$(printf '%s' "${TURBO_TELEMETRY_JOB_SUFFIX:-}" | tr -c 'A-Za-z0-9._-' '_')"
         case "${GITHUB_ACTOR:-}" in
           'dependabot[bot]') actor=dependabot ;;
           *'[bot]') actor=bot ;;
@@ -83,7 +86,7 @@ runs:
         esac
         {
           printf 'TURBO_EXPERIMENTAL_OTEL_RESOURCE=service.name=turbo,service.namespace=real-router'
-          printf ',ci.job=%s%s' "${GITHUB_JOB}" "${TURBO_TELEMETRY_JOB_SUFFIX:+-${TURBO_TELEMETRY_JOB_SUFFIX}}"
+          printf ',ci.job=%s%s' "${GITHUB_JOB}" "${suffix:+-${suffix}}"
           printf ',ci.event=%s' "${GITHUB_EVENT_NAME}"
           printf ',ci.actor=%s' "${actor}"
           printf ',ci.runner=%s' "${RUNNER_ENVIRONMENT:-unknown}"

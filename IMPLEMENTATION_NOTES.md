@@ -14138,6 +14138,8 @@ Three rounds of review of the fix found the same order of the text in two more p
 
 ## The tests of what decides the skips run outside verify (2026-10-07)
 
+> **Updated (2026-10-07).** The step runs its command under `sh`, behind `CLEAN_ENV` of `scripts/check-id.mjs`, and the steps before it are held key for key: what they write to `$GITHUB_ENV` cannot keep its tests from failing (the entry "What the steps before the skip machinery write to the environment does not reach it").
+
 **Problem.** `node:skip-facts` held the skip facts and the links from them to Repo Lints' contexts, but `verify` ran it, so `plan` decided whether it ran: a `plan` that skipped every check in CI skipped it with the rest. The audit of why the reconciliations of RFC-4 did not converge counted four returns of one class — a holder of this chain that what it held could skip.
 
 **Solution.**
@@ -14151,3 +14153,19 @@ Three rounds of review of the fix found the same order of the text in two more p
 - ⚠ Two links changed at once — the step removed and a fact bound to a constant, say — are not held in CI. The workflow comes from the pull request's own tree, so the pull request can rewrite it, the gate included.
 
 **Measured (2026-10-07).** Each mutant of the chain fails the step: `NO_SOURCE` and `PR_AUTHOR` bound to constants, `--context no-source` in the script, `Boolean(env.NO_SOURCE)` in `contextsOf`, a `plan` that skips every check with a `ciSkip`, and one that skips every check in CI. Each mutant of the step fails a test of a group that runs on that pull request: the step removed, `continue-on-error: true`, `if: false`, an `env:` with `NODE_OPTIONS`, a file dropped from the command, the step moved after `Run the checks`, and `ciBy` dropped from the registry.
+
+## What the steps before the skip machinery write to the environment does not reach it (2026-10-07)
+
+**Problem.** The step that runs `node:skip-facts` closed its own keys — an `if:`, a `continue-on-error:`, an `env:` — but inherited what the steps before it write to `$GITHUB_ENV`, and nothing read those steps. One added line, a step above or a `printf` in the setup action's stamp writing `NODE_OPTIONS=--test-skip-pattern=.`, passed actionlint, zizmor and every test of `scripts/tests`, and in CI the step would have run its 61 tests as 3 file entries and exited 0. So would every `node --test` of both groups, the guards' 486 tests as 28 entries, on every pull request after the merge. The stamp also wrote the matrix suffix as it came, so a line break in a `TURBO_*` value of a job's or the workflow's `env:` could start a variable of its own there.
+
+**Solution.**
+
+- The step runs its command under `sh`, which reads no `BASH_ENV`, behind `CLEAN_ENV` — `/usr/bin/env -i PATH="$PATH" HOME="$HOME"` — so node starts with nothing an earlier step exported. `scripts/check-id.mjs` owns the prefix; the registry's census reads a line behind it as the command after it, and no other form of `env`.
+- `verify.test.mjs` holds the steps before it, and the setup action's, key for key: a `uses:` up to its `@`, the names of an `env:` or a `with:`, the sha256 of a `run:`. The stamp is the one line of the repository that writes to the environment those steps hand on, and it reduces the matrix suffix to `[A-Za-z0-9._-]`, as it does the CPU model.
+- A step above writing `NODE_OPTIONS`, exporting it through `actions/github-script`, or the osv-scanner step writing it, is refused; so are the stamp writing it and a step appended to the setup action. The step's command, run as the runner runs it, keeps a failing suite failing under an injected `NODE_OPTIONS` and `BASH_ENV`, where a bare `node --test` and `bash` do not, and the stamp writes one variable whatever its suffix holds.
+
+**Why.** The holder of the skip machinery is the one place no context and no `plan` can skip, and an environment that filters its tests out switches it off all the same. The steps that hand it that environment are this repository's text, so they can be held.
+
+- ⚠ What the actions those steps call write — `actions/checkout`, `pnpm/action-setup`, `actions/setup-node`, `astral-sh/setup-uv` — and what `pnpm install` runs is not read. Nor is a `$GITHUB_PATH` entry they add: a program named `node` first on `PATH` would run in node's place.
+
+**Measured (2026-10-07).** Under `NODE_OPTIONS=--test-skip-pattern=.` node 24.18.1 runs `diff-carries-no-code.test.mjs` as 1 entry instead of 8 and exits 0. With the fix, the step's command under that `NODE_OPTIONS` and a `BASH_ENV` that exits at once runs 70 tests, and each of the injections above fails it. Without `shell: sh`, without the prefix, with the suffix written as it comes, with the census reading the prefixed line as it stands, or with `checkId` keeping the prefix, a cell fails. dash in `ubuntu:24.04` reads no `BASH_ENV`; bash does. Under `-c`, with stdin a socket and no `SHLVL`, bash 3.2 takes itself for a shell rshd started and reads `~/.bashrc` in place of `BASH_ENV`, so the cells run the script from a file, as the runner does.

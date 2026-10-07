@@ -34,7 +34,7 @@ import { fileURLToPath } from "node:url";
 
 import { isMap, isScalar, isSeq } from "yaml";
 
-import { checkId } from "../check-id.mjs";
+import { CLEAN_ENV, checkId, withoutCleanEnv } from "../check-id.mjs";
 import { readClosedYaml } from "../closed-yaml.mjs";
 import { CHECKS } from "../checks.mjs";
 import { gatedJobs, parseJobs } from "../ci-gate.mjs";
@@ -295,7 +295,9 @@ function workflowLines(file, yaml) {
   for (const [job, runs] of jobScripts(yaml)) {
     const place = `${file}#${job}`;
     for (const line of runs.flatMap(commandLines)) {
-      const form = FORMS.find(([, shape]) => shape.test(line))?.[0];
+      const form = FORMS.find(([, shape]) =>
+        shape.test(withoutCleanEnv(line)),
+      )?.[0];
       if (form) {
         found.push({ place, form, command: commandOf(line) });
         continue;
@@ -520,7 +522,7 @@ function findSurfaceViolations(text) {
       .filter((line) => VERIFY.test(line))
       .map((line) => VERIFY.exec(line)[1]),
     others: lines.filter(
-      (line) => !VERIFY.test(line) && RUNS_A_CHECK.test(line),
+      (line) => !VERIFY.test(line) && RUNS_A_CHECK.test(withoutCleanEnv(line)),
     ),
   };
 }
@@ -1217,6 +1219,26 @@ test("node:skip-facts runs in a step of Repo Lints of its own, outside verify", 
   assert.deepEqual(holder.ciBy, [CHECKS_JOB], "Repo Lints runs it");
 });
 
+test("a line behind CLEAN_ENV is read as the command after it, and no other form of env is", () => {
+  const suite = "node --test scripts/tests/x.test.mjs";
+  const lines = (run) =>
+    workflowLines("ci.yml", `jobs:\n  a:\n    steps:\n      - run: ${run}\n`);
+
+  assert.equal(checkId(CLEAN_ENV + suite), suite);
+  assert.deepEqual(
+    lines(CLEAN_ENV + suite).map((line) => line.form),
+    ["suite"],
+  );
+  for (const other of [
+    `/usr/bin/env -i PATH="$PATH" ${suite}`,
+    `env -i PATH="$PATH" HOME="$HOME" ${suite}`,
+    `/usr/bin/env -i PATH="$PATH" HOME="$HOME" NODE_OPTIONS= ${suite}`,
+  ]) {
+    assert.equal(checkId(other), undefined, other);
+    assert.deepEqual(lines(other), [], other);
+  }
+});
+
 test("the hooks and Repo Lints call verify with their stage, and run no check of their own but node:skip-facts", () => {
   for (const hook of ["pre-commit", "pre-push"]) {
     assert.deepEqual(
@@ -1232,11 +1254,12 @@ test("the hooks and Repo Lints call verify with their stage, and run no check of
       jobScript(workflowFiles["ci.yml"], CHECKS_JOB.split("#")[1]),
     ),
     // The one other line: the tests of what `verify` skips by, which `verify`
-    // cannot run without deciding whether they run.
+    // cannot run without deciding whether they run, behind `CLEAN_ENV`.
     {
       stages: ["ci"],
       others: [
-        CHECKS.find((check) => check.id === "node:skip-facts").run.join(" "),
+        CLEAN_ENV +
+          CHECKS.find((check) => check.id === "node:skip-facts").run.join(" "),
       ],
     },
     CHECKS_JOB,

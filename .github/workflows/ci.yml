@@ -798,9 +798,13 @@ jobs:
       # `no_source` predicate, and the next step's bindings, contexts and plan —
       # run here, outside verify, so no context and no plan can skip them. They
       # are `node:skip-facts` of `scripts/checks.mjs`; the registry's tests hold
-      # this step to that command, and `verify.test.mjs` to its shape.
+      # this step to that command, and `verify.test.mjs` to its shape. `sh`
+      # reads no BASH_ENV, and node gets PATH and HOME alone, so nothing the
+      # steps above write to $GITHUB_ENV — a NODE_OPTIONS that filters the tests
+      # out — reaches them; `verify.test.mjs` holds those steps key for key.
       - name: Hold the skip machinery
-        run: node --test scripts/tests/diff-carries-no-code.test.mjs scripts/tests/diff-carries-no-source.test.mjs scripts/tests/verify.test.mjs
+        shell: sh
+        run: /usr/bin/env -i PATH="$PATH" HOME="$HOME" node --test scripts/tests/diff-carries-no-code.test.mjs scripts/tests/diff-carries-no-source.test.mjs scripts/tests/verify.test.mjs
 
       # Every check of the ci stage of `scripts/checks.mjs`, in its order, each
       # in a ::group:: and a row of the step summary. The step passes the facts

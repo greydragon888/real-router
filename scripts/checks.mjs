@@ -147,7 +147,9 @@ export const CHECKS = [
     // `verify.test.mjs`, Repo Lints' bindings of the facts, its script,
     // `contextsOf` and `plan`. Repo Lints runs them in a step of its own,
     // outside `verify`, so no context, no `ciSkip` and no `plan` can skip
-    // them; both groups above skip on contexts these tests hold.
+    // them; both groups above skip on contexts these tests hold. The step runs
+    // this command under `sh`, behind `CLEAN_ENV` of `scripts/check-id.mjs`:
+    // what an earlier step writes to $GITHUB_ENV does not reach it.
     id: "node:skip-facts",
     run: [
       "node",
