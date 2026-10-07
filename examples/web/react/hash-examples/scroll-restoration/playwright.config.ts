@@ -10,6 +10,9 @@ export default defineConfig({
   },
   use: {
     baseURL: "http://localhost:4243",
+    // The log shows only the final scroll position; a failure that reaches
+    // its retry brings the trace of the run into the artifact.
+    trace: "on-first-retry",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 });
