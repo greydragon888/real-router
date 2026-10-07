@@ -95,13 +95,8 @@ export function coverageArrayEntries(configText, prop) {
 
 /**
  * The string literals that are ELEMENTS of an array body, ignoring any nested
- * inside a call.
- *
- * ⚠ Not cosmetic. The owner configs spell their exclusion as
- * `[...base.filter((p) => p !== "**\/index.ts"), "packages/**\/index.ts"]`, so a
- * flat literal-scan reports the filtered-OUT pattern as if it were still an
- * entry — measured, it returned both and made a guard assert the opposite of
- * the truth.
+ * inside a call: of `[...base.filter((p) => p !== "a"), "b"]` the entry is
+ * `"b"` alone, where a flat literal scan reports the filtered-out `"a"` too.
  */
 function arrayElementLiterals(body) {
   let depth = 0;

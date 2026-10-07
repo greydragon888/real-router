@@ -32,7 +32,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, matchesGlob } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -43,6 +43,7 @@ import {
   declaresSharedOwner,
   stripComments,
 } from "../coverage-owner.mjs";
+import { isPhantom } from "../repo-model.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const read = (p) => readFileSync(join(ROOT, p), "utf8");
@@ -107,33 +108,182 @@ test("`allowExternal` in a comment alone does not make an owner either", () => {
   assert.equal(declaresSharedOwner(commentedFlag, "dom-utils"), false);
 });
 
-test("owner configs measure the SHARED barrel and still skip their own", () => {
-  // #1838: the base config excludes `**/index.ts` — package barrels are pure
-  // re-exports — and the owner configs replace `include` but INHERIT `exclude`,
-  // so all three `shared/*/index.ts` were measured nowhere. Each owner now
-  // narrows that one entry to `packages/**/index.ts`.
-  //
-  // ⚠ Pinned here because nothing else can red it. Measured: dropping the
-  // narrowed entry leaves all 850 react tests green — the package's own barrel
-  // is a pure re-export today, so the term is load-bearing but INERT against the
-  // suite. Planting an uncovered function in `packages/react/src/index.ts`
-  // separates the two: exit 0 with the entry, exit 1 without it.
-  for (const [, cfg] of OWNERS) {
-    const exclude = coverageArrayEntries(read(cfg), "exclude");
+/**
+ * What coverage leaves out by the role of a file, in the base config's order
+ * (IMPLEMENTATION_NOTES "Coverage leaves files out by role, and Sonar's
+ * coverage exclusions are generated").
+ */
+const ROLE_EXCLUDE = [
+  "**/node_modules/**",
+  "**/dist/**",
+  "**/coverage/**",
+  "**/.stryker-tmp/**",
+  "**/tests/**",
+  "**/*.config.*",
+  "**/*.d.ts",
+  "**/*.test.{ts,tsx}",
+  "**/*.spec.{ts,tsx}",
+  "**/__mocks__/**",
+  "**/__fixtures__/**",
+];
 
-    assert.ok(
-      exclude.includes("packages/**/index.ts"),
-      `${cfg} must keep its OWN barrel excluded`,
+/**
+ * Vitest's reading of each package's config, from the package's directory, as
+ * `vitest run` reads it there: the config it finds, and the coverage options
+ * that config sets before vitest adds its own. It writes them to the file its
+ * first argument names, so nothing a plugin prints can garble them.
+ */
+const RESOLVE = `
+  import { writeFileSync } from "node:fs";
+  import { join } from "node:path";
+  import { resolveConfig } from "vitest/node";
+
+  const [out, ...names] = process.argv.slice(1);
+  const root = process.cwd();
+  const resolved = {};
+
+  for (const name of names) {
+    const dir = join(root, "packages", name);
+
+    process.chdir(dir);
+    const { viteConfig } = await resolveConfig({ root: dir, watch: false });
+    const coverage = viteConfig.test.coverage;
+
+    resolved[name] = {
+      configFile: viteConfig.configFile,
+      allowExternal: coverage.allowExternal === true,
+      enabled: coverage.enabled,
+      exclude: coverage.exclude,
+      include: coverage.include,
+      reportsDirectory: coverage.reportsDirectory,
+      thresholds: coverage.thresholds,
+    };
+  }
+  writeFileSync(out, JSON.stringify(resolved));
+`;
+
+/**
+ * The tracked code files under `dir`, from the repository root: no symlink, and
+ * no file whose role leaves it out.
+ */
+function codeFiles(dir) {
+  return spawnSync("git", ["ls-files", "-s", "--", dir], {
+    cwd: ROOT,
+    encoding: "utf8",
+  })
+    .stdout.split("\n")
+    .filter((line) => line !== "" && !line.startsWith("120000 "))
+    .map((line) => line.slice(line.indexOf("\t") + 1))
+    .filter(
+      (path) =>
+        /\.(?:ts|tsx|svelte)$/.test(path) &&
+        !ROLE_EXCLUDE.some((glob) => matchesGlob(path, glob)),
     );
-    assert.ok(
-      !exclude.includes("**/index.ts"),
-      `${cfg} must not re-exclude every index.ts — that is what hid the shared barrels`,
+}
+
+test("every package's coverage options resolve by role, and isPhantom reads its thresholds as vitest does", () => {
+  // A name in `exclude`, or an `include` that narrows by name, leaves out a
+  // file with code in that package — a name in the base list does it in all of
+  // them at once (#1838). Each tracked code file of a package is held to its
+  // `include` as vitest finds a file no test loads: by the glob, from the
+  // package's directory. An owner — `allowExternal`, to measure its
+  // `shared/<dir>` — reports only the files its tests load (#2694), so its own
+  // files and its shared dir are held as vitest matches a loaded file.
+  const names = readdirSync(join(ROOT, "packages"))
+    .filter((name) =>
+      existsSync(join(ROOT, "packages", name, "vitest.config.mts")),
+    )
+    .sort();
+  const scratch = mkdtempSync(join(tmpdir(), "coverage-resolve-"));
+  let resolved;
+
+  try {
+    const out = join(scratch, "resolved.json");
+    const run = spawnSync(
+      process.execPath,
+      ["--input-type=module", "-e", RESOLVE, out, ...names],
+      { cwd: ROOT, encoding: "utf8", timeout: 120_000 },
     );
+
+    assert.equal(run.status, 0, run.error?.message ?? run.stderr);
+    resolved = JSON.parse(readFileSync(out, "utf8"));
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+
+  const metrics = ["branches", "functions", "lines", "statements"];
+
+  assert.deepEqual(Object.keys(resolved), names);
+  for (const name of names) {
+    const options = resolved[name];
+    const src = join(ROOT, "packages", name, "src");
+    const links = existsSync(src)
+      ? readdirSync(src, { withFileTypes: true })
+          .filter((entry) => entry.isSymbolicLink())
+          .map((entry) => `src/${entry.name}/**`)
+      : [];
+    const owned = options.include
+      .map((entry) => /^\*\*\/shared\/([a-z-]+)\//.exec(entry)?.[1])
+      .filter((dir) => dir !== undefined);
+    const files = options.allowExternal
+      ? [
+          ...codeFiles(`packages/${name}/src`),
+          ...owned.flatMap((dir) => codeFiles(`shared/${dir}`)),
+        ]
+      : codeFiles(`packages/${name}/src`).map((path) =>
+          path.slice(`packages/${name}/`.length),
+        );
+    const included = options.allowExternal
+      ? (file) =>
+          options.include.some((entry) =>
+            matchesGlob(file, entry.startsWith("**/") ? entry : `**/${entry}`),
+          )
+      : (file) => options.include.some((entry) => matchesGlob(file, entry));
+
+    assert.equal(
+      options.configFile,
+      join(ROOT, "packages", name, "vitest.config.mts"),
+      `${name}: the config vitest picks`,
+    );
+    assert.equal(options.enabled, true, `${name}: coverage.enabled`);
+    assert.equal(
+      options.reportsDirectory,
+      "./coverage",
+      `${name}: reportsDirectory`,
+    );
+    assert.deepEqual(
+      options.exclude,
+      [...links, ...ROLE_EXCLUDE],
+      `${name}: exclude`,
+    );
+    assert.equal(
+      options.allowExternal,
+      owned.length > 0,
+      `${name}: an owner owns a shared dir`,
+    );
+    assert.ok(files.length > 0, `${name}: no code file to hold`);
+    for (const file of files) {
+      assert.ok(included(file), `${name}: ${file} is outside coverage.include`);
+    }
+    assert.equal(
+      isPhantom(ROOT, name),
+      metrics.some((metric) => options.thresholds[metric] < 100),
+      `${name}: isPhantom's reading of its thresholds`,
+    );
+  }
+  // Each answer and each kind of package occurs, so the cell discriminates.
+  for (const holds of [
+    (name) => isPhantom(ROOT, name),
+    (name) => !isPhantom(ROOT, name),
+    (name) => resolved[name].allowExternal,
+    (name) => !resolved[name].allowExternal,
+  ]) {
+    assert.ok(names.some(holds), String(holds));
   }
 });
 
 test("the parser reads the ARRAY, not the file", () => {
-  // ⚠ The three cells below pin defensive terms that no other assertion reaches.
+  // ⚠ The four cells below pin defensive terms that no other assertion reaches.
   // Mutation-checked: removing any of them left the rest of this file green.
 
   // (1) The glob in CODE but outside the include array. Without the slice bound
@@ -162,6 +312,15 @@ test("the parser reads the ARRAY, not the file", () => {
   const malformed = `config.test.coverage.include = buildIncludes();`;
 
   assert.deepEqual(coverageArrayEntries(malformed, "include"), []);
+
+  // (4) A literal inside a call is not an entry: of `[...base.filter(…), "x"]`
+  // the filtered-out pattern stays out.
+  const filtered = `config.test.coverage.include = [
+    ...config.test.coverage.include.filter((p) => p !== "**/shared/dom-utils/**/*.ts"),
+    "src/**/*.ts",
+  ];`;
+
+  assert.deepEqual(coverageArrayEntries(filtered, "include"), ["src/**/*.ts"]);
 });
 
 test("every shared owner passes its symlink alias to lint (#1913)", () => {
@@ -265,7 +424,7 @@ const SCRIPT = join(ROOT, "scripts/check-coverage-scope.mjs");
 
 /**
  * A tree the script accepts: `a` produces coverage; `b` (private) and `svelte`
- * have no tests and are excluded from Sonar coverage; `b` builds a second
+ * have no tests; `b` builds a second
  * entry, `./extra`, from `src/extra/`, as angular builds `./ssr` from
  * `src/ssr/`; `owner` measures `shared/dx` and lints it through the
  * `src/dx-alias` symlink.
@@ -301,8 +460,6 @@ const acceptedTree = () => ({
     "config.test.coverage.allowExternal = true;\n" +
     'config.test.coverage.include = ["src/**/*.ts", "../../shared/dx/**/*.ts"];\n',
   "shared/dx/index.ts": "export const dx = 1;\n",
-  "sonar-project.properties":
-    "sonar.coverage.exclusions=packages/b/src/**,packages/svelte/src/**\n",
   ".size-limit.js":
     'export default [esm("a", "1 kB"), esm("owner", "1 kB")];\n',
   "turbo.json": JSON.stringify({
@@ -381,7 +538,7 @@ test("CONTROL — the script accepts the tree every drift cell departs from", ()
   assert.equal(run.status, 0, run.stderr);
   assert.match(
     run.stderr,
-    /✓ Coverage scope in sync: 2 Sonar coverage-exclusions \(b, svelte\); 3 public packages size-tracked \(exceptions: svelte\); shared\/ consumers keyed on their dir: 1; code outside src\/: none \(4 packages, 1 src\/ links into shared\/\)\./,
+    /✓ Coverage scope in sync: 3 public packages size-tracked \(exceptions: svelte\); shared\/ consumers keyed on their dir: 1; code outside src\/: none \(4 packages, 1 src\/ links into shared\/\)\./,
   );
 });
 
@@ -481,38 +638,6 @@ test("package-root config files and scripts/ hold code legitimately", () => {
 /** One planted departure per line the report can print. */
 const DRIFTS = [
   {
-    name: "a package without tests missing from the Sonar coverage exclusions",
-    plant: (tree) => {
-      tree["sonar-project.properties"] =
-        "sonar.coverage.exclusions=packages/svelte/src/**\n";
-    },
-    line: /"packages\/b\/src\/\*\*" missing from sonar\.coverage\.exclusions \(no tests\/ → no lcov\)/,
-  },
-  {
-    name: "a package below 100 % thresholds missing from the Sonar coverage exclusions",
-    plant: (tree) => {
-      tree["packages/a/vitest.config.mts"] =
-        "thresholds: { statements: 100, branches: 90, functions: 100, lines: 100 }\n";
-    },
-    line: /"packages\/a\/src\/\*\*" missing from sonar\.coverage\.exclusions \(phantom code \(lowered vitest threshold\)\)/,
-  },
-  {
-    name: "a Sonar coverage exclusion of a package that measures clean",
-    plant: (tree) => {
-      tree["sonar-project.properties"] =
-        "sonar.coverage.exclusions=packages/b/src/**,packages/svelte/src/**,packages/a/src/**\n";
-    },
-    line: /stale coverage exclusion "packages\/a\/src\/\*\*" — "a" has tests and 100% vitest thresholds/,
-  },
-  {
-    name: "a Sonar coverage exclusion of shared sources",
-    plant: (tree) => {
-      tree["sonar-project.properties"] =
-        "sonar.coverage.exclusions=packages/b/src/**,packages/svelte/src/**,shared/dx/**\n";
-    },
-    line: /stale coverage exclusion "shared\/dx\/\*\*" — shared sources are owner-measured/,
-  },
-  {
     // The #1838 shape through the CLI: the include glob survives only in a
     // comment, which is what the text match this script delegates away from
     // would have accepted.
@@ -590,8 +715,6 @@ const DRIFTS = [
     plant: (tree) => {
       delete tree["packages/svelte/package.json"];
       delete tree["packages/svelte/src/index.ts"];
-      tree["sonar-project.properties"] =
-        "sonar.coverage.exclusions=packages/b/src/**\n";
     },
     line: /SIZE_LIMIT_EXCEPTIONS lists "svelte" which is not a package/,
   },

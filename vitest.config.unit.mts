@@ -69,6 +69,11 @@ export default mergeConfig(
         // NOTHING — measured, 16 packages dropped to 0/0 with the 100 % thresholds
         // passing vacuously and `lcov.info` empty at 0 bytes.
         include: ["src/**/*.ts", "src/**/*.tsx"],
+        // By the ROLE of a file, never by its name: tests and their support
+        // files, configs, declarations, build and tool output, dependencies,
+        // and the symlinks into `shared/`, which their owner measures. What a
+        // file is called — `index.ts`, `constants.ts`, `types.ts` — leaves
+        // nothing out.
         exclude: [
           ...symlinkedSharedDirs(),
           "**/node_modules/**",
@@ -80,26 +85,8 @@ export default mergeConfig(
           "**/*.d.ts",
           "**/*.test.{ts,tsx}",
           "**/*.spec.{ts,tsx}",
-          "**/types/**",
           "**/__mocks__/**",
           "**/__fixtures__/**",
-          "**/assets",
-          "**/contexts.ts",
-          "**/enums.ts",
-          "**/interfaces.ts",
-          "**/constants.ts",
-          "**/index.ts",
-          // Legacy core files (replaced by namespaces, kept for test compatibility)
-          "**/core/dependencies.ts",
-          "**/core/middleware.ts",
-          "**/core/navigation.ts",
-          "**/core/observable.ts",
-          "**/core/options.ts",
-          "**/core/plugins.ts",
-          "**/core/routeLifecycle.ts",
-          "**/core/routerLifecycle.ts",
-          "**/core/state.ts",
-          "**/core/routes/**",
         ],
         thresholds: {
           statements: 100,

@@ -632,7 +632,71 @@ test("lineDiff marks what --check prints", () => {
 test("the regions this repository keeps", () => {
   assert.deepEqual(
     REGIONS.map((region) => `${region.file}#${region.name}`),
-    ["sonar-project.properties#cpd-exclusions"],
+    [
+      "sonar-project.properties#cpd-exclusions",
+      "sonar-project.properties#coverage-exclusions",
+    ],
+  );
+});
+
+const COVERAGE = REGIONS.find(
+  (region) => region.name === "coverage-exclusions",
+);
+
+/** A package with tests and the vitest config `config`. */
+const tested = (name, config) => ({
+  [`packages/${name}/package.json`]: JSON.stringify({ name: `@fx/${name}` }),
+  [`packages/${name}/src/index.ts`]: "export const one = 1;\n",
+  [`packages/${name}/tests/one.test.ts`]: "\n",
+  [`packages/${name}/vitest.config.mts`]: config,
+});
+
+test("coverage-exclusions holds the src/ of each package without tests or below 100 % thresholds", () => {
+  withTree(
+    {
+      ...tested("clean", "export default {};\n"),
+      ...tested("phantom", "thresholds: { branches: 99 }\n"),
+      "packages/untested/package.json": JSON.stringify({
+        name: "@fx/untested",
+      }),
+      "packages/untested/src/index.ts": "export const one = 1;\n",
+      // No src/ of its own: nothing for Sonar to index.
+      "packages/bare/package.json": JSON.stringify({ name: "@fx/bare" }),
+    },
+    (root) => {
+      assert.deepEqual(COVERAGE.render(root), [
+        "sonar.coverage.exclusions=packages/phantom/src/**,packages/untested/src/**",
+      ]);
+    },
+  );
+});
+
+test("a threshold written only in a comment keeps the package out of coverage-exclusions", () => {
+  withTree(
+    tested(
+      "noted",
+      "// thresholds: { branches: 94 }\nthresholds: { branches: 100 }\n",
+    ),
+    (root) => {
+      assert.deepEqual(COVERAGE.render(root), ["sonar.coverage.exclusions="]);
+    },
+  );
+});
+
+test("a threshold the package walk cannot read fails the run and names the region and the file", () => {
+  const files = {
+    ...tested("odd", "thresholds: { branches: FLOOR }\n"),
+    "sonar-project.properties": [
+      open("coverage-exclusions", "", COVERAGE.source),
+      "sonar.coverage.exclusions=",
+      close("coverage-exclusions"),
+      "",
+    ].join("\n"),
+  };
+  refused(
+    files,
+    /region "coverage-exclusions": packages\/odd\/vitest\.config\.mts:1: "branches: FLOOR" — isPhantom reads a coverage threshold only as/,
+    [COVERAGE],
   );
 });
 

@@ -1596,6 +1596,40 @@ describe("SegmentMatcher", () => {
 
       expect(Object.isFrozen(meta)).toBe(true);
     });
+
+    it("gives a static route no segment entry for a key planted on Object.prototype", () => {
+      // The param map of a static segment is a frozen `{}` with the ordinary
+      // prototype, and registration walks it with `for…in`, which reaches an
+      // enumerable key of `Object.prototype` too. Only an own key is a param.
+      const matcher = createTestMatcher();
+      const aboutNode = createInputNode({
+        name: "about",
+        path: "/about",
+        fullName: "about",
+      });
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["about", aboutNode]]),
+        nonAbsoluteChildren: [aboutNode],
+      });
+
+      Object.defineProperty(Object.prototype, "rrPlanted", {
+        value: "url",
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
+
+      try {
+        matcher.registerTree(rootNode);
+      } finally {
+        Reflect.deleteProperty(Object.prototype, "rrPlanted");
+      }
+
+      expect(matcher.getMetaByName("about")).toStrictEqual({});
+    });
   });
 
   // ===========================================================================

@@ -2256,6 +2256,8 @@ Every call site is pinned to `pnpm/action-setup@v6.1.0` and passes no `version` 
 
 ### Coverage scope is generated, not hardcoded (#732)
 
+> **Updated (2026-10-07).** Check 2 is gone: `scripts/sync-config.mjs` writes `sonar.coverage.exclusions` from the package walk, and vitest's `coverage.exclude` leaves files out by role alone: "Coverage leaves files out by role, and Sonar's coverage exclusions are generated", at the end of this file.
+
 > **Updated (2026-10-05).** `packages/vue/src/**` has left `sonar.coverage.exclusions`: Vue runs on the global 100 % thresholds ("Vue reaches full coverage: its gaps were untested branches", at the end of this file).
 
 > **Updated (2026-10-04).** `codecov.yml` has no components and check 1 is gone; the Codecov upload list is still the `reports=` line of `--emit`: "Codecov has no components".
@@ -2404,6 +2406,8 @@ test set. Coverage is unaffected — it comes from the lcov `reportPaths`, and t
 `sonar.test.exclusions`, so widening it is self-contained.
 
 ### Shared sources are owner-measured at 100% (#809)
+
+> **Updated (2026-10-07).** Check 2b keeps only the owner: `sonar.coverage.exclusions` is generated from the package walk and holds no `shared/` entry: "Coverage leaves files out by role, and Sonar's coverage exclusions are generated".
 
 > **Updated (2026-10-04).** Check 2b no longer asks for a `codecov.yml` component path per shared dir: "Codecov has no components".
 
@@ -13587,6 +13591,8 @@ On CI, after the push: PR #2660, of Markdown alone, ran all 13 checks of the `ci
 
 ## The package walk is one module, `scripts/repo-model.mjs` (2026-10-04)
 
+> **Updated (2026-10-07).** `isPhantom` is no longer a field of the walk's records: it is `isPhantom(root, name)`, and only the region of `sync-config.mjs` calls it: "Coverage leaves files out by role, and Sonar's coverage exclusions are generated".
+
 **Problem.** Which directories under `packages/` are packages, and for each whether it is public, has tests, its own vitest config, a real `src/`, a coverage threshold below 100 and an lcov report, was answered by top-level code of `check-coverage-scope.mjs`. The next steps of RFC-3 derive Sonar's coverage exclusions and check the `workspace:^` entries from the same answers, in other scripts, and a second walk would be a second answer to the same questions.
 
 **Solution.**
@@ -13842,6 +13848,8 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 
 ## Vue reaches full coverage: its gaps were untested branches (2026-10-05)
 
+> **Updated (2026-10-07).** Check 2 is gone; `scripts/sync-config.mjs` writes `sonar.coverage.exclusions` from the package walk: "Coverage leaves files out by role, and Sonar's coverage exclusions are generated".
+
 **Problem.** Codecov put the repository at 99.58 %: 44 lines, all of them in four framework adapters. Vue's six were branches no test took, and its thresholds were lowered for a reason that no longer held — `branches: 95, functions: 97`, put down to `defineComponent`'s type guards. Measured before this change: statements 411/411, lines 400/400, functions 114/114, branches 197/203. The six branches:
 
 - the descriptor form of `<Link>` (`to`, #1548) was never rendered, so the `routeName ?? ""` fallback of the active watch, the href and the click never ran;
@@ -13856,6 +13864,8 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 **Measured (2026-10-05).** After: statements 411/411, branches 203/203, functions 114/114, lines 400/400.
 
 ## Svelte: three of its four gaps were the untested `to` form of `<Link>` (2026-10-05)
+
+> **Updated (2026-10-07).** Check 2 is gone; `scripts/sync-config.mjs` writes `sonar.coverage.exclusions` from the package walk: "Coverage leaves files out by role, and Sonar's coverage exclusions are generated".
 
 **Problem.** Svelte's thresholds stood at `branches: 96, functions: 93`, put down to the compiler's `$derived`/`$props` transforms. Measured before this change: statements 303/303, lines 267/267, functions 93/93, branches 128/132. Three of the four missing branches were the `routeName ?? ""` fallback of `Link.svelte` — at mount, in the href and on click — which no test reached because none rendered the descriptor form (`to`, #1548). The fourth is in `Lazy.svelte`: the compiler writes `{state.error.message}` as `` `…${error.message ?? ''}` ``, and only an Error without a message takes the `''`.
 
@@ -13878,6 +13888,8 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 **Decision.** Not done: the 100 % came from dropping two thirds of the code from the measurement. The floors stay; the package's `vitest.config.mts` comment, `CLAUDE.md` and `ARCHITECTURE.md` now say the aot copy cannot record those lines, rather than that it covers them. The aot tests still run those paths and assert what they produce: the fallback resolution of `RouteView` (S1, S2, M1, M2), its `matchEntries` (M3), and the directives' pure-href refresh, class change and same-snapshot early return.
 
 ## Solid: its phantom branches were the test transform's hot-reload code (2026-10-05)
+
+> **Updated (2026-10-07).** Check 2 is gone; `scripts/sync-config.mjs` writes `sonar.coverage.exclusions` from the package walk: "Coverage leaves files out by role, and Sonar's coverage exclusions are generated".
 
 **Problem.** Solid's thresholds stood at `statements: 99, lines: 99, functions: 95, branches: 90`, put down to babel-preset-solid's output and to JSX thunks. Codecov counted 15 of its lines: one untaken `if` at the closing brace of each of 11 component modules, three lines of `isSegmentMatch`, and a `?? ""` in `Link`. The 11 were not babel's: `vite-plugin-solid` with its defaults appends solid-refresh's `if (import.meta.hot) { … }` to every module under a dev server, which is what Vitest runs, and coverage maps that block's untaken side to the end of the component. The package does not ship it. `isSegmentMatch` was no longer called by `RouteView` — only the property tests used it, as the reference for the candidate cache. And the `?? ""` led to a bug.
 
@@ -14171,3 +14183,27 @@ Three rounds of review of the fix found the same order of the text in two more p
 - ⚠ What the actions those steps call write — `actions/checkout`, `pnpm/action-setup`, `actions/setup-node`, `astral-sh/setup-uv` — and what `pnpm install` runs is not read. Nor is a `$GITHUB_PATH` entry they add: a program named `node` first on `PATH` would run in node's place.
 
 **Measured (2026-10-07).** Under `NODE_OPTIONS=--test-skip-pattern=.` node 24.18.1 runs `diff-carries-no-code.test.mjs` as 1 entry instead of 8 and exits 0. With the fix, the step's command under that `NODE_OPTIONS` and a `BASH_ENV` that exits at once runs 70 tests, and each of the injections above fails it. Without `shell: sh`, without the prefix, with the suffix written as it comes, with the census reading the prefixed line as it stands, or with `checkId` keeping the prefix, a cell fails. dash in `ubuntu:24.04` reads no `BASH_ENV`; bash does. Under `-c`, with stdin a socket and no `SHLVL`, bash 3.2 takes itself for a shell rshd started and reads `~/.bashrc` in place of `BASH_ENV`, so the cells run the script from a file, as the runner does.
+
+## Coverage leaves files out by role, and Sonar's coverage exclusions are generated (2026-10-07)
+
+**Problem.** Three lists said which files coverage leaves out, and each named files. Vitest's `coverage.exclude` in `vitest.config.unit.mts` held `**/index.ts`, `**/constants.ts`, `**/types/**`, four more names and ten paths that match no file; `sonar.coverage.exclusions` held fifteen name patterns before its package entries; `codecov.yml` had an `ignore` of its own. A name says nothing about code: the path matcher's `registration/index.ts` registers every route and was measured by no tool, and `**/index.ts` in the base list left the three `shared/*/index.ts` measured nowhere until the owner configs narrowed it. Check 2 of `check-coverage-scope.mjs` held only the package entries of Sonar's list to the tree.
+
+**Solution.**
+
+- `coverage.exclude` in `vitest.config.unit.mts` leaves a file out by its role: tests and their support files, configs, declarations, build and tool output, dependencies, and the symlinks into `shared/`, which their owners measure. No package config sets a coverage `exclude` of its own, so the owner configs no longer narrow `**/index.ts`.
+- `sonar.coverage.exclusions` is the region `coverage-exclusions` of `scripts/sync-config.mjs`: the `src/` of each package without tests or with a coverage threshold below 100. `lint:config-sync` refuses a hand edit. Check 2 leaves `check-coverage-scope.mjs` with its cells, and so does the refusal of a `shared/` entry in that list, which the region cannot hold.
+- `codecov.yml` has no `ignore`: the uploaded lcov holds only what vitest measures.
+- Whether a package's thresholds go below 100 is `isPhantom(root, name)` of `scripts/repo-model.mjs`. Only the region calls it, so `packages()`, which `--emit` and `lint:coverage-scope` use, reads no threshold. It reads the config closed: comments and the text of strings turned into spaces, each `thresholds` opening an object of `<key>: <number>` members. A `thresholds` that opens no such object, a member of another form — a spread, a shorthand, an expression, a nested object — `thresholds` written as a string, a `\` outside a string and a `/` that opens no comment fail it, naming the file and the line. A threshold that comes from another module it does not see.
+- The cell "every package's coverage options resolve by role, and isPhantom reads its thresholds as vitest does" of `check-coverage-scope.test.mjs` has vitest resolve each package's config from the package's directory (`resolveConfig` of `vitest/node`: the config it picks, and the options that config sets before vitest adds its own). It holds the picked file to the package's `vitest.config.mts`, `enabled` and `reportsDirectory` to the base's, `exclude` to the role list and the package's symlinks, each tracked code file of the package to its `include`, and `isPhantom` to the thresholds vitest resolves, so a threshold from another module reds it. A package's files are held as vitest finds a file no test loads, by the glob from the package's directory; an owner's, as vitest matches a loaded file (the gap below).
+- The two branches the names hid get cells where a difference shows, at the engine's own surface: `hasAnyParam` skips a key planted on `Object.prototype` (`SegmentMatcher.test.ts`), and `requireStrategy` turns a format value into its key once (`strategies.test.ts`). Through `createRouter` neither shows: the options snapshot hands the engine a string, and the transition path reads only the own keys of a segment's param map.
+
+**Why one filter.** Sonar and Codecov score what the uploaded lcov holds. A list of names there can only hide files vitest measures, and the package entries of Sonar's list follow from the package walk and the packages' coverage thresholds.
+
+**Gap.** The three owner configs replace `include` with `packages/<pkg>/src/**` forms and a `shared/<dir>` glob, and with those vitest reports only the files their tests load: a planted file no test imports, in `browser-plugin/src`, left the run at 100 % with no lcov record for it, where the same file in `route-utils/src` failed the thresholds. Today the owner files without a record — five in `react`, two `types.ts` of `browser-plugin` and `shared/browser-env`, one of `ssr-data-plugin` — hold no executable code. #2694 tracks the gap.
+
+**Measured.**
+
+- With the role-only list, 84 files gained an lcov record and none lost one. Every package but core passed its thresholds; core missed the two branches above, and with their cells it passes (5 778 tests).
+- On the analysis of `e254269d8`, Sonar's `lines_to_cover` (9 944) is, file by file, the number of lines with a `DA` or a `BRDA` record in the uploaded lcov; `DA` alone gives 9 662. The four files of that analysis with neither an lcov record nor a name pattern have no line to cover.
+- `--write` over the old value of `sonar.coverage.exclusions` rewrites that one line and nothing else.
+- 34 of 34 mutants fail a cell: the two branches of core; the closed reading taking another member, a `thresholds` that opens no object, the word inside a longer one, the text of strings or comments, string escapes, a string `thresholds`, a bare `/` or `\`, an unterminated comment or string, integers alone, or a wrong line in a refusal; the region dropping either kind of package or taking one without `src/`; and, for the resolved cell, a name in the base `exclude` in double quotes, single quotes or a spread, a coverage `exclude` in the common config, an owner narrowing `include` by name, pushing onto `exclude` or keeping only its shared dir, the base `include` without `.tsx`, coverage off, another reports directory, a stray `vitest.config.ts`, and a threshold under a computed key. Five of them — the single quotes, the spread, the common config, the narrowed `include` and the push — passed the text reading this cell replaced, as the review of the step measured.

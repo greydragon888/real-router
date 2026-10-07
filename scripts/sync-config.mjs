@@ -33,6 +33,7 @@ import { join } from "node:path";
 import { render as cpdExclusions } from "./cpd-exclusions.mjs";
 import { withoutGitEnv } from "./git-env.mjs";
 import { REFUSED_CHARACTERS } from "./refused-characters.mjs";
+import { isPhantom, packages } from "./repo-model.mjs";
 
 /**
  * @typedef {object} Region
@@ -44,6 +45,25 @@ import { REFUSED_CHARACTERS } from "./refused-characters.mjs";
  *   read from its source under `root`; it throws on a source it cannot read
  */
 
+/**
+ * `sonar.coverage.exclusions`: the `src/` of each package whose coverage Sonar
+ * does not score — one without tests, which leaves no lcov, and one whose
+ * coverage thresholds go below 100, which those thresholds hold instead. Which
+ * files of the other packages count is vitest's to say.
+ *
+ * @param {string} root
+ * @returns {string[]}
+ */
+function coverageExclusions(root) {
+  const excluded = packages(root)
+    .filter(
+      (pkg) => pkg.hasRealSrc && (!pkg.hasTests || isPhantom(root, pkg.name)),
+    )
+    .map((pkg) => `${pkg.dir}/src/**`);
+
+  return [`sonar.coverage.exclusions=${excluded.join(",")}`];
+}
+
 /** @type {Region[]} The regions this script keeps. */
 export const REGIONS = [
   {
@@ -51,6 +71,12 @@ export const REGIONS = [
     file: "sonar-project.properties",
     source: ".jscpd.json",
     render: cpdExclusions,
+  },
+  {
+    name: "coverage-exclusions",
+    file: "sonar-project.properties",
+    source: "packages/*",
+    render: coverageExclusions,
   },
 ];
 

@@ -70,7 +70,7 @@ export const CHECKS = [
     run: ["pnpm", "lint:coverage-scope"],
     stages: ["pre-commit", "pre-push", "ci"],
     ciSkip: ["dependabot-pr", "no-source"],
-    why: "the Sonar, size-limit and turbo scopes match the package tree",
+    why: "each shared dir has a measuring owner, and the size-limit and turbo scopes and the code layout match the package tree",
   },
   {
     // pre-push runs it too: git runs no pre-commit for a tree `git merge` or

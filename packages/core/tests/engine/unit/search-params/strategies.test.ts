@@ -321,4 +321,26 @@ describe("format strategies (through parseQuery/build)", () => {
       ).toStrictEqual({ items: ["a", "", "b"] });
     });
   });
+
+  // ===========================================================================
+  // The format value
+  // ===========================================================================
+
+  describe("the format value", () => {
+    it("becomes its key once, so the check and the lookup read one key", () => {
+      // `createRouter` hands this layer a string; a caller of `build` or
+      // `parseQuery` can hand it anything. A value whose `toString` answers
+      // "none" and then "toString" would pass the check as one format and be
+      // looked up as another: `Object.prototype.toString` as the array strategy.
+      let reads = 0;
+      const drifting = {
+        toString: () => (++reads === 1 ? "none" : "toString"),
+      };
+
+      expect(
+        build({ items: ["a", "b"] }, { arrayFormat: drifting as never }),
+      ).toBe("items=a&items=b");
+      expect(reads).toBe(1);
+    });
+  });
 });

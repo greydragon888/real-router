@@ -43,8 +43,8 @@ echo "🧪 coverage (lcov)..."
 pnpm test
 
 # 1 + 2: projectVersion + analysis scope (mirrors CI "Get version" / "Compute
-# Sonar scope"). --emit prints `sources=…`, `tests=…`, `reports=…` lines — the
-# same source of truth that guards sonar-project.properties.
+# Sonar scope"). --emit prints `sources=…`, `tests=…`, `reports=…` lines, from
+# the packages and the source dirs of shared/.
 echo "📐 resolving version + scope..."
 VERSION="$(node -p 'require("./packages/core/package.json").version')"
 SCOPE="$(node scripts/check-coverage-scope.mjs --emit)"

@@ -51,27 +51,8 @@ comment:
   require_bundle_changes: true # Only comment when bundle size changes
   bundle_change_threshold: 1Kb # Warn on 1KB+ increase
 
-# Ignore paths (no coverage tracking)
-ignore:
-  - "**/tests/**" # Test files
-  - "**/*.test.ts" # Unit tests
-  - "**/*.test.tsx" # React tests
-  - "**/*.spec.ts" # Spec tests
-  - "**/*.spec.tsx" # React spec tests
-  - "**/*.bench.ts" # Benchmark files
-  - "**/dist/**" # Built files
-  - "**/coverage/**" # Coverage reports
-  - "**/*.config.ts" # Config files
-  - "**/*.config.mts" # Config files
-  - "**/*.config.mjs" # Config files
-  - "**/*.config.js" # Config files
-  - ".github/**" # GitHub workflows
-  - "docs/**" # Documentation
-  - "**/types.ts" # Type definitions
-  - "**/constants.ts" # Constants
-  - "**/index.ts" # Re-exports
-  - "**/__mocks__/**" # Mocks
-  - "**/__fixtures__/**" # Fixtures
+# No `ignore:` section: the uploaded lcov holds only the files vitest measures,
+# and vitest's `coverage` options say which those are.
 
 # No `flags:` section: Codecov flags only exist if every upload is tagged with
 # them (`flags:`/-F at upload time); our CI does a single untagged upload of all

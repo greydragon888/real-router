@@ -1682,10 +1682,9 @@ jobs:
           VERSION=$(node -p 'require("./packages/core/package.json").version')
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      # Generate analysis scope from the filesystem — the same
-      # `check-coverage-scope.mjs --emit` that guards sonar-project.properties,
-      # so the CI scope and the drift guard cannot disagree. Scanner CLI args
-      # override the properties file.
+      # Generate analysis scope from the filesystem: `check-coverage-scope.mjs
+      # --emit` derives it from the packages and the source dirs of `shared/`.
+      # Scanner CLI args override the properties file.
       - name: Compute Sonar scope
         id: scope
         if: steps.decide.outputs.analyse == 'true'

@@ -2,23 +2,14 @@
 /**
  * Coverage-scope guard + generator (#732).
  *
- * The external quality gates (Codecov, SonarCloud) previously drifted out of
- * sync with the package set because their scope lived in hand-maintained lists.
- * This script is now the SINGLE source of truth for that scope:
+ * The scope the external quality gates (Codecov, SonarCloud) read comes from
+ * the tree, through this script — except `sonar.coverage.exclusions`, which
+ * `scripts/sync-config.mjs` writes from the package walk and the packages'
+ * coverage thresholds:
  *
  * Check mode (default, `pnpm lint:coverage-scope` — both hooks + CI pipeline).
  * The checks keep the numbers other files cite them by, so the list starts
- * at 2:
- *   2. `sonar-project.properties` `sonar.coverage.exclusions` — must exclude
- *      exactly the packages whose `src/` legitimately lacks a clean lcov
- *      (no-tests → no lcov at all; phantom code → lowered vitest thresholds).
- *      Both directions are asserted — a missing entry AND a stale entry fail,
- *      so a package that becomes healthy can't stay silently excluded forever.
- *      `shared/**` must NOT be excluded (#809): each shared dir is measured at
- *      100% by an owner package (coverage.allowExternal + a shared/<dir>
- *      include in the owner's vitest.config.mts), and the CI "Fix coverage
- *      paths" step normalizes the owner lcov SF paths to repo-root-relative
- *      shared/<dir>/… — so Sonar scores shared sources from real lcov.
+ * at 2b:
  *   2b. Every shared/<dir> must have a measuring owner vitest config — a new
  *      shared dir cannot silently reopen the pre-#809 blind spot.
  *   2c. The owner passes the `src/<alias>/` symlink that leads to the dir in
@@ -52,10 +43,9 @@
  *
  * Emit mode (`--emit`, used by ci.yml's coverage job and sonar-trusted.yml):
  *   prints `sources=…`, `tests=…`, `reports=…` lines for `$GITHUB_OUTPUT`,
- *   computed from the same package walk the checks use
- *   (`scripts/repo-model.mjs`) — the CI scope and the drift guard cannot
- *   disagree by construction. stdout carries only the
- *   key=value lines; all human/diagnostic output goes to stderr.
+ *   computed from the tree the checks walk: the packages of
+ *   `scripts/repo-model.mjs` and the source dirs of `shared/`. stdout carries
+ *   only the key=value lines; all human/diagnostic output goes to stderr.
  */
 
 import {
@@ -105,7 +95,6 @@ const packages = [...model.keys()];
 const hasTests = (name) => model.get(name).hasTests;
 const hasRealSrc = (name) => model.get(name).hasRealSrc;
 const isPublic = (name) => model.get(name).public;
-const isPhantom = (name) => model.get(name).isPhantom;
 
 const sharedDirs = existsSync(SHARED_DIR)
   ? readdirSync(SHARED_DIR)
@@ -125,11 +114,6 @@ const sharedDirs = existsSync(SHARED_DIR)
   : [];
 
 const coverageProducing = packages.filter(hasTests);
-// Packages that are in sonar.sources (real src/) but cannot reach clean coverage.
-const mustCoverageExclude = packages.filter(
-  (p) => hasRealSrc(p) && (!hasTests(p) || isPhantom(p)),
-);
-
 const sonarSources = [
   ...packages.filter(hasRealSrc).map((p) => `packages/${p}/src`),
   ...sharedDirs.map((d) => `shared/${d}`),
@@ -143,43 +127,10 @@ const lcovReports = packages
   .filter((p) => model.get(p).hasLcov)
   .map((p) => `packages/${p}/coverage/lcov.info`);
 
-// --- Check 2: sonar.coverage.exclusions ⇔ no-test/phantom packages ----------
-const sonar = read("sonar-project.properties");
-const exclLine = sonar.match(/^sonar\.coverage\.exclusions=(.*)$/m)?.[1] ?? "";
-const exclusions = new Set(exclLine.split(",").map((s) => s.trim()));
-
-for (const pkg of mustCoverageExclude) {
-  const glob = `packages/${pkg}/src/**`;
-  if (!exclusions.has(glob)) {
-    const why = !hasTests(pkg)
-      ? "no tests/ → no lcov"
-      : "phantom code (lowered vitest threshold)";
-    errors.push(
-      `sonar-project.properties: "${glob}" missing from sonar.coverage.exclusions (${why}) — Sonar would score it as uncovered`,
-    );
-  }
-}
-// Reverse: a stale exclusion silently disables Sonar coverage for a healthy package.
-for (const entry of exclusions) {
-  const m = /^packages\/([\w-]+)\/src\/\*\*$/.exec(entry);
-  if (m && !mustCoverageExclude.includes(m[1])) {
-    errors.push(
-      `sonar-project.properties: stale coverage exclusion "${entry}" — "${m[1]}" has tests and 100% vitest thresholds (or no src), remove the exclusion so Sonar scores its coverage again`,
-    );
-  }
-}
-// --- Check 2b: shared/* must be measured, not excluded (#809) ----------------
+// --- Check 2b: every shared dir has a measuring owner (#809) -----------------
 // Each shared dir is owner-measured (allowExternal + shared/<dir> include in
 // some package's vitest.config.mts) and its lcov is normalized to shared/<dir>
-// paths in CI — so a sonar coverage-exclusion would silently un-score it, and
-// a shared dir without an owner reopens the blind spot.
-for (const entry of exclusions) {
-  if (entry === "shared/**" || entry.startsWith("shared/")) {
-    errors.push(
-      `sonar-project.properties: stale coverage exclusion "${entry}" — shared sources are owner-measured at 100% (#809), remove the exclusion so Sonar scores them`,
-    );
-  }
-}
+// paths in CI; a shared dir without an owner is measured nowhere.
 
 const ownerConfigs = packages
   .filter((p) => model.get(p).hasVitestConfig)
@@ -602,7 +553,6 @@ if (emitMode) {
   const publicCount = packages.filter(isPublic).length;
   console.error(
     `✓ Coverage scope in sync: ` +
-      `${mustCoverageExclude.length} Sonar coverage-exclusions (${mustCoverageExclude.join(", ")}); ` +
       `${publicCount} public packages size-tracked (exceptions: ${[...SIZE_LIMIT_EXCEPTIONS.keys()].join(", ")}); ` +
       `shared/ consumers keyed on their dir: ${sharedConsumers}; ` +
       `code outside src/: none (${packages.length} packages, ${srcLinks} src/ links into shared/).`,
