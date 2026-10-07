@@ -1195,15 +1195,17 @@ test("node:scripts-tooling runs scripts-tests.mjs tooling — held here, in the 
   ]);
 });
 
-test("node:skip-facts runs the test of the skip facts in CI, in every context", () => {
-  // Both scripts/tests groups skip on `no-source`, so the test that holds the
-  // step answering `no_source` runs where no context skips it.
+test("node:skip-facts runs the tests of the skip facts in CI, in every context", () => {
+  // Both scripts/tests groups skip on `no-source`, so the tests that hold the
+  // step answering `no_source` and its predicate run where no context skips
+  // them.
   const holder = CHECKS.find((each) => each.id === "node:skip-facts");
 
   assert.deepEqual(holder?.run, [
     "node",
     "--test",
     "scripts/tests/diff-carries-no-code.test.mjs",
+    "scripts/tests/diff-carries-no-source.test.mjs",
   ]);
   assert.ok(holder.stages.includes("ci"), "node:skip-facts runs in CI");
   assert.deepEqual(holder.ciSkip, [], "no CI context skips node:skip-facts");

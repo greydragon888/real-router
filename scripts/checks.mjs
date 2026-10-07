@@ -141,15 +141,21 @@ export const CHECKS = [
     why: "the tests of the repository's tooling, replayed from turbo's cache while their inputs are unchanged",
   },
   {
-    // The steps that answer `should_run` and `no_source`, held where no CI
-    // context skips them: both groups above skip on `no-source`, so a step that
-    // answered "no source" wrongly would skip the test that holds it.
+    // The steps that answer `should_run` and `no_source`, and the table of the
+    // `no_source` predicate, held where no CI context skips them: both groups
+    // above skip on `no-source`, so a step or a predicate that answered "no
+    // source" wrongly would skip the test that holds it.
     id: "node:skip-facts",
-    run: ["node", "--test", "scripts/tests/diff-carries-no-code.test.mjs"],
+    run: [
+      "node",
+      "--test",
+      "scripts/tests/diff-carries-no-code.test.mjs",
+      "scripts/tests/diff-carries-no-source.test.mjs",
+    ],
     stages: ["ci"],
     ciSkip: [],
     prePushExempt:
-      "pre-push runs this test in node:scripts-guards, which no context skips there",
+      "pre-push runs these tests in node:scripts-guards, which no context skips there",
     why: "the check job's skip facts come from their predicates' exact answers",
   },
   {

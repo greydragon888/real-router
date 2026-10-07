@@ -14006,6 +14006,8 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 
 ## The check job's skip facts come from a predicate's exact answer (2026-10-06)
 
+> **Updated (2026-10-07).** `node:skip-facts` runs the `no_source` predicate's own table, `diff-carries-no-source.test.mjs`, as well: in the guards group it skipped on the `no-source` it decides, and the steps' cells held the predicate only through the step.
+
 **Problem.** Two outputs of `ci.yml`'s `check` job decide what CI skips. With `should_run` not `true` the gate requires no job of the pipeline to have run; with `no_source` true Repo Lints skips the checks whose `ciSkip` names `no-source`. No test held either producer: the reconciliation of RFC-4 found the `no_source` step unheld, and `should_run` came from an inline `grep` classification no test read. Each failed toward the skip. The `source` step took exit 0 for "no source", so a predicate that exited 0 without answering skipped the checks: run under bash with `node` exiting 0 at once, it answered `no_source=true` on a diff with code in it. The `changes` step read an empty `grep` output as no code, so a crashed or silent `grep`, or an empty diff, answered `should_run=false`. And `git diff --name-only` lists a renamed file under its new path alone, so code moved into Markdown read as Markdown.
 
 **Solution.**
