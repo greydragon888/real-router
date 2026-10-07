@@ -5,17 +5,16 @@
 //
 // `Require Changeset` is a required check: its `check` step sets
 // `needs_changeset` when a public package's source changed, and the next step
-// fails the job when no changeset came with it. The cells run that step under
-// bash from the root of the repository, `git` replaced, so its loop reads the
-// real `packages/*/package.json`.
+// fails the job when no changeset came with it. Each cell builds a repository
+// whose `origin/master` holds a base commit and whose `HEAD` holds the pull
+// request's, and runs the step in it under bash with real git.
 //
 // Stdlib node:test/node:assert only (Node 24) — scripts/ is not a vitest
 // workspace.
 
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
-  chmodSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -23,7 +22,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, dirname, join } from "node:path";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -48,37 +47,62 @@ function checkStep() {
 }
 
 /**
- * The step's outputs over a diff. `git` prints `listed` when asked with
- * `--no-renames` and `renamed` without it — the paths of a rename, and its
- * new path alone.
+ * Git with none of the caller's repository variables or configuration: a push
+ * from a linked worktree exports GIT_DIR to its hook.
+ */
+const GIT_ENV = {
+  PATH: process.env.PATH,
+  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_SYSTEM: "/dev/null",
+  GIT_AUTHOR_NAME: "t",
+  GIT_AUTHOR_EMAIL: "t@t",
+  GIT_COMMITTER_NAME: "t",
+  GIT_COMMITTER_EMAIL: "t@t",
+};
+
+/**
+ * The step's outputs on a pull request. The base commit, `origin/master`,
+ * holds a public `packages/core` and `base`; the pull request's commit writes
+ * `write`, moves each `[from, to]` of `move` with `git mv` and deletes each
+ * path of `remove`.
  *
  * @returns {Record<string, string>}
  */
-function outputs({ listed, renamed }) {
+function outputs({ base = {}, write = {}, move = [], remove = [] }) {
   const dir = mkdtempSync(join(tmpdir(), "require-changeset-"));
+  const repo = join(dir, "repo");
+  const output = join(dir, "output");
+  const git = (...args) =>
+    execFileSync("git", args, { cwd: repo, env: GIT_ENV, stdio: "pipe" });
+  const put = (files) => {
+    for (const [path, text] of Object.entries(files)) {
+      mkdirSync(dirname(join(repo, path)), { recursive: true });
+      writeFileSync(join(repo, path), text);
+    }
+  };
 
   try {
-    const bin = join(dir, "bin");
-    const output = join(dir, "output");
-
-    mkdirSync(bin);
-    writeFileSync(join(dir, "listed"), listed);
-    writeFileSync(join(dir, "renamed"), renamed);
-    writeFileSync(
-      join(bin, "git"),
-      `#!/bin/sh\ncase " $* " in *" --no-renames "*) cat "${join(dir, "listed")}" ;; *) cat "${join(dir, "renamed")}" ;; esac\n`,
-    );
-    chmodSync(join(bin, "git"), 0o755);
+    mkdirSync(repo);
+    git("init", "-q", "-b", "master");
+    put({ "packages/core/package.json": '{ "name": "@x/core" }\n', ...base });
+    git("add", "-A");
+    git("commit", "-q", "-m", "base");
+    git("update-ref", "refs/remotes/origin/master", "HEAD");
+    git("checkout", "-q", "-b", "pr");
+    put(write);
+    for (const [from, to] of move) {
+      mkdirSync(dirname(join(repo, to)), { recursive: true });
+      git("mv", from, to);
+    }
+    for (const path of remove) git("rm", "-q", path);
+    git("add", "-A");
+    git("commit", "-q", "-m", "pr");
     writeFileSync(output, "");
 
     const run = spawnSync("bash", ["-e", "-c", checkStep().get("run")], {
-      cwd: ROOT,
+      cwd: repo,
       encoding: "utf8",
-      env: {
-        PATH: [bin, process.env.PATH].join(delimiter),
-        BASE_REF: "master",
-        GITHUB_OUTPUT: output,
-      },
+      env: { ...GIT_ENV, BASE_REF: "master", GITHUB_OUTPUT: output },
     });
 
     assert.equal(run.status, 0, run.stderr);
@@ -93,26 +117,68 @@ function outputs({ listed, renamed }) {
   }
 }
 
+const SOURCE = "packages/core/src/a.ts";
+
 test("a source file moved out of a public package's src needs a changeset", () => {
   assert.equal(
     outputs({
-      listed: "packages/core/src/a.ts\npackages/core/tests/a.ts\n",
-      renamed: "packages/core/tests/a.ts\n",
+      base: { [SOURCE]: "a\n" },
+      move: [[SOURCE, "packages/core/tests/a.ts"]],
     }).needs_changeset,
     "true",
   );
 });
 
-test("controls: a change to a source file needs a changeset, a change to a test does not", () => {
-  const source = "packages/core/src/a.ts\n";
-  const tests = "packages/core/tests/a.ts\n";
-
+test("a deleted source file needs a changeset too", () => {
   assert.equal(
-    outputs({ listed: source, renamed: source }).needs_changeset,
+    outputs({ base: { [SOURCE]: "a\n" }, remove: [SOURCE] }).needs_changeset,
+    "true",
+  );
+});
+
+test("controls: a change to a source file needs a changeset, a change to a test does not", () => {
+  assert.equal(
+    outputs({ base: { [SOURCE]: "a\n" }, write: { [SOURCE]: "b\n" } })
+      .needs_changeset,
     "true",
   );
   assert.equal(
-    outputs({ listed: tests, renamed: tests }).needs_changeset,
+    outputs({ write: { "packages/core/tests/a.ts": "b\n" } }).needs_changeset,
     "false",
   );
+});
+
+test("a changeset the pull request deletes, or moves out of .changeset/, is no changeset", () => {
+  const base = { [SOURCE]: "a\n", ".changeset/old.md": "---\n---\nx\n" };
+  const write = { [SOURCE]: "b\n" };
+
+  for (const [what, change] of [
+    ["deleted", { remove: [".changeset/old.md"] }],
+    ["moved out", { move: [[".changeset/old.md", "docs/old.md"]] }],
+  ]) {
+    assert.deepEqual(
+      outputs({ base, write, ...change }),
+      { needs_changeset: "true", has_changeset: "false" },
+      what,
+    );
+  }
+});
+
+test("controls: a changeset the pull request adds, or renames inside .changeset/, counts", () => {
+  const base = { [SOURCE]: "a\n", ".changeset/old.md": "---\n---\nx\n" };
+  const write = { [SOURCE]: "b\n" };
+
+  for (const [what, change] of [
+    ["added", { write: { ...write, ".changeset/new.md": "---\n---\ny\n" } }],
+    [
+      "renamed inside",
+      { write, move: [[".changeset/old.md", ".changeset/new.md"]] },
+    ],
+  ]) {
+    assert.deepEqual(
+      outputs({ base, write, ...change }),
+      { needs_changeset: "true", has_changeset: "true" },
+      what,
+    );
+  }
 });

@@ -14084,6 +14084,8 @@ Three rounds of review of the fix found the same order of the text in two more p
 
 ## Require Changeset sees both paths of a rename (2026-10-07)
 
+> **Updated (2026-10-07).** The step took any `.changeset/*.md` in the diff, so a changeset the pull request deletes counted all along, and `--no-renames` made one moved out of `.changeset/` count under its old path. It now takes the changesets from the diff without deletions (`--diff-filter=d`), while the source list keeps them, so a deleted source file still needs a changeset. The test runs the step on real git instead of a stub — a repository per cell, `origin/master` at its base commit — and holds both directions. The old and the new verdict agree on all 2549 first-parent commits of master: 506 delete a changeset, none of them with source.
+
 **Problem.** The `check` step of `changeset-check.yml` listed the pull request's files with `git diff --name-only`, whose rename detection prints a rename under its new path alone. A source file moved out of a public package's `src/`, such as `packages/core/src/a.ts` to `packages/core/tests/a.ts`, read as a change to tests, and the required check passed without a changeset though the published package lost a file. `should_run` of `ci.yml` lists its diff with `--no-renames` since its classifier moved into `scripts/diff-carries-no-code.mjs`. The reconciliation of RFC-4 R39 → R49 found the return condition of RFC-3's T18 met — one module of path classes, deferred until the classifier changed again — and the two readings of a rename apart.
 
 **Solution.**
