@@ -168,6 +168,9 @@ importers:
       size-limit:
         specifier: 14.1.0
         version: 14.1.0
+      smol-toml:
+        specifier: 1.9.0
+        version: 1.9.0
       svelte-eslint-parser:
         specifier: 1.8.1
         version: 1.8.1(svelte@5.57.1(@typescript-eslint/types@8.70.1))

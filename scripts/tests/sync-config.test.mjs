@@ -635,6 +635,7 @@ test("the regions this repository keeps", () => {
     [
       "sonar-project.properties#cpd-exclusions",
       "sonar-project.properties#coverage-exclusions",
+      ".github/dependency-review-config.yml#allow-ghsas",
     ],
   );
 });

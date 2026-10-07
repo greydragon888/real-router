@@ -82,40 +82,8 @@ jobs:
         uses: actions/dependency-review-action@v5
         with:
           fail-on-severity: moderate
+          # The license allow-list and `allow-ghsas`, which sync-config.mjs writes
+          # from scripts/osv-scanner.toml. A key set here would replace the file's.
           config-file: ./.github/dependency-review-config.yml
           comment-summary-in-pr: on-failure
           warn-on-openssf-scorecard-level: 0
-          # GHSA-wrw7-89jp-8q8g — glib@0.18.5 (VariantStrIter unsoundness, fixed
-          #   in 0.20.0). Transitive via Tauri 2 → GTK/WebKit bindings on Linux
-          #   only, pulled by the desktop example apps under
-          #   examples/desktop/tauri/*/src-tauri/. Not in any published package.
-          # GHSA-86w9-cpqp-85rv — node-forge (no fixed release). Only via the
-          #   root devDependency @sonar/scan, run locally; it reads a PKCS#12
-          #   truststore with node-forge and verifies no signature. Not in any
-          #   published package.
-          # GHSA-vfj7-8cjw-p6xm — braces (no fixed release). Only via micromatch
-          #   under the root devDependency danger, which expands only the
-          #   patterns a dangerfile passes to fileMatch and linesOfCode; ours
-          #   calls neither. Not in any published package.
-          # GHSA-ch52-4w7c-c8xp — http-cache-semantics (no fixed release). Only
-          #   in the examples, via electron-builder → @electron/get → got 11,
-          #   whose HTTP cache needs a `cache` option nobody passes. Not in any
-          #   published package.
-          # GHSA-jp82-f5mq-hwhp — seroval (fixed in 1.6.3, outside the ~1.5.4
-          #   solid-js 1.9.15 pins). The affected copy comes only through
-          #   solid-js, in tests, benchmarks, the examples and
-          #   cross-router-bench; solid-js uses seroval's serializer, and the
-          #   flaw is in its JSON deserializer. Not in any published package.
-          # GHSA-p6vx-979v-rg4c — seroval again (fixed in 1.6.2, outside the same
-          #   ~1.5.4), also in its JSON deserializer; the same paths and reason.
-          # GHSA-hp3w-g68c-fv3c — sprintf-js (no fixed release). Only in the
-          #   examples, via electron-builder → @electron/get → global-agent →
-          #   roarr, whose format strings are global-agent's own literals. Not
-          #   in any published package.
-          # GHSA-pqg4-j6r4-53mv — shell-quote (fixed in 1.11.0, outside the
-          #   exact 1.9.0 concurrently 10.0.5 pins). Only in the examples, via
-          #   concurrently, which calls quote() only under
-          #   --passthrough-arguments; the examples' scripts do not pass it.
-          #   Not in any published package.
-          # The list mirrors scripts/osv-scanner.toml; the two must stay in sync.
-          allow-ghsas: GHSA-wrw7-89jp-8q8g, GHSA-86w9-cpqp-85rv, GHSA-vfj7-8cjw-p6xm, GHSA-ch52-4w7c-c8xp, GHSA-jp82-f5mq-hwhp, GHSA-p6vx-979v-rg4c, GHSA-hp3w-g68c-fv3c, GHSA-pqg4-j6r4-53mv

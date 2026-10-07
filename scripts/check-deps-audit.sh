@@ -101,9 +101,9 @@ IFS=$OLDIFS
 
 echo "🔒 auditing $(($# / 2)) lockfile(s)"
 
-# Config (scripts/osv-scanner.toml) mirrors .github/workflows/codeql.yml
-# allow-ghsas + adds RUSTSEC unmaintained advisories that GitHub Dependency
-# Review doesn't flag (no CVSS) but osv-scanner does.
+# Config (scripts/osv-scanner.toml) is the source of `allow-ghsas` in
+# .github/dependency-review-config.yml, and adds RUSTSEC advisories, which
+# GitHub Dependency Review does not read and osv-scanner does.
 set +e
 # --verbosity warn silences osv-scanner's per-ignore "<id> has been filtered out because:
 # <reason>" info logging — one line per IgnoredVulns entry × each matching lockfile (~40 lines,
@@ -125,8 +125,8 @@ case $exit_code in
     echo ""
     echo "❌ Vulnerabilities detected. Triage steps:"
     echo "   1. Bump the affected package (prefer patch/minor)."
-    echo "   2. If unfixable & non-shipped (example/dev), add to"
-    echo "      scripts/osv-scanner.toml and .github/workflows/codeql.yml."
+    echo "   2. If unfixable & non-shipped (example/dev), add an entry to"
+    echo "      scripts/osv-scanner.toml, then run node scripts/sync-config.mjs --write."
     ;;
   *)
     echo ""

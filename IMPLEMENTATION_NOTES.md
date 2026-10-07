@@ -2497,13 +2497,15 @@ Bundle Size job (in `ci.yml`) compares bundle sizes between PR and base branch:
 
 ### Security Scanning
 
+> **Updated (2026-10-07).** `allow-ghsas` has left `codeql.yml` for `.github/dependency-review-config.yml`, where `scripts/sync-config.mjs` writes it: "`allow-ghsas` is generated from `scripts/osv-scanner.toml`, which a TOML parser reads".
+
 `.github/workflows/codeql.yml`:
 
 - Runs CodeQL analysis on push/PR to master
 - Weekly scheduled scan (cron: `0 3 * * 1`)
 - Uses config file `.github/codeql/codeql-config.yml` for query configuration
 - Analysis is **scoped to shipped source** via the config's `paths` allow-list (`packages/*/src/**` + `packages/*/index.ts`). `paths-ignore` mirrors the repo's test conventions — the `tests/` folder plus the `.test` / `.properties` / `.stress` / `.bench` suffixes (`.ts` **and** `.tsx`) — so intentional security anti-patterns in unit/property/stress/bench fixtures never raise false-positive alerts. Since the allow-list is src-only, `paths-ignore` is belt-and-suspenders: it only bites if a test is ever co-located under `src/` (glob `*.test.ts` would miss a `.test.tsx` there, hence both extensions are listed)
-- Dependency review on PRs (fails on moderate+ severity, uses `.github/dependency-review-config.yml` for license allow-list and inline `allow-ghsas:` for individual GHSA exemptions)
+- Dependency review on PRs (fails on moderate+ severity; `.github/dependency-review-config.yml` holds the license allow-list and `allow-ghsas`, the GHSA exemptions, generated from `scripts/osv-scanner.toml`)
 
 #### Local Dependency Audit (PR #643)
 
@@ -2515,9 +2517,9 @@ Bundle Size job (in `ci.yml`) compares bundle sizes between PR and base branch:
 
 - Skips gracefully with a hint if `osv-scanner` is not installed (fresh clones / non-security contributors can still push).
 - Refuses to run (exit `3`) when the installed `osv-scanner` is below `OSV_SCANNER_FLOOR`: an older scanner reads only the first document of a pnpm 12 lockfile. See "osv-scanner has a version floor" (2026-09-15).
-- `scripts/osv-scanner.toml` is the single source of truth for ignored advisories — mirrors `allow-ghsas:` in `codeql.yml` AND lists RUSTSEC unmaintained advisories without CVSS that GitHub Dependency Review ignores but osv-scanner reports (glib, proc-macro-error, the unic-\* set — all transitive via Tauri 2.x in desktop examples only; the file itself names each one and why).
+- `scripts/osv-scanner.toml` is the single source of truth for ignored advisories — the source of `allow-ghsas` in `.github/dependency-review-config.yml` AND lists RUSTSEC advisories, which GitHub Dependency Review does not read and osv-scanner reports (proc-macro-error, the unic-\* set, quick-xml — all transitive via Tauri 2.x in desktop examples only; the file itself names each one and why).
 
-**Sync rule:** when adding a new exemption, update **both** files (`scripts/osv-scanner.toml` + `.github/workflows/codeql.yml`) — they must stay aligned.
+**Sync rule:** add an exemption to `scripts/osv-scanner.toml` alone, then run `node scripts/sync-config.mjs --write`; `lint:config-sync` fails while `allow-ghsas` differs from it.
 
 **npm allowlist entries (vs the Rust/Tauri ones):** prefer a **bump** over an exemption — patch/minor bumps go in the affected `package.json`; transitive vulns whose dependency hard-pins the bad version get a `pnpm.overrides` security floor in the root `package.json` (the established pattern: `axios`/`qs`/`follow-redirects`/`node-forge`/`@babel/core`/`vite`/…). Only allowlist when **no in-range fix exists** — and "no fix" means you checked **every** node in the chain, not just the one that names the bad package.
 
@@ -4201,7 +4203,7 @@ Each override addresses a known vulnerability in older versions. Version-scoped 
 
 **GPL allowance:** GPL licenses are allowed for devDependencies only (build tools like `rollup-plugin-dts`). They don't link with production code, so no copyleft concern.
 
-**OpenSSF Scorecard:** `warn-on-openssf-scorecard-level: 0` — warns on low-scored packages instead of failing. Specific GHSAs can be allowed via `allow-ghsas` when a vulnerability is assessed as non-applicable.
+**OpenSSF Scorecard:** `warn-on-openssf-scorecard-level: 0` — warns on low-scored packages instead of failing. Specific GHSAs can be allowed via `allow-ghsas` when a vulnerability is assessed as non-applicable; that list is in the same file, generated from `scripts/osv-scanner.toml`: "`allow-ghsas` is generated from `scripts/osv-scanner.toml`, which a TOML parser reads".
 
 ## ESLint 10 Migration
 
@@ -14206,6 +14208,7 @@ Three rounds of review of the fix found the same order of the text in two more p
 - With the role-only list, 84 files gained an lcov record and none lost one. Every package but core passed its thresholds; core missed the two branches above, and with their cells it passes (5 778 tests).
 - On the analysis of `e254269d8`, Sonar's `lines_to_cover` (9 944) is, file by file, the number of lines with a `DA` or a `BRDA` record in the uploaded lcov; `DA` alone gives 9 662. The four files of that analysis with neither an lcov record nor a name pattern have no line to cover.
 - `--write` over the old value of `sonar.coverage.exclusions` rewrites that one line and nothing else.
+- On the analysis of `22ca6e498`, which carries the change, `lines_to_cover` is 10 125: 181 more, in the 26 files and by the numbers the `DA`-or-`BRDA` rule predicted from the role-only run. `core/src/pipeline/types.ts` and the eight owner files without an lcov record have no line to cover.
 - 34 of 34 mutants fail a cell: the two branches of core; the closed reading taking another member, a `thresholds` that opens no object, the word inside a longer one, the text of strings or comments, string escapes, a string `thresholds`, a bare `/` or `\`, an unterminated comment or string, integers alone, or a wrong line in a refusal; the region dropping either kind of package or taking one without `src/`; and, for the resolved cell, a name in the base `exclude` in double quotes, single quotes or a spread, a coverage `exclude` in the common config, an owner narrowing `include` by name, pushing onto `exclude` or keeping only its shared dir, the base `include` without `.tsx`, coverage off, another reports directory, a stray `vitest.config.ts`, and a threshold under a computed key. Five of them — the single quotes, the spread, the common config, the narrowed `include` and the push — passed the text reading this cell replaced, as the review of the step measured.
 
 ## The files svelte's build and test runs leave are not inputs of lint and type-check (2026-10-07)
@@ -14215,3 +14218,26 @@ Three rounds of review of the fix found the same order of the text in two more p
 **Solution.** `!**/.svelte-kit/**` and `!**/.vitest-cache/**` in the inputs of `lint` and `type-check`.
 
 **Measured.** A pair of `turbo run lint type-check --dry=json` in such a checkout, before and after: `svelte#lint` loses its 110 files and `svelte#type-check` its 49, all from the two directories, and no other file leaves a key. Of the other 48 tasks, 46 keep their hash; `router-benchmarks#lint` and `#type-check` change theirs only through `svelte#type-check`, which they depend on.
+
+## `allow-ghsas` is generated from `scripts/osv-scanner.toml`, which a TOML parser reads (2026-10-07)
+
+**Problem.** The advisories the repository accepts lived twice: in `scripts/osv-scanner.toml`, which osv-scanner reads for `lint:audit`, and in the `allow-ghsas` input of the Dependency Review step of `codeql.yml`, a comma-separated copy with an explanation per id above it. A comment asked to keep the two in step, and nothing checked it.
+
+**Solution.**
+
+- `allow-ghsas` is the region `allow-ghsas` of `scripts/sync-config.mjs` in `.github/dependency-review-config.yml`: a YAML list of the GHSA ids of `scripts/osv-scanner.toml`, in their order (`scripts/osv-allowlist.mjs`). `lint:config-sync` refuses a hand edit. The `RUSTSEC-*` entries stay osv-scanner's: Dependency Review reads GHSA ids alone. Without a GHSA entry the region is `allow-ghsas: []`.
+- The input `allow-ghsas` and the comment above it leave `codeql.yml`; each reason stays in the `reason` of its entry. dependency-review-action v5 merges `{...file, ...inputs}`, so an input set in the workflow would replace the file's list, and one left unset leaves it.
+- The file is read by `smol-toml` 1.9.0, a root devDependency pinned exactly, after a strict UTF-8 decode. Comments, quoting and both forms of a record are the parser's. The reading adds a closed check: only `IgnoredVulns` at the top level; in a record only an `id` and a `reason` string and an `ignoreUntil` that is a TOML local date; no `id` twice. Anything else is refused, naming the file, and the record where there is one.
+- An id that starts with `GHSA-` has the form `GHSA-xxxx-xxxx-xxxx` of lowercase letters and digits, or is refused. The region writes it as a plain YAML scalar, where whitespace at its end, ` #` or `: ` would be read as another id or a mapping while osv-scanner matches the id as written: with a trailing space, Dependency Review allowed the advisory and osv-scanner reported it.
+- A cell holds every Dependency Review step of the workflows to `actions/dependency-review-action@v5`, the version whose merge rule this rests on, to a `config-file` naming this file, and to no `allow-ghsas` input — in `with:` in any letter case, or as `INPUT_ALLOW-GHSAS` in an `env:`.
+- Dependabot ignores `smol-toml`, as it does `yaml`: a PR that bumps it carries no source, so neither group of `scripts/tests` runs on it in CI.
+
+**Why a parser.** osv-scanner reads the file with a TOML parser of its own (`BurntSushi/toml`). A line reader of ours would have to agree with it on every form the cells name, and would part from it on the first form they do not.
+
+**Measured.**
+
+- osv-scanner 2.6.0 and `smol-toml` 1.9.0, loading the same files: both read an array of inline tables, a TOML 1.1 multi-line inline table and a leading BOM, and both refuse a repeated key. osv-scanner itself refuses a quoted date and an unknown key of a record.
+- `smol-toml` gives a local date as a `TomlDate` whose `isDate()` is true, a quoted date as a string and a date with a time as one whose `isDateTime()` is, so the check of `ignoreUntil` is a check of type. A day that does not exist in its month passes it: `smol-toml` rolls 2026-02-30 over to 2026-03-02, and the parsed value cannot tell. osv-scanner refuses such a file whole, so `lint:audit` fails on it.
+- The first `--write` lists the eight ids the input listed, in its order.
+- The documentation of `smol-toml` says its next major reads dates as Temporal values by default, and calls `TomlDate` a legacy API; such a bump reds the cells of `osv-allowlist.test.mjs`.
+- 23 of 23 mutants fail a cell. Each takes out a refusal of the reading — a top-level key, an `IgnoredVulns` that is no array, a record that is no table or is a nested array, a key of a record, an `id` or a `reason` of another type, an `ignoreUntil` of another kind, a repeated `id`, a GHSA id of another form, a byte not in UTF-8 — or lets the decoder strip the BOM the parser should see, puts non-GHSA ids or a reversed order into the region, writes `allow-ghsas:` for the empty list, leaves the region unregistered, or gives the workflow an `allow-ghsas` input in either letter case, an `INPUT_ALLOW-GHSAS` in `env:`, no `config-file` or another major of the action. Before the review of the step, the cells let through the forms behind six of them: a GHSA id YAML reads apart, a BOM the decoder strips, a nested array, a non-GHSA id, a key in another letter case and another major of the action.

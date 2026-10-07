@@ -32,6 +32,7 @@ import { join } from "node:path";
 
 import { render as cpdExclusions } from "./cpd-exclusions.mjs";
 import { withoutGitEnv } from "./git-env.mjs";
+import { render as osvAllowlist } from "./osv-allowlist.mjs";
 import { REFUSED_CHARACTERS } from "./refused-characters.mjs";
 import { isPhantom, packages } from "./repo-model.mjs";
 
@@ -77,6 +78,12 @@ export const REGIONS = [
     file: "sonar-project.properties",
     source: "packages/*",
     render: coverageExclusions,
+  },
+  {
+    name: "allow-ghsas",
+    file: ".github/dependency-review-config.yml",
+    source: "scripts/osv-scanner.toml",
+    render: osvAllowlist,
   },
 ];
 

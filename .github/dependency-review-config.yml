@@ -75,3 +75,18 @@ allow-dependencies-licenses:
   # dep of every proc-macro crate, pulled in via Tauri build deps;
   # desktop examples only.
   - pkg:cargo/unicode-ident
+
+# Advisories accepted on a pull request: the GHSA ids of scripts/osv-scanner.toml,
+# where each entry gives its reason. Dependency Review reads GHSA ids alone;
+# the RUSTSEC entries there are for osv-scanner.
+# >>> sync-config: allow-ghsas — the GHSA ids of scripts/osv-scanner.toml
+allow-ghsas:
+  - GHSA-wrw7-89jp-8q8g
+  - GHSA-86w9-cpqp-85rv
+  - GHSA-vfj7-8cjw-p6xm
+  - GHSA-ch52-4w7c-c8xp
+  - GHSA-jp82-f5mq-hwhp
+  - GHSA-p6vx-979v-rg4c
+  - GHSA-hp3w-g68c-fv3c
+  - GHSA-pqg4-j6r4-53mv
+# <<< sync-config: allow-ghsas

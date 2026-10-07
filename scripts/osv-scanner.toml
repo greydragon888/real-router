@@ -1,7 +1,9 @@
-# Allowlist for osv-scanner — mirrors `allow-ghsas:` in
-# .github/workflows/codeql.yml so local pre-push checks match CI.
-# When adding a new entry here, also add it to the workflow (and
-# vice versa) — they must stay in sync.
+# Allowlist for osv-scanner (`pnpm lint:audit`), and the source of
+# `allow-ghsas` in .github/dependency-review-config.yml: after an edit here,
+# `node scripts/sync-config.mjs --write` copies the GHSA ids of these
+# entries there, and `lint:config-sync` fails while the two differ.
+# Each entry holds an `id`, and at most a `reason` and an `ignoreUntil`, a
+# TOML local date; the generator refuses any other key.
 
 [[IgnoredVulns]]
 id = "GHSA-wrw7-89jp-8q8g"
@@ -142,9 +144,9 @@ id = "RUSTSEC-2025-0100"  # unic-ucd-ident unmaintained
 reason = "Transitive via Tauri 2.x, desktop examples only."
 
 # quick-xml DoS advisories — real CVEs with CVSS scores (unlike the
-# unmaintained-crate entries above). RUSTSEC-only (no GHSA alias), so NOT
-# mirrored in codeql.yml: GitHub Dependency Review only flags GHSA advisories,
-# and quick-xml is unchanged by any PR diff anyway. Drop these when an upstream
+# unmaintained-crate entries above). RUSTSEC-only (no GHSA alias), so not in
+# `allow-ghsas`: GitHub Dependency Review reads GHSA ids alone, and quick-xml
+# is unchanged by any PR diff anyway. Drop these when an upstream
 # Tauri/plist bump moves quick-xml to >= 0.41.0.
 
 [[IgnoredVulns]]
