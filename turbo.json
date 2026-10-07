@@ -106,6 +106,8 @@
         "!dist/**",
         "!coverage/**",
         "!**/node_modules/**",
+        "!**/.svelte-kit/**",
+        "!**/.vitest-cache/**",
         "eslint.config.*",
         "!$TURBO_ROOT$/tsdown.base.*",
         "!$TURBO_ROOT$/vitest.config.*"
@@ -148,6 +150,8 @@
         "../../scripts/lib/**",
         "!dist/**",
         "!**/node_modules/**",
+        "!**/.svelte-kit/**",
+        "!**/.vitest-cache/**",
         "rollup.*",
         "tsconfig.json",
         "**/tsconfig.json",
