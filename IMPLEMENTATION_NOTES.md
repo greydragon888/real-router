@@ -14095,7 +14095,7 @@ Three rounds of review of the fix found the same order of the text in two more p
 
 **Why.** T18 stays deferred, by the owner's decision of 2026-10-07: one flag closes the divergence that is live in a required check.
 
-- ⚠ danger's reminder of a missing changeset reads a rename as its new path alone: on GitHub, danger 14.0.7 builds its file lists from the pull request's diff, and `diffToGitJSONDSL` puts `to` into `modified_files`. It stays a reminder, not a check.
+- ⚠ danger's reminder of a missing changeset reads a rename as its new path alone: on GitHub, danger 14.0.7 builds its file lists from the pull request's diff, and `diffToGitJSONDSL` puts `to` into `modified_files`. It counts a changeset the pull request deletes as well, since `allChangedFiles` in `dangerfile.ts` takes `deleted_files` too; Require Changeset fails such a pull request. It stays a reminder, not a check.
 
 **Measured (2026-10-07).** In a repository with `packages/core/src/a.ts` moved to `packages/core/tests/a.ts`, `git diff --name-only` lists `packages/core/tests/a.ts` alone, and with `--no-renames` both paths. Without the flag the test's first cell fails, and its controls pass either way.
 
