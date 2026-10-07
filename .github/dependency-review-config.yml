@@ -88,5 +88,4 @@ allow-ghsas:
   - GHSA-jp82-f5mq-hwhp
   - GHSA-p6vx-979v-rg4c
   - GHSA-hp3w-g68c-fv3c
-  - GHSA-pqg4-j6r4-53mv
 # <<< sync-config: allow-ghsas
