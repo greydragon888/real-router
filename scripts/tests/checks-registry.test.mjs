@@ -1185,8 +1185,9 @@ test("the scripts/tests groups list no tools: in a hook a missing tool skips the
   }
 });
 
-test("node:scripts-tooling runs scripts-tests.mjs tooling — held here, in the group it does not run", () => {
-  // `verify.test.mjs`, in the tooling group, holds the guards group's command.
+test("node:scripts-tooling runs scripts-tests.mjs tooling in pre-push and CI, with no tools — held here, in the group it does not run", () => {
+  // `verify.test.mjs`, in the tooling group, holds the guards group's entry
+  // the same way.
   const tooling = CHECKS.find((each) => each.id === "node:scripts-tooling");
 
   assert.deepEqual(tooling?.run, [
@@ -1194,6 +1195,9 @@ test("node:scripts-tooling runs scripts-tests.mjs tooling — held here, in the 
     "scripts/scripts-tests.mjs",
     "tooling",
   ]);
+  assert.deepEqual(tooling.stages, ["pre-push", "ci"]);
+  assert.deepEqual(tooling.ciSkip, ["dependabot-pr", "no-source"]);
+  assert.equal(tooling.tools, undefined, "node:scripts-tooling lists tools");
 });
 
 test("node:skip-facts runs in a step of Repo Lints of its own, outside verify", () => {

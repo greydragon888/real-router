@@ -934,7 +934,9 @@ test("a hook prints no ::group:: and writes no summary without GITHUB_STEP_SUMMA
 // cells would not run. This file is in the tooling group, so the guards
 // group's command and its run are held here.
 
-test("node:scripts-guards runs scripts-tests.mjs guards", () => {
+test("node:scripts-guards runs scripts-tests.mjs guards in pre-push and CI, with no tools — held here, in the group it does not run", () => {
+  // In a hook a listed tool that is missing skips the check, and a stage that
+  // is gone skips it too; a cell of the guards group would be skipped with it.
   const guards = CHECKS.find((each) => each.id === "node:scripts-guards");
 
   assert.deepEqual(guards?.run, [
@@ -942,6 +944,9 @@ test("node:scripts-guards runs scripts-tests.mjs guards", () => {
     "scripts/scripts-tests.mjs",
     "guards",
   ]);
+  assert.deepEqual(guards.stages, ["pre-push", "ci"]);
+  assert.deepEqual(guards.ciSkip, ["dependabot-pr", "no-source"]);
+  assert.equal(guards.tools, undefined, "node:scripts-guards lists tools");
 });
 
 test("scripts-tests.mjs guards runs the guards: a failing guard fails it, a failing tooling test does not", () => {
