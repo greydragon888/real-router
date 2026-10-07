@@ -19,6 +19,8 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { isWorkflowFile } from "../runner-labels.mjs";
+
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const WORKFLOWS = join(repoRoot, ".github", "workflows");
 
@@ -95,7 +97,7 @@ export function findDanglingReferences(files) {
 
 const repoFiles = new Map(
   readdirSync(WORKFLOWS)
-    .filter((file) => /\.ya?ml$/.test(file))
+    .filter((file) => isWorkflowFile(file))
     .map((file) => [file, readFileSync(join(WORKFLOWS, file), "utf8")]),
 );
 

@@ -31,6 +31,8 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { isWorkflowFile } from "../runner-labels.mjs";
+
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const WORKFLOWS = join(repoRoot, ".github", "workflows");
 
@@ -290,7 +292,7 @@ function scanWorkflow(file, text) {
 
 function scanAll() {
   const files = readdirSync(WORKFLOWS)
-    .filter((f) => /\.ya?ml$/.test(f))
+    .filter((f) => isWorkflowFile(f))
     .toSorted((a, b) => a.localeCompare(b));
   const findings = [];
   let steps = 0;

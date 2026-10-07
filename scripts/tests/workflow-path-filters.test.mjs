@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
 import { isMap, isScalar, isSeq } from "yaml";
 
 import { readClosedYaml } from "../closed-yaml.mjs";
+import { isWorkflowFile } from "../runner-labels.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const WORKFLOWS = join(ROOT, ".github/workflows");
@@ -83,7 +84,7 @@ test("every workflow path filter names something that exists", () => {
   const read = [];
 
   for (const file of readdirSync(WORKFLOWS).filter((name) =>
-    /\.ya?ml$/u.test(name),
+    isWorkflowFile(name),
   )) {
     const keys = pathFilterKeys(readFileSync(join(WORKFLOWS, file), "utf8"));
 

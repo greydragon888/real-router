@@ -39,6 +39,7 @@ import { readClosedYaml } from "../closed-yaml.mjs";
 import { CHECKS } from "../checks.mjs";
 import { gatedJobs, parseJobs } from "../ci-gate.mjs";
 import { LINT_TASK_ROLES } from "../lint-tasks.mjs";
+import { isWorkflowFile } from "../runner-labels.mjs";
 import { CONTEXTS } from "../verify.mjs";
 
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
@@ -1096,7 +1097,7 @@ test("fixture: a lint task reaches the packages that declare it, unless a static
 
 const workflowFiles = Object.fromEntries(
   readdirSync(WORKFLOWS)
-    .filter((file) => /\.ya?ml$/.test(file))
+    .filter((file) => isWorkflowFile(file))
     .sort()
     .map((file) => [file, readFileSync(join(WORKFLOWS, file), "utf8")]),
 );

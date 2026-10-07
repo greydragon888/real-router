@@ -13989,7 +13989,7 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 
 ## The tests of the CI guards hold the parser's reading of a block and the commands of both test groups (2026-10-06)
 
-> **Updated (2026-10-07).** The tooling command's status was held for a pnpm that exits 0 and for one that does not start, not for turbo failing: a `runTask` that returned 1 on a spawn error and 0 otherwise passed every test. Cells now hold `scripts-tests.mjs tooling` to the 3 a pnpm exits with, and to 1 when pnpm dies of a signal. The block comparison takes a workflow by T9's `isWorkflowFile`, `.YML` included: it took lower-case extensions alone, and a cell with `x.YML` in a repository of its own holds the rule.
+> **Updated (2026-10-07).** The tooling command's status was held for a pnpm that exits 0 and for one that does not start, not for turbo failing: a `runTask` that returned 1 on a spawn error and 0 otherwise passed every test. Cells now hold `scripts-tests.mjs tooling` to the 3 a pnpm exits with, and to 1 when pnpm dies of a signal. The block comparison takes its files by T9's rule (the entry "Every reader of the workflow set takes a workflow by T9's rule").
 
 **Problem.** The reconciliation of RFC-4 named three ways the tests of the CI guards could pass without holding, and the review of the first fix found the chain longer. `yaml` is the only reader of the gate's step, of Repo Lints' step and of every test that reads a workflow through `scripts/closed-yaml.mjs`, so a version that read a block otherwise would change what they check. A tool in `tools` of a `scripts/tests` group makes a hook skip the whole group when the tool is missing. And a group could pass having run nothing: `node:scripts-tooling` is turbo's verdict on the command of `//#test:tooling`, and nothing held that command, the check's own `run`, or that `scripts-tests.mjs` runs a group and returns its status — `run: ["true"]` or `return 0` in place of the run left every test green. Three comments had drifted too: `runner-labels.mjs` named one importer of `HOSTED` of two, `dependabot.yml` tied the `yaml` ignore to one test, and `changesets.yml` said an input under its v1 name falls back silently and that v2 stopped reading the `GITHUB_TOKEN` env var.
 
@@ -14094,3 +14094,15 @@ Three rounds of review of the fix found the same order of the text in two more p
 - ⚠ danger's reminder of a missing changeset reads a rename as its new path alone: on GitHub, danger 14.0.7 builds its file lists from the pull request's diff, and `diffToGitJSONDSL` puts `to` into `modified_files`. It stays a reminder, not a check.
 
 **Measured (2026-10-07).** In a repository with `packages/core/src/a.ts` moved to `packages/core/tests/a.ts`, `git diff --name-only` lists `packages/core/tests/a.ts` alone, and with `--no-renames` both paths. Without the flag the test's first cell fails, and its controls pass either way.
+
+## Every reader of the workflow set takes a workflow by T9's rule (2026-10-07)
+
+**Problem.** T9 reads a workflow named `.yml` or `.yaml` in any case of letters: whether GitHub runs a `.YML` file is not established, and reading one costs nothing. Five other tests read the set of workflows, and each took lower-case extensions alone: the comparison of block `run:` with their bytes in `closed-yaml.test.mjs`, the census of workflow lines in `checks-registry.test.mjs`, `workflow-run-names.test.mjs`, `workflow-env-reachability.test.mjs` and `workflow-path-filters.test.mjs`. A `.YML` workflow passed all five unread.
+
+**Solution.** T9's rule, `isWorkflowFile` in `scripts/runner-labels.mjs`, is exported, and each of the five takes its files by it. A cell of `closed-yaml.test.mjs` holds the rule: a `.github/workflows/x.YML` with a `run: |` block, in a repository of its own, has its block compared.
+
+**Why.** Which files are workflows is one fact, and T9, whose finding is a security one, already decides it in any case of letters.
+
+- ⚠ No cell holds a reader to `isWorkflowFile`: a reader that takes its files by a filter of its own again passes every test. A census of the readers would be a scan of their source text.
+
+**Measured (2026-10-07).** A `zz.YML` built to fail each of the four other readers — a path filter on a missing directory, a `workflow_run` on a missing name, a `pnpm` line outside the registry, a step reading an undeclared variable — passed all four on their own filters and fails each with `isWorkflowFile`. The same file as `zz.yml` fails the env scan on both, so its bait reaches the rule there. Mutants of the comparison's filter and of `isWorkflowFile` itself fail the `x.YML` cell.
