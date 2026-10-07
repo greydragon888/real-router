@@ -9,8 +9,9 @@
 // wrong "no code" passes a pull request no build or test ran on, and a wrong
 // "no source" drops checks. The cells hold the predicate, pin the two steps
 // and their outputs, and run the steps under bash with `git` and `node`
-// replaced: each skips only on the exact answer line, and a crash, a silent
-// run or an empty diff takes the side that runs the checks.
+// replaced: each skips only on the exact answer line, and a crash before
+// that line, a silent run or an empty diff takes the side that runs the
+// checks.
 //
 // Stdlib node:test/node:assert only (Node 24) — scripts/ is not a vitest
 // workspace.
@@ -252,7 +253,7 @@ function execute(script, diff, node) {
   }
 }
 
-test("each step skips only on its predicate's exact answer; a crash, a silent run, an empty diff or a renamed code path runs the checks", () => {
+test("each step skips only on its predicate's exact answer; a crash before the answer, a silent run, an empty diff or a renamed code path runs the checks", () => {
   const cases = [
     // [step, diff, node stand-in, expected output line]
     [

@@ -21,9 +21,10 @@
 //     any name that starts with `BASH`): a read of one need not return what
 //     the script or its step set;
 //   - it calls `echo`, `exit` with a number, its own functions, and `jq` in
-//     one form, the value of an assignment on one line: `$(jq [-r] [--slurp]
-//     '<program>' <<<"$<a variable its step passes>")`, the program's words
-//     from `JQ_WORDS`;
+//     one form, the value of an assignment: `$(jq [-r] [--slurp] '<program>'
+//     <<<"$<a variable its step passes>")`, with no line end between the
+//     words of `$( )` outside quotes — the program may span lines inside
+//     them — and the program's words from `JQ_WORDS`;
 //   - it defines a function at its top level, like a variable's first
 //     assignment, under a name no bash builtin takes (`BUILTINS`) and not the
 //     one bash calls by itself, so a call of one runs the script's function
