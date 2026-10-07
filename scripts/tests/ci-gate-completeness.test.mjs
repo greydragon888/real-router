@@ -34,6 +34,8 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import ts from "typescript";
+
 import {
   GATE_JOB,
   jobKeys,
@@ -1115,6 +1117,9 @@ function inserted(anchor, lines) {
 
 const after = (lines) => inserted(AGGREGATE_END, lines);
 
+/** The script with `lines` at its end, where an unclosed form reaches it. */
+const atEnd = (lines) => `${STEP.run}${lines}`;
+
 /** The script with one change in the aggregate's jq program. */
 function inProgram(from, to) {
   assert.equal(STEP.run.split(from).length, 2, `not exactly once: ${from}`);
@@ -1301,9 +1306,131 @@ const OUTSIDE_THE_LIST = {
     after(`X=$(jq\n'type' <<<"$NEEDS")`),
     /ends a line inside \$\( \)/,
   ],
+  "a comparison outside == and !=": [
+    after('if [[ "$NEEDS" -eq "1" ]]; then exit 0; fi'),
+    /compares with -eq it does not use inside \[\[ \]\]/,
+  ],
   "a ; that opens a list": [
     after('if [[ -n "$NEEDS" ]]; then ; exit 0; fi'),
     /has ";" where a command belongs/,
+  ],
+  "an unterminated double quote": [
+    atEnd('echo "x'),
+    /has an unterminated double quote/,
+  ],
+  "an unterminated ${{": [atEnd('echo "${{ x'), /has an unterminated \$\{\{/],
+  "an unterminated single quote": [
+    atEnd("echo 'x"),
+    /has an unterminated single quote/,
+  ],
+  "an unterminated $(": [
+    atEnd(`X=$(jq '.' <<<"$NEEDS"`),
+    /has an unterminated \$\(/,
+  ],
+  "a jq string that does not end": [
+    after(`X=$(jq '"x' <<<"$NEEDS")`),
+    /has a jq string that does not end/,
+  ],
+  "a jq escape outside its list": [
+    after(`X=$(jq '"\\x"' <<<"$NEEDS")`),
+    /has a jq escape it does not use: \\x/,
+  ],
+  "an unbalanced ) in the jq program": [
+    after(`X=$(jq '.)' <<<"$NEEDS")`),
+    /has an unbalanced \) in its jq program/,
+  ],
+  "an unbalanced ( in the jq program": [
+    after(`X=$(jq '(.' <<<"$NEEDS")`),
+    /has an unbalanced \( in its jq program/,
+  ],
+  "a reserved word missing at the end": [
+    atEnd('if [[ -n "$NEEDS" ]];'),
+    /has the end where then belongs/,
+  ],
+  "a substitution of a command other than jq": [
+    after(`X=$(printenv '.' <<<"$NEEDS")`),
+    /substitutes the word printenv, not jq/,
+  ],
+  "jq's input other than a variable its step passes": [
+    after(`X=$(jq '.' <<<"x")`),
+    /gives jq an input other than one variable its step passes/,
+  ],
+  "a word after jq's input": [
+    after(`X=$(jq '.' <<<"$NEEDS" "$GITHUB_EVENT_PATH")`),
+    /gives jq the word "\$GITHUB_EVENT_PATH" after its input/,
+  ],
+  "text before a quoted word in a value": [
+    after('X=a"$GITHUB_EVENT_NAME"'),
+    /sets X to a form it does not use/,
+  ],
+  "two quoted words as a value": [
+    after('X="a""$GITHUB_EVENT_NAME"'),
+    /sets X to a form it does not use/,
+  ],
+  "a word after a comparison inside [[ ]]": [
+    after('if [[ "$NEEDS" == "x" "$GITHUB_ACTOR" ]]; then exit 0; fi'),
+    /has the word "\$GITHUB_ACTOR" inside \[\[ \]\]/,
+  ],
+  "a quoted expansion as a case pattern": [
+    after('case "$DEPENDABOT_PR" in\n  "$GITHUB_ACTIONS") exit 0 ;;\nesac'),
+    /has a case pattern it does not use: the word "\$GITHUB_ACTIONS"/,
+  ],
+  "a case pattern without its )": [
+    after('case "$DEPENDABOT_PR" in\n  x exit 0 ;;\nesac'),
+    /has a case pattern without its \)/,
+  ],
+  "a case branch without ;; at the end": [
+    atEnd('case "$DEPENDABOT_PR" in\n  x) exit 0'),
+    /ends a case branch without ;;/,
+  ],
+  "a function inside a function": [
+    after("f() { g() { exit 0; }; }"),
+    /defines a function inside a function/,
+  ],
+  "a function with a parameter list": [
+    after("f(x) { exit 0; }"),
+    /defines f in a form it does not use/,
+  ],
+  "a function without a { } body": [
+    after("f() exit 0"),
+    /defines f without a \{ \} body/,
+  ],
+  "a reserved word as a command": [
+    after("done"),
+    /has the word done where a command belongs/,
+  ],
+  "a variable bash sets itself, read when its step passes it": [
+    after('if [[ "$SECONDS" == "0" ]]; then exit 0; fi'),
+    /reads \$SECONDS, which bash sets itself/,
+    [...STEP_ENV, "SECONDS"],
+  ],
+  "an unquoted input of jq": [
+    after(`X=$(jq '.' <<<x)`),
+    /has the word x where a double-quoted input belongs/,
+  ],
+  "a runner's variable read in the value of an assignment": [
+    after('X="$GITHUB_ACTOR"'),
+    /reads \$GITHUB_ACTOR, which neither its step passes nor it sets/,
+  ],
+  "an if without its fi at the end": [
+    atEnd('if [[ -n "$NEEDS" ]]; then exit 0'),
+    /has the end where fi belongs/,
+  ],
+  "an unquoted case subject": [
+    after("case x in\n  y) exit 0 ;;\nesac"),
+    /has the word x where a double-quoted subject belongs/,
+  ],
+  "a case without its in": [
+    after('case "$NEEDS" x) exit 0 ;;\nesac'),
+    /has the word x where in belongs/,
+  ],
+  "a { } group without its } at the end": [
+    atEnd("{ exit 0"),
+    /has the end where \} belongs/,
+  ],
+  "a function without its } at the end": [
+    atEnd("f() { exit 0"),
+    /has the end where \} belongs/,
   ],
   "a variable bash sets itself": [
     after('LINENO="0"\nif [[ "$LINENO" == "40" ]]; then exit 0; fi'),
@@ -1362,21 +1489,127 @@ const OUTSIDE_THE_LIST = {
   ],
 };
 
-for (const [name, [script, refusal]] of Object.entries(OUTSIDE_THE_LIST)) {
+for (const [name, [script, refusal, stepEnv = STEP_ENV]] of Object.entries(
+  OUTSIDE_THE_LIST,
+)) {
   test(`the gate's script is read closed: ${name} is refused`, () => {
     assert.notEqual(script, STEP.run);
-    assert.throws(() => readGateScript(script, STEP_ENV), refusal);
+    assert.throws(() => readGateScript(script, stepEnv), refusal);
   });
 }
 
-test("the gate's script is read closed: a variable bash sets itself is refused even when its step passes it", () => {
-  assert.throws(
-    () =>
-      readGateScript(after('if [[ "$SECONDS" == "0" ]]; then exit 0; fi'), [
-        ...STEP_ENV,
-        "SECONDS",
-      ]),
-    /reads \$SECONDS, which bash sets itself/,
+const READER = fileURLToPath(new URL("../gate-script.mjs", import.meta.url));
+
+/**
+ * The functions of the reader a refusal passes through on its way out. A call
+ * of one, or `readOf` handed to `forEach`, outside their own bodies, is a
+ * place where the reader refuses.
+ */
+const REFUSING = new Set(["refuse", "expect", "readOf", "quoted", "operand"]);
+
+/**
+ * The places of `scripts/gate-script.mjs` that refuse, by line, as the
+ * TypeScript checker binds the file's names; with the functions of
+ * `REFUSING` it found, the calls of `refuse` it counts, the lines of any
+ * `throw` outside `refuse`, and of any other use of `REFUSING`.
+ */
+function refusals() {
+  const program = ts.createProgram([READER], {
+    allowJs: true,
+    noEmit: true,
+    noLib: true,
+    noResolve: true,
+  });
+  const checker = program.getTypeChecker();
+  const source = program.getSourceFile(READER);
+  const lineOf = (node) =>
+    source.getLineAndCharacterOfPosition(node.getStart()).line + 1;
+  const declared = new Map();
+  const declare = (node) => {
+    const name =
+      ts.isFunctionDeclaration(node) ||
+      (ts.isVariableDeclaration(node) &&
+        node.initializer &&
+        (ts.isArrowFunction(node.initializer) ||
+          ts.isFunctionExpression(node.initializer)))
+        ? node.name?.text
+        : undefined;
+
+    if (REFUSING.has(name)) declared.set(node, name);
+    ts.forEachChild(node, declare);
+  };
+  const found = { declared, sites: [], loose: [], throws: [], calls: 0 };
+  const walk = (node, inside) => {
+    if (ts.isThrowStatement(node) && inside !== "refuse") {
+      found.throws.push(lineOf(node));
+    }
+    if (ts.isIdentifier(node) && inside === undefined) {
+      const declaration = checker.getSymbolAtLocation(node)?.valueDeclaration;
+
+      if (declared.has(declaration) && declaration.name !== node) {
+        const call = node.parent;
+        const handedOn =
+          ts.isCallExpression(call) &&
+          (call.expression === node || call.arguments.includes(node));
+
+        (handedOn ? found.sites : found.loose).push(lineOf(node));
+      }
+    }
+    if (
+      ts.isCallExpression(node) &&
+      declared.get(
+        checker.getSymbolAtLocation(node.expression)?.valueDeclaration,
+      ) === "refuse"
+    ) {
+      found.calls++;
+    }
+    ts.forEachChild(node, (child) => walk(child, declared.get(node) ?? inside));
+  };
+
+  declare(source);
+  walk(source, undefined);
+  return found;
+}
+
+/**
+ * The line of the place in the reader that refused `script`: the first frame
+ * of the error's stack in the reader that is not a function of `REFUSING`.
+ */
+function refusedAt(script, stepEnv) {
+  try {
+    readGateScript(script, stepEnv);
+  } catch (error) {
+    for (const frame of error.stack.split("\n")) {
+      if (!frame.includes("gate-script.mjs")) continue;
+      if (REFUSING.has(/^\s*at ([\w$]+) \(/.exec(frame)?.[1])) continue;
+      return Number(/:(\d+):\d+\)?$/.exec(frame)[1]);
+    }
+  }
+  return undefined;
+}
+
+test("every place the reader refuses is one a cell above reaches", () => {
+  const { declared, sites, loose, throws, calls } = refusals();
+  const reached = new Set(
+    Object.values(OUTSIDE_THE_LIST).map(([script, , stepEnv = STEP_ENV]) =>
+      refusedAt(script, stepEnv),
+    ),
+  );
+  const written = readFileSync(READER, "utf8").match(/\brefuse\(/g).length;
+
+  assert.deepEqual(
+    [...declared.values()].sort(),
+    [...REFUSING].sort(),
+    "each refusing function, declared once",
+  );
+  assert.deepEqual(throws, [], "lines that throw other than through refuse");
+  assert.deepEqual(loose, [], "lines that use a refusing function otherwise");
+  assert.equal(calls, written - 1, "calls of refuse the parser did not find");
+  assert.equal(new Set(sites).size, sites.length, "two places on one line");
+  assert.deepEqual(
+    sites.filter((line) => !reached.has(line)).sort((a, b) => a - b),
+    [],
+    "lines of scripts/gate-script.mjs that refuse with no cell reaching them",
   );
 });
 

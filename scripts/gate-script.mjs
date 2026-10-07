@@ -31,7 +31,9 @@
 //   - it names no variable of its own `PATH` or `HOME`: the first decides
 //     which `jq` runs, the second which `$HOME/.jq` it sources.
 //
-// The cells of the test name each form refused.
+// The cells of the test name each form refused, and the test holds that a
+// cell reaches every place the reader refuses: each call of `refuse`, and of
+// the functions a refusal passes through on its way out.
 
 import { REFUSED_CHARACTERS } from "./refused-characters.mjs";
 
@@ -824,7 +826,6 @@ export function readGateScript(run, stepEnv) {
   }
 
   list([]);
-  if (at !== tokens.length) refuse(`has ${describe(peek())} it does not read`);
 
   return { reads, calls, literals };
 }
