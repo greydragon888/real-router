@@ -14077,3 +14077,18 @@ Three rounds of review of the fix found the same order of the text in two more p
 - ⚠ A refusal inside a function the reader calls from several places, such as `list`, is one place however many callers reach it.
 
 **Measured (2026-10-07).** With each of the 53 calls of `refuse` in turn made a call of a function that does nothing, 48 fail a cell, four loop the reader until the run times out, one exhausts the heap, and none passes. The first sweep put `void (` in place of `refuse(`, which broke the syntax of the four calls that end in a trailing comma, and counted the broken file as a red cell; that hid the comparison, which the census found. Each of the review's mutants fails a cell or the census: `fi`, `in` or a `}` made optional; an unquoted `-n` operand or `case` subject accepted; a read in a value or `jq`'s input left unchecked; a direct `throw`; an alias of `refuse`; a new `expect` without a cell; and a census that skips `readJqProgram`.
+
+## Require Changeset sees both paths of a rename (2026-10-07)
+
+**Problem.** The `check` step of `changeset-check.yml` listed the pull request's files with `git diff --name-only`, whose rename detection prints a rename under its new path alone. A source file moved out of a public package's `src/`, such as `packages/core/src/a.ts` to `packages/core/tests/a.ts`, read as a change to tests, and the required check passed without a changeset though the published package lost a file. `should_run` of `ci.yml` lists its diff with `--no-renames` since its classifier moved into `scripts/diff-carries-no-code.mjs`. The reconciliation of RFC-4 R39 → R49 found the return condition of RFC-3's T18 met — one module of path classes, deferred until the classifier changed again — and the two readings of a rename apart.
+
+**Solution.**
+
+- The step lists the diff with `--no-renames`, so a rename brings both its paths.
+- `require-changeset.test.mjs` runs the step under bash from the repository's root, `git` replaced by one that prints both paths of a rename only when asked with `--no-renames`. A file moved out of `src/` needs a changeset; controls: a change to a source file needs one, a change to a test does not.
+
+**Why.** T18 stays deferred, by the owner's decision of 2026-10-07: one flag closes the divergence that is live in a required check.
+
+- ⚠ danger's reminder of a missing changeset reads a rename as its new path alone: on GitHub, danger 14.0.7 builds its file lists from the pull request's diff, and `diffToGitJSONDSL` puts `to` into `modified_files`. It stays a reminder, not a check.
+
+**Measured (2026-10-07).** In a repository with `packages/core/src/a.ts` moved to `packages/core/tests/a.ts`, `git diff --name-only` lists `packages/core/tests/a.ts` alone, and with `--no-renames` both paths. Without the flag the test's first cell fails, and its controls pass either way.

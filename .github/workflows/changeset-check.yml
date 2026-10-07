@@ -36,8 +36,10 @@ jobs:
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
-          # Get files changed in PR
-          CHANGED=$(git diff --name-only "origin/$BASE_REF...HEAD")
+          # Get files changed in PR, a rename under both its paths: with rename
+          # detection the diff lists the new path alone, and a source file moved
+          # out of a public package's src/ would read as no source change.
+          CHANGED=$(git diff --no-renames --name-only "origin/$BASE_REF...HEAD")
 
           PUBLIC_PACKAGES=""
           for dir in packages/*/; do
