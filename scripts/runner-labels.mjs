@@ -371,7 +371,7 @@ export function judge(files, { reader = textModel } = {}) {
 /**
  * A workflow name the reader takes: `.yml` and `.yaml` alike, in any case —
  * whether GitHub runs a `.YML` file is not established, and reading one costs
- * nothing. The tests that read the set of workflows take its files by it as well.
+ * nothing.
  */
 export const isWorkflowFile = (name) => /\.ya?ml$/i.test(name);
 

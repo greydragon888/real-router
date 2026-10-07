@@ -14099,6 +14099,8 @@ Three rounds of review of the fix found the same order of the text in two more p
 
 ## Every reader of the workflow set takes a workflow by T9's rule (2026-10-07)
 
+> **Updated (2026-10-07).** The census behind this entry looked for one form, a listing of `.github/workflows`, and missed a seventh reader: `code-roots-authority.test.mjs` reads every tracked file and took YAML by a case-sensitive extension, so a `.YML` workflow that named the src root without `shared/` passed it. A second census — every tracked code file, hidden directories included, that both lists files and names YAML, with a positive control for each form, then a pass over generic extension patterns — finds seven readers of the set. That scan now takes its extensions in any case of letters, and a cell holds it. `check-doc-anchors.mjs` names YAML too, but resolves a file by the name a document gives.
+
 **Problem.** T9 reads a workflow named `.yml` or `.yaml` in any case of letters: whether GitHub runs a `.YML` file is not established, and reading one costs nothing. Five other tests read the set of workflows, and each took lower-case extensions alone: the comparison of block `run:` with their bytes in `closed-yaml.test.mjs`, the census of workflow lines in `checks-registry.test.mjs`, `workflow-run-names.test.mjs`, `workflow-env-reachability.test.mjs` and `workflow-path-filters.test.mjs`. A `.YML` workflow passed all five unread.
 
 **Solution.** T9's rule, `isWorkflowFile` in `scripts/runner-labels.mjs`, is exported, and each of the five takes its files by it. A cell of `closed-yaml.test.mjs` holds the rule: a `.github/workflows/x.YML` with a `run: |` block, in a repository of its own, has its block compared.

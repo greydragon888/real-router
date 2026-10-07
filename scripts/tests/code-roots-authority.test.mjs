@@ -130,6 +130,12 @@ export const namesSrcRoot = (code) => SRC_ROOT.some((re) => re.test(code));
 export const namesSharedRoot = (code) =>
   SHARED_ROOT.some((re) => re.test(code));
 
+/**
+ * The extensions of a file that could hold a list, in any case of letters: a
+ * workflow is a list's file too, and T9 takes one named `.YML`.
+ */
+const LIST_FILE = /\.(?:[cm]?[jt]sx?|json|ya?ml|sh|properties|toml)$/iu;
+
 /** Tracked files that could hold a list, with their text. */
 function candidates() {
   const tracked = execFileSync("git", ["ls-files", "-z"], {
@@ -146,8 +152,7 @@ function candidates() {
         !/(?:\.md|pnpm-lock\.yaml|-baseline\.json|claim-census-ledger\.json)$/u.test(
           file,
         ) &&
-        (/\.(?:[cm]?[jt]sx?|json|ya?ml|sh|properties|toml)$/u.test(file) ||
-          /^\.husky\/[^_/][^/]*$/u.test(file)),
+        (LIST_FILE.test(file) || /^\.husky\/[^_/][^/]*$/u.test(file)),
     )
     .filter((file) => !lstatSync(join(ROOT, file)).isSymbolicLink())
     .map((file) => [file, readFileSync(join(ROOT, file), "utf8")])
@@ -189,6 +194,17 @@ test("CONTROL — the census finds the lists known to name both roots", () => {
   ]) {
     assert.ok(found.includes(file), `the census does not reach ${file}`);
   }
+});
+
+test("the census reads a file by its extension in any case of letters", () => {
+  for (const file of [
+    ".github/workflows/zz.YML",
+    ".github/workflows/zz.Yaml",
+    "scripts/x.mjs",
+  ]) {
+    assert.ok(LIST_FILE.test(file), file);
+  }
+  assert.ok(!LIST_FILE.test("docs/x.txt"), "an extension outside the list");
 });
 
 test("fixture: a src glob without shared/ is blind, with shared/ it is not", () => {
