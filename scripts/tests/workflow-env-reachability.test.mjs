@@ -16,14 +16,16 @@
 // failure is a hole in what the step can reach, which only a scan across the
 // three env scopes can answer.
 //
-// Stdlib node:test/node:assert only (Node 24) — `scripts/` is not a vitest
-// workspace, and `scripts/scripts-tests.mjs`, which pre-push and Repo Lints
-// run, picks this file up from `scripts/tests/`, so it needs no wiring of its
-// own.
+// node:test/node:assert, and the `yaml` parser through `scripts/closed-yaml.mjs`
+// — `scripts/` is not a vitest workspace, and `scripts/scripts-tests.mjs`,
+// which pre-push and Repo Lints run, picks this file up from `scripts/tests/`,
+// so it needs no wiring of its own.
 //
-// Deliberately NOT a YAML library: the extractors below are single-purpose and
-// fail-closed — the floors at the bottom fail if this stops parsing the
-// workflows, rather than reporting a clean scan.
+// The extractors below read the workflows line by line, and the parser checks
+// what they read: each step's `run:` the parser places is one they read at the
+// same line, in the same job, with the same variables, or the scan refuses it
+// there. The floors at the bottom fail if the extractors stop reading the
+// workflows at all.
 
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
@@ -31,6 +33,9 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { isMap, isScalar, isSeq } from "yaml";
+
+import { readClosedYaml } from "../closed-yaml.mjs";
 import { isWorkflowFile } from "../runner-labels.mjs";
 
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
@@ -157,10 +162,53 @@ function githubEnvExports(script) {
   return exported;
 }
 
+/**
+ * A variable a script reads. Upper-case only: a lower-case `$foo` in a
+ * workflow script is a shell local by convention, and the two cases are not
+ * worth conflating.
+ */
+const READ = /\$\{?([A-Z][A-Z0-9_]{2,})\}?/g;
+
+/** The variables a script reads, each once, sorted. */
+const readsOf = (script) =>
+  [...new Set([...script.matchAll(READ)].map((m) => m[1]))].toSorted();
+
+/** The line of `text`, counted from 0, that holds `offset`. */
+const lineAt = (text, offset) => text.slice(0, offset).split("\n").length - 1;
+
+/**
+ * Each step's `run:` as the parser places it: the line of its key, the line
+ * of its job's key, and the variables its value reads.
+ */
+function parsedRuns(text) {
+  const jobs = readClosedYaml(text).get("jobs", true);
+  const runs = [];
+
+  for (const { key, value: job } of isMap(jobs) ? jobs.items : []) {
+    const steps = isMap(job) ? job.get("steps", true) : undefined;
+
+    for (const step of isSeq(steps) ? steps.items : []) {
+      const run = isMap(step)
+        ? step.items.find((pair) => pair.key.value === "run")
+        : undefined;
+
+      if (run === undefined) continue;
+      runs.push({
+        line: lineAt(text, run.key.range[0]),
+        job: lineAt(text, key.range[0]),
+        reads: readsOf(isScalar(run.value) ? String(run.value.value) : ""),
+      });
+    }
+  }
+
+  return runs;
+}
+
 /** One `run:` step, with the scopes it can see. */
 function scanWorkflow(file, text) {
   const lines = text.split("\n");
   const findings = [];
+  const scanned = new Map();
   let steps = 0;
   let reads = 0;
 
@@ -243,6 +291,9 @@ function scanWorkflow(file, text) {
 
     // Every EARLIER step of the same job may have exported into the job env.
     const { start, end } = jobRange(from);
+
+    scanned.set(from + runAt, { job: start, reads: readsOf(script) });
+
     const jobEnv = new Set();
 
     for (const b of jobEnvBlocks)
@@ -277,9 +328,7 @@ function scanWorkflow(file, text) {
       .replace(/^\s*-?\s*name:\s*/, "")
       .trim();
 
-    // Upper-case only: a lower-case `$foo` in a workflow script is a shell local
-    // by convention, and the two cases are not worth conflating.
-    for (const m of script.matchAll(/\$\{?([A-Z][A-Z0-9_]{2,})\}?/g)) {
+    for (const m of script.matchAll(READ)) {
       reads++;
 
       if (!visible.has(m[1]))
@@ -287,7 +336,25 @@ function scanWorkflow(file, text) {
     }
   }
 
-  return { findings, steps, reads };
+  const refusals = [];
+  const parsed = parsedRuns(text);
+
+  for (const run of parsed) {
+    const read = scanned.get(run.line);
+    const at = `${file}:${run.line + 1}`;
+
+    if (read === undefined) {
+      refusals.push(`${at} a run: the scan does not read`);
+    } else if (read.job !== run.job) {
+      refusals.push(`${at} a run: the scan places in another job`);
+    } else if (read.reads.join(" ") !== run.reads.join(" ")) {
+      refusals.push(
+        `${at} the scan reads [${read.reads.join(" ")}], the parser [${run.reads.join(" ")}]`,
+      );
+    }
+  }
+
+  return { findings, refusals, runs: parsed.length, steps, reads };
 }
 
 function scanAll() {
@@ -295,6 +362,8 @@ function scanAll() {
     .filter((f) => isWorkflowFile(f))
     .toSorted((a, b) => a.localeCompare(b));
   const findings = [];
+  const refusals = [];
+  let runs = 0;
   let steps = 0;
   let reads = 0;
 
@@ -305,11 +374,13 @@ function scanAll() {
     );
 
     findings.push(...seen.findings);
+    refusals.push(...seen.refusals);
+    runs += seen.runs;
     steps += seen.steps;
     reads += seen.reads;
   }
 
-  return { files: files.length, findings, steps, reads };
+  return { files: files.length, findings, refusals, runs, steps, reads };
 }
 
 test("every $VAR a step reads is visible to that step", () => {
@@ -322,6 +393,15 @@ test("every $VAR a step reads is visible to that step", () => {
       "the usual cause is a step inserted above a trailing `env:` block, which " +
       "re-parents it onto the new step (#2472)",
   );
+});
+
+test("the scan reads each step's run: where the parser places it, in its job, in full", () => {
+  const { refusals, runs, steps } = scanAll();
+
+  assert.deepEqual(refusals, []);
+  // Every step the scan reads is one the parser places as well: the parser
+  // reads the workflows, and the scan reads no run: beyond its.
+  assert.equal(runs, steps);
 });
 
 test("CONTROL — the scan reads the workflows at all", () => {
@@ -376,4 +456,72 @@ test("CONTROL — both polarities, on a workflow written for the purpose", () =>
     scanWorkflow("reparented.yml", reparented).findings.map((f) => f.variable),
     ["RUNS"],
   );
+});
+
+test("a run: the scan does not read, places in another job or reads in part is refused", () => {
+  const job = (...steps) =>
+    ["jobs:", "  a:", "    steps:", ...steps, ""].join("\n");
+  const refused = (text) => scanWorkflow("x.yml", text).refusals;
+  const UNREAD = "a run: the scan does not read";
+
+  // Control: the form the scan reads.
+  assert.deepEqual(
+    refused(job("      - name: x", "        run: echo $ZZ_READ")),
+    [],
+  );
+
+  for (const [form, text, refusal] of [
+    [
+      "run: on the step's dash line",
+      job("      - run: echo $ZZ_READ"),
+      `4 ${UNREAD}`,
+    ],
+    [
+      "a quoted key",
+      job("      - name: x", '        "run": echo $ZZ_READ'),
+      `5 ${UNREAD}`,
+    ],
+    [
+      "a step as a flow mapping",
+      job("      - { name: x, run: echo $ZZ_READ }"),
+      `4 ${UNREAD}`,
+    ],
+    [
+      "steps at the indentation of their key",
+      [
+        "jobs:",
+        "  a:",
+        "    steps:",
+        "    - name: x",
+        "      run: echo $ZZ_READ",
+        "",
+      ].join("\n"),
+      `5 ${UNREAD}`,
+    ],
+    [
+      "a plain run: that goes on to the next line",
+      job("      - name: x", "        run: echo one", "          and $ZZ_READ"),
+      "5 the scan reads [], the parser [ZZ_READ]",
+    ],
+    [
+      "a job key with a comment, whose steps see the job above",
+      [
+        "jobs:",
+        "  a:",
+        "    env:",
+        "      ZZ_READ: 1",
+        "    steps:",
+        "      - name: x",
+        "        run: echo $ZZ_READ",
+        "  b: # the second job",
+        "    steps:",
+        "      - name: y",
+        "        run: echo $ZZ_READ",
+        "",
+      ].join("\n"),
+      "11 a run: the scan places in another job",
+    ],
+  ]) {
+    assert.deepEqual(refused(text), [`x.yml:${refusal}`], form);
+  }
 });

@@ -178,6 +178,8 @@ already cloned it.
 
 ## A step inserted above a trailing `env:` block re-parents it, and nothing saw that (#2472, 2026-09-21)
 
+> **Updated (2026-10-07).** The scan is no longer stdlib-only, and a step the step detector does not read no longer passes unjudged: the `yaml` parser checks each step's `run:` against what the line scan read (the entry "The env scan refuses a `run:` the line scan does not read in full").
+
 **Problem.** The scheduled cross-router matrix ran `run-all.mjs "$RUNS"` with
 `RUNS` unset. `Number("")` is 0, so the sub-`N_MIN` guard (#1455) refused to
 persist anything and exited 1 — correctly — after the job had already built the
@@ -14106,3 +14108,13 @@ Three rounds of review of the fix found the same order of the text in two more p
 - ⚠ No cell holds a reader to `isWorkflowFile`: a reader that takes its files by a filter of its own again passes every test. A census of the readers would be a scan of their source text.
 
 **Measured (2026-10-07).** A `zz.YML` built to fail each of the four other readers — a path filter on a missing directory, a `workflow_run` on a missing name, a `pnpm` line outside the registry, a step reading an undeclared variable — passed all four on their own filters and fails each with `isWorkflowFile`. The same file as `zz.yml` fails the env scan on both, so its bait reaches the rule there. Mutants of the comparison's filter and of `isWorkflowFile` itself fail the `x.YML` cell.
+
+## The env scan refuses a `run:` the line scan does not read in full (2026-10-07)
+
+**Problem.** `workflow-env-reachability.test.mjs` read a step only when its `run:` sat on a line of its own at indentation 8, under a step whose dash sat at 6. A step written `- run: echo "$X"`, a quoted `"run":` key, a step as a flow mapping and steps at the indentation of their `steps:` key were no steps to it, and their reads passed unjudged; its floors count steps across all workflows, so one such step moved nothing. Two more forms passed silently: a plain `run:` that goes on to the next line was read up to its first line break, and a job key with a comment after it started no job, so its steps saw the `env:` and the `$GITHUB_ENV` exports of the job above.
+
+**Solution.** The test reads each workflow a second time through `scripts/closed-yaml.mjs` and places each step's `run:` by the parser: the line of its key, the line of its job's key, and the variables its value reads. A `run:` the scan did not read at that line, one it set in another job, or one whose reads differ is a refusal with its line, and the scan reads no step beyond the parser's: the two counts are equal. A cell holds each of the six forms to its refusal, beside a control in the form the scan reads.
+
+**Why.** The scan is the only check of what a step can see, and its silence on a step it does not read looked the same as a clean scan. The parser places a step whatever its form, so the check needs no list of the forms the line scan misses.
+
+**Measured (2026-10-07).** On the 14 workflows the two readings agree on every step: 129 `run:` placed by the parser, 129 read by the scan, 323 reads, no refusal. A workflow holding `- run: echo "$ZZ_UNDECLARED"` passed the scan before and fails it now at that line. Mutants dropping each of the three refusals, and a parser that places nothing, each fail a cell.
