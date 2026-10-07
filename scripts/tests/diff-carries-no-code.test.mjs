@@ -59,6 +59,9 @@ test("Markdown and CI configuration are no code; .github/actions and everything 
     "packages/core/src/index.ts",
     "packages/core/src/.github/x.ts",
     "scripts/verify.mjs",
+    // The predicate's own file: a pull request that changes it meets this cell
+    // in `node:skip-facts`, which no context skips.
+    "scripts/diff-carries-no-code.mjs",
     "scripts/x.cmd",
     "pnpm-lock.yaml",
     "package.json",

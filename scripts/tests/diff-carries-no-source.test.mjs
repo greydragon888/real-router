@@ -91,6 +91,9 @@ test("one source file in the diff refuses it", () => {
     "packages/core/src/createRouter.ts",
     "shared/dom-utils/link-utils.ts",
     "scripts/tests/ci-gate-completeness.test.mjs",
+    // The predicate's own file: a pull request that changes it meets this
+    // cell in `node:skip-facts`, which no context skips.
+    "scripts/diff-carries-no-source.mjs",
     ".github/workflows/ci.yml",
     "README.md",
     "examples/web/react/basic/src/App.tsx",

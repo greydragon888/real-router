@@ -11,7 +11,14 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -19,19 +26,40 @@ import { fileURLToPath } from "node:url";
 import { isMap, isScalar } from "yaml";
 
 import { ClosedYamlError, readClosedYaml, sourceOf } from "../closed-yaml.mjs";
+import { isWorkflowFile } from "../runner-labels.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const char = (code) => String.fromCharCode(code);
 const CHARACTER = /a character the readers here refuse/;
 const INVISIBLE = /an invisible character/;
 
-test("CONTROL — every tracked YAML file of .github reads closed", () => {
-  const files = execFileSync("git", ["ls-files", "-z", "--", ".github"], {
-    cwd: ROOT,
+/**
+ * Git without the caller's repository variables: a push from a linked worktree
+ * exports GIT_DIR to its hook.
+ */
+const gitEnv = {
+  ...Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")),
+  ),
+  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_SYSTEM: "/dev/null",
+};
+
+/**
+ * The YAML files git tracks under `dir` of the repository at `root`, taken by
+ * the rule T9 takes a workflow by: `.yml` and `.yaml` in any case.
+ */
+const trackedYaml = (root, dir) =>
+  execFileSync("git", ["ls-files", "-z", "--", dir], {
+    cwd: root,
     encoding: "utf8",
+    env: gitEnv,
   })
     .split("\0")
-    .filter((file) => /\.ya?ml$/.test(file));
+    .filter((file) => isWorkflowFile(file));
+
+test("CONTROL — every tracked YAML file of .github reads closed", () => {
+  const files = trackedYaml(ROOT, ".github");
 
   assert.ok(
     files.length >= 15,
@@ -188,22 +216,20 @@ function fromBytes(source) {
   throw new Error(`a block header the reading does not take: ${header}`);
 }
 
-test("every block run: of the workflows reads the same through the parser and through its own bytes", () => {
-  // The gate's script, Repo Lints' step and every test that reads a workflow
-  // through the parser take a `run:` from `yaml` alone; a version that reads
-  // one of these blocks otherwise disagrees with its bytes here.
-  const files = execFileSync(
-    "git",
-    ["ls-files", "-z", "--", ".github/workflows"],
-    { cwd: ROOT, encoding: "utf8" },
-  )
-    .split("\0")
-    .filter((file) => /\.ya?ml$/.test(file));
+/**
+ * Every block `run:` of the workflows git tracks under `root`, held to its
+ * bytes: the parser's value and the byte reading agree, or this throws.
+ *
+ * @param {string} root
+ * @returns {{ headers: Set<string>, blocks: string[] }} the headers met, and
+ *   the file of each block compared
+ */
+function compareBlocks(root) {
   const headers = new Set();
-  let blocks = 0;
+  const blocks = [];
 
-  for (const file of files) {
-    const text = readFileSync(join(ROOT, file), "utf8");
+  for (const file of trackedYaml(root, ".github/workflows")) {
+    const text = readFileSync(join(root, file), "utf8");
     const jobs = readClosedYaml(text).get("jobs", true);
 
     for (const { value: job } of jobs?.items ?? []) {
@@ -216,16 +242,53 @@ test("every block run: of the workflows reads the same through the parser and th
 
         headers.add(source.split("\n")[0].replace(/ +#.*$/, ""));
         assert.equal(fromBytes(source), run.value, `${file}: ${source}`);
-        blocks++;
+        blocks.push(file);
       }
     }
   }
+
+  return { headers, blocks };
+}
+
+test("every block run: of the workflows reads the same through the parser and through its own bytes", () => {
+  // The gate's script, Repo Lints' step and every test that reads a workflow
+  // through the parser take a `run:` from `yaml` alone; a version that reads
+  // one of these blocks otherwise disagrees with its bytes here.
+  const { headers, blocks } = compareBlocks(ROOT);
 
   // Each branch of the byte reading meets a block of the real tree.
   for (const header of ["|", ">-"]) {
     assert.ok(headers.has(header), `no ${header} block read`);
   }
-  assert.ok(blocks >= 50, `only ${blocks} blocks`);
+  assert.ok(blocks.length >= 50, `only ${blocks.length} blocks`);
+});
+
+test("a workflow whose extension is in capitals has its blocks compared too", () => {
+  // T9 reads `x.YML` as a workflow, so the comparison takes it as well.
+  const repo = mkdtempSync(join(tmpdir(), "closed-yaml-"));
+
+  try {
+    mkdirSync(join(repo, ".github", "workflows"), { recursive: true });
+    writeFileSync(
+      join(repo, ".github", "workflows", "x.YML"),
+      [
+        "on: push",
+        "jobs:",
+        "  a:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: |",
+        "          echo a",
+        "",
+      ].join("\n"),
+    );
+    execFileSync("git", ["init", "-q"], { cwd: repo, env: gitEnv });
+    execFileSync("git", ["add", ".github"], { cwd: repo, env: gitEnv });
+
+    assert.deepEqual(compareBlocks(repo).blocks, [".github/workflows/x.YML"]);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
 });
 
 test("the byte reading refuses a header and a shape it does not read", () => {

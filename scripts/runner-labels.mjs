@@ -371,9 +371,9 @@ export function judge(files, { reader = textModel } = {}) {
 /**
  * A workflow name the reader takes: `.yml` and `.yaml` alike, in any case —
  * whether GitHub runs a `.YML` file is not established, and reading one costs
- * nothing.
+ * nothing. `closed-yaml.test.mjs` selects the files it reads by it as well.
  */
-const isWorkflowFile = (name) => /\.ya?ml$/i.test(name);
+export const isWorkflowFile = (name) => /\.ya?ml$/i.test(name);
 
 /**
  * Every workflow file of a directory, by name. A file that is not valid UTF-8
