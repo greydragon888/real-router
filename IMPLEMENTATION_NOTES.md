@@ -14121,13 +14121,31 @@ Three rounds of review of the fix found the same order of the text in two more p
 
 ## The links from the skip facts to Repo Lints' contexts are held in every context (2026-10-07)
 
+> **Updated (2026-10-07).** `node:skip-facts` runs in a step of Repo Lints of its own, outside `verify`, so a `plan` that skips every check no longer skips it (the entry "The tests of what decides the skips run outside verify").
+
 **Problem.** Repo Lints takes its contexts from the facts its step binds: `NO_SOURCE` from the `check` job's output, `PR_AUTHOR` and the rest from expressions of the event. `verify.mjs` reads them in `contextsOf`, and `plan` skips the checks whose `ciSkip` names a context. Only `verify.test.mjs` held the bindings, the step's script, `contextsOf` and `plan`, and it runs in the tooling group, which skips on `no-source` and `dependabot-pr`: a link that added either context skipped the test that holds it. The reconciliation of RFC-4 R49 → R62 bound `NO_SOURCE` to `"true"`; on a pull request with source both `scripts/tests` groups and six more checks skipped, `node:skip-facts` passed, and `verify.test.mjs`, red in 21 of its 41 tests, never ran. `PR_AUTHOR` bound to `dependabot[bot]`, `--context no-source` in the script and `Boolean(env.NO_SOURCE)` in `contextsOf` passed the same way, and a pull request that changes only `ci.yml` runs no pipeline, so its `CI Result` was green.
 
 **Solution.** `node:skip-facts`, the check no CI context skips, runs `verify.test.mjs` as well, and `checks-registry.test.mjs` holds its command.
 
 **Why.** The test that holds a link from a fact to a context runs where no context that link can add skips it — the rule the entry "The check job's skip facts come from a predicate's exact answer" applies to the steps.
 
-- ⚠ A `plan` that skips every check in CI skips `node:skip-facts` too, and nothing in CI holds it. Pre-push does: `ciSkip` acts in the `ci` stage alone.
-- ⚠ A pull request that changes two links at once — a fact bound to a constant and the `ciSkip` of `node:skip-facts` — is not held in CI either. The workflow comes from the pull request's own tree, so the pull request can rewrite it, the gate included.
+- A `plan` that skipped every check in CI skipped `node:skip-facts` too, and nothing in CI held it; pre-push did, since `ciSkip` acts in the `ci` stage alone.
+- Two links changed at once are not held in CI; the entry "The tests of what decides the skips run outside verify" says why.
 
 **Measured (2026-10-07).** With `verify.test.mjs` in `node:skip-facts`, the four mutants above and a `plan` that skips every check with a `ciSkip` each fail it, and the control passes. The command takes about 13.2 s against 12.0 s without the file, two alternating runs each, its files running in parallel.
+
+## The tests of what decides the skips run outside verify (2026-10-07)
+
+**Problem.** `node:skip-facts` held the skip facts and the links from them to Repo Lints' contexts, but `verify` ran it, so `plan` decided whether it ran: a `plan` that skipped every check in CI skipped it with the rest. The audit of why the reconciliations of RFC-4 did not converge counted four returns of one class — a holder of this chain that what it held could skip.
+
+**Solution.**
+
+- Repo Lints runs `node:skip-facts` in a step of its own before `Run the checks`, a plain `node --test` of its three files. Its registry entry has no stage and names `ci.yml#repo-lints` in `ciBy`: `verify` never runs it, so no context, `ciSkip` or `plan` can skip it.
+- `checks-registry.test.mjs` holds the step to the entry's command — Repo Lints runs nothing but `verify` and that command — and `verify.test.mjs` holds its shape: the step before `Run the checks`, with its name and a plain `run:` alone, since an `if:`, a `continue-on-error:` or an `env:` could keep its tests from failing the job.
+- The step never skips, and the groups skip only through the chain the step holds, so one wrong link cannot switch off both.
+
+**Why.** A holder of the machinery that decides what runs cannot run through that machinery. It is the one exception to RFC-1's rule that the hooks and Repo Lints run nothing but `verify`.
+
+- ⚠ Two links changed at once — the step removed and a fact bound to a constant, say — are not held in CI. The workflow comes from the pull request's own tree, so the pull request can rewrite it, the gate included.
+
+**Measured (2026-10-07).** Each mutant of the chain fails the step: `NO_SOURCE` and `PR_AUTHOR` bound to constants, `--context no-source` in the script, `Boolean(env.NO_SOURCE)` in `contextsOf`, a `plan` that skips every check with a `ciSkip`, and one that skips every check in CI. Each mutant of the step fails a test of a group that runs on that pull request: the step removed, `continue-on-error: true`, `if: false`, an `env:` with `NODE_OPTIONS`, a file dropped from the command, the step moved after `Run the checks`, and `ciBy` dropped from the registry.

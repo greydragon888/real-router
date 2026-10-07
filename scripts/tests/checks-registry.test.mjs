@@ -1196,11 +1196,10 @@ test("node:scripts-tooling runs scripts-tests.mjs tooling — held here, in the 
   ]);
 });
 
-test("node:skip-facts runs the tests of the skip facts and the contexts in CI, in every context", () => {
-  // Both scripts/tests groups skip on `no-source` and `dependabot-pr`, so the
-  // tests that hold the steps answering the skip facts, the `no_source`
-  // predicate, and the links from those facts to Repo Lints' contexts run
-  // where no context skips them.
+test("node:skip-facts runs in a step of Repo Lints of its own, outside verify", () => {
+  // Both scripts/tests groups skip on contexts these tests hold, and `verify`
+  // decides what runs by those contexts and `plan`: a step outside `verify`
+  // is where none of them can skip the tests.
   const holder = CHECKS.find((each) => each.id === "node:skip-facts");
 
   assert.deepEqual(holder?.run, [
@@ -1210,11 +1209,11 @@ test("node:skip-facts runs the tests of the skip facts and the contexts in CI, i
     "scripts/tests/diff-carries-no-source.test.mjs",
     "scripts/tests/verify.test.mjs",
   ]);
-  assert.ok(holder.stages.includes("ci"), "node:skip-facts runs in CI");
-  assert.deepEqual(holder.ciSkip, [], "no CI context skips node:skip-facts");
+  assert.deepEqual(holder.stages, [], "verify does not run node:skip-facts");
+  assert.deepEqual(holder.ciBy, [CHECKS_JOB], "Repo Lints runs it");
 });
 
-test("the hooks and Repo Lints call verify with their stage, and run no check of their own", () => {
+test("the hooks and Repo Lints call verify with their stage, and run no check of their own but node:skip-facts", () => {
   for (const hook of ["pre-commit", "pre-push"]) {
     assert.deepEqual(
       findSurfaceViolations(
@@ -1228,7 +1227,14 @@ test("the hooks and Repo Lints call verify with their stage, and run no check of
     findSurfaceViolations(
       jobScript(workflowFiles["ci.yml"], CHECKS_JOB.split("#")[1]),
     ),
-    { stages: ["ci"], others: [] },
+    // The one other line: the tests of what `verify` skips by, which `verify`
+    // cannot run without deciding whether they run.
+    {
+      stages: ["ci"],
+      others: [
+        CHECKS.find((check) => check.id === "node:skip-facts").run.join(" "),
+      ],
+    },
     CHECKS_JOB,
   );
 });

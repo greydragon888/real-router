@@ -4,8 +4,9 @@
 // `release-pr` context Repo Lints adds.
 //
 // Run:  node --test scripts/tests/verify.test.mjs
-//       (in the tooling group, and in CI in `node:skip-facts` as well, which
-//       no context skips: the contexts this suite holds would skip that group)
+//       (in the tooling group, and in CI in Repo Lints' step for
+//       `node:skip-facts` as well, outside verify: the contexts and the `plan`
+//       this suite holds decide whether that group runs)
 //
 // The git-environment cells run real commits in throwaway repositories, each
 // next to a control arm that shows the difference the cell is about: a cell
@@ -42,6 +43,7 @@ import {
   workflowEnvClosed,
 } from "../ci-gate.mjs";
 import { CHECKS } from "../checks.mjs";
+import { readClosedYaml } from "../closed-yaml.mjs";
 import { localEnvVars } from "../git-env.mjs";
 import { TOOLING } from "../scripts-tests.mjs";
 import { CONTEXT_FACTS, CONTEXTS, contextsOf } from "../verify.mjs";
@@ -610,6 +612,27 @@ test("Repo Lints' step binds the facts and calls verify, and nothing else", () =
   assert.ok(
     parseChecksStep(CI),
     "parseChecksStep() could not read Repo Lints' `Run the checks` step",
+  );
+});
+
+test("Repo Lints runs node:skip-facts in a step of its own before verify, and nothing in it can keep it from failing", () => {
+  // The step before `Run the checks`: its name and a plain one-line `run:`
+  // with the check's command, no other key. An `if:`, a
+  // `continue-on-error:` or an `env:` could keep its tests from failing the
+  // job.
+  const steps = readClosedYaml(CI).getIn(["jobs", "repo-lints", "steps"], true);
+  const step = steps.items.at(-2);
+  const run = step.get("run", true);
+
+  assert.deepEqual(
+    step.items.map((pair) => String(pair.key.value)),
+    ["name", "run"],
+  );
+  assert.equal(step.get("name"), "Hold the skip machinery");
+  assert.equal(run.type, "PLAIN");
+  assert.equal(
+    run.value,
+    CHECKS.find((check) => check.id === "node:skip-facts").run.join(" "),
   );
 });
 

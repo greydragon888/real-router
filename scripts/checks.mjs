@@ -9,8 +9,9 @@
 //
 // `scripts/tests/checks-registry.test.mjs` holds the rest of the repository to
 // this list: every root `lint*`/`test*` script and every check line of a
-// workflow is a check here, or is named there as none; the hooks and Repo Lints
-// call `verify` and run nothing else.
+// workflow is a check here, or is named there as none; the hooks call `verify`
+// and run nothing else, and Repo Lints runs nothing else but `node:skip-facts`,
+// the tests of what `verify` skips by, in a step of its own.
 
 /** @typedef {"pre-commit" | "pre-push" | "ci"} Stage */
 
@@ -141,13 +142,12 @@ export const CHECKS = [
     why: "the tests of the repository's tooling, replayed from turbo's cache while their inputs are unchanged",
   },
   {
-    // The skip facts and the contexts Repo Lints derives from them, held where
-    // no CI context skips them: the steps that answer `should_run` and
-    // `no_source`, the table of the `no_source` predicate, and, in
-    // `verify.test.mjs`, the step's bindings of the facts, its script,
-    // `contextsOf` and `plan`. Both groups above skip on `no-source` and
-    // `dependabot-pr`, so a link that added either context wrongly would skip
-    // the test that holds it.
+    // The tests of what decides the skips: the steps that answer `should_run`
+    // and `no_source`, the table of the `no_source` predicate, and, in
+    // `verify.test.mjs`, Repo Lints' bindings of the facts, its script,
+    // `contextsOf` and `plan`. Repo Lints runs them in a step of its own,
+    // outside `verify`, so no context, no `ciSkip` and no `plan` can skip
+    // them; both groups above skip on contexts these tests hold.
     id: "node:skip-facts",
     run: [
       "node",
@@ -156,10 +156,10 @@ export const CHECKS = [
       "scripts/tests/diff-carries-no-source.test.mjs",
       "scripts/tests/verify.test.mjs",
     ],
-    stages: ["ci"],
-    ciSkip: [],
+    stages: [],
+    ciBy: ["ci.yml#repo-lints"],
     prePushExempt:
-      "pre-push runs these tests in node:scripts-guards and node:scripts-tooling, which no context skips there",
+      "pre-push runs these tests in node:scripts-guards and node:scripts-tooling",
     why: "the check job's skip facts come from their predicates' exact answers, and Repo Lints' contexts from those facts alone",
   },
   {
