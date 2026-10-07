@@ -300,6 +300,44 @@ test("the tooling command says so when pnpm does not run", () => {
   }
 });
 
+test("the tooling command fails with the status turbo fails with", () => {
+  const stubs = mkdtempSync(join(tmpdir(), "scripts-tests-pnpm-"));
+  try {
+    writeFileSync(join(stubs, "pnpm"), "#!/bin/sh\nexit 3\n");
+    chmodSync(join(stubs, "pnpm"), 0o755);
+    const run = spawnSync(process.execPath, [SCRIPT, "tooling"], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: `${stubs}${delimiter}${process.env.PATH}`,
+      },
+    });
+
+    assert.equal(run.status, 3, run.stderr);
+  } finally {
+    rmSync(stubs, { recursive: true, force: true });
+  }
+});
+
+test("the tooling command fails when pnpm dies of a signal", () => {
+  const stubs = mkdtempSync(join(tmpdir(), "scripts-tests-pnpm-"));
+  try {
+    writeFileSync(join(stubs, "pnpm"), "#!/bin/sh\nkill -TERM $$\n");
+    chmodSync(join(stubs, "pnpm"), 0o755);
+    const run = spawnSync(process.execPath, [SCRIPT, "tooling"], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: `${stubs}${delimiter}${process.env.PATH}`,
+      },
+    });
+
+    assert.equal(run.status, 1, run.stderr);
+  } finally {
+    rmSync(stubs, { recursive: true, force: true });
+  }
+});
+
 test("scripts-tests.mjs tooling --here runs the tooling group: a failing tooling test fails it, a failing guard does not", () => {
   const first = [...TOOLING][0];
 
