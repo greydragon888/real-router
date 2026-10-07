@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // diff-carries-no-code.mjs — does this diff hold anything the pipeline checks?
 //
-//   git diff --name-only <base> <head> | node scripts/diff-carries-no-code.mjs
+//   git diff --no-renames --name-only <base> <head> | node scripts/diff-carries-no-code.mjs
 //   NO_CODE on stdout, exit 0 = Markdown and CI configuration alone
 //   anything else, exit 1     = code, or no changed paths
 //

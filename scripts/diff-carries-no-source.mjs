@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // diff-carries-no-source.mjs — is there anything in this diff for a code reader? (#2433)
 //
-//   git diff --name-only <base> <head> | node scripts/diff-carries-no-source.mjs
+//   git diff --no-renames --name-only <base> <head> | node scripts/diff-carries-no-source.mjs
 //   exit 0 = nothing but manifests, CHANGELOGs, changesets and the lockfile
 //   exit 1 = something a code reader would read
 //
