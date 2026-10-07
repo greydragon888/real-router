@@ -63,9 +63,10 @@ jobs:
       # build job — and `scripts/diff-carries-no-code.mjs` answers. With
       # `should_run` not `true` the gate requires no job of the pipeline to have
       # run, so the step takes "no code" only from the predicate's exact answer
-      # line: a crash, a run that never answers and an empty diff all run the
-      # pipeline, and a missing answer is a warning. `--no-renames` lists a
-      # renamed file's old path as well, so code moved into Markdown is still
+      # line: a crash before that line, a run that never answers and an empty
+      # diff all run the pipeline, and a missing answer is a warning.
+      # `--no-renames` lists a renamed file's old path as well, so code moved
+      # into Markdown is still
       # code. A release PR is not skipped here, deliberately: its tree is the one
       # that lands on master (IMPLEMENTATION_NOTES "Release PRs run the
       # pipeline"); CodeQL and danger keep their own head-ref skips, and Repo

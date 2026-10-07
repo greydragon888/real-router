@@ -8,8 +8,8 @@
 // `ci.yml`'s `check` job answers `should_run` with it, and with `should_run` not
 // `true` the gate requires no job of the pipeline to have run, so a wrong "no
 // code" passes a pull request no build or test ran on. The step takes "no code"
-// only from the NO_CODE line: a crash, a run that never answers and an empty
-// diff all run the pipeline.
+// only from the NO_CODE line: a crash before that line, a run that never
+// answers and an empty diff all run the pipeline.
 //
 // CI configuration is `.github/` outside `.github/actions/`. The composite
 // actions run in every build job, so a change there is code the pipeline

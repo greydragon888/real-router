@@ -14011,7 +14011,7 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 **Solution.**
 
 - `scripts/diff-carries-no-code.mjs` answers `should_run`: no code when every changed path is Markdown or a file under `.github/` outside `.github/actions/`; an empty diff is code. Neither predicate trims a path, since git prints a name as it is.
-- Both steps list the diff with `--no-renames` and take the skip only from the predicate's exact answer line, `NO_CODE` or `NO_SOURCE`. A crash, a silent run, an empty diff and a renamed code path take the side that runs the checks, and a missing answer is a warning. `git diff` stays on its own line, so its failure fails the step, and with it `check` and the gate.
+- Both steps list the diff with `--no-renames` and take the skip only from the predicate's exact answer line, `NO_CODE` or `NO_SOURCE`. A crash before the answer, a silent run, an empty diff and a renamed code path take the side that runs the checks, and a missing answer is a warning. `git diff` stays on its own line, so its failure fails the step, and with it `check` and the gate.
 - `diff-carries-no-code.test.mjs` holds the predicate, pins both steps and the job's outputs, and runs the steps under bash with `git` and `node` replaced. Its `git` gives the old path of a rename only with `--no-renames`, so a step without the flag fails a cell, not only the pin.
 - It runs as `node:skip-facts`, a check no CI context skips: both `scripts/tests` groups skip on `no-source`, so a step that answered "no source" wrongly would otherwise skip the test that holds it. Pre-push runs it in `node:scripts-guards`, and `checks-registry.test.mjs` holds the check.
 - The new line has its `NOT_A_CHECK` key, and the predicate its entry in `cli-entry.test.mjs`.
