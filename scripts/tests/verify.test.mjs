@@ -4,6 +4,8 @@
 // `release-pr` context Repo Lints adds.
 //
 // Run:  node --test scripts/tests/verify.test.mjs
+//       (in the tooling group, and in CI in `node:skip-facts` as well, which
+//       no context skips: the contexts this suite holds would skip that group)
 //
 // The git-environment cells run real commits in throwaway repositories, each
 // next to a control arm that shows the difference the cell is about: a cell

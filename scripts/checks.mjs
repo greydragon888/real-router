@@ -141,22 +141,26 @@ export const CHECKS = [
     why: "the tests of the repository's tooling, replayed from turbo's cache while their inputs are unchanged",
   },
   {
-    // The steps that answer `should_run` and `no_source`, and the table of the
-    // `no_source` predicate, held where no CI context skips them: both groups
-    // above skip on `no-source`, so a step or a predicate that answered "no
-    // source" wrongly would skip the test that holds it.
+    // The skip facts and the contexts Repo Lints derives from them, held where
+    // no CI context skips them: the steps that answer `should_run` and
+    // `no_source`, the table of the `no_source` predicate, and, in
+    // `verify.test.mjs`, the step's bindings of the facts, its script,
+    // `contextsOf` and `plan`. Both groups above skip on `no-source` and
+    // `dependabot-pr`, so a link that added either context wrongly would skip
+    // the test that holds it.
     id: "node:skip-facts",
     run: [
       "node",
       "--test",
       "scripts/tests/diff-carries-no-code.test.mjs",
       "scripts/tests/diff-carries-no-source.test.mjs",
+      "scripts/tests/verify.test.mjs",
     ],
     stages: ["ci"],
     ciSkip: [],
     prePushExempt:
-      "pre-push runs these tests in node:scripts-guards, which no context skips there",
-    why: "the check job's skip facts come from their predicates' exact answers",
+      "pre-push runs these tests in node:scripts-guards and node:scripts-tooling, which no context skips there",
+    why: "the check job's skip facts come from their predicates' exact answers, and Repo Lints' contexts from those facts alone",
   },
   {
     // Read by the whole task graph, so a diff of manifests alone or a bump of

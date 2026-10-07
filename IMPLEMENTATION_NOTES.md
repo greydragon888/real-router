@@ -14008,7 +14008,7 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 
 ## The check job's skip facts come from a predicate's exact answer (2026-10-06)
 
-> **Updated (2026-10-07).** `node:skip-facts` runs the `no_source` predicate's own table, `diff-carries-no-source.test.mjs`, as well: in the guards group it skipped on the `no-source` it decides, and the steps' cells held the predicate only through the step. Each table also holds its predicate's own file to be code, or source: a predicate taught to skip its own file passed both tables.
+> **Updated (2026-10-07).** `node:skip-facts` runs the `no_source` predicate's own table, `diff-carries-no-source.test.mjs`, as well: in the guards group it skipped on the `no-source` it decides, and the steps' cells held the predicate only through the step. Each table also holds its predicate's own file to be code, or source: a predicate taught to skip its own file passed both tables. `node:skip-facts` runs `verify.test.mjs` too (the entry "The links from the skip facts to Repo Lints' contexts are held in every context").
 
 **Problem.** Two outputs of `ci.yml`'s `check` job decide what CI skips. With `should_run` not `true` the gate requires no job of the pipeline to have run; with `no_source` true Repo Lints skips the checks whose `ciSkip` names `no-source`. No test held either producer: the reconciliation of RFC-4 found the `no_source` step unheld, and `should_run` came from an inline `grep` classification no test read. Each failed toward the skip. The `source` step took exit 0 for "no source", so a predicate that exited 0 without answering skipped the checks: run under bash with `node` exiting 0 at once, it answered `no_source=true` on a diff with code in it. The `changes` step read an empty `grep` output as no code, so a crashed or silent `grep`, or an empty diff, answered `should_run=false`. And `git diff --name-only` lists a renamed file under its new path alone, so code moved into Markdown read as Markdown.
 
@@ -14118,3 +14118,16 @@ Three rounds of review of the fix found the same order of the text in two more p
 **Why.** The scan is the only check of what a step can see, and its silence on a step it does not read looked the same as a clean scan. The parser places a step whatever its form, so the check needs no list of the forms the line scan misses.
 
 **Measured (2026-10-07).** On the 14 workflows the two readings agree on every step: 129 `run:` placed by the parser, 129 read by the scan, 323 reads, no refusal. A workflow holding `- run: echo "$ZZ_UNDECLARED"` passed the scan before and fails it now at that line. Mutants dropping each of the three refusals, and a parser that places nothing, each fail a cell.
+
+## The links from the skip facts to Repo Lints' contexts are held in every context (2026-10-07)
+
+**Problem.** Repo Lints takes its contexts from the facts its step binds: `NO_SOURCE` from the `check` job's output, `PR_AUTHOR` and the rest from expressions of the event. `verify.mjs` reads them in `contextsOf`, and `plan` skips the checks whose `ciSkip` names a context. Only `verify.test.mjs` held the bindings, the step's script, `contextsOf` and `plan`, and it runs in the tooling group, which skips on `no-source` and `dependabot-pr`: a link that added either context skipped the test that holds it. The reconciliation of RFC-4 R49 → R62 bound `NO_SOURCE` to `"true"`; on a pull request with source both `scripts/tests` groups and six more checks skipped, `node:skip-facts` passed, and `verify.test.mjs`, red in 21 of its 41 tests, never ran. `PR_AUTHOR` bound to `dependabot[bot]`, `--context no-source` in the script and `Boolean(env.NO_SOURCE)` in `contextsOf` passed the same way, and a pull request that changes only `ci.yml` runs no pipeline, so its `CI Result` was green.
+
+**Solution.** `node:skip-facts`, the check no CI context skips, runs `verify.test.mjs` as well, and `checks-registry.test.mjs` holds its command.
+
+**Why.** The test that holds a link from a fact to a context runs where no context that link can add skips it — the rule the entry "The check job's skip facts come from a predicate's exact answer" applies to the steps.
+
+- ⚠ A `plan` that skips every check in CI skips `node:skip-facts` too, and nothing in CI holds it. Pre-push does: `ciSkip` acts in the `ci` stage alone.
+- ⚠ A pull request that changes two links at once — a fact bound to a constant and the `ciSkip` of `node:skip-facts` — is not held in CI either. The workflow comes from the pull request's own tree, so the pull request can rewrite it, the gate included.
+
+**Measured (2026-10-07).** With `verify.test.mjs` in `node:skip-facts`, the four mutants above and a `plan` that skips every check with a `ciSkip` each fail it, and the control passes. The command takes about 13.2 s against 12.0 s without the file, two alternating runs each, its files running in parallel.
