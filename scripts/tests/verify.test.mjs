@@ -47,6 +47,7 @@ import { CLEAN_ENV } from "../check-id.mjs";
 import { CHECKS } from "../checks.mjs";
 import { readClosedYaml } from "../closed-yaml.mjs";
 import { localEnvVars } from "../git-env.mjs";
+import { readWorkflows } from "../runner-labels.mjs";
 import { TOOLING } from "../scripts-tests.mjs";
 import {
   CONTEXT_FACTS,
@@ -976,15 +977,12 @@ test("dependabot-pr holds on a Dependabot PR for a package, and not on one for a
   );
 });
 
-test("Dependabot's branches for GitHub Actions keep the prefix contextsOf and codeql.yml read", () => {
+test("Dependabot's branches for GitHub Actions keep the prefix contextsOf and the workflows read", () => {
   // An entry's `pull-request-branch-name` or `multi-ecosystem-group`, or the
   // file's `multi-ecosystem-groups`, renames the branches of its pull
   // requests, and one for an action would take `dependabot-pr`.
   const config = readClosedYaml(
     readFileSync(join(repoRoot, ".github", "dependabot.yml"), "utf8"),
-  ).toJS();
-  const workflow = readClosedYaml(
-    readFileSync(join(repoRoot, ".github", "workflows", "codeql.yml"), "utf8"),
   ).toJS();
 
   assert.ok(!Object.hasOwn(config, "multi-ecosystem-groups"));
@@ -1002,12 +1000,44 @@ test("Dependabot's branches for GitHub Actions keep the prefix contextsOf and co
       );
     }
   }
-  assert.ok(
-    workflow.jobs.analyze.if.includes(
-      `startsWith(github.head_ref, '${DEPENDABOT_ACTIONS}')`,
-    ),
-    workflow.jobs.analyze.if,
-  );
+
+  // A string of a workflow that names the branches reads them as `contextsOf`
+  // does, by `startsWith` on `github.head_ref`; the census names each place.
+  const reader = `startsWith(github.head_ref, '${DEPENDABOT_ACTIONS}')`;
+  const strings = (value, at) =>
+    typeof value === "string"
+      ? [[at, value]]
+      : Array.isArray(value)
+        ? value.flatMap((item, i) =>
+            strings(
+              item,
+              `${at}[${typeof item?.name === "string" ? item.name : i}]`,
+            ),
+          )
+        : value !== null && typeof value === "object"
+          ? Object.entries(value).flatMap(([key, item]) =>
+              strings(item, `${at}.${key}`),
+            )
+          : [];
+  const readers = [];
+  for (const [name, text] of Object.entries(
+    readWorkflows(join(repoRoot, ".github", "workflows")),
+  )) {
+    for (const [at, string] of strings(readClosedYaml(text).toJS(), name)) {
+      const parts = string.split(reader);
+      for (let i = 1; i < parts.length; i++) readers.push(at);
+      assert.doesNotMatch(
+        parts.join(""),
+        /dependabot[/-]github[-_]actions/i,
+        `${at}: ${string}`,
+      );
+    }
+  }
+  assert.deepEqual(readers.sort(), [
+    "ci.yml.jobs.actionlint.if",
+    "ci.yml.jobs.ci.steps[Determine result].env.DEPENDABOT_PR",
+    "codeql.yml.jobs.analyze.if",
+  ]);
 });
 
 test("release-pr is the context of one cell: changeset-release/master, this repository, no source", () => {

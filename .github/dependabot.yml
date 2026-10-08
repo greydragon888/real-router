@@ -327,11 +327,11 @@ updates:
   # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"
     # Dependabot puts this entry's pull requests on `dependabot/github_actions/…`
-    # branches, which `contextsOf` in scripts/verify.mjs and the Analyze job of
-    # `codeql.yml` read: such a pull request takes no `dependabot-pr`, and
-    # Analyze runs on it. So no entry sets `pull-request-branch-name` or
-    # `multi-ecosystem-group`, and the file sets no `multi-ecosystem-groups`:
-    # each renames the branches (verify.test.mjs).
+    # branches, which `contextsOf` in scripts/verify.mjs and the workflows read
+    # (verify.test.mjs holds where): such a pull request takes no
+    # `dependabot-pr`, and Analyze and actionlint run on it. So no entry sets
+    # `pull-request-branch-name` or `multi-ecosystem-group`, and the file sets no
+    # `multi-ecosystem-groups`: each renames the branches.
     # `/` covers `.github/workflows/**` only. A composite action referenced by a
     # RELATIVE path (`uses: ./.github/actions/setup`) is not a dependency edge
     # Dependabot follows, and its own `uses:` pins live outside that scan — so

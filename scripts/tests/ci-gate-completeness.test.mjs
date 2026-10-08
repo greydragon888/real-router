@@ -524,7 +524,7 @@ test("ci.yml: OUTSIDE_GATE allowlist is current", () => {
 const SKIP_FORBIDDEN = {
   check: "always",
   "prose-lint": "always",
-  actionlint: "always but on a Dependabot pull request",
+  actionlint: "always but on a Dependabot pull request for a package",
   "repo-lints": "always",
   "pipeline-leaf": "when should_run, in leaf mode",
   "base-bundle": "when should_run, in sharded mode",
@@ -542,7 +542,8 @@ const SKIP_FORBIDDEN = {
 
 const SKIP_RULES = {
   always: () => true,
-  "always but on a Dependabot pull request": (context) => !context.dependabot,
+  "always but on a Dependabot pull request for a package": (context) =>
+    context.dependabot !== "package",
   "when should_run, in leaf mode": (context) =>
     context.shouldRun === "true" && context.mode === "leaf",
   "when should_run, in sharded mode": (context) =>
@@ -605,9 +606,10 @@ function evaluate(expression, { context, results, needsJson }) {
   }
 
   if (
-    expression === "github.event.pull_request.user.login == 'dependabot[bot]'"
+    expression ===
+    "github.event.pull_request.user.login == 'dependabot[bot]' && !startsWith(github.head_ref, 'dependabot/github_actions/')"
   ) {
-    return String(context.dependabot);
+    return String(context.dependabot === "package");
   }
 
   throw new Error(`the harness does not know the expression: ${expression}`);
@@ -736,7 +738,10 @@ function states() {
 
   for (const shouldRun of ["true", "false", ""]) {
     for (const mode of ["leaf", "sharded", "", "unknown"]) {
-      for (const dependabot of [false, true]) {
+      // Not Dependabot's, and Dependabot's for a package. On Dependabot's for a
+      // GitHub Action the script gets what it gets on one not Dependabot's;
+      // the cell on actionlint's skip runs the gate on all three.
+      for (const dependabot of [false, "package"]) {
         const context = { shouldRun, mode, dependabot };
         const bases = [
           Object.fromEntries(NEEDS.map((job) => [job, "success"])),
@@ -792,6 +797,22 @@ test("the gate step is read in its one shape, and the table names every job it w
   );
 });
 
+test("actionlint's skip passes the gate on a Dependabot PR for a package, and on no other", () => {
+  const states = [false, "package", "action"].map((dependabot) => ({
+    context: { shouldRun: "true", mode: "leaf", dependabot },
+    results: {
+      ...Object.fromEntries(NEEDS.map((job) => [job, "success"])),
+      actionlint: "skipped",
+    },
+  }));
+
+  assert.deepEqual(states.map(expected), [false, true, false]);
+  assert.deepEqual(
+    exitCodes(STEP, states).map((code) => code === 0),
+    [false, true, false],
+  );
+});
+
 /**
  * What the variables the script reads and its step does not pass hold when it
  * starts, one value per state in turn: nothing, the empty string, or a literal
@@ -827,6 +848,10 @@ test("the gate's verdict matches the table in every state, its own variables pre
   );
 
   assert.ok(all.length > 2000, `only ${all.length} states enumerated`);
+  assert.deepEqual(
+    [...new Set(all.map(({ context }) => context.dependabot))],
+    [false, "package"],
+  );
   assert.ok(names.includes("PATH_OK"), "the reader did not see PATH_OK read");
   assert.ok(values.length > 2, "the reader kept no literal to preset");
   assert.equal(
@@ -1050,7 +1075,7 @@ const OPEN_FORMS = {
     CI.slice(CI.indexOf("\njobs:\n") + 1),
   "the step's env as an expression": () =>
     inGate(
-      "        env:\n          DEPENDABOT_PR: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}\n          NEEDS: ${{ toJSON(needs) }}\n",
+      "        env:\n          DEPENDABOT_PR: ${{ github.event.pull_request.user.login == 'dependabot[bot]' && !startsWith(github.head_ref, 'dependabot/github_actions/') }}\n          NEEDS: ${{ toJSON(needs) }}\n",
       `        env: \${{ fromJSON('{"BASH_ENV":"./x.sh"}') }}\n`,
     ),
   "if: always() quoted": () =>

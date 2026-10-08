@@ -14,7 +14,8 @@
 // CI configuration is `.github/` outside `.github/actions/`. The composite
 // actions run in every build job, so a change there is code the pipeline
 // exercises; a workflow file has Repo Lints on every pull request and
-// actionlint on every one but Dependabot's, and Markdown has prose-lint.
+// actionlint on every one but Dependabot's for a package, and Markdown has
+// prose-lint.
 //
 // A path is taken as git prints it: a name with a space at either end is that
 // name, not a shorter one.

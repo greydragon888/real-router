@@ -1445,8 +1445,8 @@ jobs:
             core.summary.addRaw(body).write();
 
   # ============================================
-  # WORKFLOW LINT: actionlint — runs on every PR but Dependabot's (no
-  # should_run gate). A PR touching only .github/workflows/*.yml sets
+  # WORKFLOW LINT: actionlint — runs on every PR but Dependabot's for a package
+  # (no should_run gate). A PR touching only .github/workflows/*.yml sets
   # should_run=false → pipeline/smoke/sonar skip, and nothing else in CI runs a
   # general linter over the syntax, expressions or shell of the highest-risk
   # code class (executable workflows with secret/publish access). Pinned by
@@ -1459,8 +1459,12 @@ jobs:
   # ============================================
   actionlint:
     name: Lint Workflows (actionlint)
-    # Skipped on a Dependabot PR; `ci` counts that skip as a pass there only.
-    if: github.event.pull_request.user.login != 'dependabot[bot]'
+    # Skipped on a Dependabot PR for a package; `ci` counts that skip as a pass
+    # there only. One for a GitHub Action changes the workflows, so the job runs
+    # on it, as Analyze in codeql.yml does.
+    if: >-
+      github.event.pull_request.user.login != 'dependabot[bot]' ||
+      startsWith(github.head_ref, 'dependabot/github_actions/')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -1757,7 +1761,7 @@ jobs:
     steps:
       - name: Determine result
         env:
-          DEPENDABOT_PR: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
+          DEPENDABOT_PR: ${{ github.event.pull_request.user.login == 'dependabot[bot]' && !startsWith(github.head_ref, 'dependabot/github_actions/') }}
           NEEDS: ${{ toJSON(needs) }}
         run: | # zizmor: ignore[template-injection] outputs of the check job
           # Every job the gate waits for must have passed or been skipped: a
@@ -1783,12 +1787,12 @@ jobs:
             exit 1
           fi
 
-          # actionlint runs on every PR but Dependabot's (no should_run gate), so
-          # check it before the docs/CI-only short-circuit — that's the whole point:
-          # a workflow-only PR must not pass the gate without workflow
-          # validation. A Dependabot workflow change is a `uses:` ref; its skip
-          # counts as a pass there and nowhere else (IMPLEMENTATION_NOTES
-          # "Dependabot PRs skip every metric").
+          # actionlint runs on every PR but Dependabot's for a package (no
+          # should_run gate), so check it before the docs/CI-only short-circuit —
+          # that's the whole point: a workflow-only PR must not pass the gate
+          # without workflow validation. DEPENDABOT_PR holds on a Dependabot PR
+          # for a package, which changes no workflow; there, and nowhere else,
+          # the skip counts as a pass (IMPLEMENTATION_NOTES "actionlint runs on Dependabot's pull requests for GitHub Actions").
           ACTIONLINT="${{ needs.actionlint.result }}"
           if [[ "$ACTIONLINT" == "skipped" && "$DEPENDABOT_PR" == "true" ]]; then
             ACTIONLINT="success"
