@@ -50,11 +50,18 @@ const A = "GHSA-aaaa-2222-cccc";
 const B = "GHSA-bbbb-3333-dddd";
 const BOM = "\uFEFF";
 
-test("on the repository, the region lists the GHSA ids of the file's id lines, in their order", () => {
-  const text = readFileSync(join(repoRoot, SOURCE), "utf8");
-  const scanned = [...text.matchAll(/\bid\s*=\s*["'](GHSA-[^"']+)["']/g)].map(
+/**
+ * The GHSA ids of the lines of `text` that start with an `id` key: a scan of
+ * the file beside the parser's reading, so a line in a comment is no record.
+ */
+const idLines = (text) =>
+  [...text.matchAll(/^[ \t]*id[ \t]*=[ \t]*["'](GHSA-[^"']+)["']/gm)].map(
     (match) => match[1],
   );
+
+test("on the repository, the region lists the GHSA ids of the file's id lines, in their order", () => {
+  const text = readFileSync(join(repoRoot, SOURCE), "utf8");
+  const scanned = idLines(text);
 
   assert.ok(scanned.length > 0, "the scan found no GHSA id");
   assert.deepEqual(render(repoRoot), [
@@ -65,6 +72,13 @@ test("on the repository, the region lists the GHSA ids of the file's id lines, i
     records(repoRoot).some((record) => record.id.startsWith("RUSTSEC-")),
     "the control needs a record the region leaves out",
   );
+});
+
+test("the scan of id lines passes over a record in a comment, as the parser does", () => {
+  const content = `# [[IgnoredVulns]]\n# id = "${B}"\n[[IgnoredVulns]]\nid = "${A}"  # id = "${B}"\n`;
+
+  assert.deepEqual(idLines(content), [A]);
+  assert.deepEqual(rendered(content), ["allow-ghsas:", `  - ${A}`]);
 });
 
 test("the region is a YAML list the action and the closed reader read as one, empty without GHSA ids", () => {
