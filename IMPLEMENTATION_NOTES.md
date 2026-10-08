@@ -13614,6 +13614,8 @@ On CI, after the push: PR #2660, of Markdown alone, ran all 13 checks of the `ci
 
 ## Generated configuration regions have one writer, `scripts/sync-config.mjs` (2026-10-04)
 
+> **Updated (2026-10-07).** The GHSA allowlist is a region of `.github/dependency-review-config.yml`, the config file of the Dependency Review action, not of `codeql.yml`: "`allow-ghsas` is generated from `scripts/osv-scanner.toml`, which a TOML parser reads".
+
 **Problem.** RFC-3 derives three pieces of configuration from sources the repository already keeps: Sonar's CPD and coverage exclusions in `sonar-project.properties`, and the GHSA allowlist of `codeql.yml`. Both files have to hold the derived text, committed. GitHub reads `codeql.yml` itself, and the fork path of the SonarCloud check takes `sonar-project.properties` from `master`, where a fork cannot rewrite it, and refuses a `*` in the values it hands the scanner on the command line. Something has to keep the committed text equal to its source.
 
 **Solution.**
