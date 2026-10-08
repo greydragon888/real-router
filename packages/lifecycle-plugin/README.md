@@ -32,10 +32,11 @@ npm install @real-router/lifecycle-plugin
 ```typescript
 import { createRouter } from "@real-router/core";
 import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
+import type { Route } from "@real-router/core";
 
-const routes = [
+const routes: Route[] = [
   {
-    name: "services.catalog",
+    name: "catalog",
     path: "/catalog?q&sort&dir",
     // Fires on entry AND on param-change — recommended default
     onNavigate: () => (toState) => {
@@ -62,7 +63,7 @@ const routes = [
 const router = createRouter(routes);
 router.usePlugin(lifecyclePluginFactory());
 
-await router.start("/");
+await router.start("/catalog");
 ```
 
 > **Start with `onNavigate`.** It covers the most common case — running the same logic whenever the route is the navigation target (data loading, analytics, UI reset). Add `onEnter` or `onStay` for extra case-specific logic.
@@ -84,7 +85,9 @@ Each hook field is a **factory function** `(router, getDependency) => (toState, 
 // Without DI — ignore factory params:
 onEnter: () => (toState) => { console.log("entered", toState.name); }
 
-// With DI — access router and dependencies:
+// With DI — access router and dependencies. getDependency is typed by the
+// routes' dependency map (`const routes: Route<{ analytics: Analytics }>[]`)
+// and reads what `createRouter(routes, {}, { analytics })` registered:
 onEnter: (router, getDependency) => (toState) => {
   const analytics = getDependency("analytics");
   analytics.track("page_viewed", { route: toState.name });
@@ -105,7 +108,7 @@ Redirecting with a **synchronous** `router.navigate()` inside a hook throws `REE
 
 ```typescript
 {
-  name: "services.catalog",
+  name: "catalog",
   path: "/catalog?q&sort&dir",
   onNavigate: () => (toState) => {
     // Fires on entry from another route AND on filter/sort param changes

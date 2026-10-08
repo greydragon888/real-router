@@ -171,9 +171,9 @@ See the [Hash Fragment Support](https://github.com/greydragon888/real-router/wik
 Navigation metadata is available on `state.context.navigation` after each transition. The plugin writes it via the claim-based State Context API, and it is frozen (`Object.freeze`) for mutation protection.
 
 ```typescript
-// In subscribe callbacks
-router.subscribe((state) => {
-  const meta = state.context.navigation;
+// In subscribe callbacks — the payload is { route, previousRoute }
+router.subscribe(({ route }) => {
+  const meta = route.context.navigation;
   console.log(meta?.navigationType); // "push" | "replace" | "traverse" | "reload"
   console.log(meta?.userInitiated); // true if user clicked back/forward/link
   console.log(meta?.direction); // "forward" | "back" | "unknown"

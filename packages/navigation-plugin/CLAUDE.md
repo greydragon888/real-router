@@ -209,9 +209,9 @@ The plugin claims **two** namespaces on `state.context`:
 Navigation metadata is accessible via `state.context.navigation` (claim-based API):
 
 ```typescript
-// In subscribe callbacks
-router.subscribe((state) => {
-  const meta = state.context.navigation;
+// In subscribe callbacks — the payload is { route, previousRoute }
+router.subscribe(({ route }) => {
+  const meta = route.context.navigation;
   console.log(meta?.navigationType); // "push" | "replace" | "traverse" | "reload"
   console.log(meta?.direction); // "forward" | "back" | "unknown"
   console.log(meta?.userInitiated); // true if user clicked back/forward/link

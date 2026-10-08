@@ -26,7 +26,7 @@ const router = createRouter(routes);
 // Register before start()
 router.usePlugin(validationPlugin());
 
-await router.start();
+await router.start("/");
 ```
 
 That's it. From this point on, every router call validates its arguments and throws a descriptive `TypeError` or `RouterError` on bad input.
@@ -82,10 +82,10 @@ Throws `RouterError("VALIDATION_PLUGIN_AFTER_START")` if the router is already a
 ```typescript
 // Correct
 router.usePlugin(validationPlugin());
-await router.start();
+await router.start("/");
 
 // Throws VALIDATION_PLUGIN_AFTER_START
-await router.start();
+await router.start("/");
 router.usePlugin(validationPlugin()); // too late
 ```
 

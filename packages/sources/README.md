@@ -189,7 +189,7 @@ primeErrorSource(router);
 
 ```typescript
 try {
-  await router.start();
+  await router.start("/");
 } catch (err) {
   // boot-time navigation errors surface here, not on a not-yet-mounted boundary
 }

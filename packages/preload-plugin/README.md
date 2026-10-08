@@ -31,24 +31,41 @@ npm install @real-router/preload-plugin
 import { createRouter } from "@real-router/core";
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { preloadPluginFactory } from "@real-router/preload-plugin";
+import type { Route } from "@real-router/core";
 
-const routes = [
+const routes: Route[] = [
   {
-    name: "users.profile",
-    path: "/users/:id",
-    preload: async ({ params }) => {
-      await queryClient.prefetchQuery({
-        queryKey: ["user", params.id],
-        queryFn: () => fetchUser(params.id),
-      });
-    },
+    name: "users",
+    path: "/users",
+    children: [
+      {
+        name: "profile",
+        path: "/:id",
+        preload:
+          () =>
+          async ({ params }) => {
+            await queryClient.prefetchQuery({
+              queryKey: ["user", params.id],
+              queryFn: () => fetchUser(params.id),
+            });
+          },
+      },
+    ],
   },
   {
-    name: "products.detail",
-    path: "/products/:slug",
-    preload: async ({ params }) => {
-      await productStore.prefetch(params.slug);
-    },
+    name: "products",
+    path: "/products",
+    children: [
+      {
+        name: "detail",
+        path: "/:slug",
+        preload:
+          () =>
+          async ({ params }) => {
+            await productStore.prefetch(params.slug);
+          },
+      },
+    ],
   },
 ];
 
@@ -58,7 +75,7 @@ router.usePlugin(browserPluginFactory(), preloadPluginFactory());
 await router.start();
 ```
 
-When a user hovers over a `<Link routeName="users.profile" routeParams={{ id: '123' }}>` for 65ms, the plugin calls `preload({ params: { id: '123' }, search: {} })` — warming up your data layer before navigation.
+`preload` is a factory, like a guard: `(router, getDependency) => preloadFn`. The plugin calls it on the first hover or touch on a link to the route and caches the function it returns. When a user hovers over a `<Link routeName="users.profile" routeParams={{ id: '123' }}>` for 65ms, the plugin calls that function with `{ params: { id: '123' }, search: {} }` — warming up your data layer before navigation.
 
 ## Options
 
@@ -92,7 +109,8 @@ The plugin uses **DOM-level event delegation** — listeners on `document`, not 
 ### Route resolution
 
 ```
-anchor.href → router.matchUrl(href) → State → getRouteConfig(state.name)?.preload → call
+anchor.href → router.matchUrl(href) → State → getRouteConfig(state.name)?.preload
+            → preload(router, getDependency), cached per route → preloadFn({ params, search })
 ```
 
 External links, routes without `preload`, and non-matching URLs are silently skipped.
@@ -140,15 +158,16 @@ router.getPreloadSettings();
 
 ## Data Layer Integration
 
-The plugin is **data-agnostic** — it calls your `preload` function and doesn't care about the result. You control what happens inside:
+The plugin is **data-agnostic** — it calls the function your `preload` factory returns and doesn't care about the result. You control what happens inside:
 
 ### TanStack Query
 
 ```typescript
+// the "profile" child of "users"
 {
-  name: "users.profile",
-  path: "/users/:id",
-  preload: async ({ params }) => {
+  name: "profile",
+  path: "/:id",
+  preload: () => async ({ params }) => {
     await queryClient.prefetchQuery({
       queryKey: ["user", params.id],
       queryFn: () => fetchUser(params.id),
@@ -160,10 +179,11 @@ The plugin is **data-agnostic** — it calls your `preload` function and doesn't
 ### Zustand / Pinia / Custom Store
 
 ```typescript
+// the "detail" child of "products"
 {
-  name: "products.detail",
-  path: "/products/:slug",
-  preload: async ({ params }) => {
+  name: "detail",
+  path: "/:slug",
+  preload: () => async ({ params }) => {
     await productStore.prefetch(params.slug);
   },
 }
@@ -175,7 +195,7 @@ The plugin is **data-agnostic** — it calls your `preload` function and doesn't
 {
   name: "dashboard",
   path: "/dashboard",
-  preload: async () => {
+  preload: () => async () => {
     await Promise.all([
       queryClient.prefetchQuery({ queryKey: ["stats"], queryFn: fetchStats }),
       queryClient.prefetchQuery({ queryKey: ["recent"], queryFn: fetchRecent }),

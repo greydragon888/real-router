@@ -157,19 +157,22 @@ await hydrateRouter(router, window.__SSR_STATE__);
 
 // SSG: enumerate all URLs for pre-rendering
 const paths = await getStaticPaths(router, {
-  "users.profile": async () => [{ id: "1" }, { id: "2" }],
+  "users.profile": async () => [
+    { params: { id: "1" } },
+    { params: { id: "2" } },
+  ],
 });
-// → ["/", "/users", "/users/1", "/users/2"]
+// → ["/", "/users/1", "/users/2"] (leaf routes only — "users" has a child)
 ```
 
 | Function                                           | Purpose                                                                                                                                                                                                                                            |
 | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `serializeRouterState(state, { excludeContext? })` | XSS-safe JSON serialization of a router `State` for SSR → client transport. Strips `transition`; keeps `name`, `params`, `path`, `context`. Pass `excludeContext` to drop non-JSON-safe namespaces (e.g. `rsc`)                                    |
+| `serializeRouterState(state, { excludeContext? })` | XSS-safe JSON serialization of a router `State` for SSR → client transport. Strips `transition`; keeps `name`, `params`, `search`, `path`, `context`. Pass `excludeContext` to drop non-JSON-safe namespaces (e.g. `rsc`)                          |
 | `hydrateRouter(router, source)`                    | Hydrate a fresh router from the server-serialized payload. Deposits the parsed state onto a one-shot scratchpad consumed by SSR loader plugins (#596) so the first `start()` reuses server-resolved namespace values instead of re-running loaders |
 | `serializeState(data)`                             | XSS-safe JSON serialization for embedding arbitrary data in HTML `<script>` tags (lower-level than `serializeRouterState`)                                                                                                                         |
 | `getStaticPaths(router, entries?)`                 | Enumerate leaf routes and build URLs for SSG pre-rendering                                                                                                                                                                                         |
 | `SerializedRouterState` (type)                     | Parsed shape produced by `serializeRouterState` after `JSON.parse` — `Omit<State, "transition">`                                                                                                                                                   |
-| `StaticPathEntries` (type)                         | Type for the `entries` parameter: `Record<string, () => Promise<Record<string, string>[]>>`                                                                                                                                                        |
+| `StaticPathEntries` (type)                         | Type for the `entries` parameter: `Record<string, () => Promise<readonly StaticPathEntry[]>>`, where `StaticPathEntry` is `{ params?, search? }`                                                                                                   |
 
 ### Ingestion primitives (`@real-router/core/utils`)
 
@@ -246,22 +249,30 @@ import { getNavigator } from "@real-router/core";
 ```
 
 ```typescript
+// The router's dependency map types getDep and the dependencies API
+interface Dependencies {
+  authService: AuthService;
+  store: Store;
+}
+
+const router = createRouter<Dependencies>(routes);
+
 // Dynamic route management
-const routes = getRoutesApi(router);
-routes.add({ name: "settings", path: "/settings" });
-routes.replace(newRoutes); // atomic HMR-safe replacement
+const routesApi = getRoutesApi(router);
+routesApi.add({ name: "settings", path: "/settings" });
+routesApi.replace(newRoutes); // atomic HMR-safe replacement
 
 // Dependency injection for guards and plugins
 const deps = getDependenciesApi(router);
 deps.set("authService", authService);
 
-// Global lifecycle guards
+// Per-route guard, registered at runtime instead of in the route config
 const lifecycle = getLifecycleApi(router);
 lifecycle.addActivateGuard("admin", (router, getDep) => (toState) => {
   return getDep("authService").isAuthenticated();
 });
 
-// SSR — clone with request-scoped deps
+// SSR — clone with request-scoped deps, merged over the base router's
 const requestRouter = cloneRouter(router, { store: requestStore });
 await requestRouter.start(req.url);
 ```
@@ -271,7 +282,8 @@ await requestRouter.start(req.url);
 ```typescript
 import type { Route } from "@real-router/core";
 
-const routes: Route[] = [
+// The type argument is the dependency map getDep reads
+const routes: Route<{ authService: AuthService }>[] = [
   {
     name: "admin",
     path: "/admin",

@@ -763,7 +763,7 @@ it is the record, not a claim about core's surface.
 | --- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Output is valid JSON                 | `JSON.parse(serializeRouterState(state))` never throws for any State.                                                                                    |
 | 2   | Transition is always stripped        | The parsed payload never contains a `transition` key — independent of what `state.transition` held on input.                                             |
-| 3   | Persistent fields preserved          | `name`, `params`, `path`, `context` survive serialize → parse with identical observable values.                                                          |
+| 3   | Persistent fields preserved          | `name`, `params`, `search`, `path`, `context` survive serialize → parse with identical observable values.                                                |
 | 4   | XSS-sensitive characters escaped     | The output string contains no raw `<`, `>`, or `&` — they are unicode-escaped to prevent `</script>` and HTML-entity injection inside `<script>` blocks. |
 | 5   | Determinism                          | `serializeRouterState(state)` returns the same string when called twice on the same input.                                                               |
 | 6   | Transition-mutation invisibility     | Mutating `state.transition` to any other valid TransitionMeta does not change the output — the transition is fully erased from the serialized form.      |

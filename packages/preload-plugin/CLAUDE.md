@@ -18,8 +18,8 @@
 2. On `mouseover`: finds the closest `<a href>` ancestor, debounces by `delay` ms
 3. On `touchstart`: finds the anchor, starts a `TOUCH_PRELOAD_DELAY` (100ms) timer
 4. On `touchmove`: cancels the touch timer if vertical scroll > `TOUCH_SCROLL_THRESHOLD` (10px)
-5. On timer fire: calls `router.matchUrl?.(anchor.href)` → `api.getRouteConfig(name)?.preload`
-6. Calls `preload({ params, search })` as fire-and-forget; errors silently caught (async rejection, synchronous throw, or non-Promise return)
+5. On the `mouseover` / `touchstart` itself, before the timer: `router.matchUrl?.(anchor.href)` → `api.getRouteConfig(name)?.preload`, a factory compiled once per route via `factory(router, getDependency)` (see "Preload function caching")
+6. On timer fire: calls the compiled `preload({ params, search })` as fire-and-forget; errors silently caught (async rejection, synchronous throw, or non-Promise return)
 
 Ghost mouse event suppression: touch devices fire a synthetic `mouseover` after `touchstart`. The plugin records the last touch target/timestamp and suppresses any `mouseover` from the same target within 2500ms.
 

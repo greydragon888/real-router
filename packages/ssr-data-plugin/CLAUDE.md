@@ -162,7 +162,7 @@ The `factory.ts` is intentionally tiny (`validateLoaders` is a single-line bindi
 
 - **Works:** `const state = await router.start(url); state.context.data` — caller sees data
 - **Works:** SSR render — server does `await start()`, then reads `state.context.data`
-- **Does NOT work:** `router.subscribe(state => state.context.data)` — data is `undefined` in subscribe callback
+- **Does NOT work:** `router.subscribe(({ route }) => route.context.data)` — data is `undefined` in subscribe callback
 
 This is by design for SSR.
 

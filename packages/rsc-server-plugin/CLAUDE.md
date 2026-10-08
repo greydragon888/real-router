@@ -164,7 +164,7 @@ src/
 
 - **Works:** `const state = await router.start(url); state.context.rsc` — caller sees the ReactNode
 - **Works:** SSR render — server does `await start()`, then reads `state.context.rsc`, then pipes Flight
-- **Does NOT work:** `router.subscribe(state => state.context.rsc)` — `rsc` is `undefined` in subscribe callback
+- **Does NOT work:** `router.subscribe(({ route }) => route.context.rsc)` — `rsc` is `undefined` in subscribe callback
 
 This is by design for SSR.
 

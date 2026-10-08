@@ -230,7 +230,10 @@ try {
   const state = await router.start(pathname);
   return new Response(renderToReadableStream(buildRscPayload(state)));
 } catch (error) {
-  if (error?.code === "LOADER_NOT_FOUND") {
+  // `error` is `unknown`; each class's literal `code` narrows the union
+  const failure = error as LoaderNotFound | LoaderRedirect;
+
+  if (failure?.code === "LOADER_NOT_FOUND") {
     return new Response("Not Found", { status: 404 });
   }
   throw error;

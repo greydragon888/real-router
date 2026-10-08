@@ -110,7 +110,8 @@ function UserProfile() {
     console.log(state.route?.params.id);
   });
 
-  return <h1>User: {state.route?.params.id}</h1>;
+  // params values are typed as every shape a param can hold; name the one this route uses
+  return <h1>User: {state.route?.params.id as string | undefined}</h1>;
 }
 ```
 

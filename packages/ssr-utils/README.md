@@ -99,7 +99,7 @@ returns `null` without an error.
 
 ```typescript
 const paths = await getStaticPaths(router);
-// ["/", "/about", "/users/1", "/users/2", ...]
+// ["/", "/about", ...] — static leaves only; a leaf with a path slot needs an entry, or this throws
 
 // Per-route entry sets for dynamic segments. An entry names its CHANNELS —
 // `params` for path slots, `search` for `?`-declared query names, both optional.
