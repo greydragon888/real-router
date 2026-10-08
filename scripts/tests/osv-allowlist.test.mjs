@@ -245,52 +245,111 @@ test("a file the parser cannot read and one with two BOMs are refused naming the
 const keysNaming = (object, name) =>
   Object.keys(object ?? {}).filter((key) => key.toLowerCase() === name);
 
-test("every Dependency Review step reads the region's file and nothing replaces its list", () => {
-  // dependency-review-action v5 merges `{...file, ...inputs}`: an `allow-ghsas`
-  // input — `with:` in any letter case, or `INPUT_ALLOW-GHSAS` in an `env:` —
-  // would replace the generated list, and a step without `config-file` would
-  // not read it. The rule is v5's, so another version reds this cell.
-  const files = execFileSync(
-    "git",
-    ["ls-files", "-z", "--", ".github/workflows"],
-    { cwd: repoRoot, encoding: "utf8", env: withoutGitEnv(process.env) },
-  )
-    .split("\0")
-    .filter((file) => isWorkflowFile(file));
-  const reviews = files.flatMap((file) => {
-    const workflow = readClosedYaml(
-      readFileSync(join(repoRoot, file), "utf8"),
-    ).toJS();
+/**
+ * The Dependency Review steps of `files`, workflows and composite actions by
+ * path, and where each departs from the wiring the region rests on.
+ * dependency-review-action v5 merges `{...file, ...inputs}`: an `allow-ghsas`
+ * input — `with:` in any letter case, or `INPUT_ALLOW-GHSAS` in an `env:` —
+ * would replace the generated list, and a step without `config-file` would not
+ * read it. The rule is v5's, so another version departs. A step is found by its
+ * `uses` in any letter case, as GitHub resolves an action, and one in a
+ * composite action departs: the rule is read off a workflow's step.
+ *
+ * @param {Record<string, string>} files
+ * @returns {{ steps: number, departures: string[] }}
+ */
+function wiring(files) {
+  const departures = [];
+  let steps = 0;
 
-    return Object.values(workflow.jobs ?? {}).flatMap((job) =>
-      (job.steps ?? [])
-        .filter(
-          (step) =>
-            typeof step.uses === "string" &&
-            step.uses.startsWith("actions/dependency-review-action@"),
-        )
-        .map((step) => ({ file, workflow, job, step })),
-    );
-  });
+  for (const [file, text] of Object.entries(files)) {
+    const parsed = readClosedYaml(text).toJS();
+    const action = !file.startsWith(".github/workflows/");
+    const jobs = action
+      ? [{ steps: parsed.runs?.steps }]
+      : Object.values(parsed.jobs ?? {});
 
-  assert.ok(reviews.length > 0, "no Dependency Review step found");
-  for (const { file, workflow, job, step } of reviews) {
-    const config = keysNaming(step.with, "config-file");
-
-    assert.equal(step.uses, "actions/dependency-review-action@v5", file);
-    assert.deepEqual(config, ["config-file"], `${file}: config-file`);
-    assert.equal(
-      step.with["config-file"],
-      "./.github/dependency-review-config.yml",
-      `${file}: config-file`,
-    );
-    assert.deepEqual(keysNaming(step.with, "allow-ghsas"), [], `${file}: with`);
-    for (const env of [workflow.env, job.env, step.env]) {
-      assert.deepEqual(
-        keysNaming(env, "input_allow-ghsas"),
-        [],
-        `${file}: env`,
-      );
+    for (const job of jobs) {
+      for (const step of job.steps ?? []) {
+        if (
+          typeof step.uses !== "string" ||
+          !step.uses
+            .toLowerCase()
+            .startsWith("actions/dependency-review-action@")
+        ) {
+          continue;
+        }
+        steps++;
+        if (action) {
+          departures.push(
+            `${file}: a Dependency Review step in a composite action`,
+          );
+          continue;
+        }
+        if (step.uses !== "actions/dependency-review-action@v5") {
+          departures.push(`${file}: uses ${step.uses}`);
+        }
+        if (
+          keysNaming(step.with, "config-file").join() !== "config-file" ||
+          step.with["config-file"] !== "./.github/dependency-review-config.yml"
+        ) {
+          departures.push(`${file}: config-file`);
+        }
+        if (keysNaming(step.with, "allow-ghsas").length > 0) {
+          departures.push(`${file}: allow-ghsas in with:`);
+        }
+        for (const env of [parsed.env, job.env, step.env]) {
+          if (keysNaming(env, "input_allow-ghsas").length > 0) {
+            departures.push(`${file}: INPUT_ALLOW-GHSAS in an env:`);
+          }
+        }
+      }
     }
+  }
+
+  return { steps, departures };
+}
+
+test("every Dependency Review step reads the region's file and nothing replaces its list", () => {
+  const files = Object.fromEntries(
+    execFileSync(
+      "git",
+      ["ls-files", "-z", "--", ".github/workflows", ".github/actions"],
+      { cwd: repoRoot, encoding: "utf8", env: withoutGitEnv(process.env) },
+    )
+      .split("\0")
+      .filter((file) =>
+        file.startsWith(".github/workflows/")
+          ? isWorkflowFile(file)
+          : /\/action\.ya?ml$/i.test(file),
+      )
+      .map((file) => [file, readFileSync(join(repoRoot, file), "utf8")]),
+  );
+  const { steps, departures } = wiring(files);
+
+  assert.ok(steps > 0, "no Dependency Review step found");
+  assert.ok(
+    Object.keys(files).includes(".github/actions/setup/action.yml"),
+    "the composite actions were not read",
+  );
+  assert.deepEqual(departures, []);
+
+  // Forms the tree does not hold, each beside the step it holds: a step in
+  // another letter case, and one in a composite action.
+  for (const [path, text] of [
+    [
+      ".github/workflows/review.yml",
+      "on: pull_request\njobs:\n  review:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: Actions/Dependency-Review-Action@v5\n",
+    ],
+    [
+      ".github/actions/review/action.yml",
+      "runs:\n  using: composite\n  steps:\n    - uses: actions/dependency-review-action@v5\n      with:\n        config-file: ./.github/dependency-review-config.yml\n",
+    ],
+  ]) {
+    assert.equal(
+      wiring({ ...files, [path]: text }).departures.length > 0,
+      true,
+      path,
+    );
   }
 });

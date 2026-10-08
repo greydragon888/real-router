@@ -152,6 +152,41 @@ test("a test the tooling set does not name lands in the guards group", () => {
   }
 });
 
+test("an entry of scripts/tests/ no group would run is refused by name, and a dotfile is passed over", () => {
+  for (const [stranger, make] of [
+    [null, () => {}],
+    ["x.test.ts", (dir) => writeFileSync(join(dir, "x.test.ts"), "")],
+    [
+      "sub",
+      (dir) => {
+        mkdirSync(join(dir, "sub"));
+        writeFileSync(join(dir, "sub", "y.test.mjs"), "");
+      },
+    ],
+  ]) {
+    const root = mkdtempSync(join(tmpdir(), "scripts-tests-(strangers)-"));
+    try {
+      const dir = join(root, "scripts", "tests");
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "a.test.mjs"), "");
+      writeFileSync(join(dir, ".DS_Store"), "");
+      make(dir);
+
+      if (stranger === null) {
+        assert.deepEqual(testsOf("guards", root, new Set()), [
+          "scripts/tests/a.test.mjs",
+        ]);
+      } else {
+        assert.throws(() => testsOf("guards", root, new Set()), {
+          message: `${stranger} in scripts/tests: no group runs it, as the groups run its files named *.test.mjs`,
+        });
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
 test("the tooling task's command is the tooling group's", () => {
   // `node:scripts-tooling` is turbo's verdict on this command alone, so a
   // command that runs no test would pass it. A diff of `package.json` alone is

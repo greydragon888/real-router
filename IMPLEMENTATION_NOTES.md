@@ -13924,6 +13924,8 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 
 ## A new test of `scripts/tests/` runs in place until `TOOLING` names it (2026-10-05)
 
+> **Updated (2026-10-08).** `testsOf` also refuses by name an entry of `scripts/tests/` that is not a file named `*.test.mjs` — a test of another name, a directory — since no group would run it; a name that starts with `.` is passed over.
+
 **Problem.** The split of `scripts/tests/` named the tests that run in place, `GUARDS`, and sent every other one to the tooling task, which runs it in a copy of the task's inputs and replays its verdict from turbo's cache. The copy was to show a test placed there by mistake: one that reads a file beyond the inputs fails in it. A test that finds what it checks by a listing can pass: git's file list and a glob in the copy hold only the inputs, and a check over an empty set passes unless it asks for a member. A review found it with a prototype of a planned workspace test, which lists the tracked `pnpm-workspace.yaml` files and checks `pmOnFail` in each. In place it finds three, and it fails when `examples/pnpm-workspace.yaml` loses the setting; in the copy, with the same change, it finds none, and the whole group exits 0. The task's key does not move with that file either, since it is not an input, so a pull request that changed only it would have replayed the last verdict.
 
 **Solution.**
@@ -14232,6 +14234,8 @@ Three rounds of review of the fix found the same order of the text in two more p
 **Measured.** A pair of `turbo run lint type-check --dry=json` in such a checkout, before and after: `svelte#lint` loses its 110 files and `svelte#type-check` its 49, all from the two directories, and no other file leaves a key. Of the other 48 tasks, 46 keep their hash; `router-benchmarks#lint` and `#type-check` change theirs only through `svelte#type-check`, which they depend on.
 
 ## `allow-ghsas` is generated from `scripts/osv-scanner.toml`, which a TOML parser reads (2026-10-07)
+
+> **Updated (2026-10-08).** The wiring cell reads the composite actions beside the workflows, finds a Dependency Review step by its `uses` in any letter case, as GitHub resolves an action, and refuses one in a composite action.
 
 **Problem.** The advisories the repository accepts lived twice: in `scripts/osv-scanner.toml`, which osv-scanner reads for `lint:audit`, and in the `allow-ghsas` input of the Dependency Review step of `codeql.yml`, a comma-separated copy with an explanation per id above it. A comment asked to keep the two in step, and nothing checked it.
 
