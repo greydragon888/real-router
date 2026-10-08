@@ -5,12 +5,12 @@
 // Run:  node --test scripts/tests/cpd-exclusions.test.mjs
 //
 // The cells of `toRegexp` hold the answers Sonar's `WildcardPattern` class gave
-// for the same pairs; the matrix runs jscpd itself as the gate runs it, in a
-// directory outside any git repository, where no ignore file of git can leave
-// a fixture file out. jscpd also judges the repository's `.jscpd.json`: it
-// names the configuration it takes and reports a value of another type or a
-// file it fails to parse, and its verdict on the fixture's clones shows the
-// threshold in force.
+// for the same pairs; the matrix runs jscpd itself over the scan roots as the
+// gate walks them, in a directory outside any git repository, where no ignore
+// file of git can leave a fixture file out. jscpd also judges the repository's
+// `.jscpd.json`: given the gate's own arguments, it names the configuration it
+// takes and prints no line on a value of it, and its verdict on the fixture's
+// clones shows the threshold in force.
 
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -190,8 +190,9 @@ const FILES = [
 ];
 
 /**
- * The files jscpd analyses in a fixture of `FILES`, run as the gate runs it:
- * once over all the scan roots, from the fixture's root, without `--absolute`,
+ * The files jscpd analyses in a fixture of `FILES`, walking the scan roots as
+ * the gate does: once over all of them, from the fixture's root, without
+ * `--absolute`,
  * so an entry meets each path as walked from a root given on the command line.
  * `ignore` is the list of a configuration of the cell's own, and `undefined`
  * leaves jscpd the fixture's `.jscpd.json`, found as the gate finds it. A row of
@@ -200,10 +201,9 @@ const FILES = [
  *
  * @param {string} root
  * @param {string[]} [ignore]
- * @param {string[]} [said] given, takes what jscpd prints
  * @returns {Set<string>}
  */
-function analysed(root, ignore, said) {
+function analysed(root, ignore) {
   const out = mkdtempSync(join(tmpdir(), "cpd-exclusions-report-"));
   try {
     const args = [];
@@ -222,18 +222,12 @@ function analysed(root, ignore, said) {
       );
       args.push("-c", config);
     }
-    const roots = [
-      ...readdirSync(join(root, "packages")).map(
-        (name) => `packages/${name}/src/`,
-      ),
-      "shared/",
-    ].filter((dir) => existsSync(join(root, dir)));
     // The `threshold` of `.jscpd.json` fails the run on the fixture's clones,
     // after the report is written.
     const run = spawnSync(
       JSCPD,
       [
-        ...roots,
+        ...scanRoots(root),
         ...args,
         "--summary",
         "--summary-top",
@@ -246,7 +240,6 @@ function analysed(root, ignore, said) {
       ],
       { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
     );
-    said?.push(run.stdout, run.stderr);
     assert.ok(run.status === 0 || run.status === 1, `jscpd: ${run.status}`);
     const report = JSON.parse(
       readFileSync(join(out, "jscpd-report.json"), "utf8"),
@@ -267,6 +260,39 @@ function analysed(root, ignore, said) {
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
+}
+
+/**
+ * The scan roots of `lint:duplicates` that exist in a fixture.
+ *
+ * @param {string} root
+ * @returns {string[]}
+ */
+function scanRoots(root) {
+  return [
+    ...readdirSync(join(root, "packages")).map(
+      (name) => `packages/${name}/src/`,
+    ),
+    "shared/",
+  ].filter((dir) => existsSync(join(root, dir)));
+}
+
+/**
+ * What jscpd prints in a fixture given only the gate's own arguments, the scan
+ * roots and `--no-tips`, so that it reads the fixture's `.jscpd.json` as the
+ * gate does: `analysed` sets the reporter on the command line, and jscpd then
+ * checks the type of `reporters` but not the names in it.
+ *
+ * @param {string} root
+ * @returns {string}
+ */
+function gateSays(root) {
+  const run = spawnSync(JSCPD, [...scanRoots(root), "--no-tips"], {
+    cwd: root,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  return `${run.stdout}\n${run.stderr}`;
 }
 
 test("by each translated entry, Sonar leaves out the files jscpd does", () => {
@@ -335,30 +361,42 @@ test("given the repository's .jscpd.json, jscpd leaves out what the translated l
   const root = fixture(FILES);
   try {
     copyFileSync(join(ROOT, ".jscpd.json"), join(root, ".jscpd.json"));
-    const said = [];
-    const files = analysed(root, undefined, said);
 
-    // jscpd names the configuration it takes, and reports a value of another
-    // type, or a file it fails to parse, as `config file .jscpd.json`; a file
-    // that is not UTF-8 it drops without a word, and then names none.
-    assert.match(said.join("\n"), /Using config from \.jscpd\.json/);
-    assert.doesNotMatch(said.join("\n"), /config file \.jscpd\.json/);
-    // A `null` it takes as unset without a word. The fixture's clones are over
-    // the threshold, so the gate's verdict shows one in force.
-    assert.match(said.join("\n"), /over threshold \(\d+(?:\.\d+)?%\)/);
-    assert.deepEqual([...files].sort(), kept.sort());
+    // jscpd names the configuration it takes; a file that is not UTF-8 it
+    // drops without a word, and then names none. A file it fails to parse, and
+    // a value of another type, a negative count or a `mode` it does not know,
+    // which it drops, it reports as `config file .jscpd.json`; a `similarity`
+    // outside (0, 1], which it takes as 1, and a reporter it does not know,
+    // which it drops, with a `Warning:`.
+    const reported = /config file \.jscpd\.json|Warning:/;
+    const said = gateSays(root);
+    assert.match(said, /Using config from \.jscpd\.json/);
+    assert.doesNotMatch(said, reported);
+    // A `null` it takes as unset, and a `minTokens` of 0 not as 0, without a
+    // word: such a value shows only in what it finds. The fixture's clones are
+    // over the threshold, so the gate's verdict shows one in force.
+    assert.match(said, /over threshold \(\d+(?:\.\d+)?%\)/);
+    assert.deepEqual([...analysed(root)].sort(), kept.sort());
 
-    // The control: this jscpd reports a value it drops in that form.
+    // The control: this jscpd prints a value of another type, a `similarity`
+    // outside (0, 1] and a reporter it does not know each on a line `reported`
+    // takes, the reporter only given the gate's own arguments.
     writeFileSync(
       join(root, ".jscpd.json"),
       JSON.stringify({
         ...JSON.parse(readFileSync(join(ROOT, ".jscpd.json"), "utf8")),
         threshold: "2%",
+        similarity: 5,
+        reporters: ["console", "bogus"],
       }),
     );
-    const control = [];
-    analysed(root, undefined, control);
-    assert.match(control.join("\n"), /config file \.jscpd\.json/);
+    const control = gateSays(root)
+      .split("\n")
+      .filter((line) => reported.test(line))
+      .join("\n");
+    assert.match(control, /config file \.jscpd\.json/);
+    assert.match(control, /Warning: --similarity/);
+    assert.match(control, /Warning: unknown reporter 'bogus'/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

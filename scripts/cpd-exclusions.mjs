@@ -24,8 +24,10 @@
 // outside the forms `refusedFiles` accepts. A key set to `null` is refused too:
 // jscpd takes it as unset without a word, and on `threshold` that takes the
 // gate's threshold off. `JSON.parse` takes more than jscpd 5.3.2 does — a
-// number out of jscpd's range or nesting 130 deep drops the whole file there, a
-// value of another type drops that value — so the test has jscpd judge this
+// number out of the range jscpd parses, `1e400`, or nesting 130 deep drops the
+// whole file there; a value of another type, a negative count or a `mode` it
+// does not know drops that value; a `similarity` outside (0, 1] it takes as 1,
+// and a reporter it does not know it drops — so the test has jscpd judge this
 // repository's `.jscpd.json` itself.
 
 import { execFileSync } from "node:child_process";
