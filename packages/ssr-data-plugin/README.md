@@ -252,7 +252,8 @@ Discriminator is the `code` field — match structurally without `instanceof`. I
 Loaders may return a `defer({ critical, deferred })` payload to split the response into a **critical** bundle (resolved before the shell renders) and a **deferred** record of named promises (streamed after via inline `<script>__rrDefer__("key", json)</script>` tags). React 19's `<Suspense>` + `use(promise)` and the cross-framework `<Await>` / `useDeferred(key)` adapters consume the deferred map natively:
 
 ```typescript
-import { defer, LoaderNotFound } from "@real-router/ssr-data-plugin";
+import { defer } from "@real-router/ssr-data-plugin";
+import { LoaderNotFound } from "@real-router/ssr-data-plugin/errors";
 
 "products.detail": () => ({ params }) => {
   const product = getProduct(params.id);

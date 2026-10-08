@@ -457,7 +457,7 @@ Paired SSR-aware boundaries. `<ClientOnly>` renders the `fallback` slot on the s
 
 ```vue
 <script setup lang="ts">
-import { ClientOnly, ServerOnly } from "@real-router/vue";
+import { ClientOnly, ServerOnly } from "@real-router/vue/ssr";
 </script>
 
 <template>

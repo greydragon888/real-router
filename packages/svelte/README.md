@@ -317,7 +317,7 @@ Paired SSR-aware boundaries. `<ClientOnly>` renders the `fallback` snippet on th
 
 ```svelte
 <script lang="ts">
-  import { ClientOnly, ServerOnly } from "@real-router/svelte";
+  import { ClientOnly, ServerOnly } from "@real-router/svelte/ssr";
 </script>
 
 <ClientOnly>
