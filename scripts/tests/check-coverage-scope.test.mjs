@@ -43,7 +43,7 @@ import {
   declaresSharedOwner,
   stripComments,
 } from "../coverage-owner.mjs";
-import { isPhantom } from "../repo-model.mjs";
+import { isPhantom } from "../coverage-exclusions.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const read = (p) => readFileSync(join(ROOT, p), "utf8");

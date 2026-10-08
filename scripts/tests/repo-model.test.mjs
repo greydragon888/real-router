@@ -20,7 +20,7 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { isPhantom, packages } from "../repo-model.mjs";
+import { packages } from "../repo-model.mjs";
 
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 
@@ -126,127 +126,6 @@ test("the walk reads each kind of package in the fixture", () => {
       record("untested", { public: false }),
     ],
   );
-});
-
-test("isPhantom is true for each package of the fixture with a threshold below 100", () => {
-  withTree(FIXTURE, (root) => {
-    assert.deepEqual(
-      packages(root)
-        .filter((pkg) => isPhantom(root, pkg.name))
-        .map((pkg) => pkg.name),
-      ["phantom", "phantom-functions", "phantom-lines", "phantom-statements"],
-    );
-  });
-});
-
-/** `isPhantom` of a tested package whose vitest config is `config`. */
-const phantom = (config) =>
-  withTree(phantomOn("x", config), (root) => isPhantom(root, "phantom-x"));
-
-test("a threshold below 100 makes a package phantom in each number form", () => {
-  for (const config of [
-    "thresholds: { branches: 99.5 }\n",
-    // Vitest reads a negative threshold as the number of uncovered items it
-    // allows.
-    "thresholds: { lines: -10 }\n",
-    "thresholds: {\n  statements: 96,\n  branches: 86,\n}\n",
-  ]) {
-    assert.equal(phantom(config), true, config);
-  }
-  assert.equal(phantom(FULL), false);
-});
-
-test("the words of a threshold outside a thresholds object are not read", () => {
-  for (const config of [
-    `// branches: 94 is the floor elsewhere\n${FULL}`,
-    `/* lines: 50 */\n${FULL}`,
-    `// thresholds: { branches: 50 } was the floor\n${FULL}`,
-    `/* thresholds: { lines: 10 } */\n${FULL}`,
-    `${FULL.trimEnd()} // functions: 10\n`,
-    `export default { test: { include: ["tests/functions/**"] } };\n${FULL}`,
-    `const lines = 50;\nconst note = "thresholds: { lines: 50 }";\n${FULL}`,
-    `const minthresholds = 1;\nconst thresholdsSeen = 2;\n${FULL}`,
-    `const say = "say \\"thresholds: { branches: 50 }\\"";\n${FULL}`,
-  ]) {
-    assert.equal(phantom(config), false, config);
-  }
-});
-
-test("a threshold isPhantom does not read throws, naming the file, the line and the text", () => {
-  const refused = (line, words) =>
-    `packages/phantom-x/vitest.config.mts:${line}: "${words}" — isPhantom reads a coverage threshold only as \`thresholds: { <key>: <number>, … }\``;
-
-  for (const [config, line, words] of [
-    ["thresholds: { branches: FLOOR }\n", 1, "branches: FLOOR"],
-    ["thresholds: { ...FLOORS }\n", 1, "...FLOORS"],
-    ["thresholds: { lines }\n", 1, "lines"],
-    ["thresholds: { branches: 100 - 10 }\n", 1, "branches: 100 - 10"],
-    ["thresholds: { lines: 1e2 }\n", 1, "lines: 1e2"],
-    ['thresholds: { "src/**": { lines: 90 } }\n', 1, '"src/**": { lines: 90'],
-    ["thresholds: { 100: true }\n", 1, "100: true"],
-    ["thresholds: base,\n", 1, "thresholds: base,"],
-    ["coverage.thresholds.lines = 90;\n", 1, "thresholds.lines = 90;"],
-    [
-      'config.test.coverage["thresholds"] = { lines: 90 };\n',
-      1,
-      '"thresholds"',
-    ],
-    ["export default { 'thresholds': { lines: 90 } };\n", 1, "'thresholds'"],
-    [
-      "thresholds: {\n  lines: 100,\n  branches: FLOOR,\n}\n",
-      3,
-      "branches: FLOOR",
-    ],
-  ]) {
-    assert.throws(
-      () => phantom(config),
-      { message: refused(line, words) },
-      config,
-    );
-  }
-});
-
-test("a config isPhantom cannot lex throws, naming the file and the line", () => {
-  for (const [config, line, message] of [
-    [
-      'const re = /["]/;\n// branches: 94\n',
-      1,
-      /a "\/" outside a string and a comment/,
-    ],
-    [
-      `${FULL}const half = 1 / 2;\n`,
-      2,
-      /a "\/" outside a string and a comment/,
-    ],
-    [
-      "const k = { \\u0074hresholds: { lines: 90 } };\n",
-      1,
-      /a "\\" outside a string and a comment/,
-    ],
-    [`${FULL}/* open\n`, 2, /a comment that does not end/],
-    [`const s = "open;\n${FULL}`, 1, /a string that does not end/],
-  ]) {
-    assert.throws(
-      () => phantom(config),
-      (error) => {
-        assert.ok(
-          error.message.startsWith(
-            `packages/phantom-x/vitest.config.mts:${line}: `,
-          ),
-          error.message,
-        );
-        assert.match(error.message, message);
-        return true;
-      },
-      config,
-    );
-  }
-});
-
-test("a package without a vitest config is not phantom", () => {
-  withTree(FIXTURE, (root) => {
-    assert.equal(isPhantom(root, "untested"), false);
-  });
 });
 
 test("a tree without packages/ throws rather than returning an empty list", () => {

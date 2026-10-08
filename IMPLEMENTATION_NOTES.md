@@ -13603,6 +13603,8 @@ On CI, after the push: PR #2660, of Markdown alone, ran all 13 checks of the `ci
 
 > **Updated (2026-10-07).** `isPhantom` is no longer a field of the walk's records: it is `isPhantom(root, name)`, and only the region of `sync-config.mjs` calls it: "Coverage leaves files out by role, and Sonar's coverage exclusions are generated".
 
+> **Updated (2026-10-08).** `isPhantom(root, name)` has left the module for the module of its one caller, the region of `scripts/coverage-exclusions.mjs`, beside `cpd-exclusions.mjs` and `osv-allowlist.mjs`: the module is the package walk alone.
+
 **Problem.** Which directories under `packages/` are packages, and for each whether it is public, has tests, its own vitest config, a real `src/`, a coverage threshold below 100 and an lcov report, was answered by top-level code of `check-coverage-scope.mjs`. The next steps of RFC-3 derive Sonar's coverage exclusions and check the `workspace:^` entries from the same answers, in other scripts, and a second walk would be a second answer to the same questions.
 
 **Solution.**
@@ -14201,6 +14203,8 @@ Three rounds of review of the fix found the same order of the text in two more p
 **Measured (2026-10-07).** Under `NODE_OPTIONS=--test-skip-pattern=.` node 24.18.1 runs `diff-carries-no-code.test.mjs` as 1 entry instead of 8 and exits 0. With the fix, the step's command under that `NODE_OPTIONS` and a `BASH_ENV` that exits at once runs 70 tests, and each of the injections above fails it. Without `shell: sh`, without the prefix, with the suffix written as it comes, with the census reading the prefixed line as it stands, or with `checkId` keeping the prefix, a cell fails. dash in `ubuntu:24.04` reads no `BASH_ENV`; bash does. Under `-c`, with stdin a socket and no `SHLVL`, bash 3.2 takes itself for a shell rshd started and reads `~/.bashrc` in place of `BASH_ENV`, so the cells run the script from a file, as the runner does.
 
 ## Coverage leaves files out by role, and Sonar's coverage exclusions are generated (2026-10-07)
+
+> **Updated (2026-10-08).** `isPhantom` and the region's renderer live in `scripts/coverage-exclusions.mjs`, and the cells of `isPhantom` in `scripts/tests/coverage-exclusions.test.mjs`.
 
 **Problem.** Three lists said which files coverage leaves out, and each named files. Vitest's `coverage.exclude` in `vitest.config.unit.mts` held `**/index.ts`, `**/constants.ts`, `**/types/**`, four more names and ten paths that match no file; `sonar.coverage.exclusions` held fifteen name patterns before its package entries; `codecov.yml` had an `ignore` of its own. A name says nothing about code: the path matcher's `registration/index.ts` registers every route and was measured by no tool, and `**/index.ts` in the base list left the three `shared/*/index.ts` measured nowhere until the owner configs narrowed it. Check 2 of `check-coverage-scope.mjs` held only the package entries of Sonar's list to the tree.
 
