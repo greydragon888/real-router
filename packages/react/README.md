@@ -353,7 +353,7 @@ Available from `@real-router/react/ssr` and `@real-router/react/legacy/ssr`.
 
 ## React 18 Migration
 
-One import path change — all hooks and `Link` work identically:
+One import path change — `Link` and every hook except `useRouteEnter` / `useRouteExit` work identically:
 
 ```diff
 - import { useRouteNode, Link } from '@real-router/react';

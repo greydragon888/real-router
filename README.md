@@ -42,7 +42,7 @@ It tells you when transitions happen; what to do with that — render a page, lo
 
 > Built from scratch with TypeScript-first design. Independent project inspired by [router5](https://github.com/router5/router5)'s declarative philosophy, not a fork.
 
-> **Pre-1.0**: Core API and plugin interfaces are stable. Minor versions preserve backward compatibility. The high release count reflects monorepo-wide coordinated publishing — one change in core triggers version bumps across the 22 packages that depend on it. See [Roadmap](https://github.com/greydragon888/real-router/issues/296) for the path to 1.0 and [Quality & Testing](#quality--testing) for reliability guarantees.
+> **Pre-1.0**: until 1.0, a minor version may contain breaking changes — read the package's changelog ([Releases](https://github.com/greydragon888/real-router/releases)) before upgrading. Each package is versioned on its own. See [Roadmap](https://github.com/greydragon888/real-router/issues/296) for the path to 1.0 and [Quality & Testing](#quality--testing) for reliability guarantees.
 
 ## Why Real-Router?
 
@@ -72,30 +72,36 @@ Real-Router:       guards + data + titles + any router related logic in one conf
 With [`@real-router/lifecycle-plugin`](packages/lifecycle-plugin), data loading, titles, and cleanup live next to the route they belong to — no wrapper components, no HOCs, no scattered `useEffect` in pages:
 
 ```typescript
+import { createRouter } from "@real-router/core";
+import type { Route } from "@real-router/core";
 import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
 
-router.usePlugin(lifecyclePluginFactory());
-
-const routes = [
+const routes: Route[] = [
   {
     name: "users",
     path: "/users",
     canActivate: authGuard,
-    onNavigate: (state) => {
-      store.users.load(state.params);
+    // A hook is a factory: it runs once and returns the function
+    // that runs on each navigation to the route.
+    onNavigate: () => (toState) => {
+      store.users.load(toState.search);
     },
     children: [
       {
         name: "profile",
         path: "/:id",
-        onNavigate: (state) => {
-          document.title = `User ${state.params.id}`;
-          store.users.loadOne(state.params.id);
+        onNavigate: () => (toState) => {
+          document.title = `User ${toState.params.id}`;
+          store.users.loadOne(toState.params.id);
         },
       },
     ],
   },
 ];
+
+const router = createRouter(routes);
+
+router.usePlugin(lifecyclePluginFactory());
 ```
 
 One config, one place. Adding a new page = one config entry. See [Recipes](https://github.com/greydragon888/real-router/wiki/recipes) for full examples.
@@ -105,22 +111,27 @@ One config, one place. Adding a new page = one config entry. See [Recipes](https
 For custom transition phases, cross-route coordination, or domain-specific concerns, you can write a generic plugin that reads your own fields from route config:
 
 ```typescript
-const routes = [
-  {
-    name: "users",
-    path: "/users",
-    loadData: (p, api) => api.getUsers(p), // custom field → your plugin
-  },
+import { getPluginApi } from "@real-router/core/api";
+import type { PluginFactory, Route, State } from "@real-router/core";
+
+type LoadData = (state: State, api: Api) => Promise<unknown>;
+
+const loadUsers: LoadData = (state, api) => api.getUsers(state.search);
+
+const routes: Route[] = [
+  { name: "users", path: "/users", loadData: loadUsers }, // custom field → your plugin
 ];
 
-const dataPlugin: PluginFactory = (router, getDep) => {
+const dataPlugin: PluginFactory<{ api: Api }> = (router, getDep) => {
   const { getRouteConfig } = getPluginApi(router);
 
   return {
     onTransitionSuccess: (toState) => {
-      const route = getRouteConfig(toState.name);
+      // A custom field reads back as `unknown` — the plugin names the type it expects.
+      const loadData = getRouteConfig(toState.name)?.loadData as
+        LoadData | undefined;
 
-      route?.loadData?.(toState.params, getDep("api"));
+      loadData?.(toState, getDep("api"));
     },
   };
 };
@@ -141,22 +152,18 @@ The most direct demonstration is an auth-driven tree swap:
 ```typescript
 import { getRoutesApi } from "@real-router/core/api";
 
-async function login(credentials) {
+async function login(credentials: Credentials) {
   await api.login(credentials);
 
-  const routes = getRoutesApi(router);
-  routes.clear();
-  routes.add(privateRoutes);
-  router.navigate("dashboard");
+  getRoutesApi(router).replace(privateRoutes);
+  await router.navigate("dashboard");
 }
 
 async function logout() {
   await api.logout();
 
-  const routes = getRoutesApi(router);
-  routes.clear();
-  routes.add(publicRoutes);
-  router.navigate("auth");
+  getRoutesApi(router).replace(publicRoutes);
+  await router.navigate("auth");
 }
 ```
 
@@ -169,7 +176,7 @@ In URL→Component routers, private routes exist in the tree regardless of auth 
 Different consumers see different surfaces:
 
 - **Application code** uses the router directly — `navigate`, `subscribe`, `usePlugin`, etc.
-- **UI components** get `Navigator` — a frozen object with only the methods components actually need (`navigate`, `getState`, `isActiveRoute`, `canNavigateTo`, `subscribe`, `subscribeLeave`, `isLeaveApproved`). No way to accidentally call `dispose()` or mutate routes.
+- **UI components** get `Navigator` — a frozen object with only the methods components actually need (`navigate`, `getState`, `isActiveRoute`, `canNavigateTo`, `subscribe`, `subscribeLeave`, `isLeaveApproved`). It has no `dispose()` and no route mutation, so a component holding it cannot call them by accident.
 - **Plugin authors** explicitly import `getPluginApi(router)` to access interceptors, state context claims, and internals. These are gated behind a separate import — invisible to everyone else.
 
 Most applications never encounter plugin APIs. Most components never see dangerous methods. The right surface at the right layer.
@@ -177,11 +184,23 @@ Most applications never encounter plugin APIs. Most components never see dangero
 One practical payoff — RBAC-aware menus without a second permission table:
 
 ```tsx
-// canNavigateTo runs the same guards navigate would —
-// so your menu shows only what the current user is actually allowed to reach.
-const visibleItems = menuItems.filter((item) =>
-  navigator.canNavigateTo(item.route),
-);
+import { Link, useRoute } from "@real-router/react";
+
+function Menu() {
+  // useRoute() re-renders the menu on every navigation.
+  const { navigator } = useRoute();
+
+  // canNavigateTo runs the same synchronous guards navigate would (an async
+  // guard reads as `false`) — so the menu shows only what the current user
+  // is actually allowed to reach.
+  return menuItems
+    .filter((item) => navigator.canNavigateTo(item.route))
+    .map((item) => (
+      <Link key={item.route} routeName={item.route}>
+        {item.label}
+      </Link>
+    ));
+}
 ```
 
 No separate permission table to keep in sync with route guards. One source of truth, used both to decide what to show and what to let through.
@@ -196,25 +215,25 @@ Runs in **browser, terminal (Ink), and desktop (Electron, Tauri)** — same rout
 
 ### First-Class SSR · Streaming · SSG
 
-The only standalone router that ships the **same SSR contract** across React 19, Preact 10, Vue 3, Solid, Svelte 5, and Angular 22+ — without locking you into Next.js, Nuxt, SolidStart, or SvelteKit. ~300+ e2e scenarios covering classical SSR, streaming, SSG, and RSC pipelines.
+The only standalone router that ships the **same SSR contract** across React 19, Preact 10, Vue 3, Solid, Svelte 5, and Angular 22+ — without locking you into Next.js, Nuxt, SolidStart, or SvelteKit. 600+ e2e scenarios covering classical, streaming and mixed-mode SSR, SSG, and RSC pipelines.
 
 | Adapter   | SSR | Streaming SSR                     | SSG | e2e scenarios |
 | --------- | --- | --------------------------------- | --- | ------------- |
-| React 19  | ✓   | OOO `<Suspense>` + `use()`        | ✓   | 36+           |
-| Preact 10 | ✓   | OOO `<preact-island>` + `<Await>` | ✓   | 4 pipelines   |
-| Vue 3     | ✓   | chunked + blocking Suspense       | ✓   | 55            |
-| Solid     | ✓   | OOO + selective hydration         | ✓   | 59            |
-| Svelte 5  | ✓   | deferred-data via `{#await}`      | ✓   | 52            |
-| Angular   | ✓   | TransferState bridge              | ✓   | 4 pipelines   |
+| React 19  | ✓   | OOO `<Suspense>` + `use()`        | ✓   | 120+          |
+| Preact 10 | ✓   | OOO `<preact-island>` + `<Await>` | ✓   | 90+           |
+| Vue 3     | ✓   | chunked + blocking Suspense       | ✓   | 110+          |
+| Solid     | ✓   | OOO + selective hydration         | ✓   | 110+          |
+| Svelte 5  | ✓   | deferred-data via `{#await}`      | ✓   | 100+          |
+| Angular   | ✓   | TransferState bridge              | ✓   | 100+          |
 
 **Unique primitives at the routing layer:**
 
 - **Per-route SSR mode** — `full` / `data-only` / `client-only` + function form `(state) => SsrMode` (data-driven, not path-based)
 - **Cross-adapter SSR components** — `<ClientOnly>`, `<ServerOnly>`, `<Await>`, `<Streamed>`, `<HttpStatusCode>` shipped symmetric across 5 adapters via `/ssr` subpath
-- **Typed loader errors → HTTP** — `LoaderRedirect` / `LoaderNotFound` / `LoaderTimeout` mapped to 301/302/404/504 in both SSR and RSC pipelines
+- **Typed loader errors → HTTP** — a loader throws `LoaderRedirect` / `LoaderNotFound` / `LoaderTimeout`; each carries a `code` (a redirect also its `status`) that your server maps to 30x / 404 / 504 — both the SSR and the RSC loader plugin export them; match on `code`
 - **`createRequestScope(req, baseRouter, deps)`** — correct-by-construction request DI: clone + AbortController + `req.on("close")` + dispose in one call
 - **Network-level cancellation** — `withTimeout()` composes deadline + client-disconnect into one `AbortSignal`; in-flight `fetch` aborts at TCP level when deadline fires
-- **Post-hydration loader skip** — zero fetch on first paint after hydration, automatic in all 6 adapters
+- **Post-hydration loader skip** — after `hydrateRouter()` the SSR loader plugins take the first client load from the server's payload instead of calling the loader, when that payload describes the state being started; works with every adapter (Angular's `provideRealRouterFactory` calls `hydrateRouter()` for you)
 
 [SSR](examples/web/react/ssr-examples/ssr) · [Streaming SSR](examples/web/react/ssr-examples/ssr-streaming) · [SSG](examples/web/react/ssr-examples/ssg) · [RSC](examples/web/react/ssr-examples/ssr-rsc) · [Wiki: SSR](https://github.com/greydragon888/real-router/wiki/ssr) · [Streaming SSR](https://github.com/greydragon888/real-router/wiki/Streaming-SSR) · [SSR Hydration](https://github.com/greydragon888/real-router/wiki/SSR-Hydration)
 
@@ -241,25 +260,26 @@ In the isolated matcher microbench ([`matcher-bench`](cross-router-bench/matcher
 - **First-class SSR / Streaming / SSG / RSC** — same primitives across React 19, Preact 10, Vue 3, Solid, Svelte 5, Angular 22+ — no meta-framework lock-in. [See above](#first-class-ssr--streaming--ssg)
 - **Named nested routes** — dot-notation hierarchy (`users.profile`)
 - **Typed path & query channels** — `state.params` (path) and `state.search` (query) are separate, each independently typed (`State<Params, Search>`); `navigate` / `buildPath` / `isActiveRoute` take path then query
-- **Lifecycle guards** — `canActivate` / `canDeactivate` per route or globally
+- **Lifecycle guards** — `canActivate` / `canDeactivate` per route, in the route config or registered at runtime via `getLifecycleApi()`
 - **AbortController** — cancel navigations via standard `AbortSignal`
 - **Dynamic route management** — add, remove, update, replace routes at runtime
 - **Dependency injection** — type-safe DI container for guards and plugins
 - **Plugin architecture** — intercept and extend router behavior
 - **Observable state** — RxJS and TC39 Observable compatible
-- **Immutable state** — deeply frozen, predictable state management
-- **Scroll restoration** — opt-in via `RouterProvider.scrollRestoration` ([docs](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration)); restores on back/forward, scrolls to top / `#hash` on push; `restore` / `top` / `manual` modes; custom scroll containers
+- **Immutable state** — every `State` and its `params`, `search` and `transition` objects are frozen (shallowly); plugins publish per-route data into `state.context` through namespace claims
+- **Scroll restoration** — opt-in via `RouterProvider.scrollRestoration` ([docs](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration)); restores on back/forward, scrolls to top / `#hash` on push; `restore` / `top` / `native` modes; custom scroll containers
 - **Scroll spy** — opt-in via `RouterProvider.scrollSpy` ([docs](https://github.com/greydragon888/real-router/wiki/Scroll-Spy)); router-coordinated `IntersectionObserver` syncs the URL hash to the topmost visible anchor as you scroll
 
 ## Quick Start
 
 ```bash
-npm install @real-router/core
+npm install @real-router/core @real-router/browser-plugin @real-router/validation-plugin
 ```
 
 ```typescript
 import { createRouter } from "@real-router/core";
 import { browserPluginFactory } from "@real-router/browser-plugin";
+import { validationPlugin } from "@real-router/validation-plugin";
 
 const routes = [
   { name: "home", path: "/" },
@@ -282,32 +302,35 @@ await router.start();
 await router.navigate("users.profile", { id: "123" });
 ```
 
-> **Recommended for development:** add [`@real-router/validation-plugin`](https://www.npmjs.com/package/@real-router/validation-plugin) for descriptive runtime errors on every API call. Falsy values in `usePlugin()` are silently skipped, so inline conditionals work naturally:
->
-> ```typescript
-> import { validationPlugin } from "@real-router/validation-plugin";
->
-> router.usePlugin(browserPluginFactory(), __DEV__ && validationPlugin());
-> ```
+> **Recommended for development:** [`@real-router/validation-plugin`](https://www.npmjs.com/package/@real-router/validation-plugin) adds descriptive runtime errors on every API call. Falsy values in `usePlugin()` are silently skipped, so `__DEV__ && validationPlugin()` registers it only in development; `__DEV__` stands for your bundler's development flag (`import.meta.env.DEV` in Vite).
 
-> **Route-level lifecycle hooks:** add [`@real-router/lifecycle-plugin`](https://www.npmjs.com/package/@real-router/lifecycle-plugin) to attach `onNavigate`, `onEnter`, `onStay`, `onLeave` callbacks directly to route definitions — no `subscribe()` boilerplate:
+> **Route-level lifecycle hooks:** add [`@real-router/lifecycle-plugin`](https://www.npmjs.com/package/@real-router/lifecycle-plugin) to attach `onNavigate`, `onEnter`, `onStay`, `onLeave` hooks directly to route definitions — no `subscribe()` boilerplate. Each hook is a factory that returns the callback:
 >
 > ```typescript
+> import { createRouter } from "@real-router/core";
 > import { lifecyclePluginFactory } from "@real-router/lifecycle-plugin";
+> import type { Route } from "@real-router/core";
 >
-> const routes = [
+> const routes: Route[] = [
 >   {
 >     name: "home",
 >     path: "/",
->     onLeave: () => cleanup(),
+>     onLeave: () => () => cleanup(),
 >   },
 >   {
->     name: "users.view",
->     path: "/users/:id",
->     onNavigate: (s) => track(s.params.id),
+>     name: "users",
+>     path: "/users",
+>     children: [
+>       {
+>         name: "view",
+>         path: "/:id",
+>         onNavigate: () => (toState) => track(toState.params.id),
+>       },
+>     ],
 >   },
 > ];
 >
+> const router = createRouter(routes);
 > router.usePlugin(lifecyclePluginFactory());
 > ```
 
@@ -324,10 +347,10 @@ function App() {
         <Link routeName="users">Users</Link>
       </nav>
       <RouteView nodeName="">
-        <RouteView.Match routeName="home">
+        <RouteView.Match segment="home">
           <HomePage />
         </RouteView.Match>
-        <RouteView.Match routeName="users">
+        <RouteView.Match segment="users">
           <UsersPage />
         </RouteView.Match>
         <RouteView.NotFound>
@@ -339,7 +362,7 @@ function App() {
 }
 ```
 
-`RouteView` with `keepAlive` requires React 19.2+ (React Activity API). For React 18+, use `@real-router/react/legacy` — all hooks and `Link`, no `RouteView`.
+`RouteView` with `keepAlive` requires React 19.2+ (React Activity API). For React 18+, use `@real-router/react/legacy` — `Link` and the hooks except `useRouteEnter` / `useRouteExit`, no `RouteView`.
 
 ## Packages
 
@@ -382,11 +405,11 @@ function App() {
 
 ### Utilities
 
-| Package                                            | Version                                                                                                                                       | Description                                                                                                                                                              |
-| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [`@real-router/sources`](packages/sources)         | [![npm](https://img.shields.io/npm/v/@real-router/sources.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/sources)         | Reactive subscription sources for UI bindings — per-router cached `getTransitionSource` / `createDismissableError` / `createActiveNameSelector` + canonical params cache |
-| [`@real-router/rx`](packages/rx)                   | [![npm](https://img.shields.io/npm/v/@real-router/rx.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/rx)                   | Observable API: `state$`, `events$`, operators, TC39 Observable                                                                                                          |
-| [`@real-router/route-utils`](packages/route-utils) | [![npm](https://img.shields.io/npm/v/@real-router/route-utils.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/route-utils) | Route tree queries: `getRouteUtils`, segment testers, `areRoutesRelated`                                                                                                 |
+| Package                                            | Version                                                                                                                                       | Description                                                                                                                                                                                   |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`@real-router/sources`](packages/sources)         | [![npm](https://img.shields.io/npm/v/@real-router/sources.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/sources)         | For adapter authors: reactive subscription sources for UI bindings — per-router cached `getTransitionSource` / `createDismissableError` / `createActiveNameSelector` + canonical params cache |
+| [`@real-router/rx`](packages/rx)                   | [![npm](https://img.shields.io/npm/v/@real-router/rx.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/rx)                   | Observable API: `state$`, `events$`, operators, TC39 Observable                                                                                                                               |
+| [`@real-router/route-utils`](packages/route-utils) | [![npm](https://img.shields.io/npm/v/@real-router/route-utils.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/route-utils) | Route tree queries: `getRouteUtils`, segment testers, `areRoutesRelated`                                                                                                                      |
 
 ## Documentation
 
@@ -426,7 +449,7 @@ Full documentation is available in the [Wiki](https://github.com/greydragon888/r
 
 ## Examples
 
-Many runnable examples across the most popular frameworks — each is a standalone Vite app:
+Many runnable examples across the most popular frameworks — each is a standalone app:
 
 <details>
 <summary><b>Feature matrix — 6 adapters × 12 features (+ framework-specific)</b></summary>
@@ -451,7 +474,7 @@ Many runnable examples across the most popular frameworks — each is a standalo
 
 ### Server rendering — cross-framework symmetry
 
-Every pipeline below ships as a standalone Vite app per adapter — `pnpm dev` from any folder. All 6 web adapters cover the same 4 SSR pipelines through one `ssr-data-plugin` contract; React additionally has RSC + Flight via `@real-router/rsc-server-plugin`.
+Every pipeline below ships as a standalone app per adapter — `pnpm dev` from any folder. All 6 web adapters cover the same 4 SSR pipelines through one `ssr-data-plugin` contract; React additionally has RSC + Flight via `@real-router/rsc-server-plugin`.
 
 <details>
 <summary><b>SSR pipeline matrix — 6 adapters × 4 pipelines (+ RSC for React)</b></summary>
@@ -506,9 +529,9 @@ Real-Router is an **independent project** — not a fork. Built from scratch wit
 
 Real-Router treats testing as a first-class engineering concern, not an afterthought.
 
-- **100% code coverage** — enforced in CI across all packages, no exceptions
+- **100% code coverage** — enforced in CI; the Angular and Svelte adapters hold measured floors below it, each with its reason in the adapter's `vitest.config.mts`
 - **Static analysis** — SonarCloud quality gate on every PR: an A rating for reliability, security and maintainability on the code the PR changes, plus its coverage, duplication and security-hotspot conditions
-- **Property-based testing** — 1000+ property tests via [fast-check](https://fast-check.dev/) across 31 packages, each running hundreds of generated inputs to verify invariants that hand-written tests miss (URL encoding, parameter serialization, route tree operations, reactive subscription ordering)
+- **Property-based testing** — 1000+ property tests via [fast-check](https://fast-check.dev/), each running generated inputs — up to thousands per test — to verify invariants that hand-written tests miss (URL encoding, parameter serialization, route tree operations, reactive subscription ordering)
 - **Stress testing** — 500+ dedicated stress tests across core, plugins, and all 6 framework adapters: thousands of concurrent navigations, guard removal mid-execution, route CRUD under load, heap snapshots confirming zero memory leaks, mount/unmount lifecycle validation, subscription fanout granularity, and full SPA simulations
 - **Playwright e2e testing** — 1000+ end-to-end test cases across 100+ Playwright suites covering all 6 framework adapters (React, Preact, Solid, Vue, Svelte, Angular). Tests verify real browser behavior: navigation, guards, data loading, error handling, hash routing, nested routes, dynamic routes, and async guards
 - **Mutation testing** — [Stryker](https://stryker-mutator.io/) mutates source code and verifies that tests catch every mutation, ensuring test suite quality beyond line coverage
@@ -533,14 +556,14 @@ pnpm lint:unused      # Check for unused code (knip)
 
 ### Windows: enable symlinks
 
-The repo uses git-tracked symlinks to share source files across framework adapters (`packages/*/src/dom-utils` → `shared/dom-utils/` — see [IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md) for the rationale). Unix/macOS/Linux contributors need no extra setup. Windows contributors need a one-time configuration:
+The repo uses git-tracked symlinks to share source files across packages (`src/dom-utils` in the framework adapters, `src/browser-env` in the URL plugins and `src/shared-ssr` in the SSR loader plugins, each pointing into `shared/` — see [IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md) for the rationale). Unix/macOS/Linux contributors need no extra setup. Windows contributors need a one-time configuration:
 
 ```bash
 # 1. Enable symlink support in git (one-time, global)
 git config --global core.symlinks true
 ```
 
-Additionally, enable [Developer Mode](https://learn.microsoft.com/en-us/windows/apps/get-started/developer-mode-features-and-debugging) in Windows Settings, or run git from an elevated shell. After enabling both, re-clone the repo (or run `git checkout` on an existing clone) to materialize the symlinks. Without this, `pnpm install`, `pnpm build`, and `pnpm test` fail with "file not found" errors for paths under `src/dom-utils/`.
+Additionally, enable [Developer Mode](https://learn.microsoft.com/en-us/windows/apps/get-started/developer-mode-features-and-debugging) in Windows Settings, or run git from an elevated shell. After enabling both, re-clone the repo (or run `git checkout` on an existing clone) to materialize the symlinks. Without this, `pnpm install`, `pnpm build`, and `pnpm test` fail with "file not found" errors for paths under those symlinked directories.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for full development setup, coding standards, and PR guidelines.
 

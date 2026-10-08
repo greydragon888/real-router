@@ -12,7 +12,7 @@ Key technical choices:
 - **Facade + Namespaces** — thin Router class delegates to single-responsibility namespace modules
 - **Optimistic sync execution** — navigation runs synchronously unless a guard returns a Promise
 - **Plugin interception** — plugins wrap router methods (onion-layer), they cannot block transitions
-- **Deeply frozen state** — all `State` objects are `Object.freeze()`'d, never mutated
+- **Frozen state** — every `State` and its `params` / `search` / `transition` objects are `Object.freeze()`'d, never mutated; `state.context` is the carve-out plugins write through namespace claims
 
 ## Package Map
 
@@ -544,7 +544,7 @@ These are deliberately designed constraints. Violating them will break the syste
 
 ### State & Immutability
 
-- **All `State` objects are deeply frozen** (`Object.freeze`). Never mutate — always create new.
+- **Every `State` is frozen** (`Object.freeze`), and so are its `params`, `search` and `transition` — one level per object, so a nested value the caller passed in a channel stays the caller's, and `state.context` is the carve-out plugins write through namespace claims (`packages/core/INVARIANTS.md`, "State immutability"). Never mutate — always create new.
 - **`State` has two param channels** — `state.params` (path params) and `state.search` (query params) are separate and independently typed (`State<Params, Search>`). Both are always present (a frozen `{}` when empty); `navigate` / `buildPath` / `isActiveRoute` take `search` as the argument after `params`.
 - **The router never moves a key between the channels** — the slot IS the channel: `params` / `defaultParams` are the path, `search` / `defaultSearch` the query, and the two meet in exactly one place, the printed URL. Enforcement rather than convention: a key the route declares with `?` supplied in the path bag makes `navigate` / `makeState` / `buildNavigationState` throw synchronously and `navigateToState` reject, a `defaultParams` naming such a key is refused at registration, and `canNavigateTo` answers `false` for the shape the verbs refuse. **There is no repair step, deliberately:** a mis-channelled key is refused, never relocated behind the producer's back, so the bag a producer wrote is the bag that ships — a silent move would let it believe otherwise.
 - **Router options are frozen one level down, the level the router owns** — the
@@ -629,9 +629,9 @@ All navigation errors are `RouterError` instances with typed `code` from `errorC
 
 ### Testing Strategy
 
-- **100% code coverage** enforced in CI across all packages
-- **Property-based testing** — 2000+ property test cases via fast-check across 31 packages: URL encoding, parameter serialization, route tree operations, reactive subscription ordering, canonical params, link helpers
-- **Stress testing** — 700+ stress test cases across 183 `.stress.ts` files in 14 packages (core, plugins, all 6 framework adapters): concurrent navigations, guard removal mid-execution, route CRUD under load, heap snapshots confirming zero memory leaks, mount/unmount lifecycle, subscription fanout granularity, full SPA simulations
+- **100% code coverage** enforced in CI; the Angular and Svelte adapters hold measured floors below it, each with its reason in the adapter's `vitest.config.mts`
+- **Property-based testing** — 1900+ property test cases via fast-check: URL encoding, parameter serialization, route tree operations, reactive subscription ordering, canonical params, link helpers
+- **Stress testing** — 1100+ stress test cases in `.stress.ts` / `.stress.tsx` files (core, plugins, all 6 framework adapters): concurrent navigations, guard removal mid-execution, route CRUD under load, heap snapshots confirming zero memory leaks, mount/unmount lifecycle, subscription fanout granularity, full SPA simulations
 - **Playwright e2e testing** — 1800+ test cases across 330+ spec files (100+ playwright projects) covering all 6 framework adapters (React, Preact, Solid, Vue, Svelte, Angular). Tests verify real browser behavior: navigation, guards, data loading, error handling, hash routing, nested routes, dynamic routes, async guards, SSR/streaming/SSG/RSC pipelines, animations. Turbo-cached via `test:e2e` task.
 - **Mutation testing** (Stryker) validates test suite quality beyond line coverage
 - **`lint:e2e`** pre-commit check — verifies every example with `playwright.config.ts` has at least one spec file
