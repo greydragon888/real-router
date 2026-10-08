@@ -48,7 +48,12 @@ import { CHECKS } from "../checks.mjs";
 import { readClosedYaml } from "../closed-yaml.mjs";
 import { localEnvVars } from "../git-env.mjs";
 import { TOOLING } from "../scripts-tests.mjs";
-import { CONTEXT_FACTS, CONTEXTS, contextsOf } from "../verify.mjs";
+import {
+  CONTEXT_FACTS,
+  CONTEXTS,
+  DEPENDABOT_ACTIONS,
+  contextsOf,
+} from "../verify.mjs";
 
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const VERIFY = join(repoRoot, "scripts", "verify.mjs");
@@ -937,6 +942,71 @@ test("each context holds on its own facts, and an unset fact is false", () => {
   assert.deepEqual(
     contextsOf({ HEAD_REF: "changeset-release/master", NO_SOURCE: "true" }),
     ["no-source"],
+  );
+});
+
+test("dependabot-pr holds on a Dependabot PR for a package, and not on one for a GitHub Action", () => {
+  const cells = [];
+  for (const author of ["dependabot[bot]", "octocat"]) {
+    for (const branch of [
+      "dependabot/github_actions/actions/dependency-review-action-6",
+      "Dependabot/GitHub_Actions/actions/checkout-6",
+      "dependabot/npm_and_yarn/jscpd-5.4.0",
+      "fix/dependabot/github_actions/x",
+      undefined,
+    ]) {
+      const contexts = contextsOf({ PR_AUTHOR: author, HEAD_REF: branch });
+      cells.push({ author, branch, held: contexts.includes("dependabot-pr") });
+    }
+  }
+
+  assert.equal(cells.length, 10);
+  assert.deepEqual(
+    cells
+      .filter(({ held }) => held)
+      .map(({ author, branch }) => ({ author, branch })),
+    [
+      {
+        author: "dependabot[bot]",
+        branch: "dependabot/npm_and_yarn/jscpd-5.4.0",
+      },
+      { author: "dependabot[bot]", branch: "fix/dependabot/github_actions/x" },
+      { author: "dependabot[bot]", branch: undefined },
+    ],
+  );
+});
+
+test("Dependabot's branches for GitHub Actions keep the prefix contextsOf and codeql.yml read", () => {
+  // An entry's `pull-request-branch-name` or `multi-ecosystem-group`, or the
+  // file's `multi-ecosystem-groups`, renames the branches of its pull
+  // requests, and one for an action would take `dependabot-pr`.
+  const config = readClosedYaml(
+    readFileSync(join(repoRoot, ".github", "dependabot.yml"), "utf8"),
+  ).toJS();
+  const workflow = readClosedYaml(
+    readFileSync(join(repoRoot, ".github", "workflows", "codeql.yml"), "utf8"),
+  ).toJS();
+
+  assert.ok(!Object.hasOwn(config, "multi-ecosystem-groups"));
+  assert.ok(
+    config.updates.some(
+      (entry) => entry["package-ecosystem"] === "github-actions",
+    ),
+    "no entry for GitHub Actions",
+  );
+  for (const entry of config.updates) {
+    for (const key of ["pull-request-branch-name", "multi-ecosystem-group"]) {
+      assert.ok(
+        !Object.hasOwn(entry, key),
+        `${entry["package-ecosystem"]}: ${key}`,
+      );
+    }
+  }
+  assert.ok(
+    workflow.jobs.analyze.if.includes(
+      `startsWith(github.head_ref, '${DEPENDABOT_ACTIONS}')`,
+    ),
+    workflow.jobs.analyze.if,
   );
 });
 

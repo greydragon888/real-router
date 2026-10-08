@@ -811,10 +811,11 @@ jobs:
       # of the run in its own `env:`, which an earlier step's $GITHUB_ENV cannot
       # override, and `contextsOf` in `scripts/verify.mjs` derives the contexts
       # from them; `verify` skips the checks whose `ciSkip` names one, and says
-      # why. On a Dependabot PR, and on the release PR, whose diff has the shape
-      # of a bump, only the checks that shape can fail run; the failure record
-      # behind the split is in IMPLEMENTATION_NOTES "Dependabot PRs skip every
-      # metric".
+      # why. On a Dependabot PR for a package, and on the release PR, whose diff
+      # has the shape of a bump, only the checks that shape can fail run; the
+      # failure record behind the split is in IMPLEMENTATION_NOTES "Dependabot
+      # PRs skip every metric". A Dependabot PR for a GitHub Action changes the
+      # workflows the tests of scripts/ read, and takes no `dependabot-pr`.
       #
       # HAS_DEDUPE_FIXER asks the Dependabot secret store on a run Dependabot
       # started, the only store such a run can see. On every other run — the one

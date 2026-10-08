@@ -51,11 +51,19 @@ export const CONTEXT_FACTS = [
 
 const DEPENDABOT = "dependabot[bot]";
 
+/** The head prefix of Dependabot's pull requests for a GitHub Action. */
+export const DEPENDABOT_ACTIONS = "dependabot/github_actions/";
+
 /**
  * The CI contexts a run matches, from the facts in `env`. A fact that is unset
  * counts as false.
  *
- *   - `dependabot-pr`: Dependabot opened the pull request (PR_AUTHOR).
+ *   - `dependabot-pr`: Dependabot opened the pull request (PR_AUTHOR) for a
+ *     package. One it opens for a GitHub Action, its head under
+ *     `DEPENDABOT_ACTIONS` (HEAD_REF), changes the workflows the tests of
+ *     `scripts/` read, and takes no `dependabot-pr`. The head is compared
+ *     without case, as `startsWith` in `codeql.yml` compares it: it only takes
+ *     this context away, so it keeps no check from a pull request.
  *   - `no-source`: its diff carries no source (NO_SOURCE, the `check` job's
  *     output).
  *   - `dependabot-actor-with-dedupe-fixer`: Dependabot started the run, and the
@@ -74,7 +82,12 @@ export function contextsOf(env) {
   const noSource = env.NO_SOURCE === "true";
   const contexts = [];
 
-  if (env.PR_AUTHOR === DEPENDABOT) contexts.push("dependabot-pr");
+  if (
+    env.PR_AUTHOR === DEPENDABOT &&
+    !(env.HEAD_REF ?? "").toLowerCase().startsWith(DEPENDABOT_ACTIONS)
+  ) {
+    contexts.push("dependabot-pr");
+  }
   if (noSource) contexts.push("no-source");
   if (env.ACTOR === DEPENDABOT && env.HAS_DEDUPE_FIXER === "true") {
     contexts.push("dependabot-actor-with-dedupe-fixer");

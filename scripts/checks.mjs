@@ -19,11 +19,12 @@
  * The CI contexts a check can be skipped in. In CI, `contextsOf` in
  * `verify.mjs` derives them from the run's facts; `verify --context` names
  * them by hand:
- * `dependabot-pr` — a PR Dependabot opened; `no-source` — a diff that carries no
- * source; `dependabot-actor-with-dedupe-fixer` — a run Dependabot started while
- * the lockfile fixer can push (`dependabot-dedupe.yml`); `release-pr` — the
- * release PR: its head is `changeset-release/master` from this repository, and
- * its diff carries no source.
+ * `dependabot-pr` — a PR Dependabot opened for a package, not one for a GitHub
+ * Action; `no-source` — a diff that carries no source;
+ * `dependabot-actor-with-dedupe-fixer` — a run Dependabot started while the
+ * lockfile fixer can push (`dependabot-dedupe.yml`); `release-pr` — the release
+ * PR: its head is `changeset-release/master` from this repository, and its diff
+ * carries no source.
  *
  * @typedef {"dependabot-pr" | "no-source" | "dependabot-actor-with-dedupe-fixer" | "release-pr"} CiSkip
  */
@@ -251,8 +252,8 @@ export const CHECKS = [
     why: "new SAST findings on the branch against .semgrep/rules.yml and p/javascript",
   },
   {
-    // No skip: a diff without code can change this command itself, in
-    // `package.json`, and Dependabot's bump of an action is a `dependabot-pr`.
+    // No skip: a diff without source can change this command itself, in
+    // `package.json`.
     id: "lint:workflow-security",
     run: ["pnpm", "lint:workflow-security"],
     stages: ["pre-push", "ci"],
