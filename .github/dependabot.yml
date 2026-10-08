@@ -119,11 +119,9 @@ updates:
       - dependency-name: "undici"
       # yaml is a root devDependency: the parser of each test that reads a
       # workflow through scripts/closed-yaml.mjs, and one of the two readers of
-      # self-hosted-triggers.test.mjs. The `yaml@2: $yaml` override
-      # (pnpm-workspace.yaml) hands its version to every 2.x consumer, a major
-      # too. A PR that bumps it carries no source, so neither group of
-      # scripts/tests runs on it in CI; a bump by hand runs them in pre-push.
-      # The name alone ignores security updates as well.
+      # self-hosted-triggers.test.mjs. A PR that bumps it carries no source, so
+      # neither group of scripts/tests runs on it in CI; a bump by hand runs
+      # them in pre-push. The name alone ignores security updates as well.
       - dependency-name: "yaml"
       # smol-toml is a root devDependency: the TOML parser that reads
       # scripts/osv-scanner.toml for the allow-ghsas region of

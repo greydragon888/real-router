@@ -12440,6 +12440,8 @@ Two edges outside their range are the entry's purpose, and their comments say so
 > ⚠ Superseded later on 2026-09-27 in one respect: `undici` no longer holds a
 > parent below its range. See "undici: the root provides danger's peer, the examples floor each major".
 
+> **Updated (2026-10-08).** The `yaml@2` pins of both files are gone ("The `yaml@2` overrides are dropped").
+
 **Problem.** An override outranks semver, and four values sat below a range some parent declares, each holding that parent on an older release:
 
 - `ajv@8: ~8.18.0` under the exact 8.20.0 of `@angular-devkit/core` and, in the root, the `~8.20.0` of `@stryker-mutator/core`.
@@ -13486,6 +13488,8 @@ Kept, because none of them points at a record: measurement dates, which say when
 
 > **Updated (2026-10-05).** The test runs in `node:scripts-tooling` now, replayed from turbo's cache while its inputs — `.github/` among them — and the tools' versions are unchanged ("The tooling tests of `scripts/tests/` replay from turbo's cache while their inputs hold").
 
+> **Updated (2026-10-08).** No override hands the root's `yaml` to other packages: `yaml@2: $yaml` is dropped ("The `yaml@2` overrides are dropped").
+
 **Problem.** What kept fork code off the self-hosted VPS was each job's `if:` and the approval policy for fork pull requests. Nothing read the workflow files for it: a `pull_request` trigger in `codspeed.yml` or `cross-router-bench.yml`, a new workflow with a self-hosted job, or a self-hosted job started by `pull_request_target`, `issue_comment` or `workflow_run` passed every check. A pull request runs its own copy of a workflow, so the `if:` it carries is the pull request's to edit.
 
 **Solution.**
@@ -14285,3 +14289,17 @@ Three rounds of review of the fix found the same order of the text in two more p
 **Why.** As for Repo Lints ("Dependabot's pull requests for GitHub Actions take no `dependabot-pr` in Repo Lints"): the head only takes a skip away. The gate holds the exception, not only the job: a job `if:` that lost it would skip actionlint on such a pull request again, and the gate fails that.
 
 - ⚠ If Dependabot renames the branches of the ecosystem, the job's `if:` and `DEPENDABOT_PR` lose the head together: actionlint skips such a pull request, and `CI Result` takes the skip as a pass. Repo Lints' `CI contexts:` line on such a pull request shows it.
+
+## The `yaml@2` overrides are dropped (2026-10-08)
+
+**Problem.** `yaml@2` entered the root overrides as a security pin, `2.8.3` (`b68cf99a9`), and no check asks whether an override is still needed (#2646). It was raised when it held `@changesets/parse` below its `^2.9.0` (`34780f07c`), copied into the examples (`0b92fdc16`), and pointed at the root's devDependency as `$yaml`. The root's comment described its effect, every 2.x consumer on the root's copy, and its own risk, a root major landing on every 2.x consumer. Without either entry no resolved version moves (measured on 2026-10-08, `pnpm install --offline` in each workspace: the same 1424 and 1306 resolved versions); each lockfile loses the entry and gives vite its own `peerDependencies.yaml`, `^2.4.2`.
+
+**Solution.** Both entries and their comments are deleted. `yaml` stays a root devDependency at an exact version, and Dependabot still ignores it.
+
+**Why.**
+
+- One copy has no reader. The repository's code that imports `yaml` is `scripts/`, which takes the root devDependency's version from its manifest with or without the entry.
+- The entry held every 2.x consumer on the version the root moves by hand. Without it, each consumer's range governs its copy, as for any other package.
+- The entry carried two hazards of its own: a version below a consumer's range downgraded that consumer silently, as `2.8.3` did `@changesets/parse`, and a root major would reach every 2.x consumer.
+- ⚠ An advisory on a copy another package pulls in gets no Dependabot pull request: the ignore names `yaml`, so it covers security updates too. `lint:audit` reports such a copy.
+- ⚠ An unscoped `yaml@2` override matches the root's devDependency as well and rewrites its specifier, so the root's readers would run the override's version with every gate green. A fix for another package's copy goes on its edge (`<parent>>yaml`); the root's own copy moves with its manifest.

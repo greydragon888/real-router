@@ -93,16 +93,6 @@ overrides:
   # exactly; any lower value holds those parents below their range.
   picomatch@4: 4.0.7
   yaml@1: 1.10.3
-  # Collapses every 2.x consumer onto one copy (@changesets/parse, @manypkg/tools,
-  # knip, vite, eslint-plugin-sonarjs, eslint-plugin-unicorn today): the root
-  # devDependency `yaml`, which `$yaml` names, so a root bump moves them all.
-  # An override outranks semver both ways — a version below a consumer's range
-  # downgrades it silently (@changesets/parse@1 declares ^2.9.0 and parses every
-  # changeset on the release path), and a root major lands on every 2.x
-  # consumer. Keep the root at or above the highest declared range — knip's
-  # `^2.9.1` today — and inside major 2. Dependabot leaves `yaml` alone
-  # (.github/dependabot.yml says why).
-  yaml@2: $yaml
   # Floor at 5.9.3, where every devalue advisory known on 2026-10-02 is fixed
   # (api.osv.dev answers clean for it). Capped below 6: `svelte`, the only
   # parent, declares `^5.9.2`, and an override outranks a parent's range — the

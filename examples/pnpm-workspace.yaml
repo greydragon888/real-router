@@ -90,12 +90,6 @@ overrides:
   # every other parent's range admits it.
   picomatch@4: 4.0.5
   yaml@1: 1.10.3
-  # Collapses every 2.x consumer onto one copy (vite, eslint-plugin-sonarjs,
-  # eslint-plugin-unicorn today). An override outranks semver, so a value below a
-  # consumer's declared range downgrades it silently — the root pnpm-workspace.yaml
-  # records the release-path incident. Raise this line with the highest declared
-  # range, never below.
-  yaml@2: 2.9.0
   # Floor at 5.9.3, where every devalue advisory known on 2026-10-02 is fixed
   # (api.osv.dev answers clean for it). Capped below 6: `svelte`, the only
   # parent, declares `^5.9.2`, and an override outranks a parent's range — the
