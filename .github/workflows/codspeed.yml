@@ -445,7 +445,7 @@ jobs:
       # values are a mixed-measurement report, and a differing auth method would
       # stop CodSpeed aggregating them at all.
       - name: Run core hot-path benchmarks under CodSpeed
-        uses: CodSpeedHQ/action@373d6868929f444bc08d901fd0eb0ad52a8875ea # v5.2.1
+        uses: CodSpeedHQ/action@c4fd08a3a159bd0cc208da1e0edf32b8c47d75e5 # v5.4.0
         with:
           mode: simulation
           runner-version: rev:v4.18.4
@@ -560,7 +560,7 @@ jobs:
       # `mode` and the (absent) `token:` in lockstep with `core` — see that
       # step's note on why aggregation depends on it.
       - name: Run adapter benchmarks under CodSpeed
-        uses: CodSpeedHQ/action@373d6868929f444bc08d901fd0eb0ad52a8875ea # v5.2.1
+        uses: CodSpeedHQ/action@c4fd08a3a159bd0cc208da1e0edf32b8c47d75e5 # v5.4.0
         with:
           mode: simulation
           runner-version: rev:v4.18.4
