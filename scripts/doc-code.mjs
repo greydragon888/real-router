@@ -9,10 +9,14 @@
 //     type — one its published `.d.ts` does not carry — reaches the pages of
 //     every other package.
 //   - Every fence is a module, written in one framework: the one its imports
-//     name, else the one its first line names in a comment (`// Angular`),
-//     else its page's (an adapter's page), else the one its heading names
-//     first, else React. Another framework's module — an import of it, an
-//     adapter's export — resolves nothing for it.
+//     name, else the one its first line names in a comment (`// Angular`) —
+//     of several named, its page's when that is among them (on a page of no
+//     adapter, its heading's), else the first — else its page's (an adapter's
+//     page), else the one its heading names first, else React. A comment that
+//     sets the page's framework against another reads as the page's: to mean
+//     the other, it names that one alone. Another framework's module — an
+//     import of it, an adapter's export — resolves nothing for it. Its markup
+//     takes children the way that framework types them.
 //   - A name a fence uses without declaring it is looked up the way a reader
 //     looks it up: an import in a fence above, an export of the page's own
 //     package, an import in a fence below, a declaration in another fence, an
@@ -22,6 +26,13 @@
 //     `inject…`, `…Plugin`, `…Factory`): a renamed export must not pass for
 //     the reader's own. A name the page imports or declares beats a DOM global
 //     of that name, and so does a placeholder (`name`, `status`, …).
+//   - The fence's framework supplies a type only where the fence reads no
+//     value of that name (`h(App)` renders the reader's component). When
+//     nothing names the framework, React is a guess, and outside markup it
+//     supplies only its types and the values shaped like library API
+//     (`cache` is the reader's).
+//   - The reader's globals (`READER_GLOBALS`) yield to a member the page
+//     declares itself in `declare global`.
 //   - A module the repository cannot resolve — the reader's own file, a
 //     library the repository does not install — exports, as `any`, what the
 //     page imports from it. An `@real-router/*` specifier that no package
@@ -65,8 +76,8 @@ const FRAMEWORK_OF = [
   /^(svelte)(?:\/|$)/,
   /^@(angular)\//,
 ];
-/** The frameworks a heading names, as it spells them. */
-const FRAMEWORK_IN_HEADING = /\b(react|preact|solid|vue|svelte|angular)\b/i;
+/** A framework a heading or a comment names, as it spells it. */
+const FRAMEWORK_NAMED = /\b(react|preact|solid|vue|svelte|angular)\b/gi;
 /** A non-React JSX fence names its runtime with a pragma on its first line. */
 const PRAGMA = { preact: "preact", solid: "solid-js", vue: "vue" };
 /** Diagnostics that say "this fence is not one program". */
@@ -109,7 +120,11 @@ export const READER_VALUES = {
   params: "declare let params: Record<string, string>;",
   createAppRouter: `declare function createAppRouter(...args: any[]): import("@real-router/core").Router<any>;`,
 };
-/** What the reader's environment adds to the globals: a bundler's `import.meta`. */
+/**
+ * What the reader's environment adds to the globals: a bundler's
+ * `import.meta`, a server's state payload. A member the page declares itself
+ * in `declare global` replaces the reader's.
+ */
 export const READER_GLOBALS = `
 interface Window { __SSR_STATE__: any }
 interface ImportMeta { [key: string]: any }
@@ -312,13 +327,99 @@ function frameworkOfSpec(spec) {
   return null;
 }
 
-/** The first framework a heading names, or `null`: "React / Preact / Solid" is React. */
-const frameworkOfHeading = (heading) =>
-  FRAMEWORK_IN_HEADING.exec(heading)?.[1].toLowerCase() ?? null;
+/** The frameworks a heading or a comment names, in the order it names them. */
+const frameworksIn = (text) =>
+  Array.from(text.matchAll(FRAMEWORK_NAMED), (m) => m[1].toLowerCase());
 
-/** The framework a fence's first line, a `// Angular` comment, names, or `null`. */
-const frameworkOfComment = (text) =>
-  frameworkOfHeading(/^\s*\/\/(.*)/.exec(text)?.[1] ?? "");
+/** The first framework a heading names, or `null`: "React / Preact / Solid" is React. */
+const frameworkOfHeading = (heading) => frameworksIn(heading)[0] ?? null;
+
+/**
+ * The frameworks a fence's first line names in a comment: `// Angular`,
+ * `// Same API in React and Preact`.
+ */
+const frameworksOfComment = (text) =>
+  frameworksIn(/^\s*\/\/(.*)/.exec(text)?.[1] ?? "");
+
+// A `{/* Your app */}` in markup stands for the reader's content: a child,
+// not an empty slot. It is an empty JSX expression that holds a comment, in a
+// fence checked as TSX: `make({ /* deps */ })` passes an object, and `{}` is
+// empty. Its line breaks stay, so the lines below it keep their numbers.
+function fillPlaceholders(ts, text) {
+  const sf = ts.createSourceFile(
+    "x.tsx",
+    text,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const slots = [];
+  (function visit(n) {
+    if (
+      ts.isJsxExpression(n) &&
+      !n.expression &&
+      n.getText(sf).slice(1, -1).trim() !== ""
+    )
+      slots.push(n);
+    ts.forEachChild(n, visit);
+  })(sf);
+  return slots.reduceRight((t, n) => {
+    const breaks = "\n".repeat(n.getText(sf).split("\n").length - 1);
+    return `${t.slice(0, n.getStart(sf))}{null as any${breaks}}${t.slice(n.getEnd())}`;
+  }, text);
+}
+
+/** Whether a node holds markup: a JSX element or fragment. */
+const holdsMarkup = (ts, n) =>
+  ts.isJsxOpeningLikeElement(n) ||
+  ts.isJsxOpeningFragment(n) ||
+  Boolean(ts.forEachChild(n, (c) => holdsMarkup(ts, c)));
+
+/** An identifier that names a property or an attribute, not a binding. */
+const isNameOf = (ts, n) =>
+  (ts.isPropertyAccessExpression(n.parent) && n.parent.name === n) ||
+  (ts.isPropertyAssignment(n.parent) && n.parent.name === n) ||
+  (ts.isQualifiedName(n.parent) && n.parent.right === n) ||
+  ts.isJsxAttribute(n.parent);
+
+/**
+ * The names a module reads as values: its identifiers outside a type, less
+ * the names of properties. A `typeof` inside a type is not counted.
+ */
+function valueNamesOf(ts, sf) {
+  const names = new Set();
+  (function visit(n) {
+    if (ts.isTypeNode(n)) return;
+    if (ts.isIdentifier(n) && !isNameOf(ts, n)) names.add(n.text);
+    ts.forEachChild(n, visit);
+  })(sf);
+  return names;
+}
+
+/**
+ * The reader's globals, less each interface member the page declares itself
+ * in `declare global`: two declarations of one member must agree, and the
+ * page's — its `?`, its type — is the one its fences read.
+ */
+function readerGlobalsOf(ts, globals, declared) {
+  const sf = ts.createSourceFile(
+    "reader.d.ts",
+    globals,
+    ts.ScriptTarget.Latest,
+    true,
+  );
+  const own = sf.statements
+    .filter(ts.isInterfaceDeclaration)
+    .flatMap((i) =>
+      i.members.filter(
+        (m) => m.name && declared.has(`${i.name.text}.${m.name.text}`),
+      ),
+    );
+  return own.reduceRight(
+    (text, m) => text.slice(0, m.getStart(sf)) + text.slice(m.getEnd()),
+    globals,
+  );
+}
 
 /**
  * What every page of one run shares: the compiler options, the resolution of
@@ -336,7 +437,11 @@ function createEnvironment({ root, ts, readerValues, readerGlobals }) {
     moduleResolution: ts.ModuleResolutionKind.Bundler,
     customConditions: ["@real-router/internal-source"],
     moduleDetection: ts.ModuleDetectionKind.Force,
-    jsx: ts.JsxEmit.ReactJSX,
+    // `preserve`, as Vue's own TSX setup has it: under `react-jsx` TypeScript
+    // types every framework's children as a `children` prop, and a Vue
+    // component takes its children as slots
+    jsx: ts.JsxEmit.Preserve,
+    jsxImportSource: "react",
     strict: true,
     skipLibCheck: true,
     noEmit: true,
@@ -596,15 +701,14 @@ function checkPage(env, file) {
   const virtual = new Map();
   const blocks = [];
   for (const f of fences) {
-    // `{/* Your app */}` stands for the reader's content: a child, not an empty slot
-    let body = f.text.replace(/\{\s*\/\*[^\n]*?\*\/\s*\}/g, "{null as any}");
-    // an adapter's page compares itself with React under headings that name it
-    const framework =
-      frameworkOfFence(body) ??
-      frameworkOfComment(body) ??
-      pageFramework ??
-      frameworkOfHeading(f.heading) ??
-      "react";
+    let body = f.text;
+    // an adapter's page compares itself with React under headings that name
+    // it; a comment that names several frameworks shows code they share
+    const context = pageFramework ?? frameworkOfHeading(f.heading);
+    const named = frameworksOfComment(body);
+    const own =
+      frameworkOfFence(body) ?? (named.includes(context) ? context : named[0]);
+    const framework = own ?? context ?? "react";
     const base = path.join(dir, `L${f.line}`);
     let ext = f.lang === "tsx" ? ".tsx" : ".ts";
     const kindOf = (e) => (e === ".tsx" ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
@@ -625,6 +729,8 @@ function checkPage(env, file) {
       ({ text: body, ext } = excerpt);
       parseError = undefined;
     }
+    // a fence checked as TS holds no markup
+    if (ext === ".tsx") body = fillPlaceholders(ts, body);
     const head = PRAGMA[framework]
       ? `/** @jsxImportSource ${PRAGMA[framework]} */ `
       : "";
@@ -633,6 +739,8 @@ function checkPage(env, file) {
       marker: f.marker,
       source: f.text,
       framework,
+      // nothing names the framework: React is a guess
+      guessed: !own && !context,
       file: base + ext,
       text: head + body,
       parseError,
@@ -643,13 +751,13 @@ function checkPage(env, file) {
     if (!parseError) virtual.set(block.file, block.text);
   }
   const readerFile = path.join(dir, "reader.d.ts");
-  virtual.set(readerFile, env.globals);
   const checked = blocks.filter((b) => !b.parseError);
   const byFile = new Map(checked.map((b) => [b.file, b]));
 
   // ── what the page imports, by fence, and what it declares
   const imports = new Map(); // name → [{ spec, line, imported | ns | def, typeOnly }]
   const decls = new Map(); // name → [{ b, mutable }]
+  const globalMembers = new Set(); // `Window.__SSR_STATE__`, declared in `declare global`
   for (const b of checked) {
     const sf = ts.createSourceFile(
       b.file,
@@ -657,7 +765,17 @@ function checkPage(env, file) {
       ts.ScriptTarget.Latest,
       true,
     );
+    b.markup = holdsMarkup(ts, sf);
+    b.values = valueNamesOf(ts, sf);
     for (const st of sf.statements) {
+      // `declare global` before a line break parses with no body
+      if (ts.isGlobalScopeAugmentation(st) && st.body) {
+        for (const d of st.body.statements.filter(ts.isInterfaceDeclaration)) {
+          // `"__SSR_STATE__"` and `__SSR_STATE__` name one member
+          for (const m of d.members)
+            if (m.name) globalMembers.add(`${d.name.text}.${m.name.text}`);
+        }
+      }
       if (
         ts.isImportDeclaration(st) &&
         st.importClause &&
@@ -710,6 +828,8 @@ function checkPage(env, file) {
       }
     }
   }
+
+  virtual.set(readerFile, readerGlobalsOf(ts, env.globals, globalMembers));
 
   const append = (b, line) =>
     virtual.set(b.file, `${virtual.get(b.file)}${line} // [doc-code]\n`);
@@ -772,9 +892,20 @@ function checkPage(env, file) {
       if (specMap.has(spec) && env.entryExports(spec).has(name))
         return importOf(spec, name, env.entryExports(spec).get(name));
     }
-    for (const spec of FW_LIBS[b.framework]) {
-      if (env.fwExports(b.framework, spec).has(name))
-        return importOf(spec, name, env.fwExports(b.framework, spec).get(name));
+    // a guessed framework supplies the names shaped like its API, its types,
+    // and every name to a fence that holds markup — not a value the reader
+    // may own: React exports a `cache`
+    const guess =
+      b.guessed &&
+      !b.markup &&
+      !LIBRARY_SHAPED.test(name) &&
+      b.values.has(name);
+    for (const spec of guess ? [] : FW_LIBS[b.framework]) {
+      const typeOnly = env.fwExports(b.framework, spec).get(name);
+      // a type is not the value a fence means: `h(App)` renders the reader's
+      // component, not Vue's `App`
+      if (typeOnly === undefined || (typeOnly && b.values.has(name))) continue;
+      return importOf(spec, name, typeOnly);
     }
     if (Object.hasOwn(values, name)) return values[name];
     if (LIBRARY_SHAPED.test(name))
@@ -785,18 +916,13 @@ function checkPage(env, file) {
   }
 
   /** A DOM global a fence reads where its page means something else. */
-  const isNameOf = (n) =>
-    (ts.isPropertyAccessExpression(n.parent) && n.parent.name === n) ||
-    (ts.isPropertyAssignment(n.parent) && n.parent.name === n) ||
-    (ts.isQualifiedName(n.parent) && n.parent.right === n) ||
-    ts.isJsxAttribute(n.parent);
   const isTag = (n) =>
     (ts.isJsxOpeningElement(n.parent) ||
       ts.isJsxSelfClosingElement(n.parent) ||
       ts.isJsxClosingElement(n.parent)) &&
     n.parent.tagName === n;
   function shadowedGlobal(b, n, checker) {
-    if (!ts.isIdentifier(n) || b.appended.has(n.text) || isNameOf(n))
+    if (!ts.isIdentifier(n) || b.appended.has(n.text) || isNameOf(ts, n))
       return null;
     const decl = checker.getSymbolAtLocation(n)?.declarations?.[0];
     if (!decl || !/lib\.dom\.d\.ts$/.test(decl.getSourceFile().fileName))
@@ -1010,7 +1136,9 @@ function checkPage(env, file) {
  * @param {string} options.root          the monorepo
  * @param {string[]} options.files       the pages, absolute
  * @param {Record<string, string>} [options.readerValues] more of the reader's values, by name
- * @param {string} [options.readerGlobals] more of what the reader's environment declares
+ * @param {string} [options.readerGlobals] more of what the reader's environment
+ *   declares; as with `READER_GLOBALS`, a member the page declares itself
+ *   replaces it
  * @param {any} [options.ts]             the TypeScript module
  * @returns {{ pages: PageResult[] }}
  */

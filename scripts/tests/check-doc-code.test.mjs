@@ -99,6 +99,54 @@ const PAGES = {
     ["clean"],
   ],
   "React-framework.md": [ts("startTransition(42);"), ["finding"]],
+  // a framework nothing names is a guess: it supplies the names shaped like
+  // its API, and the names of markup, but not a name the reader may own —
+  // React exports a `cache`
+  "guessed-own-name.md": [
+    ts(`cache.delete("users");\ncache.clear();`),
+    ["clean"],
+  ],
+  "guessed-shaped.md": [
+    ts("const [count, setCount] = useState(0);\nsetCount(count + 1);"),
+    ["clean"],
+  ],
+  "guessed-shaped-typed.md": [
+    ts(`const [, setCount] = useState(0);\nsetCount("x");`),
+    ["finding"],
+  ],
+  // a name the fence reads only as a type is not a value the reader owns
+  "guessed-type.md": [ts("const bad: ReactNode = { not: 1 };"), ["finding"]],
+  "guessed-generic-type.md": [
+    ts(
+      `export const props: PropsWithChildren<{ title: string }> = { title: "x" };`,
+    ),
+    ["clean"],
+  ],
+  // a fence whose import names its framework guesses nothing
+  "named-by-import.md": [
+    ts(
+      `import { h } from "vue";\nexport const count = ref(0);\ncount.value.toUpperCase();`,
+    ),
+    ["finding"],
+  ],
+  "guessed-markup.md": [tsx("hydrateRoot(42, <p />);"), ["finding"]],
+  "guessed-fragment.md": [tsx("hydrateRoot(42, <>x</>);"), ["finding"]],
+  // a framework's type is not the value a fence means: `h(App)` renders the
+  // reader's component, not Vue's `App` type
+  "type-not-value.md": [ts(`import { h } from "vue";\nh(App);`), ["clean"]],
+  "type-not-value-control.md": [
+    ts(
+      `import { h } from "vue";\nexport const v = (app: App): number => app.version;`,
+    ),
+    ["finding"],
+  ],
+  // a property's name is not a value the fence reads
+  "type-not-value-property.md": [
+    ts(
+      `import { h } from "vue";\nexport const titles = { App: "Home" };\nexport const v = (app: App): number => app.version;`,
+    ),
+    ["finding"],
+  ],
   // logger-plugin depends on no framework: the import resolves through an adapter's
   "logger-plugin.md": [
     ts(
@@ -111,6 +159,20 @@ const PAGES = {
       `import { Link } from "@real-router/preact";\nexport const el = <Link routeName="home" />;`,
     ),
     ["clean"],
+  ],
+  // each framework's markup takes children its way: a Vue component takes
+  // them as slots, and React's children are typed
+  "Vue-children.md": [
+    tsx(
+      `import { RouteView } from "@real-router/vue";\nexport const el = <RouteView nodeName="users"><p>Users</p></RouteView>;`,
+    ),
+    ["clean"],
+  ],
+  "React-children.md": [
+    tsx(
+      `import { Link } from "@real-router/react";\nexport const el = <Link routeName="home">{() => 42}</Link>;`,
+    ),
+    ["finding"],
   ],
   // an adapter's page is written in its framework, imports or none: Solid
   // writes `class`, under a heading that names React too
@@ -127,6 +189,39 @@ const PAGES = {
   // a fence that opens by naming its framework is that framework's, whatever the heading
   "comment-framework.md": [
     `### Solid / Angular\n\n${ts("// Angular\nexport class Form {\n  constructor() {\n    injectRouteExit(async () => {});\n  }\n}")}`,
+    ["clean"],
+  ],
+  // a comment that names several frameworks shows code they share: the
+  // page's framework or the heading's when it is among them, else the first
+  // named. Solid writes `class`, React `className`.
+  "Solid-comment-several.md": [
+    tsx(
+      `// Same API in React, Preact, and Solid\nexport const el = <div class="x" />;`,
+    ),
+    ["clean"],
+  ],
+  "comment-several-heading.md": [
+    `### Solid\n\n${tsx(`// Same API in React, Preact, and Solid\nexport const el = <div class="x" />;`)}`,
+    ["clean"],
+  ],
+  "Solid-comment-others.md": [
+    tsx(`// React and Preact\nexport const el = <div className="x" />;`),
+    ["clean"],
+  ],
+  // the first framework a heading names; a comment on the fence's first line
+  // only; and an import before any comment
+  "heading-first.md": [
+    `### React / Solid\n\n${tsx(`export const el = <div className="x" />;`)}`,
+    ["clean"],
+  ],
+  "comment-not-first.md": [
+    tsx(`export const el = <div className="x" />; // Solid writes class`),
+    ["clean"],
+  ],
+  "import-beats-comment.md": [
+    tsx(
+      `// a Solid comparison\nimport { useState } from "react";\nexport const [n] = useState(0);\nexport const el = <div className="x" />;`,
+    ),
     ["clean"],
   ],
   // an import of another framework's module resolves nothing for a React fence
@@ -209,6 +304,46 @@ const PAGES = {
     ),
     ["clean"],
   ],
+  "React-placeholders.md": [
+    tsx(
+      `import { RouterProvider } from "@real-router/react";\nexport const a = <RouterProvider router={router}>{/* Your app */}</RouterProvider>;\nexport const b = <RouterProvider router={router}>{/* Another app */}</RouterProvider>;`,
+    ),
+    ["clean"],
+  ],
+  // an expression with a comment beside it is not a placeholder
+  "placeholder-expression.md": [
+    tsx(
+      `import { Link } from "@real-router/react";\nexport const el = <Link routeName={42 /* the route */} />;`,
+    ),
+    ["finding"],
+  ],
+  // an empty `{}` holds no placeholder, and a fence checked as .ts no markup:
+  // after a generic arrow, TSX would read the rest as JSX
+  "placeholder-empty.md": [
+    tsx(
+      `import { RouterProvider } from "@real-router/react";\nexport const a = <RouterProvider router={router}>{}</RouterProvider>;`,
+    ),
+    ["finding"],
+  ],
+  "placeholder-ts-generic.md": [
+    ts(
+      "export const identity = <T>(value: T): T => value;\nexport const empty = {};",
+    ),
+    ["clean"],
+  ],
+  "placeholder-ts-object.md": [
+    ts(
+      "export const identity = <T>(value: T): T => value;\nexport const make = (deps: object) => deps;\nmake({ /* the reader's deps */ });",
+    ),
+    ["clean"],
+  ],
+  // only markup's `{/* … */}` is a placeholder: here it is an empty object
+  "placeholder-object.md": [
+    ts(
+      "export const make = (deps: object) => deps;\nmake({ /* the reader's deps */ });",
+    ),
+    ["clean"],
+  ],
   "React-markup.md": [
     tsx(
       `import { Link } from "@real-router/react";\n\n<Link routeName="home" />\n<Link routeName={42} />`,
@@ -264,6 +399,61 @@ const PAGES = {
     ["clean"],
   ],
   "isolation-b.md": [ts("window.onlyOnPageA.toUpperCase();"), ["finding"]],
+
+  // the reader's globals yield to the page's own `declare global` member, and
+  // only to that member of that interface
+  "global-own.md": [
+    ts(
+      "declare global {\n  interface Window {\n    __SSR_STATE__?: { path: string };\n  }\n}\nexport const s = window.__SSR_STATE__;",
+    ),
+    ["clean"],
+  ],
+  "global-own-typed.md": [
+    ts(
+      "declare global {\n  interface Window {\n    __SSR_STATE__?: { path: string };\n  }\n}\nexport const p: string = window.__SSR_STATE__.path;",
+    ),
+    ["finding"],
+  ],
+  "global-own-quoted.md": [
+    ts(
+      'declare global {\n  interface Window {\n    "__SSR_STATE__"?: { path: string };\n  }\n}\nexport const s = window.__SSR_STATE__;',
+    ),
+    ["clean"],
+  ],
+  "global-other-member.md": [
+    ts(
+      "declare global {\n  interface Window {\n    onlyHere: string;\n  }\n}\nexport const s: string = window.__SSR_STATE__.path;",
+    ),
+    ["clean"],
+  ],
+  "global-other-interface.md": [
+    ts(
+      "declare global {\n  interface Document {\n    __SSR_STATE__: number;\n  }\n}\nexport const s: string = window.__SSR_STATE__.path;",
+    ),
+    ["clean"],
+  ],
+  "global-var.md": [
+    ts(
+      "declare global {\n  var onlyHere: string;\n}\nexport const s: string = window.__SSR_STATE__.path;",
+    ),
+    ["clean"],
+  ],
+  // `declare global` before a line break parses with no body
+  "global-no-body.md": [ts("declare global\nexport {};"), ["clean"]],
+  // an index signature names no member
+  "global-index.md": [
+    ts(
+      "declare global {\n  interface Window {\n    [key: string]: unknown;\n  }\n}\nexport const s: string = window.__SSR_STATE__.path;",
+    ),
+    ["clean"],
+  ],
+  // a fence's own `interface Window` is local to its module
+  "global-local.md": [
+    ts(
+      "interface Window {\n  __SSR_STATE__?: number;\n}\nexport const s: string = window.__SSR_STATE__.path;",
+    ),
+    ["clean"],
+  ],
 };
 
 for (const [name, [text]] of Object.entries(PAGES))
@@ -301,6 +491,33 @@ test("each finding names its page line", () => {
   );
 });
 
+test("a placeholder over several lines keeps the lines below it", () => {
+  writeFileSync(
+    join(FIXTURE, "placeholder-lines.md"),
+    tsx(
+      [
+        `import { Link, RouterProvider } from "@real-router/react";`,
+        "export const a = (",
+        "  <RouterProvider router={router}>",
+        "    {/*",
+        "      Your app",
+        "    */}",
+        "  </RouterProvider>",
+        ");",
+        "export const b = <Link routeName={42} />;",
+      ].join("\n"),
+    ),
+  );
+  const [page] = checkDocCode({
+    root: ROOT,
+    files: [join(FIXTURE, "placeholder-lines.md")],
+  }).pages;
+  assert.deepEqual(
+    page.blocks[0].diagnostics.map((d) => [d.line, d.code]),
+    [[10, 2322]],
+  );
+});
+
 test("a fence that is not one program says how to mark it", () => {
   for (const name of ["fragment.md", "signature.md"]) {
     const messages = byName
@@ -320,6 +537,14 @@ test("a rewritten excerpt is checked, not set aside as unparsed", () => {
   assert.deepEqual(codes("route-excerpt.md"), [2322]);
   assert.deepEqual(codes("React-markup.md"), [2322]);
   assert.deepEqual(codes("tsx-retry.md"), [2322]);
+});
+
+test("a page's own global member is the one its fences read", () => {
+  // its `?`, where the reader's member is `any`
+  const codes = byName
+    .get("global-own-typed.md")
+    .blocks.flatMap((b) => b.diagnostics.map((d) => d.code));
+  assert.deepEqual(codes, [18048]);
 });
 
 test("fencesOf reads the marker above a fence and the directives that mark none", () => {

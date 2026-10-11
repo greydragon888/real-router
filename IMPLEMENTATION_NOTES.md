@@ -22,8 +22,12 @@ reads it:
   the page's package, then from any adapter's.
 - **Every fence is in one framework**: the one its imports name, else the one a
   `// Angular` comment on its first line names, else its page's (an adapter's
-  page), else the one its heading names first, else React. An import of another
-  framework's module, or another adapter's export, resolves nothing for it.
+  page), else the one its heading names first, else React. Of several frameworks
+  a comment names, the page's is taken when it is among them — on a page of no
+  adapter, the heading's — else the first. An import of another framework's
+  module, or another adapter's export, resolves nothing for it. JSX is
+  type-checked in `preserve` mode, so each framework's markup takes children its
+  own way.
 - **A name a fence leaves undeclared** is looked up in order: an import in a fence
   above, an export of the page's own package, an import in a fence below, a
   declaration in another fence (a `let` there is assignable here), an export of
@@ -31,7 +35,12 @@ reads it:
   (`router` is `Router<any>`). Anything still unresolved is the reader's own,
   typed `any` — unless it is shaped like library API (`use…`, `create…`,
   `inject…`, `…Plugin`, `…Factory`), which is a finding. A name the page imports or
-  declares beats the DOM global of that name (`screen`, `navigator`).
+  declares beats the DOM global of that name (`screen`, `navigator`). The
+  framework's own exports supply a type only to a fence that reads no value of
+  that name. When nothing names the framework, outside markup they supply only
+  types and the values shaped like library API. The reader's globals
+  (`window.__SSR_STATE__`) yield to a member the page declares in
+  `declare global`.
 - **A module the repository cannot resolve** — `./Dashboard`, `zod` — exports, as
   `any`, what the page imports from it. An `@real-router/*` specifier that no
   package exports stays an error.
@@ -82,6 +91,54 @@ under "(Solid / Vue / Svelte / Angular)". A rule that took the framework of the
 nearest fence above was tried and dropped: it handed a section the previous
 section's framework. `@real-router/react` does not export `RouterContext`, and the
 lookup used to supply Preact's, so a React fence failed on a Preact type.
+
+**Why a comment's frameworks defer to the page's (#2715).** A comment that names
+several frameworks shows code they share. Taking the first one read
+`Solid-Integration.md`'s `// Same API in React, Preact, and Solid` as React, so
+Solid's `<RouteView>` failed React's JSX — four wiki fences on the Solid, Vue and
+Preact pages. Falling through to the page whenever a comment names several gave
+the same verdicts and was dropped: seven fences name only frameworks other than
+their page's, as `// React / Preact / Solid / Vue / Svelte` over JSX on the
+Angular page, and that rule read them against what they say. The rule cannot
+tell a list from a contrast: `// React, for comparison with Solid` on the Solid
+page reads as Solid, so a comment that means the other framework names it alone.
+
+**Why a guessed React supplies only its types and the values shaped like
+library API (#2715).** `react` exports `cache` and `react-dom/server` exports
+`renderToString`, and a fence that named no framework read `cache.delete(…)` and
+`renderToString(scope.router)` against them. Supplying nothing under the guess
+was measured and dropped: six wiki fences call `useEffect`, `useMemo` or
+`useState` without an import, and each would report a library-shaped finding. A
+type stays supplied — the reader's `any` takes no type arguments, so
+`PropsWithChildren<…>` would fail — and so does every name to a fence that holds
+markup. The price is recall: under the guess, `startTransition(42)` meets the
+reader's `any` and passes.
+
+**Why a framework's type does not resolve a value (#2715).** `Accessibility.md`
+and `SSR-Hydration.md` render `h(App)`, the reader's root component. Vue exports
+`App` as a type, and importing it made three fences "not one program" (TS2693).
+A property's name — `{ App: … }`, `mods.App` — is not a value the fence reads.
+
+**Why JSX is checked in `preserve` mode (#2715).** Under `react-jsx` TypeScript
+names every element's children `children` (`getJsxElementChildrenPropertyName`),
+whatever framework's JSX namespace the fence's pragma selects. A Vue component
+takes its children as slots, so `Vue-Integration.md`'s `<RouteView>` and
+`<RouteView.Match>` failed on theirs (TS2322). `preserve` is Vue's own TSX
+setting. Measured over the wiki and the READMEs, the switch changed that one
+fence.
+
+**Why the reader's globals yield to the page's (#2715).** The reader's
+`Window.__SSR_STATE__` is `any`; `ssr.md`, `RSC-Integration.md` and
+`SSR-Hydration.md` declare their own, optional and typed, and two declarations
+of one member must agree (TS2687, TS2717).
+
+**Why only markup's `{/* … */}` is a placeholder (#2715).** `{null as any}`
+stands in a JSX child for the reader's content. As a text pattern the rewrite
+also turned `createAppRouter({ /* client deps */ })` into an object that does not
+parse: four `SSR-Hydration.md` fences reported TS1005. The placeholder is now an
+empty JSX expression that holds a comment, in a fence checked as TSX — a TSX
+parse of a `.ts` fence reads `<T>(…)` as markup and each `{}` after it as a
+placeholder. Its line breaks stay, so the lines below it keep their numbers.
 
 **Why the backlog keys on the fence's text.** A key by line, as
 `check-messages.mjs` keeps for its one row, moves with every edit above the fence.
