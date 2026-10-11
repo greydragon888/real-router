@@ -684,7 +684,7 @@ test("a threshold written only in a comment keeps the package out of coverage-ex
   );
 });
 
-test("a threshold the package walk cannot read fails the run and names the region and the file", () => {
+test("a threshold isPhantom cannot read fails the run and names the region and the file", () => {
   const files = {
     ...tested("odd", "thresholds: { branches: FLOOR }\n"),
     "sonar-project.properties": [
