@@ -152,7 +152,7 @@ test("a test the tooling set does not name lands in the guards group", () => {
   }
 });
 
-test("an entry of scripts/tests/ no group would run is refused by name, and a dotfile is passed over", () => {
+test("an entry of scripts/tests/ no group would run is refused by name, a directory named with a dot too, and a dotfile is passed over", () => {
   for (const [stranger, make] of [
     [null, () => {}],
     ["x.test.ts", (dir) => writeFileSync(join(dir, "x.test.ts"), "")],
@@ -161,6 +161,13 @@ test("an entry of scripts/tests/ no group would run is refused by name, and a do
       (dir) => {
         mkdirSync(join(dir, "sub"));
         writeFileSync(join(dir, "sub", "y.test.mjs"), "");
+      },
+    ],
+    [
+      ".wip",
+      (dir) => {
+        mkdirSync(join(dir, ".wip"));
+        writeFileSync(join(dir, ".wip", "x.test.mjs"), "");
       },
     ],
   ]) {

@@ -14010,6 +14010,8 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 
 > **Updated (2026-10-11).** jscpd keeps `similarity` as a 32-bit float and checks its range after rounding, so the cell above sees only a value whose rounded form is outside (0, 1]. 1.00000001, outside the range, and 0.99999999, inside it, both run as 1 — 8 clones with no `Warning:`, against 13 at 0.9 — and the cell passed both (measured on 2026-10-11). The generator holds the key to the text of the file: 1, or 0.0001 to 0.9999 with at most four decimal places. The text, not the number, because `JSON.parse` already reads 0.99999999999999999 as 1. Within that form the rounded value stays on the side of 1 the text states: the test checks every such value against `Math.fround`, and the two ends against what the binary stores.
 
+> **Updated (2026-10-11).** A `threshold` of "Infinity" or "NaN" jscpd takes as 0, without a word. The cell cannot see it, since the fixture's clones are over any threshold; the gate on the tree turns red on it (measured on 2026-10-11: exit 1, "over threshold (0.0%)"). That is an accepted gap, as loud as the gate.
+
 **Problem.** Two hand-kept lists named the exclusions of two duplication detectors: `ignore` in `.jscpd.json`, for jscpd and the pre-push gate, and `sonar.cpd.exclusions`, for SonarCloud's duplication on new code. A comment above the Sonar line asked to keep them in lockstep, and nothing held it: four jscpd entries were missing from Sonar's list, and Sonar's carried `**/tests/**`, which its duplication never reads. Nor would a faithful copy have held, because the two tools read one pattern differently. jscpd matches each entry, and the entry behind `**/`, against the path as it walks it from a scan root given on its command line; its `*` crosses `/`, and every leading `/` is dropped. Sonar matches against the path from the project root; its `*` stays within a segment and its `**` crosses `/`. Copied as written, `legacy.ts`, `src/**` and `packages/*/legacy.ts` leave out 5, 24 and 4 files of a fixture in jscpd, and none in Sonar.
 
 **Solution.**
@@ -14111,6 +14113,8 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 ## A new test of `scripts/tests/` runs in place until `TOOLING` names it (2026-10-05)
 
 > **Updated (2026-10-08).** `testsOf` also refuses by name an entry of `scripts/tests/` that is not a file named `*.test.mjs` — a test of another name, a directory — since no group would run it; a name that starts with `.` is passed over.
+
+> **Updated (2026-10-11).** A directory whose name starts with `.` is refused too: `.wip/x.test.mjs` would run in no group. A file whose name starts with `.` is still passed over.
 
 **Problem.** The split of `scripts/tests/` named the tests that run in place, `GUARDS`, and sent every other one to the tooling task, which runs it in a copy of the task's inputs and replays its verdict from turbo's cache. The copy was to show a test placed there by mistake: one that reads a file beyond the inputs fails in it. A test that finds what it checks by a listing can pass: git's file list and a glob in the copy hold only the inputs, and a check over an empty set passes unless it asks for a member. A review found it with a prototype of a planned workspace test, which lists the tracked `pnpm-workspace.yaml` files and checks `pmOnFail` in each. In place it finds three, and it fails when `examples/pnpm-workspace.yaml` loses the setting; in the copy, with the same change, it finds none, and the whole group exits 0. The task's key does not move with that file either, since it is not an input, so a pull request that changed only it would have replayed the last verdict.
 
@@ -14426,6 +14430,8 @@ Three rounds of review of the fix found the same order of the text in two more p
 > **Updated (2026-10-08).** The wiring cell reads the composite actions beside the workflows, finds a Dependency Review step by its `uses` in any letter case, as GitHub resolves an action, and refuses one in a composite action.
 
 > **Updated (2026-10-11).** `smol-toml` 1.9.0 has a strict mode, `useLegacyDate: false`, that refuses a day its month lacks. On ten dates — 02-29 of a leap and of a common year, 02-30, 04-31, 2100-02-29, 01-32, 13-01, 00-10 and 01-00 — it gives osv-scanner's verdict on each, where the default mode differs on the four days past their month's end. It needs a global `Temporal`: on Node 24.18.1 it fails on any date with "Temporal is not defined" and works under `--harmony-temporal`, and Node 26 enables `Temporal` by default (measured on 2026-10-11). With `.nvmrc` on Node 26, or a `smol-toml` major, the parse takes the strict mode and the divergence goes.
+
+> **Updated (2026-10-11).** The wiring cell reads every composite action git tracks, wherever it lies, and not only those under `.github/actions/`: a local `uses:` can name any directory.
 
 **Problem.** The advisories the repository accepts lived twice: in `scripts/osv-scanner.toml`, which osv-scanner reads for `lint:audit`, and in the `allow-ghsas` input of the Dependency Review step of `codeql.yml`, a comma-separated copy with an explanation per id above it. A comment asked to keep the two in step, and nothing checked it.
 

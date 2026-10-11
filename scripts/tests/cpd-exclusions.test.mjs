@@ -376,7 +376,9 @@ test("given the repository's .jscpd.json, jscpd leaves out what the translated l
     assert.doesNotMatch(said, reported);
     // A `null` it takes as unset, and a `minTokens` of 0 not as 0, without a
     // word: such a value shows only in what it finds. The fixture's clones are
-    // over the threshold, so the gate's verdict shows one in force.
+    // over the threshold, so the gate's verdict shows one in force. A
+    // `threshold` of "Infinity" or "NaN" it takes as 0, also without a word;
+    // the fixture cannot show that, and the gate on the tree turns red on it.
     assert.match(said, /over threshold \(\d+(?:\.\d+)?%\)/);
     assert.deepEqual([...analysed(root)].sort(), kept.sort());
 

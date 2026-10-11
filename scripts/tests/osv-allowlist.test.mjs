@@ -324,21 +324,66 @@ function wiring(files) {
   return { steps, departures };
 }
 
-test("every Dependency Review step reads the region's file and nothing replaces its list", () => {
-  const files = Object.fromEntries(
+/**
+ * The workflows under `root` and every composite action git tracks there,
+ * wherever it lies: a local `uses:` can name any directory.
+ */
+function workflowsAndActions(root) {
+  return Object.fromEntries(
     execFileSync(
       "git",
-      ["ls-files", "-z", "--", ".github/workflows", ".github/actions"],
-      { cwd: repoRoot, encoding: "utf8", env: withoutGitEnv(process.env) },
+      [
+        "ls-files",
+        "-z",
+        "--",
+        ".github/workflows",
+        ":(glob)**/action.yml",
+        ":(glob)**/action.yaml",
+      ],
+      { cwd: root, encoding: "utf8", env: withoutGitEnv(process.env) },
     )
       .split("\0")
       .filter((file) =>
         file.startsWith(".github/workflows/")
           ? isWorkflowFile(file)
-          : /\/action\.ya?ml$/i.test(file),
+          : /(?:^|\/)action\.ya?ml$/.test(file),
       )
-      .map((file) => [file, readFileSync(join(repoRoot, file), "utf8")]),
+      .map((file) => [file, readFileSync(join(root, file), "utf8")]),
   );
+}
+
+test("a composite action outside .github/actions/ is read too", () => {
+  const root = mkdtempSync(join(tmpdir(), "osv-allowlist-(actions)-"));
+  try {
+    const git = (...args) =>
+      execFileSync("git", args, { cwd: root, env: withoutGitEnv(process.env) });
+    git("init", "-q");
+    mkdirSync(join(root, ".github", "workflows"), { recursive: true });
+    mkdirSync(join(root, "tools", "review"), { recursive: true });
+    writeFileSync(
+      join(root, ".github", "workflows", "review.yml"),
+      "on: pull_request\njobs:\n  review:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: ./tools/review\n",
+    );
+    writeFileSync(
+      join(root, "tools", "review", "action.yml"),
+      "runs:\n  using: composite\n  steps:\n    - uses: actions/dependency-review-action@v5\n",
+    );
+    git("add", "-A");
+    const files = workflowsAndActions(root);
+    assert.deepEqual(Object.keys(files).sort(), [
+      ".github/workflows/review.yml",
+      "tools/review/action.yml",
+    ]);
+    assert.deepEqual(wiring(files).departures, [
+      "tools/review/action.yml: a Dependency Review step in a composite action",
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("every Dependency Review step reads the region's file and nothing replaces its list", () => {
+  const files = workflowsAndActions(repoRoot);
   const { steps, departures } = wiring(files);
 
   assert.ok(steps > 0, "no Dependency Review step found");

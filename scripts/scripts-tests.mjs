@@ -90,8 +90,9 @@ export const TOOLING = new Set([
 /**
  * The test files of a group, relative to `root`. A name in `tooling` without a
  * test file is refused: it would run nothing. So is an entry of the directory
- * that is not a file named `*.test.mjs` — a test of another name, a directory —
- * since no group would run it; a name that starts with `.` is passed over.
+ * that is not a file named `*.test.mjs` — a test of another name, a directory,
+ * one whose name starts with `.` too — since no group would run it; a file whose
+ * name starts with `.` is passed over.
  *
  * @param {"guards" | "tooling"} group
  * @param {string} root
@@ -102,7 +103,10 @@ export function testsOf(group, root = ROOT, tooling = TOOLING) {
   const entries = readdirSync(join(root, TESTS), { withFileTypes: true });
   const isTest = (entry) => entry.isFile() && entry.name.endsWith(".test.mjs");
   const strangers = entries
-    .filter((entry) => !isTest(entry) && !entry.name.startsWith("."))
+    .filter(
+      (entry) =>
+        !isTest(entry) && !(entry.isFile() && entry.name.startsWith(".")),
+    )
     .map((entry) => entry.name)
     .sort();
   if (strangers.length > 0) {
