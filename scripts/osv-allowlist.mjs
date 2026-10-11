@@ -16,6 +16,10 @@
 // ⚠ A day that does not exist in its month passes as an `ignoreUntil`:
 // `smol-toml` rolls 2026-02-30 over to 2026-03-02, and the parsed value cannot
 // tell. osv-scanner refuses such a file whole, so `lint:audit` fails on it.
+//
+// `smol-toml`'s strict mode, `useLegacyDate: false`, refuses such a day as
+// osv-scanner does, but needs a global `Temporal`: Node 24 has none, Node 26
+// has one by default.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

@@ -14425,6 +14425,8 @@ Three rounds of review of the fix found the same order of the text in two more p
 
 > **Updated (2026-10-08).** The wiring cell reads the composite actions beside the workflows, finds a Dependency Review step by its `uses` in any letter case, as GitHub resolves an action, and refuses one in a composite action.
 
+> **Updated (2026-10-11).** `smol-toml` 1.9.0 has a strict mode, `useLegacyDate: false`, that refuses a day its month lacks. On ten dates — 02-29 of a leap and of a common year, 02-30, 04-31, 2100-02-29, 01-32, 13-01, 00-10 and 01-00 — it gives osv-scanner's verdict on each, where the default mode differs on the four days past their month's end. It needs a global `Temporal`: on Node 24.18.1 it fails on any date with "Temporal is not defined" and works under `--harmony-temporal`, and Node 26 enables `Temporal` by default (measured on 2026-10-11). With `.nvmrc` on Node 26, or a `smol-toml` major, the parse takes the strict mode and the divergence goes.
+
 **Problem.** The advisories the repository accepts lived twice: in `scripts/osv-scanner.toml`, which osv-scanner reads for `lint:audit`, and in the `allow-ghsas` input of the Dependency Review step of `codeql.yml`, a comma-separated copy with an explanation per id above it. A comment asked to keep the two in step, and nothing checked it.
 
 **Solution.**
