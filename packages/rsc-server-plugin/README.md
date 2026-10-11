@@ -71,7 +71,7 @@ Loaders are keyed by **route name** (not path). Each value is a **factory functi
 ```typescript
 import type { RscLoaderFactoryMap } from "@real-router/rsc-server-plugin";
 
-const loaders: RscLoaderFactoryMap = {
+const loaders: RscLoaderFactoryMap<{ db: Db }> = {
   home: () => () => <HomePage />,                         // sync ReactNode
   "users.profile": () => async ({ params }) => {          // async ReactNode
     const user = await fetchUser(params.id);
@@ -217,7 +217,7 @@ import {
   LoaderRedirect,
 } from "@real-router/rsc-server-plugin/errors";
 
-const loaders: RscLoaderFactoryMap = {
+const loaders: RscLoaderFactoryMap<{ db: Db }> = {
   "users.profile": (_router, getDep) => async ({ params }) => {
     const user = await getDep("db").users.findById(params.id);
     if (!user) throw new LoaderNotFound(`user:${params.id}`);

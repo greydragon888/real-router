@@ -151,7 +151,7 @@ function UsersLayout() {
           case "users":
             return <UsersList />;
           case "users.profile":
-            return <UserProfile id={route().params.id} />;
+            return <UserProfile />;
           default:
             return null;
         }

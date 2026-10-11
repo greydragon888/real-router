@@ -10,12 +10,12 @@
 ```typescript
 // Without plugin — tampered URL params reach your app unvalidated:
 // User visits: /products?page=-1&limit=99999
-router.getState().search; // { page: -1, limit: 99999 } — crashes pagination
+router.getState()?.search; // { page: -1, limit: 99999 } — crashes pagination
 
 // With plugin — invalid params stripped, route defaults restored automatically:
 router.usePlugin(searchSchemaPlugin());
 // User visits: /products?page=-1&limit=99999
-router.getState().search; // { page: 1, limit: 20 } — safe defaults from defaultParams
+router.getState()?.search; // { page: 1, limit: 20 } — safe defaults from defaultSearch
 ```
 
 ## Installation
@@ -37,7 +37,7 @@ const routes = [
   {
     name: "products",
     path: "/products?page&limit&sortBy",
-    defaultParams: { page: 1, limit: 20, sortBy: "price" },
+    defaultSearch: { page: 1, limit: 20, sortBy: "price" },
     searchSchema: z.object({
       page: z.number().int().positive(),
       limit: z.number().int().min(1).max(100),
@@ -94,14 +94,14 @@ When schema validation succeeds, the resolved params are merged back based on `s
 
 ### Invalid params + recovery
 
-When schema validation fails, the plugin strips only the keys with validation issues and restores their `defaultParams` values:
+When schema validation fails, the plugin strips only the keys with validation issues and restores their `defaultSearch` values:
 
 ```typescript
-// Route defaultParams: { page: 1, sortBy: "price" }
+// Route defaultSearch: { page: 1, sortBy: "price" }
 // URL: /products?page=foo&sortBy=price
 // Schema fails: page is not a valid number
 // Step 1 — strip invalid: { sortBy: "price" }
-// Step 2 — merge defaults: { page: 1, sortBy: "price" }  ← page restored from defaultParams
+// Step 2 — merge defaults: { page: 1, sortBy: "price" }  ← page restored from defaultSearch
 // Result: { page: 1, sortBy: "price" }
 ```
 
@@ -109,25 +109,25 @@ In `mode: "development"`, a `console.error` is emitted with the route name and v
 
 > **Strip is per-key — cross-field `refine` issues aren't stripped.** Recovery removes only the keys a validation issue names in its `path`. A cross-field `.refine()` / `.superRefine()` that reports a **path-less** issue (it concerns the whole object, not one key) strips **nothing** — the invalid combination reaches `state` (dev still logs `console.error`; production is silent). To recover, give the refine a `path` (`{ message, path: ["max"] }`) so the offending key is stripped, or handle it in `onError`. Example: `z.object({ min: z.number(), max: z.number() }).refine((v) => v.min < v.max)` navigated with `{ min: 10, max: 5 }` leaves `{ min: 10, max: 5 }` in `state`.
 
-### `defaultParams` must satisfy the schema (contract)
+### `defaultSearch` must satisfy the schema (contract)
 
-The plugin's runtime guarantee is scoped to **user input**: an invalid _incoming_ param (from the URL or a `navigate()` call) never reaches `state`. It does **not** validate `defaultParams` at runtime — those are **trusted developer config**, injected by the router core _below_ the layer this plugin intercepts. So a `defaultParams` value that violates its own `searchSchema` **will reach `state.search` and the URL** (`state.path`), on every navigation, in **every** `mode` — including `mode: "production"` (a query-declared default lands in `state.search` since core routes defaults by channel, #1549):
+The plugin's runtime guarantee is scoped to **user input**: an invalid _incoming_ param (from the URL or a `navigate()` call) never reaches `state`. It does **not** validate `defaultSearch` at runtime — those are **trusted developer config**, injected by the router core _below_ the layer this plugin intercepts. So a `defaultSearch` value that violates its own `searchSchema` **will reach `state.search` and the URL** (`state.path`), on every navigation, in **every** `mode` — including `mode: "production"`:
 
 ```typescript
 {
   name: "products",
   path: "/products?page",
-  defaultParams: { page: -5 },              // ← violates the schema below
+  defaultSearch: { page: -5 },              // ← violates the schema below
   searchSchema: z.object({ page: z.number().positive() }),
 }
 await router.navigate("products");          // no input supplied by the caller
-router.getState().search;                   // { page: -5 }  ← invalid default reaches state
-router.getState().path;                     // "/products?page=-5"  ← and the URL
+router.getState()?.search;                  // { page: -5 }  ← invalid default reaches state
+router.getState()?.path;                    // "/products?page=-5"  ← and the URL
 ```
 
-In `mode: "development"` the plugin **warns** about a schema-violating `defaultParams` at authoring time (at `usePlugin()`, and when routes are added / replaced / updated) — a config lint, not a runtime block. `mode: "production"` skips that warning. Either way the value is **not** blocked at runtime, and `onError` does not change this (core injects the default independently of the callback).
+In `mode: "development"` the plugin **warns** about a schema-violating `defaultSearch` at authoring time (at `usePlugin()`, and when routes are added / replaced / updated) — a config lint, not a runtime block. `mode: "production"` skips that warning. Either way the value is **not** blocked at runtime, and `onError` does not change this (core injects the default independently of the callback).
 
-**Fix:** keep each route's `defaultParams` consistent with its `searchSchema`. Treat the dev warning as a config error to resolve, not a recoverable runtime condition. To _fill_ absent params from within the schema instead, use the schema's own `.default()` (e.g. Zod `z.number().default(1)`) — those values are validated by construction.
+**Fix:** keep each route's `defaultSearch` consistent with its `searchSchema`. Treat the dev warning as a config error to resolve, not a recoverable runtime condition. To _fill_ absent params from within the schema instead, use the schema's own `.default()` (e.g. Zod `z.number().default(1)`) — those values are validated by construction.
 
 ### Strict mode
 
@@ -172,7 +172,7 @@ const routes = [
   {
     name: "users",
     path: "/users?page&pageSize&status",
-    defaultParams: { page: 1, pageSize: 25, status: "active" },
+    defaultSearch: { page: 1, pageSize: 25, status: "active" },
     searchSchema: z.object({
       page: z.number().int().positive(),
       pageSize: z.number().int().min(1).max(100),
@@ -213,7 +213,7 @@ router.usePlugin(
   searchSchemaPlugin({
     onError: (routeName, params, issues) => {
       analytics.track("invalid_search_params", { routeName, issues });
-      return {}; // empty params — let defaultParams fill in from the route
+      return {}; // empty params — let defaultSearch fill in from the route
     },
   }),
 );
