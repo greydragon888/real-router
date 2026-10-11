@@ -366,8 +366,10 @@ test("given the repository's .jscpd.json, jscpd leaves out what the translated l
     // drops without a word, and then names none. A file it fails to parse, and
     // a value of another type, a negative count or a `mode` it does not know,
     // which it drops, it reports as `config file .jscpd.json`; a `similarity`
-    // outside (0, 1], which it takes as 1, and a reporter it does not know,
-    // which it drops, with a `Warning:`.
+    // whose 32-bit value is outside (0, 1], which it takes as 1, and a reporter
+    // it does not know, which it drops, with a `Warning:`. A `similarity` other
+    // than 1 that rounds to 1 it runs as 1 without one; the generator refuses
+    // those.
     const reported = /config file \.jscpd\.json|Warning:/;
     const said = gateSays(root);
     assert.match(said, /Using config from \.jscpd\.json/);
@@ -379,8 +381,8 @@ test("given the repository's .jscpd.json, jscpd leaves out what the translated l
     assert.deepEqual([...analysed(root)].sort(), kept.sort());
 
     // The control: this jscpd prints a value of another type, a `similarity`
-    // outside (0, 1] and a reporter it does not know each on a line `reported`
-    // takes, the reporter only given the gate's own arguments.
+    // of 5 and a reporter it does not know each on a line `reported` takes, the
+    // reporter only given the gate's own arguments.
     writeFileSync(
       join(root, ".jscpd.json"),
       JSON.stringify({
@@ -478,6 +480,127 @@ test("a key set to null is refused by name: jscpd takes it as unset without a wo
     assert.throws(() => render(root), /minLines, threshold set to null/);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+/**
+ * A repository whose `.jscpd.json` writes `similarity` as `text`, with `"//"`
+ * holding `reasons`, last or, given `reasonsFirst`, first.
+ */
+function withSimilarity(text, reasons = '["reasons"]', reasonsFirst = false) {
+  const root = repository();
+  const file = join(root, ".jscpd.json");
+  const { "//": _, ...config } = JSON.parse(readFileSync(file, "utf8"));
+  const json = JSON.stringify({ ...config, similarity: 0 });
+  const placeholder = '"similarity":0';
+  assert.equal(json.split(placeholder).length, 2, json);
+  const body = json
+    .slice(1, -1)
+    .replace(placeholder, () => `"similarity":${text}`);
+  writeFileSync(
+    file,
+    reasonsFirst ? `{"//":${reasons},${body}}` : `{${body},"//":${reasons}}`,
+  );
+  return root;
+}
+
+test("a similarity not written as 1 or 0.0001 to 0.9999 is refused: jscpd's 32-bit float could take it across 1", () => {
+  // The rule's premise: rounded to 32 bits, each value from 0.0001 to 0.9999
+  // stays on its own side of 1 and above 0, while 0.99999999 and 1.00000001
+  // both become 1, which is what jscpd runs. The binary stores the two ends of
+  // the range as written, without a warning: a value it refuses or a file it
+  // drops it stores as 1.
+  for (let k = 1; k <= 1e4; k++) {
+    const value = k / 1e4;
+    const float = Math.fround(value);
+    assert.ok(float > 0 && float < 1 === value < 1, String(value));
+  }
+  assert.equal(Math.fround(0.99999999), 1);
+  assert.equal(Math.fround(1.00000001), 1);
+  assert.ok(existsSync(JSCPD), `no jscpd binary at ${JSCPD}`);
+  for (const text of ["0.9999", "0.0001"]) {
+    const root = withSimilarity(text);
+    try {
+      const run = spawnSync(
+        JSCPD,
+        ["--debug", "packages/p/src/", "--no-tips"],
+        {
+          cwd: root,
+          encoding: "utf8",
+        },
+      );
+      const said = `${run.stdout}\n${run.stderr}`;
+      const stored = /"similarity":\s*([^,\s}]+)/.exec(said);
+      assert.ok(stored, said);
+      assert.equal(
+        Math.fround(Number(stored[1])),
+        Math.fround(Number(text)),
+        `${text}: stored ${stored[1]}`,
+      );
+      assert.doesNotMatch(said, /Warning:/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  // The text is what is checked: `JSON.parse` reads 0.99999999999999999 as 1.
+  for (const text of [
+    "0.99999999",
+    "1.00000001",
+    "0.99999999999999999",
+    "1.0000000000000001",
+    "0.000099999999999999999",
+    "0",
+    "0.0",
+    "0.0000",
+    "1.0",
+    "9e-1",
+    "0.90000",
+    "0.12345",
+    "1e400",
+    "-0.5",
+    "1.5",
+    "10.9",
+    '"0.9"',
+    "true",
+    "[0.9]",
+  ]) {
+    const root = withSimilarity(text);
+    try {
+      assert.throws(
+        () => render(root),
+        new RegExp(`\\.jscpd\\.json: similarity is ${RegExp.escape(text)},`),
+        text,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+  // A key of the same name under `"//"`, read before or after it, is not the
+  // setting.
+  for (const reasonsFirst of [false, true]) {
+    const nested = withSimilarity(
+      "0.99999999",
+      '{"similarity":0.9}',
+      reasonsFirst,
+    );
+    try {
+      assert.throws(
+        () => render(nested),
+        /similarity is 0\.99999999,/,
+        String(reasonsFirst),
+      );
+    } finally {
+      rmSync(nested, { recursive: true, force: true });
+    }
+  }
+  for (const text of ["0.0001", "0.57", "0.81", "0.9", "0.9999", "1"]) {
+    const root = withSimilarity(text);
+    try {
+      assert.doesNotThrow(() => render(root), text);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 });
 

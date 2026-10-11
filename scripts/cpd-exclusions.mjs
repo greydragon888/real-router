@@ -23,12 +23,16 @@
 // `sonar-project.properties` other than the ones named here, and a tracked file
 // outside the forms `refusedFiles` accepts. A key set to `null` is refused too:
 // jscpd takes it as unset without a word, and on `threshold` that takes the
-// gate's threshold off. `JSON.parse` takes more than jscpd 5.3.2 does — a
-// number out of the range jscpd parses, `1e400`, or nesting 130 deep drops the
-// whole file there; a value of another type, a negative count or a `mode` it
-// does not know drops that value; a `similarity` outside (0, 1] it takes as 1,
-// and a reporter it does not know it drops — so the test has jscpd judge this
-// repository's `.jscpd.json` itself.
+// gate's threshold off. So is a `similarity` written other than as 1 or as
+// 0.0001 to 0.9999 with at most four decimal places: jscpd keeps it as a 32-bit
+// float and checks its range after rounding, so 0.99999999 and 1.00000001 both
+// run as 1, again without a word. The text is what is checked — `JSON.parse`
+// already reads 0.99999999999999999 as 1. `JSON.parse` takes more than jscpd
+// 5.3.2 does — a number out of the range jscpd parses, `1e400`, or nesting 130
+// deep drops the whole file there; a value of another type, a negative count or
+// a `mode` it does not know drops that value, and a reporter it does not know
+// it drops — so the test has jscpd judge this repository's `.jscpd.json`
+// itself.
 
 import { execFileSync } from "node:child_process";
 import { lstatSync, readFileSync, statSync } from "node:fs";
@@ -228,7 +232,9 @@ const strings = (value) =>
  * `.jscpd.json`, decoded as jscpd decodes it — UTF-8 without a byte-order mark,
  * every string well formed; on anything else jscpd drops the whole file — and
  * held to the keys, the formats, the `absolute` and the `ignore` shape this
- * knows, with no key set to `null`, which jscpd takes as unset without a word.
+ * knows, with no key set to `null`, which jscpd takes as unset without a word,
+ * and a `similarity` written as 1 or as 0.0001 to 0.9999 with at most four
+ * decimal places.
  * With `absolute`, jscpd would match an entry against the absolute path.
  *
  * @param {string} root
@@ -236,11 +242,16 @@ const strings = (value) =>
  */
 function readJscpd(root) {
   let config;
+  const written = new Map();
   try {
     config = JSON.parse(
       new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
         readFileSync(join(root, ".jscpd.json")),
       ),
+      function (key, value, context) {
+        if (key === "similarity") written.set(this, context.source);
+        return value;
+      },
     );
   } catch (error) {
     throw new Error(`.jscpd.json: ${error.message}`);
@@ -274,6 +285,12 @@ function readJscpd(root) {
   if (config.absolute !== false) {
     throw new Error(
       `.jscpd.json: absolute is ${JSON.stringify(config.absolute)}, where this knows false`,
+    );
+  }
+  const similarity = written.get(config);
+  if (!/^(?:1|0\.(?!0+$)\d{1,4})$/.test(similarity ?? "")) {
+    throw new Error(
+      `.jscpd.json: similarity is ${similarity ?? JSON.stringify(config.similarity)}, where this knows 1 or 0.0001 to 0.9999 written with at most four decimal places`,
     );
   }
   if (!Array.isArray(config.ignore) || config.ignore.length === 0) {
