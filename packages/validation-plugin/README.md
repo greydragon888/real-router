@@ -53,6 +53,7 @@ Core's crash guards always run, regardless of whether this plugin is installed. 
 
 ### `validationPlugin()`
 
+<!-- doc-code: skip — a signature, not a program -->
 ```typescript
 function validationPlugin<
   Dependencies extends DefaultDependencies = DefaultDependencies,

@@ -2,6 +2,123 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## The TypeScript fences compile: `lint:doc-code` for the READMEs, `check-code.mjs` for the wiki (#2706, 2026-10-11)
+
+**Problem.** Nothing compiled the code a README shows, so an API change reached the
+pages only when a person re-read them: #2699 and #2704 fixed by hand what had
+accumulated. Measured when this gate was written, after #2699: four README fences
+still did not compile — a `RscLoaderFactoryMap` whose loader reads `getDep("db")`
+with no dependency map (`never`), `router.getState().search` without `?.`, a Solid
+`<UserProfile id=…>` for a component the same page declares without props, and
+`cloneRouter`'s partial override (#2703).
+
+**Solution.** `scripts/doc-code.mjs` reads a page; `scripts/check-doc-code.mjs` runs
+it over `README.md` and `packages/*/README.md`, as `lint:doc-code` in pre-push and
+Repo Lints. A finding prints as `<page>:<line>`. A page is read the way its reader
+reads it:
+
+- **One TypeScript program per page.** `@real-router/*` resolves through the
+  `@real-router/internal-source` condition to `src`; another module resolves from
+  the page's package, then from any adapter's.
+- **Every fence is in one framework**: the one its imports name, else the one a
+  `// Angular` comment on its first line names, else its page's (an adapter's
+  page), else the one its heading names first, else React. An import of another
+  framework's module, or another adapter's export, resolves nothing for it.
+- **A name a fence leaves undeclared** is looked up in order: an import in a fence
+  above, an export of the page's own package, an import in a fence below, a
+  declaration in another fence (a `let` there is assignable here), an export of
+  core or of another package, the fence's framework, and last the reader's values
+  (`router` is `Router<any>`). Anything still unresolved is the reader's own,
+  typed `any` — unless it is shaped like library API (`use…`, `create…`,
+  `inject…`, `…Plugin`, `…Factory`), which is a finding. A name the page imports or
+  declares beats the DOM global of that name (`screen`, `navigator`).
+- **A module the repository cannot resolve** — `./Dashboard`, `zod` — exports, as
+  `any`, what the page imports from it. An `@real-router/*` specifier that no
+  package exports stays an error.
+- **Two excerpt shapes are rewritten rather than set aside.** A fence that opens
+  with an object literal is a value, checked as part of a `Route` when the object
+  has a `name`; sibling JSX elements are a fragment. Fifteen README fences parse
+  only this way.
+- **A fence that is not a program carries `<!-- doc-code: skip — <reason> -->`** on
+  the line above. A marker without a reason, a marker on a fence that compiles, and
+  a directive above no TypeScript fence are each a finding. A fence that does not
+  parse needs the marker too.
+
+The gate landed with the README fixes and 21 markers. One of them is a fence of
+its own for the `cloneRouter` lines, so #2703's fix turns it into a "drop the
+marker" finding.
+
+**The wiki.** `check-code.mjs` in the wiki repository imports the same engine from
+`$REAL_ROUTER_ROOT` and runs as the third checker of `wiki-checkers.yml`. The wiki
+started with findings, so they are a backlog, `check-code.backlog.json`: 328 fences
+of 125 pages when it landed, against 1047 that compile. Each entry is keyed by
+page and by a hash of the fence's text and holds the TypeScript codes it may keep,
+by count. A finding beyond that is reported, and so is an entry the run no longer
+finds, which `node check-code.mjs --update` shrinks. Like `check-messages.mjs`, it
+says "no checks run" rather than passing when the monorepo, its install, or its
+two control pages read wrong. The names the wiki uses for the reader's own guard
+factories, hooks and plugins (`useFetch`, `authGuardFactory`, …) are listed there
+as the reader's values.
+
+**Why one program per page.** In one program over every page, a package's
+internal augmentation reaches every other page. Measured: preload-plugin's `src`
+augments `Router` with an optional `matchUrl`, which its `.d.ts` does not ship, and
+that made browser-plugin's `router.matchUrl(…)` an error.
+
+**Why the page's declarations come before the reader's values.** With the reader's
+`router` declared as a global, the `cloneRouter` fence split off core's README
+compiled against it rather than against the router that page creates with its
+`Dependencies`, so #2703 vanished from the fence that shows it.
+
+**Why an unparsed fence is a finding.** Otherwise a syntax error takes a fence out
+of the gate without a word: the fence that breaks most is the one checked least.
+
+**Why that order of frameworks.** Each step is a measured wiki case.
+Accessibility's "React / Preact / Solid" section shows a `<RouterProvider>` with
+no import, and an import in the Vue section below supplied Vue's. A Preact page
+heads a section "Same Pattern as React", which is why the page's framework comes
+before its heading. `useRouteExit.md` opens an Angular fence with `// Angular`
+under "(Solid / Vue / Svelte / Angular)". A rule that took the framework of the
+nearest fence above was tried and dropped: it handed a section the previous
+section's framework. `@real-router/react` does not export `RouterContext`, and the
+lookup used to supply Preact's, so a React fence failed on a Preact type.
+
+**Why the backlog keys on the fence's text.** A key by line, as
+`check-messages.mjs` keeps for its one row, moves with every edit above the fence.
+A key by message churns when TypeScript rewords one. A hash of the text survives
+both, and editing a fence makes its editor answer for all of it.
+
+⚠ **Checking against `src` sees what no consumer sees: a class's private fields.**
+`src` types `Router`'s `#options` with the dependency map, which makes `Router`
+invariant in it, so a router created with `createRouter<{ api: string }>` failed
+`<RouterProvider router={…}>` in React, Preact and Solid. Measured against the
+released 0.148.0 typings, where the field is `#private`, the same code compiles.
+A diagnostic whose elaboration reaches a `#` member is therefore not a finding.
+Five wiki fences were reporting it.
+
+**Why markers, not classification by diagnostic code.** A fence can be a
+non-program and hold a real error. rsc-server-plugin's handler fence has a
+top-level `return` and, beside it, the same `getDep("db")` → `never` defect.
+Classifying by code drops both. With a marker, the author reads the fence once.
+
+**What holds it.** Control arm: reverting #2699's preload fix on
+`packages/preload-plugin/README.md:198` (`preload: () => async () =>` back to
+`preload: async () =>`) fails the gate with `TS2322 … not assignable to type
+'PreloadFnFactory…'`. `scripts/tests/check-doc-code.test.mjs` gives each reading
+rule a page whose verdict flips when the rule goes inert. A sweep that disabled the
+rules one at a time — 52 mutations of `doc-code.mjs` — left no survivor. On copies
+of the wiki, `check-code.mjs` failed on each of three arms: a clean fence broken, a
+backlogged fence edited, a backlogged fence removed.
+
+⚠ **It compiles; it does not run.** The search-schema Quick Start put query defaults
+in a route's `defaultParams`, which `createRouter` refuses (`Move it to
+defaultSearch`), and that type-checks: `Params` admits any key. Fixed by hand
+alongside the gate, and a gate of this kind cannot see the next one.
+
+⚠ **A marker blinds the whole fence.** Its reason is reviewed once, when it is
+written. A later drift inside a marked fence passes until someone removes the
+marker.
+
 ## V8's `JSON.parse` renames escaped keys — property tests that parse generated keys (#1709, 2026-09-24)
 
 **Problem.** The JSON round-trip property of `packages/core/tests/property/error/serialization.properties.ts` failed twice — a local build and release PR #2470 (run 35524491155) — and neither failure replayed: the first not from its printed `{ seed, path }`, green 11 of 11 times, the second not from its shrunk counterexample. Both were one key substitution: a `"` key parsed back as `\` (`expected { '': {}, '\': {} } to strictly equal { '': {}, '"': {} }`; the first sighting's `expected undefined to strictly equal {}` is the same swap seen from the missing key).

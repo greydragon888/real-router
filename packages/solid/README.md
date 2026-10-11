@@ -469,6 +469,7 @@ The directive automatically sets `href` on `<a>` elements and adds `role="link"`
 
 **Pass the options object directly — not an accessor (#976).** Solid's compiler wraps a directive value into an accessor at compile time (`use:link={X}` → `link(el, () => X)`), so the value you write _is_ the options object:
 
+<!-- doc-code: skip — a correct and a wrong form, side by side -->
 ```tsx
 // CORRECT — object form (canonical)
 <a use:link={{ routeName: "home" }}>Home</a>
@@ -487,6 +488,7 @@ The directive captures the options **once** at init (see CLAUDE.md "use:link Opt
 
 Unlike the React and Preact adapters, hooks that subscribe to route state return `Accessor<T>`. Read the value by calling the accessor:
 
+<!-- doc-code: skip — the React form beside the Solid one -->
 ```tsx
 // React/Preact
 const { route } = useRoute();
@@ -509,6 +511,7 @@ function CurrentRoute() {
 
 Solid props are reactive getters. Destructuring them breaks the reactive graph:
 
+<!-- doc-code: skip — a wrong and a correct version of one component -->
 ```tsx
 // WRONG — loses reactivity
 function MyLink({ routeName, routeParams }) {

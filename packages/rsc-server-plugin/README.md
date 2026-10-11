@@ -7,6 +7,7 @@
 
 > Per-route `ReactNode` (RSC payload) loading for [Real-Router](https://github.com/greydragon888/real-router). Intercepts `start()` to load Server Components before Flight rendering. **Bundler-agnostic** — the plugin **never imports** a Flight renderer; the caller picks one of `@vitejs/plugin-rsc`, `react-server-dom-webpack`, `react-server-dom-turbopack`, or `react-server-dom-parcel`. Examples in this README and in the [wiki](https://github.com/greydragon888/real-router/wiki/RSC-Integration) use the Vite import path (`@vitejs/plugin-rsc/rsc`); other bundlers expose the same `renderToReadableStream` shape under their own paths (`react-server-dom-webpack/server.edge`, `react-server-dom-turbopack/server`, `react-server-dom-parcel/server`) — swap the import, keep the call site.
 
+<!-- doc-code: skip — before and after in one fence -->
 ```typescript
 // Without plugin: manual per-route Server Component dispatch
 const state = await router.start(url);
@@ -186,6 +187,7 @@ Idempotent — multiple `invalidate()` calls between refreshes collapse to one r
 
 The leave handler passes the navigation's `AbortController.signal` as the second loader argument so loaders can abort their in-flight work (DB query, RSC stream, …) when a newer navigation supersedes:
 
+<!-- doc-code: skip — one entry of a loader map, outside the map -->
 ```typescript
 "users.profile": (_router, getDep) => async ({ params }, ctx) => {
   const db = getDep("db");
@@ -211,6 +213,7 @@ The skip is single-shot — only the first `start()` triggered by `hydrateRouter
 
 Mirror of [`@real-router/ssr-data-plugin/errors`](../ssr-data-plugin/README.md#typed-loader-errors-real-routerssr-data-pluginerrors) — same shared source under `shared/ssr/errors.ts`. RSC apps can import error classes without adding `ssr-data-plugin` as a dependency:
 
+<!-- doc-code: skip — the body of a fetch handler: a top-level return -->
 ```typescript
 import {
   LoaderNotFound,

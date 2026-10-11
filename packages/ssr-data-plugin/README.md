@@ -7,6 +7,7 @@
 
 > Per-route data loading for SSR with [Real-Router](https://github.com/greydragon888/real-router). Intercepts `start()` to load data before server rendering.
 
+<!-- doc-code: skip — before and after in one fence -->
 ```typescript
 // Without plugin:
 const state = await router.start(url);
@@ -97,6 +98,7 @@ Three modes are supported. The plugin publishes the resolved mode to `state.cont
 
 `"client-only"` is **symmetric**: the loader is skipped on every `start()` call (server and client). The application reads `getSsrDataMode(state)` and triggers its own client-side fetch (React Query, `useEffect`, Suspense). This keeps the plugin free of environment detection.
 
+<!-- doc-code: skip — the body of a request handler: a top-level return -->
 ```typescript
 import { getSsrDataMode } from "@real-router/ssr-data-plugin";
 
@@ -159,6 +161,7 @@ Idempotent — multiple `invalidate()` calls between refreshes collapse to one r
 
 The leave handler passes the navigation's `AbortController.signal` as the second loader argument so loaders can abort their in-flight work (fetch, DB query, …) when a newer navigation supersedes:
 
+<!-- doc-code: skip — one entry of a loader map, outside the map -->
 ```typescript
 "users.profile": () => async ({ params }, ctx) => {
   // Network layer cancels on rapid double-click — second click aborts
@@ -198,6 +201,7 @@ The skip is single-shot — only the first `start()` triggered by `hydrateRouter
 
 The plugin is HTTP-agnostic — it only awaits the loader and writes the result to `state.context.data`. To bridge loader failures to HTTP semantics (404, 30x, 504), import typed error classes from the `errors` subpath and let your handler catch them:
 
+<!-- doc-code: skip — the body of a request handler: a top-level return -->
 ```typescript
 import {
   LoaderNotFound,
@@ -251,6 +255,7 @@ Discriminator is the `code` field — match structurally without `instanceof`. I
 
 Loaders may return a `defer({ critical, deferred })` payload to split the response into a **critical** bundle (resolved before the shell renders) and a **deferred** record of named promises (streamed after via inline `<script>__rrDefer__("key", json)</script>` tags). React 19's `<Suspense>` + `use(promise)` and the cross-framework `<Await>` / `useDeferred(key)` adapters consume the deferred map natively:
 
+<!-- doc-code: skip — one entry of a loader map, outside the map -->
 ```typescript
 import { defer } from "@real-router/ssr-data-plugin";
 import { LoaderNotFound } from "@real-router/ssr-data-plugin/errors";

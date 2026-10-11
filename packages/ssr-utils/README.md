@@ -43,6 +43,7 @@ await hydrateRouter(router, window.__SSR_STATE__);
 
 ### `serializeRouterState(state, options?)`
 
+<!-- doc-code: skip — three alternatives in one fence -->
 ```typescript
 const json = serializeRouterState(state);
 
@@ -97,6 +98,7 @@ returns `null` without an error.
 
 ### `getStaticPaths(router, entries?)`
 
+<!-- doc-code: skip — two alternatives in one fence -->
 ```typescript
 const paths = await getStaticPaths(router);
 // ["/", "/about", ...] — static leaves only; a leaf with a path slot needs an entry, or this throws
@@ -131,6 +133,7 @@ source from `entries` and let the link resolve at runtime.
 
 ### `createRequestScope(request, base, deps?)`
 
+<!-- doc-code: skip — two alternatives in one fence -->
 ```typescript
 export async function render(url: string, req: IncomingMessage) {
   const scope = createRequestScope(req, baseRouter, { currentUser });

@@ -271,7 +271,10 @@ const lifecycle = getLifecycleApi(router);
 lifecycle.addActivateGuard("admin", (router, getDep) => (toState) => {
   return getDep("authService").isAuthenticated();
 });
+```
 
+<!-- doc-code: skip — #2703: cloneRouter types a partial dependency override as the full map -->
+```typescript
 // SSR — clone with request-scoped deps, merged over the base router's
 const requestRouter = cloneRouter(router, { store: requestStore });
 await requestRouter.start(req.url);

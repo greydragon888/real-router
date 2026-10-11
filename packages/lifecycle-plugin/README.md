@@ -7,6 +7,7 @@
 
 > Route-level lifecycle hooks for [Real-Router](https://github.com/greydragon888/real-router). Add `onNavigate`, `onEnter`, `onStay`, `onLeave` callbacks directly to route definitions.
 
+<!-- doc-code: skip — before and after: subscribe() calls, then route definitions -->
 ```typescript
 // Without plugin — scattered subscribe() calls with route checks:
 router.subscribe(({ route, previousRoute }) => {
@@ -81,6 +82,7 @@ await router.start("/catalog");
 
 Each hook field is a **factory function** `(router, getDependency) => (toState, fromState?) => void`. The factory runs once per route; the returned callback is cached and invoked on each matching transition. When you don't need DI, omit the factory params:
 
+<!-- doc-code: skip — two variants of one route option, outside their route -->
 ```typescript
 // Without DI — ignore factory params:
 onEnter: () => (toState) => { console.log("entered", toState.name); }

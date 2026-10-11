@@ -119,6 +119,15 @@ export const CHECKS = [
     why: "a docblock sentence that restates the package's own docs",
   },
   {
+    // No CI context skips it: the fences compile against the installed
+    // frameworks' types, so a diff of manifests and the lockfile alone can
+    // break one.
+    id: "lint:doc-code",
+    run: ["pnpm", "lint:doc-code"],
+    stages: ["pre-push", "ci"],
+    why: "a TypeScript fence of a README that does not compile against the packages' src, or a doc-code marker that has outlived its reason",
+  },
+  {
     id: "lint:duplicates",
     run: ["pnpm", "lint:duplicates"],
     stages: ["pre-push", "ci"],

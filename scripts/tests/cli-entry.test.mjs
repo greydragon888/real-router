@@ -49,6 +49,10 @@ const CLIS = {
     args: [],
     ran: /Base bundle sizes unavailable/,
   },
+  "scripts/check-doc-code.mjs": {
+    args: ["--help"],
+    ran: /usage: check-doc-code\.mjs/,
+  },
   // The `gh` stub fails, so the scan prints and then skips the network.
   "scripts/check-issue-refs.mjs": {
     args: [],

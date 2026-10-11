@@ -440,6 +440,7 @@ Active class is hash-aware — only the matching tab lights up. Live demo: [`exa
 
 Caveat: nested object/array param **values** are compared by reference, not deep — stabilize them with a `signal`/`computed` if it matters:
 
+<!-- doc-code: skip — excerpts of a component: a decorator, a class field and a template -->
 ```ts
 // flat params — stable across change detection, recompute only on real change
 @Component({ template: `<a realLink routeName="items.item" [routeParams]="{ id }" />` })
@@ -737,6 +738,7 @@ export class PageComponent {
 
 All `inject*` functions must be called within an injection context. The constructor and field initializers are both valid:
 
+<!-- doc-code: skip — two alternatives in one fence -->
 ```typescript
 // Field initializer — preferred
 export class MyComponent {

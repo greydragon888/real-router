@@ -547,6 +547,7 @@ The directive automatically sets `cursor: pointer` and adds `role="link"` + `tab
 
 Unlike the React and Preact adapters, `useRoute()` and `useRouteNode()` return `ShallowRef` values. Read `.value` in script:
 
+<!-- doc-code: skip — the React form beside the Vue one -->
 ```typescript
 // React/Preact
 const { route } = useRoute();

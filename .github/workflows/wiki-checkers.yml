@@ -1,10 +1,12 @@
-# The wiki's two checkers — on the pull request that can cause the drift, and on a
-# schedule and a wiki edit as the net underneath.
+# The wiki's three checkers — on the pull request that can cause the drift, and on
+# a schedule and a wiki edit as the net underneath.
 #
 # They read BOTH repositories: `check-links.mjs` resolves wiki links against
-# monorepo paths, and `check-messages.mjs` compares every message a page quotes
-# against the literals in `packages/*/src`. So drift arrives from either side, and
-# a rename in the monorepo makes a page wrong with nobody touching the wiki.
+# monorepo paths, `check-messages.mjs` compares every message a page quotes
+# against the literals in `packages/*/src`, and `check-code.mjs` type-checks every
+# TypeScript fence against `packages/*/src` with the monorepo's
+# `scripts/doc-code.mjs`. So drift arrives from either side, and a rename in the
+# monorepo makes a page wrong with nobody touching the wiki.
 #
 # **The pull request is where the drift is CAUSED, so that is where the report
 # goes.** The author of a rename has the context and can update the page in a
@@ -23,8 +25,8 @@
 # the wiki-side direction immediately and costs nothing. It reports rather than
 # blocks, because the push has already happened by the time the event arrives.
 #
-# ⚠ **The two checkers are named here by hand, and nothing holds that list to the
-# wiki's.** A third checker added there runs nowhere until someone adds it to the
+# ⚠ **The three checkers are named here by hand, and nothing holds that list to the
+# wiki's.** A fourth checker added there runs nowhere until someone adds it to the
 # loop below. No gate can close that from this side: the monorepo's own tests never
 # see the wiki, so the only thing that could compare the lists is a job that has
 # already cloned it — this one. A renamed checker at least fails loudly rather than
@@ -51,6 +53,8 @@ on:
       # `check-messages.mjs` checks its own extractor against this tree before it
       # reads a page, so a change here changes the answer it expects.
       - "packages/core/tests/fixtures/raiser-heads/**"
+      # `check-code.mjs` reads every page through this engine.
+      - "scripts/doc-code.mjs"
       # So a change to this workflow is exercised by its own pull request.
       - ".github/workflows/wiki-checkers.yml"
 
@@ -79,10 +83,12 @@ jobs:
         with:
           persist-credentials: false
 
-      # `--ignore-scripts`: `check-messages.mjs` needs exactly one thing from the
+      # `--ignore-scripts`: the checkers read `packages/*/src`, never `dist`, so
+      # nothing has to be built. `check-messages.mjs` needs one thing from the
       # install — `node_modules/typescript/lib/typescript.js`, which it imports by
-      # path — and it reads `packages/*/src`, never `dist`, so nothing has to be
-      # built. `check-links.mjs` needs no dependency at all.
+      # path. `check-code.mjs` needs the whole of it: the fences compile against
+      # the frameworks' types the adapters depend on. `check-links.mjs` needs no
+      # dependency at all.
       - uses: ./.github/actions/setup
         with:
           install-args: "--frozen-lockfile --ignore-scripts"
@@ -94,19 +100,20 @@ jobs:
         env:
           WIKI_REMOTE: https://github.com/greydragon888/real-router.wiki.git
 
-      # ⚠ Both checkers resolve the wiki from their OWN location and the monorepo
+      # ⚠ The checkers resolve the wiki from their OWN location and the monorepo
       # from `$REAL_ROUTER_ROOT`, so they run from the clone with the root passed
-      # in. Without the root, `check-messages.mjs` prints "no checks run" and
-      # which of its three reasons applies — it does not pass silently, which is
-      # what makes a summary of a broken run readable rather than green.
+      # in. Without the root, `check-messages.mjs` and `check-code.mjs` print "no
+      # checks run" and which of their reasons applies — they do not pass
+      # silently, which is what makes a summary of a broken run readable rather
+      # than green.
       # ⚠ The output is CAPTURED rather than piped into the summary. `node … | tee`
       # exits with tee's status, and the default shell for `run:` is `bash -e`
       # WITHOUT pipefail — measured, that pipeline exits 0 while the checker exits
       # 1, so a finding would have been written to the summary and the job would
       # have stayed green. Capturing also closes the fenced block on the failing
       # path, which a `set -e` abort mid-step does not.
-      # ⚠ Both checkers run in ONE step so that a link finding cannot hide a
-      # message finding, and so that the verdict reaches the two steps below as a
+      # ⚠ The checkers run in ONE step so that one checker's finding cannot hide
+      # another's, and so that the verdict reaches the two steps below as a
       # single answer. This step itself never fails; what to DO about a finding is
       # the event's business, not the checker's.
       - name: Run the checkers
@@ -115,7 +122,7 @@ jobs:
           set -euo pipefail
           rc=0
           fence='```'
-          for checker in check-links check-messages; do
+          for checker in check-links check-messages check-code; do
             out=$(node "$RUNNER_TEMP/wiki/$checker.mjs" 2>&1) && status=0 || status=$?
             # ⚠ The fence is a variable: a backtick inside a `printf` FORMAT string
             # reads as legacy command substitution to shellcheck, which reports
@@ -163,7 +170,7 @@ jobs:
               findings.trim(),
               '',
               'The page documents `master`, so the usual order is: merge this, then fix the page.',
-              'Run `node check-links.mjs` / `node check-messages.mjs` in the wiki checkout with',
+              'Run `node check-links.mjs` / `node check-messages.mjs` / `node check-code.mjs` in the wiki checkout with',
               '`REAL_ROUTER_ROOT` pointing at the monorepo to confirm.',
               '',
               '_Updated in place on each push by `wiki-checkers.yml`._',
@@ -228,13 +235,13 @@ jobs:
             const title = '🔴 Wiki checkers failing';
             const body = [
               marker,
-              'A **Wiki checkers** run failed — a page quotes something the code no longer prints, or a link no longer resolves.',
+              'A **Wiki checkers** run failed — a page quotes something the code no longer prints, a link no longer resolves, or a code example no longer compiles.',
               '',
               `- Run: ${runUrl}`,
               `- Commit: ${context.sha}`,
               `- Trigger: ${context.eventName}`,
               '',
-              'The fix belongs in whichever repository the drift came from: a renamed message is fixed in the wiki page, a wrong link in whichever side moved.',
+              'The fix belongs in whichever repository the drift came from: a renamed message is fixed in the wiki page, a wrong link in whichever side moved, an example in the page or in its backlog (`node check-code.mjs --update`).',
               '',
               '_Auto-filed by `wiki-checkers.yml`. This comment updates on each subsequent failure; close the issue once green._',
             ].join('\n');
