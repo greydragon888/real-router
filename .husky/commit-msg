@@ -3,5 +3,7 @@
 # changesets.yml sets HUSKY=0 to commit and push the release without the hooks.
 [ "${HUSKY-}" = "0" ] && exit 0
 
+set -e
+
 # Validate commit message format
 pnpm commitlint --edit "$1"

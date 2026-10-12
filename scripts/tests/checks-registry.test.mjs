@@ -16,6 +16,8 @@
 //     says why not; an exemption beside a pre-push stage is stale.
 //   - The hooks and Repo Lints call `scripts/verify.mjs` with their own stage
 //     and run no check of their own.
+//   - Every tracked file under `.husky/` is executable, and its first two
+//     commands are the `HUSKY=0` skip and `set -e`.
 //   - Every `ciSkip` value is a context `verify` knows, and `lint:audit` alone
 //     skips the release PR (`release-pr`).
 //   - Each lint task runs in a gating ci.yml job whose line no static
@@ -27,6 +29,7 @@
 // it. The floors on the real tree catch an extractor that reads nothing.
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
@@ -1264,6 +1267,64 @@ test("the hooks and Repo Lints call verify with their stage, and run no check of
     },
     CHECKS_JOB,
   );
+});
+
+// git runs a tracked hook itself, by its shebang: it skips a file without the
+// exec bit, with a hint, and the commit passes; and nothing stops the hook at a
+// failing command but its own `set -e`.
+const HUSKY_SKIP = '[ "${HUSKY-}" = "0" ] && exit 0';
+
+/** What keeps each hook from running as one, `[]` when nothing does. */
+function hookProblems(hooks) {
+  return hooks.flatMap(({ path, mode, text }) => {
+    const [first, second] = text
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line !== "" && !line.startsWith("#"));
+    return [
+      ...(mode === "100755" ? [] : [`${path}: mode ${mode}, not 100755`]),
+      ...(first === HUSKY_SKIP
+        ? []
+        : [`${path}: the first command is not the HUSKY=0 skip`]),
+      ...(second === "set -e"
+        ? []
+        : [`${path}: the second command is not set -e`]),
+    ];
+  });
+}
+
+test("every tracked hook is executable and opens with the HUSKY=0 skip and set -e", () => {
+  const hooks = execFileSync("git", ["ls-files", "-s", "--", ".husky"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  })
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const [meta, path] = line.split("\t");
+      return {
+        path,
+        mode: meta.split(" ")[0],
+        text: readFileSync(join(repoRoot, path), "utf8"),
+      };
+    });
+
+  assert.ok(hooks.length > 0, "no tracked file under .husky");
+  assert.deepEqual(hookProblems(hooks), []);
+
+  // Each refusal, on a copy of a real hook.
+  const [hook] = hooks;
+  const without = (command) => hook.text.replace(`${command}\n`, "");
+  assert.deepEqual(hookProblems([{ ...hook, mode: "100644" }]), [
+    `${hook.path}: mode 100644, not 100755`,
+  ]);
+  assert.deepEqual(hookProblems([{ ...hook, text: without("set -e") }]), [
+    `${hook.path}: the second command is not set -e`,
+  ]);
+  assert.deepEqual(hookProblems([{ ...hook, text: without(HUSKY_SKIP) }]), [
+    `${hook.path}: the first command is not the HUSKY=0 skip`,
+    `${hook.path}: the second command is not set -e`,
+  ]);
 });
 
 test("each lint task runs in a gating job of ci.yml for every package that declares it (#2370)", () => {
