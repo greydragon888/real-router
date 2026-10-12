@@ -63,8 +63,8 @@ const CONCURRENCY = 16;
  * `name@version` spec whose package exists but whose version does not gets its
  * own code, so match all of them: the classification must not depend on which
  * client runs, nor on which half of a spec is missing. Measured with pnpm
- * 12.4.1 — a missing package answers `ERR_PNPM_FETCH_404`, a missing version
- * `ERR_PNPM_PACKAGE_NOT_FOUND` + "No matching version found".
+ * 12.4.1 and 12.11.2 — a missing package answers `ERR_PNPM_FETCH_404`, a
+ * missing version `ERR_PNPM_PACKAGE_NOT_FOUND` + "No matching version found".
  *
  * Exported for `scripts/check-published-versions.mjs`, which asks npm directly
  * and classifies its answer with this same pattern.

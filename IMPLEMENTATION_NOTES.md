@@ -1153,6 +1153,8 @@ suites passed against fresh production builds: 49, 8, 23 and 27 tests.
 
 ## pnpm 12.4 with `pmOnFail: ignore`, and a pre-commit guard for the switch it turns off (2026-09-15)
 
+> **Updated (2026-10-12).** The pin is pnpm 12.11.2 — see "pnpm 12.11.2, and each lockfile deduplicated by it".
+
 **Problem.** The pnpm 12 major was held by the readers of its two-document lockfile. osv-scanner stopped being one with 2.6.0 (the entry below). GitHub's dependency graph still reads only the first document (dependabot-core #15904, and the 2026-09-15 update to the entry "pnpm 11.26 and the action pin that has to move first"): on a two-document lockfile, Dependency Review, a required check, and Dependabot alerts see pnpm's own binaries and none of the tree.
 
 **Solution.**
@@ -14604,6 +14606,8 @@ A cell of `scripts/tests/checks-registry.test.mjs` holds what a file can: every 
 
 > **Updated (2026-10-12).** `@real-router/core` may not stand in the `dependencies` of a `@real-router/*` package at all, so its entry is the `devDependencies` one — see "A published package keeps `@real-router/core` out of `dependencies`, and syncpack bans it".
 
+> **Updated (2026-10-12).** pnpm 12.11.2 refuses `null` or a number under a dependency name: `pnpm install` exits 1 with `ERR_PNPM_PACKAGE_MANIFEST_INVALID_ATTRIBUTE` and writes no lockfile. `peerDependencies` as a list and `devDependencies` as a string it still passes, exit 0, with nothing of them in the lockfile — see "pnpm 12.11.2, and each lockfile deduplicated by it".
+
 **Problem.** turbo builds its task graph from `dependencies`, `devDependencies` and `optionalDependencies`, not from `peerDependencies` ("`peerDependencies` are invisible to turbo — four packages cached against a stale core"), so every package with a `@real-router/*` peer lists it in `devDependencies` as `workspace:^` too (#2294, #2426). Nothing held that. `CLAUDE.md` stated the rule; syncpack held only the form of an entry that was there, and read no `optionalDependencies` at all, so an entry there kept any form.
 
 **Solution.**
@@ -14639,3 +14643,27 @@ Nothing in the repository caught either form. Under the configuration before thi
 **Why syncpack, and why core alone.** `lint:deps` has no `ciSkip`: it runs in pre-commit, in pre-push and on every pull request, a diff of manifests alone included, where neither group of `scripts/tests` runs. The ban names core: it is the one `@real-router/*` peer today, and the one whose second copy is measured to break a plugin. `route-utils`, `sources` and `ssr-utils` stay `dependencies` entries. Two copies of `ssr-utils` split its hydration scratchpad — the same class, one package over — and it stays a `dependencies` entry by the owner's decision of 2026-09-17, to revisit before 1.0 ("Hydration scratchpad moves to `ssr-utils`, and the loader plugins take it as a dependency").
 
 ⚠ **A value that is not a string passes syncpack in silence**, as with the ban on `optionalDependencies`; turbo refuses such a manifest ("A `@real-router/*` peer has an entry turbo reads, and a test holds it").
+
+## pnpm 12.11.2, and each lockfile deduplicated by it (2026-10-12)
+
+**Problem.** The pin was pnpm 12.4.1, seven minors behind `latest`, 12.11.2. Two of the changes since touch what this repository reads.
+
+- ⚠ **Removing an override re-resolves the packages it targeted** (12.7.0, pnpm#4587). 12.4.1 kept the version an override had locked while every declared range still accepted it. The check #2646 asks for decides whether an override is still needed by resolving without it, so its verdict moves with the pnpm: on a copy of the root, removing `postcss: '>=8.5.26'` leaves the locked 8.5.28 under 12.4.1 and resolves 8.5.29, a newer release, under 12.11.2.
+- **The lockfiles were not deduplicated by 12.11.2's rules.** `pnpm dedupe --check` under 12.11.2 failed in all three workspaces; under 12.4.1 it passed. Releases 12.8.1 to 12.10.0 change how `pnpm dedupe` converges.
+
+**Solution.**
+
+- `packageManager` → `pnpm@12.11.2` in the root, `examples/` and `cross-router-bench/` manifests. The `+sha512.<hex>` is decoded from `pnpm view pnpm@12.11.2 dist.integrity`: the decoder reproduced the outgoing 12.4.1 pin first, and the sha512 of the downloaded tarball equals the decoded value.
+- `pnpm self-update 12.11.2` on the maintainer's machine, outside the repository.
+- One `pnpm dedupe` per workspace. It removed 29 resolved versions from the root lockfile, 11 from the examples' and 3 from cross-router-bench's, and added none — among them `@octokit/*`, `@typescript-eslint/*` 8.70.0, `@testing-library/jest-dom` 6.9.1, `sass` 1.101.0, `@vue/*` 3.5.39 and `@emnapi/*` 1.11.2. `lockfileVersion`, `settings`, `overrides`, `pnpmfileChecksum` and every importer specifier are unchanged; importer entries change only in the peer suffixes of their versions.
+
+**Why — measured.**
+
+- With an unchanged configuration, a scratch install of 12.11.2 kept each of the three lockfiles byte-identical: the lockfile format did not move.
+- After the change, `pnpm lint:dedupe` and `pnpm install --frozen-lockfile` pass in all three workspaces, and each lockfile is one YAML document.
+- What the repository states about pnpm holds under 12.11.2: `pnpm view` answers `ERR_PNPM_FETCH_404` for an absent package and `ERR_PNPM_PACKAGE_NOT_FOUND` for an absent version (`.changeset/unpublished-packages.mjs`), and a probe project's lockfile is two YAML documents under the default `pmOnFail` and one under `ignore`.
+- One answer moved: `pnpm install` refuses `null` or a number under a dependency name with `ERR_PNPM_PACKAGE_MANIFEST_INVALID_ATTRIBUTE` (12.10.0), where 12.4.1 exited 0; a field that is not an object it still passes.
+
+⚠ **A worktree on a commit that pins 12.4.1 cannot commit on this machine.** The guard in `.husky/pre-commit` compares the running pnpm with the pin exactly; such a worktree commits again once it is rebased onto this pin.
+
+Not measured: whether 12.9.0, which moves an optional peer to the version already in the graph, retires the `@vue/test-utils` hook of both `.pnpmfile.mjs`.

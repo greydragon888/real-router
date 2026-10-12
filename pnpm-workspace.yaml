@@ -145,8 +145,8 @@ gitTagVersion: true
 # (`download`) pnpm 12 writes its own binaries as a first document ahead of the
 # dependency tree, and GitHub's dependency graph reads only that first document:
 # Dependency Review, a required check, and Dependabot
-# alerts would then see pnpm and nothing else. Measured with pnpm 12.3.4 and
-# 12.4.1: two documents under the default, one under `ignore`.
+# alerts would then see pnpm and nothing else. Measured with pnpm 12.3.4,
+# 12.4.1 and 12.11.2: two documents under the default, one under `ignore`.
 # The cost: pnpm no longer switches to the version `packageManager` pins, and
 # pnpm 11 honours the setting too, so a machine keeps whatever pnpm it has.
 # `.husky/pre-commit` refuses a commit when `pnpm --version` differs from the
