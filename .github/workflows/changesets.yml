@@ -185,7 +185,7 @@ jobs:
           # `github.sha` first, which is exactly what v1 did.
           push-with-git-cli: true
         env:
-          # Skip husky hooks during release commit (CI already validated)
+          # HUSKY=0 skips the git hooks (.husky/*) for the release commit (CI already validated)
           HUSKY: 0
           GIT_AUTHOR_NAME: ${{ github.repository_owner }}
           GIT_AUTHOR_EMAIL: ${{ github.repository_owner }}@users.noreply.github.com

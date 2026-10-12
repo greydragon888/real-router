@@ -146,9 +146,6 @@ importers:
       fast-check:
         specifier: 4.10.2
         version: 4.10.2
-      husky:
-        specifier: 9.1.7
-        version: 9.1.7
       jscpd:
         specifier: 5.4.0
         version: 5.4.0
@@ -5237,11 +5234,6 @@ packages:
   human-signals@8.0.1:
     resolution: {integrity: sha512-eKCa6bwnJhvxj14kZk5NCPc6Hb6BdsU9DZcOnmQKSnO1VKrfV0zCvtttPZUsBvjmNDn8rpcJfpwSYnHBjc95MQ==}
     engines: {node: '>=18.18.0'}
-
-  husky@9.1.7:
-    resolution: {integrity: sha512-5gs5ytaNjBrh5Ow3zrvdUUY+0VxIuWVL4i9irt6friV+BqdCfmV11CQTWMiBYWHbXhco+J1kHfTOUkePhCDvMA==}
-    engines: {node: '>=18'}
-    hasBin: true
 
   hyperlinker@1.0.0:
     resolution: {integrity: sha512-Ty8UblRWFEcfSuIaajM34LdPXIhbs1ajEX/BBPv24J+enSVaEVY63xQ6lTO9VRYS5LAoghIG0IDJ+p+IPzKUQQ==}
@@ -11878,8 +11870,6 @@ snapshots:
   human-id@4.2.1: {}
 
   human-signals@8.0.1: {}
-
-  husky@9.1.7: {}
 
   hyperlinker@1.0.0: {}
 

@@ -556,6 +556,8 @@ The lever this blocks is concrete. Measured on core, 11-core M3 Pro, two rounds:
 
 ⚠ **What is weaker, stated plainly.** An _outside_ change pushed straight to `master` with the hook bypassed — a worktree without `.husky/_` — was reported within minutes and is now reported on Tuesday. Everything else that workflow covered is covered by `.husky/pre-push` on the same tree, or by the weekly run.
 
+> **Updated (2026-10-12).** A worktree no longer pushes past the hook for want of `.husky/_`: git runs the tracked `.husky/pre-push` in every checkout — see "Every worktree runs its own tracked hooks; husky is removed". `--no-verify` and `HUSKY=0` are the bypasses that remain.
+
 ## `lint` depends on `^type-check`, because typed rules read types the hash did not (#2432, 2026-09-19)
 
 **Problem.** A core change that a dependent's typed lint rejects was replayed green. Measured on `master` @ `a1fa45202`: widen `getNavigator`'s return type to `any`, and `@real-router/react#lint` answers `cache hit, replaying logs (no errors)` at the unchanged hash `33c9df916296831b`, exit 0 — while the same command with `--force` exits 1 on six `@typescript-eslint/no-unsafe-*` errors. `lint` had no `dependsOn` and its `inputs` name the package's own files plus `../../shared/**`, so nothing about core entered the hash; the `@real-router/internal-source` condition means the typed rules resolve `packages/core/src`, which is exactly what the hash ignored. The dependent's `type-check` does invalidate, and catches nothing here — a widened return type is valid TypeScript, and only the lint objects.
@@ -2123,6 +2125,8 @@ The `sonarcloud` job inside `.github/workflows/ci.yml` (consolidated from the fo
 This ensures SonarCloud shows correct version without manual updates.
 
 ## Git Hooks
+
+git runs the tracked `.husky/<hook>` scripts directly: the root `prepare` script sets `core.hooksPath` to `.husky`, and `HUSKY=0` skips them — see "Every worktree runs its own tracked hooks; husky is removed".
 
 ### Commit Message Validation
 
@@ -14526,3 +14530,24 @@ Three rounds of review of the fix found the same order of the text in two more p
 - The supported-versions table of `SECURITY.md` is #2723.
 
 ⚠ **The commit touches turbo global inputs and the CodSpeed harness.** The comment edits in `eslint.config.mjs` and `vitest.config.{common,properties}.mts` re-key, once, every task whose `inputs` do not negate them — `lint`, `test`, `test:properties`, `test:stress`, `build`, `lint:package` and `lint:types` of every package among them. The edits in `codspeed.yml`, `.github/actions/setup/` and `benchmarks/adapter-bench/vite/` are harness changes, so the push that carries them runs CodSpeed once.
+
+## Every worktree runs its own tracked hooks; husky is removed (2026-10-12)
+
+**Problem.** husky 9 pointed `core.hooksPath` at `.husky/_`, a directory it generates on `pnpm install` and git ignores. The path is relative, so git resolved it in each worktree separately, and a worktree where no install had run had no `.husky/_`: its commits and pushes ran no hook and printed nothing. On 2026-10-08 five commits in a linked worktree went in that way, and only `ls .husky/_` before the push caught it. Setting the path absolute, to the main checkout's `.husky/_`, closed the hole but did not last — husky wrote the relative value back on the next install — and while it held, every worktree ran the main checkout's copy of each hook rather than its branch's.
+
+**Solution.** The root `prepare` script is `git config core.hooksPath .husky || true`, so git runs the tracked `.husky/<hook>` files themselves; they were already executable `#!/bin/sh` scripts in the index. husky is removed from the root `devDependencies`. Each hook begins with `[ "${HUSKY-}" = "0" ] && exit 0`: the release job in `changesets.yml` commits and pushes with `HUSKY: 0`.
+
+⚠ **knip read the hooks through its husky plugin**, which turns on when `husky` is a dependency, and `@commitlint/cli` is called only from `.husky/commit-msg`. Without the dependency `lint:unused` reported it unused; `knip.json` turns the plugin on by name (`"husky": true`), and it reads the `.husky/<hook>` files as before.
+
+**Why — measured** on git 2.56.
+
+- In a throwaway repository with a linked worktree on its own branch: with `core.hooksPath` relative to a tracked directory, a commit in the worktree ran the branch's copy of the hook; with the path absolute, to the main checkout, the same commit ran the main checkout's copy; with the path relative to a directory that does not exist, the commit succeeded with exit 0 and no hook.
+- On a clone of this repository with `pnpm` replaced by a stub that fails: a linked worktree with neither `.husky/_` nor `node_modules` ran `pre-commit` on its first commit; `commit-msg` and `pre-push` ran from `.husky` directly; `HUSKY=0` let a commit and a push through with no hook.
+
+**What husky's runner did that is gone.**
+
+- It put `node_modules/.bin` first on `PATH`. No hook needs it: the hooks call `node`, `pnpm`, `git`, `grep` and `tr`, and every check in `scripts/checks.mjs` starts with `node` or `pnpm`. The older hooks on the five branches checked out in worktrees on 2026-10-12 call no other command.
+- It ran each hook under `sh -e`. `pre-commit` and `pre-push` set `-e` themselves, and `commit-msg` is one command.
+- It sourced `~/.config/husky/init.sh` before each hook; nothing here uses it.
+
+**The transition.** A branch whose `package.json` still runs `husky` in `prepare` writes `core.hooksPath` back to `.husky/_` when someone installs in its worktree, until the branch is rebased. Every checkout that had the generated `.husky/_` keeps it, so its hooks run under either value, and the next install on `master` writes `.husky` again.
