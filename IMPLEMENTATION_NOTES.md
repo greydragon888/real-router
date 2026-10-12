@@ -12331,6 +12331,8 @@ Nothing recorded which tasks those were.
   - the OTLP env block in `ci.yml` and `post-merge.yml`, with the endpoint and the ingest token from secrets;
   - a stamp step in the setup action, and inline in `post-merge.yml`. It sets `service.name`, `service.namespace`, `ci.job` (with a matrix suffix for `base-test` and `pipeline-sharded`), `ci.event`, `ci.runner` from `RUNNER_ENVIRONMENT`, and `process.runtime.version`.
 
+> **Updated (2026-10-12).** `post-merge.yml` runs the setup action's stamp file, `.github/actions/setup/stamp.sh`, instead of a copy inline — see "The telemetry stamp is one file, which the setup action and post-merge.yml run".
+
 **Why no run id in the identity.** `delta_to_cumulative` drops a point that starts before its stream's state. That suggested concurrent jobs on one stream would lose data. Measured, they do not: two concurrent turbo runs shared one identity, the first started 3 s earlier and reported 35.4 s later, and both accumulated (5 = 2 + 3 attempted tasks). turbo records its metrics when a run ends, so a point starts when it is recorded.
 
 Without a run id, a series survives across runs, so `rate` and `increase` work and the series count stays bounded. The same reason keeps `ci.runner` to the runner kind rather than `RUNNER_NAME`.
@@ -13139,6 +13141,8 @@ It surfaced as `navigate/pre-commit-listener` going from 11.9 to 7.4 ms between 
 
 **Solution.** Both stamps, in `.github/actions/setup` and in `post-merge.yml`, add `ci.cpu`: the first `model name` in `/proc/cpuinfo`, reduced to `[A-Za-z0-9._-]` because a comma or `=` in it would split the resource list, and `unknown` when there is none. It is named under `ci.*` because the collector turns only `ci.*` and `process.runtime.version` into labels, so the collector on the host is unchanged.
 
+> **Updated (2026-10-12).** The two stamps are one file, `.github/actions/setup/stamp.sh`, which the setup action and `post-merge.yml` run — see "The telemetry stamp is one file, which the setup action and post-merge.yml run".
+
 **Why — measured.**
 
 - A local run sent with `ci.cpu=Apple_M3_Pro` reached Grafana as the label `ci_cpu` on `turbo_run_tasks_attempted_total`.
@@ -13305,6 +13309,8 @@ A Dependabot run and a human one land on the same `pr` series: no label tells th
 **Problem.** Since the Dependabot copies of the OTLP secrets, a Dependabot run exports as a human one does, onto the same `pr` series: `ci.event` is `pull_request` for both, and the collector folds every merge ref into `pr`. A root-dependency bump re-keys every task, so such runs miss the cache wholesale, and mixed into the human runs they would move every hit rate and mean the `pr` series gives. From 24.09 to 29.09 Dependabot started 33 of the 63 pull-request runs of `ci.yml`.
 
 **Solution.** Both stamps, the setup action's and its copy in `post-merge.yml`, add `ci.actor`: `dependabot` for `dependabot[bot]`, `bot` for any other `[bot]` login, `human` for the rest and `unknown` when `GITHUB_ACTOR` is unset. The collector turns every `ci.*` resource attribute into a label, so it needs no change; the label reads `ci_actor`. Only `ci.yml`, through the setup action, and `post-merge.yml` set an OTLP endpoint, so the two stamps cover every run that exports.
+
+> **Updated (2026-10-12).** The two stamps are one file, `.github/actions/setup/stamp.sh`, which the setup action and `post-merge.yml` run — see "The telemetry stamp is one file, which the setup action and post-merge.yml run".
 
 **Why a class of `GITHUB_ACTOR`.**
 
@@ -14392,6 +14398,8 @@ Three rounds of review of the fix found the same order of the text in two more p
 - `verify.test.mjs` holds the steps before it, and the setup action's, key for key: a `uses:` up to its `@`, the names of an `env:` or a `with:`, the sha256 of a `run:`. The stamp is the one line of the repository that writes to the environment those steps hand on, and it reduces the matrix suffix to `[A-Za-z0-9._-]`, as it does the CPU model.
 - A step above writing `NODE_OPTIONS`, exporting it through `actions/github-script`, or the osv-scanner step writing it, is refused; so are the stamp writing it and a step appended to the setup action. The step's command, run as the runner runs it, keeps a failing suite failing under an injected `NODE_OPTIONS` and `BASH_ENV`, where a bare `node --test` and `bash` do not, and the stamp writes one variable whatever its suffix holds.
 
+> **Updated (2026-10-12).** The stamp is `.github/actions/setup/stamp.sh`, and the setup action's step only calls it: the guard holds the call and the file's sha256 — see "The telemetry stamp is one file, which the setup action and post-merge.yml run".
+
 **Why.** The holder of the skip machinery is the one place no context and no `plan` can skip, and an environment that filters its tests out switches it off all the same. The steps that hand it that environment are this repository's text, so they can be held.
 
 - ⚠ What the actions those steps call write — `actions/checkout`, `pnpm/action-setup`, `actions/setup-node`, `astral-sh/setup-uv` — and what `pnpm install` runs is not read. Nor is a `$GITHUB_PATH` entry they add: a program named `node` first on `PATH` would run in node's place.
@@ -14551,3 +14559,23 @@ Three rounds of review of the fix found the same order of the text in two more p
 - It sourced `~/.config/husky/init.sh` before each hook; nothing here uses it.
 
 **The transition.** A branch whose `package.json` still runs `husky` in `prepare` writes `core.hooksPath` back to `.husky/_` when someone installs in its worktree, until the branch is rebased. Every checkout that had the generated `.husky/_` keeps it, so its hooks run under either value, and the next install on `master` writes `.husky` again.
+
+## The telemetry stamp is one file, which the setup action and post-merge.yml run (2026-10-12)
+
+**Problem.** `post-merge.yml` carried a copy of the setup action's "Stamp CI identity for turbo telemetry" step, because its job does not use the action, and the copy had drifted. It read no `TURBO_TELEMETRY_JOB_SUFFIX` — a drift without effect so far, since the job has no matrix — and with no `shell:` it ran under the default `bash -e`, without pipefail: an unreadable `/proc/cpuinfo` wrote `ci.cpu=unknown` there and failed the step in the action.
+
+**Solution.** The stamp is `.github/actions/setup/stamp.sh`, and both steps run it under `shell: bash`: the setup action's as `bash "$GITHUB_ACTION_PATH/stamp.sh"`, `post-merge.yml`'s as `bash .github/actions/setup/stamp.sh`. `post-merge.yml` sets no suffix, so its `ci.job` stays `build`.
+
+- The file sets `-eo pipefail` itself: a bash started from a step does not inherit the step's options.
+- A file, not a composite action of its own: the guard below holds a file by its sha256, where a nested action would need its steps unwrapped, and the file sits in a directory the CodSpeed gate's `HARNESS` already names, where a new action's would need adding.
+- `verify.test.mjs` holds the stamp step's call among the steps before the skip machinery's, and the file's sha256 beside them; a changed call or file is a new shape, and a cell holds that the directory tracks `action.yml` and `stamp.sh` alone. The cell that runs the stamp runs the file, and a new cell holds pipefail: with `/proc/cpuinfo` unreadable the stamp fails and writes nothing, and with `set -e` alone it writes `ci.cpu=unknown`.
+
+⚠ **No shellcheck reads `stamp.sh`.** actionlint checks the `run:` of a workflow, not a file it calls, so the copy in `post-merge.yml` was shellchecked and the file is not — as the shell scripts under `scripts/` are not. shellcheck 0.11.0 finds nothing in it at any severity.
+
+**Why — measured.**
+
+- `git grep -n "printf 'TURBO_EXPERIMENTAL_OTEL_RESOURCE=" -- .github` gave two lines before the step and gives one after it, in the file.
+- The code moved byte for byte: the file's body after `set -eo pipefail` and the blank line below it equals the setup step's `run:` before the step.
+- Mutants, each in a worktree: `NODE_OPTIONS` printed into `$GITHUB_ENV` from the file turns the held shape red and the stamp writes two variables; an export appended to the call fails the test file; `set -e` in place of `set -eo pipefail` turns the pipefail cell red. Restored, 55 of 55 pass.
+
+⚠ **The runs on the push check what this commit cannot.** `post-merge.yml`, which runs the file, and the `changesets.yml` it starts must end `success` — after a failed post-merge the release run is `skipped`. In `coverage-master.yml`, and in `codspeed.yml` when it runs, the Setup step, which runs the file inside the action, must be green: the jobs API shows a composite action as one step. The telemetry labels of job `build` must stay the same, with `ci.cpu` the CPU model rather than `unknown`.

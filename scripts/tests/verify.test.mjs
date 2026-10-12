@@ -540,10 +540,10 @@ test("--context skips in CI the checks whose ciSkip names it, before looking for
 // What earlier steps of the job write to $GITHUB_ENV reaches this step, whose
 // own `env:` wins only for the names it sets. The steps before the skip
 // machinery's, and those of `.github/actions/setup`, are held key for key
-// below, so the setup action's stamp is the one line of this repository that
-// writes there. ⚠ What the actions they call write — `actions/checkout`,
-// `pnpm/action-setup`, `actions/setup-node`, `astral-sh/setup-uv` — and what
-// `pnpm install` runs is not read.
+// below, with the file its stamp step runs, so the setup action's stamp is
+// the one part of this repository that writes there. ⚠ What the actions they
+// call write — `actions/checkout`, `pnpm/action-setup`, `actions/setup-node`,
+// `astral-sh/setup-uv` — and what `pnpm install` runs is not read.
 
 const CI = readFileSync(
   join(repoRoot, ".github", "workflows", "ci.yml"),
@@ -707,6 +707,15 @@ const SETUP = readFileSync(
   "utf8",
 );
 
+/** The file the setup action's stamp step runs. */
+const STAMP = readFileSync(
+  join(repoRoot, ".github", "actions", "setup", "stamp.sh"),
+  "utf8",
+);
+
+/** The stamp step's `run:`, which the mutants below extend. */
+const STAMP_CALL = 'bash "$GITHUB_ACTION_PATH/stamp.sh"';
+
 const sha256 = (text) => createHash("sha256").update(text).digest("hex");
 
 /**
@@ -724,19 +733,24 @@ const stepShape = (step) =>
     }),
   );
 
-/** The steps of Repo Lints before the skip machinery's, and of the setup action, as `stepShape` reads them. */
-function stepsBeforeHold(ci, setup) {
+/**
+ * The steps of Repo Lints before the skip machinery's, and of the setup
+ * action, as `stepShape` reads them, and the sha256 of `stamp.sh`: the setup
+ * action's stamp step only calls it.
+ */
+function stepsBeforeHold(ci, setup, stamp = STAMP) {
   const steps = readClosedYaml(ci).toJS().jobs["repo-lints"].steps;
   return {
     job: steps.slice(0, -2).map(stepShape),
     setup: readClosedYaml(setup).toJS().runs.steps.map(stepShape),
+    stamp: sha256(stamp),
   };
 }
 
 /**
  * Every step that runs before the skip machinery's: none can write to
- * $GITHUB_ENV or $GITHUB_PATH but the setup action's stamp, whose text the
- * sha256 holds. A changed `run:` is a new hash here.
+ * $GITHUB_ENV or $GITHUB_PATH but the setup action's stamp, whose call and
+ * file the sha256s hold. A changed `run:` or `stamp.sh` is a new hash here.
  */
 const BEFORE_HOLD = {
   job: [
@@ -767,7 +781,7 @@ const BEFORE_HOLD = {
     {
       name: "Stamp CI identity for turbo telemetry",
       shell: "bash",
-      run: "66d3697fafa80dbcf5b72cf19c473a10922073e9b7fc5c49672e8ed401f566e6",
+      run: "dbbda71c87a57ae9d46be5bab6f20232b47522ba95f223a49ea7fbadcf106a18",
     },
     {
       name: "Install dependencies",
@@ -777,21 +791,36 @@ const BEFORE_HOLD = {
       run: "d9092cf7a4abd1a395409defb31f75067b34194b114c6fe4463df6f9b2cbe831",
     },
   ],
+  stamp: "6a3c0b5804d689be9686e4e17092a7dad7f34825d58d7e82b930d20491a3416e",
 };
 
 test("the steps before the skip machinery's, and the setup action's, are these, key for key: none writes to the environment it inherits but the stamp", () => {
   assert.deepEqual(stepsBeforeHold(CI, SETUP), BEFORE_HOLD);
 });
 
+test("the setup action's directory tracks action.yml and stamp.sh alone: the rule above reads both", () => {
+  // A file beside them that either runs would pass unread.
+  const tracked = execFileSync(
+    "git",
+    ["ls-files", "-z", "--", join(".github", "actions", "setup")],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+
+  assert.deepEqual(tracked.split("\0").filter(Boolean).sort(), [
+    ".github/actions/setup/action.yml",
+    ".github/actions/setup/stamp.sh",
+  ]);
+});
+
 const HOLD_LINE = "      - name: Hold the skip machinery\n";
-const STAMP_END = '        } >> "$GITHUB_ENV"\n';
+const STAMP_END = '} >> "$GITHUB_ENV"\n';
 const once = (text, anchor, replacement) => {
   assert.equal(text.split(anchor).length, 2, `anchor: ${anchor}`);
   return text.replace(anchor, () => replacement);
 };
 const EXPORT = 'echo "NODE_OPTIONS=--test-skip-pattern=." >> "$GITHUB_ENV"';
 
-for (const [name, ci, setup] of [
+for (const [name, ci, setup, stamp = STAMP] of [
   [
     "a step above writing NODE_OPTIONS to $GITHUB_ENV",
     once(
@@ -822,10 +851,20 @@ for (const [name, ci, setup] of [
   [
     "the setup action's stamp writing it",
     CI,
+    SETUP,
+    once(
+      STAMP,
+      STAMP_END,
+      `  printf 'NODE_OPTIONS=--test-skip-pattern=.\\n'\n${STAMP_END}`,
+    ),
+  ],
+  [
+    "the stamp step writing it after the stamp",
+    CI,
     once(
       SETUP,
-      STAMP_END,
-      `          printf 'NODE_OPTIONS=--test-skip-pattern=.\\n'\n${STAMP_END}`,
+      `      run: ${STAMP_CALL}\n`,
+      `      run: |\n        ${STAMP_CALL}\n        ${EXPORT}\n`,
     ),
   ],
   [
@@ -835,7 +874,7 @@ for (const [name, ci, setup] of [
   ],
 ]) {
   test(`the steps before the skip machinery's are held: ${name} is refused`, () => {
-    assert.notDeepEqual(stepsBeforeHold(ci, setup), BEFORE_HOLD);
+    assert.notDeepEqual(stepsBeforeHold(ci, setup, stamp), BEFORE_HOLD);
   });
 }
 
@@ -847,51 +886,93 @@ test("the steps before the skip machinery's are held up to each action's version
   assert.deepEqual(stepsBeforeHold(bumped(CI), bumped(SETUP)), BEFORE_HOLD);
 });
 
+/**
+ * Runs a stamp script the way its step does, under a bash of its own, with
+ * /proc/cpuinfo read from `cpuinfo` instead: its exit status, and the lines it
+ * wrote to $GITHUB_ENV.
+ */
+function stamped(text, cpuinfo) {
+  const dir = fresh("stamp");
+  const file = join(dir, "github-env");
+  const script = join(dir, "stamp.sh");
+  writeFileSync(file, "");
+  writeFileSync(
+    script,
+    once(text, "/proc/cpuinfo 2>/dev/null", `${cpuinfo} 2>/dev/null`),
+  );
+  const run = spawnSync("bash", [script], {
+    env: {
+      PATH: process.env.PATH,
+      GITHUB_ENV: file,
+      GITHUB_JOB: "repo-lints",
+      GITHUB_EVENT_NAME: "pull_request",
+      GITHUB_ACTOR: "someone",
+      RUNNER_ENVIRONMENT: "github-hosted",
+      TURBO_TELEMETRY_JOB_SUFFIX: "x\nNODE_OPTIONS=--test-skip-pattern=.\nZ=",
+    },
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  return {
+    status: run.status,
+    stderr: run.stderr,
+    lines: readFileSync(file, "utf8").split("\n").filter(Boolean),
+  };
+}
+
+/**
+ * A cpuinfo with one model name, which the stamp reduces to
+ * `Test_CPU_2.00GHz`.
+ */
+function cpuinfo() {
+  const file = join(fresh("cpuinfo"), "cpuinfo");
+  writeFileSync(file, "processor\t: 0\nmodel name\t: Test CPU @ 2.00GHz\n");
+  return file;
+}
+
 test("the setup action's stamp writes one variable to $GITHUB_ENV, whatever its matrix suffix holds", () => {
   // The suffix comes from a job's env, a workflow's `TURBO_*` too: a line
   // break in it would start a variable of its own, NODE_OPTIONS say.
-  const { run } = readClosedYaml(SETUP)
-    .toJS()
-    .runs.steps.find(
-      (step) => step.name === "Stamp CI identity for turbo telemetry",
-    );
-  const written = (text) => {
-    const dir = fresh("stamp");
-    const file = join(dir, "github-env");
-    const script = join(dir, "stamp.sh");
-    writeFileSync(file, "");
-    writeFileSync(script, text);
-    const stamp = spawnSync("bash", ["-e", script], {
-      env: {
-        PATH: process.env.PATH,
-        GITHUB_ENV: file,
-        GITHUB_JOB: "repo-lints",
-        GITHUB_EVENT_NAME: "pull_request",
-        GITHUB_ACTOR: "someone",
-        RUNNER_ENVIRONMENT: "github-hosted",
-        TURBO_TELEMETRY_JOB_SUFFIX: "x\nNODE_OPTIONS=--test-skip-pattern=.\nZ=",
-      },
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    assert.equal(stamp.status, 0, stamp.stderr);
-    return readFileSync(file, "utf8").split("\n").filter(Boolean);
-  };
-  const lines = written(run);
+  const { status, stderr, lines } = stamped(STAMP, cpuinfo());
 
+  assert.equal(status, 0, stderr);
   assert.equal(lines.length, 1, lines.join("\n"));
   assert.match(
     lines[0],
-    /^TURBO_EXPERIMENTAL_OTEL_RESOURCE=service\.name=turbo,/,
+    /^TURBO_EXPERIMENTAL_OTEL_RESOURCE=service\.name=turbo,.*,ci\.cpu=Test_CPU_2\.00GHz,/,
   );
   assert.ok(
-    written(
-      run.replace(
+    stamped(
+      once(
+        STAMP,
         '"${suffix:+-${suffix}}"',
         '"${TURBO_TELEMETRY_JOB_SUFFIX:+-${TURBO_TELEMETRY_JOB_SUFFIX}}"',
       ),
-    ).length > 1,
+      cpuinfo(),
+    ).lines.length > 1,
     "control: the suffix written as it comes adds variables",
+  );
+});
+
+test("the stamp fails on an unreadable /proc/cpuinfo rather than write ci.cpu=unknown, by its own pipefail", () => {
+  // A bash started from the step does not inherit the step's -eo pipefail,
+  // so the file sets them; without pipefail the failing awk is masked.
+  const missing = join(fresh("cpuinfo"), "missing");
+  const failed = stamped(STAMP, missing);
+
+  assert.notEqual(failed.status, 0);
+  assert.deepEqual(failed.lines, []);
+
+  const masked = stamped(
+    once(STAMP, "set -eo pipefail\n", "set -e\n"),
+    missing,
+  );
+  assert.equal(masked.status, 0, masked.stderr);
+  assert.equal(masked.lines.length, 1);
+  assert.match(
+    masked.lines[0],
+    /,ci\.cpu=unknown,/,
+    "control: without pipefail the stamp writes ci.cpu=unknown",
   );
 });
 
