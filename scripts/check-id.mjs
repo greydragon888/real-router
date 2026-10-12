@@ -6,9 +6,10 @@
 
 /**
  * The prefix that starts a command in an environment of `PATH` and `HOME`
- * alone, so nothing an earlier step exported — `NODE_OPTIONS` among it — reaches
- * it. Repo Lints runs `node:skip-facts` behind it; a line is read as the command
- * after it, and no other form of `env` is.
+ * alone, so nothing an earlier step wrote to `$GITHUB_ENV` reaches it — a
+ * `NODE_TEST_CONTEXT` or a `BASH_ENV` among it. Repo Lints runs
+ * `node:skip-facts` behind it; a line is read as the command after it, and no
+ * other form of `env` is.
  */
 export const CLEAN_ENV = '/usr/bin/env -i PATH="$PATH" HOME="$HOME" ';
 
