@@ -556,7 +556,7 @@ The lever this blocks is concrete. Measured on core, 11-core M3 Pro, two rounds:
 
 ⚠ **What is weaker, stated plainly.** An _outside_ change pushed straight to `master` with the hook bypassed — a worktree without `.husky/_` — was reported within minutes and is now reported on Tuesday. Everything else that workflow covered is covered by `.husky/pre-push` on the same tree, or by the weekly run.
 
-> **Updated (2026-10-12).** A worktree no longer pushes past the hook for want of `.husky/_`: git runs the tracked `.husky/pre-push` in every checkout — see "Every worktree runs its own tracked hooks; husky is removed". `--no-verify` and `HUSKY=0` are the bypasses that remain.
+> **Updated (2026-10-12).** git runs the tracked `.husky/pre-push` in every worktree of a clone once an install has run in it — see "Every worktree runs its own tracked hooks; husky is removed". Two gaps stay: a fresh clone runs no hook before its first install, and an install at a commit whose `prepare` runs husky, without `HUSKY=0`, sends every worktree without `.husky/_` past its hooks until an install at a later commit. `--no-verify` and `HUSKY=0` are the bypasses that remain.
 
 ## `lint` depends on `^type-check`, because typed rules read types the hash did not (#2432, 2026-09-19)
 
@@ -14568,7 +14568,7 @@ Three rounds of review of the fix found the same order of the text in two more p
 - It ran each hook under `sh -e`. `pre-commit` and `pre-push` set `-e` themselves, and `commit-msg` is one command.
 - It sourced `~/.config/husky/init.sh` before each hook; nothing here uses it.
 
-**The transition.** A branch whose `package.json` still runs `husky` in `prepare` writes `core.hooksPath` back to `.husky/_` when someone installs in its worktree, until the branch is rebased. Every checkout that had the generated `.husky/_` keeps it, so its hooks run under either value, and the next install on `master` writes `.husky` again.
+**The window.** An install at any commit whose `prepare` runs husky — a branch not rebased yet, a snapshot installed for a probe, an older commit checked out — writes `core.hooksPath` back to `.husky/_` unless `HUSKY=0` is set, and that value is the one every worktree shares. A checkout that holds the generated `.husky/_`, the one husky ran in or one that kept it, still runs its hooks; every other worktree runs none, without a word, until an install at a later commit writes `.husky` again. `HUSKY=0` on such an install leaves `core.hooksPath` alone. Measured with husky 9.1.7's own install in a throwaway repository: run in a linked worktree, it set the shared path to `.husky/_` and made that directory there alone; a commit in the other checkout then passed a pre-commit that had refused it, the linked worktree still refused it, and under `HUSKY=0` the path stayed `.husky`. On 2026-10-12 the main checkout still holds a `.husky/_` from before, and a worktree added since holds none.
 
 ## The telemetry stamp is one file, which the setup action and post-merge.yml run (2026-10-12)
 

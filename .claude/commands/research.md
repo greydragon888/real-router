@@ -77,7 +77,7 @@ $ARGUMENTS
 ## Фаза 4 — Эксперимент
 
 - Для ведущей гипотезы **выпиши предсказания ДО эксперимента** — из исходников инструмента, документации, отчётов. В README — таблица «№ | предсказание | замер».
-- **Где:** detached worktree вне репозитория — `git worktree add --detach <scratchpad>/<name> <срез>`, затем `pnpm install --frozen-lockfile --offline`. Реальный `turbo run` — только с `--cache-dir` в scratchpad: без него worktree пишет в кеш основного чекаута. Базовую сборку для сравнения сохрани в scratchpad до правок.
+- **Где:** detached worktree вне репозитория — `git worktree add --detach <scratchpad>/<name> <срез>`, затем `HUSKY=0 pnpm install --frozen-lockfile --offline`: на срезе, чей `prepare` зовёт husky, без `HUSKY=0` тот направит хуки всех worktree на `.husky/_`, и worktree без этого каталога останутся без хуков до следующей установки на новом коммите. Реальный `turbo run` — только с `--cache-dir` в scratchpad: без него worktree пишет в кеш основного чекаута. Базовую сборку для сравнения сохрани в scratchpad до правок.
 - **Сравнение артефактов — побайтно** с базой; каждое отличие объяснено, необъяснённое — находка.
 - **Упавший эксперимент — не замер:** код выхода и последние строки лога до любых выводов.
 - В конце — `git worktree remove` и проверка `git worktree list`.
