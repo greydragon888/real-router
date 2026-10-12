@@ -25,9 +25,7 @@ updates:
       # `react` bumped without `react-dom`, a clean install, and failing React
       # tests — and no `react-dom` PR at all. The exact names outrank the `*`
       # of `patches` and `dev-dependencies`: a dependency joins the most
-      # specific group it matches, and the order of this list breaks only a
-      # tie (IMPLEMENTATION_NOTES "react and react-dom move as one Dependabot
-      # group", "The patches group takes production dependencies only").
+      # specific group it matches, and the order of this list breaks only a tie.
       react:
         patterns:
           - "react"
@@ -39,8 +37,7 @@ updates:
       # `dev-dependencies`, where the step would be read as another package's.
       # Pinned to a 6.0.0 prerelease, it is also offered the later 6.0.0
       # prereleases. Listed before `dev-dependencies` for the reason the `react`
-      # group gives. (IMPLEMENTATION_NOTES "CodSpeed simulation runs without
-      # Maglev".)
+      # group gives.
       codspeed:
         patterns:
           - "@codspeed/*"
@@ -49,9 +46,7 @@ updates:
       # dependency matches `*` here and in `dev-dependencies` equally, and
       # Dependabot gives such a tie to the group listed first — this one, which
       # takes no minor, so the minor came as a PR of its own. Dev dependencies
-      # keep their groups, patches and minors together. (IMPLEMENTATION_NOTES
-      # "Dependabot carries the float-set patches" and "The patches group takes
-      # production dependencies only".)
+      # keep their groups, patches and minors together.
       patches:
         dependency-type: "production"
         update-types:
@@ -104,10 +99,9 @@ updates:
       # here is a decision about its own advisory, not a copy of the overrides.
       # Dependabot can apply an override — a security PR has proposed the major
       # an open override floor admitted — and a security job that cannot reach a
-      # fixed version errors; repeated errors halt every npm update
-      # (IMPLEMENTATION_NOTES "Dependabot npm ecosystem auto-halted by
-      # pnpm-override-managed transitive advisories"). An ignore fails its own
-      # way: the security job for an ignored dep can end in `all_versions_ignored`.
+      # fixed version errors; repeated errors halt every npm update. An ignore
+      # fails its own way: the security job for an ignored dep can end in
+      # `all_versions_ignored`.
       - dependency-name: "piscina" # override in pnpm-workspace.yaml
       - dependency-name: "js-yaml" # override in pnpm-workspace.yaml
       # undici is no dependency of the root: danger installs a 7.x of its own
