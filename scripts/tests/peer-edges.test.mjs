@@ -8,11 +8,12 @@
 // entry for a `@real-router/*` package is the peer is out of that package's
 // graph, and turbo replays its results computed against an older copy of it.
 //
-// This file holds that the entry is there; syncpack holds its form.
-// `syncpack.config.mjs` pins `@real-router/*` to `workspace:^` in
+// This file holds that the entry is there; syncpack holds the form of a string
+// entry. `syncpack.config.mjs` pins `@real-router/*` to `workspace:^` in
 // `dependencies` and `devDependencies` and bans it from `optionalDependencies`,
-// and the cells below run syncpack with that config on fixtures. The check
-// reads no form of the entry.
+// and the cells below run syncpack with that config on fixtures. A value that
+// is not a string syncpack passes in silence, and turbo refuses the manifest.
+// The check reads no form of the entry.
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
