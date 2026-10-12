@@ -58,7 +58,7 @@ export const CHECKS = [
     id: "lint:deps",
     run: ["pnpm", "lint:deps"],
     stages: ["pre-commit", "pre-push", "ci"],
-    why: "dependency versions agree across the workspace (syncpack)",
+    why: "dependency versions agree across the workspace, and no @real-router/* package sits in optionalDependencies (syncpack)",
   },
   {
     id: "lint:config-sync",

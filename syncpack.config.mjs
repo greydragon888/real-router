@@ -19,6 +19,10 @@ export default {
     "!packages/*/dist/**",
     "!packages/*/coverage/**",
   ],
+  // syncpack reads `optionalDependencies` only through a type that names them.
+  customTypes: {
+    optional: { strategy: "versionsByName", path: "optionalDependencies" },
+  },
   semverGroups: [
     {
       label: "Ignore local package versions",
@@ -83,6 +87,18 @@ export default {
     },
   ],
   versionGroups: [
+    {
+      // turbo reads `optionalDependencies` before `devDependencies`, so an
+      // entry there with a version hides the edge the `workspace:^` entry in
+      // `devDependencies` gives. Banned, not checked for its form:
+      // `scripts/tests/peer-edges.test.mjs` then needs only the entry's
+      // presence, and runs syncpack with this file on fixtures.
+      label: "No @real-router/* in optionalDependencies",
+      packages: ["**"],
+      dependencies: ["@real-router/*"],
+      dependencyTypes: ["optional"],
+      isBanned: true,
+    },
     // REQUIRED — not dead after the pnpm 11 migration. syncpack 15.x reads pnpm
     // `overrides` from pnpm-workspace.yaml as well as the legacy package.json#pnpm
     // location, so this `pnpmOverrides` ignore still matches. Verified: removing
