@@ -7640,6 +7640,8 @@ could be deleted. **It cannot.** syncpack 15.x reads `overrides` from
 trip `SameRangeMismatch` against the pinned devDependency and fails `lint:deps`.
 The group is kept (with a comment in `syncpack.config.mjs` recording this).
 
+> **Updated (2026-10-12).** syncpack 15.3.3 reads the `overrides` of `pnpm-workspace.yaml`, as the type `pnpmOverrides`, and none of `package.json#pnpm`: an `overrides` block there gives it no instance, beside a `pnpm-workspace.yaml` or not. The group is required for the reason above — measured on the tree, without it `@types/node` is `SameRangeMismatch`.
+
 ### What only a real release can confirm
 
 OIDC trusted publishing on pnpm 11's native publish path cannot be validated by

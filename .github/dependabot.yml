@@ -173,7 +173,7 @@ updates:
       # and can halt the whole npm job (same coupled-peer class as vite above).
       # The framework only moves via a manual, coordinated `pnpm update` across
       # all @angular/* at once; the `~` ranges then absorb the patch.
-      # Ignore the namespace entirely (this replaced the `@angular/router` override).
+      # Ignore the namespace entirely.
       - dependency-name: "@angular/*"
 
   # The examples workspace — its own lockfile, so its own block: a single

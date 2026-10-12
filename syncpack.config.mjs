@@ -36,10 +36,10 @@ export default {
       dependencies: [
         "@real-router/*",
       ],
-      // No "peer": a @real-router/* peer dep must NOT be forced to workspace:^
-      // (on 0.x, ^0.x.y is patch-only, so a core minor leaves the range and every
-      // consumer hits a peer conflict — CLAUDE.md "Never use workspace:^ for peerDependencies on
-      // 0.x"). Peer deps fall through to the ">= ranges" group below.
+      // No "peer": `workspace:^` is not a semver range, so syncpack applies none
+      // from this group, and a peer listed here would skip the ">= ranges" group
+      // below — a `^0.x` peer would pass, while on 0.x `^0.x.y` is patch-only: a
+      // core minor leaves the range and every consumer hits a peer conflict.
       dependencyTypes: ["prod", "dev"],
       range: "workspace:^",
     },
@@ -52,7 +52,8 @@ export default {
     {
       // UI frameworks and testing libraries are dev/test-only — they never ship
       // to consumers (published adapters expose them via peerDependency ranges,
-      // governed by the ">= ranges" group above).
+      // governed by the ">= ranges" group above, except the preact adapter's
+      // `preact` peer, which a version group below ignores).
       // Float the PATCH (`~`, not `^` — a minor can carry behavioural change and
       // stays reviewed): a patch then moves the lockfile alone, and Dependabot
       // brings it every week without touching the range
@@ -61,7 +62,7 @@ export default {
       // packages have EXACT cross-peer requirements (router@x needs core@x
       // exactly), so a single-package bump breaks strictPeerDependencies — hence
       // Dependabot ignores @angular/* entirely and the set moves together via
-      // `pnpm update` (this replaced the old `@angular/router` pnpm override).
+      // `pnpm update`.
       label: "UI frameworks and testing libs float latest patch (~)",
       packages: ["**"],
       dependencies: [
@@ -99,12 +100,10 @@ export default {
       dependencyTypes: ["optional"],
       isBanned: true,
     },
-    // REQUIRED — not dead after the pnpm 11 migration. syncpack 15.x reads pnpm
-    // `overrides` from pnpm-workspace.yaml as well as the legacy package.json#pnpm
-    // location, so this `pnpmOverrides` ignore still matches. Verified: removing
-    // it makes `@types/node: $@types/node` trip SameRangeMismatch against the
-    // pinned devDependency. (The pnpm-11 migration analysis assumed this group
-    // would go dead — it does not.)
+    // Required: syncpack reads the `overrides` of pnpm-workspace.yaml as the type
+    // `pnpmOverrides` (not those of package.json#pnpm), and without this group
+    // `@types/node: $@types/node` there trips SameRangeMismatch against the
+    // pinned devDependency.
     {
       label: "Ignore pnpm overrides",
       packages: ["**"],
@@ -137,8 +136,8 @@ export default {
       // prod/dev only — peer deps must NOT be pinned to workspace:^: on 0.x,
       // ^0.x.y is patch-only, so a core minor leaves the range and every
       // consumer sees a peer conflict. Peer ranges are governed by the
-      // ">= ranges" semverGroup instead. Without this exclusion the pin
-      // overrode that intent (DiffersToPin).
+      // ">= ranges" semverGroup instead. With "peer" here, the pin would report
+      // every peer floor as DiffersToPin.
       dependencyTypes: ["prod", "dev"],
       pinVersion: "workspace:^",
       policy: "pinned",
