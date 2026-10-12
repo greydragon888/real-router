@@ -794,10 +794,10 @@ jobs:
       # run here, outside verify, so no context and no plan can skip them. They
       # are `node:skip-facts` of `scripts/checks.mjs`; the registry's tests hold
       # this step to that command, and `verify.test.mjs` to its shape. `sh`
-      # reads no BASH_ENV, and node gets PATH and HOME alone, so nothing the
-      # steps above write to $GITHUB_ENV — a NODE_TEST_CONTEXT under which a
-      # failing suite exits 0 — reaches them; `verify.test.mjs` holds those
-      # steps key for key.
+      # reads no BASH_ENV, and node gets PATH and HOME alone: of what the steps
+      # above write to $GITHUB_ENV only those two reach the tests, and a
+      # NODE_TEST_CONTEXT under which a failing suite exits 0 does not;
+      # `verify.test.mjs` holds those steps key for key.
       - name: Hold the skip machinery
         shell: sh
         run: /usr/bin/env -i PATH="$PATH" HOME="$HOME" node --test scripts/tests/diff-carries-no-code.test.mjs scripts/tests/diff-carries-no-source.test.mjs scripts/tests/verify.test.mjs

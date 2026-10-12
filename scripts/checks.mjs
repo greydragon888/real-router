@@ -159,7 +159,7 @@ export const CHECKS = [
     // outside `verify`, so no context, no `ciSkip` and no `plan` can skip
     // them; both groups above skip on contexts these tests hold. The step runs
     // this command under `sh`, behind `CLEAN_ENV` of `scripts/check-id.mjs`:
-    // what an earlier step writes to $GITHUB_ENV does not reach it.
+    // of what an earlier step writes to $GITHUB_ENV, PATH and HOME alone get in.
     id: "node:skip-facts",
     run: [
       "node",

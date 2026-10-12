@@ -631,7 +631,8 @@ test("Repo Lints runs node:skip-facts in a step of its own before verify, and no
   // one-line `run:` — the check's command behind `CLEAN_ENV` — and no other
   // key. An `if:`, a `continue-on-error:` or an `env:` could keep its tests
   // from failing the job; `sh` reads no BASH_ENV, and `CLEAN_ENV` hands node
-  // PATH and HOME alone, so what an earlier step writes to $GITHUB_ENV cannot.
+  // PATH and HOME alone, so of what an earlier step writes to $GITHUB_ENV only
+  // those two reach it.
   const steps = readClosedYaml(CI).getIn(["jobs", "repo-lints", "steps"], true);
   const step = steps.items.at(-2);
   const run = step.get("run", true);
