@@ -49,7 +49,7 @@
     "type-check": "turbo run type-check type-check:tests",
     "sonar:local": "bash scripts/sonar-local.sh",
     "packages-structure": "find packages/*/src -type f -name \"*.ts*\" -print | tree --fromfile",
-    "prepare": "git config core.hooksPath .husky || true",
+    "prepare": "[ -e .git ] && git config core.hooksPath .husky || true",
     "size": "size-limit",
     "commit": "czg",
     "changeset": "changeset",
