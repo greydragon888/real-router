@@ -3,7 +3,6 @@
 // installs by itself. Without a provider, danger's `require("undici")` falls
 // through to whatever copy is hoisted (jsdom's 8.x, outside danger's ranges).
 // Dropping the peer declaration makes the dependency danger's own again.
-// IMPLEMENTATION_NOTES: "undici: danger installs its own copy".
 export const hooks = {
   readPackage(pkg) {
     if (pkg.name === "danger" && pkg.peerDependencies?.undici) {
@@ -16,8 +15,6 @@ export const hooks = {
     // vue alone leaves the peer at the old one, which `strictPeerDependencies`
     // refuses — the Dependabot runs of 2026-10-01. No test renders through
     // test-utils' SSR helpers, and vue brings a renderer of its own.
-    // IMPLEMENTATION_NOTES: "The patches group takes production dependencies
-    // only".
     if (
       pkg.name === "@vue/test-utils" &&
       pkg.peerDependencies?.["@vue/server-renderer"]

@@ -186,8 +186,7 @@ export const CHECKS = [
 
   // ── Turbo ──────────────────────────────────────────────────────────────────
   {
-    // `lint` is named: it is a sibling task of `test`, not its dependency
-    // (IMPLEMENTATION_NOTES, the entry on `lint` as a sibling of `test`).
+    // `lint` is named: it is a sibling task of `test`, not its dependency.
     id: "turbo:test+lint",
     run: ["pnpm", "turbo", "run", "test", "lint"],
     stages: ["pre-commit"],

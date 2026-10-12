@@ -11,8 +11,7 @@ import path from "node:path";
  *
  * ⚠ **Derived, never listed.** A hand-kept list would be a second copy that
  * drifts on the next scan added; the predicate below is what makes a test a
- * reader. IMPLEMENTATION_NOTES "Stryker on core reached zero mutants" owns the
- * counts and the two failure shapes.
+ * reader.
  *
  * ⚠ **The cost is named rather than hidden.** A file that MIXES a source scan
  * with behavioural cells loses both, so its behavioural cells contribute no

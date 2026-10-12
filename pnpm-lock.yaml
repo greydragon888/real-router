@@ -29,7 +29,7 @@ overrides:
   fflate: '>=0.8.3 <0.9'
   js-yaml: '>=4.3.2 <5'
 
-pnpmfileChecksum: sha256-5srI8hrBD/f0DUPUGOL8FZOqadOUWS0sTzfrdZSY7z4=
+pnpmfileChecksum: sha256-d8WrKzRwRTTD6HRX1/sYmYA5BTKUZqTk9S/dP5lV1EI=
 
 importers:
 

@@ -46,8 +46,7 @@ overrides:
   ajv@8: ~8.20.0
   # undici has no entry here. danger 14 declares it both as a dependency and as
   # an optional peer; `.pnpmfile.mjs` drops the peer declaration, so danger
-  # installs a 7.x of its own. jsdom 30 takes 8.x on its own range
-  # (IMPLEMENTATION_NOTES has the measurements).
+  # installs a 7.x of its own. jsdom 30 takes 8.x on its own range.
   # At the version @angular/build, its one parent here, pins exactly.
   piscina: '>=5.3.2 <6.0.0'
   # ReDoS in brace-expansion (GHSA-3jxr-9vmj-r5cp, High). Two major lines, @2 and @5, are in the tree
@@ -125,8 +124,7 @@ overrides:
   # fflate < 0.8.3: `unzipSync` can loop forever on a malformed ZIP64 archive
   # (GHSA-px8p-9vwx-vf98, 7.5). `@arethetypeswrong/core` (via its CLI and tsdown)
   # declares `^0.8.3`, but `@vitest/ui` declares `^0.8.2`, a range that admits
-  # the affected release; the floor is what excludes it. IMPLEMENTATION_NOTES
-  # records how an exact dedupe pin on this line once held the tree below the fix.
+  # the affected release; the floor is what excludes it.
   # Root devDeps, build and test tooling, never in a published @real-router/*
   # package, and what they unzip is our own build output rather than untrusted
   # input. Bounded `<0.9` because on a 0.x line the minor IS the major. No 0.9 exists today, so the bound costs nothing.

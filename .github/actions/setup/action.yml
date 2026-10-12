@@ -47,8 +47,7 @@ runs:
       with:
         # Read from `.nvmrc` (repo root, resolved against GITHUB_WORKSPACE) so
         # the major CI runs and the major a dev machine selects cannot drift —
-        # they did, and it cost ten days of a locally-red / CI-green test suite
-        # (IMPLEMENTATION_NOTES "`.nvmrc` as the Node single source of truth").
+        # they did, and it cost ten days of a locally-red / CI-green test suite.
         # Safe here because every caller checks out first, as documented above.
         node-version-file: .nvmrc
         cache: ${{ inputs.node-cache }}

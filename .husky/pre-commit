@@ -11,9 +11,8 @@ echo "🔍 Running pre-commit checks..."
 # Node-major drift guard (WARNING only, never blocks). A local major other than
 # the one CI runs silently changes host-provided globals: Node >= 26 ships Web
 # Storage unflagged, which shadows jsdom's `sessionStorage` under vitest and made
-# 7 adapter scroll tests fail locally while CI stayed green for ten days (see
-# IMPLEMENTATION_NOTES "Adapter scroll tests mock sessionStorage"). Silent when
-# the majors match.
+# 7 adapter scroll tests fail locally while CI stayed green for ten days. Silent
+# when the majors match.
 if [ -f .nvmrc ]; then
   want_node="$(tr -d '[:space:]' < .nvmrc)"
   have_node="$(node -p 'process.versions.node.split(".")[0]')"

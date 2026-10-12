@@ -128,8 +128,7 @@ export const createConfig = (opts: CreateConfigOptions = {}): UserConfig[] => {
     // here and declare their own `lint:package` / `lint:types` scripts instead —
     // all three do. ⚠ Those two pass `--ignore-rules` for findings
     // judged intended against a reference library of the same build (see each
-    // package's CLAUDE.md); this config ignores nothing. See
-    // IMPLEMENTATION_NOTES "Release-pipeline...".
+    // package's CLAUDE.md); this config ignores nothing.
     publint: true,
     // ⚠ `profile` is explicit because tsdown 0.23.0 changed the default from
     // `strict` to `esm-only`, which ignores CJS resolution failures — and the

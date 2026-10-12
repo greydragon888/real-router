@@ -13636,6 +13636,10 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 
 ## Build configs carry no issue numbers or record references (2026-10-02)
 
+> **Updated (2026-10-12).** A pointer to an entry of this file goes too: `(IMPLEMENTATION_NOTES "…")`, `see IMPLEMENTATION_NOTES …`, `the record behind it is in IMPLEMENTATION_NOTES …`. Owner decision: the sentence before such a pointer already states what holds, and the pointer names the record of how it came to be. 36 pointers left 20 configs — the workflows, the setup action, `dependabot.yml`, the pre-commit hook, the check registry, the pnpm configs, and the lint, test and bundle configs — and each file differs from its previous version in comments alone. `.vale.ini` and the Vale historiography rule keep the file's name: the first configures the linting of this file, the second states where history lives.
+>
+> ⚠ The lockfile records the sha256 of `.pnpmfile.mjs` as `pnpmfileChecksum`, so an edit there, a comment included, carries the new sum; with the old one `pnpm install --frozen-lockfile` stops.
+
 **Problem.** The comments and descriptions of the build configs pointed at records instead of stating what holds: issue and PR numbers, sections of the 2026-08-01 CI/CD audit, revision and phase marks of RFCs (`R2.19`, `Phase 2`), CI run ids, commit SHAs, and documents under `.claude/` that git does not track. A registry `why` reaches every hook and CI log, so the hooks printed lines like `▶ node:scripts-tests — the repository's own tooling tests (#2359)`.
 
 **Solution.** Across the check registry (`scripts/checks.mjs`, `scripts/repo-wide-scans.json`), the git hooks, the GitHub workflows, the setup action, the Dependabot and Dependency Review configs, and the lint, test, bundle, Sonar and Codecov configs, each such reference is removed and its sentence keeps what it states.

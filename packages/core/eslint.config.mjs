@@ -69,8 +69,7 @@ export default [
       // Folded-in utils primitives keep their own functional suites, which
       // import the module they OWN via a relative ../../../src/utils/* path
       // (frozen fsm copy + dissolved event-emitter + dissolved logger — the
-      // per-router RouterLogger). To be rewritten onto a public surface
-      // later — see IMPLEMENTATION_NOTES "fsm + event-emitter → core/src/utils".
+      // per-router RouterLogger). To be rewritten onto a public surface later.
       "tests/functional/utils/**/*.test.ts",
       // Structural core-invariant test: it asserts the FSM engine core
       // ACTUALLY builds on (src/utils/fsm) exposes no forceState bypass, so

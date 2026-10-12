@@ -63,8 +63,7 @@ jobs:
   examples:
     name: Build & Test Examples
     # Not on the self-hosted VPS: the build ran no faster there and held the
-    # runner's single job slot (IMPLEMENTATION_NOTES "The examples build runs on
-    # GitHub-hosted runners").
+    # runner's single job slot.
     runs-on: ubuntu-latest
     # A hang fails as a named timeout long before the 360-minute job default,
     # and notify-failure below files it.

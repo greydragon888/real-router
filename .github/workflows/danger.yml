@@ -23,10 +23,10 @@ jobs:
     # codeql.yml: the author of a pull request picks its branch name, a fork's
     # author included.
     #
-    # Dependabot's PRs are skipped by author (IMPLEMENTATION_NOTES "Dependabot
-    # PRs skip every metric"). Every rule here is advisory, and the one about
-    # bumps, `checkLockfileSync`, has nothing to find there: Dependabot changes
-    # the lockfile with the manifests. A human's deps bump still runs it.
+    # Dependabot's PRs are skipped by author. Every rule here is advisory, and
+    # the one about bumps, `checkLockfileSync`, has nothing to find there:
+    # Dependabot changes the lockfile with the manifests. A human's deps bump
+    # still runs it.
     if: >-
       github.event.pull_request.draft == false &&
       github.event.pull_request.user.login != 'dependabot[bot]' &&

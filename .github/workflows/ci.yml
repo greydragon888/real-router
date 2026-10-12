@@ -67,10 +67,10 @@ jobs:
       # `--no-renames` lists a renamed file's old path as well, so code moved
       # into Markdown is still
       # code. A release PR is not skipped here, deliberately: its tree is the one
-      # that lands on master (IMPLEMENTATION_NOTES "Release PRs run the
-      # pipeline"); CodeQL and danger keep their own head-ref skips, and Repo
-      # Lints skips `lint:audit` on it (`release-pr`). `git diff` runs on its own
-      # line, so its failure fails the step, and with it `check` and the gate.
+      # that lands on master; CodeQL and danger keep their own head-ref skips,
+      # and Repo Lints skips `lint:audit` on it (`release-pr`). `git diff` runs
+      # on its own line, so its failure fails the step, and with it `check` and
+      # the gate.
       # diff-carries-no-code.test.mjs pins this step and runs it.
       - name: Check for code changes
         id: changes
@@ -208,8 +208,7 @@ jobs:
   # Its artifacts carry a `-leaf` suffix; the coverage merge and bundle-size
   # read them by name.
   # turbo run test triggers type-check as a dep; `lint` is a SIBLING task on the
-  # run line (it stopped being a `test` dependency — see IMPLEMENTATION_NOTES
-  # "lint left the test dependency chain").
+  # run line, not a `test` dependency.
   # turbo run bundle produces dist/ (cache-shared with build).
   # ============================================
 
@@ -224,7 +223,7 @@ jobs:
       # the `check` heuristic (should_run=true) yet affects ZERO packages, so
       # test/bundle run nothing and no dist/coverage artifacts exist. Downstream
       # artifact consumers gate on this to skip instead of failing on a missing
-      # download. See IMPLEMENTATION_NOTES "CI: artifact-gated downstream jobs".
+      # download.
       built: ${{ steps.artifacts.outputs.built }}
     steps:
       - name: Checkout
@@ -809,10 +808,9 @@ jobs:
       # override, and `contextsOf` in `scripts/verify.mjs` derives the contexts
       # from them; `verify` skips the checks whose `ciSkip` names one, and says
       # why. On a Dependabot PR for a package, and on the release PR, whose diff
-      # has the shape of a bump, only the checks that shape can fail run; the
-      # failure record behind the split is in IMPLEMENTATION_NOTES "Dependabot
-      # PRs skip every metric". A Dependabot PR for a GitHub Action changes the
-      # workflows the tests of scripts/ read, and takes no `dependabot-pr`.
+      # has the shape of a bump, only the checks that shape can fail run. A
+      # Dependabot PR for a GitHub Action changes the workflows the tests of
+      # scripts/ read, and takes no `dependabot-pr`.
       #
       # HAS_DEDUPE_FIXER asks the Dependabot secret store on a run Dependabot
       # started, the only store such a run can see. On every other run — the one
@@ -1110,9 +1108,8 @@ jobs:
     name: Coverage (Codecov)
     needs: [check, pipeline-leaf, base-bundle, base-test, base-coverage, pipeline-sharded]
     # Skipped on a Dependabot PR, which changes manifests and the lockfile but
-    # never a covered line (IMPLEMENTATION_NOTES "Dependabot PRs skip every
-    # metric"), and on any diff that holds no source — a release PR uploads the
-    # lcov the shards just produced from master's code. `ci` reads
+    # never a covered line, and on any diff that holds no source — a release PR
+    # uploads the lcov the shards just produced from master's code. `ci` reads
     # either skip through `ok`.
     if: >-
       always() &&
@@ -1225,10 +1222,10 @@ jobs:
     #
     # Skipped on a Dependabot PR: no published package has a third-party
     # runtime dependency, so only a bundler bump could move a size, and that
-    # case is accepted as rare (IMPLEMENTATION_NOTES "Dependabot PRs skip every
-    # metric"). Skipped on a diff that holds no source for a stronger reason
-    # than rarity: nothing inlines a version into a bundle, so on a release PR
-    # the bytes are master's bytes and the delta is zero by construction.
+    # case is accepted as rare. Skipped on a diff that holds no source for a
+    # stronger reason than rarity: nothing inlines a version into a bundle, so
+    # on a release PR the bytes are master's bytes and the delta is zero by
+    # construction.
     needs: [check, pipeline-leaf, base-bundle, pipeline-sharded]
     if: >-
       always() &&
@@ -1597,8 +1594,7 @@ jobs:
             exit 0
           }
 
-          # A bump changes manifests and the lockfile, never a line this reads
-          # (IMPLEMENTATION_NOTES "Dependabot PRs skip every metric").
+          # A bump changes manifests and the lockfile, never a line this reads.
           [[ "$AUTHOR" == "dependabot[bot]" ]] && verdict "Not analysed: dependabot"
 
           # ⚠ Every arm below reads an OUTPUT of `check`, and a job that did not
@@ -1790,7 +1786,7 @@ jobs:
           # that's the whole point: a workflow-only PR must not pass the gate
           # without workflow validation. DEPENDABOT_PR holds on a Dependabot PR
           # for a package, which changes no workflow; there, and nowhere else,
-          # the skip counts as a pass (IMPLEMENTATION_NOTES "actionlint runs on Dependabot's pull requests for GitHub Actions").
+          # the skip counts as a pass.
           ACTIONLINT="${{ needs.actionlint.result }}"
           if [[ "$ACTIONLINT" == "skipped" && "$DEPENDABOT_PR" == "true" ]]; then
             ACTIONLINT="success"

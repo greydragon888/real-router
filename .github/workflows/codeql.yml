@@ -24,8 +24,7 @@ jobs:
     name: Analyze
     runs-on: ubuntu-latest
     # Skip the release PR (no code to analyze) and Dependabot's npm PRs, which
-    # change manifests and the lockfile but no line CodeQL reads
-    # (IMPLEMENTATION_NOTES "Dependabot PRs skip every metric"). A Dependabot
+    # change manifests and the lockfile but no line CodeQL reads. A Dependabot
     # GitHub Actions PR still runs: when the bump is this action, this job is
     # the only run of the new version before it reaches master.
     # CodeQL stays advisory (not a required check), so a skip here can't block.

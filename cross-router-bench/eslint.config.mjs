@@ -1156,8 +1156,7 @@ const blocks = tsEslint.config(
   // Three recommended rules are OFF as structural false positives for a
   // client-side router library (kept narrow — the high-signal rules like
   // detect-unsafe-regex, detect-eval-with-expression, detect-child-process stay
-  // ON). Complements CodeQL (cloud, deep taint) + semgrep diff scan (pre-push) —
-  // see IMPLEMENTATION_NOTES "Local SAST".
+  // ON). Complements CodeQL (cloud, deep taint) + semgrep diff scan (pre-push).
   //
   //  - detect-object-injection: fires on EVERY `obj[variable]` (`map[name]`,
   //    `params[key]`) — ~100% false positives in a router.

@@ -34,8 +34,7 @@ export default mergeConfig(
         // statements and does not hold those lines, so it cannot show them
         // run — the aot tests assert what the paths produce. Compiling these
         // files with the Angular compiler in the jit project too only makes
-        // the jit copy as coarse (IMPLEMENTATION_NOTES, "Angular keeps its
-        // coverage floors"). The floors are measured and locked to catch
+        // the jit copy as coarse. The floors are measured and locked to catch
         // regressions.
         thresholds: {
           statements: 96,
@@ -72,10 +71,10 @@ export default mergeConfig(
               // plus the components/directives they exercise (whose
               // contentChildren()/input() initializer APIs only register under
               // a compiler transform). Everything else — dependency src
-              // (core/sources/…, which the plugin would export-mangle, see
-              // IMPLEMENTATION_NOTES §adapter-bench) AND this package's plain
-              // TS (providers, functions, dom-utils) — keeps the default
-              // esbuild pipeline. Plain TS matters for coverage, not just
+              // (core/sources/…, which the plugin would export-mangle) AND this
+              // package's plain TS (providers, functions, dom-utils) — keeps
+              // the default esbuild pipeline. Plain TS matters for coverage,
+              // not just
               // safety: the Angular emit maps function positions differently
               // than esbuild, so every file it compiles DOUBLES its function
               // entries in the merged jit+aot coverage report (measured
