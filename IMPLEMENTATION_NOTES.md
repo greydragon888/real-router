@@ -14392,6 +14392,8 @@ Three rounds of review of the fix found the same order of the text in two more p
 
 **Problem.** The step that runs `node:skip-facts` closed its own keys — an `if:`, a `continue-on-error:`, an `env:` — but inherited what the steps before it write to `$GITHUB_ENV`, and nothing read those steps. One added line, a step above or a `printf` in the setup action's stamp writing `NODE_OPTIONS=--test-skip-pattern=.`, passed actionlint, zizmor and every test of `scripts/tests`, and in CI the step would have run its 61 tests as 3 file entries and exited 0. So would every `node --test` of both groups, the guards' 486 tests as 28 entries, on every pull request after the merge. The stamp also wrote the matrix suffix as it came, so a line break in a `TURBO_*` value of a job's or the workflow's `env:` could start a variable of its own there.
 
+> **Refuted in part (2026-10-12).** The runner refuses `NODE_OPTIONS` from `$GITHUB_ENV`: `SetEnvFileCommand` in `actions/runner` keeps the name on a block list (v2.338.0), drops the line and reports "Can't store NODE_OPTIONS output parameter using '$GITHUB_ENV' command.", and `core.exportVariable` writes the same file. So the line above would not have reached the step. A `NODE_TEST_CONTEXT` would — under it a failing `node --test` exits 0, measured on node 24.18.1 — and so would a `BASH_ENV`; `CLEAN_ENV` and `sh` close both, and the guard's cells name them now.
+
 **Solution.**
 
 - The step runs its command under `sh`, which reads no `BASH_ENV`, behind `CLEAN_ENV` — `/usr/bin/env -i PATH="$PATH" HOME="$HOME"` — so node starts with nothing an earlier step exported. `scripts/check-id.mjs` owns the prefix; the registry's census reads a line behind it as the command after it, and no other form of `env`.
@@ -14576,6 +14578,6 @@ Three rounds of review of the fix found the same order of the text in two more p
 
 - `git grep -n "printf 'TURBO_EXPERIMENTAL_OTEL_RESOURCE=" -- .github` gave two lines before the step and gives one after it, in the file.
 - The code moved byte for byte: the file's body after `set -eo pipefail` and the blank line below it equals the setup step's `run:` before the step.
-- Mutants, each in a worktree: `NODE_OPTIONS` printed into `$GITHUB_ENV` from the file turns the held shape red and the stamp writes two variables; an export appended to the call fails the test file; `set -e` in place of `set -eo pipefail` turns the pipefail cell red. Restored, 55 of 55 pass.
+- Mutants, each in a worktree: a variable printed into `$GITHUB_ENV` from the file turns the held shape red and the stamp writes two variables; an export appended to the call fails the test file; `set -e` in place of `set -eo pipefail` turns the pipefail cell red. Restored, 55 of 55 pass.
 
 ⚠ **The runs on the push check what this commit cannot.** `post-merge.yml`, which runs the file, and the `changesets.yml` it starts must end `success` — after a failed post-merge the release run is `skipped`. In `coverage-master.yml`, and in `codspeed.yml` when it runs, the Setup step, which runs the file inside the action, must be green: the jobs API shows a composite action as one step. The telemetry labels of job `build` must stay the same, with `ci.cpu` the CPU model rather than `unknown`.

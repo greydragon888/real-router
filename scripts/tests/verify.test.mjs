@@ -650,10 +650,11 @@ test("Repo Lints runs node:skip-facts in a step of its own before verify, and no
   );
 });
 
-test("the step's command keeps a failing suite failing under an injected NODE_OPTIONS or BASH_ENV, where a bare node --test and bash would not", () => {
+test("the step's command keeps a failing suite failing under an injected NODE_TEST_CONTEXT or BASH_ENV, where a bare node --test and bash would not", () => {
   // What a step above, or the setup action, could write to $GITHUB_ENV: a
-  // NODE_OPTIONS that filters every test out, or a BASH_ENV that exits at
-  // once. A failing suite stands in for the step's own.
+  // NODE_TEST_CONTEXT under which a failing suite exits 0, or a BASH_ENV that
+  // exits at once. The runner refuses a NODE_OPTIONS there. A failing suite
+  // stands in for the step's own.
   const dir = fresh("hold");
   const suite = join(dir, "fails.test.mjs");
   const payload = join(dir, "exit.sh");
@@ -680,7 +681,7 @@ test("the step's command keeps a failing suite failing under an injected NODE_OP
       env: {
         PATH: process.env.PATH,
         HOME: process.env.HOME,
-        NODE_OPTIONS: "--test-skip-pattern=.",
+        NODE_TEST_CONTEXT: "child-v8",
         BASH_ENV: payload,
       },
       stdio: "ignore",
@@ -692,7 +693,7 @@ test("the step's command keeps a failing suite failing under an injected NODE_OP
   assert.equal(
     status("sh", `node --test ${suite}`),
     0,
-    "control: a bare node --test, which NODE_OPTIONS filters",
+    "control: a bare node --test, which NODE_TEST_CONTEXT lets exit 0",
   );
   assert.equal(
     status("bash", command),
@@ -818,11 +819,11 @@ const once = (text, anchor, replacement) => {
   assert.equal(text.split(anchor).length, 2, `anchor: ${anchor}`);
   return text.replace(anchor, () => replacement);
 };
-const EXPORT = 'echo "NODE_OPTIONS=--test-skip-pattern=." >> "$GITHUB_ENV"';
+const EXPORT = 'echo "NODE_TEST_CONTEXT=child-v8" >> "$GITHUB_ENV"';
 
 for (const [name, ci, setup, stamp = STAMP] of [
   [
-    "a step above writing NODE_OPTIONS to $GITHUB_ENV",
+    "a step above writing NODE_TEST_CONTEXT to $GITHUB_ENV",
     once(
       CI,
       HOLD_LINE,
@@ -835,7 +836,7 @@ for (const [name, ci, setup, stamp = STAMP] of [
     once(
       CI,
       HOLD_LINE,
-      `      - name: Tune node\n        uses: actions/github-script@v7\n        with:\n          script: core.exportVariable('NODE_OPTIONS', '--test-skip-pattern=.')\n\n${HOLD_LINE}`,
+      `      - name: Tune node\n        uses: actions/github-script@v7\n        with:\n          script: core.exportVariable('NODE_TEST_CONTEXT', 'child-v8')\n\n${HOLD_LINE}`,
     ),
     SETUP,
   ],
@@ -855,7 +856,7 @@ for (const [name, ci, setup, stamp = STAMP] of [
     once(
       STAMP,
       STAMP_END,
-      `  printf 'NODE_OPTIONS=--test-skip-pattern=.\\n'\n${STAMP_END}`,
+      `  printf 'NODE_TEST_CONTEXT=child-v8\\n'\n${STAMP_END}`,
     ),
   ],
   [
@@ -908,7 +909,7 @@ function stamped(text, cpuinfo) {
       GITHUB_EVENT_NAME: "pull_request",
       GITHUB_ACTOR: "someone",
       RUNNER_ENVIRONMENT: "github-hosted",
-      TURBO_TELEMETRY_JOB_SUFFIX: "x\nNODE_OPTIONS=--test-skip-pattern=.\nZ=",
+      TURBO_TELEMETRY_JOB_SUFFIX: "x\nNODE_TEST_CONTEXT=child-v8\nZ=",
     },
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
@@ -932,7 +933,7 @@ function cpuinfo() {
 
 test("the setup action's stamp writes one variable to $GITHUB_ENV, whatever its matrix suffix holds", () => {
   // The suffix comes from a job's env, a workflow's `TURBO_*` too: a line
-  // break in it would start a variable of its own, NODE_OPTIONS say.
+  // break in it would start a variable of its own, NODE_TEST_CONTEXT say.
   const { status, stderr, lines } = stamped(STAMP, cpuinfo());
 
   assert.equal(status, 0, stderr);

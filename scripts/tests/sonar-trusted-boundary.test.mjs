@@ -810,8 +810,7 @@ const AROUND_NODE = {
     ],
   ],
   "a step that writes $GITHUB_ENV": [
-    () =>
-      fixture({ ...SOUND, extra: ['echo "NODE_OPTIONS=x" >> "$GITHUB_ENV"'] }),
+    () => fixture({ ...SOUND, extra: ['echo "BASH_ENV=x" >> "$GITHUB_ENV"'] }),
     ["a run: line names $GITHUB_ENV or $GITHUB_PATH: Extra"],
   ],
   "a step that writes $GITHUB_PATH": [
