@@ -141,7 +141,6 @@ export default {
       // every peer floor as DiffersToPin.
       dependencyTypes: ["prod", "dev"],
       pinVersion: "workspace:^",
-      policy: "pinned",
     },
     {
       label: "Ensure consistent versions across packages",
