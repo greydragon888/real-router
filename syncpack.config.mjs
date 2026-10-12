@@ -31,19 +31,6 @@ export default {
       isIgnored: true,
     },
     {
-      label: "Workspace packages use workspace:^",
-      packages: ["**"],
-      dependencies: [
-        "@real-router/*",
-      ],
-      // No "peer": `workspace:^` is not a semver range, so syncpack applies none
-      // from this group, and a peer listed here would skip the ">= ranges" group
-      // below — a `^0.x` peer would pass, while on 0.x `^0.x.y` is patch-only: a
-      // core minor leaves the range and every consumer hits a peer conflict.
-      dependencyTypes: ["prod", "dev"],
-      range: "workspace:^",
-    },
-    {
       label: "Peer dependencies use >= ranges",
       packages: ["**"],
       dependencyTypes: ["peer"],
