@@ -10,10 +10,11 @@
 //
 // This file holds that the entry is there; syncpack holds the form of a string
 // entry. `syncpack.config.mjs` pins `@real-router/*` to `workspace:^` in
-// `dependencies` and `devDependencies` and bans it from `optionalDependencies`,
-// and the cells below run syncpack with that config on fixtures. A value that
-// is not a string syncpack passes in silence, and turbo refuses the manifest.
-// The check reads no form of the entry.
+// `dependencies` and `devDependencies`, bans it from `optionalDependencies`,
+// and bans `@real-router/core` from the `dependencies` of a `@real-router/*`
+// package; the cells below run syncpack with that config on fixtures. A value
+// that is not a string syncpack passes in silence, and turbo refuses the
+// manifest. The check reads no form of the entry.
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -332,9 +333,56 @@ for (const form of [
 
 test("syncpack holds dependencies to workspace:^ against a version", () => {
   const { lint, a } = syncpackSays(
-    shapeWith({ dependencies: { "@real-router/core": "0.1.0" } }),
+    shapeWith({ dependencies: { "@real-router/sources": "0.1.0" } }),
   );
 
-  assert.equal(a.get("@real-router/core prod"), "DiffersToPin");
+  assert.equal(a.get("@real-router/sources prod"), "DiffersToPin");
   assert.equal(lint, 1);
+});
+
+test("syncpack bans core from the dependencies of a @real-router/* package beside its peer", () => {
+  const { lint, a } = syncpackSays(
+    shapeWith({ dependencies: { "@real-router/core": "workspace:^" } }),
+  );
+
+  assert.equal(a.get("@real-router/core prod"), "IsBanned");
+  assert.equal(lint, 1);
+});
+
+test("syncpack bans core from the dependencies of a @real-router/* package without a peer", () => {
+  const { lint, a } = syncpackSays({
+    ...SHAPE,
+    "packages/a/package.json": {
+      name: "@real-router/a",
+      version: "0.1.0",
+      dependencies: { "@real-router/core": "workspace:^" },
+    },
+  });
+
+  assert.equal(a.get("@real-router/core prod"), "IsBanned");
+  assert.equal(lint, 1);
+});
+
+test("syncpack lets a package outside @real-router/* keep core in dependencies", () => {
+  const { lint, a } = syncpackSays({
+    ...SHAPE,
+    "packages/a/package.json": {
+      name: "fixture-harness",
+      version: "0.1.0",
+      private: true,
+      dependencies: { "@real-router/core": "workspace:^" },
+    },
+  });
+
+  assert.equal(a.get("@real-router/core prod"), "IsIdenticalToPin");
+  assert.equal(lint, 0);
+});
+
+test("syncpack lets a @real-router/* package keep another @real-router/* package in dependencies", () => {
+  const { lint, a } = syncpackSays(
+    shapeWith({ dependencies: { "@real-router/sources": "workspace:^" } }),
+  );
+
+  assert.equal(a.get("@real-router/sources prod"), "IsIdenticalToPin");
+  assert.equal(lint, 0);
 });

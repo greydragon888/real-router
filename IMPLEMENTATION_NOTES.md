@@ -3920,7 +3920,7 @@ Uses syncpack v14 (Rust rewrite). `syncpack.config.mjs` enforces:
 - All other dependencies are pinned (exact versions)
 - Consistent versions across all packages (`policy: "sameRange"`)
 
-> **Updated (2026-10-12).** The version in use is the `syncpack` pin in the root `package.json`, and `syncpack.config.mjs` is what it enforces; this list does not follow the file. The file also declares `optionalDependencies` as the type `optional`, which syncpack reads only through such a type, and bans `@real-router/*` there — see "A `@real-router/*` peer has an entry turbo reads, and a test holds it".
+> **Updated (2026-10-12).** The version in use is the `syncpack` pin in the root `package.json`, and `syncpack.config.mjs` is what it enforces; this list does not follow the file. The file also declares `optionalDependencies` as the type `optional`, which syncpack reads only through such a type, and bans `@real-router/*` there — see "A `@real-router/*` peer has an entry turbo reads, and a test holds it". It bans `@real-router/core` from the `dependencies` of a `@real-router/*` package as well — see "A published package keeps `@real-router/core` out of `dependencies`, and syncpack bans it".
 
 **v13 → v14 migration notes:**
 
@@ -11452,6 +11452,8 @@ core still in `dependencies` the installer places a nested copy anyway. A live
 instance of the very class this issue is about, in the package whose job is
 validation.
 
+> **Updated (2026-10-12).** Under npm. Measured on the published validation-plugin 0.18.4 with core a minor ahead in the consumer: npm 11.16 installs the nested copy, while pnpm 12.4.1 keeps the peer alone and installs one copy — see "A published package keeps `@real-router/core` out of `dependencies`, and syncpack bans it".
+
 The eighteen now match the established form exactly — `dependencies` entry
 removed, `peerDependencies: workspace:>=0.134.0` (core is `0.134.0`, so the floor
 is the current release), `devDependencies: workspace:^`. The dev entry is not
@@ -14600,6 +14602,8 @@ A cell of `scripts/tests/checks-registry.test.mjs` holds what a file can: every 
 
 ## A `@real-router/*` peer has an entry turbo reads, and a test holds it (2026-10-12)
 
+> **Updated (2026-10-12).** `@real-router/core` may not stand in the `dependencies` of a `@real-router/*` package at all, so its entry is the `devDependencies` one — see "A published package keeps `@real-router/core` out of `dependencies`, and syncpack bans it".
+
 **Problem.** turbo builds its task graph from `dependencies`, `devDependencies` and `optionalDependencies`, not from `peerDependencies` ("`peerDependencies` are invisible to turbo — four packages cached against a stale core"), so every package with a `@real-router/*` peer lists it in `devDependencies` as `workspace:^` too (#2294, #2426). Nothing held that. `CLAUDE.md` stated the rule; syncpack held only the form of an entry that was there, and read no `optionalDependencies` at all, so an entry there kept any form.
 
 **Solution.**
@@ -14613,3 +14617,25 @@ A cell of `scripts/tests/checks-registry.test.mjs` holds what a file can: every 
 **A form syncpack passes and turbo refuses.** syncpack 15.3.3 reports "No issues found" on a value that is not a string or a field that is not an object — `null` or a number under a name, `peerDependencies` as a list, `devDependencies` as a string — and `pnpm install` 12.4.1 exits 0 and leaves the entry out of the lockfile. turbo 2.11.7 refuses a workspace that holds such a manifest, whatever the filter (`package_json_parse_error`, code 1), and turbo runs in pre-commit and in the CI pipeline. The test refuses a field that is not an object for its own reading.
 
 ⚠ **On a pull request of manifests alone, CI does not run the test.** Both groups of `scripts/tests` carry `ciSkip: ["dependabot-pr", "no-source"]`, and a diff of nothing but manifests is `no-source`, so pre-push is the only run there; `lint:deps` carries no `ciSkip`, so the ban holds on every pull request. Accepted: the authors of such pull requests that run no pre-push, Dependabot and the release pull request, have never changed a `@real-router/*` entry in a package's `dependencies` or `devDependencies` — measured over the history on 2026-10-12, no Dependabot commit changes a `@real-router/*` line in `packages/*/package.json`, and every such line a release commit changes is a peer floor, `workspace:>=…`. An edit made in the GitHub editor or pushed with `--no-verify` turns red on the next pull request with code.
+
+## A published package keeps `@real-router/core` out of `dependencies`, and syncpack bans it (2026-10-12)
+
+**Problem.** Core identifies a router by identity in a module-level `WeakMap` ("One refusal, three causes — core says which"), so with a second copy of core in an install, a plugin that reaches core's internals refuses the router the application built. A published package with core in `dependencies` installs that second copy for a consumer whose core is a minor ahead, and core moves a minor with every breaking change — 16 minors between 2026-09-13 and 2026-10-12 — which `^0.x.y` does not admit. Measured on the published packages, with core 0.135.0 in a fresh consumer:
+
+- `@real-router/validation-plugin` 0.18.4, core in `dependencies` (`^0.134.0`) and in `peerDependencies`: npm 11.16 installs a nested core 0.134.1 and `usePlugin` throws "Invalid router instance"; pnpm 12.4.1 keeps the peer alone and installs one copy;
+- `@real-router/lifecycle-plugin` 0.7.58, core in `dependencies` only: two copies and the same throw under both;
+- their next releases, 0.19.0 and 0.8.0, with core a peer only: one copy, and `usePlugin` passes;
+- with core 0.134.1, every form gives one copy.
+
+Nothing in the repository caught either form. Under the configuration before this change both passed `lint:deps`; `scripts/tests/peer-edges.test.mjs` accepts an entry in `dependencies`; `published-dependency-authority.test.ts` judges only external names there; publint 0.3.24 has no rule on `peerDependencies`; the smoke test installs the packages of one tree together, so one copy. Of the 24 manifests under `packages/` that held core when they were created, 20 held it in `dependencies` (one of them the benchmark harness, where it belongs), one in both sections — validation-plugin, from 2026-03-26 to #2294 on 2026-09-13 — and three as a peer only; `pnpm add` without a flag writes `dependencies`. The angular build has a guard of its own, and it was off: ng-packagr refuses every `dependencies` entry outside `allowedNonPeerDependencies`, and that list named core.
+
+**Solution.**
+
+- `syncpack.config.mjs` bans `@real-router/core` from the `dependencies` of every `@real-router/*` package it reads (`packages: ["@real-router/*"]`, `dependencyTypes: ["prod"]`, `isBanned`), after the ban on `optionalDependencies` and before the pin, which would judge such an entry first. `router-benchmarks`, which is not published, keeps core in `dependencies`: the filter is the package name.
+- `scripts/tests/peer-edges.test.mjs` runs syncpack with the file on fixtures: core in `dependencies` beside a peer and without one is `IsBanned`, and `syncpack lint` exits 1; core in a package outside `@real-router/*`, and `@real-router/sources` in the `dependencies` of a `@real-router/*` package, pass. The cell of a version in `dependencies` names `@real-router/sources` now: core there is banned before the pin reads it.
+- `packages/angular/ng-package.json` drops core from `allowedNonPeerDependencies`. Measured on a copy of the tree with core added to angular's `dependencies`: with the old list ng-packagr builds; without core in it the build stops — "Dependency @real-router/core must be explicitly allowed using the "allowedNonPeerDependencies" option" — and the package as it is builds.
+- `CLAUDE.md` and `/new-package` name the rule.
+
+**Why syncpack, and why core alone.** `lint:deps` has no `ciSkip`: it runs in pre-commit, in pre-push and on every pull request, a diff of manifests alone included, where neither group of `scripts/tests` runs. The ban names core: it is the one `@real-router/*` peer today, and the one whose second copy is measured to break a plugin. `route-utils`, `sources` and `ssr-utils` stay `dependencies` entries. Two copies of `ssr-utils` split its hydration scratchpad — the same class, one package over — and it stays a `dependencies` entry by the owner's decision of 2026-09-17, to revisit before 1.0 ("Hydration scratchpad moves to `ssr-utils`, and the loader plugins take it as a dependency").
+
+⚠ **A value that is not a string passes syncpack in silence**, as with the ban on `optionalDependencies`; turbo refuses such a manifest ("A `@real-router/*` peer has an entry turbo reads, and a test holds it").

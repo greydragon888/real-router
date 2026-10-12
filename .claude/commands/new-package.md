@@ -12,6 +12,7 @@ $ARGUMENTS
 ### Scaffold
 
 - `package.json` — version **`0.0.1`** (changesets will bump to `0.1.0` on first release), `"type": "commonjs"`, dual ESM/CJS exports (`@real-router/internal-source` → `types` → `import` → `require`), `"bundle"` script (not `"build"` — turbo `build` task is an orchestrator with no own command)
+- `@real-router/core` goes into `peerDependencies` as `workspace:>=<current core version>`, never into `dependencies`: with it there, a consumer whose core is a minor ahead installs a second copy of core — under npm even beside the peer entry (syncpack bans it)
 - Each `@real-router/*` in `peerDependencies` goes into `devDependencies` too, as `workspace:^` — turbo builds its graph from that entry, not from the peer (`scripts/tests/peer-edges.test.mjs` fails a peer with no entry of the same name in `dependencies` or `devDependencies`; syncpack bans `@real-router/*` from `optionalDependencies`)
 - `tsconfig.json` — extends `../../tsconfig.json`, include `src` and `tests`
 - `tsconfig.node.json` — extends `../../tsconfig.node.json`, include `*.mts` and root configs

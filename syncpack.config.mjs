@@ -100,6 +100,20 @@ export default {
       dependencyTypes: ["optional"],
       isBanned: true,
     },
+    {
+      // A published package with core in `dependencies` installs a second copy
+      // of core for a consumer whose core is a minor ahead, with npm even
+      // beside a peer entry. Core identifies a router by identity, so a plugin
+      // of that package that reaches core's internals refuses the consumer's
+      // router. Core is a peer, with its `workspace:^` entry in
+      // `devDependencies`. The filter is the package name: `router-benchmarks`
+      // is not published and keeps core here.
+      label: "No @real-router/core in the dependencies of a published package",
+      packages: ["@real-router/*"],
+      dependencies: ["@real-router/core"],
+      dependencyTypes: ["prod"],
+      isBanned: true,
+    },
     // Required: syncpack reads the `overrides` of pnpm-workspace.yaml as the type
     // `pnpmOverrides` (not those of package.json#pnpm), and without this group
     // `@types/node: $@types/node` there trips SameRangeMismatch against the

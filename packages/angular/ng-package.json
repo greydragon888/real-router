@@ -5,7 +5,6 @@
   },
   "dest": "dist",
   "allowedNonPeerDependencies": [
-    "@real-router/core",
     "@real-router/sources",
     "@real-router/route-utils",
     "@real-router/ssr-utils"
