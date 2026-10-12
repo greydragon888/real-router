@@ -15,7 +15,7 @@
  * syscalls that CodSpeed's Simulation (callgrind) instrument cannot measure
  * consistently (the "N system calls, totalling …" warning) AND they measure
  * dev overhead instead of the shipped hot path. Statically substituting
- * `"production"` lets rollup constant-fold + tree-shake the dev branches out
+ * `"production"` lets vite's bundler constant-fold + tree-shake the dev branches out
  * entirely, so the benches measure the real production adapter/router work.
  *
  * `internalSource: false` (angular): the analog plugin runs the Angular
@@ -72,7 +72,7 @@ export function adapterBuild(
       outDir: `adapter-bench/dist/${fw}`,
       emptyOutDir: true,
       // Names stay readable for the CodSpeed flamegraph — dev-code elimination
-      // comes from the `define` constant-fold + rollup tree-shake, not minify.
+      // comes from the `define` constant-fold + the bundler's tree-shake, not minify.
       minify: false,
       target: "node20",
       lib: {

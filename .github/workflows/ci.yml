@@ -8,8 +8,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Least-privilege default. Jobs that need write (duplication→security-events,
-# coverage/bundle-size→pull-requests/checks) declare their own job-level
+# Least-privilege default. A job that needs more declares its own job-level
 # `permissions:`, which fully overrides this. No-op today (repo
 # default_workflow_permissions is already `read`) — this is insurance against a
 # future flip of that global setting silently over-permissioning every job.
@@ -206,8 +205,8 @@ jobs:
 
   # ============================================
   # PIPELINE-LEAF: monolithic path for small, non-core PRs (mode=leaf).
-  # Byte-identical to the historical single `pipeline` job; only the two
-  # uploaded artifact names carry a `-leaf` suffix (coverage merge).
+  # Its artifacts carry a `-leaf` suffix; the coverage merge and bundle-size
+  # read them by name.
   # turbo run test triggers type-check as a dep; `lint` is a SIBLING task on the
   # run line (it stopped being a `test` dependency — see IMPLEMENTATION_NOTES
   # "lint left the test dependency chain").
@@ -258,8 +257,8 @@ jobs:
           TURBO_BASE: ${{ needs.check.outputs.turbo_base || 'origin/master' }}
         run: echo "LEAF_FILTER=${LEAF_FILTER:-"--filter=...[$TURBO_BASE]"}" >> "$GITHUB_ENV"
 
-      # Full validation: type-check → lint → test → test:properties.
-      # ^bundle for upstream packages runs bundle (tsdown) as a dependency.
+      # Full validation: test, test:properties and lint; the type-checks they
+      # need come from their `dependsOn` in turbo.json.
       #
       # `test:stress` intentionally NOT included on PR CI — its leak/race-condition
       # signal is low-frequency and the iterations are CPU-expensive (saves
@@ -294,9 +293,9 @@ jobs:
           --filter='!./benchmarks'
           --summarize
 
-      # Bundle affected packages (tsdown/rollup/svelte-package).
-      # bundle:upstream → cache hit from test step (^bundle already executed).
-      # bundle:affected-leaf → tsdown runs fresh.
+      # Bundle the affected packages, each with its own bundler. `bundle`
+      # depends on `^bundle`, so upstream packages bundle too; any of them
+      # replays from the Remote Cache when an earlier run built the same inputs.
       - name: Bundle
         run: >-
           pnpm turbo run bundle
@@ -389,13 +388,12 @@ jobs:
   # BASE — since turbo `test` dropped its `^bundle` dependency, TESTS need no
   # dists at all, so base-bundle gates NOTHING via `needs` anymore: base-test
   # and the shards start straight after `check`, and base-bundle runs in
-  # PARALLEL with them. base-bundle still exists for four jobs:
-  #   1. dist-base artifact (consumed by bundle-size / smoke),
+  # PARALLEL with them. base-bundle exists for:
+  #   1. the dist-base artifact, which bundle-size downloads,
   #   2. core's publication lints (publint/attw),
   #   3. Remote-Cache warm of core#bundle — the shards' SECOND turbo invocation
   #      (`turbo run bundle`, after their tests) hits it instead of each shard
-  #      rebuilding core (a lost race is a benign duplicate build, not a failure),
-  #   4. the angular dom-utils sync check, run once.
+  #      rebuilding core (a lost race is a benign duplicate build, not a failure).
   # Repo-global lints live in the separate parallel repo-lints job.
   # ============================================
 
@@ -441,12 +439,12 @@ jobs:
           retention-days: 1
 
   # ============================================
-  # BASE-TEST: core-layer test + test:properties, PARALLEL to the shards AND to
+  # BASE-TEST: core-layer test, PARALLEL to the shards AND to
   # base-bundle. It starts straight after `check`: turbo `test` no longer
   # depends on `^bundle`, so the former `needs: base-bundle` edge ("purely for
   # the upstream ^bundle Remote-Cache HIT") lost its premise and was removed —
   # it was delaying the heaviest test job by base-bundle's full duration for
-  # nothing. Emits coverage-reports-base for the coverage / sonar merge.
+  # nothing. Its coverage blobs go to base-coverage, which merges them.
   # ============================================
   base-test:
     name: Base test (core layer, shard ${{ matrix.shard }}/4)
@@ -507,10 +505,8 @@ jobs:
         run: |
           FILTERS=$(node -e 'import("./scripts/build-matrix.mjs").then((m) => process.stdout.write([...m.CORE_LAYER].map((p) => "--filter=" + p).join(" ")))')
           echo "Core-layer filters: $FILTERS"
-          # shared/{browser-env,dom-utils} coverage is now owned by the
-          # consumer packages (browser-plugin ← browser-env, react ← dom-utils) and
-          # rides along in their shard jobs; there is no separate shared test node to
-          # run here anymore.
+          # A shared/<dir> is measured by the package that owns it (check 2b of
+          # `pnpm lint:coverage-scope`), in that package's job, not here.
           # shellcheck disable=SC2086
           # `lint` is NOT here: it is `base-lint`'s job. It never gated the
           # tests — the two ran concurrently on one 4-vCPU runner, at 197 s and
@@ -667,7 +663,7 @@ jobs:
           FILTERS=$(node -e 'import("./scripts/build-matrix.mjs").then((m) => process.stdout.write([...m.CORE_LAYER].map((p) => "--filter=" + p).join(" ")))')
           echo "Core-layer filters: $FILTERS"
           # ESLint's worker threads, and ONLY here. This job lints one
-          # package alone on its own runner; `turbo run lint` across the 25
+          # package alone on its own runner; `turbo run lint` across the
           # packages already saturates the machine, and adding workers inside
           # each of them is over-subscription — measured, 74.7 s -> 83.0 s of
           # wall for 1.73x the CPU. So the flag is a passthrough here rather
@@ -853,8 +849,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [check]
     # ⚠ An empty plan must be refused HERE. A matrix with no entries does not
-    # skip the job: GitHub fails it without creating it, and `ci`, `smoke` and
-    # `coverage` all read `skipped` as the empty-plan result. The planner emits
+    # skip the job: GitHub fails it without creating it, and every job that
+    # needs this one reads `skipped` as the empty-plan result. The planner emits
     # an empty `include` for a core-layer-only change, which base-* cover.
     if: >-
       needs.check.outputs.mode == 'sharded' &&
@@ -955,7 +951,7 @@ jobs:
   # examples the diff edits, so a PR that adds an API together with its example
   # is checked as one. `scripts/examples-plan.mjs` picks the set: an example
   # whose directory the diff touches, or every example when a file of the
-  # workspace itself changes (its lockfile, settings, pnpmfile, lint configs).
+  # workspace itself changes (any file directly under `examples/`).
   # Dependents are not followed — measured: a core-only diff put
   # 156 tasks and 5m23s on the gate's critical path — so a library change that
   # breaks an example stays the weekly examples.yml's job. No lint here: the
@@ -997,7 +993,8 @@ jobs:
   # config: one such change merged green on a base whose lint was red.
   # `scripts/benchmarks-lint-filter.mjs` takes the set from turbo's own attribution.
   #
-  # ⚠ This is the only arm that runs BEFORE a merge, and it has no Dependabot
+  # ⚠ This is the only CI arm that runs BEFORE a merge — on a Dependabot PR,
+  # which no local hook sees, the only arm at all — and it has no Dependabot
   # skip on purpose: the incident is an ESLint bump going green here and then
   # failing every branch's pre-push, which lints the benchmarks too.
   # ============================================
@@ -1099,7 +1096,7 @@ jobs:
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
 
-      # bundle (not build) — only tsdown, no test/lint/type-check.
+      # bundle (not build) — the packages' bundlers only, no test/lint/type-check.
       # Affected + upstream → remote cache from pipeline.
       # Non-affected → remote cache from previous CI runs.
       - name: Bundle all packages
@@ -1193,7 +1190,7 @@ jobs:
 
       # The TRANSPORT to Codecov is an external dependency — the action downloads
       # its uploader binary and verifies a GPG signature against a keyserver — and
-      # this job is a HARD requirement of the single required gate (`ok "$COVERAGE"`
+      # this job is a HARD requirement of the `CI Result` gate (`ok "$COVERAGE"`
       # in the `ci` job). So a keyserver outage turned a green codebase red:
       # one run died with `gpg: no valid OpenPGP data found` →
       # `Coverage (Codecov)` failed → `CI Result` failed, while all ten shards,
@@ -1203,8 +1200,9 @@ jobs:
       # softening what actually protects coverage: `fail_ci_if_error` stays on, so a
       # failed upload is still reported (visible as a tolerated failure, not a silent
       # pass); the integrity guard above ("Verify all coverage shards uploaded")
-      # stays HARD, so a silently-lost shard still reds the gate; and the 100 %
-      # thresholds are enforced by vitest inside each test job, not by this upload.
+      # stays HARD, so a silently-lost shard still reds the gate; and the coverage
+      # thresholds are enforced by vitest — core's in base-coverage, every other
+      # package's in its own test job — not by this upload.
       # What is lost is dashboard freshness on a Codecov outage — not a gate.
       - name: Upload coverage to Codecov
         continue-on-error: true
@@ -1221,8 +1219,8 @@ jobs:
     # cache-fill bundle — base-test produces NO dist (coverage only), so it does
     # not belong on this job's path. Same class as smoke; the win here is
     # an earlier PR size comment, not gate wall-clock (bundle-size is not in the
-    # `ci` gate). coverage DOES keep base-test — it consumes its
-    # coverage-reports-base artifact.
+    # `ci` gate). coverage keeps base-test and base-coverage in its `needs`:
+    # it reads base-coverage's coverage-reports-base artifact.
     #
     # Skipped on a Dependabot PR: no published package has a third-party
     # runtime dependency, so only a bundler bump could move a size, and that
@@ -1455,7 +1453,7 @@ jobs:
   # SHELLCHECK_OPTS=--severity=warning drops the benign SC2086/SC2001 info/style
   # noise on `>> $GITHUB_OUTPUT`-style writes while keeping warnings, errors, and
   # actionlint's own expression/script-injection checks gating. Result is folded
-  # into "CI Result" below so the single required check covers it.
+  # into "CI Result" below, which the ruleset requires.
   # ============================================
   actionlint:
     name: Lint Workflows (actionlint)
@@ -1511,7 +1509,7 @@ jobs:
 
       # The version and its checksum live in vale-styles/VERSION: a range that
       # edits them lints the whole corpus, and check-prose.sh holds a local Vale
-      # to the same version.
+      # to that version or newer.
       - name: Install Vale
         run: |
           VALE_VERSION="$(sed -n 's/^VALE_VERSION=//p' vale-styles/VERSION)"
@@ -1623,7 +1621,7 @@ jobs:
             fi
           done
 
-          # The same predicate `coverage` and `duplication` consult.
+          # `check`'s `no_source`: the jobs that skip on it name it in their `if:`.
           [[ "$NO_SOURCE" == "true" ]] && verdict "Not analysed: no source changed"
 
           [[ "$SHOULD_RUN" != "true" ]] && verdict "Not analysed: docs or CI only"
@@ -1742,8 +1740,7 @@ jobs:
             -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
   # ============================================
-  # GATE: Single required status check
-  # Configure "CI Result" in branch protection
+  # GATE: "CI Result", a status context the `protect-master` ruleset requires
   # ============================================
 
   ci:
@@ -1752,10 +1749,10 @@ jobs:
     # ⚠ Sonar is not on this gate's path. The `sonar` job above (a pull
     # request from this repository) or `sonar-trusted.yml` (a fork's, once
     # this workflow completes) posts the verdict to the head SHA, where it
-    # gates on its own: the `protect-master` ruleset lists "SonarCloud" as a
-    # required status check beside "CI Result" / "Require Changeset" /
-    # "Validate Changesets" / "Dependency Review". So a red quality gate blocks
-    # the merge without its ~90s scan sitting on this job's critical path.
+    # gates on its own: the `protect-master` ruleset requires "SonarCloud" beside
+    # "CI Result" (`gh api repos/greydragon888/real-router/rules/branches/master`
+    # lists every required context). So a red quality gate blocks the merge
+    # without its ~90s scan sitting on this job's critical path.
     needs: [check, pipeline-leaf, base-bundle, base-test, base-lint, base-coverage, base-properties, pipeline-sharded, repo-lints, smoke, coverage, actionlint, prose-lint, examples-build, benchmarks-lint, cross-router-lint]
     if: always()
     steps:

@@ -4,14 +4,15 @@
 //
 // The base is the commit the PR's sizes were built on: the first parent of the
 // merge commit `actions/checkout` puts at HEAD. Its sizes come from the
-// `master-bundle-sizes` artifact post-merge.yml publishes for each push.
+// `master-bundle-sizes` artifact post-merge.yml publishes for each push it builds.
 //
 // ⚠ A run is chosen by its commit, never by where it sits in the API's answer:
 // taking the first row once diffed #2395 against a post-merge run six weeks old.
 //
 // In order: the successful run for the base commit itself; else the closest
-// ancestor within MAX_DISTANCE commits, since a push that follows quickly
-// cancels the previous post-merge run and leaves that commit unbuilt; else no
+// ancestor within MAX_DISTANCE commits, since a commit can stay unbuilt — the
+// next push cancelled its post-merge run, or its push touched only paths
+// post-merge.yml ignores; else no
 // base, which the report states instead of diffing.
 //
 // Wired into ci.yml's `bundle-size` job: `node scripts/bundle-size-base.mjs`

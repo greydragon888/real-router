@@ -33,8 +33,8 @@ export default {
         "@real-router/*",
       ],
       // No "peer": a @real-router/* peer dep must NOT be forced to workspace:^
-      // (on 0.x, ^0.x.y is patch-only → any minor bump triggers a major via
-      // changesets — CLAUDE.md "Never use workspace:^ for peerDependencies on
+      // (on 0.x, ^0.x.y is patch-only, so a core minor leaves the range and every
+      // consumer hits a peer conflict — CLAUDE.md "Never use workspace:^ for peerDependencies on
       // 0.x"). Peer deps fall through to the ">= ranges" group below.
       dependencyTypes: ["prod", "dev"],
       range: "workspace:^",
@@ -105,7 +105,8 @@ export default {
     {
       // Preact adapter spans Preact 10.28+ and Preact 11 beta — the
       // compound peer range `>=10.28.0 || ^11.0.0-0` can't be compared
-      // with `sameRange` policy against the pinned example versions.
+      // with `sameRange` policy against the `~` ranges the workspace declares
+      // for preact elsewhere.
       label: "Ignore preact peer dependency range",
       packages: ["@real-router/preact"],
       dependencies: ["preact"],

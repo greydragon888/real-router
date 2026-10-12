@@ -7,11 +7,12 @@
 # instrumental sense, and its count table excludes framework versions and
 # distances by lookbehind. Vale has neither lookbehind nor that calibration, so
 # pointing it at `packages/*/src` would replace a precise ratchet with a blunt
-# one. What `.md` has is the opposite problem: the #2111 census READ those 29
-# files, but no FORM ratchet reaches them at all.
+# one. What `.md` has is the opposite problem: the #2111 census reads the files
+# in its ledger, but no FORM ratchet reaches them at all.
 #
-# Scope comes from `.vale.ini`, and gitignored trees — `.claude/**` above all —
-# are out of it by owner decision.
+# Scope is the tracked Markdown (`git ls-files`, below) minus the trees
+# `in_corpus` names — `.claude/` among them, by owner decision; `.vale.ini`
+# holds the rules.
 #
 # Skips gracefully when Vale is absent, matching lint:audit and lint:security:
 # a fresh clone is never wedged. Install with:

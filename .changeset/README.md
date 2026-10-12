@@ -92,18 +92,6 @@ Follow [Semantic Versioning](https://semver.org/):
 
 When a feature spans multiple packages, create **separate changeset files** for cleaner CHANGELOG:
 
-**File:** `.changeset/navigator-types.md`
-
-```markdown
----
-"@real-router/types": minor
----
-
-Add `Navigator` interface for safe router subset (#37)
-
-New `Navigator` interface providing minimal router API for UI components.
-```
-
 **File:** `.changeset/navigator-core.md`
 
 ```markdown
@@ -210,15 +198,15 @@ Add noValidate option and fix middleware bug
 
 ```markdown
 ---
-"route-tree": patch
+"@real-router/shared-sources": patch
 ---
 
-Move validation to core
+Fix popstate handling in browser-env
 ```
 
-**Problem:** `route-tree` is private (`"private": true`).
+**Problem:** `@real-router/shared-sources` (`shared/`) is private (`"private": true`).
 
-**Solution:** Don't create changesets for private packages. Instead, create a changeset for the **public consumer** whose behavior changed (e.g., `@real-router/core` depends on `route-tree` via `workspace:^`). The user-facing behavior changed in core, not in the internal package.
+**Solution:** Don't create changesets for private packages. Instead, create a changeset for each **public consumer** whose behavior changed (e.g., `shared/browser-env/` is bundled into `@real-router/browser-plugin`, `@real-router/hash-plugin` and `@real-router/navigation-plugin` through their `src/browser-env` symlink). The user-facing behavior changed in those plugins, not in the internal package.
 
 ### ❌ Wrong Version Bump
 

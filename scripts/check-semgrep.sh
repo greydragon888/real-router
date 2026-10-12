@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Diff-aware static analysis (SAST) via semgrep — a fast, local complement to the
+# Diff-aware static analysis (SAST) via semgrep — a fast complement to the
 # cloud CodeQL scan. Catches injection / incomplete-sanitization / dangerous-API
-# classes BEFORE push instead of waiting for CI.
+# classes; its entry in scripts/checks.mjs says where it runs.
 #
 # Scope: only findings INTRODUCED by the current branch (--baseline-commit against
 # the merge-base with origin/master), so a pre-existing finding never blocks an

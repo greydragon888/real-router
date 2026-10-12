@@ -25,7 +25,7 @@ This Code of Conduct is adapted from the Contributor Covenant, version 1.0.0, av
 
 ### CI server
 
-Commits on an open PR will trigger builds on Travis. You can build and run tests locally to make sure they will pass before pushing a commit:
+Commits on an open PR trigger GitHub Actions (`.github/workflows/ci.yml`). You can build and run tests locally to make sure they will pass before pushing a commit:
 
 ```sh
 pnpm install
@@ -35,4 +35,4 @@ pnpm test && pnpm lint && pnpm type-check
 
 ### Git Commit Guidelines
 
-[Angular's Commit Conventions](https://docs.google.com/document/d/1QrDFcIiPjSLDn3EL15IJygNPiHORgU1_OOAqWjiDU5Y/edit#) are used in this project and other router5's repositories.
+[Angular's Commit Conventions](https://docs.google.com/document/d/1QrDFcIiPjSLDn3EL15IJygNPiHORgU1_OOAqWjiDU5Y/edit#) are used in this project.

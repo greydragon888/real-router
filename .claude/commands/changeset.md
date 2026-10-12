@@ -39,10 +39,9 @@
    ```
 
 3. **Определи затронутые публичные пакеты по полю `private` в их `package.json`, а не по статическому списку** — список пакетов дрейфует (адаптеры `vue`/`solid`/`svelte`/`preact`/`angular`, новые плагины), и хардкод устаревает:
-   - Для каждого затронутого пакета: `node -p "require('./packages/<pkg>/package.json').private || 'PUBLIC'"`. `PUBLIC` → changeset нужен; `true` → пропусти (для private-пакета changeset делается на его публичного consumer'а, чьё поведение изменилось).
-   - Все `packages/*` без `"private": true` — публичные (сверка 2026-07-03: `core`, `core-types`/`types`, `fsm`, `logger`, `route-utils`, `rx`, `sources`, все адаптеры `react`/`preact`/`solid`/`vue`/`svelte`/`angular`, все `*-plugin`).
-   - НЕ включай private (сверка 2026-07-03): `event-emitter`, `path-matcher`, `route-tree`, `search-params`, `type-guards` (и любой другой с `"private": true`).
-   - ⚠ Эти списки — ориентир, НЕ источник: они уже дрейфовали (`path-matcher` числился «публичным», будучи `private: true` — чуть не породил неверный changeset-план в RFC #804; `helpers` вовсе не существует). Проверка `node -p` из первого пункта обязательна для каждого затронутого пакета.
+   - Для каждого затронутого пакета: `node -p "require('./packages/<pkg>/package.json').private || 'PUBLIC'"`. `PUBLIC` → changeset нужен. Приватных пакетов в `packages/` нет.
+   - Код движка, FSM, эмиттера и логгера живёт в `@real-router/core` (`src/engine`, `src/utils/*`): правка там — changeset на `@real-router/core`.
+   - Правка `shared/<dir>/*.ts` попадает в пакеты, которые линкуют каталог как `src/<alias>` (`CLAUDE.md` § Symlink Consumers): changeset — каждому из них, чьё поведение изменилось; `changeset-check.yml` требует его и на такую правку.
 
 4. **Определи тип изменения** (следуй таблице bump в [.changeset/README.md](../../.changeset/README.md); pre-1.0: breaking → `minor`):
    - `major` — breaking changes
@@ -58,10 +57,9 @@
 ```markdown
 ---
 "@real-router/core": minor
-"@real-router/react": patch
 ---
 
-Краткое описание изменений на английском языке.
+Краткое описание изменений на английском языке (#NN).
 
 - Детали изменения 1
 - Детали изменения 2
@@ -71,7 +69,8 @@
 
 - Описание на **английском**, безличный тон ("Add feature", не "I added")
 - Путь: `.changeset/<random-name>.md` (например `happy-dolphins-swim.md`)
-- Если изменения только в private/CI/config/tests — changeset не нужен
+- Один пакет на файл и ссылка `#NN` на PR/issue — `.changeset/check-changeset.mjs` отвергает changeset без них
+- Если изменения только в CI/config/tests — changeset не нужен
 - Для major — укажи как мигрировать
 
 ## Пример
@@ -81,7 +80,7 @@
 "@real-router/core": minor
 ---
 
-Add support for async route guards
+Add support for async route guards (#NN)
 
 - New `beforeEnter` and `beforeLeave` async guards
 - Guards can return `false` to cancel navigation

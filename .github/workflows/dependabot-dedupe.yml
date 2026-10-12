@@ -13,9 +13,9 @@ name: Dependabot Lockfile Dedupe
 # WHY the push needs a PAT (2026-08-01 — this REVERSES the original design):
 # the first version pushed with the default GITHUB_TOKEN, reasoning that "a
 # GITHUB_TOKEN push does not re-trigger CI … re-evaluation is handled at merge
-# time". There is no merge-time re-evaluation: `protect-master` requires five
-# per-SHA status contexts (Require Changeset, CI Result, Validate Changesets,
-# Dependency Review, SonarCloud), and GitHub's loop-prevention means a
+# time". There is no merge-time re-evaluation: `protect-master` requires
+# per-SHA status contexts (`gh api repos/greydragon888/real-router/rules/branches/master`
+# lists them), and GitHub's loop-prevention means a
 # GITHUB_TOKEN push creates NO workflow run for the new head SHA. The PR then
 # sits on "Expected — waiting for status" forever: strictly worse than the red
 # `lint:dedupe` it was meant to fix, and silent (no red X anywhere).
@@ -150,7 +150,7 @@ jobs:
 
       # No push token → do NOT push. A GITHUB_TOKEN push would move the PR head to
       # a commit no workflow ever validates, and branch protection would then block
-      # the merge on five contexts that never report (see the header). Not a
+      # the merge on required contexts that never report (see the header). Not a
       # failure either: `lint:dedupe` in ci.yml already reports the same problem as
       # a red REQUIRED check, so a second red X here would be pure noise. Warn,
       # name the manual command, stay green.

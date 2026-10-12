@@ -343,5 +343,5 @@ Rationale: `state$`/`events$` are **infinite** streams driven by the router's li
 
 - [INVARIANTS.md](INVARIANTS.md) — Property-based test invariants
 - [core CLAUDE.md](../core/CLAUDE.md) — Core package architecture
-- [event-emitter ARCHITECTURE.md](../event-emitter/ARCHITECTURE.md) — Event emitter (events are observed via plugin API)
+- [event-emitter ARCHITECTURE.md](../core/src/utils/event-emitter/ARCHITECTURE.md) — Event emitter (events are observed via plugin API)
 - [ARCHITECTURE.md](../../ARCHITECTURE.md) — System-level architecture

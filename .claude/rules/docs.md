@@ -32,7 +32,7 @@ When adding packages or features, keep these root files in sync:
 - Link to **wiki** for detailed docs — README is an overview, not a manual
 - Update "Framework-agnostic" feature bullet when adapters change
 
-### CLAUDE.md (this file)
+### CLAUDE.md
 
 - Keep **package count** on line 5 accurate
 - **See Also** must link to every package's CLAUDE.md
@@ -46,7 +46,6 @@ When adding packages or features, keep these root files in sync:
 
 ### Wiki (separate repo: `real-router.wiki/`)
 
-- **Integration Guide** per framework (Preact/Solid/Vue/Svelte/Angular-Integration.md) — kept in sync with adapter features
+- **Integration Guide** per framework (React/Preact/Solid/Vue/Svelte/Angular-Integration.md) — kept in sync with adapter features
 - **Per-API pages** (RouterProvider, Link, RouteView, useRouter, etc.) — include import alternatives for all frameworks
 - **\_Sidebar.md** — links to all integration guides
-- Move features from **Planned Features** → implemented sections when shipped

@@ -8,15 +8,7 @@
 //   • Level 1 — affected derivation (A5): the rx-only regression that proves the
 //     dependency-closure is NOT pulled in (without it, leaf-routing is dead).
 //   • Level 2 — classify(): a live sweep over the real packages/* tree must
-//     reproduce the companion §C buckets — now 1/6/3/2/2/9 = 23 after the
-//     foundation dissolutions (event-emitter + logger in wave-1; type-guards +
-//     the @real-router/types fold into core in wave-2; @real-router/fsm's frozen
-//     shell deleted in wave-3; engine folded into core/src/engine, engine-merge
-//     iteration 2 — and the then-empty `internal` bucket dropped from
-//     GROUP_NAMES, so 6 buckets now, not 7) and the @real-router/ssr-utils
-//     extraction (#1543, a new leaf — depends only on core's public subpaths,
-//     no shared/ssr symlink); §C's original master figure was
-//     6/6/3/2/2/8/1 = 28 — plus synthetic
+//     reproduce the bucket counts the L2 test below asserts — plus synthetic
 //     edge cases driven through injected readers (NOT turbo package-filters,
 //     which give the dep tree, not affected — companion §C footgun).
 // Plus routing (buildPlan): K boundary, touchesCore override, fanout shapes.

@@ -26,7 +26,7 @@
 > **Companion + ПОРЯДОК:** `.claude/prompts/perf-optimization-deep-analysis.md` —
 > код-хант; он **ДОВЕРЯЕТ числам** (карта метрик §2.3 там — общий артефакт).
 > Этот промпт их **ВАЛИДИРУЕТ**. **Гоняй ЭТОТ ПЕРВЫМ.** Dimension-находка →
-> обнови §2.3 perf-промпта + карту метрик в `/bench-report`/`/perf-optimize`
+> обнови §2.3 perf-промпта + карту метрик в `/perf-optimize`
 > скилах. Пер-сценарные причинные находки — в трекаемый ledger
 > `cross-router-bench/SCENARIO-LAG-ANALYSIS.md` (confidence + cause-class),
 > харнесс-находки — в отчёт §8.
@@ -63,8 +63,8 @@ downstream: деку (публичная инфографика!), ledger, ко�
 3. **Computation** — верна ли механика замера (CDP-семантика, settle, warm,
    force-GC, sampling, median/RME) **и математика агрегации** (deck-extract
    verdict/GRID/ratio, ci-summary)?
-4. **Config** — резолвятся ли движки честно (PROD dist, minify-паритет, dedupe,
-   freshness-гейт, CI-воркфлоу-ручки)?
+4. **Config** — резолвятся ли движки честно (PROD dist опубликованного релиза, minify-паритет, dedupe,
+   провенанс релиза, CI-воркфлоу-ручки)?
 
 Итог — отчёт-документ в `.claude/` (§8), находки ранжированы по
 **«переворачивает ли вывод»** (flip > сдвиг > косметика).
@@ -82,12 +82,12 @@ downstream: деку (публичная инфографика!), ledger, ко�
 | Замер | `harness/cdp.mjs` | CDPSession: `Performance.getMetrics` + `HeapProfiler.startSampling/stopSampling` (gross-alloc, include-collected флаги #1417) + force-GC; `installNavMetric` (click→settle wall + `settleGone`) |
 | | `harness/measure.mjs` | fresh-context per sample; warmup + K; `measureInterleaved` (round-robin движки в ОДНОМ браузере, ротация порядка — S4 #1460); CPU-throttle параметр (штамп `throttle` в ячейке) |
 | Статистика | `harness/stats.mjs` | median / p95 / mean / RME (**rme — уже ПРОЦЕНТ**, не доля) |
-| Драйвер | `run.mjs` (ячейка) · `run-all.mjs` (матрица) · `run-subset.mjs` (scoped-подмножество) | vite build+preview (**PROD dist**) → Playwright/CDP → `results/<fw>/<sc>/<eng>.json`; `KNOWN_NA` skip-map (2 записи, #1456) — enforced ТОЛЬКО в run-all (K14 07-18); run-subset — третий писатель results/ с дрейфующим контрактом (env-штамп без cpu/runner — откат O-10; K15) |
-| Гигиена | `harness/provenance.mjs` (freshness src>dist → exit 3 + env-штамп `{commit,dirty,dirtyFiles,dirtyCode,distNewestMtime,cpu,runner}` #1459/O-10) · `write-cell.mjs` (`N_MIN=10`, смоук не пишется #1455) · `lint-spec-parity.mjs` (O-13: value-parity 7 копий свип-констант) · `sanity-remeasure.mjs` (#1261 mid-run load) · `rme-gate.mjs` (families: stable≤15 / noisy≤40; ⚠K4 07-18: `isSweep=/@\d+$/` вывел ВСЕ `@N` в report-only c5fe977e — включая НЕ-свиповые cold-start/table-heap/mountMs семейства; 5/13 GRID-строк без armed-гейта) | |
+| Драйвер | `run.mjs` (ячейка) · `run-all.mjs` (матрица) · `run-subset.mjs` (scoped-подмножество) | vite build+preview (**PROD dist**) → Playwright/CDP → `results/<fw>/<sc>/<eng>.json`; `KNOWN_NA` skip-map (`harness/known-na.mjs`) — соблюдают все три писателя `results/` (`run.mjs` отказывает без `BENCH_ALLOW_KNOWN_NA=1`), и все штампуют env с cpu/runner |
+| Гигиена | `harness/provenance.mjs` (env-штамп `{commit,dirty,dirtyFiles,dirtyCode,realRouterCore}` — какой релиз core измерен; `envStamp` добавляет `date`/`cpu`/`runner`) · `write-cell.mjs` (`N_MIN=10`, смоук не пишется #1455) · `lint-spec-parity.mjs` (O-13: value-parity 7 копий свип-констант) · `sanity-remeasure.mjs` (#1261 mid-run load) · `rme-gate.mjs` (families: stable≤15 / noisy≤40; ⚠K4 07-18: `isSweep=/@\d+$/` вывел ВСЕ `@N` в report-only c5fe977e — включая НЕ-свиповые cold-start/table-heap/mountMs семейства; 5/13 GRID-строк без armed-гейта) | |
 | Сценарии | `scenarios/*.mjs` (12) | cold-start · nav-latency · param-nav · nested-switch · active-links · link-build · wide-config · deep-config · search-param-scaling · table-heap · nav-churn · back-forward; свипы греют realm (`WARM_NAVS=12`, F3 #1453) |
 | **Инструмент №2** | `matcher-bench/{run.mjs,matchers.mjs,results.json}` | ИЗОЛИРОВАННЫЙ матчер, чистый Node, µs/match (лог-ось); N_SWEEP [4..256] + DEPTH_SWEEP [3..90]; холдауты: angular-deep (recognizer), mateo (runes) |
-| **Отчёт = дека** | `deck/{deck-config.js,deck-extract.mjs,deck-data.json,build-deck.mjs,deck.html}` | `results/`+matcher → `deck-data.json` (DATA/GRID/SWEEP/META) → deck.html; **verdict-математика в deck-extract** (ratio vs fastest rival; классы g≥1.12 / r≤0.88 / y); WHY-блёрбы КУРИРУЕМЫЕ (staleness-класс) |
-| CI | `.github/workflows/cross-router-bench.yml` (self-hosted, rme-gate ARMED) · `harness/ci-summary.mjs` (штамп+grid+RME-watch из СВЕЖЕЙ deck-data) | еженедельный снимок; НЕ trend-гейт |
+| **Отчёт = дека** | `deck/{deck-config.js,deck-extract.mjs,build-deck.mjs}` → `deck/out/{deck-data.json,deck.html}` (генерируются, в `.gitignore`) | `results/`+matcher → `deck-data.json` (DATA/GRID/SWEEP/META) → deck.html; **verdict-математика в deck-extract** (ratio vs fastest rival; классы g≥1.12 / r≤0.88 / y); WHY-блёрбы КУРИРУЕМЫЕ (staleness-класс) |
+| CI | `.github/workflows/cross-router-bench.yml` (self-hosted, rme-gate report-only) · `harness/ci-summary.mjs` (штамп+grid+RME-watch из СВЕЖЕЙ deck-data) | еженедельный снимок; НЕ trend-гейт |
 | Пробы-самопроверки | `harness/{f3-warm-validate,settle-symmetry-probe,validate-per-nav-metric}.mjs` | переиспользуй их ПЕРЕД написанием своих |
 
 Ретайрнуто (не ищи): `report.mjs`, `status-tables.mjs`, `REPORT-*.md`, `totalMs`
@@ -120,9 +120,8 @@ downstream: деку (публичная инфографика!), ledger, ко�
 - **Alloc (#1417):** `includeObjectsCollectedBy{Major,Minor}GC` ОБЯЗАТЕЛЬНЫ — без
   них сумма деградирует к ≈retained (молча, ~100× занижение).
 - **Retained:** force-GC ДО и ПОСЛЕ.
-- **PROD dist:** vite → `dist/esm` (scoped `internal-source` невидим);
-  freshness-гейт provenance (exit 3) отказывает на stale dist; turbo cache-restore
-  пишет СВЕЖИЕ mtime → на CI не ложносрабатывает (проверено 07-18).
+- **PROD dist:** vite → `dist/esm` опубликованного релиза (scoped `internal-source`
+  невидим, `src/` в тарболе нет); провенанс штампует версию установленного core.
 - **Вердикты деки:** deck-extract `verdict()` — ratio vs **fastest rival**, классы
   g≥1.12/r≤0.88/y; GRID=endpoint, SWEEP=per-point. Это МАТЕМАТИКА ПОКАЗА — аудируй
   как computation (пороги, min-of-rivals, null-ячейки, KNOWN_NA→null).
@@ -133,7 +132,7 @@ downstream: деку (публичная инфографика!), ledger, ко�
 |---|---|
 | wrong-dimension | #1417 retained→gross · #1418 CPU→wall mountMs · F1/#1451 totalMs мёртв · F2/#1452 script-only false-flat (24×) |
 | cold/realm | F3/#1453 свипы мерили интерпретатор (~85% floor'а wide@1000) |
-| app-parity | #1483 O(N)-шелл links-апп (фикс view-isolate) · O-13 спек-дрейф (silent point-drop; `lint:bench-apps`) |
+| app-parity | #1483 O(N)-шелл links-апп (фикс view-isolate) · O-13 спек-дрейф (silent point-drop; `lint:spec-parity`) |
 | extraction-parity | **tanstack-deep late-binding (07-16): parent-замыкание → fuzzy 2-match → ложный O(1)-флэт; с фиксом O(depth), «deep-лаг rr» был багом бенча** |
 | settle | #1466 angular async-settle (фикс sync detectChanges) |
 | process | #1326 baseline-strawman · #1261 mid-run load (sanity) · S4/#1460 position-bias (interleave) · S5/#1455 смоук-ячейки (N_MIN) · #1459 stale-dist/provenance |
@@ -191,7 +190,7 @@ finder** (двигает РАНГ или ВЕЛИЧИНУ). Плюс сигна�
 эквивалентность изолированного матчера его браузерному поведению (matcher-bench).
 Отличай «rr медленнее» от «бенч дал конкуренту пропустить работу» и от «экстракция
 дала конкуренту ЛОЖНУЮ лёгкость» (tanstack-deep). `_baseline` — честный floor
-(#1326)? Спек-константы в синке (`pnpm lint:bench-apps`)?
+(#1326)? Спек-константы в синке (`pnpm --dir cross-router-bench lint:spec-parity`)?
 
 ### 4.3 Computation: замер И агрегация
 CDP-событие/метрика верные; settle закрывается тем, чем заявлено; warm достаточен;
@@ -206,9 +205,9 @@ by-quantization (это НЕ нестабильность); µs-матчер —
 инвариантна железу. Нарушение подписи = red flag даже при «верном» вычислении.
 
 ### 4.5 Config/resolution/CI
-PROD dist оба движка; minify-паритет; dedupe фреймворка; freshness-гейт живой;
-env-штамп честный (cpu/runner); CI: armed-rme условия, salvage-if, committed-дека
-не перезаписывается (O-3).
+PROD dist оба движка (у real-router — опубликованный релиз); minify-паритет;
+dedupe фреймворка; провенанс релиза в ячейке; env-штамп честный (cpu/runner);
+CI: rme-gate report-only, публикация только после полностью зелёной матрицы.
 
 ---
 
@@ -249,8 +248,9 @@ parent давал fuzzy 2-match → ложный O(1)-флэт → ledger зап
   same-session С БЭКАПОМ ячейки (run.mjs перезаписывает; n<10 не пишется вовсе);
   sub-ms сравнения — ТОЛЬКО same-session; полный `pnpm build`/матрицу НЕ гонять
   (делегируй владельцу).
-- **A/B гигиена:** отдельный worktree; PROD dist (`pnpm -F <pkg> bundle` после
-  правки src); тихая машина для sub-ms.
+- **A/B гигиена:** правка `src` на cross-router не видна до релиза — A/B
+  неопубликованной правки сейчас не поставить (#2720); A/B правки bench-app — в
+  одной сессии; тихая машина для sub-ms.
 
 ---
 
@@ -259,7 +259,7 @@ parent давал fuzzy 2-match → ложный O(1)-флэт → ledger зап
 **Метрика-фикс инвалидирует всю историю на ней.** Любая dimension/extraction-находка
 ОБЯЗАНА нести: (а) флаг «ре-ран затронутых ячеек + переинтерпретация прошлых
 выводов»; (б) апдейт §2.3 perf-промпта + карт метрик в скилах
-(`/bench-report`, `/perf-optimize`); (в) правку затронутых **WHY-блёрбов деки** и
+(`/perf-optimize`); (в) правку затронутых **WHY-блёрбов деки** и
 записей **ledger** (`SCENARIO-LAG-ANALYSIS.md`) — оба публично-читаемые артефакты
 теперь; (г) список решений/issue, чья мотивация меняется.
 

@@ -411,7 +411,7 @@ test("the CLI script delegates to this predicate", () => {
 //
 // The cells above hold the owner predicate and read the script's text; none of
 // them runs it. `pnpm lint:coverage-scope` (both hooks, Repo Lints) and
-// `--emit` (the Sonar scope in CI) run the FILE, so these cells do: the real
+// `--emit` (the coverage and Sonar steps of CI) run the FILE, so these cells do: the real
 // script, with `cwd` at a fixture tree, because it takes its root from the
 // working directory and `pnpm` hands it the repository root. Each drift cell
 // plants ONE departure from a tree the script accepts and expects the one line

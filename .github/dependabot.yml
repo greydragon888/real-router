@@ -99,20 +99,17 @@ updates:
       - "dependencies"
       - "automated"
     ignore:
-      # Transitive deps whose OSV/GHSA advisories are already resolved by a pnpm
-      # `overrides` entry in pnpm-workspace.yaml (verified clean by `lint:audit` /
-      # osv-scanner). Dependabot does NOT apply pnpm overrides during resolution,
-      # so it re-resolves these to their natural transitive ceiling (e.g. undici
-      # 7.27.2 < fixed 7.28.0), decides it "cannot update X to a non-vulnerable
-      # version", and ERRORS THE ENTIRE npm job — producing zero PRs. Repeated
-      # errors then auto-halt Dependabot for the whole repo. These are pure
-      # transitive deps (no direct import), fully managed via overrides, so
-      # Dependabot can never PR them anyway — ignore them here.
-      #
-      # PATTERN: whenever a transitive-dep advisory is fixed via a pnpm override
-      # in pnpm-workspace.yaml, add the dep here too, or Dependabot will re-halt.
-      - dependency-name: "piscina" # override: piscina '>=5.2.0 <6.0.0'
-      - dependency-name: "js-yaml" # override: read-yaml-file '>=2.1.0' (GHSA-h67p-54hq-rp68)
+      # Transitive deps whose advisories an `overrides` entry in
+      # pnpm-workspace.yaml resolves; `lint:audit` checks the result. Each entry
+      # here is a decision about its own advisory, not a copy of the overrides.
+      # Dependabot can apply an override — a security PR has proposed the major
+      # an open override floor admitted — and a security job that cannot reach a
+      # fixed version errors; repeated errors halt every npm update
+      # (IMPLEMENTATION_NOTES "Dependabot npm ecosystem auto-halted by
+      # pnpm-override-managed transitive advisories"). An ignore fails its own
+      # way: the security job for an ignored dep can end in `all_versions_ignored`.
+      - dependency-name: "piscina" # override in pnpm-workspace.yaml
+      - dependency-name: "js-yaml" # override in pnpm-workspace.yaml
       # undici is no dependency of the root: danger installs a 7.x of its own
       # (`.pnpmfile.mjs`), and jsdom takes 8.x on its own range. Each
       # parent's range moves its copy; Dependabot would offer 8.x to both.
@@ -129,33 +126,30 @@ updates:
       # neither group of scripts/tests runs on it in CI; a bump by hand runs
       # them in pre-push. The name alone ignores security updates as well.
       - dependency-name: "smol-toml"
-      # @types/node is pinned to the Node.js runtime major (Node 24 — `.nvmrc` is
-      # the source of truth; see the CLAUDE.md toolchain table). Block semver-major:
+      # @types/node is pinned to the Node.js runtime major (`.nvmrc` is the
+      # source of truth; see the CLAUDE.md toolchain table). Block semver-major:
       # type defs ahead of the runtime let TS resolve Node APIs that don't exist
-      # at runtime (compiles, then fails on Node 24). 24.x patch/minor still flow.
+      # at runtime (compiles, then fails on the runtime). Patch/minor still flow.
       # Lift this when the project moves to a newer Node major.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
-      # typescript is pinned to the current major (6.x) until the type-tooling
+      # typescript is pinned to the current major until the type-tooling
       # ecosystem supports the next one. typescript-eslint and ts-morph lag each
       # TS major (TS 7 is unsupported by them today), so bumping TS ahead of them
       # breaks `pnpm lint` + type-tooling repo-wide — at most a split toolchain is
-      # viable. Block the major only; 6.x patch/minor keep flowing. Lift this when
+      # viable. Block the major only; patch/minor keep flowing. Lift this when
       # typescript-eslint + ts-morph declare support for the next TS major, then
       # bump TS manually.
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
       # vite is a direct dev-dep of benchmarks/package.json (the CodSpeed
-      # bundles), so Dependabot bumps it INDIVIDUALLY ahead of its ecosystem. On a new MAJOR
-      # (vite 8) the whole plugin/test stack still peers `vite >=7.3.5 <8` —
-      # vitest@4.1.x + @vitest/mocker, vite-plugin-solid, @sveltejs/vite-plugin-svelte,
-      # @analogjs/vite-plugin-angular, @testing-library/svelte,
-      # vitefu — so the `pnpm install --lockfile-only` re-resolve fails with
-      # ERR_PNPM_PEER_DEP_ISSUES (strictPeerDependencies: true) and ERRORS THE ENTIRE
-      # npm job (observed with vite 8.1.3), risking a repo-wide halt.
-      # Block the major only; 7.x patch/minor keep flowing. Lift this when vitest
-      # peers vite 8, then bump the vite major manually + together across the
-      # ecosystem.
+      # bundles), so Dependabot bumps it INDIVIDUALLY ahead of its ecosystem. A
+      # new MAJOR lands before vitest and the framework vite plugins peer it, so
+      # the `pnpm install --lockfile-only` re-resolve fails with
+      # ERR_PNPM_PEER_DEP_ISSUES (strictPeerDependencies: true) and ERRORS THE
+      # ENTIRE npm job (observed with vite 8.1.3), risking a repo-wide halt.
+      # Block the major only; patch/minor keep flowing, and a major moves by
+      # hand, together across the ecosystem.
       - dependency-name: "vite"
         update-types: ["version-update:semver-major"]
       # vitest and its two plugins peer each other's exact version, so any one of
@@ -243,9 +237,8 @@ updates:
       - "automated"
     ignore:
       # Transitive deps whose advisories an `overrides` entry in
-      # examples/pnpm-workspace.yaml resolves. Dependabot does not apply pnpm
-      # overrides, re-resolves them to their natural ceiling and errors the whole
-      # job — the root block has the incident.
+      # examples/pnpm-workspace.yaml resolves — each a decision about its own
+      # advisory, as in the root block, which names both ways it can fail.
       - dependency-name: "undici"
       - dependency-name: "piscina"
       - dependency-name: "js-yaml"
@@ -336,7 +329,7 @@ updates:
     # they were never bumped. Proof: the PR "bump actions/setup-node from 6 to
     # 7" updated six workflow files and left `.github/actions/setup/action.yml`
     # on v6; `git log -- .github/actions/` shows no dep bump in the directory's
-    # history. That action runs in 11 jobs, i.e. the pins most worth updating
+    # history. That action sets up many CI jobs, i.e. the pins most worth updating
     # were the only ones frozen. Listing its directory explicitly puts it in
     # scope.
     directories:

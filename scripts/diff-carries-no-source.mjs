@@ -5,7 +5,8 @@
 //   exit 0 = nothing but manifests, CHANGELOGs, changesets and the lockfile
 //   exit 1 = something a code reader would read
 //
-// Three checks read code and report on it: SonarCloud, Codecov and jscpd. On a
+// The code readers skip on it: the ci.yml jobs that read `check`'s `no_source`,
+// and the checks whose `ciSkip` in scripts/checks.mjs lists `no-source`. On a
 // diff of this shape each of them re-reads what it already read. Measured on
 // release PR #2424: Sonar's own comment says "0 New issues · 0.0% Coverage on
 // New Code", and Sonar is the LAST required check to report — 95 s after
@@ -16,9 +17,10 @@
 // and the lockfile when a specifier moved with them. Measured over the twelve
 // release commits before this file, those are the only paths they touch.
 //
-// ⚑ A dependency bump matches too — `package.json` plus `pnpm-lock.yaml` — and
-// the callers want that: it changes no code either. The name says the predicate,
-// not the occasion.
+// ⚑ A dependency bump of the root workspace matches too — `package.json` plus
+// the root `pnpm-lock.yaml` — and the callers want that: it changes no code
+// either. Another workspace's lockfile is not matched, so a diff that carries
+// one counts as source. The name says the predicate, not the occasion.
 //
 // ⚠ It is asked of the DIFF, never of a branch name. A branch called
 // `changeset-release/*` is what it is called, not what it holds; one source file
@@ -32,7 +34,8 @@ export const NO_SOURCE = "no source in this diff";
  *
  * ⚠ `.changeset/` is matched at `*.md` only. The directory also holds six `.mjs`
  * scripts — the changelog formatter, the PR-ref extractor, the release-plan
- * checks — and those are code SonarCloud reads.
+ * checks — and those are code: turbo hashes them into `//#test:tooling`, and the
+ * tooling tests skip on a no-source diff.
  */
 export const isManifestOnlyPath = (path) =>
   path === "pnpm-lock.yaml" ||

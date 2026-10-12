@@ -2,7 +2,7 @@
 
 > **Назначение.** Самодостаточный промпт для модели / агент-оркестратора, выполняющей **исчерпывающий поиск ОСТАВШИХСЯ
 > векторов perf-оптимизации** в монорепо `real-router` (view-agnostic роутер:
-> `path-matcher → route-tree → core` + адаптеры react/vue/solid/svelte/angular +
+> `core` (движок `src/engine`: path-matcher → route-tree) + адаптеры react/vue/solid/svelte/angular +
 > reactive-слой `sources` + плагины). Цель — не список желаний, а **честная,
 > эмпирически обоснованная карта**: что реально устранимо vs что — inherent
 > capability-цена / уже отгружено / debunked.
@@ -13,9 +13,9 @@
 > строк/issue дрейфуют; секция 2 помечает якоря, а не истину).
 >
 > **Companion-доки в репо** (читай, не дублируй): `cross-router-bench/CLAUDE.md`
-> (методология бенча), `cross-router-bench/REPORT-SUMMARY.md` (кросс-когортная
-> матрица rr-статуса), `cross-router-bench/REPORT-<fw>.md` (нарратив по
-> когорте), `packages/*/CLAUDE.md` (архитектура пакетов), `ARCHITECTURE.md`,
+> (методология бенча), дека `cross-router-bench/deck/` (кросс-когортная матрица
+> вердиктов; `deck/out/` генерируется), `cross-router-bench/SCENARIO-LAG-ANALYSIS.md`
+> (ledger по сценариям), `packages/*/CLAUDE.md` (архитектура пакетов), `ARCHITECTURE.md`,
 > `IMPLEMENTATION_NOTES.md`.
 >
 > **⚠ ПРЕДПОСЫЛКА.** Валидируй инструмент промптом
@@ -62,16 +62,16 @@ adversarial-верификация КАЖДОГО кандидата → complet
 
 | Слой | Пакет | Hot-path файлы (якоря) |
 |---|---|---|
-| URL-матчер (segment trie) | `packages/path-matcher/src` | `SegmentMatcher.ts` (match-walk `#traverseFrom`, `#scanPath`, static-cache), `registration/{index,trie,trieNodes}.ts` (построение трие), `pathUtils.ts` (`createSegmentNode`), `types.ts` (`SegmentNode`), `parseSegment.ts` (токенайзер) |
-| Матчер-фабрика | `packages/route-tree/src` | `createMatcher.ts` |
-| Ядро (FSM + immutable state) | `packages/core/src` | `helpers.ts` (`normalizeParams`, `freezeStateInPlace`, `buildNavigateState`), `namespaces/NavigationNamespace/*` (transition, commit-gate), `namespaces/EventBusNamespace/*` (`#setupFSMActions`), `namespaces/StateNamespace/*` (`makeState`), `completeTransition.ts`, `fsm/routerFSM.ts` |
-| FSM-движок | `packages/fsm/src` | `fsm.ts` (`send`/dispatch, `#actions`-таблица) |
+| URL-матчер (segment trie) | `packages/core/src/engine/path-matcher` | `SegmentMatcher.ts` (match-walk `#traverseFrom`, `#scanPath`, static-cache), `registration/{index,trie,trieNodes}.ts` (построение трие), `pathUtils.ts` (`createSegmentNode`), `types.ts` (`SegmentNode`), `parseSegment.ts` (токенайзер) |
+| Матчер-фабрика | `packages/core/src/engine` | `createMatcher.ts` |
+| Ядро (FSM + immutable state) | `packages/core/src` | `helpers.ts` (`freezeStateShell`, `mergePathChannel`, `mergeQueryChannel`), `namespaces/NavigationNamespace/*` (transition, commit-gate), `namespaces/EventBusNamespace/*` (`#setupFSMActions`), `namespaces/StateNamespace/*` (`makeState`), `completeTransition.ts`, `routerFSM.ts` |
+| FSM-движок | `packages/core/src/utils/fsm` | `fsm.ts` (`send`/dispatch, `#actions`-таблица) |
 | Reactive-слой (UI-байндинги) | `packages/sources/src` | `BaseSource`, `createRouteSource`, `createActiveRouteSource`, `createActiveNameSelector`, `canonicalJson` |
 | Адаптеры | `packages/{react,vue,solid,svelte,angular}/src` | react `hooks/useIsActiveRoute.tsx` + `components/Link.tsx`; vue `Link.ts`; angular `RealLink.ts`; solid/svelte Link |
 
 **Бандл-факт (для cold-start-оси):** `packages/core/dist/esm` ≈ **100 KB
-minified** и **инлайнит весь граф** (`path-matcher`+`route-tree`+`sources`+`event-emitter`
-внутри; внешние рантайм-импорты — только `@real-router/fsm` + `@real-router/logger`).
+minified** и **инлайнит весь граф** (движок `src/engine/` и `src/utils/` — fsm,
+event-emitter, logger — внутри; рантайм-зависимостей у пакета нет).
 Доминируют 2 чанка: монолит `Router-*.mjs` ~52 KB (все namespaces сшиты) + shared
 matcher/tree ~33 KB. Минимальное приложение, вызвав `createRouter`, парсит ~85 KB
 монолита — parse-cost ∝ размер, это ось cold-start.
@@ -85,9 +85,9 @@ matcher/tree ~33 KB. Минимальное приложение, вызвав `
 - **Сырьё (ground truth):** `results/<cohort>/<scenario>/<engine>.json` →
   `.metrics[key].{median, p95, mean, rme, n}`. `results/` **gitignored** (может
   отсутствовать — тогда прогони, см. ниже).
-- **Сводки:** `REPORT-SUMMARY.md` (кросс-когортная матрица rr-статуса 🟢/🟡/🔴,
-  генератор `harness/status-matrix.mjs`), `REPORT-<fw>.md` (проза по когорте —
-  **отстаёт от таблиц**, сверяй с `results/`).
+- **Сводки:** дека (`deck/deck-extract.mjs` → `deck/out/deck-data.json`,
+  `deck/build-deck.mjs` → `deck/out/deck.html`: вердикты против быстрейшего соперника) и ledger
+  `SCENARIO-LAG-ANALYSIS.md` (проза — **отстаёт от таблиц**, сверяй с `results/`).
 - **12 сценариев:** cold-start · nav-latency · param-nav · nested-switch ·
   active-links · link-build · wide-config · deep-config · search-param-scaling ·
   table-heap · nav-churn · back-forward.
@@ -158,16 +158,16 @@ matcher/tree ~33 KB. Минимальное приложение, вызвав `
 
 - **Веди весь анализ в ОТДЕЛЬНОМ git worktree** (`git worktree add <path>
   origin/master` → работай там → `git worktree remove <path>` в конце), чтобы НЕ
-  было конфликтов: A/B правит `packages/*/src` + пересобирает `dist` + делает
-  `git checkout`-revert для BEFORE-замера — в основном рабочем дереве (и
-  параллельно с другими сессиями) это затирает `dist`, гоняется за рабочей копией
-  и делит общий git-stash. Изолированный worktree снимает это и даёт чистый revert.
-- **Бенч читает PRODUCTION `dist`, не `src`** (vite build+preview, minify). После
-  ЛЮБОЙ правки `packages/*/src` — **`pnpm -F <pkg> bundle`** затронутых пакетов
-  (для core-изменения: `path-matcher` → `@real-router/core`, т.к. core инлайнит
-  path-matcher's dist). Иначе бенч мерит стейл-dist.
-- Фильтры pnpm: приватные пакеты — bare имя (`-F path-matcher`), публичные —
-  `@real-router/*` (`-F @real-router/core`).
+  было конфликтов: правка и `git checkout`-revert для BEFORE-замера в основном
+  рабочем дереве (и параллельно с другими сессиями) гоняются за рабочей копией и
+  делят общий git-stash. Изолированный worktree даёт чистый revert; воркспейс
+  `cross-router-bench/` ставится в нём отдельно (`pnpm install` в нём).
+- **Бенч читает PRODUCTION-сборку опубликованного npm-релиза** (vite
+  build+preview, minify), а не этот чекаут: правка `packages/*/src` видна ему
+  только после релиза, и A/B неопубликованной правки сейчас не поставить (#2720).
+  Правка bench-app (`apps/<fw>/<engine>/…`) видна сразу — `run.mjs` сам
+  пересобирает app.
+- Фильтры pnpm — npm-имя (`-F @real-router/core`): приватных пакетов нет.
 - Не гоняй бенчи под чужой CPU-нагрузкой (контаминация sub-ms). Память
   (`table-heap`/`nav-churn heap`) load-толерантна (rme~0).
 
@@ -183,7 +183,7 @@ matcher/tree ~33 KB. Минимальное приложение, вызвав `
 capabilityRisk / validationNeeded`). Оси:
 
 1. **Core per-nav CPU + allocation** — transition-pipeline (`helpers.ts`
-   normalizeParams/freezeStateInPlace/buildNavigateState, `NavigationNamespace`
+   freezeStateShell/mergePathChannel/mergeQueryChannel, `NavigationNamespace`
    transition, `StateNamespace.makeState`, `completeTransition.ts`, `fsm.ts`
    send-dispatch). Что аллоцируется/CPU-тратится per-nav и **что из этого — не
    контракт иммутабельности**?
@@ -330,13 +330,13 @@ view-transitions), interceptor-chain глубина, subscribeLeave/leave-approv
    (`jsHeapMB@10000`) — ~10% (истина). Пустой null-proto объект ≈192 B в Node V8,
    ≈88 B в Chrome V8. Node-прокси **направленно верен, но завышает абсолют ~2×** —
    для memory-claim гоняй БРАУЗЕРНЫЙ table-heap (memory-класс: стабилен, rme~0,
-   load-толерантен). Рецепт A/B: bundle path-matcher+core dist (fix) →
-   `run.mjs table-heap real-router react 6` → `git checkout` src + rebuild → мерь
-   no-fix → restore. **Бэкапь ячейку `results/` перед прогоном** (run.mjs перезаписывает).
+   load-толерантен). Браузерный A/B неопубликованной правки сейчас не поставить:
+   cross-router ставит npm-релиз (#2720). **Бэкапь ячейку `results/` перед
+   прогоном** (run.mjs перезаписывает).
 2. **Sub-ms — ТОЛЬКО same-session A/B.** Кросс-сессионный дрейф sub-ms ~2×
    (термал/нагрузка); memory/matcher/link-build стабильны ~5%. «Улучшилось vs
    прошлый прогон» на sub-ms без same-session A/B — не доказано.
-3. **Числа — из `results/`, НЕ из REPORT-прозы** (проза отстаёт). Ранжируй по
+3. **Числа — из `results/`, НЕ из прозы деки и ledger** (проза отстаёт). Ранжируй по
    ПРАВИЛЬНОЙ headline-метрике (§2.3) + правильному endpoint (@1000/@90/@50/@10k).
 4. **Load-bearing / неожиданный claim перепроверь САМ** — компиляция (`tsc`), прогон
    (`node`/бенч), трассировка code-path. Вердикт субагента = гипотеза, не факт.
@@ -347,7 +347,7 @@ view-transitions), interceptor-chain глубина, subscribeLeave/leave-approv
 
 ## 7. Протокол достоверности (обязателен)
 
-- Доказывай **первоисточником** (код + замер), не рассуждением и не REPORT-прозой.
+- Доказывай **первоисточником** (код + замер), не рассуждением и не прозой отчётов.
 - `file:line` на каждый несущий claim; число — из `results/` или собственного замера.
 - REFUTE by default; планка REAL (§4) — жёсткая.
 - Раздели **«конкурент структурно легче (делает меньше)»** и **«rr тратит впустую»** —

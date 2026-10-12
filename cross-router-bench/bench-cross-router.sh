@@ -1,7 +1,6 @@
 #!/bin/bash
 # =============================================================================
 # Cross-Router Benchmark Runner — machine-readiness + full unattended matrix
-# Modelled on benchmarks/bench-compare.sh.bak, but for the cross-router (Playwright + CDP) suite.
 #
 # Updates @real-router/* in the cross-router workspace to the latest npm release, gates
 # on machine readiness for a ~3 h unattended run, and — on success — runs the full
@@ -9,8 +8,7 @@
 # the REFERENCE results/ — the deck source — is n=50: use --runs 50), writing
 # results/ (the source for the infographic deck; text REPORT-*.md are retired).
 #
-# ROOT vs USER split (why this is not a straight bench-compare.sh.bak clone):
-#   bench-compare.sh.bak runs its mitata workload AS ROOT (node-only, needs nice -20).
+# ROOT vs USER split:
 #   The cross-router workload drives a real Chromium via Playwright and MUST run
 #   as the invoking (non-root) user:
 #     • Playwright's browser cache lives under the user's $HOME
@@ -209,7 +207,7 @@ confirm_or_abort() {
     fi
 }
 
-# --- Thermal helpers (Apple Silicon; identical discipline to bench-compare.sh.bak) --
+# --- Thermal helpers (Apple Silicon) --
 get_thermal_pressure() {
     local output
     output=$(sudo powermetrics --samplers thermal -i 1 -n 1 2>/dev/null)

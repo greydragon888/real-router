@@ -156,7 +156,7 @@ dist/
 `lint:types` is
 `attw --pack . --ignore-rules no-resolution cjs-resolves-to-esm internal-resolution-error`,
 run under attw's default **`strict`** profile — the same profile `tsdown.base.ts`
-pins for the twenty tsdown-built packages. All three ignored rules cover the
+pins for the tsdown-built packages. All three ignored rules cover the
 shape of a `svelte-package` library that re-exports components, not defects:
 
 | row               | here                                                | verdict                                             |

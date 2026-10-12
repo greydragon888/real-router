@@ -54,7 +54,6 @@ External dependencies:
 | -------------------- | ------------------------------------------------------------ | ------------------------- |
 | `@real-router/core`  | `getPluginApi`, types (`PluginApi`, `Params`, `State`, etc.) | `factory.ts`, `plugin.ts` |
 | `@real-router/core/types` | `StateContext` interface (module augmentation target)         | `index.ts`                |
-| `type-guards`        | `isPrimitiveValue` — rejects NaN, Infinity, objects, arrays  | `validation.ts`           |
 
 ## Factory + Class Pattern
 
@@ -312,7 +311,7 @@ Throws `TypeError` with a descriptive message on any violation. The factory neve
 | `null`                        | Throws `TypeError` with "cannot be null" message            |
 | object, array                 | Throws `TypeError` with "must be a primitive value" message |
 
-`isPrimitiveValue` from `type-guards` handles the primitive check, including rejection of `NaN` and `Infinity`.
+`isPrimitiveValue` (`src/is-primitive-value.ts`) handles the primitive check, including rejection of `NaN` and `Infinity`.
 
 ## Parameter Removal Semantics
 

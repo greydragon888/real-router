@@ -15,8 +15,9 @@ import type { Router } from "@real-router/core";
  * refused to fold `#handleNoGuardsLeave` into the guard machinery — the fold was
  * behaviourally correct and cost a controller on the other two arcs.
  *
- * That decision was held by a benchmark arc alone, and the benchmark gate is
- * paused (#984): allocating a controller unconditionally in
+ * That decision was held by a benchmark arc alone, and the benchmark gates no
+ * merge — `codspeed.yml` runs after a push to master, or by hand: allocating a
+ * controller unconditionally in
  * `#handleNoGuardsLeave` leaves the rest of the suite green (measured). These
  * tests are the missing gate — they fail on exactly that edit, so a refactor
  * that moves controller ownership cannot silently re-introduce the cost.

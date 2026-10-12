@@ -4,9 +4,11 @@
 # vitest emits package-relative source paths (SF:src/plugin.ts); Codecov and
 # SonarCloud both need project-root-relative paths
 # (SF:packages/browser-plugin/src/plugin.ts). This rewrites every produced
-# lcov.info in place. Called from the three coverage-producing jobs in ci.yml
-# (pipeline-leaf / base-test / pipeline-sharded) — ONE source of truth so the
-# rewrite can't drift between the (formerly triple-duplicated) steps (#1132).
+# lcov.info in place. Every job that produces an lcov report runs it once, in
+# its "Fix coverage paths" step before the report is uploaded — `git grep -n
+# fix-lcov-paths -- .github` lists them — so the rewrite has ONE source and
+# cannot drift between them (#1132). A job that only downloads the reports
+# (Codecov, Sonar) does not run it again: the rewrite is not idempotent.
 #
 # GNU sed only (`sed -i` with no backup suffix) — runs on the CI Ubuntu runner;
 # do NOT run on macOS/BSD sed (which needs `sed -i ''`).

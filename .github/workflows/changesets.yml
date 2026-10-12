@@ -6,9 +6,11 @@ on:
     types: [completed]
     branches: [master]
   # Manual recovery. The trigger chain push → Post-Merge Build → workflow_run has
-  # exactly one failure mode and it is SILENT: a post-merge run that fails, or one
-  # cancelled by the next push (post-merge.yml runs cancel-in-progress: true),
-  # produces no `workflow_run` with conclusion == 'success', so version bumps sit
+  # exactly one failure mode and it is SILENT: a post-merge run of a release
+  # commit that does not succeed — post-merge.yml gives that commit its own
+  # concurrency group, so a later push does not cancel it, but a failure or a
+  # manual cancel still ends it — produces no `workflow_run` with
+  # conclusion == 'success', so version bumps sit
   # on master unpublished with nothing to alert on. Re-running an older release
   # run is not a substitute: a workflow_run re-run keeps its original event
   # payload, so it checks out that run's head_sha and republishes THAT snapshot,
@@ -438,9 +440,8 @@ jobs:
 
           # Notes = the '## <version>' section of a CHANGELOG (between two headers).
           # Extraction + the "has own (non-dependency) changes" predicate live in
-          # .changeset/changelog-notes.mjs (unit-tested, byte-parity with the
-          # former inline awk/grep — see its tests). The gh/git orchestration
-          # below stays in bash.
+          # .changeset/changelog-notes.mjs. The gh/git orchestration below
+          # stays in bash.
           version_notes() {
             node .changeset/changelog-notes.mjs "$1" "$2"
           }

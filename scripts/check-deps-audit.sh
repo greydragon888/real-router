@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Vulnerability scan over pnpm-lock.yaml + all Cargo.lock via osv-scanner.
-# Mirrors the GHSA database used by GitHub Dependency Review, but runs
-# locally before push instead of waiting for CI.
+# Vulnerability scan over every pnpm-lock.yaml and Cargo.lock git lists, via
+# osv-scanner. Mirrors the GHSA database used by GitHub Dependency Review; its
+# entry in scripts/checks.mjs says where it runs.
 #
 # Skips gracefully when osv-scanner isn't installed — keeps the hook
 # non-blocking for fresh clones. A scanner below OSV_SCANNER_FLOOR fails
@@ -21,10 +21,13 @@ if ! command -v osv-scanner >/dev/null 2>&1; then
   exit 0
 fi
 
-# ⚠ A floor, not an exact pin. pnpm 12 writes pnpm-lock.yaml as two YAML
-# documents, and osv-scanner before 2.6.0 reads only the first, which lists
-# pnpm's own binaries: it prints `No issues found` and exits 0 without seeing
-# the dependency tree. 2.6.0 is the first release built on the osv-scalibr fix
+# ⚠ A floor, not an exact pin. A pnpm 12 lockfile written with the version
+# switch on holds two YAML documents, the first listing pnpm's own binaries,
+# and osv-scanner before 2.6.0 reads only the first: it prints `No issues found`
+# and exits 0 without seeing the dependency tree. This repository's lockfiles
+# are one document (`pmOnFail: ignore` turns the switch off), so the floor
+# guards a lockfile written without that setting. 2.6.0 is the first release
+# built on the osv-scalibr fix
 # (google/osv-scalibr#2385). The failure lives below the floor, and an exact
 # pin would also fail every push after a `brew upgrade`.
 OSV_SCANNER_FLOOR="2.6.0"
@@ -42,7 +45,7 @@ lower="$(printf '%s\n%s\n' "$OSV_SCANNER_FLOOR" "$osv_version" |
   sort -t . -k 1,1n -k 2,2n -k 3,3n | head -n 1)"
 if [ "$lower" != "$OSV_SCANNER_FLOOR" ]; then
   echo "❌ osv-scanner $osv_version is below $OSV_SCANNER_FLOOR — the audit did NOT run."
-  echo "   Below it, a pnpm 12 lockfile scans as pnpm alone and reads as clean."
+  echo "   Below it, a two-document pnpm 12 lockfile scans as pnpm alone and reads as clean."
   echo "   Upgrade with: brew upgrade osv-scanner"
   exit 3
 fi

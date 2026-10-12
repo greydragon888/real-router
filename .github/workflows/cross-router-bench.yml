@@ -1,11 +1,11 @@
 name: Cross Routers Benchmarks
 
-# Scheduled snapshot of the cross-router Playwright + CDP benchmark matrix (5 cohorts ×
-# 12 scenarios) → Pages dashboard + step-summary + artifact. It measures the latest npm
-# release of @real-router/* against the competitors' releases, installed in the
-# cross-router-bench workspace; this checkout's packages/ are not built. GHA runners are shared/noisy,
-# so this is an HONEST SNAPSHOT with RME annotation, NOT a regression gate. Action majors
-# pinned to the current majors (checkout v7 · upload-artifact v7 · download-artifact v8 · pages v5).
+# Scheduled snapshot of the cross-router Playwright + CDP benchmark matrix → Pages
+# dashboard + step-summary + artifact. It measures the latest npm release of
+# @real-router/* against the competitors' releases, installed in the
+# cross-router-bench workspace; this checkout's packages/ are not built. The
+# self-hosted VPS is no quiet lab machine, so this is an HONEST SNAPSHOT with RME
+# annotation, NOT a regression gate.
 
 on:
   schedule:
@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   bench:
-    # Unsharded: ONE job runs all 5 cohorts (as per-SCENARIO node processes — see the matrix
+    # Unsharded: ONE job runs every cohort (as per-SCENARIO node processes — see the matrix
     # step) — coherent snapshot, one honest machine stamp (same VPS → identical env stamp).
     #
     # ⚠ This host is NOT dedicated and NOT low-variance (measured 2026-09-10 on the
@@ -49,7 +49,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      # pnpm + Node 24 + `pnpm install --frozen-lockfile` of cross-router-bench ONLY: it is
+      # pnpm + Node (`.nvmrc`) + `pnpm install --frozen-lockfile` of cross-router-bench ONLY: it is
       # a pnpm workspace of its own, and nothing it runs reads the root's node_modules.
       - uses: ./.github/actions/setup
         with:
@@ -156,7 +156,7 @@ jobs:
         timeout-minutes: 300
         env:
           BENCH_RUNNER: "self-hosted" # machine stamp (env.cpu carries the real CPU model)
-          RUNS: ${{ inputs.runs || '100' }} # via env, not inline in `run:` — a workflow_dispatch input spliced into a run-script is a shell-injection sink (matches the rme-gate step below)
+          RUNS: ${{ inputs.runs || '100' }} # via env, not inline in `run:` — a workflow_dispatch input spliced into a run-script is a shell-injection sink
 
       # always(): a reclaim may be WHY the matrix above failed — exit 137 is its
       # "a worker was killed" code, and reclaim is the quieter neighbour of that.

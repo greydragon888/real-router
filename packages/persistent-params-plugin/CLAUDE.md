@@ -16,7 +16,7 @@ persistentParamsPluginFactory({ lang: "en", theme: "light" });
 
 **Allowed value types:** `string`, `number`, `boolean`, `undefined` (to remove).
 
-`null`, arrays, and objects throw `TypeError` at navigation time. `NaN` and `Infinity` are also rejected (via `isPrimitiveValue` from `type-guards`).
+`null`, arrays, and objects throw `TypeError` at navigation time. `NaN` and `Infinity` are also rejected (via `isPrimitiveValue`, `src/is-primitive-value.ts`).
 
 Empty config (`{}` or `[]`) returns a no-op `PluginFactory` — no interceptor registered, no root path change.
 

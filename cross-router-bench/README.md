@@ -25,7 +25,7 @@ cross-router-bench/          # REAL Chromium (Playwright + CDP), all competitors
 
 Real Chromium via Playwright + CDP, comparing **every competitor in a cohort** (not just one), metrics read straight from the DevTools Protocol (`Performance.getMetrics`, `HeapProfiler`). **Per-cohort only** — routers are compared within one framework; no cross-framework ranking (a cross-framework number is mostly a framework comparison). The same engine-agnostic drivers (interacting by `data-testid`) run against every engine — only the routing layer differs, which keeps it fair and the harness small (N drivers + M apps, not N×M scripts).
 
-Cohorts (each 2–3 FULL routers): **react** (real-router · react-router@8 · @tanstack/react-router) · **vue** (· vue-router@4 · @tanstack/vue-router) · **solid** (· @solidjs/router · @tanstack/solid-router) · **svelte** (· sv-router · @mateothegreat/svelte5-router) · **angular** (· @angular/router). `_baseline` = bare framework floor.
+Cohorts (each 2–3 FULL routers): **react** (real-router · react-router@8 · @tanstack/react-router) · **vue** (· vue-router@5 · @tanstack/vue-router) · **solid** (· @solidjs/router · @tanstack/solid-router) · **svelte** (· sv-router · @mateothegreat/svelte5-router) · **angular** (· @angular/router). `_baseline` = bare framework floor.
 
 Scenarios — `harness/scenarios-registry.mjs` owns the list: `cold-start` · `nav-latency` · `param-nav` · `wide-config` · `deep-config` · `search-param-scaling` · `table-heap` · `nav-churn` · `active-links` · `back-forward` · `link-build` · `nested-switch`. Metrics: CPU (`script` + Blink → `total`), retained heap, and transient `allocKBPerNav` (GC pressure).
 

@@ -1,5 +1,5 @@
 // ci-gate-completeness.test.mjs — meta-test: every ci.yml job is wired into
-// the single required check ("CI Result"), or explicitly allowlisted.
+// the "CI Result" gate, or explicitly allowlisted.
 //
 // Run:  node --test scripts/tests/ci-gate-completeness.test.mjs
 //

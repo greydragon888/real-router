@@ -33,7 +33,7 @@
 Минимальный чек-лист перед коммитом:
 
 ```bash
-pnpm build                                           # 207+ тасков, все адаптеры
+pnpm build                                           # полный граф, все адаптеры
 pnpm -F @real-router/react test:properties -- --run  # property-тесты buildActiveClassName/buildHref
 pnpm -F @real-router/svelte test:properties -- --run # property-тесты (дублируют React, оба должны пройти)
 ```

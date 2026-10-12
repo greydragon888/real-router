@@ -80,7 +80,7 @@ export function withComponentFiles(blocks) {
 // v65 surface — these rules fire on idiomatic non-shipped patterns (callback
 // `push`, deeply-nested `expect()`, `forEach`, boundary constants, `break` in
 // nested loops) where modernizing is pure churn with no shipped value. Applied
-// via the broad files block (section 13.4) so .test/.properties/.stress/helpers/
+// via the broad files block (section 13.3) so .test/.properties/.stress/helpers/
 // *.bench.ts/benchmarks/** are all covered regardless of file naming.
 /** @type {import("eslint").Linter.RulesRecord} */
 const UNICORN_NON_SHIPPED_OFF = {
@@ -162,7 +162,6 @@ const blocks = tsEslint.config(
   // ============================================
   // 4. STYLISTIC RULES (all files)
   // ============================================
-  // Updated for @stylistic/eslint-plugin v5.10.0
   // Changelog: https://github.com/eslint-stylistic/eslint-stylistic/releases
   {
     plugins: {
@@ -628,7 +627,6 @@ const blocks = tsEslint.config(
   // ============================================
   // 7. JSDOC CONFIGURATION (for public APIs)
   // ============================================
-  // Updated for eslint-plugin-jsdoc v64.5.2
   // Changelog: https://github.com/gajus/eslint-plugin-jsdoc/releases
   {
     files: [
@@ -717,7 +715,6 @@ const blocks = tsEslint.config(
   // ============================================
   // 8. UNICORN CONFIGURATION (Modern JS/TS patterns)
   // ============================================
-  // Updated for eslint-plugin-unicorn v75.0.0
   // Changelog: https://github.com/sindresorhus/eslint-plugin-unicorn/releases
   {
     files: ["**/*.ts", "**/*.tsx"],
@@ -812,8 +809,8 @@ const blocks = tsEslint.config(
       // ============================================
       // DISABLED RULES (too strict or unsuitable)
       // ============================================
-      // The library ships a custom Node-style EventEmitter (the `event-emitter`
-      // package) by design — a view-agnostic core cannot depend on the DOM
+      // The library ships a custom Node-style EventEmitter (core's
+      // `src/utils/event-emitter`) by design — a view-agnostic core cannot depend on the DOM
       // `EventTarget`. The rule fired on every internal `new EventEmitter()` in
       // src, tests and benchmarks, so it is off globally rather than per-site.
       "unicorn/prefer-event-target": "off",
@@ -892,7 +889,7 @@ const blocks = tsEslint.config(
       // recommended). Enforced in production src: 0 violations — the only
       // `.forEach` is React's `Children.forEach(children, cb)`, a 2-arg call the
       // rule ignores (it matches only single-arg `<receiver>.forEach(cb)`). The
-      // rule is turned OFF for tests below (section 12) to avoid churning 165
+      // rule is turned OFF for tests below (section 13.3) to avoid churning 165
       // readable test usages into `for…of`.
       "unicorn/prefer-spread": "warn",
       // Off: the rule also reports a guard followed by a return
@@ -917,9 +914,8 @@ const blocks = tsEslint.config(
       // but every site it flagged here is a static constant (the announcer's
       // `data-real-router-announcer` attr) or a test-controlled value (testids,
       // loop indices, route names the test itself generates). None carry an
-      // injection vector, so the rule guards nothing real, while enabling it cost
-      // a jsdom `CSS.escape` polyfill (jsdom@29 ships no global `CSS`) plus
-      // `CSS.escape(...)` wrapping of provably-safe values. The router never
+      // injection vector, so the rule guards nothing real, while enabling it would
+      // cost `CSS.escape(...)` wrapping of provably-safe values. The router never
       // builds selectors from untrusted data, so the forward-looking value is
       // marginal too. Re-enable if that changes.
       "unicorn/require-css-escape": "off",
@@ -1021,11 +1017,10 @@ const blocks = tsEslint.config(
       // (prefer-simplified-conditions, prefer-split-limit) are adopted and
       // autofixed in place.
       // ============================================
-      // v72: `.getHTML()` (Element serialization API) is undefined in jsdom@29 —
+      // v72: `.getHTML()` (Element serialization API) is undefined in jsdom —
       // the entire test env. All 37 hits are test assertions reading `.innerHTML`
       // (`expect(el.innerHTML.trim())…`); autofixing to `.getHTML()` would throw
       // TypeError at runtime. Reading innerHTML in a test is correct and universal.
-      // Same jsdom-missing-API precedent as require-css-escape.
       "unicorn/prefer-dom-node-html-methods": "off",
       // v72: `.then(f, g)` → `.then(f).catch(g)` changes semantics — the 2-arg
       // form's reject handler does NOT catch errors thrown by the fulfill handler.
@@ -1069,7 +1064,6 @@ const blocks = tsEslint.config(
   // ============================================
   // 11. SONARJS CONFIGURATION
   // ============================================
-  // Updated for eslint-plugin-sonarjs v4.2.1
   // Repo moved from archived SonarSource/eslint-plugin-sonarjs to SonarSource/SonarJS
   // Changelog: https://github.com/SonarSource/SonarJS/blob/master/packages/analysis/src/jsts/rules/CHANGELOG.md
   // v4 breaking: removed enforce-trailing-comma, super-invocation (covered by eslint core)
@@ -1282,7 +1276,7 @@ const blocks = tsEslint.config(
   },
 
   // ============================================
-  // 13. BENCHMARK FILES (mitata, tests/benchmarks)
+  // 13. BENCHMARK FILES (tinybench, tests/benchmarks)
   // ============================================
   {
     files: [
@@ -1291,7 +1285,7 @@ const blocks = tsEslint.config(
       "**/tests/benchmarks/**/*.ts",
     ],
     rules: {
-      // Disable ALL vitest rules for Mitata benchmarks (not vitest!)
+      // Disable ALL vitest rules for the tinybench benchmarks (not vitest!)
       "vitest/require-hook": "off",
       "vitest/expect-expect": "off",
       "vitest/valid-title": "off",

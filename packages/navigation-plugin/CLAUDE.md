@@ -302,7 +302,7 @@ src/
 
 ### Key dependency: `browser-env` (partial reuse)
 
-navigation-plugin reuses URL and environment utilities from the private `browser-env` package:
+navigation-plugin reuses URL and environment utilities from `shared/browser-env/` (symlinked as `src/browser-env`):
 
 - `normalizeBase` — base path normalization in factory
 - `safelyEncodePath` — path encoding in `navigation-browser.ts`

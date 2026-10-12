@@ -54,7 +54,7 @@ External dependencies:
 | ------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------- |
 | `@real-router/core` | `getPluginApi`, types (`Router`, `PluginApi`, `State`, etc.)            | `factory.ts`, `plugin.ts`, `index.ts`                       |
 | `browser-env`       | Browser abstraction, popstate + hashchange handling, validation, URL parsing helpers | `factory.ts`, `plugin.ts`, `validation.ts`, `hash-utils.ts` |
-| `type-guards`       | `isStateStrict` (`history.state` validation)                            | `index.ts` (re-exported as `isState`)                       |
+| `browser-env`       | `isStateStrict` from `state-guard.ts` (`history.state` validation)      | `index.ts` (re-exported as `isState`)                       |
 
 ## Factory + Class Pattern
 
@@ -136,9 +136,9 @@ export function hashPluginFactory(opts?, browser?): PluginFactory {
 
 ## Browser API Abstraction
 
-The `Browser` interface, `createSafeBrowser()`, `createFallbackBrowser()`, `safelyEncodePath()`, and all SSR fallback logic live in the private `browser-env` package — shared between `browser-plugin` and `hash-plugin`.
+The `Browser` interface, `createSafeBrowser()`, `createHistoryFallbackBrowser()`, `safelyEncodePath()`, and all SSR fallback logic live in `shared/browser-env/`, symlinked into this package as `src/browser-env` — shared between `browser-plugin` and `hash-plugin`.
 
-See [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) for details on the Browser interface and its two implementations.
+See [`shared/browser-env/`](../../shared/browser-env/) — `types.ts` (`Browser`), `safe-browser.ts`, `ssr-fallback.ts` — for the Browser interface and its two implementations.
 
 **Key points for hash-plugin:**
 
@@ -382,7 +382,7 @@ After the current transition completes, `processDeferredEvent()` processes the l
 
 An **external** fragment change fires `hashchange` alone (no popstate), so it is never dropped — that is the gap #759 closed.
 
-See [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) for implementation details.
+See [`shared/browser-env/popstate-handler.ts`](../../shared/browser-env/popstate-handler.ts) (`createHashSyncLifecycle`) for implementation details.
 
 ## Hash Utilities
 
@@ -429,7 +429,7 @@ no `context` parameter. See
 
 Popstate event handling (`getRouteFromEvent`, `updateBrowserState`), critical error recovery, and deferred event processing all live in `browser-env` — shared between browser-plugin and hash-plugin.
 
-See [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) for details on:
+See [`shared/browser-env/`](../../shared/browser-env/) for details on:
 
 - Route extraction from popstate events (history.state validation → URL matching fallback)
 - `historyState` as a subset of `State` (only `name`, `params`, `path` stored in `history.state`)
@@ -551,7 +551,7 @@ buildUrl("users.profile", { id: "123" })
 
 - [ARCHITECTURE.md](../../ARCHITECTURE.md) — System architecture of the monorepo
 - [core/ARCHITECTURE.md](../core/ARCHITECTURE.md) — Core architecture (Plugin API, addInterceptor)
-- [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) — Shared browser abstractions
+- [shared/browser-env/](../../shared/browser-env/) — Shared browser abstractions (source, symlinked as `src/browser-env`)
 - [browser-plugin/ARCHITECTURE.md](../browser-plugin/ARCHITECTURE.md) — History API plugin (sibling)
 - [INVARIANTS.md](INVARIANTS.md) — Property-based test invariants
 - [CLAUDE.md](CLAUDE.md) — Quick reference for AI agents

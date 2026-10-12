@@ -41,8 +41,8 @@ paths:
   # extractor does not follow symlinked directories — measured on run
   # 30711121982, of 586 extracted files ZERO were under shared/. So shared/ is
   # listed here by its real path, as one glob: a new shared dir is in scope the
-  # day it lands. Same reason sonar-project.properties lists shared/* explicitly
-  # (see ci.yml "Compute Sonar scope").
+  # day it lands. For the same reason the Sonar scope names each shared/<dir>
+  # by its real path (`node scripts/check-coverage-scope.mjs --emit`).
   - "shared/**"
 
 # Queries to run

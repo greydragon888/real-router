@@ -14,9 +14,9 @@
  * ⚑ **The numbers, measured 2026-09-05 on the `a9b45fa6c` post-merge.** The
  * slowest cell in core's suite runs 1159 ms locally. Against the 60 s timeout in
  * force at the time that was 52× headroom. The runner delivered 63× on the file
- * and 85× on its worst cell, so both timed out. The timeout is now 300 s; this
- * guard keeps the RATIO honest as cells are added, which the timeout alone
- * cannot do.
+ * and 85× on its worst cell, so both timed out. This guard reads the timeout
+ * from the config (`testTimeout`) and keeps the RATIO honest as cells are
+ * added, which the timeout alone cannot do.
  *
  * ⚠ It asserts a ratio, never a wall-time. A slow MACHINE moves every duration
  * together and must not red this — what reds it is one cell growing against the

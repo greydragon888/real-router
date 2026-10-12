@@ -18,7 +18,7 @@ RED='\033[0;31m'
 print_error() { echo -e "${RED}✗${NC} $1"; }
 
 # Warning + confirmation
-print_warning "This will remove ALL node_modules directories AND pnpm-lock.yaml!"
+print_warning "This will remove node_modules of the root and packages/* AND the root pnpm-lock.yaml!"
 read -p "Are you sure? (y/N) " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -32,7 +32,7 @@ echo "🔥 DEEP clean of real-router monorepo (including node_modules)..."
 clean_artifacts
 
 # Step 2: node_modules
-print_step "Removing all node_modules directories..."
+print_step "Removing node_modules of the root and packages/*..."
 rm -rf node_modules
 find packages -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null || true
 

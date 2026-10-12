@@ -3,8 +3,8 @@
  * Stranded-release guard.
  *
  * A release commit allocates a version for every bumped package. If the
- * `Post-Merge Build` for that commit is CANCELLED — which the next push to
- * master does automatically — `Changesets` never fires, `changeset publish`
+ * `Post-Merge Build` for that commit does not end in success — cancelled or
+ * failed — `Changesets` never fires, `changeset publish`
  * never runs, and the allocated version ends up existing in exactly one place:
  * its own `CHANGELOG.md` section. No npm release, no git tag. A reader who
  * follows the file to `npm i @real-router/core@0.118.0` gets a 404 (#2057).
@@ -255,7 +255,7 @@ if (fresh.length > 0) {
     `\n❌ ${fresh.length} version(s) exist in a CHANGELOG and nowhere else:\n  ` +
       fresh.join("\n  ") +
       "\n\nA release was allocated and never published. Either its " +
-      "`Post-Merge Build` was cancelled by the next push, so `Changesets` " +
+      "`Post-Merge Build` did not succeed, so `Changesets` " +
       "never fired (#2057), or the release PR was merged while `master` " +
       "carried changesets it did not include, so the `Changesets` run on its " +
       "commit opened the next release PR instead of publishing. For the first, " +

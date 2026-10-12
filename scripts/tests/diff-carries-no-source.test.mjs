@@ -1,12 +1,13 @@
-// diff-carries-no-source.test.mjs — meta-tests for the predicate three CI
-// checks consult before reading code (#2433).
+// diff-carries-no-source.test.mjs — meta-tests for the predicate the CI code
+// readers consult before reading code (#2433).
 //
 // Run:  node --test scripts/tests/diff-carries-no-source.test.mjs
 //       (run by `scripts/scripts-tests.mjs` in pre-push, and in CI as
 //       `node:skip-facts`, which no context skips: the groups of
 //       `scripts/tests` skip on the `no-source` this predicate decides)
 //
-// The predicate is consulted by the `sonar` job, by Codecov and by jscpd. A
+// The predicate is consulted by the ci.yml jobs that read `check`'s
+// `no_source` and by the checks whose `ciSkip` lists `no-source`. A
 // false positive — answering "no source" on a diff that has some — is a check
 // silently not run on code that changed, which is the #1127 class: nothing goes
 // red, the report just never happens. So the cells below spend most of their
@@ -111,7 +112,8 @@ test("`.changeset/` is matched at *.md only — the directory also holds code", 
   assert.equal(isManifestOnlyPath(".changeset/tidy-donkeys-shave.md"), true);
 
   // Six .mjs scripts live beside the changesets: the changelog formatter, the
-  // PR-ref extractor, the release-plan checks. SonarCloud reads every one.
+  // PR-ref extractor, the release-plan checks. Each is an input of turbo's
+  // `//#test:tooling`.
   for (const script of git("ls-files", ".changeset")
     .split("\n")
     .filter((p) => p && !p.endsWith(".md"))) {
@@ -244,7 +246,7 @@ test("a dependency bump is accepted too, and that is the point", (t) => {
 
   // The predicate asks what the diff carries, not what produced it. A bump of
   // a devDependency changes `package.json` and the lockfile and no code, so the
-  // three checks have nothing new to read there either — measured on master,
+  // code readers have nothing new to read there either — measured on master,
   // where dependency bumps land as their own commits.
   const bumps = git(
     "log",

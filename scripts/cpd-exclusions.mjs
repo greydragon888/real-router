@@ -28,7 +28,7 @@
 // float and checks its range after rounding, so 0.99999999 and 1.00000001 both
 // run as 1, again without a word. The text is what is checked — `JSON.parse`
 // already reads 0.99999999999999999 as 1. `JSON.parse` takes more than jscpd
-// 5.3.2 does — a number out of the range jscpd parses, `1e400`, or nesting 130
+// does — a number out of the range jscpd parses, `1e400`, or nesting 130
 // deep drops the whole file there; a value of another type, a negative count or
 // a `mode` it does not know drops that value, and a reporter it does not know
 // it drops — so the test has jscpd judge this repository's `.jscpd.json`

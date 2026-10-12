@@ -28,7 +28,7 @@ $ARGUMENTS
 
 - **Механическое многофайловое применение делегируй субагенту** (`general-purpose`) с точными per-пункт спеками из черновиков issue + явным списком «out of scope» (код-пункты) + «не коммить». Потом **сам РЕВЬЮ полный `git diff`** — доки требуют точности (см. гочи ниже); субагент может промахнуться мимо строки или разъехать таблицу.
   - **⚠️ Permitted-file список ОБЯЗАН покрывать КАЖДЫЙ файл, который трогают пункты issue.** Мульти-пунктовый issue часто размазан по нескольким файлам (`ARCHITECTURE.md` + `README.md` + `INVARIANTS.md` + src-коммент) — вычитай file-таргеты ВСЕХ пунктов issue ПЕРЕД делегированием и внеси их все в Touch-ONLY. Заскоупишь узко — субагент верно ПОМЕТИТ забытый пункт «out of scope», но не тронет → issue закроется наполовину, а `Closes #N` соврёт. (Прогон #1207: заскоупил на `ARCHITECTURE.md`, items 3-4 жили в README/INVARIANTS — пришлось дочинять руками перед `Closes`.)
-- **Коммит на issue** (или на пакет — pure-doc обычно разбит по пакетам) через `/commit-msg`. **Changeset НЕ нужен** — `.md`+комменты не триггерят `changeset-check` (он требует changeset лишь на поведенческую правку public-`src/`).
+- **Коммит на issue** (или на пакет — pure-doc обычно разбит по пакетам) через `/commit-msg`. **Changeset НЕ нужен** — поведение не меняется, а push идёт в master мимо PR, где `changeset-check` не запускается (на PR он судит по путям: правка комментария в public-`src/` его включает).
 - **`Closes #N`** — только если ВСЕ пункты issue pure-doc (закроется push'ем в master, т.к. это default-branch). **`Refs #N`** — если issue СМЕШАННЫЙ (doc-часть готова, код-хвост остаётся → issue должен остаться OPEN).
 - **⚠️ Wiki-страница → коммит в ОТДЕЛЬНЫЙ репо (`real-router.wiki`), его коммиты НЕ закрывают main-repo issue.** Для wiki-issue: `Refs #N` в коммите + **ручной `gh issue close #N` ПОСЛЕ wiki-push** (в отличие от `.md`/комментов в main-repo, где `Closes #N` срабатывает push'ем master). Issue, размазанный по обоим репо (часть — main `INVARIANTS`, часть — wiki-страница), закрывай только когда ОБА запушены.
 
@@ -44,7 +44,7 @@ $ARGUMENTS
 Pure-doc → master — инфра-поток CLAUDE.md (без PR, без changeset). Но **push — только по явной просьбе** пользователя (стандартный гейт; «сделай doc-batch» ≠ «запушь»).
 
 - **Сперва rebase, если локальный master разошёлся:** мид-сессионный коммит в master мог лечь на устаревшую базу (за сессию origin/master ушёл вперёд) — `git fetch origin && git rebase origin/master` ПЕРЕД push. (Прогон: локальный doc-коммит сел на до-мёрж базу; харнесс ребейзнул его при клинапе worktree — проверяй `git log origin/master..master` перед push.)
-- `git push origin master --no-verify` — doc-only, валидировать нечего (комменты+`.md`, поведение/тесты не тронуты; полная pre-push сборка делегируется пользователю). Push default-branch'а закрывает `Closes #N`-issue — сверь `gh issue view <N> --json state` после.
+- `git push origin master`, без `--no-verify`: pre-push проверяет и доки — `lint:prose`, `lint:doc-code`, `lint:doc-dup` (записи стадии `pre-push` в `scripts/checks.mjs`), — а push в master мимо PR других проверок не получает. Push default-branch'а закрывает `Closes #N`-issue — сверь `gh issue view <N> --json state` после.
 
 ## Шаг 3 — Код-хвост → ветка/PR
 

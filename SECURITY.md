@@ -99,7 +99,7 @@ Real-router is designed for production use. However, always follow these best pr
 We use automated tools to keep dependencies updated:
 
 - **Dependabot**: Automated security updates for dependencies
-- **pnpm audit**: Regular vulnerability scanning
+- **osv-scanner** (`pnpm lint:audit`): known-vulnerability scan of every lockfile, in pre-push and CI
 - **CodeQL**: Automated security analysis
 
 To check for known vulnerabilities in your installation:

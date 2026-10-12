@@ -9,7 +9,7 @@ import { commonConfig } from "./vitest.config.common.mjs";
  *
  * Extends common config with:
  * - Coverage disabled (focus on invariants, not coverage)
- * - Extended timeout (30s for multiple iterations)
+ * - Extended timeout (`testTimeout` below, for multiple iterations)
  * - Reduced workers (2 for stability)
  *
  * @see https://vitest.dev/config/

@@ -32,11 +32,11 @@
  *
  * ⚠ **Why a root script and not a test per package.** A scan rooted inside a
  * package cannot see `shared/`: `globSync` over a parent returns zero files
- * from a symlinked directory (#1838), and `shared/dom-utils` reaches five
- * adapters that way. From the repo root `shared/` is an ordinary directory. The
- * alternative — one guard per coverage owner — would be four copies of this
- * predicate that must stay identical, which is the class it guards, one level
- * up.
+ * from a symlinked directory (#1838), and `shared/dom-utils` reaches every
+ * adapter that way. From the repo root `shared/` is an ordinary directory. The
+ * alternative — one guard per coverage owner — would be a copy of this
+ * predicate per owner, all of which must stay identical, which is the class it
+ * guards, one level up.
  *
  * ⚑ Files come from `git ls-files`, so each shared source is visited ONCE: git
  * stores a consumer's `src/dom-utils` as a symlink entry, not as its contents.

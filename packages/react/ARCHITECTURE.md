@@ -253,7 +253,7 @@ tests/
 
 **Legacy entry:** One smoke test — verifies all exports exist and basic render + navigation works. Full test suite runs against main entry only. Both entries re-export the same code, so duplicating tests is unnecessary.
 
-**Coverage:** 100% required (enforced in vitest.config).
+**Coverage:** enforced by vitest; the thresholds live in the vitest config, not here.
 
 ### Performance Tests
 

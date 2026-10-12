@@ -11,7 +11,7 @@ $ARGUMENTS
 
 ### Scaffold
 
-- `package.json` — version **`0.0.1`** (changesets will bump to `0.1.0` on first release), `"type": "commonjs"`, dual ESM/CJS exports (`types` → `import` → `require`), `"bundle"` script (not `"build"` — turbo `build` task is an orchestrator with no own command)
+- `package.json` — version **`0.0.1`** (changesets will bump to `0.1.0` on first release), `"type": "commonjs"`, dual ESM/CJS exports (`@real-router/internal-source` → `types` → `import` → `require`), `"bundle"` script (not `"build"` — turbo `build` task is an orchestrator with no own command)
 - `tsconfig.json` — extends `../../tsconfig.json`, include `src` and `tests`
 - `tsconfig.node.json` — extends `../../tsconfig.node.json`, include `*.mts` and root configs
 - `tsdown.config.mts` — use `createBrowserConfig()` or `createIsomorphicConfig()` from `../../tsdown.base.js` (the file on disk is `tsdown.base.ts` — the `.js` specifier is NodeNext resolution, not a typo)

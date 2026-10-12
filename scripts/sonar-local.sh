@@ -1,8 +1,9 @@
 #!/bin/bash
 
-# Local SonarCloud analysis — mirrors the `sonar` job in
-# .github/workflows/sonar-trusted.yml so `pnpm sonar:local` analyses the SAME
-# scope and coverage the CI scanner does (instead of a stale/default scope).
+# Local SonarCloud analysis — mirrors what CI hands the scanner (ci.yml's `sonar`
+# job for a pull request from this repository, sonar-trusted.yml for a fork's)
+# so `pnpm sonar:local` analyses the SAME scope and coverage the CI scanner does
+# (instead of a stale/default scope).
 #
 # Why this script exists:
 #   sonar-project.properties intentionally OMITS sonar.sources / sonar.tests /
@@ -14,6 +15,7 @@
 #     1. "Get version from core package"  → -Dsonar.projectVersion
 #     2. "Compute Sonar scope"            → -Dsonar.sources / .tests / lcov paths
 #     3. "Fix coverage paths"             → rewrite lcov SF: to repo-root-relative
+#        (a step of the jobs that produce coverage)
 #
 # Note: this UPLOADS the analysis to SonarCloud (sonar.qualitygate.wait=true in
 # sonar-project.properties → it blocks until the server returns a verdict), so
@@ -34,7 +36,7 @@ pnpm type-check
 echo "🧪 coverage (lcov)..."
 # `turbo run test` (NOT `-- --coverage`) — coverage is config-enabled in
 # vitest.config.unit.mts (coverage.enabled: true), so plain `test` already
-# emits lcov. This mirrors CI's "Test with coverage" step exactly. The
+# emits lcov. CI's "Test with coverage" step passes no flag either. The
 # `-- --coverage` passthrough is deliberately avoided: it gives `test` a
 # distinct turbo cache key (→ cold full re-run every time, slow) and forces
 # every jsdom package to execute coverage concurrently, which triggers a

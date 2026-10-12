@@ -34,11 +34,9 @@ allow-licenses:
   - Apache-2.0 WITH LLVM-exception  # target-lexicon. Apache-2.0 + extra
                       # patent grant for LLVM-derived projects.
 
-# Transitive devDeps with SPDX strings the allow-list doesn't disambiguate but
-# that are de-facto permissive. All four are vendored by jsdom / Playwright /
-# pnpm tooling and have been present in pnpm-lock.yaml since before the Ink
-# entry PR — the action only surfaces them now because the dependency graph
-# shifted. Exempted by name (any version) for future-proofing.
+# Packages whose SPDX strings the allow-list doesn't disambiguate but that are
+# de-facto permissive; each entry says why. Exempted by name (any version) for
+# future-proofing.
 allow-dependencies-licenses:
   # "JSON AND MIT" — JSON license (harmless, dual-listed with MIT).
   - pkg:npm/parse-statements

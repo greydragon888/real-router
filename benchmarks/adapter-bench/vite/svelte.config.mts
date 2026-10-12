@@ -10,12 +10,10 @@ const config = adapterBuild(
   [svelte()],
 );
 
-// @real-router/svelte is the ONE adapter without the internal-source export
-// condition (deliberate: its src entry imports .svelte files, which tsc
-// cannot consume — the condition would break monorepo-wide type-check).
-// Vite CAN compile .svelte, so alias the package straight to src here to
-// keep this suite measuring live source like the others (and to build at
-// all on the CI runner, where packages/svelte/dist never exists).
+// @real-router/svelte resolves through the `@real-router/internal-source`
+// condition base.mts selects for this suite, to its src entry; this alias
+// names the same file. Vite compiles the .svelte files that entry imports,
+// and the CI runner builds no packages/svelte/dist.
 config.resolve = {
   ...config.resolve,
   alias: {

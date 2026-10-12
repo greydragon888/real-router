@@ -5,12 +5,12 @@ $ARGUMENTS
 
 Формат аргументов:
 
-- Имя пакета (как в pnpm `-F`) — например `@real-router/core`, `path-matcher`, `@real-router/sources`. Резолвится в `packages/<dir>` (для scoped — отбрось `@real-router/`); анализируется вся стресс-поверхность + существующие `tests/stress/*.stress.ts`.
+- Имя пакета (как в pnpm `-F`) — например `@real-router/core`, `@real-router/route-utils`, `@real-router/sources`. Резолвится в `packages/<dir>` (для scoped — отбрось `@real-router/`); анализируется вся стресс-поверхность + существующие `tests/stress/*.stress.ts`.
 - Опционально `--scenarios-only` — только матрица пробелов + спецификации сценариев, без написания и мутационной валидации тестов (по умолчанию: спецификация → генерация теста → мутационная валидация каждого → отчёт).
 
 ```
 /stress-scenarios @real-router/core
-/stress-scenarios search-params --scenarios-only
+/stress-scenarios @real-router/route-utils --scenarios-only
 ```
 
 ---
@@ -36,7 +36,7 @@ $ARGUMENTS
 
 Применимость архетипа зависит от того, ЧТО пакет содержит. Не навязывай stateful-архетипы чистым функциям и наоборот:
 
-- **Чистые функции** (path-matcher, search-params, type-guards, route-tree): нет состояния, подписок, async, таймеров → применимы оси **C, D, J, K**. Оси A/B/E/F-async/G/H/I — **N/A**.
+- **Чистые функции** (движок core `packages/core/src/engine/`; гарды `packages/validation-plugin/src/type-guards/`): нет состояния, подписок, async, таймеров → применимы оси **C, D, J, K**. Оси A/B/E/F-async/G/H/I — **N/A**.
 - **Stateful / реактивные / async** (core, sources, rx, плагины, адаптеры): применимы **все** оси A–K в зависимости от поверхности (Шаг 1).
 
 **Жёсткий фильтр применимости (применяй ДО объявления пробела).** Архетип — пробел ТОЛЬКО если дискриминирующий тест реально возможен И ещё не покрыт. Это НЕ пробел (пометь `N/A` с причиной), когда:
@@ -47,9 +47,9 @@ $ARGUMENTS
 4. **Синхронный, однопоточный** → нет async/concurrency-поверхности (оси B / F-async / G / H — N/A).
 5. **Решение задокументировано** в CLAUDE.md пакета («No stress tests — intentional, not a gap») → не предлагай, не релитигируй.
 
-Канонические примеры ОПРАВДАННОГО отсутствия (НЕ пробелы): **`fsm`** — всё ограничено (`#listeners` bounded-by-peak и ридит reuse-property; `#actions` hard-capped; send-args GC-masked; синхронный; единственный unbounded-путь — misuse `on(undeclaredFrom)` — это guard-кандидат, не стресс-тест) — и **`logger`** — singleton с фиксированным набором полей, нет растущих коллекций/подписок/таймеров. Оба документируют это явно в CLAUDE.md. Анализируешь такой пакет → отчёт = «N/A по всем осям, причина: <…>», ноль сгенерированных тестов — это валидный, правильный результат, а не недоработка.
+Канонические примеры ОПРАВДАННОГО отсутствия (НЕ пробелы) — модули core `src/utils/`: **`fsm`** — всё ограничено (`#listeners` bounded-by-peak и ридит reuse-property; `#actions` hard-capped; send-args GC-masked; синхронный; `on()` бросает на необъявленном `from` и на паре без ребра — unbounded-пути нет) — и **`logger`** — экземпляр на роутер с фиксированным набором полей, нет растущих коллекций/подписок/таймеров. Оба документируют это явно в своём CLAUDE.md (`packages/core/src/utils/fsm/`, `packages/core/src/utils/logger/`). Анализируешь такой модуль → отчёт = «N/A по всем осям, причина: <…>», ноль сгенерированных тестов — это валидный, правильный результат, а не недоработка.
 
-**Зрелость модуля калибрует ОЖИДАНИЯ (но не строгость).** На ЗРЕЛОМ пакете с обширным functional+stress (как `core` — единственный крупный модуль; остальные в несколько раз меньше) ожидай МАЛО пробелов: бóльшая часть работы — доказать, что кандидат избыточен/N-A, а не родить тест; таймбоксируй sweep, не выдумывай пробел ради числа. На НОВОМ модуле с пустым `tests/stress/` — наоборот: пустота тут означает «не начато», и каждый применимый (по фильтру) архетип = реальный пробел; не списывай в N/A из усталости. «Ноль тестов — валидный результат» относится ТОЛЬКО к пакетам, где архетипы генуинно N/A (fsm/logger), НЕ к новому непокрытому модулю.
+**Зрелость модуля калибрует ОЖИДАНИЯ (но не строгость).** На ЗРЕЛОМ пакете с обширным functional+stress (как `core` — единственный крупный модуль; остальные в несколько раз меньше) ожидай МАЛО пробелов: бóльшая часть работы — доказать, что кандидат избыточен/N-A, а не родить тест; таймбоксируй sweep, не выдумывай пробел ради числа. На НОВОМ модуле с пустым `tests/stress/` — наоборот: пустота тут означает «не начато», и каждый применимый (по фильтру) архетип = реальный пробел; не списывай в N/A из усталости. «Ноль тестов — валидный результат» относится ТОЛЬКО к модулям, где архетипы генуинно N/A (fsm/logger), НЕ к новому непокрытому модулю.
 
 ## Шаг 1 — Картируй стресс-чувствительную поверхность из `src/`
 
@@ -95,16 +95,16 @@ $ARGUMENTS
 
 ### (A) Память / утечки
 
-| Архетип                            | Абьюз-паттерн · триггер                                                                          | Дискриминация · эталон                                                                                                                                       |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| listener-churn                     | N×subscribe→unsubscribe; триггер — любой стор подписок                                           | COUNT net-zero (added===removed) или heap genuine-linear; `core/event-listener-memory`, `event-emitter/subscription-churn`, `sources/listener-set-integrity` |
-| dynamic-key record cleanup         | on/off по 200k уникальных имён; триггер — `Map` по динамическому ключу                           | heap genuine-linear: запись удаляется при `size→0`; `event-emitter/event-emitter` (#750)                                                                     |
-| interceptor/extension accumulation | N×add→remove обёрток/расширений; триггер — wrap/extend с cleanup                                 | heap genuine-linear (~1.7MB при поломке vs ~106KB healthy); `core/plugin-lifecycle-memory`                                                                   |
-| eager-subscription leak            | много рефов на один cached-source; триггер — eager-подписка вверх по потоку                      | WeakMap GC-eligible на dispose; `sources/eager-subscription-leak`, `rx/lifecycle-leak`                                                                       |
-| abort-controller leak              | abort-listener на `signal` не снят на `complete()`; триггер — `addEventListener` на AbortSignal  | COUNT released; `rx/lifecycle-leak`, `navigation-plugin/abort-controller-leak`                                                                               |
-| dual-subscription teardown         | обе подписки сняты на ЛЮБОМ терминале (complete/error/unsub); триггер — оператор notifier+source | `rx/takeuntil-lifecycle`                                                                                                                                     |
-| long-run stability                 | 10k+ навигаций/циклов, heap к baseline; триггер — per-op состояние                               | heap genuine-linear при N≥порога; `sources/long-run-leak`, `core/navigation-memory`                                                                          |
-| state-retention per-op             | удержание State/entry на операцию; триггер — core/плагин держит per-nav                          | heap genuine-linear **только при N≥20k** (иначе сигнал в шуме); `core/guards-stress` S5.3                                                                    |
+| Архетип                            | Абьюз-паттерн · триггер                                                                          | Дискриминация · эталон                                                                                                                                                  |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| listener-churn                     | N×subscribe→unsubscribe; триггер — любой стор подписок                                           | COUNT net-zero (added===removed) или heap genuine-linear; `core/event-listener-memory`, `core/utils/event-emitter/subscription-churn`, `sources/listener-set-integrity` |
+| dynamic-key record cleanup         | on/off по 200k уникальных имён; триггер — `Map` по динамическому ключу                           | heap genuine-linear: запись удаляется при `size→0`; `core/utils/event-emitter/event-emitter` (#750)                                                                     |
+| interceptor/extension accumulation | N×add→remove обёрток/расширений; триггер — wrap/extend с cleanup                                 | heap genuine-linear (~1.7MB при поломке vs ~106KB healthy); `core/plugin-lifecycle-memory`                                                                              |
+| eager-subscription leak            | много рефов на один cached-source; триггер — eager-подписка вверх по потоку                      | WeakMap GC-eligible на dispose; `sources/eager-subscription-leak`, `rx/lifecycle-leak`                                                                                  |
+| abort-controller leak              | abort-listener на `signal` не снят на `complete()`; триггер — `addEventListener` на AbortSignal  | COUNT released; `rx/lifecycle-leak`, `navigation-plugin/abort-controller-leak`                                                                                          |
+| dual-subscription teardown         | обе подписки сняты на ЛЮБОМ терминале (complete/error/unsub); триггер — оператор notifier+source | `rx/takeuntil-lifecycle`                                                                                                                                                |
+| long-run stability                 | 10k+ навигаций/циклов, heap к baseline; триггер — per-op состояние                               | heap genuine-linear при N≥порога; `sources/long-run-leak`, `core/navigation-memory`                                                                                     |
+| state-retention per-op             | удержание State/entry на операцию; триггер — core/плагин держит per-nav                          | heap genuine-linear **только при N≥20k** (иначе сигнал в шуме); `core/guards-stress` S5.3                                                                               |
 
 ### (B) Конкурентность / гонки
 
@@ -122,26 +122,26 @@ $ARGUMENTS
 
 ### (C) Масштаб / пропускная способность
 
-| Архетип                 | Абьюз-паттерн · триггер                                                                       | Дискриминация · эталон                                                                                                              |
-| ----------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| operation churn linear  | 1k–20k операций, heap bounded + correctness финального состояния                              | heap throughput + PARITY на финале; `core/navigation-memory`                                                                        |
-| trie/tree scaling       | 500–10k маршрутов + deep/wide дерево; build+match без drop/alias                              | TIMING <~1ms/pair + correctness; `core/route-tree-scaling`, `path-matcher/registration-scale`                                       |
-| wide-breadth N-distinct | N уникальных ключей register/parse без drop/merge/alias                                       | correctness **sampled every Kth** + catastrophe-ceiling; `search-params/parse-scale` (50k), `type-guards/serializable-scale` (300k) |
-| listener fan-out        | N listeners × M events = точно N×M вызовов; триггер — широковещание                           | PARITY точный счёт; `core/navigate-to-not-found` S12.3, `sources/cross-source`                                                      |
-| predicate hot-path      | 10k+ `isActiveRoute`/`areStatesEqual`/`shouldUpdate`; триггер — предикат на каждый transition | TIMING < X µs/call + детерминированный split count; `core/is-active-route`, `hot-path-utilities`                                    |
-| CRUD under nav          | add/remove/update/clear 3k циклов; `has()`/config проверены per cycle                         | PARITY per-cycle + heap throughput; `core/route-crud`                                                                               |
+| Архетип                 | Абьюз-паттерн · триггер                                                                       | Дискриминация · эталон                                                                                                                                |
+| ----------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| operation churn linear  | 1k–20k операций, heap bounded + correctness финального состояния                              | heap throughput + PARITY на финале; `core/navigation-memory`                                                                                          |
+| trie/tree scaling       | 500–10k маршрутов + deep/wide дерево; build+match без drop/alias                              | TIMING <~1ms/pair + correctness; `core/route-tree-scaling`, `core/engine/path-matcher/registration-scale`                                             |
+| wide-breadth N-distinct | N уникальных ключей register/parse без drop/merge/alias                                       | correctness **sampled every Kth** + catastrophe-ceiling; `core/engine/search-params/parse-scale` (50k), `validation-plugin/serializable-scale` (300k) |
+| listener fan-out        | N listeners × M events = точно N×M вызовов; триггер — широковещание                           | PARITY точный счёт; `core/navigate-to-not-found` S12.3, `sources/cross-source`                                                                        |
+| predicate hot-path      | 10k+ `isActiveRoute`/`areStatesEqual`/`shouldUpdate`; триггер — предикат на каждый transition | TIMING < X µs/call + детерминированный split count; `core/is-active-route`, `hot-path-utilities`                                                      |
+| CRUD under nav          | add/remove/update/clear 3k циклов; `has()`/config проверены per cycle                         | PARITY per-cycle + heap throughput; `core/route-crud`                                                                                                 |
 
 ### (D) Враждебный / патологический вход
 
-| Архетип                  | Абьюз-паттерн · триггер                                                                          | Дискриминация · эталон                                                                                           |
-| ------------------------ | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| malformed-encoding flood | 15k невалид-UTF-8 `%`-последовательностей; триггер — percent-decode недоверенного                | 0 throws + все → `undefined`; `path-matcher/decode-safety`                                                       |
-| multi-MB / massive-count | 5MB значение / 100k params / 100k повторов ключа; триггер — парсер недоверенного URL             | `not.toThrow` + bounded **correct** output (length+sampling); `search-params/pathological-input`                 |
-| corrupted / exotic state | null/partial/proto-polluted/Map/Symbol как внешний state; триггер — потребление внешнего объекта | URL/fallback корректен + нет prototype pollution; `browser-plugin/corrupted-state-storm`, `exotic-state`         |
-| fragment/separator leak  | `?q#frag` × 30k — фрагмент не утекает в значение param; триггер — парсинг query                  | равенство значения + scan на `#`; `path-matcher/fragment-strip`                                                  |
-| circular reference       | прямой+непрямой цикл; триггер — рекурсивный сериализатор/валидатор                               | throw `TypeError` (не `RangeError`); `sources/canonical-json-pathological`, `type-guards/serializable-scale`     |
-| deep-nesting no-overflow | 500k-глубокая цепочка; триггер — рекурсивная структура на недоверенном                           | итеративный обход, **нет `RangeError`**; `type-guards/serializable-scale`, `route-tree/build-scale` (1000-level) |
-| DAG-shared subtree       | 100+ ссылок на один объект; триггер — done-set vs on-path                                        | не ложный цикл + линейно; `sources/canonical-json`, `type-guards` diamond                                        |
+| Архетип                  | Абьюз-паттерн · триггер                                                                          | Дискриминация · эталон                                                                                                  |
+| ------------------------ | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| malformed-encoding flood | 15k невалид-UTF-8 `%`-последовательностей; триггер — percent-decode недоверенного                | 0 throws + все → `undefined`; `core/engine/path-matcher/decode-safety`                                                  |
+| multi-MB / massive-count | 5MB значение / 100k params / 100k повторов ключа; триггер — парсер недоверенного URL             | `not.toThrow` + bounded **correct** output (length+sampling); `core/engine/search-params/pathological-input`            |
+| corrupted / exotic state | null/partial/proto-polluted/Map/Symbol как внешний state; триггер — потребление внешнего объекта | URL/fallback корректен + нет prototype pollution; `browser-plugin/corrupted-state-storm`, `exotic-state`                |
+| fragment/separator leak  | `?q#frag` × 30k — фрагмент не утекает в значение param; триггер — парсинг query                  | равенство значения + scan на `#`; `core/engine/path-matcher/fragment-strip`                                             |
+| circular reference       | прямой+непрямой цикл; триггер — рекурсивный сериализатор/валидатор                               | throw `TypeError` (не `RangeError`); `sources/canonical-json-pathological`, `validation-plugin/serializable-scale`      |
+| deep-nesting no-overflow | 500k-глубокая цепочка; триггер — рекурсивная структура на недоверенном                           | итеративный обход, **нет `RangeError`**; `validation-plugin/serializable-scale`, `core/engine/build-scale` (1000-level) |
+| DAG-shared subtree       | 100+ ссылок на один объект; триггер — done-set vs on-path                                        | не ложный цикл + линейно; `sources/canonical-json`, `validation-plugin/serializable-scale` S3                           |
 
 ### (E) Жизненный цикл / teardown
 
@@ -161,12 +161,12 @@ $ARGUMENTS
 | --------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
 | error-storm recovery              | 500×CANNOT_ACTIVATE/SAME_STATES/ROUTE_NOT_FOUND; FSM остаётся READY            | точные счётчики + готовность к след. операции; `core/error-path-storm`                                 |
 | error fan-out                     | 10 плагинов × 500 onError, каждый ровно 500                                    | PARITY точный счёт; `core/error-path-storm` S11.5                                                      |
-| listener/hook throw isolation     | бросающий listener/hook не валит транзакцию, прочие исполняются                | инвариант изоляции; `core/event-depth`, `lifecycle-plugin/rapid-lifecycle-hooks`                       |
+| listener/hook throw isolation     | бросающий listener/hook не валит транзакцию, прочие исполняются                | инвариант изоляции; `core/navigation-throughput-listener-isolation` S7.5, `lifecycle-plugin/rapid-lifecycle-hooks`                       |
 | loader-rejection / sync-throw     | loader reject/throw → корректно через Promise; mixed concurrent                | `Promise.allSettled` исходы; `ssr-data-plugin/loader-error-handling`                                   |
 | factory-throw retry               | бросающая фабрика не кэшируется, ретраится каждую операцию                     | PARITY: N навигаций → N вызовов фабрики; `lifecycle-plugin/rapid-lifecycle-hooks`                      |
 | error-handler exception isolation | `next()` throws → `error()` called; `error()` throws → swallowed, non-terminal | `subscription.closed===false`; `rx/error-cascade`                                                      |
 | unhandledRejection no-leak        | late-rejection / never-settling / abort                                        | guard на отсутствие unhandledRejection; `ssr-data-plugin/inject-deferred-scripts`, `rx/lifecycle-leak` |
-| recursion-depth recovery          | overflow до MAX_DEPTH → ошибка; **легальная рекурсия работает после**          | poison-recovery probe; `event-emitter/recursion-recovery`, `core/event-depth`                          |
+| recursion-depth recovery          | overflow до MAX_DEPTH → ошибка; **легальная рекурсия работает после**          | poison-recovery probe                                                                                  |
 
 ### (G) Переплетение внешних событий
 
@@ -197,21 +197,21 @@ $ARGUMENTS
 
 ### (J) Алгоритмическая сложность / ReDoS / backtracking
 
-| Архетип                      | Абьюз-паттерн · триггер                                                                 | Дискриминация · эталон                                                                                                      |
-| ---------------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| exponential-fork memoization | K последовательных optional → O(2^K) без memo; триггер — fork-расширение                | wallclock-ceiling ~500ms (~500× healthy, ~15× ниже broken) + correctness; `path-matcher/optional-expansion` (K=26)          |
-| ReDoS sentinel               | adversarial near-limit **FAIL-кейс** (полный скан); триггер — `RegExp` на недоверенном  | ceiling ~1000× healthy; мутация = уязвимый regex виснет; `type-guards/route-name-redos`                                     |
-| done-set linear traversal    | 1k-level diamond (2^1000 unfolded vs 1001 nodes); триггер — обход с разделяемыми узлами | < 800ms + correctness; `type-guards/serializable-scale` S3                                                                  |
-| anti-quadratic membership    | `Set.has` O(1) vs `array.includes` O(n); 50k declared×input; триггер — членство в цикле | ceiling 300–500ms (20–33× healthy, 7.5× ниже broken); `path-matcher/pathological-input` strict, `route-tree/validate-scale` |
-| backtracking-at-scale        | splat-fallback 50k; триггер — backtracking-ветка                                        | per-op correctness (`rest===remainder`, не `startsWith`) + per-op ceiling; `path-matcher/splat-backtrack`                   |
+| Архетип                      | Абьюз-паттерн · триггер                                                                 | Дискриминация · эталон                                                                                                                   |
+| ---------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| exponential-fork memoization | K последовательных optional → O(2^K) без memo; триггер — fork-расширение                | wallclock-ceiling ~500ms (~500× healthy, ~15× ниже broken) + correctness                                                                 |
+| ReDoS sentinel               | adversarial near-limit **FAIL-кейс** (полный скан); триггер — `RegExp` на недоверенном  | ceiling ~1000× healthy; мутация = уязвимый regex виснет; `validation-plugin/route-name-redos`                                            |
+| done-set linear traversal    | 1k-level diamond (2^1000 unfolded vs 1001 nodes); триггер — обход с разделяемыми узлами | < 800ms + correctness; `validation-plugin/serializable-scale` S3                                                                         |
+| anti-quadratic membership    | `Set.has` O(1) vs `array.includes` O(n); 50k declared×input; триггер — членство в цикле | ceiling 300–500ms (20–33× healthy, 7.5× ниже broken); `core/engine/path-matcher/pathological-input` strict, `core/engine/validate-scale` |
+| backtracking-at-scale        | splat-fallback 50k; триггер — backtracking-ветка                                        | per-op correctness (`rest===remainder`, не `startsWith`) + per-op ceiling; `core/engine/path-matcher/splat-backtrack`                    |
 
 ### (K) Аллокация на горячем пути
 
-| Архетип                  | Абьюз-паттерн · триггер                                                               | Дискриминация · эталон                                              |
-| ------------------------ | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| per-iteration alloc O(1) | splat childParams / query merge не накапливает per-op; триггер — аллокация в hot-loop | per-op ceiling + correctness; `path-matcher/splat-backtrack`        |
-| buildUrl/closure alloc   | 30k buildUrl/закрытий; триггер — аллокация per-render/per-call                        | heap throughput GC-masked; `browser-plugin/buildurl-allocation`     |
-| state-factory churn      | 10k makeState/buildState уник params; триггер — фабрика состояния per-nav             | heap throughput + correctness per-call; `core/state-factory-stress` |
+| Архетип                  | Абьюз-паттерн · триггер                                                               | Дискриминация · эталон                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| per-iteration alloc O(1) | splat childParams / query merge не накапливает per-op; триггер — аллокация в hot-loop | per-op ceiling + correctness; `core/engine/path-matcher/splat-backtrack` |
+| buildUrl/closure alloc   | 30k buildUrl/закрытий; триггер — аллокация per-render/per-call                        | heap throughput GC-masked; `browser-plugin/buildurl-allocation`          |
+| state-factory churn      | 10k makeState/buildState уник params; триггер — фабрика состояния per-nav             | heap throughput + correctness per-call; `core/state-factory-stress`      |
 
 ## Шаг 3 — Матрица пробелов
 
@@ -255,7 +255,7 @@ $ARGUMENTS
 
 ### 4.3 Напиши тест
 
-Используй helper-примитивы пакета (НЕ изобретай): `forceGC`, `takeHeapSnapshot`, `formatBytes`, `MB`, `measureTime(Async)`, `createStressRouter`, `createFlatRoutes`/`createParamRoutes`/`createDeepRouteTree`, `noopPluginFactory`/`fullPluginFactory` (см. `<pkg>/tests/stress/helpers.ts`). Для чистых пакетов helper'ов часто нет — `performance.now()` + sampled-every-Kth + крупные генераторы входа (как `search-params`/`path-matcher`/`type-guards`). Заголовок теста — правдивый: что за абьюз, какой инвариант, какой класс дискриминации.
+Используй helper-примитивы пакета (НЕ изобретай): `forceGC`, `takeHeapSnapshot`, `formatBytes`, `MB`, `measureTime(Async)`, `createStressRouter`, `createFlatRoutes`/`createParamRoutes`/`createDeepRouteTree`, `noopPluginFactory`/`fullPluginFactory` (см. `<pkg>/tests/stress/helpers.ts`). Для чистых модулей helper'ов часто нет — `performance.now()` + sampled-every-Kth + крупные генераторы входа (как стресс-тесты движка в `packages/core/tests/engine/stress/` и `packages/validation-plugin/tests/stress/serializable-scale.stress.ts`). Заголовок теста — правдивый: что за абьюз, какой инвариант, какой класс дискриминации.
 
 ### 4.4 Мутационно провалидируй (полный протокол `/audit-stress`)
 
@@ -290,7 +290,7 @@ $ARGUMENTS
 
 ## Замечание
 
-Изменения только в тестах → changeset не нужен. Если 4.4 вскрыл реальный баг и в `src` ушёл фикс → changeset для public consumer (private-пакет → его public consumer). Push не делай без явной просьбы.
+Изменения только в тестах → changeset не нужен. Если 4.4 вскрыл реальный баг и в `src` ушёл фикс → changeset для public consumer (правка в `shared/<dir>` → changeset тем его консьюмерам, чьё поведение изменилось). Push не делай без явной просьбы.
 
 ## Самокоррекция скила (ОБЯЗАТЕЛЬНО, в конце КАЖДОГО прогона)
 

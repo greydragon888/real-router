@@ -109,7 +109,7 @@ export const CHECKS = [
     run: ["pnpm", "lint:dedupe"],
     stages: ["pre-push", "ci"],
     ciSkip: ["dependabot-actor-with-dedupe-fixer"],
-    why: "the three lockfiles are deduplicated",
+    why: "each workspace's lockfile is deduplicated",
   },
   {
     id: "lint:doc-dup",

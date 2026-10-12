@@ -7,7 +7,8 @@
  * `scripts/sync-config.mjs` writes from the package walk and the packages'
  * coverage thresholds:
  *
- * Check mode (default, `pnpm lint:coverage-scope` — both hooks + CI pipeline).
+ * Check mode (default, `pnpm lint:coverage-scope` — its entry in
+ * `scripts/checks.mjs` says where it runs).
  * The checks keep the numbers other files cite them by, so the list starts
  * at 2b:
  *   2b. Every shared/<dir> must have a measuring owner vitest config — a new
@@ -41,7 +42,9 @@
  *      The code roots are then `packages/<pkg>/src` and `shared/<dir>`, and
  *      nothing else.
  *
- * Emit mode (`--emit`, used by ci.yml's coverage job and sonar-trusted.yml):
+ * Emit mode (`--emit`, for the CI steps that upload coverage or run Sonar and
+ * for `scripts/sonar-local.sh` — `git grep -n 'check-coverage-scope.mjs --emit'`
+ * lists them):
  *   prints `sources=…`, `tests=…`, `reports=…` lines for `$GITHUB_OUTPUT`,
  *   computed from the tree the checks walk: the packages of
  *   `scripts/repo-model.mjs` and the source dirs of `shared/`. stdout carries
@@ -71,9 +74,9 @@ const read = (p) => readFileSync(join(ROOT, p), "utf8");
 
 /**
  * A real (non-symlink) directory — mirrors what sonar-scanner analyses (it
- * leaves the files behind a symlinked dir out, as ignored by git), so symlinked
- * src (browser-env, dom-utils → shared/) stays out of sonar.sources; the
- * shared/* real dirs are added instead.
+ * leaves the files behind a symlinked dir out, as ignored by git), so a
+ * symlinked src dir (→ shared/<dir>) stays out of sonar.sources; the shared/*
+ * real dirs are added instead.
  * @param {string} p
  */
 const isRealDir = (p) => {
@@ -119,10 +122,9 @@ const sonarSources = [
   ...sharedDirs.map((d) => `shared/${d}`),
 ];
 const sonarTests = coverageProducing.map((p) => `packages/${p}/tests`);
-// #1065/#1086: shared/{browser-env,dom-utils} coverage is now owned by the
-// consumer packages (react ← dom-utils, browser-plugin ← browser-env) and rides
-// in their packages/*/coverage/lcov.info (paths normalized to shared/… in CI) —
-// there is no separate shared/coverage/lcov.info anymore.
+// #1065/#1086: each shared/<dir> is measured by its owner package (check 2b
+// below) and rides in that package's coverage/lcov.info, its paths normalized
+// to shared/… in CI.
 const lcovReports = packages
   .filter((p) => model.get(p).hasLcov)
   .map((p) => `packages/${p}/coverage/lcov.info`);

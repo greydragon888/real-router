@@ -49,7 +49,7 @@ External dependencies:
 | ------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------- |
 | `@real-router/core` | `getPluginApi`, types (`Router`, `PluginApi`, `State`, etc.)                                           | `factory.ts`, `index.ts`              |
 | `browser-env`       | Browser abstraction, popstate handling, validation, URL parsing, URL utils, `createUpdateBrowserState` | `factory.ts`, `validation.ts`         |
-| `type-guards`       | `isStateStrict` (`history.state` validation)                                                           | `index.ts` (re-exported as `isState`) |
+| `browser-env`       | `isStateStrict` from `state-guard.ts` (`history.state` validation)                                     | `index.ts` (re-exported as `isState`) |
 
 ## Factory Pattern
 

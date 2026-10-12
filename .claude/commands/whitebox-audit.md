@@ -6,19 +6,19 @@ $ARGUMENTS
 Формат аргументов:
 
 - **Модуль (ОБЯЗАТЕЛЬНО)** — какой пакет аудировать. Любое из:
-  - путь к пакету: `packages/path-matcher`, `packages/route-tree`
-  - npm-имя: `@real-router/logger`, `search-params`
-  - короткое имя директории: `path-matcher`, `fsm`, `event-emitter`
+  - путь к пакету: `packages/sources`, `packages/route-utils`
+  - npm-имя: `@real-router/sources`, `@real-router/rx`
+  - короткое имя директории: `sources`, `rx`, `route-utils`
 - Опционально `--report-only` — только Фазы 0–3 (guardrail + замер + карта кандидатов), без правок. По умолчанию: аудит + переписывание + резолюция находок под гейтом подтверждения на каждой src-правке.
 
-> **⛔ Без аргумента НЕ запускать.** Если `$ARGUMENTS` пуст или модуль не резолвится в `packages/<dir>` — остановись, попроси указать модуль и приведи пример (`/whitebox-audit path-matcher`). НЕ выбирай модуль сам, НЕ гони по всем пакетам, НЕ угадывай.
+> **⛔ Без аргумента НЕ запускать.** Если `$ARGUMENTS` пуст или модуль не резолвится в `packages/<dir>` — остановись, попроси указать модуль и приведи пример (`/whitebox-audit sources`). НЕ выбирай модуль сам, НЕ гони по всем пакетам, НЕ угадывай.
 
 > **Диспетчер.** Это НЕ `/mutation-score` (тот убивает выживших мутантов точечными тестами — ось «сила ассертов»). `/whitebox-audit` — про **границу** теста: unit-тесты обязаны ходить через public API, тогда недостижимый код всплывает как непокрытая ветка. Пересекается с `/mutation-score` (оба про качество тестов), но дополняет его: whitebox = ЧЕСТНОСТЬ границы, mutation = сила ассертов внутри границы.
 
 **Прецеденты (изучи перед прогоном — это готовая эталонная реализация):**
 
 - `packages/core/eslint.config.mjs` — первый white-box guardrail + аудит-доктрина в комментарии.
-- `packages/path-matcher/eslint.config.mjs` + `tests/unit/*` — ПОЛНАЯ миграция всеми тремя исходами (мигрирован / v8-ignore / KEEP-exception); `createSegmentNode.test.ts` и `percentEncoding.test.ts` — образцы KEEP-исключений с заголовком-обоснованием.
+- `packages/core/eslint.config.mjs` (блок `tests/engine/unit/path-matcher/**`) + `packages/core/tests/engine/unit/path-matcher/*` — ПОЛНАЯ миграция всеми тремя исходами (мигрирован / v8-ignore / KEEP-exception); `createSegmentNode.test.ts` и `percentEncoding.test.ts` — образцы KEEP-исключений с заголовком-обоснованием.
 - `.claude/whitebox-test-audit-2026-06-23.md` — исходный аудит core (если есть локально).
 
 ---
@@ -32,12 +32,12 @@ White-box-тест может убить мутанта, **не усилив П�
 1. Резолвь модуль → `packages/<dir>` (путь / npm-имя / короткое имя, как `/mutation-score`). Не резолвится или `$ARGUMENTS` пуст → **СТОП** (см. гейт выше).
 2. Найди тестовую директорию для «unit-подобных» тестов пакета: обычно `tests/unit/`, у некоторых пакетов — `tests/functional/` (core). Определи по факту (`ls`). Property (`tests/property/`), stress (`tests/stress/`), helpers, benchmarks — **вне области** (у них легитимно другое отношение к внутренностям, см. Фазу 5).
 3. Сверься с публичной поверхностью: прочитай `src/index.ts` пакета — что РЕАЛЬНО экспортится. (Часть «внутренних» на деле публичны — не суди по имени модуля.)
-4. **Fast-path «пакет уже пред-мигрирован» (`grep` импортов ПЕРВЫМ делом).** Прежде чем строить карту кандидатов, `grep -rn "from \"" tests/` по ВСЕМ сьютам. Если в unit/functional-тестах **ноль** `src/*`-импортов (все идут из имени пакета) **И** unit-гейт-прогон (`vitest run`, functional-alone) даёт **100% stmt/branch/func/line** по каждому src-модулю (в т.ч. `internal/*`) — пакет уже полностью честен: публично-недостижимого кода нет, Фазы 2–5 сворачиваются в ноль (нечего классифицировать/мерить/резолвить), а весь дедаврабл — **добавить guardrail с ПУСТЫМ allowlist**, фиксируя уже-честное состояние (не чинить регресс). Это НЕ «пропустить аудит»: пустой allowlist здесь — доказанный результат (100%-functional-coverage = каждая ветка достижима публично), а не необследованность. Прецедент: `type-guards` (2026-07-17, весь набор functional+property+stress уже на public API). Дисциминирующую силу guardrail'а всё равно докажи мутацией (инъекция `src/*`-импорта в functional-тест → `no-restricted-imports` краснеет).
+4. **Fast-path «пакет уже пред-мигрирован» (`grep` импортов ПЕРВЫМ делом).** Прежде чем строить карту кандидатов, `grep -rn "from \"" tests/` по ВСЕМ сьютам. Если в unit/functional-тестах **ноль** `src/*`-импортов (все идут из имени пакета) **И** unit-гейт-прогон (`vitest run`, functional-alone) даёт **100% stmt/branch/func/line** по каждому src-модулю (в т.ч. `internal/*`) — пакет уже полностью честен: публично-недостижимого кода нет, Фазы 2–5 сворачиваются в ноль (нечего классифицировать/мерить/резолвить), а весь дедаврабл — **добавить guardrail с ПУСТЫМ allowlist**, фиксируя уже-честное состояние (не чинить регресс). Это НЕ «пропустить аудит»: пустой allowlist здесь — доказанный результат (100%-functional-coverage = каждая ветка достижима публично), а не необследованность. Дисциминирующую силу guardrail'а всё равно докажи мутацией (инъекция `src/*`-импорта в functional-тест → `no-restricted-imports` краснеет).
 
 ## Фаза 1 — Guardrail (eslint white-box правило)
 
-1. Если у пакета НЕТ локального `eslint.config.mjs` — создай `[...eslintConfig, {блок}]` (`import eslintConfig from "../../eslint.config.mjs"`), как у `path-matcher`/`core`. Если есть — добавь блок.
-2. Блок: `files: ["tests/<unit-dir>/**/*.test.ts"]`, правило `no-restricted-imports` с `patterns: [{ group: ["**/src", "**/src/**"], message: "…" }]`. В message: публичная поверхность ЭТОГО пакета (импорт из имени пакета, не `src/*`) + подсказка «public-символ через src-путь → сменить путь; чистая внутренняя функция → в tests/property; недостижимо публично → KEEP-narrow ignores-исключение здесь». Скопируй тон из `path-matcher`/`core`.
+1. Если у пакета НЕТ локального `eslint.config.mjs` — создай `[...eslintConfig, {блок}]` (`import eslintConfig from "../../eslint.config.mjs"`), как у `core`. Если есть — добавь блок.
+2. Блок: `files: ["tests/<unit-dir>/**/*.test.ts"]`, правило `no-restricted-imports` с `patterns: [{ group: ["**/src", "**/src/**"], message: "…" }]`. В message: публичная поверхность ЭТОГО пакета (импорт из имени пакета, не `src/*`) + подсказка «public-символ через src-путь → сменить путь; чистая внутренняя функция → в tests/property; недостижимо публично → KEEP-narrow ignores-исключение здесь». Скопируй тон из `core`.
 3. Прогони eslint по тест-директории → собери СПИСОК `src/*`-импортов (нарушения). Это карта кандидатов. (Правило пока «краснит» — норм; резолвим по ходу.)
 
 ## Фаза 2 — Классификация каждого нарушения
@@ -61,7 +61,7 @@ pnpm -F <pkg> exec vitest run tests/ \
 
 - непрямыми public-тестами других файлов (тогда прямой тест избыточен для покрытия);
 - **exempt-property-тестом** (`*.properties.ts`) — **ГОЧА:** property-тесты НЕ гоняются в `vitest run tests/` (default config), их покрытие в unit-гейт НЕ входит; строка, покрытая ТОЛЬКО exempt-property, всплывёт «непокрытой» в unit-гейте — это НЕ мёртвый код, это кандидат в v8-ignore (Фаза 5). **⚠ Но сначала спроси: достижима ли строка ПУБЛИЧНЫМ UNIT-тестом (просто ненаписанным)?** Exempt-property часто гоняет ветку через тот же public API под форматом/опцией, которые unit не покрывает (напр. `noneBooleanStrategy` покрыт только property с `booleanFormat:"none"`, но тривиально достижим unit'ом `parse("x=true",{booleanFormat:"none"})`). Если достижим — это **МИГРАЦИЯ** (допиши public-unit с нужной опцией, Фаза 4), а НЕ v8-ignore. v8-ignore — ТОЛЬКО когда НИ ОДИН разумный public-unit до строки не дотягивается (реально dead-via-unit, живёт лишь в property/другом слое). Проверяй достижимость эмпирически (Фаза 3-замер от кандидатного unit), не глазом;
-- кросс-пакетно (напр. gate `route-tree` зовёт публичную функцию `path-matcher`) — проверь консьюмеров grep'ом.
+- кросс-пакетно (напр. `validation-plugin` зовёт `buildParamMeta` движка из `@real-router/core/validation`) — проверь консьюмеров grep'ом.
 
 ## Фаза 4 — Honest-переписывание через public API
 
@@ -89,14 +89,14 @@ pnpm -F <pkg> exec vitest run tests/ \
 
 - **Unit-гейт 100%** (`pnpm -F <pkg> test`) — все src-строки покрыты/ignored.
 - **Property** (`test:properties`) + **stress** (если есть) — зелёные (после сигнатурных правок src).
-- **Downstream-консьюмеры** — при правке движка прогнать прямых потребителей (`route-tree`, `core`).
+- **Downstream-консьюмеры** — при правке движка (`packages/core/src/engine/`) прогнать сьют core и прямых потребителей его экспортов (`validation-plugin` — через `@real-router/core/validation`).
 - **type-check** (`tsc --noEmit`) + **eslint** (`tests/**` + тронутый `src/**`) чисты; allowlist держит только KEEP-исключения.
 - **Мутационно** валидируй ЛЮБУЮ тронутую src-ветку/новый лок-тест: сломать ветку → тест/property краснеет (иначе тест не дискриминирует).
 - **Форматирование:** после рерайта `eslint --fix` по тест-директории (prettier/padding).
 
 ## Фаза 7 — Оформление
 
-- **changeset** на затронутые public-пакеты. Приватный src (path-matcher/route-tree) → `@real-router/core` **patch** (behavior-preserving cleanup, `#NN`-референс на код-линейку находки). См. `.changeset/README.md`.
+- **changeset** на затронутые public-пакеты. src движка (`packages/core/src/engine/`) — это `@real-router/core` → **patch** (behavior-preserving cleanup, `#NN`-референс на код-линейку находки). См. `.changeset/README.md`.
 - Обнови гочи в `<pkg>/CLAUDE.md`, если менялись тест-конвенции («tests import directly from src/*» → «unit через public API; чистые внутренние — в exempt property; memory/perf-инварианты — KEEP-exception»).
 - **Коммиты (каждый зелёный):** миграция + src-находки одного файла-кластера — вместе (покрытие связывает тест и src); правило-guardrail — отдельным коммитом ПОСЛЕ миграций (иначе коммит с правилом до миграций краснит линт). Инкрементально: правило можно приземлять с TODO-`ignores` на ещё-не-мигрированные, освобождая список по мере готовности.
 - **push/PR — `--no-verify`** (pre-commit/pre-push = полный turbo, таймаутит; таргетная валидация локально, полная в CI). Не пушить без явной просьбы.

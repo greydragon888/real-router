@@ -650,5 +650,5 @@ if (
 - [ARCHITECTURE.md](../../ARCHITECTURE.md) — System architecture of the monorepo
 - [core/ARCHITECTURE.md](../core/ARCHITECTURE.md) — Core architecture (Plugin API, addInterceptor)
 - [browser-plugin/ARCHITECTURE.md](../browser-plugin/ARCHITECTURE.md) — History API equivalent
-- [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) — Shared browser abstractions
+- [shared/browser-env/](../../shared/browser-env/) — Shared browser abstractions (source, symlinked as `src/browser-env`)
 - [CLAUDE.md](CLAUDE.md) — Quick reference for AI agents

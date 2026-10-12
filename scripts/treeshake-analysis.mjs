@@ -10,10 +10,10 @@
  *   pnpm build && node scripts/treeshake-analysis.mjs
  *
  * Requirements:
- *   - esbuild on PATH. It is not a declared dependency: it arrives
- *     transitively through vite and is hoisted into node_modules/.bin, so a
- *     dependency change elsewhere can take it away. `npx esbuild --version`
- *     before trusting a run; size-limit no longer supplies it (its preset
+ *   - esbuild. It is not a declared dependency of the root and is not in the
+ *     root's node_modules/.bin, so `npx esbuild` runs whichever one npx finds.
+ *     `npx esbuild --version` before trusting a run; size-limit no longer
+ *     supplies it (its preset
  *     moved to rolldown in v14).
  *   - Built packages (pnpm build)
  */

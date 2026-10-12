@@ -3,8 +3,8 @@
 //
 // Run:  node --test scripts/tests/scripts-lib-reach.test.mjs
 //
-// turbo keys a task on the files its `inputs` name. Of `scripts/`, only
-// `scripts/lib/**` is named, and only by some tasks: `test` and `lint` of every
+// turbo keys a task on the files its `inputs` name. Of `scripts/`, a package
+// task names only `scripts/lib/**`, and only some tasks do: `test` and `lint` of every
 // package, `type-check` of the packages whose configuration is not core's, and
 // `type-check:tests` of core's configuration (core and the five packages that
 // extend it); `bundle`, `test:properties` and `test:stress` name none of it. So

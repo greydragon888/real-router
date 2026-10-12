@@ -222,7 +222,7 @@ tests/
 └── setup.ts              # JSDOM + @testing-library/jest-dom matchers
 ```
 
-**Coverage:** 100% required (enforced in vitest.config).
+**Coverage:** enforced by vitest; the thresholds live in the vitest config, not here.
 
 ## Stress Test Coverage
 

@@ -43,7 +43,7 @@ real-router/
 │   ├── route-utils/               # Route tree queries and segment testing
 │   └── ssr-utils/                 # Router-level SSR/SSG/hydration helpers
 ├── shared/                         # Bare source files shared across packages via src/ symlinks (minimal workspace entry)
-│   ├── package.json               # Minimal: name, type:commonjs, devDeps on @real-router/{core,sources} for transitive symlink resolution
+│   ├── package.json               # Minimal: name, type:commonjs, devDeps on @real-router/{core,sources,ssr-utils} for transitive symlink resolution
 │   ├── dom-utils/                 # Shared DOM utilities for adapters: route announcer, scroll restoration, scroll spy, view transitions, direction tracker, link helpers
 │   ├── browser-env/               # Shared browser abstractions for URL plugins: history API, popstate, SSR fallback
 │   └── ssr/                       # Shared SSR plugin scaffolding: createSsrLoaderPlugin generic factory + createLoadersValidator
@@ -572,7 +572,7 @@ These are deliberately designed constraints. Violating them will break the syste
 
 ### Packages
 
-- **Internal packages are never imported by end users** — they are bundled into consumer packages at build time.
+- **Shared sources are never imported by end users** — `shared/` is bundled into the packages that link it, at build time.
 - **`core` never depends on browser APIs** — platform-agnostic. The `start(path)` method requires a path; browser-plugin makes it optional by injecting `browser.getLocation()` via interceptor.
 
 ## Boundaries
@@ -632,13 +632,13 @@ All navigation errors are `RouterError` instances with typed `code` from `errorC
 - **100% code coverage** enforced in CI; the Angular and Svelte adapters hold measured floors below it, each with its reason in the adapter's `vitest.config.mts`
 - **Property-based testing** — 1900+ property test cases via fast-check: URL encoding, parameter serialization, route tree operations, reactive subscription ordering, canonical params, link helpers
 - **Stress testing** — 1100+ stress test cases in `.stress.ts` / `.stress.tsx` files (core, plugins, all 6 framework adapters): concurrent navigations, guard removal mid-execution, route CRUD under load, heap snapshots confirming zero memory leaks, mount/unmount lifecycle, subscription fanout granularity, full SPA simulations
-- **Playwright e2e testing** — 1800+ test cases across 330+ spec files (100+ playwright projects) covering all 6 framework adapters (React, Preact, Solid, Vue, Svelte, Angular). Tests verify real browser behavior: navigation, guards, data loading, error handling, hash routing, nested routes, dynamic routes, async guards, SSR/streaming/SSG/RSC pipelines, animations. Turbo-cached via `test:e2e` task.
+- **Playwright e2e testing** — 1800+ test cases across 330+ spec files (100+ playwright projects) covering all 6 framework adapters (React, Preact, Solid, Vue, Svelte, Angular). Tests verify real browser behavior: navigation, guards, data loading, error handling, hash routing, nested routes, dynamic routes, async guards, SSR/streaming/SSG/RSC pipelines, animations.
 - **Mutation testing** (Stryker) validates test suite quality beyond line coverage
 - **`lint:e2e`** pre-commit check — verifies every example with `playwright.config.ts` has at least one spec file
 
 ### Build System
 
-pnpm monorepo with Turborepo for task orchestration. Dual ESM/CJS output via tsdown (Rolldown-based bundler). Internal packages are bundled into consumers — not separate npm artifacts. `workspace:^` protocol for inter-package dependencies. All turbo tasks use `outputLogs: "errors-only"` — silent on success, full output on failure. `build:verbose`/`test:verbose` scripts override to full output for debugging. The examples sit outside turbo, in a pnpm workspace of their own: `pnpm -r` builds and tests them against the npm releases their lockfile records, or against tarballs of this checkout's packages (`scripts/checkout-tarballs.mjs`).
+pnpm monorepo with Turborepo for task orchestration. Dual ESM/CJS output via tsdown (Rolldown-based bundler). Shared sources (`shared/`) are bundled into the packages that link them — not separate npm artifacts. `workspace:^` protocol for inter-package dependencies. The reporting turbo tasks use `outputLogs: "errors-only"` — silent on success, full output on failure; `turbo.json` names them. `build:verbose`/`test:verbose` scripts override to full output for debugging. The examples sit outside turbo, in a pnpm workspace of their own: `pnpm -r` builds and tests them against the npm releases their lockfile records, or against tarballs of this checkout's packages (`scripts/checkout-tarballs.mjs`).
 
 ### Performance Hot Path
 

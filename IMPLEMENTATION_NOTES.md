@@ -8046,6 +8046,8 @@ Pilot on `core` proved parity + two non-obvious facts:
 
 ## Dependabot npm ecosystem auto-halted by pnpm-override-managed transitive advisories (2026-07-01)
 
+> **Refuted in part (2026-10-12).** "Dependabot does not apply pnpm `overrides`" does not hold: its security PRs #2647 and #2648 proposed `devalue` 6.0.2, the major that the open override floor `>=5.9.2` admitted above svelte's `^5.9.2` — the entry "devalue takes the 5.9 patch, and node-forge's advisory is allowlisted" has the case. The halt stands: a security job that cannot reach a fixed version errors, and repeated errors stop every npm update. The rule this entry set — ignore every dependency an override manages — does not: an ignore fails its own way (`all_versions_ignored`, 2026-09-29), and each `ignore` in `.github/dependabot.yml` is a decision about its own advisory.
+
 ### Problem
 
 Dependabot stopped opening **any** npm PRs for ~2 weeks (only the `github-actions` ecosystem kept working — e.g. `actions/cache 5→6`), while `pnpm outdated` showed 30+ available bumps (angular, tanstack, preact, svelte, rollup, eslint plugins, …). The Dependabot update-log (`/network/updates`) showed every npm job **errored**, culminating in a repository-level auto-pause:
@@ -12155,6 +12157,8 @@ Turbo keys a package's `test` task on `tests/**/*.{ts,tsx}`, so inside core the 
 
 ## One parse for every reader of a raiser head (#2537, 2026-09-23)
 
+> **Updated (2026-10-12).** **Why the input** below no longer holds as written. The root `test`, `type-check` and `lint` inputs name no `../../shared/**`: each consumer's own `turbo.json` names its shared dir. And not every `type-check` names `../../scripts/lib/**`: core's `turbo.json` names its own `type-check` inputs without it, and the five packages that extend it inherit them; their `type-check:tests` names the directory instead. The entry "A task's key holds every module of `scripts/` it loads, and `scripts/lib/` holds only such modules" has the split, and `scripts/tests/scripts-lib-reach.test.mjs` holds it.
+
 **Problem.** Five readers of a raiser head each carried their own copy of one parse: find the `raiser(...)` binding a tag reads, resolve it from the site, read receiver and door. The map keyed by the binding's name was written into four of those copies, and the fixture above reds each reader on it — but each copy had to be fixed on its own, and a new arrival form would have to be taught five times.
 
 **Solution.** `scripts/lib/raiser-head.mjs` holds the parse once — `raiserCallParts` (receiver, door, dynamic), `raiserBindingOf`, `raiserTagOf`, and `raiserPartsAt`, which resolves by lexical scope and reads each scope whole. `raiser-head.d.mts` types it for the TypeScript authorities, as `claim-paragraphs.d.mts` does, with no tsconfig change. The two scripts, 1845, 2457 and 2479 import it. Each keeps its RENDERING, which differs on purpose: the scripts spell a dynamic door `${}`, 1845 does not judge it, 2457 leaves it unclosed, and 2479 skips it. The wiki's `check-messages.mjs` keeps its own copy and answers for the fixture in its normal run.
@@ -14498,3 +14502,27 @@ Three rounds of review of the fix found the same order of the text in two more p
 
 - ⚠ A grouped bump of a package that another package names as a peer can leave an importer on the old peer variant, and no check fails before the merge. The adapter benchmark bundles `benchmarks` with the adapter under `packages/`, so after such a bump the two should resolve the framework runtime to the same snapshot key.
 - A variant that only a linter loads is not bundled. `svelte` has a second one, under `eslint-plugin-svelte` and `svelte-eslint-parser`, while `benchmarks` and `packages/svelte` share the first (read on 2026-10-11).
+
+## Prose that restated the configuration, corrected in one pass (2026-10-12)
+
+**Problem.** A comment or a doc that restates the configuration drifts on its own schedule, and nothing re-derives it. A sweep of the infrastructure prose — the workflows and the setup action, `scripts/` and its tests, the root configs and docs, the skills and prompts under `.claude/`, and what package docs say about the machinery — found more than a hundred such places. Among them:
+
+- `ci.yml` named a `duplication` job that no longer exists and called "CI Result" the single required check, while `protect-master` requires five contexts;
+- `check-deps-audit.sh` said pnpm 12 writes the lockfile as two YAML documents, while `pmOnFail: ignore` keeps all three lockfiles one document;
+- `.github/dependabot.yml` said Dependabot does not apply pnpm overrides, and asked for an `ignore` beside every override;
+- `/perf-optimize`, `/bugfix-batch` and two prompts prescribed a browser A/B that rebuilds this checkout's `dist`, while `cross-router-bench` installs the npm release, so both arms would measure the same release;
+- skills and docs cited packages dissolved into core (`route-tree`, `path-matcher`, `@real-router/logger`, …) as packages, and rules for private packages that no longer exist;
+- `cross-router-bench/CLAUDE.md` said the runner unit has no memory limit; `systemctl show` on the host gives `MemoryMax=5368709120` (2026-10-12).
+
+**Solution.** Each place is corrected or, where another file owns the fact, replaced by a pointer to that owner: the check registry, `turbo.json`, the ruleset (`gh api repos/greydragon888/real-router/rules/branches/master`), the vitest configs, a `git grep` that lists the callers. Counts that a later change would move are dropped. A class is fixed as a class — every reference to a dissolved package outside `packages/core/`, not the one instance the first list held; core's own docs and comments are #2721. A procedure whose mechanism is gone is stated as blocked rather than redesigned: the browser A/B of an unreleased change points at #2720.
+
+**Why pointers.** A sentence that restates the configuration is a second copy that goes stale without a signal; a pointer names the file that changes when the fact does.
+
+**Not in this pass.**
+
+- Values, not prose: the override entries whose floor sits below a parent's or whose edge is gone — `picomatch@4` in the examples, `postcss` in the root and the examples, `'ng-packagr>rollup'` in the root — go to the overrides check of #2646, together with their comments.
+- Package docs about the package itself — entry points, dependency graphs, test counts — are #2721, to be fixed by fact across every home.
+- Leftovers of the rolldown and tinybench switches are #2722, among them a bundle-order measurement taken under rollup that needs re-measuring before its comment is restated.
+- The supported-versions table of `SECURITY.md` is #2723.
+
+⚠ **The commit touches turbo global inputs and the CodSpeed harness.** The comment edits in `eslint.config.mjs` and `vitest.config.{common,properties}.mts` re-key, once, every task whose `inputs` do not negate them — `lint`, `test`, `test:properties`, `test:stress`, `build`, `lint:package` and `lint:types` of every package among them. The edits in `codspeed.yml`, `.github/actions/setup/` and `benchmarks/adapter-bench/vite/` are harness changes, so the push that carries them runs CodSpeed once.

@@ -22,7 +22,7 @@ npm trust github <pkg> --file changesets.yml \
   --repo greydragon888/real-router --allow-publish
 ```
 
-`--allow-publish` is **not optional**: trusted-publisher configurations created after 2026-05-20 must name at least one allowed action (older ones, i.e. the existing 23 packages, default to publish-only). Same applies to `npm deprecate` on a retired package — a write action, same ceremony.
+`--allow-publish` is **not optional**: trusted-publisher configurations created after 2026-05-20 must name at least one allowed action (older ones default to publish-only). Same applies to `npm deprecate` on a retired package — a write action, same ceremony.
 
 If the manual step is skipped, the release run says so: the preflight (`.changeset/unpublished-packages.mjs`) distinguishes "never published" from "one release behind" and emits an `::error::` naming exactly this procedure, instead of letting `changeset publish` die on a bare 404.
 

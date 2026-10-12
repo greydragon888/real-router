@@ -10,7 +10,7 @@
  *
  * Default mode — aggregate + suppress-safety verdict:
  *   node scripts/mutation-analyze.mjs <target>
- *     <target> = a package name (`route-tree`, `@real-router/logger`), a package
+ *     <target> = a package name (`core`, `@real-router/logger-plugin`), a package
  *     dir (`packages/core`), a dir, or a path to a mutation-report.json.
  *   Prints: status counts, package + per-file score, and every Survived/NoCoverage
  *   mutant grouped by file → line:col → mutator, each tagged:

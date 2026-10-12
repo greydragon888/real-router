@@ -6,7 +6,7 @@ $ARGUMENTS
 Формат аргументов (цель — любое из):
 
 - **Путь к пакету** (`packages/<dir>`) — берёт его `reports/mutation-report.json`
-- **Имя пакета** — npm-имя (`@real-router/logger`, `search-params`) ИЛИ короткое имя директории (`logger`, `path-matcher`)
+- **Имя пакета** — npm-имя (`@real-router/rx`, `@real-router/logger-plugin`) ИЛИ короткое имя директории (`rx`, `logger-plugin`)
 - **Путь к конкретному** `reports/mutation-report.json`
 - Опционально:
   - `--report-only` — только классификация + отчёт, без правок (по умолчанию: классификация + правки)
@@ -15,17 +15,17 @@ $ARGUMENTS
 
 **Резолв имени → директории** (имя ≠ путь и не `.json`):
 
-1. Сними scope если есть (`@real-router/logger` → `logger`), попробуй `packages/<это>`.
-2. Если такой директории нет — **матчи по полю `name`** в `packages/*/package.json` (директория может отличаться от npm-имени: напр. `@real-router/types` лежит в `packages/core-types`). Однозначного совпадения нет → СТОП, спроси.
+1. Сними scope если есть (`@real-router/rx` → `rx`), попробуй `packages/<это>`.
+2. Если такой директории нет — **матчи по полю `name`** в `packages/*/package.json` (директория может отличаться от npm-имени). Однозначного совпадения нет → СТОП, спроси.
 3. Дальше работаешь с `packages/<резолв>/reports/mutation-report.json` (как в Шаге 0; нет файла → СТОП).
 
 Пример:
 
 ```
-/mutation-score @real-router/logger
-/mutation-score search-params --report-only
+/mutation-score @real-router/rx
+/mutation-score logger-plugin --report-only
 /mutation-score packages/core --file src/api/getRoutesApi.ts
-/mutation-score packages/path-matcher/reports/mutation-report.json --report-only
+/mutation-score packages/rx/reports/mutation-report.json --report-only
 ```
 
 ---
@@ -56,7 +56,7 @@ Mutation score измеряет, **ассертят** ли тесты повед
    - **Запускай из директории ПАКЕТА** (`cd packages/<name>`), не из корня монорепо: из корня Stryker копирует в sandbox посторонние корневые артефакты (сокеты вроде `.codegraph` и пр.) и падает с `ENOTSUP`/copyfile.
    - **Дешёвая проба «а не убит ли уже?»** на подозрительном `Survived` из stale-базы: инъецируй мутацию, прогони сьют. Red → уже покрыт существующими тестами (не пиши новый тест — это был stale-артефакт). Green → действительно выжил, действуй по классу.
 3. **Stryker видит только то, что в его vitest-include** (обычно `*.test.ts`). `*.properties.ts` / `*.stress.ts` ему НЕвидимы — инварианты, проверяемые только там, для Stryker = дыры. Целевые kills клади в `*.test.ts` (или зеркаль ключевые примеры из property).
-4. **`coverageAnalysis: "perTest"` не атрибутирует module-level код.** Литералы на уровне модуля (regex-/массив-`const`, вычисляемые при import) не привязываются ни к одному тесту → их мутанты выходят как `cov=0` **Survived**, даже когда поведение реально покрыто (тест гоняет функцию, использующую этот regex). Не спутай с настоящей NoCoverage-дырой: проверь инъекцией (red на полном сьюте = покрыто, просто не атрибутировано). Что даёт `coverageAnalysis: "all"`: гоняет ВСЕ тесты против КАЖДОГО мутанта (без per-test фильтра) → такие module-const мутанты честно убиваются и пробел закрывается; цена — дольше прогон (нет per-test отсечения). Применяй точечно/для финального прогона, если такие `cov=0`-артефакты мешают классификации. **НЕ путай с `ignoreStatic: true` — это ДРУГОЙ механизм.** При `ignoreStatic:true` (частый дефолт, напр. route-tree без `STRYKER_FULL=true`) static-мутанты (regex/const-литералы, default-значения, всё вычисляемое при загрузке модуля) выходят как **`Ignored`**, а НЕ `Survived` — они исключены из знаменателя, классифицировать нечего. Сценарий «module-const regex даёт `cov=0` **Survived**» возникает только при `ignoreStatic:false`. Перед классификацией const/regex/default-выжившего сверь режим в `stryker.config`: при `ignoreStatic:true` его в Survived и не будет; если такой ВСЁ ЖЕ в Survived — значит static включены, и это настоящий перебор покрытия.
+4. **`coverageAnalysis: "perTest"` не атрибутирует module-level код.** Литералы на уровне модуля (regex-/массив-`const`, вычисляемые при import) не привязываются ни к одному тесту → их мутанты выходят как `cov=0` **Survived**, даже когда поведение реально покрыто (тест гоняет функцию, использующую этот regex). Не спутай с настоящей NoCoverage-дырой: проверь инъекцией (red на полном сьюте = покрыто, просто не атрибутировано). Что даёт `coverageAnalysis: "all"`: гоняет ВСЕ тесты против КАЖДОГО мутанта (без per-test фильтра) → такие module-const мутанты честно убиваются и пробел закрывается; цена — дольше прогон (нет per-test отсечения). Применяй точечно/для финального прогона, если такие `cov=0`-артефакты мешают классификации. **НЕ путай с `ignoreStatic: true` — это ДРУГОЙ механизм.** При `ignoreStatic:true` (его не задаёт ни один `packages/*/stryker.config.mjs`) static-мутанты (regex/const-литералы, default-значения, всё вычисляемое при загрузке модуля) выходят как **`Ignored`**, а НЕ `Survived` — они исключены из знаменателя, классифицировать нечего. Сценарий «module-const regex даёт `cov=0` **Survived**» возникает только при `ignoreStatic:false`. Перед классификацией const/regex/default-выжившего сверь режим в `stryker.config`: при `ignoreStatic:true` его в Survived и не будет; если такой ВСЁ ЖЕ в Survived — значит static включены, и это настоящий перебор покрытия.
 5. **Агрегация — `pnpm mutation:analyze <pkg|packages/dir|path-to-report.json>`** (`scripts/mutation-analyze.mjs`). Считает статусы (Killed/Survived/NoCoverage/Timeout/CompileError/Ignored), `Score=Detected/Valid` (`Detected=Killed+Timeout`, `Valid=Detected+Survived+NoCoverage`; CompileError + Ignored вне знаменателя), **per-file score**, и группирует каждого Survived/NoCoverage по файл+строка+**КОЛОНКА**+мутатор с дословным `replacement`, помечая **DISABLE-SAFE** (нет killed-собрата этого мутатора на строке — `disable` не уронит kill, выдаёт готовую строку) / **ENTANGLED-KEEP** (killed-собрат есть → подавлять нельзя, документируй). `--lines <file>:n,n` — дамп ВСЕХ мутантов строк (killed+survived+ignored) для ручной сверки. ⚠ **DISABLE-SAFE — СТРУКТУРНЫЙ вердикт (что МОЖНО подавить не теряя kill), НЕ «эквивалент»**: равенство поведения доказывай инъекцией (Эмпирический протокол) и только потом disable — иначе disable-театр. **Почему колонка обязательна** (это и считает тул): на одной строке несколько sub-expression мутантов одного мутатора в разных колонках с РАЗНЫМИ статусами — `a && b && c` даёт `ConditionalExpression→true` для всего условия (col X, killed) И для операнда `c` (col Y, survived); без колонки сольёшь killed и survived и будешь час гоняться за «противоречием Stryker». (Тул недоступен → тот же расчёт node-скриптом по JSON; формула и группировка выше.)
 
 ## Классификация выживших (вынеси класс КАЖДОМУ)

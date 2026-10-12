@@ -197,7 +197,7 @@ src/
 
 ### Key dependency: `browser-env`
 
-Most browser abstractions (Browser interface, popstate handling, SSR fallback, state validation, history updates) live in the private `browser-env` package — shared with `hash-plugin`.
+Most browser abstractions (Browser interface, popstate handling, SSR fallback, state validation, history updates) live in `shared/browser-env/`, symlinked into this package as `src/browser-env` — shared with `hash-plugin`.
 
 browser-plugin imports from `browser-env`:
 

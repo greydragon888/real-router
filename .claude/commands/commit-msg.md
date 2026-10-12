@@ -27,17 +27,12 @@
 - test: только тесты
 - perf: оптимизация производительности
 
-Scopes (из cz.config.js — используй приоритетно):
-
-- Пакеты: core, core-types, route-tree, search-params, type-guards, helpers, logger
-- Плагины: browser-plugin, logger-plugin, persistent-params-plugin
-- Фреймворки: react
-- Инфраструктура: deps, config, ci, benchmarks
+Scopes — только из `SCOPES` в `commitlint.config.mjs`: `scope-enum` отвергает любой другой, а `pnpm commit` (`cz.config.js`) берёт тот же список.
 
 Правила:
 
 - Описание в imperative mood ("add", не "added")
-- Scope — приоритетно из списка выше, можно кастомный если нужно
+- Scope — только из `SCOPES` (кастомный commitlint отвергнет)
 - Не начинай с заглавной буквы после двоеточия
 - Без точки в конце description
 - Body через пустую строку, каждый пункт с "- "

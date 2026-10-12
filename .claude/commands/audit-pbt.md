@@ -12,8 +12,8 @@ $ARGUMENTS
 Пример:
 
 ```
-/audit-pbt packages/path-matcher
-/audit-pbt packages/search-params/tests/property/parse.properties.ts --report-only
+/audit-pbt packages/sources
+/audit-pbt packages/core/tests/engine/property/search-params/parseBuild.properties.ts --report-only
 ```
 
 ---
@@ -85,7 +85,7 @@ $ARGUMENTS
 
 ## Замечание
 
-Изменения только в тестах → changeset не нужен. Если в src ушёл фикс реального бага → changeset для публичного потребителя (private-пакет → его public consumer). Push не делай без явной просьбы.
+Изменения только в тестах → changeset не нужен. Если в src ушёл фикс реального бага → changeset для публичного потребителя (правка в `shared/<dir>` → changeset тем его консьюмерам, чьё поведение изменилось). Push не делай без явной просьбы.
 
 ## Самокоррекция скила (ОБЯЗАТЕЛЬНО, в конце КАЖДОГО прогона)
 

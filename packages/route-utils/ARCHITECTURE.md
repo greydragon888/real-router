@@ -26,7 +26,7 @@ The package serves two independent purposes unified under a single import:
 
 ### 1. Route Tree Queries (`RouteUtils` class)
 
-Instance methods that query pre-computed route tree data. Accepts any object matching the `RouteTreeNode` interface (structurally compatible with `RouteTree` from `route-tree`).
+Instance methods that query pre-computed route tree data. Accepts any object matching the `RouteTreeNode` interface (structurally compatible with `RouteTree` from `@real-router/core`).
 
 - `getChain(name)` — ancestor chain lookup (Map read)
 - `getSiblings(name)` — sibling lookup (Map read)
@@ -69,7 +69,7 @@ Constructor
 
 ### Absolute Route Semantics
 
-An absolute **path** (e.g., `~/modal`) overrides the parent path at the URL level only — the node keeps its position in the route tree (route-tree ARCHITECTURE.md: "Override parent path"). Its `fullName` keeps the parent prefix (e.g. `users.modal`) and `getChain` still routes through the parent — the node is **not** hoisted to root. Sibling semantics:
+An absolute **path** (e.g., `~/modal`) overrides the parent path at the URL level only — the node keeps its position in the route tree (`packages/core/src/engine/ARCHITECTURE.md`: "Override parent path"). Its `fullName` keeps the parent prefix (e.g. `users.modal`) and `getChain` still routes through the parent — the node is **not** hoisted to root. Sibling semantics:
 
 - Absolute routes are **excluded** from their parent's `nonAbsoluteChildren`
 - An absolute route's siblings are **all** `nonAbsoluteChildren` of its **parent** (which equals the root's `nonAbsoluteChildren` only when the absolute route is top-level — the common case the functional tests cover)
@@ -175,7 +175,7 @@ const cache = new WeakMap<RouteTreeNode, RouteUtils>();
 | -------------------- | ------- | ----------------------------------------- |
 | `@real-router/core` | peer | `State` type for segment tester overloads (type-only, erased at build) |
 
-`RouteTreeNode` interface is defined locally — no runtime dependency on the internal `route-tree` package. TypeScript structural typing ensures compatibility when passing the real `RouteTree` object.
+`RouteTreeNode` interface is defined locally — no runtime dependency on core's routing engine. TypeScript structural typing ensures compatibility when passing the real `RouteTree` object.
 
 ---
 

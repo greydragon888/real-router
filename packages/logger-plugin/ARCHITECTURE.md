@@ -278,6 +278,6 @@ All checks happen once (at manager/provider creation), not per call.
 ## See Also
 
 - [core CLAUDE.md](../core/CLAUDE.md) — Core package architecture (PluginFactory interface)
-- [event-emitter ARCHITECTURE.md](../event-emitter/ARCHITECTURE.md) — Event emitter (delivers lifecycle events to plugins)
+- [event-emitter ARCHITECTURE.md](../core/src/utils/event-emitter/ARCHITECTURE.md) — Event emitter (delivers lifecycle events to plugins)
 - [ARCHITECTURE.md](../../ARCHITECTURE.md) — System-level architecture
 - [INVARIANTS.md](INVARIANTS.md) — Property-based test invariants

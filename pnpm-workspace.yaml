@@ -48,7 +48,7 @@ overrides:
   # an optional peer; `.pnpmfile.mjs` drops the peer declaration, so danger
   # installs a 7.x of its own. jsdom 30 takes 8.x on its own range
   # (IMPLEMENTATION_NOTES has the measurements).
-  # At the version @angular/build pins exactly; ng-packagr's `^5.0.0` admits it.
+  # At the version @angular/build, its one parent here, pins exactly.
   piscina: '>=5.3.2 <6.0.0'
   # ReDoS in brace-expansion (GHSA-3jxr-9vmj-r5cp, High). Two major lines, @2 and @5, are in the tree
   # via assorted dev/tooling deps — pin each to its patched release. EXACT (not '>=') because the
@@ -129,8 +129,7 @@ overrides:
   # records how an exact dedupe pin on this line once held the tree below the fix.
   # Root devDeps, build and test tooling, never in a published @real-router/*
   # package, and what they unzip is our own build output rather than untrusted
-  # input. Bounded `<0.9` for the reason the @xmldom/xmldom entry states: on a 0.x
-  # line the minor IS the major. No 0.9 exists today, so the bound costs nothing.
+  # input. Bounded `<0.9` because on a 0.x line the minor IS the major. No 0.9 exists today, so the bound costs nothing.
   fflate: '>=0.8.3 <0.9'
   # js-yaml 4.x — GHSA-5p4m-2wfm-xmqj (High, quadratic CPU in `!!omap`, fixed 4.3.1)
   # and GHSA-2883-xcg3-v3hh (High, 7.5, fixed 4.3.2). Every parent is dev/build

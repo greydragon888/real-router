@@ -1,5 +1,5 @@
 name: 🐛 Bug Report
-description: Report a reproducible bug in router6
+description: Report a reproducible bug in real-router
 title: "[Bug]: "
 labels: [bug]
 body:

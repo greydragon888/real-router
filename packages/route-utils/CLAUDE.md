@@ -36,4 +36,4 @@ src/
 - **Segment testers match via flat string comparisons** — no RegExp engine: prefix/suffix/occurrence checks with a dot-or-edge boundary (`codePointAt === 46`), exactly equivalent to the historical `^seg(?:\\.|$)`-style patterns (locked by `tests/property/segmentTesters.regex-equivalence.properties.ts`). Validation (length `MAX_SEGMENT_LENGTH` + character safety) runs once per segment via a `Set` cache; an invalid segment throws on every call.
 - **Segment testers accept `State` objects** — When passed a `State`, the `.name` property is extracted automatically.
 - **`areRoutesRelated` is pure string comparison** — No tree lookup; O(k) where k is name length. Checks `===`, `startsWith(a + ".")`, or `startsWith(b + ".")`.
-- **Structural `RouteTreeNode` type** — Defined locally to avoid runtime dependency on `route-tree`. Structurally compatible with `RouteTree`.
+- **Structural `RouteTreeNode` type** — Defined locally to avoid a runtime dependency on core's routing engine. Structurally compatible with `RouteTree`.

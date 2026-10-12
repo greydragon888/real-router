@@ -4,12 +4,11 @@ on:
   pull_request:
     branches: [master]
 
-# Least-privilege default, matching every other workflow in the repo (ci.yml,
-# post-merge.yml, examples.yml, codspeed*.yml, cross-router-bench.yml). This was
-# the ONLY workflow declaring nothing at either level, so `require-changeset`
-# inherited whatever `default_workflow_permissions` happens to be — a no-op today
-# (the repo default is `read`), insurance against a future flip of that global
-# setting. `validate-changesets` keeps its own block, which fully overrides this.
+# Least-privilege default. Without it `require-changeset`, which declares
+# nothing of its own, would inherit whatever `default_workflow_permissions`
+# happens to be — a no-op today (the repo default is `read`), insurance against
+# a future flip of that global setting. `validate-changesets` keeps its own
+# block, which fully overrides this.
 permissions:
   contents: read
 
@@ -58,9 +57,9 @@ jobs:
 
           # Check if any source files in public packages changed.
           # shared/<dir>/*.ts is shipped source too: shared/{browser-env,dom-utils,ssr}
-          # is symlinked into 10 public packages, so a change there ships in a
-          # release and needs a changeset (turbo hashes it — see turbo.json
-          # `../../shared/**/*.ts`). Only .ts counts, mirroring the turbo
+          # is symlinked into public packages, so a change there ships in a
+          # release and needs a changeset (each consumer's turbo.json hashes its
+          # dir as `../../shared/<dir>/**/*.ts`). Only .ts counts, mirroring that
           # glob: shared docs (CLAUDE.md, .claude/), shared/package.json, and
           # __test-helpers/ (test-only, never bundled) must not trip this
           # REQUIRED gate — a bare `^shared/` did, on docs-only PRs.

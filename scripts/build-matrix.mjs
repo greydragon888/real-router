@@ -3,7 +3,7 @@
 //
 // Reads turbo's affected-package set for the current PR, classifies each package
 // by architectural layer, and emits either:
-//   • mode=leaf    — small, non-core PR → keep the monolithic `pipeline` job, OR
+//   • mode=leaf    — small, non-core PR → the monolithic `pipeline-leaf` job, OR
 //   • mode=sharded — full/near-full rebuild → a dynamic GHA matrix of parallel
 //                    shards (base + adapters + plugin groups).
 //
@@ -85,32 +85,34 @@ export const MAX_PER_SHARD = 5;
  * entirely from GROUP_NAMES / classify — no bare packages remain). `engine`
  * folded the former `path-matcher` + `search-params` + `route-tree` trio into
  * one bundled dep (engine-merge #1510), dropping the set from 8 to 6.
- * `event-emitter` then dissolved into core (`core/src/foundation/event-emitter`),
+ * `event-emitter` then dissolved into core (`core/src/utils/event-emitter`),
  * dropping it to 5; `@real-router/logger` likewise dissolved into core
- * (`core/src/foundation/logger` — a per-router `RouterLogger` instance replacing
+ * (`core/src/utils/logger` — a per-router `RouterLogger` instance replacing
  * the old process-global singleton, #724), dropping it to 4. `@real-router/types`
  * folded into core as the `/types` subpath (wave-2) — core no longer declares it
  * as a dep — dropping it to 3. `@real-router/fsm`'s frozen shell — published by
- * mistake, its live engine long since copied to `core/src/foundation/fsm` — was
+ * mistake, its live engine long since copied to `core/src/utils/fsm` — was
  * deleted outright (wave-3; the published `0.6.1` stays on npm, undeprecated),
  * dropping it to 2. Finally `engine` itself folded into core as `core/src/engine`
  * (engine-merge iteration 2) — core no longer declares it as a workspace dep —
  * dropping the set to 1: core alone.
  *
  * This member is EXCLUDED from the dynamic shards (`buildPlan` never puts the
- * `base` group in `include`) and delegated to the base-test job. base-test
- * imports THIS set to build its filter — running `test` on core explicitly. It
+ * `base` group in `include`) and delegated to the base-* jobs. base-test,
+ * base-lint and base-properties import THIS set to build their filters —
+ * running each task on core explicitly. It
  * deliberately does NOT use `--filter='@real-router/core...'`: turbo's `pkg...`
  * runs the task only on the matched package, not its deps (`test` has no
  * `^test`). With core alone that would still run core (no gap today), but the
  * explicit-member form stays authoritative — if a bundled workspace dep is ever
  * re-added to base it would otherwise be tested nowhere → no lcov → SonarCloud
  * 0% on its changed lines (the #1030 failure mode, via the former event-emitter).
- * Keep this set authoritative: ci.yml's base-test filter is generated from it.
+ * Keep this set authoritative: ci.yml's base-test, base-lint and base-properties
+ * filters are generated from it; base-bundle and base-coverage name core literally.
  */
 export const CORE_LAYER = new Set(["@real-router/core"]);
 
-/** The seven layer buckets, in a fixed order so the emitted matrix is stable. */
+/** The layer buckets, in a fixed order so the emitted matrix is stable. */
 const GROUP_NAMES = [
   "base",
   "adapter",
@@ -197,8 +199,8 @@ export function deriveMembership(dryRunJson) {
 
 /**
  * Classify one affected package into a layer bucket. Pure given its readers.
- * Throws on an unrecognised package so a new package with unusual deps fails the
- * compute-plan job loudly (R2.18 SPoF defence) rather than silently mis-sharding.
+ * Throws when turbo reports no directory for the package, so the `check` job
+ * fails loudly rather than mis-sharding; a package no rule names is a `leaf`.
  *
  * @param {string} pkg package name
  * @param {Map<string,string>} dirOf name→directory (from turbo)
@@ -227,7 +229,7 @@ export function classify(pkg, dirOf, readers = defaultReaders) {
   if (symlinks.some((s) => s.endsWith("shared/browser-env")))
     return "url-plugin";
   if (symlinks.some((s) => s.endsWith("shared/ssr"))) return "ssr-plugin";
-  // route-utils/sources fan out to all 6 adapters — their own shard.
+  // route-utils/sources fan out to every adapter — their own shard.
   if (pkg === "@real-router/sources" || pkg === "@real-router/route-utils")
     return "adapter-shared";
   // Everything else is a leaf — depends only on core (+ its /types, /validation,
@@ -289,7 +291,7 @@ export function groupAffected(affected, dirOf, readers = defaultReaders) {
  *
  * Sharded: each adapter is its own shard (1 adapter = 1 shard, R2.10); the other
  * non-empty groups become one shard each, split into chunks when larger than
- * MAX_PER_SHARD. `base` is handled by a separate job,
+ * MAX_PER_SHARD. `base` is handled by the base-* jobs,
  * so it is never in `include`. Empty groups are omitted → GHA spawns no runner.
  *
  * `leafFilter` (leaf only, else "") is the explicit `--filter=<pkg>` set the
@@ -322,8 +324,8 @@ export function buildPlan(
   const routing = groupAffected(affected, dirOf, readers);
   const touchesCore = routing.base.length > 0;
   // sources / route-utils are intermediate fanout amplifiers: a change to either
-  // invalidates ALL 6 (heavy) adapters, so however few packages turbo reports
-  // (sources alone fans out to 7, route-utils to 9 — both ≤ K), the monolithic
+  // invalidates EVERY (heavy) adapter, so however few packages turbo reports
+  // (either one alone stays ≤ K), the monolithic
   // leaf path would serialize the entire adapter cohort (~15m observed on a
   // sources-only PR, #1017). Force the sharded path so the adapter shards run in
   // parallel — same rationale as touchesCore, just one layer down the graph.
@@ -332,7 +334,7 @@ export function buildPlan(
   // sources/route-utils. The `@real-router/shared-sources` workspace (dir
   // `shared/`) owns shared/dom-utils, shared/browser-env and shared/ssr; an edit
   // to any of them fans out to every consumer that symlinks it — dom-utils → the
-  // 6 (heavy) adapters, browser-env → the 3 url-plugins, ssr → the 2 ssr-plugins.
+  // (heavy) adapters, browser-env → the url-plugins, ssr → the ssr-plugins.
   // The declared-dep query set reports NONE of those consumers (the dep is a
   // symlink, not a package.json edge), only the `shared` workspace — which
   // `deriveAffected` drops from `affected` (path `shared/`, not `packages/*`). So
@@ -483,7 +485,7 @@ export function runAffectedQuery() {
  * request at a time, about each task the local cache lacks — in CI, every task.
  * The plan reads no cache field.
  * `maxBuffer` is raised: on a full/shared rebuild the graph JSON (per-task input
- * maps for ~32 packages × 3 tasks) exceeds the 1 MiB execSync default.
+ * maps for every workspace package × 3 tasks) exceeds the 1 MiB execSync default.
  *
  * @param {typeof execSync} [exec] runs the command; the tests inject it
  */

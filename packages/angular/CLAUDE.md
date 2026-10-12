@@ -132,7 +132,7 @@ ssr/
 
 `lint:types` is `attw --pack . --ignore-rules no-resolution cjs-resolves-to-esm`,
 run under attw's default **`strict`** profile — the same profile `tsdown.base.ts`
-pins for the twenty tsdown-built packages, so this package is held to one
+pins for the tsdown-built packages, so this package is held to one
 standard with the rest. The two ignored rules cover findings that are the shape
 of an ESM-only Angular library rather than defects; `@angular/router` reports
 the same two:
@@ -462,7 +462,7 @@ Despite the `subscribe` method name and `output()` source, the boundary's `onErr
 
 ## Coverage Ceiling — JIT Limitation, not Poor Testing
 
-Coverage thresholds are **96%/86%/98%/97%** (statements/branches/functions/lines), not 100%, and they measure angular's own code: `src/dom-utils` is the `shared/dom-utils` symlink, which `vitest.config.unit.mts` leaves out of every consumer's coverage and react measures as its owner (#2552). The gap is **not untested code**: the ordinary non-JIT gaps (providersFactory) are closed in the jit suite, and the aot project exercises every JIT-unreachable path (`RouteView` fallback resolution, `RealLink` / `RealLinkActive` active flips, href writes, class transitions) with mutation-validated assertions.
+Coverage thresholds sit below 100% — the values are in `vitest.config.mts` — and they measure angular's own code: `src/dom-utils` is the `shared/dom-utils` symlink, which `vitest.config.unit.mts` leaves out of every consumer's coverage and react measures as its owner (#2552). The gap is **not untested code**: the ordinary non-JIT gaps (providersFactory) are closed in the jit suite, and the aot project exercises every JIT-unreachable path (`RouteView` fallback resolution, `RealLink` / `RealLinkActive` active flips, href writes, class transitions) with mutation-validated assertions.
 
 What keeps the floor below 100 is structural: **merge duplicates** (files tested in BOTH projects reach the merged report twice; the jit copy keeps the paths only AOT runs untaken, and the aot copy's map is too coarse to record them — see the gotcha below) and a few **AOT-emit phantom branches** (the angular#64583 class: branch records on lines whose every semantic path executes). Closing those would require evicting each Angular-entity file's tests wholly into the aot project and would still not guarantee 100% branches — measured and deliberately not pursued.
 

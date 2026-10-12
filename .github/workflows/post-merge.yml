@@ -31,8 +31,8 @@ on:
 # alternative (dropping `cancel-in-progress` outright) pays
 # for the same protection with a wasted build on every push, which is the
 # thing the setting exists to avoid. The prefix is not a guess:
-# `changesets.yml` sets `commit: "release: version packages…"`, and a
-# squash-merge of that PR keeps it.
+# `changesets.yml` sets "release: version packages…" as the PR's
+# `pr-title:` and `commit-message:`, and a squash-merge of that PR keeps it.
 concurrency:
   # ⚠ DOUBLE-quoted, and that is not style: the expression contains
   # `release: version packages`, and a colon-space inside a plain scalar makes

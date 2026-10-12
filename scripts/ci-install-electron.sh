@@ -24,7 +24,7 @@ if [ "$(uname -s)/$(uname -m)" != "Linux/x86_64" ]; then
   exit 1
 fi
 
-# All three desktop/electron/* examples share one .pnpm/electron@X, so resolving
+# The desktop/electron/* examples share one .pnpm/electron@X, so resolving
 # via one example materialises the binary for all. They live in the examples
 # workspace, which this script reaches from its own location, not the cwd.
 examples_dir="$(cd "$(dirname "$0")/../examples" && pwd)"

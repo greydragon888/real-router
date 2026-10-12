@@ -2,8 +2,10 @@
  * Shared Vitest configuration for the monorepo.
  *
  * Listed in `turbo.json#global.inputs`, so this file's hash participates
- * in every task's cache key. Touch the cache-bust marker below to
- * invalidate the remote turbo cache across all packages.
+ * in the cache key of every task whose `inputs` do not negate
+ * `vitest.config.*` — the test tasks among them. Touch the cache-bust marker
+ * below to invalidate the remote turbo cache of those tasks across all
+ * packages.
  *
  * Cache bust: 2026-04-18 — regenerate `lcov.info` for jsdom-environment
  * packages (browser-plugin, hash-plugin, memory-plugin, navigation-plugin,
