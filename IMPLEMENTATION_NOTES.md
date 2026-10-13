@@ -6069,15 +6069,25 @@ Scroll after a refused Back from a page scrolled to 2000 px, whose origin entry 
 
 `finished` of the refused navigation under navigation-plugin:
 
-| Arc                           | `master`              | fix                         |
-| ----------------------------- | --------------------- | --------------------------- |
+| Arc                           | `master`              | fix                          |
+| ----------------------------- | --------------------- | ---------------------------- |
 | Back, `canDeactivate` refuses | rejects, `AbortError` | rejects, `CANNOT_DEACTIVATE` |
 | a link, `canActivate` refuses | rejects, `AbortError` | rejects, `CANNOT_ACTIVATE`   |
 | the same with `replace`       | rejects, `AbortError` | rejects, `AbortError`        |
 
 `navigateerror` fires in each row, and no `unhandledrejection`: the browser marks `finished` as handled. `traverseTo` with a key no entry has returns `committed` and `finished` rejected with `InvalidStateError`, unhandled — it does not throw — which is why `returnToOrigin` looks the key up in `entries()` first. `MockNavigation` answers both ways as Chromium does now.
 
-The owner chose the resolution of the push arc on 2026-10-13: return here, the refused entry staying one forward entry until the next push from the origin replaces it; `precommitHandler` — deferring the commit until the guards answer — as the next change, to be reverted if it costs more than it gives.
+The owner chose the resolution of the push arc on 2026-10-13: return here, the refused entry staying one forward entry until the next push from the origin replaces it; `precommitHandler` — deferring the commit until the guards answer — to be tried next and reverted if it costs more than it gives.
+
+**`precommitHandler`, measured and not adopted.** A prototype ran the router's transition inside `precommitHandler` for a cancelable navigation to a route, and wrote the entry once the browser committed. On Chromium 153 a refusal then cancels the navigation outright: a refused link leaves no entry, a refused Back no `popstate`, and the address bar keeps the current page while a guard decides. But the router finishes its transition inside the precommit handler, before the browser commits, so `router.subscribe` saw the previous URL after every navigation the browser started and the router allowed:
+
+| Allowed navigation | `router.subscribe` saw, return | saw, `precommitHandler` |
+| ------------------ | ------------------------------ | ----------------------- |
+| a link             | `/users/list`                  | `/home`                 |
+| Back               | `/home`                        | `/users/view/42`        |
+| a link with a hash | `/users/view/42#part`          | `/home`                 |
+
+Fixing that needs a core hook that holds the commit after the last guard; `subscribeLeave`, the one hook core awaits, runs before the activation guards. And the return stays either way: a traversal without a user activation is not cancelable — `intercept({ precommitHandler })` throws `InvalidStateError` there (measured) — and a released Safari has no `precommitHandler` (MDN's compatibility data lists it in Technology Preview only). The prototype is not committed.
 
 **Review.** Six adversarial reviewers read the first version; each finding below has a test that fails on that version:
 

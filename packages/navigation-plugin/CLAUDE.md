@@ -129,6 +129,8 @@ The not-found arm returns the same way and rejects too: `navigateToNotFound` ref
 
 **A route the router keeps refusing to enter turns Back away each time.** An entry whose route a `canActivate` guard closes for good — an authenticated page after logout — stays in history, and every Back onto it returns; the user steps past it from the browser's history menu.
 
+**The handler does not use `precommitHandler`.** A transition run there commits before the browser does, so `router.subscribe` sees the previous URL after every navigation the browser starts and the router allows (measured on Chromium 153). A traversal without a user activation cannot take one, and a released Safari has none, so the return would stay anyway. IMPLEMENTATION_NOTES "URL Plugins: a Refused Navigation Returns to the Entry It Started From (#2740)" records the measurement.
+
 See #524 for why the "swallow silently" path was broken (URL committed, router state frozen, observable desync).
 
 ### Router-driven mutations re-enter the navigate handler (#518, #580)
