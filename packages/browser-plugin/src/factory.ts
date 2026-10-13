@@ -3,6 +3,7 @@ import { getPluginApi } from "@real-router/core/api";
 import {
   buildUrl,
   canSkipPopstateHistoryWrite,
+  createEntryPositions,
   createPluginBuildUrl,
   createPopstateHandler,
   createPopstateLifecycle,
@@ -18,6 +19,7 @@ import {
   safelyEncodePath,
   shouldReplaceHistory,
   urlToPath,
+  withEntryPositions,
 } from "./browser-env";
 import { defaultOptions, LOGGER_CONTEXT, POPSTATE_SOURCE } from "./constants";
 import { validateOptions } from "./validation";
@@ -121,10 +123,14 @@ function createBrowserPlugin(
   router: Router,
   api: PluginApi,
   options: Required<BrowserPluginOptions>,
-  browser: Browser,
+  givenBrowser: Browser,
   transitionOptions: PopstateTransitionOptions,
   shared: SharedFactoryState,
 ): Plugin {
+  // Every entry this plugin writes carries its position, so a refused
+  // traversal can return to the entry it started from (#2740).
+  const positions = createEntryPositions();
+  const browser = withEntryPositions(givenBrowser, positions);
   const claim = api.claimContextNamespace("browser");
   // Shared URL namespace (#532) — both navigation-plugin and browser-plugin
   // claim "url"; mutually exclusive at runtime.
@@ -196,6 +202,7 @@ function createBrowserPlugin(
       (router.getState()?.context as { url?: { hash?: string } } | undefined)
         ?.url?.hash ?? "",
     /* v8 ignore stop */
+    positions,
   });
 
   const lifecycle = createPopstateLifecycle({

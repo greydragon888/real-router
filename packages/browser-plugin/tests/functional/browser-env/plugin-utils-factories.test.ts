@@ -315,6 +315,7 @@ describe("canSkipPopstateHistoryWrite — search-channel handling (#1548)", () =
 
   const browserWith = (live: unknown): Browser =>
     ({ getState: () => live }) as unknown as Browser;
+  const position = { run: "r", index: 0 };
 
   it("backfills an empty query bag for a pre-M2 (search-less) entry and skips", () => {
     // A history entry written before the M2 `search` channel existed: no
@@ -324,7 +325,7 @@ describe("canSkipPopstateHistoryWrite — search-channel handling (#1548)", () =
     expect(
       canSkipPopstateHistoryWrite(
         toState,
-        browserWith({ name: "home", params: {}, path: "/" }),
+        browserWith({ name: "home", params: {}, path: "/", position }),
         areStatesEqual,
       ),
     ).toBe(true);
@@ -334,9 +335,25 @@ describe("canSkipPopstateHistoryWrite — search-channel handling (#1548)", () =
     expect(
       canSkipPopstateHistoryWrite(
         toState,
-        browserWith({ name: "home", params: {}, search: {}, path: "/" }),
+        browserWith({
+          name: "home",
+          params: {},
+          search: {},
+          path: "/",
+          position,
+        }),
         areStatesEqual,
       ),
     ).toBe(true);
+  });
+
+  it("keeps the write for an equal entry that carries no position, so it gets one (#2740)", () => {
+    expect(
+      canSkipPopstateHistoryWrite(
+        toState,
+        browserWith({ name: "home", params: {}, search: {}, path: "/" }),
+        areStatesEqual,
+      ),
+    ).toBe(false);
   });
 });

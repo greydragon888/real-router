@@ -6031,6 +6031,83 @@ The owner decided the issue's three open questions while it was being fixed (202
 - `!= null` rather than `!== null` for the two nullable attributes: a hand-built event without them (the package's own direct handler tests have one) must not read as a download.
 - The mock change is what made the defect testable at all: with `sameDocument: true` on every event, no test could tell the two kinds of navigation apart, and a rollback the browser does not perform let refusal tests pass on behaviour that does not exist.
 
+## URL Plugins: a Refused Navigation Returns to the Entry It Started From (#2740)
+
+### Problem
+
+When the router refused a navigation the browser had already made — Back, Forward, `go(±n)`, and under navigation-plugin a link or `location.assign()` to a route — every URL plugin wrote the router's URL into the entry the browser stood on. That entry is the destination: `popstate` fires after the traversal, and the Navigation API commits an intercepted navigation before its handler runs and does not roll it back when the handler rejects (measured on Chromium 153). URL and router state agreed; session history did not survive. A refused Back from `[/home, /users/42]` left `[/users/42, /users/42]`: the page left behind was gone, replaced by a copy of the current page. A refused link under navigation-plugin left a copy of the current page ahead of it, so Back from there repeated the page. navigation-plugin's not-found arm had no recovery at all: it relied on a rollback the browser does not perform, so a refused unmatched destination kept its URL while the router stayed.
+
+Nothing pinned the entry list: no test in the three packages read it after a refusal, and `MockNavigation` rolled a rejected handler back until #2724.
+
+### Solution
+
+**navigation-plugin.** Every navigation the handler takes gets a record: its signal, `from` — the key of the entry the router stands on — and the router's state. `from` is the key of `browser.currentEntry`, read before the commit, unless the last record's navigation has not brought the router to its destination — cancelled by this one, or still running — and the router is still in that record's state: then it is that record's `from`, because the browser has committed an entry the router never reached. A navigation that reaches the router's own state (`SAME_STATES`) drops the record. Every recovery calls `returnToOrigin(record)`: nothing when the router's state is no longer the record's — a navigation committed since owns the URL; `browser.traverseTo(from)` when that entry is in `entries()` and is not the current one; otherwise `syncUrlToRouterState` as before — a `replace` keeps its key, no origin is known, or `traverseTo` throws. After a return the intercept rejects with the refusal or the crash. The not-found arm recovers the same way. The #2724 download race returns with the record of the navigation it aborted, and only while the router is active.
+
+**browser-plugin and hash-plugin (`shared/browser-env`).** The History API names no entry, so the plugins number the entries they write. `withEntryPositions` wraps the plugin's `Browser` — every member calls the given browser's own at call time — and stamps every state it writes with `position: { run, index }`: a replace keeps the place of the entry it rewrites, a push takes the next one, and each write first adopts the place the live entry carries. A run starts on an entry that carries no position — the one a document loads with, one the browser or other code wrote; a plugin started on an entry that carries one, as after a reload, continues its run. The popstate handler keeps where the traversal started — the router's entry and its state — and, on a refusal, calls `returnOrRollback`: nothing when the router's state changed since; `history.go(origin.index - live.index)` when both positions are in one run, the browser has `go`, and the distance is not zero; the rewrite otherwise, and when `go` throws. A popstate that lands on the entry the return was sent to is the return and starts no transition; one that lands anywhere else is taken as a traversal of its own. A return drops an event deferred behind the refusal — a second Back while the guard decides. `SAME_STATES` and `TRANSITION_CANCELLED` refuse nothing and keep the rewrite. `canSkipPopstateHistoryWrite` no longer skips the write onto an entry without a position, so a traversal the router takes onto one stamps it.
+
+**`createDirectionTracker` (`shared/dom-utils`, six adapters).** The plugin's own return fires a `popstate` that no router event follows, so the tracker's flag stayed armed and the next forward navigation was labelled `back`. A `popstate` that lands on the URL of the router's current state — built with the URL plugin's `buildUrl` — arms nothing now.
+
+Before / After, a Back refused on `/users/42`:
+
+```
+entries before the Back:  [/home, /users/42*]
+before: the entry the browser landed on is rewritten
+                          [/users/42*, /users/42]   — /home is gone
+after:  traverseTo(from) / history.go(1)
+                          [/home, /users/42*]       — unchanged
+```
+
+Measured on Chromium 153.0.8010.12 against `src`, the three plugins in one harness: all 35 arcs pass; on `master` @ `4ccffc845` only the 8 that expect no change pass — 7 controls, and the refused fragment navigation the browser made under hash-plugin, which keeps the rewrite (below). Overlapping navigations, and a redirect a `TRANSITION_ERROR` listener queues, keep URL and router together in all three plugins.
+
+Scroll after a refused Back from a page scrolled to 2000 px, whose origin entry was left at 300 px:
+
+| Plugin            | `master` | first version | fix  |
+| ----------------- | -------- | ------------- | ---- |
+| navigation-plugin | 2000     | 300           | 2000 |
+| browser-plugin    | 300      | 2000          | 2000 |
+| hash-plugin       | 300      | 2000          | 2000 |
+
+`finished` of the refused navigation under navigation-plugin:
+
+| Arc                           | `master`              | fix                         |
+| ----------------------------- | --------------------- | --------------------------- |
+| Back, `canDeactivate` refuses | rejects, `AbortError` | rejects, `CANNOT_DEACTIVATE` |
+| a link, `canActivate` refuses | rejects, `AbortError` | rejects, `CANNOT_ACTIVATE`   |
+| the same with `replace`       | rejects, `AbortError` | rejects, `AbortError`        |
+
+`navigateerror` fires in each row, and no `unhandledrejection`: the browser marks `finished` as handled. `traverseTo` with a key no entry has returns `committed` and `finished` rejected with `InvalidStateError`, unhandled — it does not throw — which is why `returnToOrigin` looks the key up in `entries()` first. `MockNavigation` answers both ways as Chromium does now.
+
+The owner chose the resolution of the push arc on 2026-10-13: return here, the refused entry staying one forward entry until the next push from the origin replaces it; `precommitHandler` — deferring the commit until the guards answer — as the next change, to be reverted if it costs more than it gives.
+
+**Review.** Six adversarial reviewers read the first version; each finding below has a test that fails on that version:
+
+- navigation-plugin took the origin of a navigation that overlapped another from `currentEntry` — the overlapped one's committed entry, which the router never reached — and returned there, leaving URL and router apart (the #524 shape): a second Back while an async `canDeactivate` decides. Its first fix asked whether the earlier handler had finished; that passed on `MockNavigation` and failed in Chromium, which runs microtasks between the abort and the next `navigate` event. The rule asks the router's state instead.
+- A navigation the router committed between the refusal and the recovery was undone by the return.
+- The handler resolved after a return, and Chromium applied the refused destination's scroll position to the page the router stayed on (table above).
+- `withEntryPositions` copied the browser with a spread: a class instance lost its prototype methods, and a test that spied on a member after `usePlugin` stopped seeing calls.
+- A `go` that threw or never arrived left the return armed, and the user's next Back was swallowed.
+- The direction tracker's mislabel, above.
+- The download race ignored a not-found navigation, and a router commit, between the download and its next task.
+
+### Why
+
+- **Return rather than rewrite.** A rewrite can only turn the landed entry into a copy of another one. Only a traversal leaves every entry where it was.
+- **The origin key is read before the commit**, because the plugin's `NavigationBrowser` has nothing later that names it: after the commit `currentEntry` is the destination, and the router's state names a route, not an entry.
+- **The router's state object answers "has the router moved?".** A commit makes a new one, so comparing identities settles both whether a newer navigation owns the URL and whether an earlier record still describes where the router stands — whatever the order of microtasks around an abort.
+- **The intercept rejects after a return.** A navigation that finishes has the browser apply its scroll; a refused one moves nothing.
+- **Only an exact landing is the return.** A return that never arrives — a `go` that does nothing, a step of an iframe's joint session history — or one that lands elsewhere must not swallow the user's next traversal.
+- **Positions live in `history.state`** because it is the only per-entry storage the History API offers. `history.length` counts entries and does not say which one is current.
+- **Runs**, because two indexes are comparable only when one writer numbered them without a gap: an entry someone else wrote breaks the numbering, and a distance measured across it would be confidently wrong, so a run restarts there. A run's name carries a random per-document prefix, so the runs of two documents do not share a name.
+- **Every write adopts the live position first.** A traversal can move the browser while a transition runs; a write numbered from the remembered place would give two entries one index.
+- **The tracker asks the URL plugin.** It cannot see the plugin's return; the URL of the router's state is where a traversal that starts no transition lands.
+- **`SAME_STATES` and `TRANSITION_CANCELLED` are not refusals.** The property guard found the first: a traversal onto an entry holding the router's own state was taken back, though nothing refused it.
+- **Limitations.**
+  - hash-plugin numbers an entry a fragment navigation creates (`<a href="#/x">`, an address-bar edit, `location.hash =`) on its own, so refusing that navigation, or a Back or Forward between two such entries, rewrites the entry — in an app that navigates by plain anchors, no refusal returns.
+  - Under the History API plugins a traversal a newer navigation cancels still rewrites the live entry.
+  - A route the router keeps refusing to enter — an authenticated page after logout — turns Back away each time, as in Vue Router; Angular's `canceledNavigationResolution: "replace"` default rewrites instead.
+  - A return the browser does not perform leaves the URL on the refused entry until the next traversal.
+  - `MockNavigation` dispatches the next `navigate` event before an aborted navigation's handler finishes; Chromium does not.
+
 ## Scroll Restoration as Utility, Not Plugin
 
 **Problem.** SPA navigation typically loses scroll position — users expect back/forward to restore where they left off (browser default for MPAs, universally emulated by modern SPA routers: Angular `withInMemoryScrolling`, React Router `<ScrollRestoration>`, Vue `scrollBehavior`). Real-router shipped no such feature, putting us behind parity.

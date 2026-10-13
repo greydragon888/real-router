@@ -442,8 +442,8 @@ describe("Navigation Plugin — Lifecycle", () => {
       mockNav.navigate("http://localhost/home");
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      // Guard blocks navigation — router state stays at users.list, and
-      // `syncUrlToRouterState` writes its URL into the current entry (#2740)
+      // Guard blocks navigation — router state stays at users.list, and the
+      // browser returns to the entry the navigation started from (#2740)
       expect(router.getState()!.name).toBe("users.list");
       expect(mockNav.currentUrl).toBe("http://localhost/users/list");
     });
@@ -767,7 +767,9 @@ describe("Navigation Plugin — Lifecycle", () => {
 
     it("recovery preserves hash from state.context.url on CANNOT_DEACTIVATE (#532)", async () => {
       // Replace router with strict-deactivate setup so guard rejection
-      // routes through syncUrlToRouterState (`navigate-handler.ts`).
+      // routes through syncUrlToRouterState (`navigate-handler.ts`): a refused
+      // `replace` keeps the slot's key, so the slot is rewritten rather than
+      // returned to (#2740).
       router.stop();
       unsubscribe?.();
       mockNav.navigate("http://localhost/home#anchor", { history: "replace" });
@@ -783,12 +785,12 @@ describe("Navigation Plugin — Lifecycle", () => {
       // Block deactivation of home → trigger CANNOT_DEACTIVATE on user-driven nav.
       getLifecycleApi(router).addDeactivateGuard("home", () => () => false);
 
-      // User clicks a link to /users/list — Navigation API fires navigate
+      // `location.replace("/users/list")` — Navigation API fires navigate
       // event, plugin intercepts, router rejects with CANNOT_DEACTIVATE,
       // recovery runs syncUrlToRouterState which must rebuild the URL with
       // ctxHash from state.context.url.
       await mockNav
-        .navigate("http://localhost/users/list")
+        .navigate("http://localhost/users/list", { history: "replace" })
         .finished.catch(noop);
 
       expect(mockNav.currentUrl).toContain("#anchor");

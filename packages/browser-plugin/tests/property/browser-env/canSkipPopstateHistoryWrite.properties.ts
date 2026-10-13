@@ -70,8 +70,24 @@ describe("canSkipPopstateHistoryWrite Properties", () => {
   });
 
   describe("restored entry identical to resolved — skips", () => {
+    // Every entry the plugin writes carries its position (#2740).
+    const position = { run: "r", index: 0 };
+
     test.prop([arbFullState], { numRuns: NUM_RUNS.standard })(
       "an identical {name,params,path} live entry allows the skip",
+      (toState: State) => {
+        expect(
+          canSkipPopstateHistoryWrite(
+            toState,
+            browserWithState(() => ({ ...triplet(toState), position })),
+            areStatesEqual,
+          ),
+        ).toBe(true);
+      },
+    );
+
+    test.prop([arbFullState], { numRuns: NUM_RUNS.standard })(
+      "an identical live entry with no position keeps the write, which stamps one",
       (toState: State) => {
         expect(
           canSkipPopstateHistoryWrite(
@@ -79,7 +95,7 @@ describe("canSkipPopstateHistoryWrite Properties", () => {
             browserWithState(() => triplet(toState)),
             areStatesEqual,
           ),
-        ).toBe(true);
+        ).toBe(false);
       },
     );
   });

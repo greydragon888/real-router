@@ -6,8 +6,9 @@
 // `deps.browser.replaceState(currentState, url)` — the whole committed `State`,
 // which additionally carries `context` and `transition`.
 //
-// It fires on every guard-rejected Back, every SAME_STATES popstate and every
-// strict-mode unmatched URL, so this is not a rare path.
+// It fires on every SAME_STATES popstate, and on a refused Back or a
+// strict-mode unmatched URL wherever the plugin cannot measure the way back
+// (#2740), so this is not a rare path.
 //
 // ⚠ Why it matters, and it is not tidiness: `state.context` is a PUBLIC plugin
 // slot whose contents this plugin does not control. A real browser runs
@@ -58,7 +59,7 @@ describe("#1837 — the rollback writes the four-channel projection", () => {
     vi.clearAllMocks();
   });
 
-  it("writes exactly {name, params, search, path} on a strict-mode rollback", async () => {
+  it("writes exactly {name, params, search, path} and the entry's position on a strict-mode rollback", async () => {
     router = createRouter(routerConfig, {
       defaultRoute: "home",
       allowNotFound: false,
@@ -81,10 +82,10 @@ describe("#1837 — the rollback writes the four-channel projection", () => {
 
     // ⚑ The KEY SET is the assertion, not the values: `context` and
     // `transition` are what must not be there, and asserting the values would
-    // pass with them present.
+    // pass with them present. `position` is the entry's place (#2740).
     expect(
       Object.keys(written).toSorted((a, b) => a.localeCompare(b)),
-    ).toStrictEqual(["name", "params", "path", "search"]);
+    ).toStrictEqual(["name", "params", "path", "position", "search"]);
   });
 
   it("POSITIVE CONTROL — the four channels still carry the surviving state", async () => {

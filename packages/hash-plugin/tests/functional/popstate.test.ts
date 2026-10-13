@@ -781,8 +781,14 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
       await router.navigate("users.view", { id: "1" });
 
       // Browser restores the users.list entry on back: sets history.state +
-      // hash location, THEN fires popstate.
-      const restored = { name: "users.list", params: {}, path: "/users/list" };
+      // hash location, THEN fires popstate. The plugin wrote that entry, so it
+      // carries the plugin's position (#2740).
+      const restored = {
+        name: "users.list",
+        params: {},
+        path: "/users/list",
+        position: { run: "r", index: 0 },
+      };
 
       globalThis.history.replaceState(restored, "", "/#/users/list");
 

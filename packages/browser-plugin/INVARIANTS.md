@@ -48,8 +48,15 @@
 | --- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | `matchUrl` returns undefined for non-matching URLs | URLs that do not correspond to any route in the tree produce `undefined`. Validates the negative path of the full URL resolution pipeline (parse → extract → match). |
 
+## Refused Traversal (#2740)
+
+| #   | Invariant | Description |
+| --- | --------- | ----------- |
+| 1   | A refused traversal returns to the entry it started from | After any journey of router navigations, a Back, Forward or `go(±n)` to an entry of another route that `canDeactivate` or `canActivate` refuses leaves the browser on the entry it started from, with the router's state unchanged, and the entry it reached keeps its URL: the same traversal after `stop()` lands on it. |
+
 ## Test Files
 
 | File                                         | Invariants | Category                                                                                              |
 | -------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------- |
 | `tests/property/browserPlugin.properties.ts` | 15         | URL roundtrip, base path, trailing slash, query string resilience, path extraction, negative matching |
+| `tests/property/refused-traversal.properties.ts` | 1 | refused traversal |

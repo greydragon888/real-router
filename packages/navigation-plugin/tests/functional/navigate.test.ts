@@ -157,9 +157,9 @@ describe("Navigation Plugin — Navigate", () => {
       expect(Object.isFrozen(errorHook.mock.calls[0][2])).toBe(true);
       expect(Object.isFrozen(finishedRejection)).toBe(true);
 
-      // Router state unchanged. The URL is not asserted: the rejected
-      // intercept leaves it where the navigation put it (#2740).
+      // Router state unchanged, and the browser back on its entry (#2740).
       expect(restrictedRouter.getState()).toStrictEqual(previousState);
+      expect(new URL(mockNav.currentUrl).pathname).toBe(previousState.path);
 
       restrictedRouter.stop();
     });
@@ -314,8 +314,8 @@ describe("Navigation Plugin — Navigate", () => {
   describe("canDeactivate guard contract — #524", () => {
     // Regression for #524: canDeactivate guards must run on browser
     // back/forward by default (`forceDeactivate` flipped from true → false),
-    // and a blocked guard must leave the router where it was; the URL comes
-    // back through `syncUrlToRouterState` (#2740).
+    // and a blocked guard must leave the router where it was; the browser
+    // comes back to the entry the navigation started from (#2740).
 
     it("forceDeactivate default is false (respect guards)", async () => {
       // Indirect contract check: with default options, a blocking guard must
@@ -328,7 +328,9 @@ describe("Navigation Plugin — Navigate", () => {
 
       const { finished } = mockNav.navigate("http://localhost/users/list");
 
-      await finished;
+      await expect(finished).rejects.toMatchObject({
+        code: "CANNOT_DEACTIVATE",
+      });
 
       // Router state stays on "index" — guard blocked the transition.
       expect(router.getState()?.name).toBe("index");
@@ -349,7 +351,7 @@ describe("Navigation Plugin — Navigate", () => {
       expect(guardSpy).toHaveBeenCalledTimes(1);
     });
 
-    it("guard rejection syncs URL back and leaves router state unchanged", async () => {
+    it("guard rejection returns the URL and leaves router state unchanged", async () => {
       unsubscribe = router.usePlugin(navigationPluginFactory({}, browser));
       await router.start();
 
@@ -358,21 +360,23 @@ describe("Navigation Plugin — Navigate", () => {
       const urlBefore = mockNav.currentUrl;
       const { finished } = mockNav.navigate("http://localhost/users/list");
 
-      await finished;
+      await expect(finished).rejects.toMatchObject({
+        code: "CANNOT_DEACTIVATE",
+      });
 
-      // Explicit sync via browser.navigate({history:"replace"}) tagged with
-      // PLUGIN_SYNC_INFO keeps URL and router state consistent. No desync.
+      // The plugin traverses back to the entry the navigation started from
+      // (#2740), tagged with PLUGIN_SYNC_INFO. No desync.
       expect(mockNav.currentUrl).toBe(urlBefore);
       expect(router.getState()?.name).toBe("index");
     });
 
-    it("guard rejection rebuilds the URL with its query channel (#1586)", async () => {
-      // syncUrlToRouterState rebuilds the visible URL from the state that
-      // survived the rejection. It used to rebuild it from `name` + `params`
-      // alone, so a blocked back-navigation away from `?tab=a&sort=z` left the
-      // user on the bare path — a URL the router itself does not believe in
-      // (`state.path` still carries the query), and the one the address bar
-      // keeps if they copy it.
+    it("a refused replace rewrites the URL with its query channel (#1586)", async () => {
+      // A refused `replace` keeps its entry, and syncUrlToRouterState
+      // rebuilds that entry's URL from the state that survived the rejection.
+      // It used to rebuild it from `name` + `params` alone, so a blocked
+      // navigation away from `?tab=a&sort=z` left the user on the bare path —
+      // a URL the router itself does not believe in (`state.path` still
+      // carries the query), and the one the address bar keeps if they copy it.
       router.stop();
 
       mockNav = new MockNavigation("http://localhost/");
@@ -395,9 +399,11 @@ describe("Navigation Plugin — Navigate", () => {
         () => () => false,
       );
 
-      const { finished } = mockNav.navigate("http://localhost/home");
+      const { finished } = mockNav.navigate("http://localhost/home", {
+        history: "replace",
+      });
 
-      await finished;
+      await finished.catch(() => undefined);
 
       expect(router.getState()?.name).toBe("users.list");
       expect(mockNav.currentUrl).toBe(urlBefore);
@@ -766,28 +772,23 @@ describe("Error Recovery", () => {
     });
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const browserNavigateSpy = vi.spyOn(browser, "navigate");
 
     const { finished } = mockNav.navigate("http://localhost/users/list");
 
-    await finished;
+    await expect(finished).rejects.toThrow("unexpected crash");
 
     expect(consoleSpy).toHaveBeenCalledWith(
       "[navigation-plugin] Critical error in navigate handler",
       expect.any(TypeError),
     );
 
-    expect(browserNavigateSpy).toHaveBeenCalledWith(
-      "/",
-      expect.objectContaining({
-        state: expect.objectContaining({
-          name: "index",
-          params: {},
-          path: "/",
-        }),
-        history: "replace",
-      }),
-    );
+    // Back on the entry the navigation started from, the refused one ahead
+    // (#2740).
+    expect(mockNav.entries().map((entry) => entry.url)).toStrictEqual([
+      "http://localhost/",
+      "http://localhost/users/list",
+    ]);
+    expect(mockNav.currentEntry?.index).toBe(0);
 
     consoleSpy.mockRestore();
   });
@@ -795,7 +796,7 @@ describe("Error Recovery", () => {
   // Obsolete after #483: strict-mode path no longer invokes navigateToDefault,
   // so there is no "navigateToDefault crash" code path to recover from.
 
-  it("RouterError triggers manual URL sync (syncUrlToRouterState) without critical-error logging", async () => {
+  it("RouterError returns to the entry the navigation started from, without critical-error logging (#524, #2740)", async () => {
     unsub = router.usePlugin(
       navigationPluginFactory({ forceDeactivate: false }, browser),
     );
@@ -804,13 +805,14 @@ describe("Error Recovery", () => {
     getLifecycleApi(router).addDeactivateGuard("index", () => () => false);
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const browserNavigateSpy = vi.spyOn(browser, "navigate");
+    const traverseSpy = vi.spyOn(browser, "traverseTo");
+    const originKey = mockNav.currentEntry?.key;
 
     const { finished } = mockNav.navigate("http://localhost/users/list");
 
-    // #524: RouterError triggers manual URL sync (syncUrlToRouterState) but
-    // does not surface through `finished`.
-    await finished;
+    // #524: the refusal is recovered from, and the intercept rejects with it
+    // (#2740).
+    await expect(finished).rejects.toMatchObject({ code: "CANNOT_DEACTIVATE" });
 
     // Negative: the critical-error logging path (for non-RouterError crashes)
     // must stay quiet.
@@ -819,20 +821,13 @@ describe("Error Recovery", () => {
       expect.anything(),
     );
 
-    // Positive: manual URL sync must fire — `browser.navigate(url, { history: "replace" })`
-    // with the current (unchanged) router state. Pins the #524 contract so a
-    // regression that "handles RouterError silently" (i.e. no sync at all,
-    // restoring the old URL/state desync) fails here.
-    expect(browserNavigateSpy).toHaveBeenCalledWith(
-      "/",
-      expect.objectContaining({
-        state: expect.objectContaining({ name: "index", path: "/" }),
-        history: "replace",
-      }),
-    );
+    // Positive: a regression that "handles RouterError silently" — no
+    // recovery, the URL left on the refused destination (#524) — fails here.
+    expect(traverseSpy).toHaveBeenCalledWith(originKey);
+    expect(mockNav.currentUrl).toBe("http://localhost/");
 
     consoleSpy.mockRestore();
-    browserNavigateSpy.mockRestore();
+    traverseSpy.mockRestore();
   });
 
   it("strict-mode throws ROUTE_NOT_FOUND silently (no critical recovery) (#483)", async () => {
@@ -861,13 +856,17 @@ describe("Error Recovery", () => {
       expect.anything(),
     );
 
-    // No recovery write: the URL stays where the navigation put it (#2740).
+    // Back on the entry the navigation started from, without a rewrite
+    // (#2740).
+    expect(mockNav.currentUrl).toBe("http://localhost/");
     expect(browserNavigateSpy).not.toHaveBeenCalled();
 
     consoleSpy.mockRestore();
     restrictedRouter.stop();
   });
 
+  // The two below take a `replace`: it keeps the slot's key, so recovery
+  // rewrites the slot with the router's URL rather than returning to it.
   it("recovery handles null state gracefully", async () => {
     unsub = router.usePlugin(navigationPluginFactory({}, browser));
     await router.start();
@@ -880,16 +879,23 @@ describe("Error Recovery", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const browserNavigateSpy = vi.spyOn(browser, "navigate");
 
-    const { finished } = mockNav.navigate("http://localhost/users/list");
+    const { finished } = mockNav.navigate("http://localhost/users/list", {
+      history: "replace",
+    });
 
-    await finished;
+    await expect(finished).rejects.toThrow("crash");
 
     expect(consoleSpy).toHaveBeenCalledWith(
       "[navigation-plugin] Critical error in navigate handler",
       expect.any(TypeError),
     );
 
+    // Nothing to write, and nothing failed on the way.
     expect(browserNavigateSpy).not.toHaveBeenCalled();
+    expect(consoleSpy).not.toHaveBeenCalledWith(
+      "[navigation-plugin] Failed to sync URL to router state",
+      expect.anything(),
+    );
 
     consoleSpy.mockRestore();
   });
@@ -907,9 +913,11 @@ describe("Error Recovery", () => {
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const { finished } = mockNav.navigate("http://localhost/users/list");
+    const { finished } = mockNav.navigate("http://localhost/users/list", {
+      history: "replace",
+    });
 
-    await finished;
+    await expect(finished).rejects.toThrow("crash");
 
     expect(consoleSpy).toHaveBeenCalledWith(
       "[navigation-plugin] Critical error in navigate handler",
@@ -923,21 +931,51 @@ describe("Error Recovery", () => {
     consoleSpy.mockRestore();
   });
 
+  it("a return to the origin entry that fails is logged, and the entry is rewritten instead (#2740)", async () => {
+    unsub = router.usePlugin(navigationPluginFactory({}, browser));
+    await router.start();
+
+    getLifecycleApi(router).addDeactivateGuard("index", () => () => false);
+    vi.spyOn(browser, "traverseTo").mockImplementation(() => {
+      throw new Error("traverseTo failed");
+    });
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { finished } = mockNav.navigate("http://localhost/users/list");
+
+    await expect(finished).rejects.toMatchObject({ code: "CANNOT_DEACTIVATE" });
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "[navigation-plugin] Failed to return to the entry the navigation started from",
+      expect.objectContaining({ message: "traverseTo failed" }),
+    );
+    // The URL agrees with the router again.
+    expect(mockNav.currentUrl).toBe("http://localhost/");
+
+    consoleSpy.mockRestore();
+  });
+
   it("recovery calls browser.navigate with replace history", async () => {
-    // Recovery delegates URL→state sync to browser.navigate; the built-in
+    // With no current entry there is no origin to return to, so recovery
+    // rewrites the entry through browser.navigate; the built-in
     // createNavigationBrowser tags that call with `info: PLUGIN_SYNC_INFO` so
     // the navigate-event handler short-circuits it (verified separately in
     // navigation-browser.test.ts → "navigate"/"replaceState"/"traverseTo").
+    // One state object until a commit, as a router's `getState()` answers.
+    const state = { name: "index", params: {}, path: "/" };
     const mockRouter = {
       isActive: () => true,
       navigate: vi.fn().mockRejectedValue(new TypeError("crash")),
-      getState: () => ({ name: "index", params: {}, path: "/" }),
+      getState: () => state,
       buildUrl: () => "/",
     } as unknown as Router;
 
     const mockBrowserNavigate = vi.fn();
     const mockBrowser = {
       navigate: mockBrowserNavigate,
+      entries: () => [],
+      currentEntry: null,
     } as unknown as NavigationBrowser;
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -972,7 +1010,7 @@ describe("Error Recovery", () => {
       info: undefined,
     } as unknown as NavigateEvent);
 
-    await interceptedHandler?.();
+    await expect(interceptedHandler?.()).rejects.toThrow(TypeError);
 
     expect(mockBrowserNavigate).toHaveBeenCalledWith(
       "/",

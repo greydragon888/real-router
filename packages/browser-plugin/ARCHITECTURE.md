@@ -322,11 +322,17 @@ User clicks back or forward
         │
         ├── location = browser.getLocation()   (snapshot at fire time, #757)
         │
+        ├── the return returnOrRollback started, landing on its origin?
+        │     (positions.takeReturn() consumes it either way)
+        │     YES: return — no transition
+        │
         ├── isTransitioning === true?
         │     YES: deferred = { evt, location }  (last-write-wins)
         │          return
         │
         ├── isTransitioning = true
+        │
+        ├── start = { origin: positions.current, state: router.getState() }
         │
         ├── getRouteFromEvent(evt, api, location)
         │     │
@@ -339,18 +345,38 @@ User clicks back or forward
         ├── route found?
         │     YES: await router.navigate(route.name, route.params, transitionOptions)
         │     NO + allowNotFound: router.navigateToNotFound(location)
-        │     NO + !allowNotFound: api.emitTransitionError(ROUTE_NOT_FOUND) + rollbackUrlToCurrentState()
+        │     NO + !allowNotFound: api.emitTransitionError(ROUTE_NOT_FOUND) + returnOrRollback(start)
         │                          (no silent navigateToDefault — see #483)
         │
         ├── catch (error):
-        │     error instanceof RouterError? → rollbackUrlToCurrentState() (URL↔state resync)
-        │     otherwise: recoverFromCriticalError(error)
-        │               └── browser.replaceState(currentState, pathToUrl(currentState.path))
+        │     SAME_STATES / TRANSITION_CANCELLED → rollbackUrlToCurrentState() (nothing refused)
+        │     other RouterError → returnOrRollback(start)
+        │     otherwise: recoverFromCriticalError(error) → returnOrRollback(start)
         │
         └── finally:
               isTransitioning = false
               processDeferredEvent()
 ```
+
+### Return to the entry a refused traversal started from
+
+```
+returnOrRollback(start)
+  │   distance = from the live entry's position to origin's
+  │
+  ├── router.getState() !== start.state?
+  │     YES: return — a navigation committed since owns the URL
+  │
+  ├── browser.go present, one run, distance ≠ 0?
+  │     YES: positions.returnTo(origin); browser.go(distance); deferred = null
+  │          (a popstate landing on origin is the return: no transition;
+  │           one landing elsewhere is a traversal of its own)
+  │          go throws → the branch below
+  │
+  └── otherwise: rollbackUrlToCurrentState() — the live entry is rewritten
+```
+
+The positions come from `withEntryPositions`: every state the plugin writes carries `position: { run, index }` — a replace keeps the place of the entry it rewrites, a push follows it, and each write reads that place off the live entry first. A run starts on an entry that carries no position — the one a document loads with, one the browser or other code wrote — so only two entries of one run are `index` apart. A plugin started on an entry that carries one, as after a reload, continues its run.
 
 ### Deferred popstate Handling
 
@@ -359,7 +385,7 @@ Rapid back/forward clicks generate multiple popstate events in quick succession.
 The `isTransitioning` flag blocks concurrent processing.
 New events are written to the single-slot `deferred = { evt, location }` queue — each one overwrites the previous (last-write-wins).
 The `location` is snapshotted when the event fires, not when it is replayed: the in-flight navigation's `onTransitionSuccess → replaceState` overwrites the live location before `processDeferredEvent()` runs, so re-reading it then would resolve the wrong target (#757).
-After the current transition completes, `processDeferredEvent()` processes the last deferred event against its snapshotted location.
+After the current transition completes, `processDeferredEvent()` processes the last deferred event against its snapshotted location — unless the router refused the transition and the plugin travelled back, which drops it.
 
 ```
 Click 1 → onPopState → isTransitioning=true → navigate("page1")...
@@ -412,8 +438,8 @@ Popstate event handling, critical error recovery, and deferred event processing 
 
 - `shared/browser-env/popstate-utils.ts` — `getRouteFromEvent` (validates `history.state` via `isStateStrict`, falls back to `api.matchPath(browser.getLocation())` when invalid), `updateBrowserState` (the four-channel projection `{ name, params, search, path }` — hash-plugin's writer, and since #1837 the URL rollback's too, so a rollback entry carries the same members every other write site does), `createUpdateBrowserState` (mutable-buffer factory used by browser-plugin on the hot path)
 - `shared/browser-env/popstate-handler.ts` — `createPopstateHandler` (deferred-queue, last-write-wins, `RouterError` vs critical-error split), `createPopstateLifecycle` (popstate listener add/remove + `cleanup` callback)
-- `historyState` is a subset of `State`: only `{ name, params, search, path }` are stored in `history.state` — `transition`, `context`, etc. are not persisted across reloads
-- Error categorization in `popstate-handler.ts`: `RouterError` instances are routed through `rollbackUrlToCurrentState()` (sync URL with current router state); anything else triggers `recoverFromCriticalError()` (warns + `replaceState` to last good URL)
+- `historyState` is a subset of `State`: only `{ name, params, search, path }` and the entry's `position` are stored in `history.state` — `transition`, `context`, etc. are not persisted across reloads
+- Error categorization in `popstate-handler.ts`: a refusal — a `RouterError` other than `SAME_STATES` / `TRANSITION_CANCELLED` — and anything else, after `recoverFromCriticalError()` logs it, go through `returnOrRollback()`; the two codes that refuse nothing resync the live entry with `rollbackUrlToCurrentState()`
 
 ## Option Defaults
 

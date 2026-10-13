@@ -1,11 +1,13 @@
 import {
   canSkipPopstateHistoryWrite,
+  createEntryPositions,
   createPopstateHandler,
   createHashSyncLifecycle,
   createStartInterceptor,
   createReplaceHistoryState,
   shouldReplaceHistory,
   updateBrowserState,
+  withEntryPositions,
 } from "./browser-env";
 import { LOGGER_CONTEXT, source as POPSTATE_SOURCE } from "./constants";
 import { hashUrlToPath } from "./hash-utils";
@@ -38,7 +40,7 @@ export class HashPlugin {
     router: Router,
     api: PluginApi,
     options: Required<HashPluginOptions>,
-    browser: Browser,
+    givenBrowser: Browser,
     prefixRegex: RegExp | null,
     transitionOptions: {
       source: string;
@@ -47,6 +49,11 @@ export class HashPlugin {
     },
     shared: SharedFactoryState,
   ) {
+    // Every entry this plugin writes carries its position, so a refused
+    // traversal can return to the entry it started from (#2740).
+    const positions = createEntryPositions();
+    const browser = withEntryPositions(givenBrowser, positions);
+
     this.#router = router;
     this.#browser = browser;
 
@@ -169,6 +176,7 @@ export class HashPlugin {
       // for the same reason: the rollback is handed an already-resolved state
       // and must not rebuild its path from the name (#2250).
       pathToUrl: (path: string) => this.#urlPrefix + path,
+      positions,
     });
 
     this.#lifecycle = createHashSyncLifecycle({

@@ -53,7 +53,8 @@ const QUEUED_MATCHED = {
 
 /**
  * Queued behind it, and NOT matched — its replay takes the strict-mode branch,
- * where the handler calls `rollbackUrlToCurrentState` itself.
+ * where the handler rewrites the entry with `rollbackUrlToCurrentState`: a
+ * synthetic event moves no entry, so no way back is measured (#2740).
  */
 const QUEUED_UNMATCHED = {
   name: "gone",

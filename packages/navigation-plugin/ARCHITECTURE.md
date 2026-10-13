@@ -425,7 +425,7 @@ User clicks back/forward/link, submits a form, or navigation.navigate() fires
         ├── downloadRequest set?
         │     YES: return — the browser downloads, the document stays
         │          (the last navigation taken aborted by it → on the next task,
-        │           syncUrlToRouterState() writes the router's URL back)
+        │           returnToOrigin() with the entry that navigation started from)
         │
         ├── formData set, or navigationType === "reload"?
         │     YES: return — the browser submits or reloads
@@ -435,33 +435,64 @@ User clicks back/forward/link, submits a form, or navigation.navigate() fires
         ├── !matchedState && !event.destination.sameDocument?
         │     YES: return — the browser loads the page
         │
+        ├── record = { signal, from, state: router.getState() }
+        │     from: the entry the router stands on — browser.currentEntry's key
+        │     (the event fires before the commit), or the last record's from
+        │     while the router is still in that record's state: that navigation
+        │     was cancelled or is running, and the browser committed its entry
+        │     record becomes the last navigation taken
+        │
         ├── Set #capturedMeta BEFORE event.intercept()
         │     (written to toState.context.navigation in onTransitionStart, available in guards)
         │
         ├── matchedState found?
-        │     YES: remember event.signal as the last navigation taken;
-        │          event.intercept({ handler: () => withRecovery(() =>
+        │     YES: event.intercept({ handler: () => withRecovery(() =>
         │           api.navigateToState(matchedState, { ...transitionOptions, hash, signal: event.signal }))
         │         })
-        │         withRecovery: TRANSITION_CANCELLED / SAME_STATES → nothing
-        │                       other RouterError → syncUrlToRouterState()
+        │         withRecovery: resolved / SAME_STATES → the router stands on the
+        │                                     destination: the record is dropped
+        │                       TRANSITION_CANCELLED → nothing, the record stays
+        │                       other RouterError → returnToOrigin(), rethrow
         │                       non-RouterError → recoverFromNavigateError()
+        │                                         → returnToOrigin(), rethrow
         │
         ├── allowNotFound?
         │     YES: event.intercept({ handler: () => router.navigateToNotFound(path) })
+        │          refused (CANNOT_DEACTIVATE) → returnToOrigin(), then rethrow
         │
         └── otherwise (strict):
               event.intercept({ handler: async () => {
                 const err = new RouterError(ROUTE_NOT_FOUND, { path })
                 api.emitTransitionError(err)
-                throw err  // rejects the intercept; the URL stays where the navigation put it
+                returnToOrigin()
+                throw err  // rejects the intercept
               }})
               (no silent navigateToDefault)
+
+returnToOrigin(record)
+  │   The browser stands on the refused destination: the Navigation API
+  │   commits before the handler runs and does not undo a rejected one.
+  │
+  ├── router.getState() !== record.state?
+  │     YES: return — a navigation committed since owns the URL
+  │
+  ├── record.from in browser.entries() and not the current entry?
+  │     YES: browser.traverseTo(record.from) — the return moves no entry;
+  │          a refused push leaves its own entry ahead of the origin.
+  │          The traversal carries PLUGIN_SYNC_INFO → NOOP_INTERCEPT.
+  │          traverseTo throws → logged, then the branch below
+  │
+  └── otherwise (a replace kept origin's key, or no origin is known):
+        syncUrlToRouterState() — browser.navigate(router's URL, { history: "replace" });
+        a failure is logged, never thrown
+
+  The handler rejects after it: a navigation that finishes has the browser
+  apply its scroll to the page the router stayed on.
 ```
 
-### No Race Condition
+### Overlapping Navigations
 
-The Navigation API serializes navigations via `event.intercept()`. Only one intercept handler runs at a time — the browser queues subsequent navigate events until the current handler resolves. No deferred event queue needed (unlike browser-plugin's popstate handling).
+The Navigation API keeps one ongoing navigation: a navigation that starts while another is in flight aborts it, whose `event.signal` aborts the router's transition (`TRANSITION_CANCELLED`). No deferred event queue is needed, unlike browser-plugin's popstate handling. The browser has committed the aborted navigation's entry, which the router never reached, so the next navigation inherits the aborted one's origin while the router is still in the state it took that navigation in. Chromium runs microtasks between the abort and the next `navigate` event — the aborted navigation's handler has finished by then — so the rule asks the router's state, not whether that handler is done.
 
 ## URL Utilities
 

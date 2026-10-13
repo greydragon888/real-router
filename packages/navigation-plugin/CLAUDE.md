@@ -31,7 +31,7 @@ All navigation methods return `Promise<State>`:
 - `router.start(path?)` — path made optional via `createStartInterceptor` which injects `browser.getLocation()` when no path given
 - `api.navigateToState()` — what the navigate handler calls for a matched URL, inside `withRecovery`
 - `router.navigateToNotFound(path?)` — called when `allowNotFound: true` and a navigate event that stays in this document has a URL no route matches (synchronous, returns `State`)
-- `allowNotFound: false` + an unmatched URL that stays in this document — the plugin emits `$$error` with `ROUTE_NOT_FOUND` via `api.emitTransitionError()` and throws in the `event.intercept()` handler. The rejection does not roll the URL back: it stays where the navigation put it (#2740). No silent `navigateToDefault()` fallback (see #483)
+- `allowNotFound: false` + an unmatched URL that stays in this document — the plugin emits `$$error` with `ROUTE_NOT_FOUND` via `api.emitTransitionError()`, takes the browser back to the entry the navigation started from, and throws in the `event.intercept()` handler (#2740). No silent `navigateToDefault()` fallback (see #483)
 
 ## Gotchas
 
@@ -45,11 +45,11 @@ All navigation methods return `Promise<State>`:
 
 These checks run before `#capturedMeta` is set: the document outlives a download or a server attachment, and staged meta would land on the router's next transition. So `canDeactivate` is never consulted for these, and strict mode raises no `ROUTE_NOT_FOUND` for them. A same-document navigation to an unmatched URL — `history.pushState`, a traverse inside the document — is still the router's. `tests/functional/browser-owned-navigations-2724.test.ts` owns the table, on a `MockNavigation` whose `destination.sameDocument` follows the channel.
 
-**A download aborts a navigation the router is still taking.** The browser aborts the pending intercepted navigation when the download starts, so its URL stays committed while the router stays put, and `withRecovery` leaves `TRANSITION_CANCELLED` to a newer navigation the router never sees. The handler remembers the signal of the last navigation it took; a download that finds it aborted writes the router's URL back with `syncUrlToRouterState` on the next task — a navigation started during the download's own event cancels the download (measured on Chromium 153). Every navigation the plugin starts itself clears the remembered signal — `router.replaceHistoryState()` starts one — so a URL it wrote is never taken back.
+**A download aborts a navigation the router is still taking.** The browser aborts the pending intercepted navigation when the download starts, so its URL stays committed while the router stays put, and `withRecovery` leaves `TRANSITION_CANCELLED` to a newer navigation the router never sees. The handler remembers the signal of the last navigation it took and the entry that navigation started from; a download that finds the signal aborted takes the browser back to that entry on the next task (#2740) — a navigation started during the download's own event cancels the download (measured on Chromium 153). Every navigation the plugin starts itself clears the remembered signal — `router.replaceHistoryState()` starts one — so a URL it wrote is never taken back, and a router stopped by then takes nothing back.
 
-### No Popstate Race Condition
+### Overlapping Navigations
 
-The Navigation API serializes navigation via `event.intercept()` — only one navigation runs at a time. No deferred queue needed (unlike browser-plugin's popstate handling).
+The Navigation API keeps one ongoing navigation: a new one aborts it, and its `event.signal` cancels the router's transition. No deferred queue is needed (unlike browser-plugin's popstate handling). A refused navigation that arrives while the router was still taking the aborted one returns to that one's origin — see the section below.
 
 ### Base Path Normalization
 
@@ -85,7 +85,7 @@ URL fragments are first-class state, owned by the plugin (not by core). Stored d
 - **State namespace**: `state.context.url = { hash: string; hashChanged: boolean }` — hash is decoded, no leading `#` (symmetric to params). `hashChanged` is `true` only on browser-driven hash-only navigation (`event.hashChange === true`).
 - **Tri-state `opts.hash`** in `router.navigate(name, params, search?, { hash })` (options at position 4 since RFC-4 M2, #1548): `undefined` preserves current hash, `""` clears, non-empty value sets. Same widening on `router.buildUrl` and `router.replaceHistoryState`.
 - **Browser-driven hash-only click**: `navigate-handler.ts` reads `event.hashChange` and forwards `{ force: true, hashChange: true, hash }` to `api.navigateToState` — bypasses core's `SAME_STATES` rejection. Subscribers disambiguate via `state.context.url.hashChanged`, not via the overloaded `force` flag.
-- **Recovery paths preserve hash**: `syncUrlToRouterState` reads `currentState.context.url.hash` to rebuild the URL after guard rejection — without this, `CANNOT_DEACTIVATE` would silently strip the fragment.
+- **Recovery paths preserve hash**: a refused navigation returns to the entry it started from, whose URL carries its own fragment; the rewrite a refused `replace` takes, `syncUrlToRouterState`, reads `currentState.context.url.hash` to rebuild the URL — without this, `CANNOT_DEACTIVATE` would silently strip the fragment.
 - **F5 / cold-load: lazy read in `onTransitionSuccess`**. On the first transition (`!fromState`), the plugin calls `getDecodedHash(browser)` to read the previous hash. **NOT in the constructor** — by the time `onTransitionSuccess` fires, `location.hash` already reflects the destination URL, so F5 on `/page#section` is recovered without explicit priming. This is **separate** from the `navigationType` priming via `getActivationType()` documented in "Cross-document Activation Priming" — that priming is Navigation-API-only metadata and does not touch the URL fragment.
 
 See [IMPLEMENTATION_NOTES.md](../../IMPLEMENTATION_NOTES.md) section "URL Fragment ('hash') Support" for the full design rationale.
@@ -108,20 +108,28 @@ Error: [navigation-plugin] Navigation API is not supported. Use @real-router/bro
 // throw-check (refuses SSR + real environment without Navigation API).
 ```
 
-### CANNOT_DEACTIVATE: Manual URL sync after guard rejection
+### A refused navigation returns to the entry it started from (#2740)
 
-When a guard blocks navigation, `withRecovery` in `navigate-handler.ts` catches the `RouterError` and explicitly calls `syncUrlToRouterState` — `browser.navigate({ history: "replace" })` to the current router state — so URL and router state stay consistent.
+The Navigation API commits an intercepted navigation before its handler runs and does not roll it back when the handler rejects — measured on Chromium 153, the URL and the entry stay where the navigation put them. When the router refuses — a guard, `ROUTE_NOT_FOUND`, a crash inside the transition — `returnToOrigin` in `navigate-handler.ts` takes the browser back with `browser.traverseTo` to the entry the router stands on. That is the entry the navigation started from — `handleNavigateEvent` reads its key off `browser.currentEntry` before the commit — unless an earlier navigation the router took has not brought it to its destination — cancelled by this one, or still running: the browser has committed that one's entry and the router has not moved, so this one inherits that one's origin. "Has not moved" is the router's state object: a commit makes a new one, and a navigation that reaches the router's own state (`SAME_STATES`) drops the inherited origin. The return moves no entry: the page a refused Back left behind is still one Back away. The traversal carries `PLUGIN_SYNC_INFO`, so it reaches no router transition.
 
-"Consistent" includes the query channel: the rebuilt URL passes `currentState.search` at slot 3 and the buffered entry state carries `search`. Drop either and recovery becomes the one writer producing a narrower entry than every other (#1586) — a blocked back-navigation away from `?tab=a` leaves the user on the bare path while `state.path` still holds the query.
+A refused push leaves its own entry one step ahead of the origin, and the next push from the origin replaces it. Until then the history extensions see it: `canGoForward()` is `true`, `peekForward()` returns the refused route, and the visit counts include it.
 
-Why manual: the Navigation API does not roll an intercepted navigation back when its handler rejects — measured on Chromium 153, the URL and the entry stay where the navigation put them. Without this write URL and router state disagree. The write replaces the entry the browser landed on, which is the defect of #2740.
+A refused `replace` keeps the key of the entry it replaced, so origin and destination are one entry, and `syncUrlToRouterState` rewrites it — `browser.navigate({ history: "replace" })` to the current router state. So does a recovery that finds no origin entry — e.g. a custom `NavigationBrowser` with no `currentEntry` — or whose `traverseTo` throws, which is logged as `Failed to return to the entry the navigation started from`. A navigation the router committed between the refusal and the recovery — a redirect a `TRANSITION_ERROR` listener queues — owns the URL, and nothing is written.
+
+That rewrite carries the query channel: the rebuilt URL passes `currentState.search` at slot 3 and the buffered entry state carries `search`. Drop either and recovery becomes the one writer producing a narrower entry than every other (#1586) — a blocked navigation away from `?tab=a` leaves the user on the bare path while `state.path` still holds the query.
 
 `withRecovery` handles the two error classes:
 
-- **Non-`RouterError`** (unexpected crashes) → `recoverFromNavigateError` — logs `Critical error in navigate handler` + calls `syncUrlToRouterState`.
-- **`RouterError`** — `TRANSITION_CANCELLED` and `SAME_STATES` → nothing (a newer navigation owns the URL, or URL and state already agree); any other code (guard refusal, `ROUTE_NOT_FOUND`, …) → `syncUrlToRouterState`, no logging. Router already emitted `TRANSITION_ERROR` / `TRANSITION_CANCEL` — observers can subscribe there. `navigation.navigate().finished` resolves (URL is valid, just pointing back to previous state).
+- **Non-`RouterError`** (unexpected crashes) → `recoverFromNavigateError` — logs `Critical error in navigate handler` + `returnToOrigin`; the intercept rejects with the error.
+- **`RouterError`** — `TRANSITION_CANCELLED` and `SAME_STATES` → nothing, and the intercept resolves (a newer navigation owns the URL, or URL and state already agree); any other code (guard refusal, `ROUTE_NOT_FOUND`, …) → `returnToOrigin`, no logging, and the intercept rejects with the refusal. Router already emitted `TRANSITION_ERROR` / `TRANSITION_CANCEL` — observers can subscribe there.
 
-See #524 for why the previous "swallow silently" path was broken (URL committed, router state frozen, observable desync).
+**The intercept rejects after a return, so the browser applies no scroll.** A navigation whose handler resolves has the browser restore the scroll position of the entry it reached onto the page the router stayed on — measured on Chromium 153 for a refused Back. So `finished` of a refused navigation rejects and `navigateerror` fires. The browser marks `finished` as handled: a caller that does not await it sees no `unhandledrejection` (measured on Chromium 153; `MockNavigation` does the same).
+
+The not-found arm returns the same way and rejects too: `navigateToNotFound` refused by `canDeactivate` (`CANNOT_DEACTIVATE`) and strict mode's `ROUTE_NOT_FOUND`. `tests/functional/refused-navigation-returns-2740.test.ts` owns the table of arcs; `tests/property/refused-navigation.properties.ts` holds the class.
+
+**A route the router keeps refusing to enter turns Back away each time.** An entry whose route a `canActivate` guard closes for good — an authenticated page after logout — stays in history, and every Back onto it returns; the user steps past it from the browser's history menu.
+
+See #524 for why the "swallow silently" path was broken (URL committed, router state frozen, observable desync).
 
 ### Router-driven mutations re-enter the navigate handler (#518, #580)
 
@@ -135,7 +143,7 @@ Consumers supplying a custom `NavigationBrowser` must pass `PLUGIN_SYNC_INFO` as
 
 ### Error Recovery
 
-`recoverFromNavigateError` in `navigate-handler.ts` restores the URL on non-RouterError exceptions by calling `browser.navigate(url, { history: "replace" })`.
+`recoverFromNavigateError` in `navigate-handler.ts` takes the browser back to the entry the navigation started from on a non-`RouterError` exception, as a refusal does (see above).
 
 ### NavigationMeta Undefined in Guards During Programmatic Navigation
 

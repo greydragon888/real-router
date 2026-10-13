@@ -767,14 +767,16 @@ The guard is implemented by the pure helper `isSameHref(target, currentHref)` in
 ### F1. Non-RouterError Recovery
 **Category:** Error Recovery  
 **Testable:** Example-based  
-**Description:** Only non-RouterError exceptions trigger recovery; RouterError is allowed to propagate.
+**Description:** Only a non-RouterError is logged as a critical error; both classes are recovered from.
 
 **Precondition:**
-- Navigate handler catches an error in `router.navigate()`
+- The transition a navigate handler starts rejects
 
 **Postcondition:**
-- If error is `RouterError`: error propagates, no recovery
-- If error is not `RouterError`: `recoverFromNavigateError()` is called
+- If error is not `RouterError`: `recoverFromNavigateError()` logs it and returns to the router's entry
+- If error is a `RouterError` that refuses (`CANNOT_DEACTIVATE`, `CANNOT_ACTIVATE`, `ROUTE_NOT_FOUND`, …): returns to the router's entry, nothing logged
+- `SAME_STATES` and `TRANSITION_CANCELLED`: nothing is done
+- After a return the intercept rejects with the error
 
 **Why it matters:** Distinguishes expected routing errors from unexpected exceptions.
 
@@ -783,7 +785,7 @@ The guard is implemented by the pure helper `isSameHref(target, currentHref)` in
 ### F2. Error Recovery URL Restoration
 **Category:** Error Recovery  
 **Testable:** Example-based  
-**Description:** On non-RouterError, the URL must be restored to the current router state.
+**Description:** On non-RouterError, the browser must return to the entry the router stands on.
 
 **Precondition:**
 - Navigate handler throws a non-RouterError
@@ -791,9 +793,9 @@ The guard is implemented by the pure helper `isSameHref(target, currentHref)` in
 
 **Postcondition:**
 - `recoverFromNavigateError()` is called
-- `browser.navigate(url, { history: "replace" })` is called with URL matching current state
+- The browser traverses back to the entry the navigation started from (#2740); a `replace` keeps that entry's key, so it is rewritten instead — `browser.navigate(url, { history: "replace" })` with the URL of the current state
 - Browser URL is restored to `/`
-- **The rebuilt URL carries every channel of the surviving state (#1586)** — `buildUrl(name, params, state.search, { hash })`, and the buffered entry state carries `search`. Recovery rebuilds the state that SURVIVED the failure, so a dropped channel publishes a URL the router itself does not hold. This applies to the `RouterError` branch (`withRecovery` → `syncUrlToRouterState`) identically.
+- **The rewritten URL carries every channel of the surviving state (#1586)** — `buildUrl(name, params, state.search, { hash })`, and the buffered entry state carries `search`. Recovery rebuilds the state that SURVIVED the failure, so a dropped channel publishes a URL the router itself does not hold. This applies to the `RouterError` branch (`withRecovery` → `returnToOrigin`) identically.
 
 **Why it matters:** Prevents URL from being stuck in an inconsistent state.
 
@@ -806,12 +808,11 @@ The guard is implemented by the pure helper `isSameHref(target, currentHref)` in
 
 **Precondition:**
 - Navigate handler throws an error
-- Recovery calls `browser.navigate()`
+- Recovery calls `browser.traverseTo()` or `browser.navigate()`
 
 **Postcondition:**
-- `isSyncingFromRouter` is set to `true` before recovery
-- Navigate event from recovery is ignored
-- `isSyncingFromRouter` is set to `false` after recovery
+- The navigate event the recovery fires carries `info: PLUGIN_SYNC_INFO`
+- The handler answers it with a no-op intercept and starts no transition
 
 **Why it matters:** Prevents infinite error loops.
 
@@ -832,6 +833,24 @@ The guard is implemented by the pure helper `isSameHref(target, currentHref)` in
 - Router doesn't crash
 
 **Why it matters:** Prevents cascading failures.
+
+---
+
+### F5. A Refused Navigation Returns to the Entry It Started From (#2740)
+**Category:** Error Recovery  
+**Testable:** PBT  
+**Description:** A browser navigation the router refuses moves no entry back, and leaves the browser on the entry the router stands on — the one the navigation started from.
+
+**Precondition:**
+- A traversal or a push that a `canDeactivate` or `canActivate` guard refuses, while the router takes no other navigation
+
+**Postcondition:**
+- `entries()` holds the URLs it held before; a refused push leaves its own entry right after the origin, in place of the entries that were ahead of it
+- `currentEntry.index` is the origin's index, and router state is unchanged
+
+**Test:** `tests/property/refused-navigation.properties.ts`; the arcs one by one, `replace` and the not-found arm included, in `tests/functional/refused-navigation-returns-2740.test.ts`.
+
+**Why it matters:** The Navigation API does not undo a navigation whose handler rejects, so a recovery that rewrites the entry the browser landed on turns it into a copy of the current page — the page a refused Back left behind leaves history.
 
 ---
 
@@ -1169,6 +1188,7 @@ agnostic parsing; validation is the matcher's job, not the parser's. See
 | F2. URL Restoration | Error | Example | High |
 | F3. No Recursive Navigation | Error | Example | Critical |
 | F4. Double-Error Handling | Error | Example | Medium |
+| F5. Refused Navigation Returns to Origin (#2740) | Error | PBT | Critical |
 | G1. Base Path Stripping | URL | PBT | High |
 | G2. Base Path Building | URL | PBT | High |
 | G3. URL Parsing Robustness | URL | PBT | High |

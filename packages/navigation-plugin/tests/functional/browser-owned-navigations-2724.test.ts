@@ -181,26 +181,31 @@ describe.each([{ allowNotFound: true }, { allowNotFound: false }])(
         );
       });
 
-      it("a fragment navigation on a page with no route", async () => {
-        await mockNav
-          .historyPushState("http://localhost/orders/unknown")
-          .finished.catch(() => undefined);
+      // Under strict mode the push to the page with no route is refused and
+      // the browser returns from it (#2740): the router never stands on that
+      // page here.
+      it.runIf(allowNotFound)(
+        "a fragment navigation on a page with no route",
+        async () => {
+          await mockNav.historyPushState("http://localhost/orders/unknown")
+            .finished;
 
-        const result = await outcome(
-          mockNav.navigate("http://localhost/orders/unknown#details").finished,
-        );
+          const result = await outcome(
+            mockNav.navigate("http://localhost/orders/unknown#details")
+              .finished,
+          );
 
-        expect(mockNav.crossDocumentNavigations).toStrictEqual([]);
-        expect(result).toBe(
-          allowNotFound ? UNKNOWN_ROUTE : errorCodes.ROUTE_NOT_FOUND,
-        );
-      });
+          expect(mockNav.crossDocumentNavigations).toStrictEqual([]);
+          expect(result).toBe(UNKNOWN_ROUTE);
+        },
+      );
 
       it("a Back to a same-document entry with no route", async () => {
-        await mockNav
-          .historyPushState("http://localhost/orders/unknown")
-          .finished.catch(() => undefined);
-        await mockNav.historyPushState("http://localhost/users/list").finished;
+        // An entry the router never took: written while it was stopped.
+        router.stop();
+        mockNav.historyPushState("http://localhost/orders/unknown");
+        mockNav.historyPushState("http://localhost/users/list");
+        await router.start();
 
         expect(router.getState()?.name).toBe("users.list");
 
@@ -277,6 +282,36 @@ describe.each([{ allowNotFound: true }, { allowNotFound: false }])(
         ).toStrictEqual([]);
       });
 
+      it("leaves the URL to a navigation the router commits before the write", async () => {
+        const finished = takeSlowNavigation();
+
+        mockNav.download("http://localhost/files/report.txt");
+        await router.navigate("users.view", { id: "7" });
+        await finished.catch(() => undefined);
+        await settle();
+
+        expect(router.getState()?.name).toBe("users.view");
+        expect(mockNav.currentUrl).toBe("http://localhost/users/view/7");
+      });
+
+      // The navigation to the URL with no route aborted the slow one, and the
+      // router took it to the end.
+      it("writes nothing after a navigation to a URL with no route", async () => {
+        const finished = takeSlowNavigation();
+
+        await mockNav.historyPushState("/nope").finished.catch(() => undefined);
+        mockNav.download("http://localhost/files/report.txt");
+        await finished.catch(() => undefined);
+        await settle();
+
+        expect(router.getState()?.name).toBe(
+          allowNotFound ? UNKNOWN_ROUTE : "home",
+        );
+        expect(mockNav.currentUrl).toBe(
+          allowNotFound ? "http://localhost/nope" : "http://localhost/home",
+        );
+      });
+
       it("writes nothing after a navigation the router finished", async () => {
         await mockNav.navigate("http://localhost/users/list").finished;
 
@@ -290,11 +325,14 @@ describe.each([{ allowNotFound: true }, { allowNotFound: false }])(
         expect(mockNav.currentUrl).toBe("http://localhost/users/list");
       });
 
-      // The refused navigation's own recovery write aborts it, and the URL the
-      // application writes afterwards is not the router's to take back.
+      // The refused navigation is over once the plugin has returned from it,
+      // and the URL the application writes afterwards is not the router's to
+      // take back.
       it("keeps a URL the application wrote after a refused navigation", async () => {
         getLifecycleApi(router).addDeactivateGuard("home", () => () => false);
-        await mockNav.navigate("http://localhost/users/list").finished;
+        await mockNav
+          .navigate("http://localhost/users/list")
+          .finished.catch(() => undefined);
         router.replaceHistoryState("users.view", { id: "9" });
 
         mockNav.download("http://localhost/files/report.txt");
