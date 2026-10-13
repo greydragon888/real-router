@@ -31,7 +31,7 @@ overrides:
   rollup: '>=4.59.0'
   minimatch@3: ~3.1.4
   minimatch@9: ~9.0.7
-  minimatch@10: ~10.2.3
+  minimatch@10: ~10.2.6
   ajv@6: ~6.14.0
   # At the version @angular-devkit/core pins exactly (8.20.0); every other
   # parent's range admits it.
@@ -86,9 +86,9 @@ overrides:
   # when express pulls >=2.3.0.
   body-parser: '>=2.3.0'
   picomatch@2: 2.3.2
-  # At the version @angular-devkit/core and @angular/build pin exactly (4.0.5);
+  # At the version @angular-devkit/core and @angular/build pin exactly (4.0.7);
   # every other parent's range admits it.
-  picomatch@4: 4.0.5
+  picomatch@4: 4.0.7
   yaml@1: 1.10.3
   # Floor at 5.9.3, where every devalue advisory known on 2026-10-02 is fixed
   # (api.osv.dev answers clean for it). Capped below 6: `svelte`, the only
@@ -97,12 +97,14 @@ overrides:
   # `@real-router/svelte` and is never bundled into it, which leaves the examples'
   # builds and this audit gate as the exposure.
   devalue: '>=5.9.3 <6.0.0'
-  esbuild: '>=0.28.1'
+  esbuild: '>=0.28.2'
   # @angular/build depends on an exact vite of its own; this collapses that
   # edge onto the exact vite the example manifests declare, so the tree holds
   # one vite. Scoped to that edge rather than global, for the reason the root
-  # pnpm-workspace.yaml gives under its `vite` entry.
-  '@angular/build>vite': '>=8.2.2 <9'
+  # pnpm-workspace.yaml gives under its `vite` entry, which also says why the
+  # overrides check accepts it narrowing no range. Its floor is the vite
+  # @angular/build pins.
+  '@angular/build>vite': '>=8.3.0 <9'
   # Floor for GHSA-hrr3-gc8f-f4qj (Medium), fixed in 3.1.8. Transitive via `ajv`,
   # which declares `^3.0.1`.
   fast-uri: '>=3.1.8 <4'
@@ -117,10 +119,10 @@ overrides:
   # vite, @angular/build, ng-packagr, @vue/compiler-sfc, beasties, postcss-scss /
   # -safe-parser / -load-config, eslint-plugin-svelte, svelte-eslint-parser. Not in any published
   # @real-router/* package. Single 8.x line, patch-level fix, so a floor is enough. It sits at
-  # 8.5.26, the highest minimum a parent declares (vite's `^8.5.26`): an override outranks
-  # semver, so a lower floor can keep vite on an older release. Drop when the toolchain pulls
-  # >=8.5.23 on its own.
-  postcss: '>=8.5.26'
+  # 8.5.28, the highest minimum a parent declares (`^8.5.28`: vite and @vue/compiler-sfc): an
+  # override outranks semver, so a lower floor can keep a parent on an older release. Drop when
+  # the toolchain pulls >=8.5.23 on its own.
+  postcss: '>=8.5.28'
   tmp: '>=0.2.6'
   # fflate < 0.8.3: `unzipSync` can loop forever on a malformed ZIP64 archive
   # (GHSA-px8p-9vwx-vf98, 7.5). Its one parent here, `@vitest/ui`, declares

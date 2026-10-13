@@ -32,14 +32,8 @@ overrides:
   # @real-router/* package. typed-rest-client pins an exact 6.15.1, an affected
   # release, so this floor overrides that pin on purpose.
   qs: '>=6.16.0'
-  # Floor raised for GHSA-mw96-cpmx-2vgc (arbitrary file write via path traversal,
-  # High, fixed in 4.59.0). Of the installed packages, only ng-packagr depends on
-  # rollup (`^4.24.0`, optional); the rest take it as a peer. Scoped to that
-  # edge so it does not reach the pin in `packages/solid` — the `vite` entry
-  # says what an override does to a direct dependency.
-  'ng-packagr>rollup': '>=4.59.0'
   minimatch@9: ~9.0.7
-  minimatch@10: ~10.2.3
+  minimatch@10: ~10.2.6
   ajv@6: ~6.14.0
   # At the version @angular-devkit/core pins exactly (8.20.0); every other
   # parent's range admits it.
@@ -47,8 +41,7 @@ overrides:
   # undici has no entry here. danger 14 declares it both as a dependency and as
   # an optional peer; `.pnpmfile.mjs` drops the peer declaration, so danger
   # installs a 7.x of its own. jsdom 30 takes 8.x on its own range.
-  # At the version @angular/build, its one parent here, pins exactly.
-  piscina: '>=5.3.2 <6.0.0'
+  #
   # ReDoS in brace-expansion (GHSA-3jxr-9vmj-r5cp, High). Two major lines, @2 and @5, are in the tree
   # via assorted dev/tooling deps — pin each to its patched release. EXACT (not '>=') because the
   # '@N' selector value can't be an open range without risking a cross-major jump (a '>=1.1.16' on
@@ -99,17 +92,19 @@ overrides:
   # `@real-router/svelte` and is never bundled into it, which leaves the adapter's
   # own tests, the benchmark apps and this audit gate as the exposure.
   devalue: '>=5.9.3 <6.0.0'
-  esbuild: '>=0.28.1'
+  esbuild: '>=0.28.2'
   # @angular/build depends on an exact vite of its own; this collapses that
   # edge onto the exact vite `benchmarks/package.json` pins, so the tree holds
-  # one vite. A DEDUPE pin, not a security floor; the ceiling keeps it inside the
-  # major @angular/build declares.
+  # one vite. A DEDUPE pin, not a security floor: it narrows no range, and
+  # `scripts/overrides-accepted.json` accepts the "dead" finding the overrides
+  # check reports for it. Its floor is the vite @angular/build pins; the ceiling
+  # keeps it inside the major @angular/build declares.
   # ⚠ Scoped to that edge, not global. An override that reaches a direct
   # dependency becomes its recorded specifier: a raised pin then installs
   # nothing, with the install green and the lockfile untouched, and
   # `pnpm update --no-save` rewrites the specifier into a lockfile that
   # `install --frozen-lockfile` refuses.
-  '@angular/build>vite': '>=8.2.2 <9'
+  '@angular/build>vite': '>=8.3.0 <9'
   # Floor for GHSA-hrr3-gc8f-f4qj (Medium), fixed in 3.1.8. Transitive via `ajv`,
   # which declares `^3.0.1`.
   fast-uri: '>=3.1.8 <4'
@@ -117,10 +112,10 @@ overrides:
   # vite, @angular/build, ng-packagr, @vue/compiler-sfc, beasties, postcss-scss /
   # -safe-parser / -load-config, eslint-plugin-svelte, svelte-eslint-parser. Not in any published
   # @real-router/* package. Single 8.x line, patch-level fix, so a floor is enough. It sits at
-  # 8.5.26, the highest minimum a parent declares (vite's `^8.5.26`): an override outranks
-  # semver, so a lower floor can keep vite on an older release. Drop when the toolchain pulls
-  # >=8.5.23 on its own.
-  postcss: '>=8.5.26'
+  # 8.5.28, the highest minimum a parent declares (`^8.5.28`: vite and @vue/compiler-sfc): an
+  # override outranks semver, so a lower floor can keep a parent on an older release. Drop when
+  # the toolchain pulls >=8.5.23 on its own.
+  postcss: '>=8.5.28'
   # fflate < 0.8.3: `unzipSync` can loop forever on a malformed ZIP64 archive
   # (GHSA-px8p-9vwx-vf98, 7.5). `@arethetypeswrong/core` (via its CLI and tsdown)
   # declares `^0.8.3`, but `@vitest/ui` declares `^0.8.2`, a range that admits

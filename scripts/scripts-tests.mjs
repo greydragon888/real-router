@@ -66,6 +66,7 @@ export const TOOLING = new Set([
   "check-e2e-specs",
   "check-issue-refs",
   "check-lint-reach",
+  "check-overrides",
   "check-prose",
   "check-published-versions",
   "check-semgrep",

@@ -9,12 +9,10 @@ overrides:
   vite-plugin-solid>@babel/core: '>=7.29.6 <8'
   '@codspeed/core>axios': '>=1.18.0'
   qs: '>=6.16.0'
-  ng-packagr>rollup: '>=4.59.0'
   minimatch@9: ~9.0.7
-  minimatch@10: ~10.2.3
+  minimatch@10: ~10.2.6
   ajv@6: ~6.14.0
   ajv@8: ~8.20.0
-  piscina: '>=5.3.2 <6.0.0'
   brace-expansion@2: 2.1.7
   brace-expansion@5: 5.0.12
   shell-quote: '>=1.9.0'
@@ -22,10 +20,10 @@ overrides:
   picomatch@4: 4.0.7
   yaml@1: 1.10.3
   devalue: '>=5.9.3 <6.0.0'
-  esbuild: '>=0.28.1'
-  '@angular/build>vite': '>=8.2.2 <9'
+  esbuild: '>=0.28.2'
+  '@angular/build>vite': '>=8.3.0 <9'
   fast-uri: '>=3.1.8 <4'
-  postcss: '>=8.5.26'
+  postcss: '>=8.5.28'
   fflate: '>=0.8.3 <0.9'
   js-yaml: '>=4.3.2 <5'
 
@@ -161,6 +159,9 @@ importers:
       publint:
         specifier: 0.3.24
         version: 0.3.24
+      semver:
+        specifier: 7.8.5
+        version: 7.8.5
       size-limit:
         specifier: 14.1.0
         version: 14.1.0
@@ -787,7 +788,7 @@ packages:
       karma: ^6.4.0
       less: ^4.2.0
       ng-packagr: ^22.0.0
-      postcss: '>=8.5.26'
+      postcss: '>=8.5.28'
       rollup: ^4.0.0
       tailwindcss: ^2.0.0 || ^3.0.0 || ^4.0.0
       tslib: ^2.3.0
@@ -6078,7 +6079,7 @@ packages:
     resolution: {integrity: sha512-6DiM4E7v4coTE4uzA8U//WhtPwyhiim3eyjEMFCnUpzbrkK9wJHgKDT2mR+HbtSrd/NubVaYTOpSpjUl8NQeRg==}
     engines: {node: '>= 10'}
     peerDependencies:
-      postcss: '>=8.5.26'
+      postcss: '>=8.5.28'
       ts-node: '>=9.0.0'
     peerDependenciesMeta:
       postcss:
@@ -6093,13 +6094,13 @@ packages:
     resolution: {integrity: sha512-0AioNCJZ2DPYz5ABT6bddIqlhgwhpHZ/l65YAYo0BCIn0xiDpsnTHz0gnoTGk0OXZW0JRs+cDwL8u/teRdz+8A==}
     engines: {node: '>=18.0'}
     peerDependencies:
-      postcss: '>=8.5.26'
+      postcss: '>=8.5.28'
 
   postcss-scss@4.0.9:
     resolution: {integrity: sha512-AjKOeiwAitL/MXxQW2DliT28EKukvvbEWx3LBmJIRN8KfBGZbRTxNYW0kSqi1COiTZ57nZ9NW06S6ux//N1c9A==}
     engines: {node: '>=12.0'}
     peerDependencies:
-      postcss: '>=8.5.26'
+      postcss: '>=8.5.28'
 
   postcss-selector-parser@7.1.6:
     resolution: {integrity: sha512-7qASPzhKF2l2KLboRZux8CCTRMdGiV08vWmyKzPz22qZ7ZjQBOeY7rNzNoCLSUiftJ7HUq0GERHmxw/t0dCdMw==}
@@ -7080,7 +7081,7 @@ packages:
     peerDependencies:
       '@types/node': 24.19.0
       '@vitejs/devtools': ^0.7.1
-      esbuild: '>=0.28.1'
+      esbuild: '>=0.28.2'
       jiti: '>=1.21.0'
       less: ^4.0.0
       sass: ^1.70.0

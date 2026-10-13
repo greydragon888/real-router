@@ -12595,6 +12595,10 @@ The `fflate` record in "Third shape — the override WAS the vulnerability" says
 > for a decision — `ajv@8`, `picomatch@4`, `yaml@2`, `postcss` — were acted on.
 > See "Override values rise to the ranges their parents declare".
 
+> **Updated (2026-10-13).** `'ng-packagr>rollup'` is gone: ng-packagr 22.2
+> depends on rolldown, not rollup. `'@angular/build>vite'` reads `>=8.3.0 <9`.
+> See "Overrides are judged against the ranges their parents declare".
+
 **Problem.** An override replaces every edge it matches. Two consequences of that were measured on 2026-09-27.
 
 - ⚠ **An override that matches a direct dependency becomes that dependency's recorded specifier.** The lockfiles recorded `>=8.2.2 <9` as the `vite` of the 124 example manifests and of `benchmarks/package.json`, and `>=4.59.0` as the `rollup` of `packages/solid`. A raised pin then installs nothing. Raising `vite` to 8.3.1 in one example, or `rollup` to 4.63.5 in `packages/solid`, left the lockfile untouched with `pnpm install --lockfile-only` green. In the examples, `pnpm update -r --no-save "@real-router/*"` rewrote the 124 specifiers to `8.2.2`, and `install --frozen-lockfile` then refused the lockfile with `ERR_PNPM_OUTDATED_LOCKFILE`.
@@ -12633,6 +12637,10 @@ Two edges outside their range are the entry's purpose, and their comments say so
 
 > ⚠ Superseded later on 2026-09-27 in one respect: `undici` no longer holds a
 > parent below its range. See "undici: the root provides danger's peer, the examples floor each major".
+
+> **Updated (2026-10-13).** The parents' minimums rose again: the examples
+> `picomatch@4` is 4.0.7 and `postcss` is `>=8.5.28` in both files, and a check
+> now holds the rule this entry applied. See "Overrides are judged against the ranges their parents declare".
 
 > **Updated (2026-10-08).** The `yaml@2` pins of both files are gone ("The `yaml@2` overrides are dropped").
 
@@ -13039,6 +13047,9 @@ Measured after the push: the post-merge run on `d32b27d8d` (00:57–01:15 UTC) e
 - `scripts/codspeed-gate.mjs` answers `skip` for the bump, and `RUN` for the jsdom bump used as the control.
 
 ## The root workspace's Angular stack moves to 22.2 (2026-09-28)
+
+> **Updated (2026-10-13).** The root `piscina` entry is gone: `@angular/build`
+> pins 5.3.2 itself. See "Overrides are judged against the ranges their parents declare".
 
 **Problem.** `packages/angular` and `benchmarks` stayed on Angular 22.1 and Analog 2.7.2 after the examples moved to 22.2 (entry above). Angular 22.2 is the only line whose `@angular/build` declares a Vitest 5 peer, and Analog 2.7.2 does not start under it: its plugin calls `cache.has` on the 22.2 `SourceFileCache`, which analog#2576 fixed in 2.7.3.
 
@@ -14533,6 +14544,9 @@ Three rounds of review of the fix found the same order of the text in two more p
 
 ## Prose that restated the configuration, corrected in one pass (2026-10-12)
 
+> **Updated (2026-10-13).** The override values and comments this entry left to
+> #2646 are corrected. See "Overrides are judged against the ranges their parents declare".
+
 **Problem.** A comment or a doc that restates the configuration drifts on its own schedule, and nothing re-derives it. A sweep of the infrastructure prose — the workflows and the setup action, `scripts/` and its tests, the root configs and docs, the skills and prompts under `.claude/`, and what package docs say about the machinery — found more than a hundred such places. Among them:
 
 - `ci.yml` named a `duplication` job that no longer exists and called "CI Result" the single required check, while `protect-master` requires five contexts;
@@ -14646,6 +14660,9 @@ Nothing in the repository caught either form. Under the configuration before thi
 
 ## pnpm 12.11.2, and each lockfile deduplicated by it (2026-10-12)
 
+> **Updated (2026-10-13).** The overrides check judges an entry by the ranges it
+> rewrites, not by resolving without it. See "Overrides are judged against the ranges their parents declare".
+
 **Problem.** The pin was pnpm 12.4.1, seven minors behind `latest`, 12.11.2. Two of the changes since touch what this repository reads.
 
 - ⚠ **Removing an override re-resolves the packages it targeted** (12.7.0, pnpm#4587). 12.4.1 kept the version an override had locked while every declared range still accepted it. The check #2646 asks for decides whether an override is still needed by resolving without it, so its verdict moves with the pnpm: on a copy of the root, removing `postcss: '>=8.5.26'` leaves the locked 8.5.28 under 12.4.1 and resolves 8.5.29, a newer release, under 12.11.2.
@@ -14667,3 +14684,40 @@ Nothing in the repository caught either form. Under the configuration before thi
 ⚠ **A worktree on a commit that pins 12.4.1 cannot commit on this machine.** The guard in `.husky/pre-commit` compares the running pnpm with the pin exactly; such a worktree commits again once it is rebased onto this pin.
 
 Not measured: whether 12.9.0, which moves an optional peer to the version already in the graph, retires the `@vue/test-utils` hook of both `.pnpmfile.mjs`.
+
+## Overrides are judged against the ranges their parents declare (2026-10-13)
+
+**Problem.** Nothing read the `overrides` of the three workspaces but `pnpm install`, and `lint:audit` judges only the result (#2646). Each class the issue names had happened and was found by hand: an entry nothing needs, a floor below the version a parent declares, an entry wider than its edge. The issue judged "still needed" by resolving without the entry, and since pnpm 12.7.0 removing an override re-resolves its targets ("pnpm 12.11.2, and each lockfile deduplicated by it"). That verdict moved with npm: on 12.11.2, `postcss` in all three workspaces and `rollup` in the examples read as needed only because newer releases had appeared, 8.5.29 and 4.63.6.
+
+**Solution.** `pnpm lint:overrides` runs `scripts/check-overrides.mjs`, with the rules in `scripts/overrides.mjs`. It reads every workspace whose `pnpm-workspace.yaml` git tracks, the root among them, and judges each key over the edges the key rewrites:
+
+- **dead** — its value narrows none of the ranges it rewrites. A `$name` value is not judged by this rule; the output names it, since it holds the root's version against a future tree;
+- **below** — the lowest version its value admits is under the highest minimum a parent declares;
+- **edge** — a key with a parent the tree lacks, or a key that rewrites the specifier the lockfile records for a direct dependency of a project, a peer pnpm installs for it included.
+
+The declared ranges come from the manifests in each workspace's `node_modules/.pnpm`: the lockfile records resolved versions only. The npm script installs `examples` and `cross-router-bench` first, as `lint:cross-router` installs the bench.
+
+A finding kept on purpose sits in `scripts/overrides-accepted.json` with its reason, and an entry no finding matches fails the check. There are five. `@types/node` is "below" in the root and the examples: it is held to the Node.js major of `.nvmrc`, and `jsdoc-type-pratt-parser` 9.2.2 declares `^26.4.0`. The vite dedupe pins are "dead" in all three workspaces: they widen the exact vite of `@angular/build` onto the one the workspace holds.
+
+The first run found 45 of 62 keys. Rule 3 of the issue, "a key whose target only one parent needs can be `parent>child`", gave 31 of them, and by the owner's decision of 2026-10-13 it is no rule of the check. In 28 of the 31 the key rewrote only its one parent's edges, so naming the parent changed nothing in the tree and only withheld the floor from a future parent. The harm that rule guards against shows as "below" when it happens: #2605's undici held jsdom's `^8.10.2` at 7.29.0. Of the other 14:
+
+- dead and gone: the root `'ng-packagr>rollup'` (ng-packagr 22.2 depends on rolldown, not rollup) and the root `piscina` (`@angular/build` pins 5.3.2 itself). The root `ignore` for `piscina` in `.github/dependabot.yml`, whose comment named that entry, goes with it; the examples keep both;
+- below, raised to the highest minimum: `postcss` to `>=8.5.28` in the root and the examples (`^8.5.28`: vite and `@vue/compiler-sfc`), `minimatch@10` to `~10.2.6` (`eslint-plugin-sonarjs`), `esbuild` to `>=0.28.2` (`@angular/build` pins 0.28.2), the examples `picomatch@4` to 4.0.7 (the version `@angular-devkit/core` and `@angular/build` pin, and vite declares `^4.0.7`), and `'@angular/build>vite'` to `>=8.3.0 <9` in all three (`@angular/build` pins 8.3.0);
+- accepted: the five above.
+
+Each changed value carries its comment along, and the bench's `picomatch@4` comment, which still described a lift of 4.0.5, names the version the Angular pair pins.
+
+It runs in pre-push alone, by the owner's decision. A finding is drift, not a vulnerability, and `lint:audit` holds those in pre-push and CI. In CI every pull request would pay for installing the examples, 18 to 39 s in the `Examples (affected)` job, and the bench, about 13 s with its setup, to judge dependency changes few of them carry.
+
+**Why — measured.**
+
+- Which key rewrites an edge follows pnpm 12.11.2's own code, `pnpm/crates/package-manager/src/overrides.rs` and `overrides/selectors.rs`; pnpm 12 is written in Rust. Against what pnpm wrote on the three trees the check's model disagrees nowhere. Over 7 258 edges, each resolved version lies inside the range the model derives and each project specifier equals it. Each of the 777 peer ranges of `packages:` equals it too, 56 of them rewritten by a key. The check repeats that comparison over the edges it reads and refuses to judge on a disagreement, so a pnpm that applies overrides another way stops it instead of turning its verdicts.
+- Six rules of the matching that the trees do not exercise were probed on pnpm 12.11.2 with `install --lockfile-only --offline`, over `minimatch` 9.0.9 and `brace-expansion`. A key with a parent wins over one without, written first or second. A key with a range wins over one without, in either order. Of two keys whose ranges intersect, the first in the file wins. A parent's range holds the parent's version. A key with a range does not match an empty specifier, which pnpm's semver does not parse, while a key without one rewrites it. A peer pnpm installs for a project is rewritten, by a key with or without the project as its parent. Each has a fixture cell.
+- The raised values moved one version. Resolving the edited files in scratch copies moved picomatch 4.0.5 → 4.0.7 in the examples and nothing else, though npm holds postcss 8.5.30 and vite 8.3.4: pnpm kept every locked version the new values admit, so `@angular/build` keeps the workspace's vite. The repository's lockfiles changed the same way, plus their `overrides:` headers and the peer ranges the values rewrite. `lint:dedupe`, the three frozen installs, `lint:deps` and `lint:audit` ("No issues found", five lockfiles) pass.
+- On macOS, 282, 220 and 181 packages of the three lockfiles have no manifest in `node_modules/.pnpm`, each restricted to another platform or reachable only through one. None is a parent of a key's target, and an edge from one that a key could rewrite is refused, not passed over.
+- `pnpm lint:overrides` takes 2.0 s with every workspace installed: 1.3 s the check, 0.4 s the two installs.
+- `scripts/tests/check-overrides.test.mjs` has 35 cells, each rule on a fixture with its control. Each of 24 mutants of the rules and 13 of the accepted list and the CLI fails it.
+
+⚠ **"Dead" reads the ranges, not the effect.** A key that narrows a range is needed by the rule even when the narrowing does harm: the root `minimatch@9` narrows the `^9.0.3 || ^10.1.2` of `eslint-plugin-import-x`, which keeps a second, older minimatch in the tree. A key that widens on purpose, such as the vite dedupe pins, reads as dead; the accepted list holds those.
+
+⚠ **A `readPackage` hook is invisible to the check.** `.pnpmfile.mjs` edits a manifest in memory and the check reads it from disk. Both hooks today drop peer declarations alone, which adds no edge.

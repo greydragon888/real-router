@@ -102,7 +102,6 @@ updates:
       # fixed version errors; repeated errors halt every npm update. An ignore
       # fails its own way: the security job for an ignored dep can end in
       # `all_versions_ignored`.
-      - dependency-name: "piscina" # override in pnpm-workspace.yaml
       - dependency-name: "js-yaml" # override in pnpm-workspace.yaml
       # undici is no dependency of the root: danger installs a 7.x of its own
       # (`.pnpmfile.mjs`), and jsdom takes 8.x on its own range. Each

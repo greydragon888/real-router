@@ -227,6 +227,17 @@ export const CHECKS = [
     why: "installs cross-router-bench/, a workspace of its own, then ESLint over it and the census of what its config reaches",
   },
   {
+    // Pre-push alone. A finding here is drift, not a vulnerability: lint:audit
+    // holds those in pre-push and CI. In CI every pull request would pay for
+    // installing the examples and the bench, to judge dependency changes few
+    // of them carry. It installs both first, as lint:cross-router does: the
+    // ranges it reads are in each workspace's node_modules.
+    id: "lint:overrides",
+    run: ["pnpm", "lint:overrides"],
+    stages: ["pre-push"],
+    why: "each workspace's overrides narrow a range they rewrite, admit no version below a parent's minimum, and name edges the tree has (scripts/overrides.mjs)",
+  },
+  {
     // CI and post-merge exclude it by design: heap thresholds flake under a
     // concurrent build.
     id: "test:stress",

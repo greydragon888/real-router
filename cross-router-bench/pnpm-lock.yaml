@@ -6,7 +6,7 @@ settings:
 
 overrides:
   vite-plugin-solid>@babel/core: '>=7.29.6 <8'
-  '@angular/build>vite': '>=8.2.2 <9'
+  '@angular/build>vite': '>=8.3.0 <9'
   ajv@8: ~8.20.0
   picomatch@4: 4.0.7
   fast-uri: '>=3.1.6 <4'
