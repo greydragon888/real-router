@@ -3,6 +3,9 @@
 
 let entryCounter = 0;
 
+/** The promises of a navigation that left the document. */
+const PENDING = new Promise<never>(() => {});
+
 function generateKey(): string {
   return `key-${++entryCounter}`;
 }
@@ -17,6 +20,27 @@ function isSameOrigin(url: string, base: string): boolean {
     const baseUrl = new URL(base);
 
     return parsed.origin === baseUrl.origin;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether a push or replace to `newUrl` stays in the current document: the URLs
+ * differ only in the fragment and `newUrl` has one. Anything else loads a new
+ * document unless a listener intercepts it.
+ */
+function isFragmentNavigation(oldUrl: string, newUrl: string): boolean {
+  try {
+    const oldParsed = new URL(oldUrl);
+    const newParsed = new URL(newUrl);
+
+    return (
+      oldParsed.origin === newParsed.origin &&
+      oldParsed.pathname === newParsed.pathname &&
+      oldParsed.search === newParsed.search &&
+      newParsed.href.includes("#")
+    );
   } catch {
     return false;
   }
@@ -92,8 +116,8 @@ export class MockNavigateEvent extends Event implements NavigateEvent {
   readonly info: unknown;
   readonly signal: AbortSignal;
   readonly hashChange: boolean;
-  readonly downloadRequest: string | null = null;
-  readonly formData: FormData | null = null;
+  readonly downloadRequest: string | null;
+  readonly formData: FormData | null;
   readonly hasUAVisualTransition: boolean = false;
   readonly sourceElement: Element | null;
 
@@ -109,6 +133,8 @@ export class MockNavigateEvent extends Event implements NavigateEvent {
     hashChange: boolean;
     abortController: AbortController;
     sourceElement?: Element | null;
+    downloadRequest?: string | null;
+    formData?: FormData | null;
   }) {
     super("navigate", { cancelable: true, bubbles: false });
     this.navigationType = options.navigationType;
@@ -120,6 +146,8 @@ export class MockNavigateEvent extends Event implements NavigateEvent {
     this._abortController = options.abortController;
     this.signal = options.abortController.signal;
     this.sourceElement = options.sourceElement ?? null;
+    this.downloadRequest = options.downloadRequest ?? null;
+    this.formData = options.formData ?? null;
   }
 
   intercept(options?: NavigationInterceptOptions): void {
@@ -148,6 +176,22 @@ export class MockNavigateEvent extends Event implements NavigateEvent {
 interface NavigationResult {
   committed: Promise<MockNavigationEntry>;
   finished: Promise<MockNavigationEntry>;
+}
+
+interface NavigationParams {
+  navigationType: NavigationType;
+  destinationUrl: string;
+  destinationState: unknown;
+  destinationKey?: string;
+  destinationId?: string;
+  destinationIndex?: number;
+  canIntercept: boolean;
+  userInitiated: boolean;
+  info: unknown;
+  hashChange: boolean;
+  sameDocument: boolean;
+  downloadRequest?: string;
+  formData?: FormData;
 }
 
 export class MockNavigation implements Navigation {
@@ -218,6 +262,63 @@ export class MockNavigation implements Navigation {
       userInitiated: false,
       info,
       hashChange: isHashChange(currentUrl, resolvedUrl),
+      sameDocument: isFragmentNavigation(currentUrl, resolvedUrl),
+    });
+  }
+
+  /**
+   * `history.pushState()` by code outside the router: a same-document push the
+   * browser commits whether or not a listener intercepts it.
+   */
+  historyPushState(url: string): NavigationResult {
+    const resolvedUrl = new URL(url, this.currentUrl).href;
+
+    return this._performNavigation({
+      navigationType: "push",
+      destinationUrl: resolvedUrl,
+      destinationState: undefined,
+      canIntercept: true,
+      userInitiated: false,
+      info: undefined,
+      hashChange: isHashChange(this.currentUrl, resolvedUrl),
+      sameDocument: true,
+    });
+  }
+
+  /** A POST form submission to `url`. */
+  submitForm(url: string, formData: FormData): NavigationResult {
+    const resolvedUrl = new URL(url, this.currentUrl).href;
+
+    return this._performNavigation({
+      navigationType: "push",
+      destinationUrl: resolvedUrl,
+      destinationState: undefined,
+      canIntercept: isSameOrigin(resolvedUrl, this.currentUrl),
+      userInitiated: true,
+      info: undefined,
+      hashChange: false,
+      sameDocument: false,
+      formData,
+    });
+  }
+
+  /**
+   * A click on `<a href={url} download={filename}>`. Left to the browser, it
+   * downloads and the document stays where it is.
+   */
+  download(url: string, filename = ""): void {
+    const resolvedUrl = new URL(url, this.currentUrl).href;
+
+    this._performNavigation({
+      navigationType: "push",
+      destinationUrl: resolvedUrl,
+      destinationState: undefined,
+      canIntercept: isSameOrigin(resolvedUrl, this.currentUrl),
+      userInitiated: true,
+      info: undefined,
+      hashChange: false,
+      sameDocument: false,
+      downloadRequest: filename,
     });
   }
 
@@ -265,6 +366,7 @@ export class MockNavigation implements Navigation {
       userInitiated: false,
       info: undefined,
       hashChange: false,
+      sameDocument: false,
     });
   }
 
@@ -337,6 +439,8 @@ export class MockNavigation implements Navigation {
     this._currentIndex = 0;
     this._listeners.clear();
     this._ongoingAbortController = null;
+    this._crossDocumentNavigations.length = 0;
+    this._downloads.length = 0;
   }
 
   private _performTraversal(
@@ -357,21 +461,11 @@ export class MockNavigation implements Navigation {
       userInitiated,
       info,
       hashChange: isHashChange(this.currentUrl, target.url),
+      sameDocument: target.sameDocument,
     });
   }
 
-  private _performNavigation(params: {
-    navigationType: NavigationType;
-    destinationUrl: string;
-    destinationState: unknown;
-    destinationKey?: string;
-    destinationId?: string;
-    destinationIndex?: number;
-    canIntercept: boolean;
-    userInitiated: boolean;
-    info: unknown;
-    hashChange: boolean;
-  }): NavigationResult {
+  private _performNavigation(params: NavigationParams): NavigationResult {
     if (this._ongoingAbortController) {
       this._ongoingAbortController.abort();
       this._ongoingAbortController = null;
@@ -381,16 +475,13 @@ export class MockNavigation implements Navigation {
 
     this._ongoingAbortController = abortController;
 
-    const prevIndex = this._currentIndex;
-    const prevEntries = [...this._entries];
-
     const isTraverse = params.navigationType === "traverse";
     const destination: NavigationDestination = {
       url: params.destinationUrl,
       key: isTraverse ? (params.destinationKey ?? "") : "",
       id: isTraverse ? (params.destinationId ?? "") : "",
       index: isTraverse ? (params.destinationIndex ?? -1) : -1,
-      sameDocument: true,
+      sameDocument: params.sameDocument,
       getState: () => structuredClone(params.destinationState),
     };
 
@@ -402,31 +493,11 @@ export class MockNavigation implements Navigation {
       info: params.info,
       hashChange: params.hashChange,
       abortController,
+      downloadRequest: params.downloadRequest ?? null,
+      formData: params.formData ?? null,
     });
 
-    const listeners = this._listeners.get("navigate");
-
-    if (listeners) {
-      if (this._asyncDispatch) {
-        // Mirror Safari 26.2 WKWebView behaviour observed in #580: navigate
-        // events fire on a subsequent microtask, not synchronously inside
-        // `nav.navigate(...)`. Tests that opt into this mode prove the
-        // plugin's detection path does not depend on synchronous dispatch.
-        // Snapshot listeners to avoid races if the set mutates between now
-        // and the microtask running.
-        const snapshot = [...listeners];
-
-        queueMicrotask(() => {
-          for (const fn of snapshot) {
-            fn(event);
-          }
-        });
-      } else {
-        for (const fn of listeners) {
-          fn(event);
-        }
-      }
-    }
+    this._dispatch(event);
 
     const applyNavigation = (): MockNavigationEntry => {
       if (params.navigationType === "traverse") {
@@ -438,6 +509,11 @@ export class MockNavigation implements Navigation {
           this._currentIndex = idx;
         }
 
+        return this._entries[this._currentIndex];
+      }
+
+      // A reload keeps the entry it reloads.
+      if (params.navigationType === "reload") {
         return this._entries[this._currentIndex];
       }
 
@@ -466,11 +542,6 @@ export class MockNavigation implements Navigation {
       return newEntry;
     };
 
-    const rollback = (): void => {
-      this._entries = prevEntries;
-      this._currentIndex = prevIndex;
-    };
-
     if (event._wasIntercepted) {
       const committedPromise = new Promise<MockNavigationEntry>(
         (resolve, reject) => {
@@ -490,8 +561,9 @@ export class MockNavigation implements Navigation {
 
           return entry;
         } catch (error) {
+          // The commit stands: a rejected handler does not move the URL or
+          // the entry back (measured on Chromium 153, #2740).
           event._abort();
-          rollback();
 
           throw error;
         }
@@ -500,21 +572,14 @@ export class MockNavigation implements Navigation {
       return { committed: committedPromise, finished: finishedPromise };
     }
 
-    if (params.canIntercept && this._strictIntercept) {
-      // Emulate Chromium behaviour: a `navigate` event on a same-origin,
-      // canIntercept URL that NO listener intercepts falls back to a
-      // cross-document navigation (full page reload). In a real browser that
-      // tears down the document and re-runs the bootstrap script, which is
-      // exactly the infinite-loop symptom of #518. Tests that need to catch
-      // that regression should opt in via `strictIntercept: true` — see
-      // `enableStrictIntercept()`.
-      this._crossDocumentReloads += 1;
-      this._ongoingAbortController = null;
+    // Under async dispatch no listener has run yet, so the navigation is
+    // applied in this document whatever a listener later decides.
+    const left = this._asyncDispatch
+      ? undefined
+      : this._leaveDocument(params, applyNavigation, abortController.signal);
 
-      throw new DOMException(
-        "Navigate event was not intercepted — Chromium would perform a cross-document reload",
-        "InvalidStateError",
-      );
+    if (left) {
+      return left;
     }
 
     const entry = applyNavigation();
@@ -527,16 +592,89 @@ export class MockNavigation implements Navigation {
     };
   }
 
+  private _dispatch(event: MockNavigateEvent): void {
+    const listeners = this._listeners.get("navigate");
+
+    if (!listeners) {
+      return;
+    }
+
+    if (this._asyncDispatch) {
+      // Mirror Safari 26.2 WKWebView behaviour observed in #580: navigate
+      // events fire on a subsequent microtask, not synchronously inside
+      // `nav.navigate(...)`. Tests that opt into this mode prove the
+      // plugin's detection path does not depend on synchronous dispatch.
+      // Snapshot listeners to avoid races if the set mutates between now
+      // and the microtask running.
+      const snapshot = [...listeners];
+
+      queueMicrotask(() => {
+        for (const fn of snapshot) {
+          fn(event);
+        }
+      });
+
+      return;
+    }
+
+    for (const fn of listeners) {
+      fn(event);
+    }
+  }
+
+  /**
+   * What the browser does with a navigation no listener intercepted, when that
+   * takes it out of this document's hands: a download, which keeps the
+   * document, or a load of a new one. `undefined` for a same-document
+   * navigation, which the caller applies in place.
+   */
+  private _leaveDocument(
+    params: NavigationParams,
+    applyNavigation: () => MockNavigationEntry,
+    signal: AbortSignal,
+  ): NavigationResult | undefined {
+    if (params.downloadRequest !== undefined) {
+      this._ongoingAbortController = null;
+
+      // A navigation started during the download's own event cancels the
+      // download (measured on Chromium 153).
+      if (!signal.aborted) {
+        this._downloads.push(params.destinationUrl);
+      }
+
+      return { committed: PENDING, finished: PENDING };
+    }
+
+    if (params.sameDocument) {
+      return undefined;
+    }
+
+    // The session history keeps the entry, so it is applied; the old
+    // document, with every promise it holds, is gone, so these never settle.
+    this._ongoingAbortController = null;
+    this._crossDocumentNavigations.push(params.destinationUrl);
+
+    if (params.canIntercept && this._strictIntercept) {
+      throw new DOMException(
+        "Navigate event was not intercepted — Chromium would perform a cross-document navigation",
+        "InvalidStateError",
+      );
+    }
+
+    applyNavigation();
+
+    return { committed: PENDING, finished: PENDING };
+  }
+
   private _strictIntercept = false;
-  private _crossDocumentReloads = 0;
+  private readonly _crossDocumentNavigations: string[] = [];
+  private readonly _downloads: string[] = [];
   private _asyncDispatch = false;
 
   /**
-   * Opt in to strict cross-document fallback emulation. When enabled, any
-   * `navigate` event with `canIntercept: true` that is NOT intercepted by
-   * any listener causes the mock to throw `InvalidStateError` from the
-   * `navigate()` call site, mirroring Chromium's cross-document reload
-   * behaviour (the primary symptom of #518).
+   * Make a cross-document navigation that no listener intercepted although it
+   * could (`canIntercept: true`) throw `InvalidStateError` from the call site,
+   * so a test sees the #518 failure where it happens.
    */
   enableStrictIntercept(): void {
     this._strictIntercept = true;
@@ -556,7 +694,13 @@ export class MockNavigation implements Navigation {
     this._asyncDispatch = true;
   }
 
-  get crossDocumentReloadCount(): number {
-    return this._crossDocumentReloads;
+  /** URLs this document was left for: cross-document navigations no listener intercepted. */
+  get crossDocumentNavigations(): readonly string[] {
+    return this._crossDocumentNavigations;
+  }
+
+  /** URLs of `download()` clicks no listener intercepted. */
+  get downloads(): readonly string[] {
+    return this._downloads;
   }
 }

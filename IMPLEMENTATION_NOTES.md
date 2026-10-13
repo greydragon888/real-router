@@ -5977,6 +5977,7 @@ Unified contract: `allowNotFound: false` means "unknown route is an error, repor
 1. Added `PluginApi.emitTransitionError(error)` — a standard point-of-entry for plugins to emit `$$error` without synthesising a navigation. Delegates to `ctx.emitTransitionError` on `RouterInternals`, which calls `eventBus.sendFailSafe(undefined, state.get(), error)` (safe at any FSM state — direct emit when not READY).
 2. `shared/browser-env/popstate-handler.ts`: strict-mode else-branch emits `ROUTE_NOT_FOUND` via `api.emitTransitionError` and calls `rollbackUrlToCurrentState()` (replaces URL with the current router state's path) — no more silent `navigateToDefault`.
 3. `navigation-plugin/navigate-handler.ts`: strict-mode branch emits the same error and throws inside an `async` `event.intercept()` handler — Navigation API auto-rolls back the URL via intercept rejection.
+   ⚠ **The rollback premise does not hold.** Measured on Chromium 153 (2026-10-13): a rejected intercept handler leaves the URL and the entry where the navigation put them, so this branch leaves URL and router state apart — #2740. Since #2724 the branch is reached only by a navigation that stays in the document.
 4. `hash-plugin`: inherits the fix via `browser-env` symlink.
 
 ### Incidental fix bundled in
@@ -6004,6 +6005,31 @@ router.usePlugin(() => ({
 - Closes #471 case 3 from the opposite direction — `{ allowNotFound: false, defaultRoute: "" }` is no longer a dead-end configuration.
 - Single purpose for `defaultRoute`: only the explicit `router.navigateToDefault()` target.
 - All error surfaces go through one channel (`onTransitionError`) — uniform observability for logs, analytics, and recovery UIs.
+
+## navigation-plugin: the Browser Keeps the Navigations It Performs (#2724)
+
+### Problem
+
+The `navigate` handler intercepted every navigation it could. The Navigation API fires `navigate` for a plain link, `location.assign()`, a form submission, `location.reload()` and an `<a download>`; none of them reaches a `popstate` listener when it loads a new document or downloads, so under navigation-plugin each of them became a router navigation. Measured in Chromium 153 against `src`: a link, redirect or form to a URL with no route never reached the server — it rendered not-found in place under `allowNotFound: true` and moved the URL while the page stayed under `false`; a POST to a URL with a route navigated the router and dropped the body; an `<a download>` navigated instead of downloading; `location.reload()` on a URL with a route did not reload the document — where the URL showed the router's own state, the router refused it with `SAME_STATES`, an error `onTransitionError`, `RouterErrorBoundary` and `logger-plugin` all saw.
+
+### Solution
+
+Early returns in `handleNavigateEvent`, after the `PLUGIN_SYNC_INFO` branch and before `#capturedMeta` is set:
+
+1. `event.downloadRequest != null`, `event.formData != null`, `event.navigationType === "reload"` — the browser downloads, submits or reloads, whatever the URL.
+2. `!matchedState && !event.destination.sameDocument` — a URL with no route that would load a new document is the server's. A same-document one (`history.pushState`, a traverse inside the document) still reaches `navigateToNotFound` / `ROUTE_NOT_FOUND`.
+3. A download that finds the signal of the last navigation the handler took aborted restores the URL of the route the router stayed on with `syncUrlToRouterState`, on the next task. Measured on Chromium 153: starting a download aborts a pending intercepted navigation, whose URL is already committed, and keeps the document — while `withRecovery` leaves a `TRANSITION_CANCELLED` to the newer navigation, which here is never the router's. A navigation started during the download's own event cancels the download, hence the next task. Every navigation the plugin starts itself clears the remembered signal — `router.replaceHistoryState()` starts one — so a URL it wrote is not taken back.
+
+The owner decided the issue's three open questions while it was being fixed (2026-10-13): the rule is the default, not an option; strict mode declines these navigations too; a reload reloads the document rather than re-running the transition. Two decisions concern what the browser matrix found beyond the issue: downloads and POST forms are declined for any URL, not only one without a route; and the download race is fixed here with the recovery every refused guard gets, which rewrites the entry the browser moved to — #2740.
+
+`MockNavigation` answers like Chromium 153 now, under its default synchronous dispatch: `destination.sameDocument` follows the channel (a fragment-only push or replace, `historyPushState()` and a traverse are same-document — every entry the mock holds counts as this document's; any other push or replace, and a reload, are not); a cross-document navigation no listener intercepts lands in `crossDocumentNavigations`, keeps its entry and never settles its promises; `download()` lands in `downloads`, keeps the document, and is cancelled by a navigation started during its event; a reload keeps its entry; a rejected handler no longer rolls the entries back.
+
+### Why
+
+- Parity with `browser-plugin`, which the options docblock promises ("plugins are interchangeable"): none of these channels reaches the router there.
+- Before `#capturedMeta`: the document can outlive a declined navigation — a download, or a server response sent as an attachment — and staged metadata would be written onto the router's next transition.
+- `!= null` rather than `!== null` for the two nullable attributes: a hand-built event without them (the package's own direct handler tests have one) must not read as a download.
+- The mock change is what made the defect testable at all: with `sameDocument: true` on every event, no test could tell the two kinds of navigation apart, and a rollback the browser does not perform let refusal tests pass on behaviour that does not exist.
 
 ## Scroll Restoration as Utility, Not Plugin
 

@@ -408,43 +408,55 @@ router.navigate(name, params, opts)
 ## Data Flow: Navigate Event
 
 ```
-User clicks back/forward/link, or navigation.navigate() fires
+User clicks back/forward/link, submits a form, or navigation.navigate() fires
         │
         ▼
   navigate event → handleNavigateEvent(event)
         │
-        ├── event.canIntercept === false? → return (cross-origin, download, etc.)
+        ├── event.canIntercept === false? → return (cross-origin, traverse to another document)
         │
         ├── router.isActive() === false? → return
         │
         ├── event.info === PLUGIN_SYNC_INFO?
-        │     YES: event.intercept({ handler: async () => {} }) — noop, no router call
-        │          (plugin-initiated event; identity-based check, timing-independent — #580)
+        │     YES: forget the last navigation taken;
+        │          event.intercept(NOOP_INTERCEPT) — no router call
+        │          (plugin-initiated event; identity-based check, timing-independent)
         │
-        ├── Parse destination URL → path
+        ├── downloadRequest set?
+        │     YES: return — the browser downloads, the document stays
+        │          (the last navigation taken aborted by it → on the next task,
+        │           syncUrlToRouterState() writes the router's URL back)
+        │
+        ├── formData set, or navigationType === "reload"?
+        │     YES: return — the browser submits or reloads
+        │
+        ├── Parse destination URL → path; matchedState = api.matchPath(path)
+        │
+        ├── !matchedState && !event.destination.sameDocument?
+        │     YES: return — the browser loads the page
         │
         ├── Set #capturedMeta BEFORE event.intercept()
         │     (written to toState.context.navigation in onTransitionStart, available in guards)
         │
-        ├── matchedState = api.matchPath(path)
-        │
         ├── matchedState found?
-        │     YES: event.intercept({ handler: async () => {
-        │           await router.navigate(matchedState.name, matchedState.params, undefined, { ...transitionOptions, signal: event.signal })
-        │           catch RouterError → ignore (CANNOT_DEACTIVATE, etc.)
-        │           catch other → recoverFromNavigateError()
-        │         }})
+        │     YES: remember event.signal as the last navigation taken;
+        │          event.intercept({ handler: () => withRecovery(() =>
+        │           api.navigateToState(matchedState, { ...transitionOptions, hash, signal: event.signal }))
+        │         })
+        │         withRecovery: TRANSITION_CANCELLED / SAME_STATES → nothing
+        │                       other RouterError → syncUrlToRouterState()
+        │                       non-RouterError → recoverFromNavigateError()
         │
-        ├── !matchedState && allowNotFound?
+        ├── allowNotFound?
         │     YES: event.intercept({ handler: () => router.navigateToNotFound(path) })
         │
-        └── !matchedState && !allowNotFound?
+        └── otherwise (strict):
               event.intercept({ handler: async () => {
                 const err = new RouterError(ROUTE_NOT_FOUND, { path })
                 api.emitTransitionError(err)
-                throw err  // Navigation API auto-rolls back URL on reject
+                throw err  // rejects the intercept; the URL stays where the navigation put it
               }})
-              (no silent navigateToDefault — see #483)
+              (no silent navigateToDefault)
 ```
 
 ### No Race Condition

@@ -136,7 +136,7 @@ describe("N1 — Navigate Event Storm", () => {
     expect(router.getState()?.name).toBe("home");
   });
 
-  it("1.4 — 50 navigate to unknown URL with allowNotFound=true", async () => {
+  it("1.4 — 50 same-document navigations to an unknown URL with allowNotFound=true", async () => {
     const result = createStressRouter({ allowNotFound: true });
 
     router = result.router;
@@ -148,8 +148,10 @@ describe("N1 — Navigate Event Storm", () => {
 
     const spy = vi.spyOn(router, "navigateToNotFound");
 
+    // Same-document: a navigation that would load a new document for an
+    // unknown URL is the browser's, not the router's (#2724).
     for (let i = 0; i < 50; i++) {
-      mockNav.navigate("http://localhost/nonexistent");
+      mockNav.historyPushState("http://localhost/nonexistent");
     }
 
     await waitForTransitions();
@@ -188,7 +190,7 @@ describe("N1 — Navigate Event Storm", () => {
     expect(router.getState()).toStrictEqual(stateBefore);
   });
 
-  it("1.6 — 50 navigate events, allowNotFound=false: no silent fallback, errors surface, state pinned (#483)", async () => {
+  it("1.6 — 50 same-document navigate events, allowNotFound=false: no silent fallback, errors surface, state pinned (#483)", async () => {
     const result = createStressRouter({ allowNotFound: false });
 
     router = result.router;
@@ -207,7 +209,7 @@ describe("N1 — Navigate Event Storm", () => {
 
     for (let i = 0; i < 50; i++) {
       mockNav
-        .navigate("http://localhost/nonexistent")
+        .historyPushState("http://localhost/nonexistent")
         .finished.catch(() => undefined);
     }
 
@@ -219,7 +221,8 @@ describe("N1 — Navigate Event Storm", () => {
     // Every navigate event produced a ROUTE_NOT_FOUND error hook invocation
     expect(errorHook).toHaveBeenCalled();
 
-    // Router state pinned to initial — Navigation API rolled back each URL
+    // Router state pinned to initial. The URL is not asserted: each rejected
+    // intercept leaves it where the navigation put it (#2740).
     expect(router.getState()).toStrictEqual(initialState);
   });
 });

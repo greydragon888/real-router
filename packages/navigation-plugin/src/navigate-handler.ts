@@ -65,6 +65,9 @@ export function computeDirection(
 export function createNavigateHandler(deps: NavigateHandlerDeps) {
   const { router, api, browser, base, transitionOptions } = deps;
   const { allowNotFound } = api.getOptions();
+  // The signal of the last navigation this handler took to a matched route,
+  // until the plugin next writes the router's own URL.
+  let taken: AbortSignal | undefined;
 
   return function handleNavigateEvent(event: NavigateEvent): void {
     if (!event.canIntercept || !router.isActive()) {
@@ -72,6 +75,8 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
     }
 
     if (event.info === PLUGIN_SYNC_INFO) {
+      taken = undefined;
+
       // Plugin-originated navigate event after its own successful transition
       // (onTransitionSuccess calls browser.navigate to sync URL). We must still
       // intercept — a bare `return` leaves the event un-intercepted, and
@@ -91,8 +96,41 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
       return;
     }
 
+    // The browser performs these itself: a download, a POST whose body the
+    // router has no channel for, and a reload of the document (#2724).
+    if (event.downloadRequest != null) {
+      // A download keeps this document, and starting one aborts a navigation
+      // the router is still taking: its URL stays committed while the router
+      // stays put, and `withRecovery` leaves the cancelled one to a newer
+      // navigation the router never sees. Put the URL back here (#2724) — on
+      // the next task: a navigation started during this event cancels the
+      // download (measured on Chromium 153).
+      // A navigation the router takes before then owns the URL instead; a
+      // stopped router holds no state, so the write finds nothing to restore.
+      if (taken?.aborted) {
+        taken = undefined;
+        setTimeout(() => {
+          if (taken === undefined) {
+            syncUrlToRouterState(router, browser);
+          }
+        }, 0);
+      }
+
+      return;
+    }
+
+    if (event.formData != null || event.navigationType === "reload") {
+      return;
+    }
+
     const { path, hash } = urlToPathAndHash(event.destination.url, base);
     const matchedState = api.matchPath(path);
+
+    // A URL with no route is the router's only while the navigation stays in
+    // this document; otherwise the browser loads that page (#2724).
+    if (!matchedState && !event.destination.sameDocument) {
+      return;
+    }
 
     const navType = event.navigationType;
     const currentIndex = browser.currentEntry?.index ?? -1;
@@ -110,6 +148,7 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
     });
 
     if (matchedState) {
+      taken = event.signal;
       event.intercept({
         handler: () =>
           withRecovery(
@@ -142,11 +181,12 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
         },
       });
     } else {
-      // Strict mode — unmatched URL is an error. Emit $$error and reject the
-      // intercept so the Navigation API auto-rolls back the URL. No silent
-      // fallback to defaultRoute.
+      // Strict mode — an unmatched URL that stays in this document is an
+      // error. Emit $$error and reject the intercept; no silent fallback to
+      // defaultRoute. The rejection leaves the URL where the navigation put it
+      // (#2740).
       event.intercept({
-        // eslint-disable-next-line @typescript-eslint/require-await -- Navigation API requires async handler; synchronous throw is the rollback signal
+        // eslint-disable-next-line @typescript-eslint/require-await -- Navigation API requires async handler; the throw rejects the intercept
         handler: async () => {
           const err = freezeThrownError(
             new RouterError(errorCodes.ROUTE_NOT_FOUND, { path }),
@@ -199,12 +239,10 @@ async function withRecovery(
 
     // Other RouterError codes (CANNOT_DEACTIVATE, CANNOT_ACTIVATE,
     // ROUTE_NOT_FOUND, …) — router rejected the transition, state is
-    // unchanged, but URL may have already committed to a different value by
-    // the Navigation API. Sync the URL back to the current router state in a
-    // single visible transition (headless Chromium and some cross-origin
-    // setups leave "committed-then-reverted" windows if we relied on the
-    // native rollback via intercept reject). Observers that care about the
-    // error see it through the router's TRANSITION_ERROR event.
+    // unchanged, but the Navigation API has already committed the URL, and it
+    // does not roll an intercepted navigation back when the handler rejects
+    // (#2740). Sync the URL back to the current router state. Observers that
+    // care about the error see it through the router's TRANSITION_ERROR event.
     syncUrlToRouterState(router, browser);
   }
 }

@@ -21,7 +21,8 @@ describe("Cross-Origin Filtering", () => {
     const stateBefore = withoutMeta(router.getState()!);
     const contextBefore = router.getState()!.context;
 
-    mock.navigate("https://external.com/page");
+    // A path with a route, so only `canIntercept` keeps it from the router.
+    mock.navigate("https://external.com/users/list");
 
     await new Promise((resolve) => setTimeout(resolve, 10));
 
