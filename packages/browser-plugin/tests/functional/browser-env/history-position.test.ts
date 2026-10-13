@@ -202,13 +202,20 @@ describe("withEntryPositions (#2740)", () => {
     expect(positions.current?.run).not.toBe("x");
   });
 
-  it("stamps the state object the writer passes", () => {
+  it("hands the browser a stamped copy and leaves the writer's state alone (#2741)", () => {
     const { browser, pushState } = browserOn(null);
     const state = { name: "home" };
 
     withEntryPositions(browser, createEntryPositions()).pushState(state, "/a");
 
-    expect(pushState.mock.calls[0]?.[0]).toBe(state);
+    const passed = pushState.mock.calls[0]?.[0];
+
+    expect(passed).not.toBe(state);
+    expect(passed).toStrictEqual({
+      name: "home",
+      position: { run: expect.any(String), index: 0 },
+    });
+    expect(state).toStrictEqual({ name: "home" });
   });
 
   it.each([

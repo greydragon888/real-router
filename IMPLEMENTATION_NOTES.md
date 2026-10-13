@@ -14880,3 +14880,26 @@ Of the copies, `codecov.yml` lost its component list in `9ede09e08` (90 lines de
 - On HEAD, `node scripts/scripts-tests.mjs guards` and `node scripts/scripts-tests.mjs tooling`, the commands pre-push and Repo Lints run through `verify`, exit 0.
 - The deleted and added counts are `git show --numstat` of the commits named. The reconciliations' own lines come from reading the two diffs, segmented by construct.
 - The Definition of Done of RFC-3 is closed. Its last item, a green release run after the change of "The telemetry stamp is one file, which the setup action and post-merge.yml run", closed with the first release after that change, `@real-router/navigation-plugin@0.13.0` on 2026-10-13: the `Post-Merge Build` of the release commit, which runs the stamp, and the `changesets.yml` run it started, which published, ended `success` (runs 38365705334 and 38365788171). The guards of CI have their own Definition of Done in RFC-4, closed.
+
+## The URL plugins hand the History API a copy of each state they write (2026-10-13)
+
+**Problem (#2741).** browser-plugin and hash-plugin reuse one `{ name, params, search, path }` object for the states they write — `createUpdateBrowserState` for transitions, `createReplaceHistoryState` for `router.replaceHistoryState()` — on the ground that the host clones `history.state` inside `pushState` and `replaceState`. A browser does. jsdom keeps the object itself (`History-impl.js`: `// TODO structured clone data`), so every entry written through one buffer read back the state written last. `withEntryPositions` stamped the position onto that same object, so in jsdom the positions were shared too. Measured on `master` @ `753e62a96`, jsdom with browser-plugin: after `start("/home")` and a navigation to `users.view`, Back popped an entry carrying `users.view`, the router answered `SAME_STATES`, a `canDeactivate` on `users.view` was called 0 times, and the return of #2740 never ran. navigation-plugin's `MockNavigation` kept the state it was given and cloned on read, so its suite aliased `#historyStateBuffer` the same way.
+
+**Solution.** `withEntryPositions` — the wrapper every History write of browser-plugin and hash-plugin passes — stamps the position onto a copy of the writer's state, so the History API receives an object no writer keeps. The buffers stay; the copy is the one allocation per write. `MockNavigation` stores a structured clone on every write, as the Navigation API does. navigation-plugin itself is unchanged: jsdom has no Navigation API, and a browser clones. The cloning harnesses the #2740 tests carried are gone, and those tests run on jsdom's own history.
+
+**Why the copy sits in the wrapper.** A fresh object per write in the two buffered writers gave the same behaviour and the same cost, with one other pin flipped. The copy in the wrapper covers every writer behind it, including writers added later; the per-writer form leaves the next writer that reuses an object free to bring the defect back. Both plugins write only through the wrapped browser — the browser they are given serves to build it and nothing else.
+
+**Measured.** Navigation cost, 50 000 navigations on a stub browser, four interleaved runs per arm:
+
+| Arm                                               | ns per navigation      |
+| ------------------------------------------------- | ---------------------- |
+| stamp on the writer's object                      | 2274, 2150, 2833, 2091 |
+| stamp on a copy (adopted)                         | 2219, 2247, 2326, 2271 |
+| buffered writers (separate run)                   | 2293, 2259, 2151, 2303 |
+| a fresh object per writer (same run, not adopted) | 2337, 2245, 2268, 2220 |
+
+The arms overlap: one allocation per write sits inside the run-to-run spread. Neither #511 nor #559, which brought the buffers, records a measurement of them.
+
+Five mutants, against a green baseline: the stamp back on the writer's object, a copy without the position, `null` copied too, and each of the two writes of `MockNavigation` keeping a reference. Each fails tests: the first one fails the #2740 tests as well, now that they run on jsdom's own history.
+
+**Limitation.** jsdom still keeps the objects application code passes to `pushState` and `replaceState`; that half is jsdom's own `TODO`.

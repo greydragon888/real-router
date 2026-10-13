@@ -12,25 +12,15 @@ import type { Router } from "@real-router/core";
 
 /**
  * jsdom's own history: a traversal fires `popstate` on a later task, as a
- * browser does. A browser stores a structured clone of the state it is given
- * where jsdom keeps the object, so the states are cloned here — the plugin
- * reuses its buffers between writes.
+ * browser does. jsdom keeps the object a write is given where a browser
+ * stores a clone, and the plugin copies what it writes (#2741), so no harness
+ * stands between them.
  */
-function createCloningBrowser(): Browser {
-  const browser = createSafeBrowser(
+function createJsdomBrowser(): Browser {
+  return createSafeBrowser(
     () => globalThis.location.pathname + globalThis.location.search,
     "browser-plugin",
   );
-
-  return {
-    ...browser,
-    pushState: (state, url) => {
-      browser.pushState(structuredClone(state), url);
-    },
-    replaceState: (state, url) => {
-      browser.replaceState(structuredClone(state), url);
-    },
-  };
 }
 
 // The traversal, the transition and the plugin's own return each take a task.
@@ -77,7 +67,7 @@ async function setup(
   });
 
   created.usePlugin(
-    browserPluginFactory({}, options.browser ?? createCloningBrowser()),
+    browserPluginFactory({}, options.browser ?? createJsdomBrowser()),
     () => ({
       onTransitionStart: (toState) => {
         started.push(toState.name);
@@ -275,7 +265,7 @@ describe("a traversal the router refuses returns to the entry it started from (#
       allowNotFound: true,
     });
 
-    again.usePlugin(browserPluginFactory({}, createCloningBrowser()));
+    again.usePlugin(browserPluginFactory({}, createJsdomBrowser()));
     await again.start();
     router = again;
     refuse(again, "leave", "users.view");
@@ -313,7 +303,7 @@ describe("a traversal the router refuses returns to the entry it started from (#
   });
 
   it("a traversal a newer navigation cancels is not a refusal: the plugin does not travel", async () => {
-    const browser = createCloningBrowser();
+    const browser = createJsdomBrowser();
     let travelled = 0;
     const r = await setup({
       browser: {
@@ -404,11 +394,11 @@ describe("a traversal the router refuses returns to the entry it started from (#
       }
 
       pushState(state: unknown, url: string): void {
-        this.#history.pushState(structuredClone(state), "", url);
+        this.#history.pushState(state, "", url);
       }
 
       replaceState(state: unknown, url: string): void {
-        this.#history.replaceState(structuredClone(state), "", url);
+        this.#history.replaceState(state, "", url);
       }
 
       addPopstateListener(fn: (evt: PopStateEvent) => void): () => void {
@@ -442,7 +432,7 @@ describe("a traversal the router refuses returns to the entry it started from (#
   });
 
   it("a browser whose go throws: the entry is rewritten, and the next Back is a traversal of its own", async () => {
-    const browser = createCloningBrowser();
+    const browser = createJsdomBrowser();
     const r = await setup({
       browser: {
         ...browser,
@@ -468,7 +458,7 @@ describe("a traversal the router refuses returns to the entry it started from (#
   });
 
   it("a return the browser never makes: the next Back is a traversal of its own", async () => {
-    const browser = createCloningBrowser();
+    const browser = createJsdomBrowser();
     const r = await setup({
       browser: {
         ...browser,
@@ -621,7 +611,7 @@ describe("a traversal the router refuses returns to the entry it started from (#
       allowNotFound: false,
     });
 
-    strict.usePlugin(browserPluginFactory({}, createCloningBrowser()));
+    strict.usePlugin(browserPluginFactory({}, createJsdomBrowser()));
     await strict.start();
     router = strict;
 
@@ -639,7 +629,7 @@ describe("a traversal the router refuses returns to the entry it started from (#
 
   describe("where the distance cannot be measured, the entry the browser stands on is rewritten", () => {
     it("a browser that cannot travel", async () => {
-      const browser = createCloningBrowser();
+      const browser = createJsdomBrowser();
 
       delete browser.go;
 
@@ -712,7 +702,7 @@ describe("a traversal the router refuses returns to the entry it started from (#
   it("a return that lands elsewhere is a traversal of its own, and the guard is asked again", async () => {
     // A first `go` that falls one entry short, as if entries had moved under
     // the plugin.
-    const browser = createCloningBrowser();
+    const browser = createJsdomBrowser();
     let short = true;
     const r = await setup({
       browser: {

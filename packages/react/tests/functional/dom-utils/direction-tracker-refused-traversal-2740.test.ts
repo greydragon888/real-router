@@ -5,45 +5,11 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { createDirectionTracker } from "../../../src/dom-utils";
 
-import type { Browser } from "@real-router/browser-plugin";
 import type { Router } from "@real-router/core";
 
-/**
- * jsdom's own history: a traversal fires `popstate` on a later task. A browser
- * stores a structured clone of the state it is given where jsdom keeps the
- * object, so the states are cloned here — the plugin reuses its buffers.
- */
-function createCloningBrowser(): Browser {
-  return {
-    getLocation: () =>
-      globalThis.location.pathname + globalThis.location.search,
-    getHash: () => globalThis.location.hash,
-    getState: () => globalThis.history.state as unknown,
-    go: (delta) => {
-      globalThis.history.go(delta);
-    },
-    pushState: (state, url) => {
-      globalThis.history.pushState(structuredClone(state), "", url);
-    },
-    replaceState: (state, url) => {
-      globalThis.history.replaceState(structuredClone(state), "", url);
-    },
-    addPopstateListener: (fn) => {
-      globalThis.addEventListener("popstate", fn);
-
-      return () => {
-        globalThis.removeEventListener("popstate", fn);
-      };
-    },
-    addHashChangeListener: (fn) => {
-      globalThis.addEventListener("hashchange", fn);
-
-      return () => {
-        globalThis.removeEventListener("hashchange", fn);
-      };
-    },
-  };
-}
+// jsdom's own history: a traversal fires `popstate` on a later task. jsdom
+// keeps the object a write is given where a browser stores a clone, and the
+// plugin copies what it writes (#2741).
 
 // The traversal, the transition and the plugin's own return each take a task.
 const settle = async (): Promise<void> => {
@@ -70,7 +36,7 @@ async function setup(): Promise<{ router: Router; destroy: () => void }> {
   );
   const tracker = createDirectionTracker(created);
 
-  created.usePlugin(browserPluginFactory({}, createCloningBrowser()));
+  created.usePlugin(browserPluginFactory());
   await created.start();
   await created.navigate("about");
   router = created;

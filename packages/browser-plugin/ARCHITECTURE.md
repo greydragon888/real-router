@@ -79,8 +79,8 @@ browserPluginFactory(opts?, browser?)         ← public
                             │  Per-plugin-instance setup:
                             │  - api.claimContextNamespace("browser")
                             │  - createUpdateBrowserState() — closure with reusable
-                            │    mutable {name, params, search, path} buffer (browser
-                            │    structured-clones synchronously, so reuse is safe)
+                            │    mutable {name, params, search, path} buffer (the
+                            │    History API gets a stamped copy, so reuse is safe)
                             │  - createStartInterceptor (via browser-env)
                             │  - api.extendRouter({buildUrl, matchUrl, replaceHistoryState})
                             │  - createPopstateHandler + createPopstateLifecycle
@@ -307,7 +307,7 @@ router.navigate(name, params, opts)
         └── updateState(toState, finalUrl, shouldReplace, browser)   ← createUpdateBrowserState() closure
                   │
                    ├── Reuse mutable buffer { name, params, search, path } (overwritten in place)
-                   └── browser.pushState() or browser.replaceState()  (browser structured-clones)
+                   └── browser.pushState() or browser.replaceState()  (withEntryPositions writes a stamped copy)
 ```
 
 ## Data Flow: popstate (back/forward buttons)
@@ -376,7 +376,7 @@ returnOrRollback(start)
   └── otherwise: rollbackUrlToCurrentState() — the live entry is rewritten
 ```
 
-The positions come from `withEntryPositions`: every state the plugin writes carries `position: { run, index }` — a replace keeps the place of the entry it rewrites, a push follows it, and each write reads that place off the live entry first. A run starts on an entry that carries no position — the one a document loads with, one the browser or other code wrote — so only two entries of one run are `index` apart. A plugin started on an entry that carries one, as after a reload, continues its run.
+The positions come from `withEntryPositions`: every state the plugin writes carries `position: { run, index }` — a replace keeps the place of the entry it rewrites, a push follows it, and each write reads that place off the live entry first. The position goes onto a copy of the writer's state, so the History API receives an object no writer keeps, and an entry holds the state it was written with even where the host stores state by reference, as jsdom does. A run starts on an entry that carries no position — the one a document loads with, one the browser or other code wrote — so only two entries of one run are `index` apart. A plugin started on an entry that carries one, as after a reload, continues its run.
 
 ### Deferred popstate Handling
 
@@ -570,7 +570,7 @@ const finalUrl = hash ? `${url}#${encodeHashFragment(hash)}` : url;
 | `historyState` as a subset of `State`                      | `browser-env`                   | Less data stored in `history.state`                                                                                                                                   |
 | `createSafeBrowser()` called once                          | `factory.ts`                    | Environment check doesn't repeat                                                                                                                                      |
 | `FROZEN_POPSTATE` / `FROZEN_NAVIGATE` constants            | `factory.ts`              | Pre-frozen `BrowserContext` literals — no `Object.freeze()` allocation per `onTransitionSuccess`                                                                      |
-| Mutable `historyState` buffer (`createUpdateBrowserState`) | `browser-env/popstate-utils.ts` | Per-instance closure reuses one `{ name, params, search, path }` object across `pushState`/`replaceState` (browser structured-clones synchronously, so reuse is safe) |
+| Mutable `historyState` buffer (`createUpdateBrowserState`) | `browser-env/popstate-utils.ts` | Per-instance closure reuses one `{ name, params, search, path }` object across `pushState`/`replaceState` (`withEntryPositions` writes a stamped copy, so reuse is safe) |
 | Memoized `getLocation` (`createDefaultBrowser`)            | `factory.ts`              | Skips `extractPath + safelyEncodePath` when `(pathname, search)` is unchanged since the last call (popstate-storm benefit)                                            |
 | `buildUrl(toState.path, base)` instead of a name rebuild   | `factory.ts`                | `toState.path` is already final, so `onTransitionSuccess` only prefixes it — and a rebuild would ask the `forwardState` seam a second time. The rollback takes the same shape via its `pathToUrl` dep |
 

@@ -6,18 +6,16 @@ import { describe, expect } from "vitest";
 import { hashPluginFactory } from "@real-router/hash-plugin";
 
 import { NUM_RUNS } from "./helpers";
-import { createSafeBrowser } from "../../src/browser-env";
-import { buildHashLocation } from "../../src/hash-utils";
 import { routerConfig } from "../helpers/testUtils";
 
-import type { Browser } from "../../src/browser-env";
 import type { Router } from "@real-router/core";
 
 /**
  * #2740 class guard: a traversal the router refuses leaves every entry where
  * it was and the browser on the entry the traversal started from — whatever
  * the distance and direction, whichever guard refuses — through the
- * popstate/hashchange pair hash-plugin listens to.
+ * popstate/hashchange pair hash-plugin listens to. It runs on jsdom's own
+ * history, which keeps the object a write is given (#2741).
  */
 
 const PATHS: Readonly<Record<string, string>> = {
@@ -27,29 +25,6 @@ const PATHS: Readonly<Record<string, string>> = {
   "users.view": "/users/view/1",
 };
 const NAMES = Object.keys(PATHS);
-
-// A browser stores a structured clone of each state; jsdom keeps the object.
-function createCloningBrowser(): Browser {
-  const browser = createSafeBrowser(
-    () =>
-      buildHashLocation(
-        globalThis.location.hash,
-        globalThis.location.search,
-        null,
-      ),
-    "hash-plugin",
-  );
-
-  return {
-    ...browser,
-    pushState: (state, url) => {
-      browser.pushState(structuredClone(state), url);
-    },
-    replaceState: (state, url) => {
-      browser.replaceState(structuredClone(state), url);
-    },
-  };
-}
 
 const settle = async (): Promise<void> => {
   for (let i = 0; i < 8; i++) {
@@ -103,7 +78,7 @@ async function start(
 
   const router = createRouter(routerConfig, { defaultRoute: "home" });
 
-  router.usePlugin(hashPluginFactory({}, createCloningBrowser()));
+  router.usePlugin(hashPluginFactory());
   await router.start();
 
   for (const name of journey) {

@@ -4,38 +4,12 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { hashPluginFactory } from "@real-router/hash-plugin";
 
-import { createSafeBrowser } from "../../src/browser-env";
-import { buildHashLocation } from "../../src/hash-utils";
 import { routerConfig } from "../helpers/testUtils";
 
-import type { Browser } from "../../src/browser-env";
 import type { Router } from "@real-router/core";
 
-/**
- * jsdom's own history, with the states cloned as a browser clones them —
- * jsdom keeps the object the plugin passes, and the plugin reuses buffers.
- */
-function createCloningBrowser(): Browser {
-  const browser = createSafeBrowser(
-    () =>
-      buildHashLocation(
-        globalThis.location.hash,
-        globalThis.location.search,
-        null,
-      ),
-    "hash-plugin",
-  );
-
-  return {
-    ...browser,
-    pushState: (state, url) => {
-      browser.pushState(structuredClone(state), url);
-    },
-    replaceState: (state, url) => {
-      browser.replaceState(structuredClone(state), url);
-    },
-  };
-}
+// jsdom's own history. It keeps the object a write is given where a browser
+// stores a clone, and the plugin copies what it writes (#2741).
 
 // The traversal, the transition and the plugin's own return each take a task.
 const settle = async (): Promise<void> => {
@@ -68,7 +42,7 @@ async function setup(options: { before?: string[] } = {}): Promise<Router> {
 
   const created = createRouter(routerConfig, { defaultRoute: "home" });
 
-  created.usePlugin(hashPluginFactory({}, createCloningBrowser()), () => ({
+  created.usePlugin(hashPluginFactory(), () => ({
     onTransitionStart: (toState) => {
       started.push(toState.name);
     },

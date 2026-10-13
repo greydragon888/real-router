@@ -169,8 +169,8 @@ describe("createUpdateBrowserState", () => {
     update(stateB, "/b", false, browser);
 
     expect(captured[0]).toBe(captured[1]);
-    // The buffer now holds the LAST written projection — callers rely on
-    // browsers structured-cloning synchronously inside pushState.
+    // The buffer now holds the LAST written projection — the plugin's
+    // `withEntryPositions` copies it before the History API sees it (#2741).
     expect(captured[0]).toMatchObject({ name: "b", path: "/b" });
   });
 });

@@ -6,15 +6,14 @@ import { describe, expect } from "vitest";
 import { browserPluginFactory } from "@real-router/browser-plugin";
 
 import { NUM_RUNS, ROUTES } from "./helpers";
-import { createSafeBrowser } from "../../src/browser-env";
 
-import type { Browser } from "../../src/browser-env";
 import type { Router } from "@real-router/core";
 
 /**
  * #2740 class guard: a traversal the router refuses leaves every entry where
  * it was and the browser on the entry the traversal started from — whatever
- * the distance and direction, whichever guard refuses.
+ * the distance and direction, whichever guard refuses. It runs on jsdom's own
+ * history, which keeps the object a write is given (#2741).
  */
 
 const PATHS: Readonly<Record<string, string>> = {
@@ -24,24 +23,6 @@ const PATHS: Readonly<Record<string, string>> = {
   "users.view": "/users/view/1",
 };
 const NAMES = Object.keys(PATHS);
-
-// A browser stores a structured clone of each state; jsdom keeps the object.
-function createCloningBrowser(): Browser {
-  const browser = createSafeBrowser(
-    () => globalThis.location.pathname + globalThis.location.search,
-    "browser-plugin",
-  );
-
-  return {
-    ...browser,
-    pushState: (state, url) => {
-      browser.pushState(structuredClone(state), url);
-    },
-    replaceState: (state, url) => {
-      browser.replaceState(structuredClone(state), url);
-    },
-  };
-}
 
 const settle = async (): Promise<void> => {
   for (let i = 0; i < 8; i++) {
@@ -93,7 +74,7 @@ async function start(
 
   const router = createRouter(ROUTES, { defaultRoute: "home" });
 
-  router.usePlugin(browserPluginFactory({}, createCloningBrowser()));
+  router.usePlugin(browserPluginFactory());
   await router.start();
 
   for (const name of journey) {
