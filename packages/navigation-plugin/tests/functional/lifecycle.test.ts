@@ -442,8 +442,8 @@ describe("Navigation Plugin — Lifecycle", () => {
       mockNav.navigate("http://localhost/home");
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      // Guard blocks navigation — router state stays at users.list
-      // (In real Navigation API, URL also auto-rolls back via event.intercept() rejection)
+      // Guard blocks navigation — router state stays at users.list, and
+      // `syncUrlToRouterState` writes its URL into the current entry (#2740)
       expect(router.getState()!.name).toBe("users.list");
       expect(mockNav.currentUrl).toBe("http://localhost/users/list");
     });

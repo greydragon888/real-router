@@ -51,10 +51,12 @@ describe("Navigation Plugin — Navigate", () => {
       expect(router.getState()?.name).toBe("users.list");
     });
 
-    it("handles navigate to unknown URL with allowNotFound", async () => {
+    // A same-document navigation reaches the not-found arm; one that would load
+    // a new document is the browser's (#2724).
+    it("handles a same-document navigation to an unknown URL with allowNotFound", async () => {
       const navigateToNotFoundSpy = vi.spyOn(router, "navigateToNotFound");
 
-      const { finished } = mockNav.navigate(
+      const { finished } = mockNav.historyPushState(
         "http://localhost/nonexistent-path",
       );
 
@@ -75,7 +77,7 @@ describe("Navigation Plugin — Navigate", () => {
 
       getLifecycleApi(router).addDeactivateGuard("index", () => guard);
 
-      const { finished } = mockNav.navigate(
+      const { finished } = mockNav.historyPushState(
         "http://localhost/nonexistent-path",
       );
 
@@ -92,7 +94,7 @@ describe("Navigation Plugin — Navigate", () => {
 
       getLifecycleApi(router).addDeactivateGuard("index", () => guard);
 
-      const { finished } = mockNav.navigate(
+      const { finished } = mockNav.historyPushState(
         "http://localhost/nonexistent-path",
       );
 
@@ -102,7 +104,7 @@ describe("Navigation Plugin — Navigate", () => {
       expect(router.getState()?.name).toBe(UNKNOWN_ROUTE);
     });
 
-    it("emits $$error and rejects intercept on unknown URL when allowNotFound is false (#483)", async () => {
+    it("emits $$error and rejects intercept on a same-document navigation to an unknown URL when allowNotFound is false (#483)", async () => {
       router.stop();
       unsubscribe?.();
       unsubscribe = undefined;
@@ -125,7 +127,7 @@ describe("Navigation Plugin — Navigate", () => {
         "navigateToDefault",
       );
 
-      const { finished } = mockNav.navigate(
+      const { finished } = mockNav.historyPushState(
         "http://localhost/nonexistent-path",
       );
 
@@ -155,8 +157,8 @@ describe("Navigation Plugin — Navigate", () => {
       expect(Object.isFrozen(errorHook.mock.calls[0][2])).toBe(true);
       expect(Object.isFrozen(finishedRejection)).toBe(true);
 
-      // Router state unchanged — Navigation API auto-rolls back the URL
-      // via intercept rejection
+      // Router state unchanged. The URL is not asserted: the rejected
+      // intercept leaves it where the navigation put it (#2740).
       expect(restrictedRouter.getState()).toStrictEqual(previousState);
 
       restrictedRouter.stop();
@@ -165,8 +167,9 @@ describe("Navigation Plugin — Navigate", () => {
     it("skips events with canIntercept: false", async () => {
       expect(router.getState()!.name).toBe("index");
 
-      // Cross-origin navigate → canIntercept: false
-      mockNav.navigate("https://other-origin.com/path");
+      // Cross-origin navigate → canIntercept: false. The path has a route, so
+      // only the `canIntercept` check stands between it and the router.
+      mockNav.navigate("https://other-origin.com/users/list");
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(router.getState()!.name).toBe("index");
@@ -276,13 +279,13 @@ describe("Navigation Plugin — Navigate", () => {
     });
 
     it("router.start() does not trigger cross-document reload", () => {
-      expect(mockNav.crossDocumentReloadCount).toBe(0);
+      expect(mockNav.crossDocumentNavigations).toStrictEqual([]);
     });
 
     it("router.navigate() does not trigger cross-document reload", async () => {
       await router.navigate("users.list");
 
-      expect(mockNav.crossDocumentReloadCount).toBe(0);
+      expect(mockNav.crossDocumentNavigations).toStrictEqual([]);
       expect(router.getState()?.name).toBe("users.list");
     });
 
@@ -291,7 +294,7 @@ describe("Navigation Plugin — Navigate", () => {
       await router.navigate("home");
       await router.navigate("users.view", { id: "42" });
 
-      expect(mockNav.crossDocumentReloadCount).toBe(0);
+      expect(mockNav.crossDocumentNavigations).toStrictEqual([]);
       expect(router.getState()?.name).toBe("users.view");
       expect(router.getState()?.params).toStrictEqual({ id: "42" });
       expect(mockNav.currentUrl).toBe("http://localhost/users/view/42");
@@ -302,7 +305,7 @@ describe("Navigation Plugin — Navigate", () => {
 
       await finished;
 
-      expect(mockNav.crossDocumentReloadCount).toBe(0);
+      expect(mockNav.crossDocumentNavigations).toStrictEqual([]);
       expect(router.getState()?.name).toBe("users.list");
       expect(mockNav.currentUrl).toBe("http://localhost/users/list");
     });
@@ -311,8 +314,8 @@ describe("Navigation Plugin — Navigate", () => {
   describe("canDeactivate guard contract — #524", () => {
     // Regression for #524: canDeactivate guards must run on browser
     // back/forward by default (`forceDeactivate` flipped from true → false),
-    // and a blocked guard must reject the intercept() handler so the
-    // Navigation API rolls back the URL.
+    // and a blocked guard must leave the router where it was; the URL comes
+    // back through `syncUrlToRouterState` (#2740).
 
     it("forceDeactivate default is false (respect guards)", async () => {
       // Indirect contract check: with default options, a blocking guard must
@@ -486,7 +489,7 @@ describe("Navigation Plugin — Navigate", () => {
     it("uses updateCurrentEntry for navigateToNotFound (not navigate)", async () => {
       const updateSpy = vi.spyOn(browser, "updateCurrentEntry");
 
-      mockNav.navigate("http://localhost/nonexistent-path");
+      mockNav.historyPushState("http://localhost/nonexistent-path");
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(router.getState()?.name).toBe(UNKNOWN_ROUTE);
@@ -501,8 +504,11 @@ describe("createNavigateHandler — direct", () => {
   const makeEvent = (overrides: Partial<NavigateEvent> = {}): NavigateEvent =>
     ({
       canIntercept: true,
+      // Same-document, so an unmatched URL still reaches the handler's
+      // intercept branches and only the early returns under test can stop it.
       destination: {
         url: "http://localhost/users",
+        sameDocument: true,
       } as NavigateEvent["destination"],
       intercept: vi.fn(),
       signal: new AbortController().signal,
@@ -829,7 +835,7 @@ describe("Error Recovery", () => {
     browserNavigateSpy.mockRestore();
   });
 
-  it("strict-mode throws ROUTE_NOT_FOUND silently (no critical recovery) — Navigation API auto-rolls back URL (#483)", async () => {
+  it("strict-mode throws ROUTE_NOT_FOUND silently (no critical recovery) (#483)", async () => {
     router.stop();
 
     const restrictedRouter = createRouter(routerConfig, {
@@ -843,9 +849,11 @@ describe("Error Recovery", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const browserNavigateSpy = vi.spyOn(browser, "navigate");
 
-    const { finished } = mockNav.navigate("http://localhost/nonexistent");
+    const { finished } = mockNav.historyPushState(
+      "http://localhost/nonexistent",
+    );
 
-    await finished.catch(() => undefined);
+    await expect(finished).rejects.toMatchObject({ code: "ROUTE_NOT_FOUND" });
 
     // RouterError does not trigger the critical-recovery console.error path
     expect(consoleSpy).not.toHaveBeenCalledWith(
@@ -853,8 +861,7 @@ describe("Error Recovery", () => {
       expect.anything(),
     );
 
-    // Plugin does not call browser.navigate for recovery — Navigation API
-    // rolls back URL automatically on intercept rejection
+    // No recovery write: the URL stays where the navigation put it (#2740).
     expect(browserNavigateSpy).not.toHaveBeenCalled();
 
     consoleSpy.mockRestore();

@@ -286,6 +286,19 @@ lifecycle.addDeactivateGuard(
 );
 ```
 
+Guards run for the navigations the router takes. One the browser keeps (see [Links, Forms and Downloads](#links-forms-and-downloads)) leaves the page without them — protect unsaved work there with `beforeunload`.
+
+## Links, Forms and Downloads
+
+A same-origin link, `location.assign()` or GET form to a URL that a route matches becomes a router transition — a plain `<a href>` to it is a single-page navigation. The browser keeps the navigations a router cannot perform, as it does under `browser-plugin`:
+
+- a link, `location.assign()` or GET form to a URL **no route matches** loads that page from the server;
+- a **POST** form submission goes to the server, whatever the URL;
+- an `<a download>` downloads, whatever the URL;
+- `location.reload()` reloads the document.
+
+To keep URLs no route matches inside the application, declare a catch-all route such as `/*rest`.
+
 ## SSR Support
 
 The plugin is SSR-safe. In a non-browser environment it falls back to no-ops via `createNavigationFallbackBrowser`:
