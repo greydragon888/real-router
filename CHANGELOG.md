@@ -7,6 +7,115 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-10-13]
 
+### @real-router/browser-plugin@0.26.0
+
+### Minor Changes
+
+- [#2745](https://github.com/greydragon888/real-router/pull/2745) [`5f3acac`](https://github.com/greydragon888/real-router/commit/5f3acac2de96d2acc066260457c16b46852fba5b) Thanks [@greydragon888](https://github.com/greydragon888)! - A Back or Forward the router refuses takes the browser back to the entry it started from, instead of rewriting the entry it reached ([#2740](https://github.com/greydragon888/real-router/issues/2740))
+
+  **Breaking Change:** `popstate` fires after the browser has moved. When the router refused the traversal — a `canDeactivate` or `canActivate` guard, `ROUTE_NOT_FOUND` under `allowNotFound: false`, a crash inside the transition — the plugin wrote the router's state into the entry the browser had moved to. A refused Back from `[/home, /users/42]` left `[/users/42, /users/42]`: the page left behind was gone, replaced by a copy of the current page.
+
+  The plugin now calls `history.go()` with the distance back to the entry the traversal started from. Every entry stays where it was, and the return starts no transition. A second Back pressed while a guard decides is dropped with the first. A navigation the router commits between the refusal and the recovery — a redirect a `TRANSITION_ERROR` listener queues — owns the URL, and nothing is written. A traversal that lands anywhere but the entry the return was sent to is taken as a traversal of its own.
+
+  The History API names no entry, so the plugin numbers the entries it writes: every `history.state` it writes carries `position: { run, index }` beside `name`, `params`, `search` and `path`. Where the distance cannot be measured, the plugin rewrites the entry the browser stands on, as before — an entry the browser or other code wrote breaks the numbering, and a custom `Browser` without `go` or `getState`, or whose `go` throws, cannot travel. `SAME_STATES` and `TRANSITION_CANCELLED` refuse nothing, and keep that rewrite. A Back or Forward the router takes onto an entry without a `position` writes the entry even when nothing else about it changed, so that it gets one.
+
+  A page the router keeps refusing to enter — an authenticated one after logout — stays in history and turns Back away each time.
+
+  The `Browser` type gains an optional `go(delta)`, which the built-in browser implements.
+
+  **Migration:** code that writes `history.state` on an entry the plugin wrote should keep the `position` member it finds there. A custom `Browser` gets the return by implementing `go` and `getState`.
+
+### @real-router/hash-plugin@0.16.0
+
+### Minor Changes
+
+- [#2745](https://github.com/greydragon888/real-router/pull/2745) [`5f3acac`](https://github.com/greydragon888/real-router/commit/5f3acac2de96d2acc066260457c16b46852fba5b) Thanks [@greydragon888](https://github.com/greydragon888)! - A Back or Forward the router refuses takes the browser back to the entry it started from, instead of rewriting the entry it reached ([#2740](https://github.com/greydragon888/real-router/issues/2740))
+
+  **Breaking Change:** `popstate` fires after the browser has moved. When the router refused the traversal — a `canDeactivate` or `canActivate` guard, `ROUTE_NOT_FOUND` under `allowNotFound: false`, a crash inside the transition — the plugin wrote the router's state into the entry the browser had moved to. A refused Back from `[#/home, #/users/42]` left `[#/users/42, #/users/42]`: the page left behind was gone, replaced by a copy of the current page.
+
+  The plugin now calls `history.go()` with the distance back to the entry the traversal started from. Every entry stays where it was, and the return starts no transition. A second Back pressed while a guard decides is dropped with the first. A navigation the router commits between the refusal and the recovery — a redirect a `TRANSITION_ERROR` listener queues — owns the URL, and nothing is written. A traversal that lands anywhere but the entry the return was sent to is taken as a traversal of its own.
+
+  The History API names no entry, so the plugin numbers the entries it writes: every `history.state` it writes carries `position: { run, index }` beside `name`, `params`, `search` and `path`. Where the distance cannot be measured, the plugin rewrites the entry the browser stands on, as before — an entry the browser or other code wrote breaks the numbering, and a custom `Browser` without `go` or `getState`, or whose `go` throws, cannot travel. An entry a fragment navigation creates — a native `<a href="#/x">`, an address-bar edit, `location.hash =` — is numbered on its own: refusing that navigation, or a Back or Forward between two such entries, still rewrites, so in an app that navigates by plain anchors no refusal returns. `SAME_STATES` and `TRANSITION_CANCELLED` refuse nothing, and keep that rewrite. A Back or Forward the router takes onto an entry without a `position` writes the entry even when nothing else about it changed, so that it gets one.
+
+  A page the router keeps refusing to enter — an authenticated one after logout — stays in history and turns Back away each time.
+
+  The `Browser` type gains an optional `go(delta)`, which the built-in browser implements.
+
+  **Migration:** code that writes `history.state` on an entry the plugin wrote should keep the `position` member it finds there. A custom `Browser` gets the return by implementing `go` and `getState`.
+
+### @real-router/navigation-plugin@0.14.0
+
+### Minor Changes
+
+- [#2745](https://github.com/greydragon888/real-router/pull/2745) [`5f3acac`](https://github.com/greydragon888/real-router/commit/5f3acac2de96d2acc066260457c16b46852fba5b) Thanks [@greydragon888](https://github.com/greydragon888)! - A navigation the router refuses takes the browser back to the entry the router stands on, instead of rewriting the entry it reached ([#2740](https://github.com/greydragon888/real-router/issues/2740))
+
+  **Breaking Change:** the Navigation API commits an intercepted navigation before the handler runs and does not undo it when the handler rejects. When the router refused — a `canDeactivate` or `canActivate` guard, any other `RouterError`, a crash inside the transition — the plugin wrote the router's URL into the entry the browser stood on, which is the destination. A refused Back from `[/home, /users/42]` left `[/users/42, /users/42]`: the page left behind was gone, replaced by a copy of the current page. A refused link to a route left a copy of the current page ahead of it, so Back from there repeated the page.
+
+  The plugin now calls `traverseTo()` with the key of the entry the router stands on — the one the navigation started from, or, for a navigation that cancels another the router was still taking, that one's origin:
+
+  - the return moves no entry — the page a refused Back or Forward left behind is still one step away;
+  - a refused push (a link, `location.assign()` or `navigation.navigate()` to a route) leaves its own entry one step ahead of the page, until the next push from there replaces it; until then `canGoForward()` is `true`, `peekForward()` returns the refused route, and the visit counts include it;
+  - a refused `replace` keeps its entry, and the plugin rewrites it as before; so does a recovery whose `traverseTo` throws;
+  - a navigation the router commits between the refusal and the recovery — a redirect a `TRANSITION_ERROR` listener queues — owns the URL, and nothing is written;
+  - the return is the plugin's own traversal and starts no transition.
+
+  A navigation to a URL no route matches recovers the same way. Under `allowNotFound: true`, a `navigateToNotFound()` the current route's `canDeactivate` refuses takes the browser back; under `allowNotFound: false`, `ROUTE_NOT_FOUND` does. Both left the URL where the navigation put it while the router stayed. A download that cancels a navigation the router is still taking returns too, and does nothing once the router has stopped or committed another navigation.
+
+  After a return the intercept rejects with the refusal, so `finished` of a refused navigation rejects with the router's error (`CANNOT_DEACTIVATE`, …) where it rejected with `AbortError`, and `navigateerror` carries it. A refused `replace` still rejects with `AbortError`. A handler that resolved would have the browser restore the scroll position of the entry it reached onto the page the router stayed on (measured on Chromium 153).
+
+  A page the router keeps refusing to enter — an authenticated one after logout — stays in history and turns Back away each time.
+
+  **Migration:** observe a refusal through `onTransitionError` or the router's `TRANSITION_ERROR` event. Code that matched `AbortError` on `finished` of a refused navigation sees the router's error instead.
+
+### @real-router/angular@0.24.3
+
+### Patch Changes
+
+- [#2745](https://github.com/greydragon888/real-router/pull/2745) [`5f3acac`](https://github.com/greydragon888/real-router/commit/5f3acac2de96d2acc066260457c16b46852fba5b) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` keeps the navigation after a refused Back or Forward labelled `forward` ([#2740](https://github.com/greydragon888/real-router/issues/2740))
+
+  The URL plugins take the browser back to the entry a refused Back or Forward started from, and that return fires a `popstate` that no transition follows. The tracker armed its flag on it and published `<html data-nav-direction="back">` on the next forward navigation. A `popstate` that lands on the URL of the router's current state — built with the URL plugin's `buildUrl` — no longer arms it. Without a URL plugin, or when `buildUrl` throws, every `popstate` arms it, as before.
+
+### @real-router/preact@0.24.1
+
+### Patch Changes
+
+- [#2745](https://github.com/greydragon888/real-router/pull/2745) [`5f3acac`](https://github.com/greydragon888/real-router/commit/5f3acac2de96d2acc066260457c16b46852fba5b) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` keeps the navigation after a refused Back or Forward labelled `forward` ([#2740](https://github.com/greydragon888/real-router/issues/2740))
+
+  The URL plugins take the browser back to the entry a refused Back or Forward started from, and that return fires a `popstate` that no transition follows. The tracker armed its flag on it and published `<html data-nav-direction="back">` on the next forward navigation. A `popstate` that lands on the URL of the router's current state — built with the URL plugin's `buildUrl` — no longer arms it. Without a URL plugin, or when `buildUrl` throws, every `popstate` arms it, as before.
+
+### @real-router/react@0.37.1
+
+### Patch Changes
+
+- [#2745](https://github.com/greydragon888/real-router/pull/2745) [`5f3acac`](https://github.com/greydragon888/real-router/commit/5f3acac2de96d2acc066260457c16b46852fba5b) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` keeps the navigation after a refused Back or Forward labelled `forward` ([#2740](https://github.com/greydragon888/real-router/issues/2740))
+
+  The URL plugins take the browser back to the entry a refused Back or Forward started from, and that return fires a `popstate` that no transition follows. The tracker armed its flag on it and published `<html data-nav-direction="back">` on the next forward navigation. A `popstate` that lands on the URL of the router's current state — built with the URL plugin's `buildUrl` — no longer arms it. Without a URL plugin, or when `buildUrl` throws, every `popstate` arms it, as before.
+
+### @real-router/solid@0.26.2
+
+### Patch Changes
+
+- [#2745](https://github.com/greydragon888/real-router/pull/2745) [`5f3acac`](https://github.com/greydragon888/real-router/commit/5f3acac2de96d2acc066260457c16b46852fba5b) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` keeps the navigation after a refused Back or Forward labelled `forward` ([#2740](https://github.com/greydragon888/real-router/issues/2740))
+
+  The URL plugins take the browser back to the entry a refused Back or Forward started from, and that return fires a `popstate` that no transition follows. The tracker armed its flag on it and published `<html data-nav-direction="back">` on the next forward navigation. A `popstate` that lands on the URL of the router's current state — built with the URL plugin's `buildUrl` — no longer arms it. Without a URL plugin, or when `buildUrl` throws, every `popstate` arms it, as before.
+
+### @real-router/svelte@0.24.1
+
+### Patch Changes
+
+- [#2745](https://github.com/greydragon888/real-router/pull/2745) [`5f3acac`](https://github.com/greydragon888/real-router/commit/5f3acac2de96d2acc066260457c16b46852fba5b) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` keeps the navigation after a refused Back or Forward labelled `forward` ([#2740](https://github.com/greydragon888/real-router/issues/2740))
+
+  The URL plugins take the browser back to the entry a refused Back or Forward started from, and that return fires a `popstate` that no transition follows. The tracker armed its flag on it and published `<html data-nav-direction="back">` on the next forward navigation. A `popstate` that lands on the URL of the router's current state — built with the URL plugin's `buildUrl` — no longer arms it. Without a URL plugin, or when `buildUrl` throws, every `popstate` arms it, as before.
+
+### @real-router/vue@0.25.1
+
+### Patch Changes
+
+- [#2745](https://github.com/greydragon888/real-router/pull/2745) [`5f3acac`](https://github.com/greydragon888/real-router/commit/5f3acac2de96d2acc066260457c16b46852fba5b) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` keeps the navigation after a refused Back or Forward labelled `forward` ([#2740](https://github.com/greydragon888/real-router/issues/2740))
+
+  The URL plugins take the browser back to the entry a refused Back or Forward started from, and that return fires a `popstate` that no transition follows. The tracker armed its flag on it and published `<html data-nav-direction="back">` on the next forward navigation. A `popstate` that lands on the URL of the router's current state — built with the URL plugin's `buildUrl` — no longer arms it. Without a URL plugin, or when `buildUrl` throws, every `popstate` arms it, as before.
+
+
 ### @real-router/navigation-plugin@0.13.0
 
 ### Minor Changes
