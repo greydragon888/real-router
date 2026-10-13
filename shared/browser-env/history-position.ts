@@ -139,8 +139,10 @@ export function createEntryPositions(): EntryPositions {
 
 /**
  * The plugin's `Browser`, with every state it writes stamped with the position
- * `positions` gives that write. The stamp goes onto the state object the
- * writer passes — always one the plugin owns.
+ * `positions` gives that write. The stamp goes onto a copy of the writer's
+ * state, so the History API receives an object no writer keeps: an entry holds
+ * the state it was written with even where the host stores state by reference,
+ * as jsdom does (#2741). That is what lets the writers reuse their buffers.
  *
  * Each write first takes the position of the entry the browser stands on: a
  * replace keeps that entry's place and a push follows it. The browser may
@@ -181,7 +183,7 @@ export function withEntryPositions(
 
 function stamp(state: unknown, position: EntryPosition): unknown {
   if (state !== null && typeof state === "object") {
-    (state as { position?: EntryPosition }).position = position;
+    return { ...state, position };
   }
 
   return state;

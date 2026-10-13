@@ -74,8 +74,8 @@ describe("B7.2 — replaceHistoryState vs navigate race", () => {
       await waitForTransitions(20);
 
       // After the dust settles, replaceHistoryState/onTransitionSuccess
-      // both wrote to the buffered `history.state`. The buffer is mutable
-      // (B5/A2 — `createUpdateBrowserState`), so the last write wins.
+      // both wrote the current entry's `history.state`, so the last write
+      // wins.
       // Touch `browser.getLocation()` to ensure the cached browser is alive.
       browser.getLocation();
       const finalHistoryState = globalThis.history.state;

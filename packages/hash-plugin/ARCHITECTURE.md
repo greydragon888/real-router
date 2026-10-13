@@ -388,7 +388,7 @@ returnOrRollback(start)
   └── otherwise: rollbackUrlToCurrentState() — the live entry is rewritten
 ```
 
-The positions come from `withEntryPositions`: every state the plugin writes carries `position: { run, index }` — a replace keeps the place of the entry it rewrites, a push follows it, and each write reads that place off the live entry first. A run starts on an entry that carries no position — the one a document loads with, one the browser or other code wrote — so only two entries of one run are `index` apart. A plugin started on an entry that carries one, as after a reload, continues its run.
+The positions come from `withEntryPositions`: every state the plugin writes carries `position: { run, index }` — a replace keeps the place of the entry it rewrites, a push follows it, and each write reads that place off the live entry first. The position goes onto a copy of the writer's state, so the History API receives an object no writer keeps, and an entry holds the state it was written with even where the host stores state by reference, as jsdom does. A run starts on an entry that carries no position — the one a document loads with, one the browser or other code wrote — so only two entries of one run are `index` apart. A plugin started on an entry that carries one, as after a reload, continues its run.
 
 ### Deferred popstate Handling
 

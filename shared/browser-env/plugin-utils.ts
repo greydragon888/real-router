@@ -146,9 +146,10 @@ export function createReplaceHistoryState(
   search?: SearchParams,
   options?: ReplaceHistoryStateOptions,
 ) => void {
-  // Reusable buffer — browsers structured-clone state synchronously inside
-  // replaceState, so the buffer never escapes. Eliminates one allocation per
-  // navigation on the hot path. (Mirrors createUpdateBrowserState.)
+  // Reusable buffer. No entry holds it: browser-plugin and hash-plugin write
+  // through `withEntryPositions`, which hands the History API a copy, and the
+  // Navigation API stores a structured clone of the state navigation-plugin
+  // passes (#2741). (Mirrors createUpdateBrowserState.)
   const buffer = {
     name: "",
     params: {} as Params,

@@ -80,7 +80,9 @@ export class MockNavigationEntry implements NavigationHistoryEntry {
     this.id = generateId();
     this.sameDocument = true;
     this._index = options.index;
-    this._state = options.state;
+    // A browser stores a structured clone of the state on write, and returns
+    // a fresh one on every read (#2741).
+    this._state = structuredClone(options.state);
   }
 
   get index(): number {
@@ -92,7 +94,7 @@ export class MockNavigationEntry implements NavigationHistoryEntry {
   }
 
   _setState(state: unknown): void {
-    this._state = state;
+    this._state = structuredClone(state);
   }
 
   _setIndex(index: number): void {

@@ -139,10 +139,9 @@ export function updateBrowserState(
  * across calls instead of allocating a fresh `{ name, params, path }` object
  * per push/replace.
  *
- * Why: Browsers structured-clone `history.state` synchronously inside
- * `pushState`/`replaceState`, so the caller never sees the buffer escape —
- * it can be safely overwritten before the next call. Eliminates one
- * allocation per navigation on the hot path.
+ * Why: the plugin writes through `withEntryPositions`, which hands the History
+ * API a copy, so no entry holds the buffer and it can be overwritten before
+ * the next call (#2741). That copy is the one allocation per write.
  *
  * Each plugin instance must own its own buffer (do not share across plugins).
  */
