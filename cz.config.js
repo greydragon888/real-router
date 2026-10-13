@@ -23,16 +23,6 @@ export default {
     name: `${value}:`.padEnd(12) + TYPE_DESCRIPTIONS[value],
   })),
   scopes: SCOPES,
-  scopeOverrides: {
-    fix: [
-      "core",
-      "browser-plugin",
-      "logger-plugin",
-      "persistent-params-plugin",
-      "react",
-      "benchmarks",
-    ].map((name) => ({ name })),
-  },
   allowEmptyScopes: true,
   // Must stay false: commitlint.config.mjs enforces `scope-enum` (error on any
   // scope outside SCOPES), so a custom scope typed in `pnpm commit` would then

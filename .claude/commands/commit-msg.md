@@ -27,7 +27,7 @@
 - test: только тесты
 - perf: оптимизация производительности
 
-Scopes — только из `SCOPES` в `commitlint.config.mjs`: `scope-enum` отвергает любой другой, а `pnpm commit` (`cz.config.js`) предлагает тот же список, кроме `fix`: для него — свой `scopeOverrides.fix`.
+Scopes — только из `SCOPES` в `commitlint.config.mjs`: `scope-enum` отвергает любой другой, а `pnpm commit` (`cz.config.js`) предлагает тот же список.
 
 Правила:
 
