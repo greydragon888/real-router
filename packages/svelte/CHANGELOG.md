@@ -1,5 +1,13 @@
 # @real-router/svelte
 
+## 0.24.1
+
+### Patch Changes
+
+- [#2745](https://github.com/greydragon888/real-router/pull/2745) [`5f3acac`](https://github.com/greydragon888/real-router/commit/5f3acac2de96d2acc066260457c16b46852fba5b) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` keeps the navigation after a refused Back or Forward labelled `forward` ([#2740](https://github.com/greydragon888/real-router/issues/2740))
+
+  The URL plugins take the browser back to the entry a refused Back or Forward started from, and that return fires a `popstate` that no transition follows. The tracker armed its flag on it and published `<html data-nav-direction="back">` on the next forward navigation. A `popstate` that lands on the URL of the router's current state — built with the URL plugin's `buildUrl` — no longer arms it. Without a URL plugin, or when `buildUrl` throws, every `popstate` arms it, as before.
+
 ## 0.24.0
 
 ### Minor Changes
