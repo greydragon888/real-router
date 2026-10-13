@@ -1,7 +1,7 @@
 import { errorCodes, RouterError } from "@real-router/core";
 import { freezeThrownError } from "@real-router/core/utils";
 
-import { urlToPathAndHash } from "./browser-env";
+import { buildUrl, encodeHashFragment, urlToPathAndHash } from "./browser-env";
 import { PLUGIN_SYNC_INFO } from "./navigation-browser";
 
 import type {
@@ -122,7 +122,7 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
         taken = undefined;
         setTimeout(() => {
           if (taken === undefined) {
-            returnToOrigin(router, browser, aborted);
+            returnToOrigin(router, browser, aborted, base);
           }
         }, 0);
       }
@@ -173,6 +173,20 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
     });
 
     if (matchedState) {
+      // A fragment the router has not published needs a transition on the
+      // route it shows: the browser's fragment-only navigation, and a URL the
+      // router rewrites — an alias of that route — with another fragment
+      // (#2744). A fragment that changes on the router's own path and query,
+      // as a third party's `history.replaceState(null, "", "#x")` changes
+      // it, starts no transition.
+      const hashChange =
+        event.hashChange ||
+        (state?.path === matchedState.path &&
+          path !== state.path &&
+          hash !==
+            ((state.context as { url?: { hash?: string } } | undefined)?.url
+              ?.hash ?? ""));
+
       event.intercept({
         handler: async () => {
           const arrived = await withRecovery(
@@ -183,20 +197,20 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
               // entry point — not on the public Router/Navigator surface.
               //
               // Hash extraction (#532): pass through the destination's hash so
-              // onTransitionSuccess sets state.context.url.hash. When the
-              // browser fires hashChange (same-document fragment-only nav),
-              // add force+hashChange to bypass SAME_STATES — subscribers
-              // disambiguate via state.context.url.hashChanged, not via the
-              // overloaded force flag.
+              // onTransitionSuccess sets state.context.url.hash. A fragment
+              // change adds force+hashChange to bypass SAME_STATES —
+              // subscribers disambiguate via state.context.url.hashChanged,
+              // not via the overloaded force flag.
               api.navigateToState(matchedState, {
                 ...transitionOptions,
                 hash,
-                ...(event.hashChange && { force: true, hashChange: true }),
+                ...(hashChange && { force: true, hashChange: true }),
                 signal: event.signal,
               }),
             router,
             browser,
             record,
+            base,
           );
 
           if (arrived) {
@@ -211,7 +225,7 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
             router.navigateToNotFound(path);
           } catch (error) {
             // The router refused to leave the current route (#2740).
-            returnToOrigin(router, browser, record);
+            returnToOrigin(router, browser, record, base);
 
             throw error;
           }
@@ -229,7 +243,7 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
           );
 
           api.emitTransitionError(err);
-          returnToOrigin(router, browser, record);
+          returnToOrigin(router, browser, record, base);
 
           throw err;
         },
@@ -240,9 +254,9 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
 
 /**
  * Module-scope helper hoisted out of handleNavigateEvent so the closure is
- * not re-allocated on every navigate event. The router/browser refs come from
- * arguments instead of an enclosing scope; identical behaviour, fewer GC'd
- * closures.
+ * not re-allocated on every navigate event. The router, browser and base come
+ * from arguments instead of an enclosing scope; identical behaviour, fewer
+ * GC'd closures.
  */
 /**
  * Runs the router's transition for a navigation the handler took, and
@@ -254,6 +268,7 @@ async function withRecovery(
   router: Router,
   browser: NavigationBrowser,
   taken: Taken,
+  base: string,
 ): Promise<boolean> {
   try {
     await run();
@@ -261,7 +276,7 @@ async function withRecovery(
     return true;
   } catch (error) {
     if (!(error instanceof RouterError)) {
-      recoverFromNavigateError(error, router, browser, taken);
+      recoverFromNavigateError(error, router, browser, taken, base);
 
       throw error;
     }
@@ -273,13 +288,26 @@ async function withRecovery(
     // in-flight newer transition, which is exactly the rapid-fire-events storm
     // failure mode.
     //
-    // SAME_STATES: router refused because router.getState() already equals the
-    // target. URL and router state are already consistent — no sync needed.
+    // SAME_STATES: the router already shows the target state, but the entry
+    // the browser committed can carry an alias of it — a `forwardTo` source,
+    // a trailing slash the router strips. The entry gets the router's URL, as
+    // the History API plugins resync it (#2744); a URL that differs only in
+    // its fragment keeps it. A navigation a newer one has aborted writes
+    // nothing and keeps the newer one's record, for the reason above: the
+    // newer one owns the URL.
     if (error.code === errorCodes.TRANSITION_CANCELLED) {
       return false;
     }
 
     if (error.code === errorCodes.SAME_STATES) {
+      if (taken.signal.aborted) {
+        return false;
+      }
+
+      if (standsOnAlias(router, browser, base)) {
+        syncUrlToRouterState(router, browser, base);
+      }
+
       return true;
     }
 
@@ -288,7 +316,7 @@ async function withRecovery(
     // unchanged, but the Navigation API has already committed the navigation,
     // and it does not roll an intercepted navigation back when the handler
     // rejects.
-    returnToOrigin(router, browser, taken);
+    returnToOrigin(router, browser, taken, base);
 
     // The intercept rejects with the refusal: a navigation that finishes
     // has the browser apply its scroll to the page the router stayed on.
@@ -301,13 +329,14 @@ function recoverFromNavigateError(
   router: Router,
   browser: NavigationBrowser,
   taken: Taken,
+  base: string,
 ): void {
   console.error(
     "[navigation-plugin] Critical error in navigate handler",
     error,
   );
 
-  returnToOrigin(router, browser, taken);
+  returnToOrigin(router, browser, taken, base);
 }
 
 /**
@@ -327,6 +356,7 @@ function returnToOrigin(
   router: Router,
   browser: NavigationBrowser,
   taken: Taken,
+  base: string,
 ): void {
   if (router.getState() !== taken.state) {
     return;
@@ -347,12 +377,32 @@ function returnToOrigin(
     );
   }
 
-  syncUrlToRouterState(router, browser);
+  syncUrlToRouterState(router, browser, base);
+}
+
+/**
+ * Whether the browser stands on another path or query than the router's state
+ * — an alias of it, such as a `forwardTo` source. A URL that differs only in
+ * its fragment is not one, and neither is an entry whose URL is unknown.
+ */
+function standsOnAlias(
+  router: Router,
+  browser: NavigationBrowser,
+  base: string,
+): boolean {
+  const url = browser.currentEntry?.url;
+
+  return (
+    url !== undefined &&
+    url !== null &&
+    urlToPathAndHash(url, base).path !== router.getState()?.path
+  );
 }
 
 function syncUrlToRouterState(
   router: Router,
   browser: NavigationBrowser,
+  base: string,
 ): void {
   const currentState = router.getState();
 
@@ -361,22 +411,17 @@ function syncUrlToRouterState(
   }
 
   try {
+    // The URL is the state's own path, query included (#1586), as
+    // `onTransitionSuccess` writes it: a rebuild from the route name drops
+    // the trailing slash `trailingSlash: "preserve"` keeps in `state.path`.
     // Preserve hash on recovery (#532): reading from state.context.url
     // keeps the visible URL fragment intact when a guard rejects a hash-
     // bearing navigation.
     const ctxHash = (
       currentState.context as { url?: { hash?: string } } | undefined
     )?.url?.hash;
-    const url = router.buildUrl(
-      currentState.name,
-      currentState.params,
-      // Query channel at position 3 (RFC-4 M2 / #1548), hash opts at 4. The
-      // state's own `search` goes in it (#1586): recovery rebuilds the URL of
-      // the state that SURVIVED the rejection, so dropping its query would
-      // leave the user on a URL the router itself does not hold.
-      currentState.search,
-      ctxHash ? { hash: ctxHash } : undefined,
-    );
+    const path = buildUrl(currentState.path, base);
+    const url = ctxHash ? `${path}#${encodeHashFragment(ctxHash)}` : path;
 
     // browser.navigate inside `createNavigationBrowser` tags `info` with
     // PLUGIN_SYNC_INFO so the navigate event this fires is recognised by

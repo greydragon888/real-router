@@ -907,8 +907,9 @@ describe("Error Recovery", () => {
     router.subscribeLeave(() => {
       throw new TypeError("crash");
     });
-    vi.spyOn(router, "buildUrl").mockImplementation(() => {
-      throw new Error("buildUrl failed");
+    // The recovery's own write fails too.
+    vi.spyOn(browser, "navigate").mockImplementation(() => {
+      throw new Error("navigate failed");
     });
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});

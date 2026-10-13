@@ -273,8 +273,8 @@ describe("Navigation Plugin — Lifecycle", () => {
       // The user-facing semantics of `reload: true` — navigationType reported
       // as "reload" in state.context.navigation — must survive the
       // updateCurrentEntry optimization. Without this, downstream consumers
-      // (scroll restoration, direction tracker, …) cannot distinguish a
-      // genuine reload from a replace.
+      // such as scroll restoration cannot distinguish a genuine reload from
+      // a replace.
       const ctx = router.getState()?.context as
         { navigation?: { navigationType: string } } | undefined;
 
@@ -349,6 +349,31 @@ describe("Navigation Plugin — Lifecycle", () => {
           state: expect.objectContaining({ name: "users.list" }),
           history: "push",
         }),
+      );
+    });
+
+    it("`reload: true` on the same path under another URL replaces the entry", async () => {
+      vi.spyOn(browser, "navigate");
+
+      await router.navigate("index", {}, undefined, {
+        reload: true,
+        hash: "top",
+      });
+
+      expect(browser.navigate).toHaveBeenCalledWith(
+        "/#top",
+        expect.objectContaining({ history: "replace" }),
+      );
+    });
+
+    it("`reload: true` to another path pushes", async () => {
+      vi.spyOn(browser, "navigate");
+
+      await router.navigate("users.list", {}, undefined, { reload: true });
+
+      expect(browser.navigate).toHaveBeenCalledWith(
+        "/users/list",
+        expect.objectContaining({ history: "push" }),
       );
     });
 

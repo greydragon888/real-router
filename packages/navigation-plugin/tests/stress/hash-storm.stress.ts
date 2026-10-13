@@ -102,10 +102,10 @@ describe("N21 — Hash storm", () => {
     // navigate event with `hashChange: false`, so the plugin forwards to
     // `api.navigateToState` WITHOUT `force: true`. Core rejects with
     // SAME_STATES; navigate-handler's `withRecovery` swallows the
-    // RouterError (SAME_STATES branch — URL and router state already
-    // consistent, no sync needed). After 100 such rejections the router
-    // must still be on the original hash, with `state.context.url`
-    // unchanged from the initial transition.
+    // RouterError (SAME_STATES branch — the entry is already at the
+    // router's URL, so its resync writes nothing). After 100 such
+    // rejections the router must still be on the original hash, with
+    // `state.context.url` unchanged from the initial transition.
     const { router, mockNav, unsubscribe } = createStressRouter();
 
     mockNav.reset("http://localhost/home#stuck");
