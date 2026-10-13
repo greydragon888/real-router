@@ -14728,7 +14728,7 @@ It runs in pre-push alone, by the owner's decision. A finding is drift, not a vu
 
 **Problem.** A pnpm workspace of its own touches many places: the copies of the workspace set, the dedupe in four files, its Dependabot entry, its CI job, and the pnpm settings that keep its lockfile one YAML document. No check compares those copies with the workspaces, so most misses show nowhere. A miss in `dependabot-dedupe.yml` shows only after the merge, since `lint:dedupe` is skipped on the Dependabot PR, and a missing `pmOnFail: ignore` writes a lockfile whose second document GitHub's dependency graph does not read. A new package has its own edits, which checks demand one at a time, and `/new-package` listed those of its manifest alone. The commitlint `SCOPES` still offered `helpers`, a package that no longer exists.
 
-**Solution.** `CLAUDE.md` "New Workspace Checklist" names each obligation and each copy of the set, by name and symbol, and the prose by a query rather than a list. The checks of a new workspace's settings and of commit scopes from directories are out of wave 1 by the owner's decision of 2026-10-11, so the checklist names the pnpm settings and `packageManager` itself, and `/new-package` the commitlint scope. `/new-package` also names the edits the checks demand of a new package: its `.size-limit.js` entry, the `shared/` inputs of a consumer's `turbo.json`, and its bucket in `scripts/tests/build-matrix.test.mjs`. `helpers` leaves `SCOPES` in `commitlint.config.mjs`, and `cz.config.js` drops `scopeOverrides.fix`, by the owner's decision of 2026-10-13: it offered a `fix` commit six scopes, five of the 23 packages and `benchmarks`, and `pnpm commit` now offers `fix` the scopes of every other type.
+**Solution.** `CLAUDE.md` "New Workspace Checklist" names each obligation and each copy of the set, by name and symbol, and the prose by a query rather than a list. A check of a new workspace's settings and the derivation of commit scopes from the package directories are out of wave 1 by the owner's decision of 2026-10-11, so the checklist names the pnpm settings and `packageManager` itself, and `/new-package` the commitlint scope. `/new-package` also names the edits the checks demand of a new package: its `.size-limit.js` entry, the `shared/` inputs of a consumer's `turbo.json`, and its bucket in `scripts/tests/build-matrix.test.mjs`. `helpers` leaves `SCOPES` in `commitlint.config.mjs`, and `cz.config.js` drops `scopeOverrides.fix`, by the owner's decision of 2026-10-13: it offered a `fix` commit six scopes, five of the 23 packages and `benchmarks`, and `pnpm commit` now offers `fix` the scopes of every other type.
 
 **Why.** A new workspace is a rare event, and by the rule RFC-3 follows, a fact that changes with a rare event gets a checklist rather than a mechanism. Measured on the tree:
 
@@ -14736,3 +14736,34 @@ It runs in pre-push alone, by the owner's decision. A finding is drift, not a vu
 - `examples` and `cross-router-bench` carry each scalar setting of the root `pnpm-workspace.yaml` with the root's value, except `gitTagVersion` and `cleanupUnusedCatalogs`; the examples add `verifyDepsBeforeRun` of their own. The three `packageManager` fields are equal.
 - `Dependency Review` is a required context of the `master` ruleset.
 - No package or `shared/` directory is named `helpers`.
+
+## Derived configuration (2026-10-13)
+
+**Problem.** Configuration files kept copies of facts the tree holds: the package set in Codecov's components, the packages Sonar must not score in `sonar.coverage.exclusions`, the duplication ignores in `sonar.cpd.exclusions`, and the advisory allowlist of Dependency Review in `codeql.yml`. `scripts/check-coverage-scope.mjs` reconciled two of them with the tree after the fact: check 1 compared Codecov's components with the packages, check 2 Sonar's coverage exclusions, and check 2b both again for `shared/`, beside its own part, the owner that measures each shared dir. A reconciliation finds a drift after someone has made it, and the copy stays a second place to edit.
+
+**Solution.** Wave 1 of RFC-3 derives the copies, each step in an entry of its own:
+
+- one package walk and one writer of generated regions, which `lint:config-sync` holds fresh in the hooks and on every pull request: "The package walk is one module, `scripts/repo-model.mjs`" and "Generated configuration regions have one writer, `scripts/sync-config.mjs`";
+- "Codecov has no components";
+- Sonar's exclusions: "`sonar.cpd.exclusions` is generated from `.jscpd.json`, each entry translated" and "Coverage leaves files out by role, and Sonar's coverage exclusions are generated";
+- "`allow-ghsas` is generated from `scripts/osv-scanner.toml`, which a TOML parser reads";
+- what changes with a rare event gets a checklist instead: "A new workspace's obligations are a checklist in CLAUDE.md". Deriving commit scopes from the package directories, and a check of the workspaces' pnpm settings, `packageManager` and lockfile form, are out of the wave.
+
+Other steps moved copies that no reconciliation held: "Dependabot carries the float-set patches", "The telemetry stamp is one file, which the setup action and post-merge.yml run" and "Prose that restated the configuration, corrected in one pass". Where a copy cannot be derived, the wave added a reconciliation instead: "A `@real-router/*` peer has an entry turbo reads, and a test holds it".
+
+Each reconciliation went, with its test cells, in the step that derived or dropped its copy. The table gives the lines of the reconciliation itself, then all the lines the commit deleted and added in the file:
+
+| Reconciliation                     | Removed in  | Guard lines: own / deleted / added | Test lines: own / deleted / added |
+| ---------------------------------- | ----------- | ---------------------------------- | --------------------------------- |
+| check 1 and the Codecov part of 2b | `9ede09e08` | 35 / 51 / 19                       | 49 / 49 / 1                       |
+| check 2 and the Sonar part of 2b   | `bb48e548e` | 49 / 60 / 10                       | 36 / 60 / 183                     |
+
+The rest of the guard's change is prose around the removal: the header, which keeps the checks' numbers, the descriptions of checks 2b and 4 and of the emit mode, a description of check 2c the header lacked, and the hint and success lines. In the test file `bb48e548e` also replaced the cell "owner configs measure the SHARED barrel and still skip their own" (20 lines) with "every package's coverage options resolve by role, and isPhantom reads its thresholds as vitest does" (about 170 lines with its helpers), whose `isPhantom` half holds what replaced check 2, and added a parser cell (9 lines).
+
+Of the copies, `codecov.yml` lost its component list in `9ede09e08` (90 lines deleted, 4 added) and its `ignore` list in `bb48e548e` (21 deleted, 2 added). The hand-kept `sonar.coverage.exclusions` went in `bb48e548e`: its package entries are a generated region now, and its name patterns gave way to the roles of the coverage configs. `sonar.cpd.exclusions` became a generated region in `488f40a84`, and the `allow-ghsas` input of `codeql.yml` (34 lines deleted, 2 added in `ce773849a`) a generated region of `.github/dependency-review-config.yml`.
+
+**Why — measured.**
+
+- On HEAD, `node scripts/scripts-tests.mjs guards` and `node scripts/scripts-tests.mjs tooling`, the commands pre-push and Repo Lints run through `verify`, exit 0.
+- The deleted and added counts are `git show --numstat` of the commits named. The reconciliations' own lines come from reading the two diffs, segmented by construct.
+- The Definition of Done of RFC-3 is closed but for one item: a green release run after the change of "The telemetry stamp is one file, which the setup action and post-merge.yml run", which waits for the next release. The guards of CI have their own Definition of Done in RFC-4, closed.
