@@ -1,5 +1,6 @@
 import { adoptChannel } from "@real-router/core/utils";
 
+import { readPosition } from "./history-position";
 import { isStateStrict as isState } from "./state-guard";
 
 import type { Browser } from "./types.js";
@@ -187,6 +188,7 @@ export function createUpdateBrowserState(): (
  *   - redirect            → resolved name/params differ from the restored entry
  *   - path normalization  → resolved path differs (e.g. trailing slash)
  *   - corrupted / missing `history.state` → fails `isState`
+ *   - an entry with no position → the write stamps one (#2740)
  *   - custom `Browser` without a state reader → `getState` absent (opt-in)
  *
  * URL equality is not re-checked: the resolved path is compared directly, and
@@ -210,7 +212,11 @@ export function canSkipPopstateHistoryWrite(
 
   const live = browser.getState();
 
-  if (!isState(live) || live.path !== toState.path) {
+  if (
+    !isState(live) ||
+    live.path !== toState.path ||
+    readPosition(live) === undefined
+  ) {
     return false;
   }
 

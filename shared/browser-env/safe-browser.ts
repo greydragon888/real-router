@@ -6,6 +6,7 @@ import {
   addHashChangeListener,
   getHash,
   getState,
+  go,
 } from "./history-api.js";
 import {
   createWarnOnce,
@@ -27,6 +28,7 @@ export function createSafeBrowser(
       getLocation,
       getHash,
       getState,
+      go,
     };
   }
 

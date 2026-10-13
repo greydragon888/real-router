@@ -334,11 +334,17 @@ User clicks back/forward (popstate) OR changes the fragment externally (hashchan
         │
         ├── location = browser.getLocation()   (snapshot at fire time, #757)
         │
+        ├── the return returnOrRollback started, landing on its origin?
+        │     (positions.takeReturn() consumes it either way)
+        │     YES: return — no transition
+        │
         ├── isTransitioning === true?
         │     YES: deferred = { evt, location }  (last-write-wins)
         │          return
         │
         ├── isTransitioning = true
+        │
+        ├── start = { origin: positions.current, state: router.getState() }
         │
         ├── getRouteFromEvent(evt, api, location)
         │     │
@@ -351,18 +357,38 @@ User clicks back/forward (popstate) OR changes the fragment externally (hashchan
         ├── route found?
         │     YES: await router.navigate(route.name, route.params, route.search, transitionOptions)
         │     NO + allowNotFound: router.navigateToNotFound(location)
-        │     NO + !allowNotFound: api.emitTransitionError(ROUTE_NOT_FOUND) + rollbackUrlToCurrentState()
+        │     NO + !allowNotFound: api.emitTransitionError(ROUTE_NOT_FOUND) + returnOrRollback(start)
         │                          (no silent navigateToDefault — see #483)
         │
         ├── catch (error):
-        │     error instanceof RouterError? → rollbackUrlToCurrentState() (URL↔state resync)
-        │     otherwise: recoverFromCriticalError(error)
-        │               └── browser.replaceState(currentState, pathToUrl(currentState.path))
+        │     SAME_STATES / TRANSITION_CANCELLED → rollbackUrlToCurrentState() (nothing refused)
+        │     other RouterError → returnOrRollback(start)
+        │     otherwise: recoverFromCriticalError(error) → returnOrRollback(start)
         │
         └── finally:
               isTransitioning = false
               processDeferredEvent()
 ```
+
+### Return to the entry a refused traversal started from
+
+```
+returnOrRollback(start)
+  │   distance = from the live entry's position to origin's
+  │
+  ├── router.getState() !== start.state?
+  │     YES: return — a navigation committed since owns the URL
+  │
+  ├── browser.go present, one run, distance ≠ 0?
+  │     YES: positions.returnTo(origin); browser.go(distance); deferred = null
+  │          (a popstate landing on origin is the return: no transition;
+  │           one landing elsewhere is a traversal of its own)
+  │          go throws → the branch below
+  │
+  └── otherwise: rollbackUrlToCurrentState() — the live entry is rewritten
+```
+
+The positions come from `withEntryPositions`: every state the plugin writes carries `position: { run, index }` — a replace keeps the place of the entry it rewrites, a push follows it, and each write reads that place off the live entry first. A run starts on an entry that carries no position — the one a document loads with, one the browser or other code wrote — so only two entries of one run are `index` apart. A plugin started on an entry that carries one, as after a reload, continues its run.
 
 ### Deferred popstate Handling
 
@@ -371,7 +397,7 @@ Rapid back/forward clicks generate multiple popstate events in quick succession.
 The `isTransitioning` flag blocks concurrent processing.
 New events are written to the single-slot `deferred = { evt, location }` queue — each one overwrites the previous (last-write-wins).
 The `location` is snapshotted when the event fires, not when it is replayed: the in-flight navigation's `onTransitionSuccess → replaceState` overwrites the live hash location before `processDeferredEvent()` runs, so re-reading it then would resolve the wrong target (#757).
-After the current transition completes, `processDeferredEvent()` processes the last deferred event against its snapshotted location.
+After the current transition completes, `processDeferredEvent()` processes the last deferred event against its snapshotted location — unless the router refused the transition and the plugin travelled back, which drops it.
 
 ### popstate/hashchange dedup (#759)
 
@@ -432,8 +458,8 @@ Popstate event handling (`getRouteFromEvent`, `updateBrowserState`), critical er
 See [`shared/browser-env/`](../../shared/browser-env/) for details on:
 
 - Route extraction from popstate events (history.state validation → URL matching fallback)
-- `historyState` as a subset of `State` (only `name`, `params`, `path` stored in `history.state`)
-- Error categorization (RouterError = expected, anything else = critical recovery via `replaceState`)
+- `historyState` as a subset of `State` (`name`, `params`, `search`, `path` and the entry's `position` stored in `history.state`)
+- Error categorization (a refusal and a crash return to the entry the traversal started from; `SAME_STATES` / `TRANSITION_CANCELLED` resync the live entry)
 
 ## Option Defaults
 

@@ -32,3 +32,7 @@ export const getHash = (): string => globalThis.location.hash;
 
 export const getState: NonNullable<HistoryBrowser["getState"]> = () =>
   globalThis.history.state;
+
+export const go: NonNullable<HistoryBrowser["go"]> = (delta) => {
+  globalThis.history.go(delta);
+};

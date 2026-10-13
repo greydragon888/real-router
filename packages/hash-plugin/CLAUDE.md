@@ -48,11 +48,11 @@ Handled by `createPopstateHandler` in `browser-env` via deferred queue:
 
 ```
 Click back → transition starts
-Click back again → event DEFERRED (not lost)
+Click back again → event DEFERRED
 Transition completes → process deferred event
 ```
 
-Only the **last** deferred event is kept (intermediate states skipped).
+Only the **last** deferred event is kept (intermediate states skipped). A transition the router refuses drops it when the plugin travels back to the entry the refused one started from: it describes a traversal from an entry the browser leaves (#2740).
 
 `createHashSyncLifecycle` empties the queue on `stop()` and `teardown()` via `PopstateHandler.discard` (#1922). Removing the two listeners is not enough — the in-flight transition's `finally` drains the queue unconditionally, so a queued event replayed after the plugin was gone. Shared via `browser-env`, so browser-plugin gets the same discard.
 
@@ -162,7 +162,7 @@ also why the test estate was blind to the `DataCloneError` half for so long.
 
 ### Popstate history-write skip (#1353)
 
-On back/forward the browser has **already** restored the target entry's `{name, params, path}` and URL before firing `popstate`, so `onTransitionSuccess`'s `replaceState` re-writes identical values — a value-level no-op that still fires a **second** `updateForSameDocumentNavigation` Blink event per nav. The write is skipped when `canSkipPopstateHistoryWrite` (browser-env) proves it a no-op: `source === "popstate"` (via the `source` NavigationOptions augmentation), `replace` is true, and the resolved target deep-equals the live `history.state` (`Browser.getState` reader + same `path` + `router.areStatesEqual`). Every **load-bearing** write is kept — redirect/normalization (path or params differ), corrupted/missing `history.state` (fails `isStateStrict`), or a custom `Browser` without `getState`. `url` is only built when the write actually happens. Same guard as browser-plugin — the logic lives in shared `browser-env`.
+On back/forward the browser has **already** restored the target entry's `{name, params, path}` and URL before firing `popstate`, so `onTransitionSuccess`'s `replaceState` re-writes identical values — a value-level no-op that still fires a **second** `updateForSameDocumentNavigation` Blink event per nav. The write is skipped when `canSkipPopstateHistoryWrite` (browser-env) proves it a no-op: `source === "popstate"` (via the `source` NavigationOptions augmentation), `replace` is true, and the resolved target deep-equals the live `history.state` (`Browser.getState` reader + same `path` + `router.areStatesEqual`). Every **load-bearing** write is kept — redirect/normalization (path or params differ), corrupted/missing `history.state` (fails `isStateStrict`), an entry carrying no `position` (the write stamps one, #2740), or a custom `Browser` without `getState`. `url` is only built when the write actually happens. Same guard as browser-plugin — the logic lives in shared `browser-env`.
 
 ### SSR Safety
 
@@ -172,9 +172,11 @@ On back/forward the browser has **already** restored the target entry's `{name, 
 // Returns no-op fallbacks in SSR
 ```
 
-### CANNOT_DEACTIVATE Recovery
+### A refused traversal returns to the entry it started from (#2740)
 
-When guard blocks navigation but browser already changed URL — critical error recovery in browser-env restores the previous URL via `replaceState`.
+The popstate handler is the one browser-plugin uses (`browser-env`), so a refused Back or Forward takes the browser back with `history.go(delta)` to the entry it started from, measured by the `position` each entry the plugin writes carries — browser-plugin's CLAUDE.md describes the mechanism. A popstate and the paired `hashchange` of the return are deduplicated as any traversal's are.
+
+⚠ **An entry the browser makes for a fragment navigation measures no way back.** A native `<a href="#/x">`, an address-bar edit or `location.hash = …` creates the entry before any plugin code runs, and the plugin numbers it on its own when it writes into it. So refusing that navigation, or a Back or Forward between two such entries, rewrites the entry the browser stands on — in an app that navigates by plain anchors, no refusal returns. `tests/functional/refused-traversal-returns-2740.test.ts` pins both.
 
 ## State in History
 
@@ -184,8 +186,12 @@ history.state = {
   params: { id: "123" },
   search: {},
   path: "/users/123",
+  position: { run: "k3x9a1b2.0", index: 2 },
 };
 ```
+
+`position` is the entry's place among the entries the plugin wrote (#2740) — the
+same field browser-plugin writes, described there.
 
 ## Module Structure
 

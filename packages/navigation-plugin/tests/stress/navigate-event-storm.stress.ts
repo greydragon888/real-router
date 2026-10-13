@@ -221,8 +221,9 @@ describe("N1 — Navigate Event Storm", () => {
     // Every navigate event produced a ROUTE_NOT_FOUND error hook invocation
     expect(errorHook).toHaveBeenCalled();
 
-    // Router state pinned to initial. The URL is not asserted: each rejected
-    // intercept leaves it where the navigation put it (#2740).
+    // Router state pinned to initial, and the browser back on its entry:
+    // each refused push inherits the origin of the one it cancelled (#2740).
     expect(router.getState()).toStrictEqual(initialState);
+    expect(new URL(mockNav.currentUrl).pathname).toBe(initialState.path);
   });
 });

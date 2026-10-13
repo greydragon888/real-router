@@ -115,8 +115,15 @@
 | --- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Arbitrary query dictionary is parsed correctly by `matchUrl`     | An arbitrary `Record<string, string>` appended to the built URL survives `matchUrl`, exposing all keys in `state.search`. Verifies that query parsing handles multiple keys, not just the canonical `id` path parameter. |
 
+## Refused Traversal (#2740)
+
+| #   | Invariant | Description |
+| --- | --------- | ----------- |
+| 1   | A refused traversal returns to the entry it started from | After any journey of router navigations, a Back, Forward or `go(±n)` to an entry of another route that `canDeactivate` or `canActivate` refuses leaves the browser on the entry it started from, with the router's state unchanged, and the entry it reached keeps its URL: the same traversal after `stop()` lands on it. |
+
 ## Test Files
 
 | File                                      | Invariants | Category                                                                                                                                                                                                                                    |
 | ----------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `tests/property/hashPlugin.properties.ts` | 33         | URL roundtrip, hash prefix inclusion, prefix stripping, regex escaping, default prefix, parameter encoding, unsafe encoding, base, fallback, rejection, determinism, path suffix, leading-slash, injectivity, query collision, multi-key query, idempotence (`extractHashPath`, `normalizeBase`) |
+| `tests/property/refused-traversal.properties.ts` | 1 | refused traversal |

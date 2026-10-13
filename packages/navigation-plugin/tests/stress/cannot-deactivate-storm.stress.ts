@@ -81,8 +81,8 @@ describe("N4 — Cannot Deactivate Storm", () => {
     expect(["home", "users.list"]).toContain(router.getState()?.name);
   });
 
-  it("4.3 — 50 navigate events with TypeError: error recovery calls browser.navigate", async () => {
-    const browserNavigateSpy = vi.spyOn(browser, "navigate");
+  it("4.3 — 50 navigate events with TypeError: error recovery takes the URL back", async () => {
+    const traverseSpy = vi.spyOn(browser, "traverseTo");
 
     // ⚑ A REAL failure, not a stubbed door: a leave listener that throws makes
     // every navigation of the storm reject with what it threw, and a
@@ -97,11 +97,11 @@ describe("N4 — Cannot Deactivate Storm", () => {
 
     await waitForTransitions();
 
-    expect(browserNavigateSpy).toHaveBeenCalled();
+    expect(traverseSpy).toHaveBeenCalled();
 
-    // The recovery path (syncUrlToRouterState) re-syncs the browser URL to the
-    // current router state. navigateToState is mocked to reject, so the router
-    // never advances past users.list — the URL must be pulled back to parity.
+    // Recovery takes the browser back to the entry the router stands on
+    // (#2740). Every navigation of the storm rejects, so the router never
+    // advances past users.list — the URL must be pulled back to parity.
     const finalState = router.getState();
 
     expect(finalState).toBeDefined();
@@ -122,8 +122,10 @@ describe("N4 — Cannot Deactivate Storm", () => {
       throw new Error("BuildUrl throws");
     });
 
+    // Replaces keep the entry the router stands on, so recovery rewrites it
+    // — the path through `buildUrl`.
     for (let i = 0; i < 20; i++) {
-      mockNav.navigate("http://localhost/home");
+      mockNav.navigate("http://localhost/home", { history: "replace" });
     }
 
     await waitForTransitions();

@@ -74,6 +74,7 @@ pnpm -F @real-router/svelte test:properties -- --run # property-тесты (ду
 
 - Аргумент — живой `Router`, а не любой объект с `subscribeLeave` (#1924): утилита резолвит инстанс в реестре internals ядра, чтобы видеть жизненный цикл транзишна.
 - Установка — до `usePlugin(browserPlugin)` (см. комментарий о listener-ordering в `direction-tracker.ts`).
+- `popstate` на URL текущего состояния роутера флаг не взводит (#2740): так приходит возврат URL-плагина после отказанного Back/Forward, а за ним не следует ни одного события транзишна. URL строит `buildUrl` URL-плагина; без него — и если `buildUrl` бросает — флаг взводит каждый `popstate`. Держит `packages/react/tests/functional/dom-utils/direction-tracker-refused-traversal-2740.test.ts`.
 
 Поведение меряет `packages/react` как владелец `shared/dom-utils` (white-box — `tests/functional/dom-utils/direction-tracker.test.ts`); остальные адаптеры держат `src/dom-utils` вне своего покрытия (`vitest.config.unit.mts`). Экспорт через точку входа проверяет `tests/functional/createDirectionTracker.test.ts` каждого адаптера.
 

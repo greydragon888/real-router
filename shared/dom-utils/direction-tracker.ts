@@ -1,7 +1,14 @@
 import { events } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 
-import type { Router } from "@real-router/core";
+import type { Params, Router, SearchParams } from "@real-router/core";
+
+type BuildUrl = (
+  name: string,
+  params: Params,
+  search?: SearchParams,
+  options?: { hash?: string },
+) => string | undefined;
 
 export interface DirectionTracker {
   destroy: () => void;
@@ -60,7 +67,42 @@ export function createDirectionTracker(router: Router): DirectionTracker {
   // in-flight transition and replays it from that transition's `finally`. The
   // gap has no upper bound. Measured on the obvious choice: a task-boundary
   // expiry disarms a live navigation on ONE async `canDeactivate`.
+  // ⚑ A traversal onto the URL of the router's own state starts no
+  // transition: a URL plugin's return after a refused Back or Forward
+  // (#2740), or a Back onto an entry holding that state. The URL comes from
+  // the URL plugin's `buildUrl`; without one, every popstate arms the flag.
+  const landsOnRouterState = (): boolean => {
+    const state = router.getState();
+    const buildUrl = router.buildUrl as BuildUrl | undefined;
+
+    if (state === undefined || buildUrl === undefined) {
+      return false;
+    }
+
+    try {
+      const hash = (state.context as { url?: { hash?: string } } | undefined)
+        ?.url?.hash;
+      const url = buildUrl(
+        state.name,
+        state.params,
+        state.search,
+        hash ? { hash } : undefined,
+      );
+
+      return (
+        url !== undefined &&
+        new URL(url, globalThis.location.href).href === globalThis.location.href
+      );
+    } catch {
+      return false;
+    }
+  };
+
   const onPopstate = (): void => {
+    if (landsOnRouterState()) {
+      return;
+    }
+
     popstateFlag = true;
     // A deferred event belongs to the replay, not to the transition running
     // now, so that transition's terminal event must not spend it.

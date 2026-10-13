@@ -145,6 +145,8 @@ describe("Browser Plugin — Popstate", () => {
           params: previousState.params,
           search: previousState.search,
           path: previousState.path,
+          // The position of the entry it rewrites (#2740).
+          position: { run: expect.any(String), index: expect.any(Number) },
         },
         expect.stringContaining(previousState.path),
       );
@@ -189,7 +191,7 @@ describe("Browser Plugin — Popstate", () => {
       expect(mockedBrowser.replaceState).not.toHaveBeenCalled();
     });
 
-    it("restores URL via replaceState when deactivate guard blocks back-navigation (CANNOT_DEACTIVATE recovery)", async () => {
+    it("rewrites the entry via replaceState when a deactivate guard blocks a back-navigation it cannot measure (CANNOT_DEACTIVATE recovery)", async () => {
       // Set up the disposable router with forceDeactivate: false so that
       // deactivate guards actually block popstate-triggered back navigations.
       router.stop();
@@ -233,8 +235,9 @@ describe("Browser Plugin — Popstate", () => {
       expect(guardedRouter.getState()).toStrictEqual(previousState);
 
       // The plugin must have called replaceState with the previous state
-      // and a URL containing the previous path — this is the actual URL
-      // restoration that the gotcha promises but was previously untested.
+      // and a URL containing the previous path: a synthetic popstate moves
+      // no entry, so no way back is measured and the entry is rewritten
+      // (#2740).
       // ⚠ The FOUR-CHANNEL projection, not the whole `State` (#1837). This
       // asserted `previousState` — six members, `context` and `transition`
       // among them — and so pinned the defect: `context` is a public plugin
@@ -247,6 +250,8 @@ describe("Browser Plugin — Popstate", () => {
           params: previousState.params,
           search: previousState.search,
           path: previousState.path,
+          // The position of the entry it rewrites (#2740).
+          position: { run: expect.any(String), index: expect.any(Number) },
         },
         expect.stringContaining(previousState.path),
       );
@@ -314,6 +319,8 @@ describe("Browser Plugin — Popstate", () => {
           params: previousState.params,
           search: previousState.search,
           path: previousState.path,
+          // The position of the entry it rewrites (#2740).
+          position: { run: expect.any(String), index: expect.any(Number) },
         },
         "/users/list?tab=a&sort=z#anchor",
       );
@@ -771,8 +778,14 @@ describe("Browser Plugin — Popstate", () => {
       await router.navigate("users.view", { id: "1" });
 
       // Real browsers set history.state + location for the restored entry,
-      // THEN fire popstate. Emulate a back to the index entry ("/").
-      const restored = { name: "index", params: {}, path: "/" };
+      // THEN fire popstate. Emulate a back to the index entry ("/"), which the
+      // plugin wrote and so stamped with its position (#2740).
+      const restored = {
+        name: "index",
+        params: {},
+        path: "/",
+        position: { run: "r", index: 0 },
+      };
 
       globalThis.history.replaceState(restored, "", "/");
 

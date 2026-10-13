@@ -1,11 +1,13 @@
 import { errorCodes, RouterError, UNKNOWN_ROUTE } from "@real-router/core";
 import { freezeThrownError } from "@real-router/core/utils";
 
+import { distanceBetween, readPosition } from "./history-position.js";
 import { getRouteFromEvent, updateBrowserState } from "./popstate-utils.js";
 import { encodeHashFragment, normalizeHashInput } from "./url-context.js";
 
+import type { EntryPosition, EntryPositions } from "./history-position.js";
 import type { Browser, SharedFactoryState } from "./types.js";
-import type { Plugin, Router } from "@real-router/core";
+import type { Plugin, Router, State } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
 /**
@@ -53,6 +55,13 @@ export interface PopstateHandlerDeps {
    * Defaults to no-op (returns "") for hash-plugin. (#532)
    */
   getCurrentContextHash?: () => string;
+  /**
+   * The positions the plugin's writes stamp — the same object its `browser`
+   * was wrapped with by `withEntryPositions`. A refused traversal returns to
+   * the entry it started from through them (#2740); without them it rewrites
+   * the entry the browser landed on.
+   */
+  positions?: EntryPositions;
 }
 
 /**
@@ -102,6 +111,12 @@ export interface PopstateHandler {
    * touches another router's (#758 / #1213).
    */
   discard: () => void;
+}
+
+/** Where a traversal started: the router's entry and the state it held. */
+interface TraversalStart {
+  readonly position: EntryPosition | undefined;
+  readonly state: State | undefined;
 }
 
 export function createPopstateHandler(
@@ -188,14 +203,107 @@ export function createPopstateHandler(
     updateBrowserState(currentState, url, true, deps.browser);
   }
 
-  function recoverFromCriticalError(error: unknown): void {
+  /**
+   * After the router refused the entry a traversal landed on: back to the
+   * entry the traversal started from, every entry left where it was (#2740).
+   * Without two positions of one run to measure the distance, or when the
+   * browser does not travel, the entry it stands on is rewritten with the
+   * router's URL instead. A navigation the router committed since the
+   * traversal began owns the URL, and nothing is written.
+   */
+  function returnOrRollback(start: TraversalStart): void {
+    if (deps.router.getState() !== start.state) {
+      return;
+    }
+
+    const { positions, browser } = deps;
+    const origin = start.position;
+
+    if (positions && browser.go && origin) {
+      // From where the browser stands now: a traversal queued behind the
+      // refused one may have moved it further.
+      const distance = distanceBetween(
+        readPosition(browser.getState?.()),
+        origin,
+      );
+
+      if (distance !== undefined && distance !== 0) {
+        positions.returnTo(origin);
+
+        try {
+          browser.go(distance);
+        } catch {
+          // No traversal will arrive.
+          positions.takeReturn();
+          rollbackUrlToCurrentState();
+
+          return;
+        }
+
+        // A queued event describes a traversal from an entry the browser is
+        // about to leave.
+        deferred = null;
+
+        return;
+      }
+    }
+
+    rollbackUrlToCurrentState();
+  }
+
+  /**
+   * Whether this event is the traversal `returnOrRollback` started: it lands
+   * on the entry the return was sent to, where the router already stands. A
+   * traversal that lands anywhere else is taken as one of its own — the
+   * user's, or one the browser made in place of the return.
+   */
+  function isReturnArriving(): boolean {
+    const awaited = deps.positions?.takeReturn();
+
+    return (
+      awaited !== undefined &&
+      distanceBetween(readPosition(deps.browser.getState?.()), awaited) === 0
+    );
+  }
+
+  /**
+   * navigate() already emitted $$error. A refusal returns to the entry the
+   * traversal started from; `SAME_STATES` (URL and state agree) and
+   * `TRANSITION_CANCELLED` (a newer navigation owns the URL) refuse nothing,
+   * and only resync the entry the browser stands on.
+   *
+   * Rollback errors are swallowed: teardown races may remove router.buildUrl
+   * while a popstate event is still queued.
+   */
+  function recoverFromRouterError(
+    error: RouterError,
+    start: TraversalStart,
+  ): void {
+    try {
+      if (
+        error.code === errorCodes.SAME_STATES ||
+        error.code === errorCodes.TRANSITION_CANCELLED
+      ) {
+        rollbackUrlToCurrentState();
+      } else {
+        returnOrRollback(start);
+      }
+    } catch {
+      // noop — nothing safe to do here
+    }
+  }
+
+  function recoverFromCriticalError(
+    error: unknown,
+    start: TraversalStart,
+  ): void {
     console.error(
       `[${deps.loggerContext}] Critical error in onPopState`,
       error,
     );
 
     try {
-      rollbackUrlToCurrentState();
+      returnOrRollback(start);
     } catch (recoveryError) {
       console.error(
         `[${deps.loggerContext}] Failed to recover from critical error`,
@@ -209,6 +317,10 @@ export function createPopstateHandler(
     location: string,
     hash: string | undefined,
   ): Promise<void> {
+    if (isReturnArriving()) {
+      return;
+    }
+
     if (isTransitioning) {
       console.warn(
         `[${deps.loggerContext}] Transition in progress, deferring popstate event`,
@@ -219,6 +331,17 @@ export function createPopstateHandler(
     }
 
     isTransitioning = true;
+
+    // Where the traversal started: the router's entry, and its state there.
+    const start: TraversalStart = {
+      position: deps.positions?.current,
+      state: deps.router.getState(),
+    };
+    // The router now stands on the entry the browser does; a write skipped as
+    // a no-op (#1353) did not record it.
+    const adoptLanded = (): void => {
+      deps.positions?.adopt(deps.browser.getState?.());
+    };
 
     try {
       const restored = getRouteFromEvent(evt, deps.api, location);
@@ -239,8 +362,8 @@ export function createPopstateHandler(
       // the first would leave two places to keep in step. Sending it down the
       // existing branch means `allowNotFound: true` still restores (through
       // `navigateToNotFound`, with the #1448 same-state short-circuit) and
-      // `false` reports `ROUTE_NOT_FOUND` and rolls the URL back — one rule,
-      // whichever way the not-found arrived.
+      // `false` reports `ROUTE_NOT_FOUND` and recovers as from a refusal — one
+      // rule, whichever way the not-found arrived.
       const matched = restored?.name === UNKNOWN_ROUTE ? undefined : restored;
 
       if (matched) {
@@ -252,6 +375,7 @@ export function createPopstateHandler(
           ...deps.transitionOptions,
           ...resolveHashOptions(deps, matched.path, hash),
         });
+        adoptLanded();
       } else if (deps.allowNotFound) {
         // Same-state short-circuit (#1448): a popstate that resolves to the
         // UNKNOWN_ROUTE already committed for this exact path is a no-op — skip
@@ -265,9 +389,12 @@ export function createPopstateHandler(
         if (current?.name !== UNKNOWN_ROUTE || current.path !== location) {
           deps.router.navigateToNotFound(location);
         }
+
+        adoptLanded();
       } else {
-        // Strict mode — unmatched URL is an error. Emit $$error and sync URL
-        // back to the current router state (no silent fallback to defaultRoute).
+        // Strict mode — unmatched URL is an error. Emit $$error and take the
+        // browser back to the router's entry (no silent fallback to
+        // defaultRoute).
         const err = freezeThrownError(
           new RouterError(errorCodes.ROUTE_NOT_FOUND, {
             path: location,
@@ -275,20 +402,13 @@ export function createPopstateHandler(
         );
 
         deps.api.emitTransitionError(err);
-        rollbackUrlToCurrentState();
+        returnOrRollback(start);
       }
     } catch (error) {
       if (error instanceof RouterError) {
-        // navigate() already emitted $$error — just sync URL with router state.
-        // Swallow rollback errors: teardown races may remove router.buildUrl
-        // while a popstate event is still queued.
-        try {
-          rollbackUrlToCurrentState();
-        } catch {
-          // noop — nothing safe to do here
-        }
+        recoverFromRouterError(error, start);
       } else {
-        recoverFromCriticalError(error);
+        recoverFromCriticalError(error, start);
       }
     } finally {
       isTransitioning = false;

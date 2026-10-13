@@ -286,6 +286,8 @@ lifecycle.addDeactivateGuard(
 );
 ```
 
+A refused back/forward takes the browser back to the page it started from, and leaves history as it was: the page the user tried to reach is still one Back (or Forward) away. A refused link to a route leaves its own entry one step ahead of the page, until the next link followed from there replaces it. A page the router refuses to enter — an authenticated one after logout — stays in history and turns Back away each time.
+
 Guards run for the navigations the router takes. One the browser keeps (see [Links, Forms and Downloads](#links-forms-and-downloads)) leaves the page without them — protect unsaved work there with `beforeunload`.
 
 ## Links, Forms and Downloads

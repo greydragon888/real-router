@@ -1,0 +1,165 @@
+import { fc, test } from "@fast-check/vitest";
+import { createRouter } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
+import { describe, expect } from "vitest";
+
+import { hashPluginFactory } from "@real-router/hash-plugin";
+
+import { NUM_RUNS } from "./helpers";
+import { createSafeBrowser } from "../../src/browser-env";
+import { buildHashLocation } from "../../src/hash-utils";
+import { routerConfig } from "../helpers/testUtils";
+
+import type { Browser } from "../../src/browser-env";
+import type { Router } from "@real-router/core";
+
+/**
+ * #2740 class guard: a traversal the router refuses leaves every entry where
+ * it was and the browser on the entry the traversal started from — whatever
+ * the distance and direction, whichever guard refuses — through the
+ * popstate/hashchange pair hash-plugin listens to.
+ */
+
+const PATHS: Readonly<Record<string, string>> = {
+  index: "/",
+  home: "/home",
+  "users.list": "/users/list",
+  "users.view": "/users/view/1",
+};
+const NAMES = Object.keys(PATHS);
+
+// A browser stores a structured clone of each state; jsdom keeps the object.
+function createCloningBrowser(): Browser {
+  const browser = createSafeBrowser(
+    () =>
+      buildHashLocation(
+        globalThis.location.hash,
+        globalThis.location.search,
+        null,
+      ),
+    "hash-plugin",
+  );
+
+  return {
+    ...browser,
+    pushState: (state, url) => {
+      browser.pushState(structuredClone(state), url);
+    },
+    replaceState: (state, url) => {
+      browser.replaceState(structuredClone(state), url);
+    },
+  };
+}
+
+const settle = async (): Promise<void> => {
+  for (let i = 0; i < 8; i++) {
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  }
+};
+
+const here = (): string => globalThis.location.hash.slice(1);
+
+/** The paths of the entries a journey leaves, from the first. */
+function pathsOf(journey: readonly string[]): string[] {
+  const names = ["index"];
+
+  for (const name of journey) {
+    // A repeat of the current route is refused as SAME_STATES, and adds none.
+    if (name !== names.at(-1)) {
+      names.push(name);
+    }
+  }
+
+  return names.map((name) => PATHS[name]);
+}
+
+function routeOf(path: string): string {
+  return NAMES.find((name) => PATHS[name] === path) ?? "";
+}
+
+function refuse(
+  router: Router,
+  guard: "leave" | "enter",
+  origin: string,
+  target: string,
+): void {
+  const lifecycle = getLifecycleApi(router);
+
+  if (guard === "leave") {
+    lifecycle.addDeactivateGuard(origin, () => () => false);
+  } else {
+    lifecycle.addActivateGuard(target, () => () => false);
+  }
+}
+
+async function start(
+  journey: readonly string[],
+  back: number,
+): Promise<{ router: Router; paths: string[]; origin: number }> {
+  // This run's first entry; earlier runs' entries stay behind it.
+  globalThis.history.pushState(null, "", "/#/");
+
+  const router = createRouter(routerConfig, { defaultRoute: "home" });
+
+  router.usePlugin(hashPluginFactory({}, createCloningBrowser()));
+  await router.start();
+
+  for (const name of journey) {
+    await router
+      .navigate(name, name === "users.view" ? { id: "1" } : {})
+      .catch(() => undefined);
+  }
+
+  const paths = pathsOf(journey);
+  const steps = Math.min(back, paths.length - 1);
+
+  if (steps > 0) {
+    globalThis.history.go(-steps);
+    await settle();
+  }
+
+  return { router, paths, origin: paths.length - 1 - steps };
+}
+
+describe("refused traversal — hash-plugin (#2740)", () => {
+  test.prop(
+    [
+      fc.array(fc.constantFrom(...NAMES), { minLength: 1, maxLength: 4 }),
+      fc.nat({ max: 4 }),
+      fc.nat({ max: 4 }),
+      fc.constantFrom("leave" as const, "enter" as const),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "leaves the entries where they were and the browser on the entry it started from",
+    async (journey, back, to, guard) => {
+      const { router, paths, origin } = await start(journey, back);
+
+      try {
+        const target = to % paths.length;
+        const originRoute = routeOf(paths[origin]);
+        const targetRoute = routeOf(paths[target]);
+
+        fc.pre(targetRoute !== originRoute);
+        refuse(router, guard, originRoute, targetRoute);
+
+        globalThis.history.go(target - origin);
+        await settle();
+
+        expect(here()).toBe(paths[origin]);
+        expect(router.getState()?.name).toBe(originRoute);
+
+        // The entry the traversal reached is still the one it was.
+        router.stop();
+        globalThis.history.go(target - origin);
+        await settle();
+
+        expect(here()).toBe(paths[target]);
+      } finally {
+        router.stop();
+      }
+    },
+  );
+});

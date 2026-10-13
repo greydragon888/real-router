@@ -26,6 +26,13 @@ export interface HistoryBrowser {
    * The default browser (`createSafeBrowser`) always provides it.
    */
   getState?: () => unknown;
+  /**
+   * `history.go(delta)`: takes the browser back to the entry a refused
+   * traversal started from (#2740). Optional for the same reason as
+   * `getState`; without it, or without `getState`, the plugin rewrites the
+   * entry the browser landed on instead.
+   */
+  go?: (delta: number) => void;
 }
 
 export interface Browser extends HistoryBrowser {

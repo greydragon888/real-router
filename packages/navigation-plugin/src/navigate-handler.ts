@@ -9,7 +9,7 @@ import type {
   NavigationDirection,
   NavigationMeta,
 } from "./types";
-import type { Router } from "@real-router/core";
+import type { Router, State } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
 // Hoisted noop intercept options — reused on every plugin-originated
@@ -32,6 +32,15 @@ const NOOP_INTERCEPT: NavigationInterceptOptions = {
   handler: NOOP_ASYNC,
   scroll: "manual",
 };
+
+/** A navigation the handler took. */
+interface Taken {
+  readonly signal: AbortSignal;
+  /** The key of the entry the router stood on. */
+  readonly from: string | undefined;
+  /** The router's state then; a navigation committed since owns the URL. */
+  readonly state: State | undefined;
+}
 
 interface NavigateHandlerDeps {
   router: Router;
@@ -65,9 +74,9 @@ export function computeDirection(
 export function createNavigateHandler(deps: NavigateHandlerDeps) {
   const { router, api, browser, base, transitionOptions } = deps;
   const { allowNotFound } = api.getOptions();
-  // The signal of the last navigation this handler took to a matched route,
-  // until the plugin next writes the router's own URL.
-  let taken: AbortSignal | undefined;
+  // The last navigation this handler took, until the router reaches its
+  // destination or the plugin next writes the router's own URL.
+  let taken: Taken | undefined;
 
   return function handleNavigateEvent(event: NavigateEvent): void {
     if (!event.canIntercept || !router.isActive()) {
@@ -102,16 +111,18 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
       // A download keeps this document, and starting one aborts a navigation
       // the router is still taking: its URL stays committed while the router
       // stays put, and `withRecovery` leaves the cancelled one to a newer
-      // navigation the router never sees. Put the URL back here (#2724) — on
-      // the next task: a navigation started during this event cancels the
-      // download (measured on Chromium 153).
-      // A navigation the router takes before then owns the URL instead; a
-      // stopped router holds no state, so the write finds nothing to restore.
-      if (taken?.aborted) {
+      // navigation the router never sees. Return to the router's entry here
+      // (#2724, #2740) — on the next task: a navigation started during this
+      // event cancels the download (measured on Chromium 153).
+      // A navigation the router takes or commits before then owns the URL
+      // instead, and a stopped router owns none.
+      const aborted = taken;
+
+      if (aborted?.signal.aborted) {
         taken = undefined;
         setTimeout(() => {
           if (taken === undefined) {
-            syncUrlToRouterState(router, browser);
+            returnToOrigin(router, browser, aborted);
           }
         }, 0);
       }
@@ -133,7 +144,21 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
     }
 
     const navType = event.navigationType;
-    const currentIndex = browser.currentEntry?.index ?? -1;
+    // The event fires before the commit: the browser still stands on the
+    // entry the navigation starts from.
+    const origin = browser.currentEntry;
+    const state = router.getState();
+    // The router stands there too, unless an earlier navigation it took has
+    // not brought it to its destination — cancelled, or still running: the
+    // browser has committed that one's entry, and the router has not moved.
+    const record: Taken = {
+      signal: event.signal,
+      from:
+        taken !== undefined && taken.state === state ? taken.from : origin?.key,
+      state,
+    };
+
+    taken = record;
 
     deps.setCapturedMeta({
       navigationType: navType,
@@ -142,16 +167,15 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
       direction: computeDirection(
         navType,
         event.destination.index,
-        currentIndex,
+        origin?.index ?? -1,
       ),
       sourceElement: event.sourceElement ?? null,
     });
 
     if (matchedState) {
-      taken = event.signal;
       event.intercept({
-        handler: () =>
-          withRecovery(
+        handler: async () => {
+          const arrived = await withRecovery(
             () =>
               // api.navigateToState: matchPath already applied forwardState +
               // matchSourceTrailingSlash; reusing the State avoids the redundant
@@ -172,19 +196,31 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
               }),
             router,
             browser,
-          ),
+            record,
+          );
+
+          if (arrived) {
+            taken = undefined;
+          }
+        },
       });
     } else if (allowNotFound) {
       event.intercept({
         handler: () => {
-          router.navigateToNotFound(path);
+          try {
+            router.navigateToNotFound(path);
+          } catch (error) {
+            // The router refused to leave the current route (#2740).
+            returnToOrigin(router, browser, record);
+
+            throw error;
+          }
         },
       });
     } else {
       // Strict mode — an unmatched URL that stays in this document is an
-      // error. Emit $$error and reject the intercept; no silent fallback to
-      // defaultRoute. The rejection leaves the URL where the navigation put it
-      // (#2740).
+      // error. Emit $$error, return to the entry the navigation started from
+      // and reject the intercept; no silent fallback to defaultRoute (#2740).
       event.intercept({
         // eslint-disable-next-line @typescript-eslint/require-await -- Navigation API requires async handler; the throw rejects the intercept
         handler: async () => {
@@ -193,6 +229,7 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
           );
 
           api.emitTransitionError(err);
+          returnToOrigin(router, browser, record);
 
           throw err;
         },
@@ -207,18 +244,26 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
  * arguments instead of an enclosing scope; identical behaviour, fewer GC'd
  * closures.
  */
+/**
+ * Runs the router's transition for a navigation the handler took, and
+ * answers whether the router stands on its destination: `false` when a
+ * newer navigation cancelled it. A refusal or a crash rejects.
+ */
 async function withRecovery(
   run: () => Promise<unknown>,
   router: Router,
   browser: NavigationBrowser,
-): Promise<void> {
+  taken: Taken,
+): Promise<boolean> {
   try {
     await run();
+
+    return true;
   } catch (error) {
     if (!(error instanceof RouterError)) {
-      recoverFromNavigateError(error, router, browser);
+      recoverFromNavigateError(error, router, browser, taken);
 
-      return;
+      throw error;
     }
 
     // TRANSITION_CANCELLED: a newer navigation aborted this one — the newer
@@ -230,20 +275,24 @@ async function withRecovery(
     //
     // SAME_STATES: router refused because router.getState() already equals the
     // target. URL and router state are already consistent — no sync needed.
-    if (
-      error.code === errorCodes.TRANSITION_CANCELLED ||
-      error.code === errorCodes.SAME_STATES
-    ) {
-      return;
+    if (error.code === errorCodes.TRANSITION_CANCELLED) {
+      return false;
+    }
+
+    if (error.code === errorCodes.SAME_STATES) {
+      return true;
     }
 
     // Other RouterError codes (CANNOT_DEACTIVATE, CANNOT_ACTIVATE,
     // ROUTE_NOT_FOUND, …) — router rejected the transition, state is
-    // unchanged, but the Navigation API has already committed the URL, and it
-    // does not roll an intercepted navigation back when the handler rejects
-    // (#2740). Sync the URL back to the current router state. Observers that
-    // care about the error see it through the router's TRANSITION_ERROR event.
-    syncUrlToRouterState(router, browser);
+    // unchanged, but the Navigation API has already committed the navigation,
+    // and it does not roll an intercepted navigation back when the handler
+    // rejects.
+    returnToOrigin(router, browser, taken);
+
+    // The intercept rejects with the refusal: a navigation that finishes
+    // has the browser apply its scroll to the page the router stayed on.
+    throw error;
   }
 }
 
@@ -251,11 +300,52 @@ function recoverFromNavigateError(
   error: unknown,
   router: Router,
   browser: NavigationBrowser,
+  taken: Taken,
 ): void {
   console.error(
     "[navigation-plugin] Critical error in navigate handler",
     error,
   );
+
+  returnToOrigin(router, browser, taken);
+}
+
+/**
+ * Takes the browser back to the entry the router stood on when it took a
+ * navigation it refused (#2740). The browser stands on the refused
+ * destination; rewriting that entry with the router's URL would replace the
+ * page the user meant to reach with a copy of the one they stayed on, so it is
+ * left in place.
+ *
+ * A `replace` keeps the key of the entry it replaces, so origin and
+ * destination are one entry: that entry is rewritten with the router's URL.
+ * So is the current one when the origin is unknown or gone, or the browser
+ * does not travel. A navigation the router committed since owns the URL, and
+ * nothing is written.
+ */
+function returnToOrigin(
+  router: Router,
+  browser: NavigationBrowser,
+  taken: Taken,
+): void {
+  if (router.getState() !== taken.state) {
+    return;
+  }
+
+  try {
+    const origin = browser.entries().find((entry) => entry.key === taken.from);
+
+    if (origin && origin.key !== browser.currentEntry?.key) {
+      browser.traverseTo(origin.key);
+
+      return;
+    }
+  } catch (error) {
+    console.error(
+      "[navigation-plugin] Failed to return to the entry the navigation started from",
+      error,
+    );
+  }
 
   syncUrlToRouterState(router, browser);
 }
@@ -264,45 +354,47 @@ function syncUrlToRouterState(
   router: Router,
   browser: NavigationBrowser,
 ): void {
+  const currentState = router.getState();
+
+  if (!currentState) {
+    return;
+  }
+
   try {
-    const currentState = router.getState();
+    // Preserve hash on recovery (#532): reading from state.context.url
+    // keeps the visible URL fragment intact when a guard rejects a hash-
+    // bearing navigation.
+    const ctxHash = (
+      currentState.context as { url?: { hash?: string } } | undefined
+    )?.url?.hash;
+    const url = router.buildUrl(
+      currentState.name,
+      currentState.params,
+      // Query channel at position 3 (RFC-4 M2 / #1548), hash opts at 4. The
+      // state's own `search` goes in it (#1586): recovery rebuilds the URL of
+      // the state that SURVIVED the rejection, so dropping its query would
+      // leave the user on a URL the router itself does not hold.
+      currentState.search,
+      ctxHash ? { hash: ctxHash } : undefined,
+    );
 
-    if (currentState) {
-      // Preserve hash on recovery (#532): reading from state.context.url
-      // keeps the visible URL fragment intact when a guard rejects a hash-
-      // bearing navigation.
-      const ctxHash = (
-        currentState.context as { url?: { hash?: string } } | undefined
-      )?.url?.hash;
-      const url = router.buildUrl(
-        currentState.name,
-        currentState.params,
-        // Query channel at position 3 (RFC-4 M2 / #1548), hash opts at 4. The
-        // state's own `search` goes in it (#1586): recovery rebuilds the URL of
-        // the state that SURVIVED the rejection, so dropping its query would
-        // leave the user on a URL the router itself does not hold.
-        currentState.search,
-        ctxHash ? { hash: ctxHash } : undefined,
-      );
-
-      // browser.navigate inside `createNavigationBrowser` tags `info` with
-      // PLUGIN_SYNC_INFO so the navigate event this fires is recognised by
-      // the handler and short-circuited — no manual flag management here.
-      browser.navigate(url, {
-        state: {
-          name: currentState.name,
-          params: currentState.params,
-          // The buffered entry state is two-channel since RFC-4 M2 (#1548) —
-          // see the shape documented in CLAUDE.md. Omitting `search` here made
-          // the recovery path the one writer producing a narrower entry than
-          // every other, so a reader restoring from it saw a state the router
-          // never held (#1586).
-          search: currentState.search,
-          path: currentState.path,
-        },
-        history: "replace",
-      });
-    }
+    // browser.navigate inside `createNavigationBrowser` tags `info` with
+    // PLUGIN_SYNC_INFO so the navigate event this fires is recognised by
+    // the handler and short-circuited — no manual flag management here.
+    browser.navigate(url, {
+      state: {
+        name: currentState.name,
+        params: currentState.params,
+        // The buffered entry state is two-channel since RFC-4 M2 (#1548) —
+        // see the shape documented in CLAUDE.md. Omitting `search` here made
+        // the recovery path the one writer producing a narrower entry than
+        // every other, so a reader restoring from it saw a state the router
+        // never held (#1586).
+        search: currentState.search,
+        path: currentState.path,
+      },
+      history: "replace",
+    });
   } catch (syncError) {
     console.error(
       "[navigation-plugin] Failed to sync URL to router state",

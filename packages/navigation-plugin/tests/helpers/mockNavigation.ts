@@ -325,11 +325,18 @@ export class MockNavigation implements Navigation {
   traverseTo(key: string, options?: { info?: unknown }): NavigationResult {
     const targetIndex = this._entries.findIndex((entry) => entry.key === key);
 
+    // An unknown key returns rejected promises, nobody's handled — it does not
+    // throw (measured on Chromium 153).
     if (targetIndex === -1) {
-      throw new DOMException(
+      const error = new DOMException(
         `Entry with key "${key}" not found in entries list`,
         "InvalidStateError",
       );
+
+      return {
+        committed: Promise.reject(error),
+        finished: Promise.reject(error),
+      };
     }
 
     return this._performTraversal(targetIndex, false, options?.info);
@@ -568,6 +575,12 @@ export class MockNavigation implements Navigation {
           throw error;
         }
       });
+
+      // Marked as handled, as the browser does: a refused navigation nobody
+      // awaits fires `navigateerror` and no `unhandledrejection` (measured on
+      // Chromium 153). An awaiting caller still sees the rejection.
+      committedPromise.catch(() => undefined);
+      finishedPromise.catch(() => undefined);
 
       return { committed: committedPromise, finished: finishedPromise };
     }

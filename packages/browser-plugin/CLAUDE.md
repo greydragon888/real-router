@@ -42,11 +42,11 @@ Handled by `createPopstateHandler` in `browser-env` via deferred queue:
 
 ```
 Click back → transition starts
-Click back again → event DEFERRED (not lost)
+Click back again → event DEFERRED
 Transition completes → process deferred event
 ```
 
-Only the **last** deferred event is kept (intermediate states skipped).
+Only the **last** deferred event is kept (intermediate states skipped). A transition the router refuses drops it when the plugin travels back to the entry the refused one started from: it describes a traversal from an entry the browser leaves (#2740).
 
 The queue is emptied on `stop()` and `teardown()` too, via `PopstateHandler.discard` (#1922). Removing the listener is not enough — the in-flight transition's `finally` drains the queue unconditionally, so a queued event replayed after the plugin was gone: it navigated a router the plugin no longer serves, and on the strict-mode branch it wrote history directly (`rollbackUrlToCurrentState` is called by the handler, not by a hook, so removing the hooks does not stop it). `discard` runs unconditionally, outside the `#1213` shared-slot identity check — the queue belongs to this handler whoever owns the shared listener.
 
@@ -127,7 +127,7 @@ also why the test estate was blind to the `DataCloneError` half for so long.
 
 ### Popstate history-write skip (#1353)
 
-On back/forward the browser has **already** restored the target entry's `{name, params, path}` and URL before firing `popstate`, so `onTransitionSuccess`'s `replaceState` re-writes identical values — a value-level no-op that still fires a **second** `updateForSameDocumentNavigation` Blink event per nav (lean native routers emit one; real-router emitted two). The write is skipped when `canSkipPopstateHistoryWrite` (browser-env) proves it a no-op: `source === "popstate"`, `replace` is true, and the resolved target deep-equals the live `history.state` (`Browser.getState` reader + same `path` + `router.areStatesEqual` with query params compared). Every **load-bearing** write is kept — redirect/normalization (path or params differ), corrupted/missing `history.state` (fails `isStateStrict`), or a custom `Browser` without `getState` (opt-in, non-breaking). The guard runs **after** `claim.write`/`urlClaim.write`, so subscribers still receive the transition; only the redundant native write is elided. `getState` is a rare popstate-path read (not the per-nav hot path — cf. #1019). The deferred-popstate replay (#757) is unaffected: it reads the event's own snapshot, not the live entry this write would commit. Shared via `browser-env`, so hash-plugin gets the same skip.
+On back/forward the browser has **already** restored the target entry's `{name, params, path}` and URL before firing `popstate`, so `onTransitionSuccess`'s `replaceState` re-writes identical values — a value-level no-op that still fires a **second** `updateForSameDocumentNavigation` Blink event per nav (lean native routers emit one; real-router emitted two). The write is skipped when `canSkipPopstateHistoryWrite` (browser-env) proves it a no-op: `source === "popstate"`, `replace` is true, and the resolved target deep-equals the live `history.state` (`Browser.getState` reader + same `path` + `router.areStatesEqual` with query params compared). Every **load-bearing** write is kept — redirect/normalization (path or params differ), corrupted/missing `history.state` (fails `isStateStrict`), an entry carrying no `position` (the write stamps one, #2740), or a custom `Browser` without `getState` (opt-in, non-breaking). The guard runs **after** `claim.write`/`urlClaim.write`, so subscribers still receive the transition; only the redundant native write is elided. `getState` is a rare popstate-path read (not the per-nav hot path — cf. #1019). The deferred-popstate replay (#757) is unaffected: it reads the event's own snapshot, not the live entry this write would commit. Shared via `browser-env`, so hash-plugin gets the same skip.
 
 ### SSR Safety
 
@@ -137,9 +137,17 @@ On back/forward the browser has **already** restored the target entry's `{name, 
 // Returns no-op fallbacks in SSR
 ```
 
-### CANNOT_DEACTIVATE Recovery
+### A refused traversal returns to the entry it started from (#2740)
 
-When guard blocks navigation but browser already changed URL — critical error recovery in browser-env restores the previous URL via `replaceState`.
+A guard refuses a Back or Forward the browser has already made. The popstate handler (`browser-env`) takes the browser back with `history.go(delta)` to the entry the traversal started from, so every entry stays where it was — the page a refused Back left behind is still one Back away. So do a strict-mode `ROUTE_NOT_FOUND` and a crash inside the transition. A navigation the router commits between the refusal and the recovery — a redirect a `TRANSITION_ERROR` listener queues — owns the URL, and nothing is written.
+
+The History API names no entry, so the distance comes from positions: `withEntryPositions` stamps every state the plugin writes with `{ run, index }` (see [State in History](#state-in-history)) — a replace keeps the place of the entry it rewrites, a push follows it, and each write reads that place off the live entry first. Two entries of one run are `index` apart. `withEntryPositions` calls the given browser's own members at call time, so a class instance keeps its prototype and private fields.
+
+The plugin's own return is the traversal that lands on the entry it was sent to, and starts no transition. A traversal that lands anywhere else is taken as one of its own — the user's, or one the browser made in place of the return. A second Back that arrives while a guard decides is dropped when the plugin travels back.
+
+The entry the browser stands on is rewritten with the router's state (`rollbackUrlToCurrentState`) where no distance can be measured — an entry the browser or other code wrote, two entries of different runs, a custom `Browser` without `getState` or `go` — where `go` throws, and on `SAME_STATES` and `TRANSITION_CANCELLED`, which refuse nothing. `tests/functional/refused-traversal-returns-2740.test.ts` owns the table; `tests/property/refused-traversal.properties.ts` holds the class.
+
+⚠ **A route the router keeps refusing to enter turns Back away each time.** An entry whose route a `canActivate` guard closes for good — an authenticated page after logout — stays in history, and every Back onto it returns; the user steps past it from the browser's history menu.
 
 ### Explicit `replace: false` on first navigation → push
 
@@ -177,11 +185,18 @@ history.state = {
   params: { id: "123" },
   search: { tab: "posts" },
   path: "/users/123?tab=posts",
+  position: { run: "k3x9a1b2.0", index: 2 },
 };
 ```
 
 Since RFC-4 M2 (#1548) the buffered state carries a dedicated `search` (query)
 channel alongside path-only `params` — a frozen `{}` when the route has no query.
+
+`position` is the entry's place among the entries the plugin wrote (#2740): `run`
+names a numbering without gaps and `index` the entry's place in it. A run starts
+on an entry that carries no position — the one a document loads with, one the
+browser or other code wrote — so only two entries of one run measure a distance.
+A plugin started on an entry that carries one, as after a reload, continues its run.
 
 ## Module Structure
 

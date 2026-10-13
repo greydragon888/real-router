@@ -27,6 +27,15 @@ export {
 } from "./popstate-utils.js";
 
 export {
+  createEntryPositions,
+  distanceBetween,
+  readPosition,
+  withEntryPositions,
+} from "./history-position.js";
+
+export type { EntryPosition, EntryPositions } from "./history-position.js";
+
+export {
   createOptionsValidator,
   safeBaseRule,
   safeHashPrefixRule,

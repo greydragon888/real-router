@@ -1319,7 +1319,7 @@
       "ec657cefd2cf",
       "36f23ee6431d",
       "e3f103f91490",
-      "65d588e85342"
+      "2d96216d8de9"
     ],
     "shared/browser-env/popstate-utils.ts": [
       "8179cb5cc295",
@@ -1359,7 +1359,8 @@
     ],
     "shared/dom-utils/direction-tracker.ts": [
       "9b51790f8046",
-      "e1aaccc762c8"
+      "e1aaccc762c8",
+      "da9efdaebe8b"
     ],
     "shared/dom-utils/link-utils.ts": [
       "4a570a8f94fd",
@@ -1866,7 +1867,8 @@
     ],
     "packages/browser-plugin/CLAUDE.md": [
       "5782bce19551",
-      "097ec3f7ea70"
+      "097ec3f7ea70",
+      "007dabc0db1c"
     ],
     "packages/browser-plugin/INVARIANTS.md": [
       "407e3b75ce2f"
@@ -2100,7 +2102,8 @@
       "af432506a5f7"
     ],
     "packages/hash-plugin/CLAUDE.md": [
-      "097ec3f7ea70"
+      "097ec3f7ea70",
+      "c142ac0ba337"
     ],
     "packages/persistent-params-plugin/CLAUDE.md": [
       "df4d6fe6c106",

@@ -20,8 +20,9 @@ import {
  * B7.7 — popstate arriving during CANNOT_DEACTIVATE recovery
  *
  * When `forceDeactivate: false` and a `canDeactivate` guard rejects a
- * popstate-triggered navigation, the plugin's `rollbackUrlToCurrentState`
- * calls `browser.replaceState`. Some browsers emit `popstate` while the
+ * popstate-triggered navigation it cannot travel back from (#2740), the
+ * plugin's `rollbackUrlToCurrentState` calls `browser.replaceState`. Some
+ * browsers emit `popstate` while the
  * URL is being rewritten mid-recovery. This file confirms that such a
  * nested popstate either (a) re-enters the deferred queue via the
  * `isTransitioning` flag, or (b) is already observed as benign because
