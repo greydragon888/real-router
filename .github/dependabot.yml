@@ -119,6 +119,11 @@ updates:
       # neither group of scripts/tests runs on it in CI; a bump by hand runs
       # them in pre-push. The name alone ignores security updates as well.
       - dependency-name: "smol-toml"
+      # semver is a root devDependency for the overrides check,
+      # scripts/overrides.mjs, alone. A PR that bumps it carries no source, so
+      # neither group of scripts/tests runs on it in CI; a bump by hand runs
+      # them in pre-push. The name alone ignores security updates as well.
+      - dependency-name: "semver"
       # @types/node is pinned to the Node.js runtime major (`.nvmrc` is the
       # source of truth; see the CLAUDE.md toolchain table). Block semver-major:
       # type defs ahead of the runtime let TS resolve Node APIs that don't exist

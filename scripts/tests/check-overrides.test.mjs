@@ -66,8 +66,9 @@ after(() => {
  * @property {Record<string, Record<string, any>>} [packages] `name@version` →
  *   its manifest's dependency fields, `resolved` and `resolvedOptional`
  *   (dependency → version, the snapshot's `dependencies` and
- *   `optionalDependencies`) and `recordedPeers` (the lockfile's peer ranges,
- *   the declared ones unless given)
+ *   `optionalDependencies`), `variants` (a peer suffix → that snapshot's
+ *   resolved dependencies, a snapshot per suffix in place of `resolved`) and
+ *   `recordedPeers` (the lockfile's peer ranges, the declared ones unless given)
  * @property {string} [lockfileVersion]
  * @property {string[]} [missing] packages the virtual store lacks
  * @property {boolean} [installed] false: no virtual store at all
@@ -133,15 +134,26 @@ function writeWorkspace(base, tree) {
       ]),
     ),
     snapshots: Object.fromEntries(
-      Object.entries(packages).map(([key, pkg]) => [
-        key,
-        {
-          ...(pkg.resolved === undefined ? {} : { dependencies: pkg.resolved }),
-          ...(pkg.resolvedOptional === undefined
-            ? {}
-            : { optionalDependencies: pkg.resolvedOptional }),
-        },
-      ]),
+      Object.entries(packages).flatMap(([key, pkg]) =>
+        pkg.variants === undefined
+          ? [
+              [
+                key,
+                {
+                  ...(pkg.resolved === undefined
+                    ? {}
+                    : { dependencies: pkg.resolved }),
+                  ...(pkg.resolvedOptional === undefined
+                    ? {}
+                    : { optionalDependencies: pkg.resolvedOptional }),
+                },
+              ],
+            ]
+          : Object.entries(pkg.variants).map(([suffix, resolved]) => [
+              `${key}${suffix}`,
+              { dependencies: resolved },
+            ]),
+      ),
     ),
   };
   writeFileSync(
@@ -174,6 +186,7 @@ function writeWorkspace(base, tree) {
     for (const [dep, resolved] of Object.entries({
       ...pkg.resolved,
       ...pkg.resolvedOptional,
+      ...Object.values(pkg.variants ?? {})[0],
     })) {
       mkdirSync(path.dirname(path.join(modules, dep)), { recursive: true });
       symlinkSync(
@@ -315,6 +328,79 @@ test("dead: an edge of `optionalDependencies` is judged as any other", () => {
   ]);
 });
 
+test("dead: a dependency in both dependencies and optionalDependencies is judged by the optional one", () => {
+  // npm's rule, which pnpm keeps: optionalDependencies override dependencies
+  // of the same name.
+  const findings = findingsOf({
+    overrides: [["c", ">=1.2.0"]],
+    packages: {
+      "a@1.0.0": {
+        dependencies: { c: "^1.0.0" },
+        optionalDependencies: { c: "^1.2.0" },
+        resolvedOptional: { c: "1.2.5" },
+      },
+      "c@1.2.5": {},
+    },
+  });
+  assert.deepEqual(rulesOf(findings, "c"), ["dead"]);
+});
+
+/**
+ * A scoped parent with two peer variants, each resolving `@s/c`.
+ *
+ * @param {string} key
+ * @param {string} value
+ * @param {[string, string]} versions what each variant resolves `@s/c` to
+ */
+const scoped = (key, value, versions) => ({
+  overrides: /** @type {[string, string][]} */ ([[key, value]]),
+  packages: {
+    "@s/a@1.0.0": {
+      dependencies: { "@s/c": "^1.2.0" },
+      peerDependencies: { "@s/x": "*" },
+      variants: {
+        "(@s/x@1.0.0)": { "@s/c": versions[0], "@s/x": "1.0.0" },
+        "(@s/x@2.0.0)": { "@s/c": versions[1], "@s/x": "2.0.0" },
+      },
+    },
+    "@s/c@1.2.5": {},
+    "@s/c@1.2.6": {},
+    "@s/x@1.0.0": {},
+    "@s/x@2.0.0": {},
+  },
+});
+
+test("scoped names and the peer variants of a snapshot are read as pnpm writes them", () => {
+  assert.deepEqual(
+    findingsOf(scoped("@s/c", ">=1.2.0", ["1.2.5", "1.2.5"])).get("@s/c"),
+    [
+      "dead: it narrows none of the 1 edge(s) it rewrites: @s/a@1.0.0 declares ^1.2.0",
+    ],
+  );
+  assert.deepEqual(
+    findingsOf(scoped("@s/x>@s/c", "1.2.5", ["1.2.5", "1.2.5"])).get(
+      "@s/x>@s/c",
+    ),
+    ["dead: it rewrites no edge", "edge: no @s/x in the tree depends on @s/c"],
+  );
+  // A scoped parent the tree has: the key rewrites its edge.
+  assert.equal(
+    findingsOf(scoped("@s/a>@s/c", "1.2.5", ["1.2.5", "1.2.5"])).has(
+      "@s/a>@s/c",
+    ),
+    false,
+  );
+});
+
+test("refused: a peer variant whose resolved version the key does not admit", () => {
+  // The first variant breaks it: each one is compared, not the last.
+  refusalOf(scoped("@s/c", "1.2.5", ["1.2.6", "1.2.5"]));
+  assert.equal(
+    findingsOf(scoped("@s/c", "1.2.5", ["1.2.5", "1.2.5"])).has("@s/c"),
+    false,
+  );
+});
+
 test("`$name` reads optionalDependencies over dependencies over devDependencies", () => {
   const { unjudged } = judgeWorkspace(
     repository({
@@ -334,6 +420,26 @@ test("`$name` reads optionalDependencies over dependencies over devDependencies"
   );
   assert.deepEqual(
     unjudged.map((override) => override.value),
+    ["1.2.5"],
+  );
+
+  const withoutOptional = judgeWorkspace(
+    repository({
+      overrides: [["c", "$c"]],
+      projects: {
+        ".": {
+          name: "fx-root",
+          devDependencies: { c: "1.0.0" },
+          dependencies: { c: "1.2.5" },
+        },
+      },
+      importers: { ".": { dependencies: { c: ["1.2.5", "1.2.5"] } } },
+      packages: { "c@1.2.5": {} },
+    }),
+    ".",
+  );
+  assert.deepEqual(
+    withoutOptional.unjudged.map((override) => override.value),
     ["1.2.5"],
   );
 });
@@ -650,30 +756,43 @@ test("refused: a lockfile of another version", () => {
   assert.equal(findingsOf(tree("9.0")).has("c"), false);
 });
 
-test("refused: a value that is not a string, and an alias in the file", () => {
-  for (const text of [
-    "overrides:\n  c: 1\n",
-    "overrides:\n  c: &v 1.2.5\n  d: *v\n",
+test("refused: a value that is not a string, and an anchor in the file", () => {
+  for (const [text, message] of [
+    [
+      "overrides:\n  c: 1\n",
+      /^the root workspace: c: a value that is not a string$/,
+    ],
+    [
+      "overrides:\n  c: &v 1.2.5\n  d: *v\n",
+      /^the root workspace: pnpm-workspace\.yaml: an anchor at overrides\.c$/,
+    ],
   ]) {
     const root = repository({
       overrides: [["c", "1.2.5"]],
       packages: parentsOfC({ a: "^1.0.0", b: "^1.1.0" }, "1.2.5"),
     });
     writeFileSync(path.join(root, "pnpm-workspace.yaml"), text);
-    assert.throws(() => judgeWorkspace(root, "."), Error, text);
+    assert.throws(
+      () => judgeWorkspace(root, "."),
+      (error) =>
+        error instanceof OverridesRefusal && message.test(error.message),
+      text,
+    );
   }
 });
 
 // ── accepted findings ──────────────────────────────────────────────────────
 
 /**
- * A repository whose root holds `text` as its accepted list.
+ * A repository whose root holds `text` as its accepted list, or no list for
+ * `null`.
  *
- * @param {string} text
+ * @param {string | null} text
  */
 function acceptedIn(text) {
   const root = mkdtempSync(path.join(tmpdir(), "overrides-accepted-"));
   fixtures.push(root);
+  if (text === null) return root;
   mkdirSync(path.join(root, "scripts"));
   writeFileSync(path.join(root, ACCEPTED_FILE), text);
   return root;
@@ -690,10 +809,7 @@ const entry = (fields = {}) => ({
 test("accepted: the list a repository keeps, and none without one", () => {
   const root = acceptedIn(JSON.stringify([entry()]));
   assert.deepEqual(readAccepted(root), [entry()]);
-  assert.deepEqual(
-    readAccepted(mkdtempSync(path.join(tmpdir(), "overrides-none-"))),
-    [],
-  );
+  assert.deepEqual(readAccepted(acceptedIn(null)), []);
 });
 
 test("accepted, refused: each form the list does not read", () => {
@@ -843,7 +959,7 @@ test("CLI: a refusal exits 2, and so does a repository that tracks no workspace"
   assert.equal(refused.status, 2, refused.output);
   assert.match(
     refused.output,
-    /✖ overrides: cannot judge — the root workspace is not installed/,
+    /✖ overrides: cannot judge — the root workspace: not installed: no node_modules\/\.pnpm/,
   );
 
   const none = runCli(repositoryOf({ ".": clean }, ["."]));
@@ -879,4 +995,60 @@ test("CLI: an accepted finding passes; an accepted one no longer found fails", (
     failed.output,
     /✖ overrides: 1 accepted finding\(s\) no longer found — remove them from scripts\/overrides-accepted\.json:\n {2}\.: c: dead$/m,
   );
+});
+
+test("CLI: what a reader refuses exits 2, named with its workspace and file", () => {
+  const cases = [
+    [
+      (root) =>
+        writeFileSync(
+          path.join(root, "sub", "pnpm-lock.yaml"),
+          "lockfileVersion: '9.0'\nimporters: {}\npackages:\n  a@1.0.0:\n    deprecated: no\u00a0break\n",
+        ),
+      /✖ overrides: cannot judge — sub: pnpm-lock\.yaml: an invisible character/,
+    ],
+    [
+      (root) =>
+        writeFileSync(
+          path.join(
+            root,
+            "sub",
+            "node_modules",
+            ".pnpm",
+            "a@1.0.0",
+            "node_modules",
+            "a",
+            "package.json",
+          ),
+          "{",
+        ),
+      /✖ overrides: cannot judge — sub: node_modules\/\.pnpm\/a@1\.0\.0\/node_modules\/a\/package\.json: not JSON/,
+    ],
+    [
+      (root) => writeFileSync(path.join(root, "sub", "package.json"), "{"),
+      /✖ overrides: cannot judge — sub: package\.json: not JSON/,
+    ],
+    [
+      (root) =>
+        writeFileSync(
+          path.join(root, "sub", "pnpm-workspace.yaml"),
+          "overrides:\n  c: latest\n",
+        ),
+      /✖ overrides: cannot judge — sub: c: "latest" is not a semver range/,
+    ],
+    [
+      (root) => {
+        mkdirSync(path.join(root, "scripts"));
+        writeFileSync(path.join(root, ACCEPTED_FILE), "[{");
+      },
+      /✖ overrides: cannot judge — scripts\/overrides-accepted\.json: not JSON/,
+    ],
+  ];
+  for (const [breakIt, message] of cases) {
+    const root = repositoryOf({ ".": clean, sub: dead });
+    breakIt(root);
+    const { status, output } = runCli(root);
+    assert.equal(status, 2, output);
+    assert.match(output, message);
+  }
 });

@@ -30,7 +30,7 @@ overrides:
   fast-uri: '>=3.1.6 <4'
   # @angular/build, beasties and postcss-safe-parser declare ranges below the 8.5.23
   # fix; the floor sits at 8.5.28, the highest minimum a parent declares
-  # (@vue/compiler-sfc), so it holds no parent below its range.
+  # (vite and @vue/compiler-sfc), so it holds no parent below its range.
   postcss: '>=8.5.28'
   # esbuild 0.28.0 (GHSA-g7r4-m6w7-qqqr, fixed in 0.28.1): unplugin declares `*` and
   # vite `^0.27.0 || ^0.28.0`. Scoped to those edges because the manifest declares

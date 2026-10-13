@@ -81,7 +81,7 @@ overrides:
   shell-quote: '>=1.9.0'
   picomatch@2: 2.3.2
   # 4.0.7 is the highest minimum a parent declares (`^4.0.7`: @changesets/config,
-  # knip, tsdown) and the version @angular-devkit/core and @angular/build pin
+  # knip, tsdown, vite) and the version @angular-devkit/core and @angular/build pin
   # exactly; any lower value holds those parents below their range.
   picomatch@4: 4.0.7
   yaml@1: 1.10.3

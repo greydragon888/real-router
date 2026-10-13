@@ -29,12 +29,14 @@
 // `scripts/overrides-accepted.json` of the repository the check reads; an
 // entry no finding matches fails the check.
 //
-// ⚠ The lockfile records resolved versions, not declared ranges: those come
-// from the manifests in the workspace's virtual store, `node_modules/.pnpm`, so
-// the workspace must be installed. A package pnpm skips on this platform has no
-// manifest there; an edge from it that a key could rewrite is refused, not
-// passed over. A `readPackage` hook of `.pnpmfile.mjs` edits a manifest in
-// memory only, and its edit is invisible here.
+// ⚠ The lockfile records resolved versions, and peer ranges as the overrides
+// rewrote them, not the ranges the parents declare. Those come from the
+// manifests in the workspace's virtual store, `node_modules/.pnpm`, so the
+// workspace must be installed. A package pnpm skipped there (`skipped` in
+// `node_modules/.modules.yaml`) has no manifest, and an edge from it that a key
+// could rewrite is refused, not passed over. So is an edge the manifest on disk
+// does not declare: a `readPackage` hook of `.pnpmfile.mjs` and pnpm's own
+// package extensions edit a manifest in memory only.
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -43,7 +45,7 @@ import path from "node:path";
 import semver from "semver";
 import { isMap, isScalar } from "yaml";
 
-import { readClosedYaml } from "./closed-yaml.mjs";
+import { ClosedYamlError, readClosedYaml } from "./closed-yaml.mjs";
 
 /** A form the rules do not read, or a tree they cannot read. */
 export class OverridesRefusal extends Error {}
@@ -54,6 +56,40 @@ export class OverridesRefusal extends Error {}
  */
 function refuse(message) {
   throw new OverridesRefusal(message);
+}
+
+/**
+ * The one YAML document of `text`, read closed; a form it refuses is a
+ * refusal of the check, named by `file`.
+ *
+ * @param {string} text
+ * @param {string} file
+ */
+function readYaml(text, file) {
+  try {
+    return readClosedYaml(text);
+  } catch (error) {
+    if (error instanceof ClosedYamlError) refuse(`${file}: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * A JSON file; a file that is missing or does not parse is a refusal.
+ *
+ * @param {string} file
+ * @param {string} shown how the output names it
+ */
+function readJson(file, shown) {
+  if (!existsSync(file)) refuse(`${shown}: not found`);
+  try {
+    return JSON.parse(readFileSync(file, "utf8"));
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      refuse(`${shown}: not JSON (${error.message})`);
+    }
+    throw error;
+  }
 }
 
 /**
@@ -85,7 +121,7 @@ function refuse(message) {
  * @property {"specifier" | "peer" | "version"} recordedAs what the lockfile
  *                                records for it: a project's specifier, a
  *                                package's peer range, or the version resolved
- * @property {string} [recorded]
+ * @property {(string | undefined)[]} recorded one per peer variant of the parent
  */
 
 /**
@@ -161,7 +197,9 @@ export function parseKey(key) {
  * @returns {Override[]}
  */
 export function readOverrides(workspaceText, rootManifest) {
-  const overrides = readClosedYaml(workspaceText).get("overrides");
+  const overrides = readYaml(workspaceText, "pnpm-workspace.yaml").get(
+    "overrides",
+  );
   if (overrides === undefined) return [];
   if (!isMap(overrides)) refuse("`overrides` is not a map");
   return overrides.items.map(({ key: keyNode, value: valueNode }) => {
@@ -251,24 +289,26 @@ export function edgesOf(lockfile, manifests, projects) {
         manifest === undefined
           ? { declared: undefined, peer: false }
           : declaredBy(manifest, dep);
-      edges.set(`${from}>${dep}`, {
+      // pnpm records the peer ranges of `packages` as the overrides rewrite
+      // them, and a version per peer variant of the parent.
+      const recorded = peer
+        ? own(lockfile.packages?.[from]?.peerDependencies, dep)
+        : String(resolved).split("(")[0];
+      const id = `${from}>${dep}`;
+      const known = edges.get(id);
+      if (known !== undefined) {
+        known.recorded.push(recorded);
+        continue;
+      }
+      edges.set(id, {
         from,
         parentName: name,
         parentVersion: version,
         name: dep,
         declared,
         installed: manifest !== undefined,
-        // pnpm records the peer ranges of `packages` as the overrides
-        // rewrite them.
-        ...(peer
-          ? {
-              recordedAs: "peer",
-              recorded: own(lockfile.packages?.[from]?.peerDependencies, dep),
-            }
-          : {
-              recordedAs: "version",
-              recorded: String(resolved).split("(")[0],
-            }),
+        recordedAs: peer ? "peer" : "version",
+        recorded: [recorded],
       });
     }
   }
@@ -294,7 +334,7 @@ export function edgesOf(lockfile, manifests, projects) {
           declared,
           installed: true,
           recordedAs: "specifier",
-          recorded: own(entry, "specifier"),
+          recorded: [own(entry, "specifier")],
         });
       }
     }
@@ -362,24 +402,25 @@ function mostSpecific(candidates, edge, declared) {
 }
 
 /**
- * Whether the lockfile holds what the check derives for an edge: a specifier
- * or peer range equal to it, a resolved version inside it. A version the check
- * cannot compare — a link, an alias, a URL — passes.
+ * What the lockfile records for an edge and the check does not derive: a
+ * specifier or peer range other than the derived one, a resolved version
+ * outside it. A version the check cannot compare — a link, an alias, a URL —
+ * passes.
  *
  * @param {Edge} edge
  * @param {string} effective
  */
-function recordedAsDerived(edge, effective) {
-  if (edge.recordedAs !== "version") return edge.recorded === effective;
-  if (
-    edge.recorded === undefined ||
-    semver.valid(edge.recorded) === null ||
-    semver.validRange(effective) === null
-  ) {
-    return true;
-  }
-  return semver.satisfies(edge.recorded, effective, {
-    includePrerelease: true,
+function recordedOtherwise(edge, effective) {
+  return edge.recorded.find((recorded) => {
+    if (edge.recordedAs !== "version") return recorded !== effective;
+    if (
+      recorded === undefined ||
+      semver.valid(recorded) === null ||
+      semver.validRange(effective) === null
+    ) {
+      return false;
+    }
+    return !semver.satisfies(recorded, effective, { includePrerelease: true });
   });
 }
 
@@ -422,8 +463,8 @@ export function judge(overrides, edges) {
     if (!reached) continue;
     refuse(
       edge.installed
-        ? `${edge.from} declares no ${edge.name} in its manifest, so no key can be matched against the edge`
-        : `${edge.from}, a parent of ${edge.name}, is not installed: install the workspace, or pnpm skips it on this platform`,
+        ? `${edge.from} declares no ${edge.name} in its manifest on disk — a pnpmfile hook or pnpm's package extensions add the edge in memory — so the check cannot tell which key pnpm applies to it`
+        : `${edge.from}, a parent of ${edge.name}, has no manifest in node_modules/.pnpm: install the workspace, or pnpm skipped it (\`skipped\` in node_modules/.modules.yaml)`,
     );
   }
 
@@ -433,9 +474,10 @@ export function judge(overrides, edges) {
     if (edge.declared === undefined) continue;
     const chosen = chooseOverride(overrides, edge, edge.declared);
     const effective = chosen?.value ?? edge.declared;
-    if (!recordedAsDerived(edge, effective)) {
+    const otherwise = recordedOtherwise(edge, effective);
+    if (otherwise !== undefined || edge.recorded.includes(undefined)) {
       refuse(
-        `the lockfile records ${String(edge.recorded)} for ${edge.name} in ${edge.from}, where the check derives ${effective}${chosen === undefined ? "" : ` from ${chosen.key}`}: how pnpm applies overrides is not what this check reads`,
+        `the lockfile records ${String(otherwise)} for ${edge.name} in ${edge.from}, where the check derives ${effective}${chosen === undefined ? "" : ` from ${chosen.key}`}: how pnpm applies overrides is not what this check reads`,
       );
     }
     if (chosen === undefined) continue;
@@ -498,12 +540,11 @@ export function judge(overrides, edges) {
     }
 
     for (const edge of acted) {
-      if (edge.importer === undefined || edge.recorded === edge.declared) {
-        continue;
-      }
+      const [recorded] = edge.recorded;
+      if (edge.importer === undefined || recorded === edge.declared) continue;
       found.push({
         rule: "edge",
-        detail: `it rewrites the specifier of ${edge.name} in ${edge.from}: the manifest declares ${edge.declared}, the lockfile records ${String(edge.recorded)}`,
+        detail: `it rewrites the specifier of ${edge.name} in ${edge.from}: the manifest declares ${edge.declared}, the lockfile records ${String(recorded)}`,
       });
     }
 
@@ -531,14 +572,13 @@ function example(edges) {
  * The manifests of a workspace's virtual store, by `name@version`.
  *
  * @param {string} dir the workspace's directory
- * @param {string} label how the output names it
  * @returns {Map<string, Record<string, unknown>>}
  */
-export function installedManifests(dir, label) {
+export function installedManifests(dir) {
   const store = path.join(dir, "node_modules", ".pnpm");
   if (!existsSync(store)) {
     refuse(
-      `${label} is not installed: no node_modules/.pnpm, from which the declared ranges are read`,
+      "not installed: no node_modules/.pnpm, from which the declared ranges are read",
     );
   }
   /** @type {Map<string, Record<string, unknown>>} */
@@ -546,7 +586,7 @@ export function installedManifests(dir, label) {
   /** @param {string} file */
   const read = (file) => {
     if (!existsSync(file)) return;
-    const manifest = JSON.parse(readFileSync(file, "utf8"));
+    const manifest = readJson(file, path.relative(dir, file));
     manifests.set(`${manifest.name}@${manifest.version}`, manifest);
   };
   for (const entry of readdirSync(store, { withFileTypes: true })) {
@@ -592,15 +632,6 @@ export function workspaceDirs(root) {
 }
 
 /**
- * @param {string} file
- * @returns {Record<string, unknown>}
- */
-function readJson(file) {
-  if (!existsSync(file)) refuse(`${file}: not found`);
-  return JSON.parse(readFileSync(file, "utf8"));
-}
-
-/**
  * Judge one workspace of the repository.
  *
  * @param {string} root the repository's top level
@@ -608,37 +639,49 @@ function readJson(file) {
  */
 export function judgeWorkspace(root, dir) {
   const label = dir === "." ? "the root workspace" : dir;
-  const base = path.join(root, dir);
+  try {
+    return { dir, label, ...judgeAt(path.join(root, dir)) };
+  } catch (error) {
+    if (error instanceof OverridesRefusal) refuse(`${label}: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * The overrides of the workspace at `base` and what the rules find in them.
+ *
+ * @param {string} base
+ */
+function judgeAt(base) {
   const overrides = readOverrides(
     readFileSync(path.join(base, "pnpm-workspace.yaml"), "utf8"),
-    readJson(path.join(base, "package.json")),
+    readJson(path.join(base, "package.json"), "package.json"),
   );
   if (overrides.length === 0) {
-    return { dir, label, overrides, findings: new Map(), unjudged: [] };
+    return { overrides, findings: new Map(), unjudged: [] };
   }
   const lockfilePath = path.join(base, "pnpm-lock.yaml");
-  if (!existsSync(lockfilePath)) refuse(`${label}: no pnpm-lock.yaml`);
-  const lockfile = readClosedYaml(readFileSync(lockfilePath, "utf8")).toJS();
+  if (!existsSync(lockfilePath)) refuse("no pnpm-lock.yaml");
+  const lockfile = readYaml(
+    readFileSync(lockfilePath, "utf8"),
+    "pnpm-lock.yaml",
+  ).toJS();
   if (lockfile?.lockfileVersion !== "9.0") {
     refuse(
-      `${label}: lockfileVersion ${String(lockfile?.lockfileVersion)}, where this check reads 9.0`,
+      `lockfileVersion ${String(lockfile?.lockfileVersion)}, where this check reads 9.0`,
     );
   }
   const projects = new Map(
     Object.keys(lockfile.importers ?? {}).map((importer) => [
       importer,
-      readJson(path.join(base, importer, "package.json")),
+      readJson(
+        path.join(base, importer, "package.json"),
+        path.posix.join(importer, "package.json"),
+      ),
     ]),
   );
-  const edges = edgesOf(lockfile, installedManifests(base, label), projects);
-  try {
-    return { dir, label, overrides, ...judge(overrides, edges) };
-  } catch (error) {
-    if (error instanceof OverridesRefusal) {
-      refuse(`${label}: ${error.message}`);
-    }
-    throw error;
-  }
+  const edges = edgesOf(lockfile, installedManifests(base), projects);
+  return { overrides, ...judge(overrides, edges) };
 }
 
 /** The accepted findings, relative to the repository's top level. */
@@ -664,7 +707,7 @@ const ACCEPTED_FIELDS = ["key", "rule", "why", "workspace"];
 export function readAccepted(root) {
   const file = path.join(root, ACCEPTED_FILE);
   if (!existsSync(file)) return [];
-  const entries = JSON.parse(readFileSync(file, "utf8"));
+  const entries = readJson(file, ACCEPTED_FILE);
   if (!Array.isArray(entries)) refuse(`${ACCEPTED_FILE}: not a list`);
   const seen = new Set();
   return entries.map((entry, index) => {

@@ -4,7 +4,8 @@
 // the repository; each workspace with overrides must be installed.
 //
 // Exit 0 when every finding is accepted, 1 with an open finding or an accepted
-// one no longer found, 2 when a form or a tree cannot be read.
+// one no longer found, 2 when a form or a tree cannot be read or the check
+// itself fails.
 import { execFileSync } from "node:child_process";
 
 import {
@@ -30,8 +31,12 @@ try {
   results = dirs.map((dir) => judgeWorkspace(root, dir));
   accepted = readAccepted(root);
 } catch (error) {
-  if (!(error instanceof OverridesRefusal)) throw error;
-  console.error(`✖ overrides: cannot judge — ${error.message}`);
+  if (error instanceof OverridesRefusal) {
+    console.error(`✖ overrides: cannot judge — ${error.message}`);
+  } else {
+    console.error("✖ overrides: cannot judge — the check itself failed:");
+    console.error(error);
+  }
   process.exit(2);
 }
 
