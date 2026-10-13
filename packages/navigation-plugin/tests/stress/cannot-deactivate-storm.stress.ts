@@ -118,12 +118,12 @@ describe("N4 — Cannot Deactivate Storm", () => {
     router.subscribeLeave(() => {
       throw new TypeError("Navigate throws");
     });
-    vi.spyOn(router, "buildUrl").mockImplementation(() => {
-      throw new Error("BuildUrl throws");
+    vi.spyOn(browser, "navigate").mockImplementation(() => {
+      throw new Error("Recovery write throws");
     });
 
     // Replaces keep the entry the router stands on, so recovery rewrites it
-    // — the path through `buildUrl`.
+    // — the path through `browser.navigate`.
     for (let i = 0; i < 20; i++) {
       mockNav.navigate("http://localhost/home", { history: "replace" });
     }

@@ -436,20 +436,17 @@ export class NavigationPlugin {
               state: this.#historyStateBuffer,
             });
           } else {
-            // Initial transition (no fromState) means router.start() is
-            // resolving the cross-document load — the browser already created
-            // a history entry for it. A `push` here would duplicate that
-            // entry. Always `replace` on the first transition so the
-            // back/forward stack has only one entry (canGoBack === false).
-            // navigationType metadata stays "push"/"reload"/"replace" for
-            // downstream consumers (scroll restore, direction tracker).
-            const isInitialTransition = fromState === undefined;
-            const replace =
-              frozenMeta.navigationType !== "push" || isInitialTransition;
-
+            // The write follows the transition's options, as in browser-plugin
+            // and hash-plugin, and not `navigationType`: a push the browser
+            // started reports `"push"`, while its entry is already committed
+            // and its transition carries `replace: true`. A push
+            // there would add a second entry wherever the router lands on
+            // another URL (#2744). `start()` passes `replace: true` as well.
             this.#browser.navigate(finalUrl, {
               state: this.#historyStateBuffer,
-              history: replace ? "replace" : "push",
+              history: shouldReplaceHistory(navOptions, toState, fromState)
+                ? "replace"
+                : "push",
             });
           }
         }

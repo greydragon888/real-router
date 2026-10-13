@@ -81,6 +81,25 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 
 ---
 
+### A5. A Browser Navigation Leaves One Entry, at the Router's URL (#2744)
+**Category:** Bidirectional Sync  
+**Testable:** Example-based + PBT  
+**Description:** A navigation the browser starts adds at most one entry, and the current entry carries the router's URL, also when the router rewrites the URL the browser committed.
+
+**Precondition:**
+- A push, a replace or a traversal the browser starts, to a URL the router rewrites: a `forwardTo` source, a trailing slash `trailingSlash: "never"` strips, a query `defaultSearch` adds
+- The router lands on another route, or already shows that route (`SAME_STATES`), and no newer navigation aborts this one
+
+**Postcondition:**
+- A push leaves one entry after the one it started from, in place of the entries that were ahead of it; a replace or a traversal adds none
+- `currentEntry.url` is the router's URL for `router.getState()`, with the fragment the navigation carried as `state.context.url.hash`
+
+**Test:** the rewrites, arcs and fragments one by one in `tests/functional/browser-push-rewritten-url-2744.test.ts`; `tests/property/history-model.properties.ts` holds the push of a `forwardTo` source (`browserPush`) under random sequences.
+
+**Why it matters:** The browser commits an intercepted navigation's entry before the router runs. An entry the plugin does not rewrite keeps a URL the router does not hold, and a push on top of it leaves a second entry that the first Back lands on.
+
+---
+
 ## B. History Extensions Invariants
 
 ### B1. Entry-to-State Matching Correctness
@@ -388,7 +407,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 - If `shouldReplaceHistory()` returns true: `navigationType = "replace"`
 - Otherwise: `navigationType = "push"`
 
-**Why it matters:** Enables correct history management (push vs replace).
+**Why it matters:** `state.context.navigation.navigationType` tells consumers a reload or a replace from a push. The history write does not read it: it decides with `shouldReplaceHistory`.
 
 ---
 
@@ -775,7 +794,8 @@ The guard is implemented by the pure helper `isSameHref(target, currentHref)` in
 **Postcondition:**
 - If error is not `RouterError`: `recoverFromNavigateError()` logs it and returns to the router's entry
 - If error is a `RouterError` that refuses (`CANNOT_DEACTIVATE`, `CANNOT_ACTIVATE`, `ROUTE_NOT_FOUND`, …): returns to the router's entry, nothing logged
-- `SAME_STATES` and `TRANSITION_CANCELLED`: nothing is done
+- `SAME_STATES`: an entry at another path or query than the router's gets the router's URL (A5); a URL that differs only in its fragment keeps it
+- `TRANSITION_CANCELLED`, and `SAME_STATES` of a navigation a newer one has aborted: nothing is done — the newer one owns the URL
 - After a return the intercept rejects with the error
 
 **Why it matters:** Distinguishes expected routing errors from unexpected exceptions.
@@ -795,7 +815,7 @@ The guard is implemented by the pure helper `isSameHref(target, currentHref)` in
 - `recoverFromNavigateError()` is called
 - The browser traverses back to the entry the navigation started from (#2740); a `replace` keeps that entry's key, so it is rewritten instead — `browser.navigate(url, { history: "replace" })` with the URL of the current state
 - Browser URL is restored to `/`
-- **The rewritten URL carries every channel of the surviving state (#1586)** — `buildUrl(name, params, state.search, { hash })`, and the buffered entry state carries `search`. Recovery rebuilds the state that SURVIVED the failure, so a dropped channel publishes a URL the router itself does not hold. This applies to the `RouterError` branch (`withRecovery` → `returnToOrigin`) identically.
+- **The rewritten URL carries every channel of the surviving state (#1586)** — the state's own `path`, query included, with `base` and the published fragment, and the buffered entry state carries `search`. Recovery rebuilds the state that SURVIVED the failure, so a dropped channel publishes a URL the router itself does not hold. This applies to the `RouterError` branch (`withRecovery` → `returnToOrigin`) identically.
 
 **Why it matters:** Prevents URL from being stuck in an inconsistent state.
 
@@ -1153,6 +1173,7 @@ agnostic parsing; validation is the matcher's job, not the parser's. See
 | A2. Browser→Router Sync | Bidirectional | Example | Critical |
 | A3. Roundtrip | Bidirectional | PBT | Critical |
 | A4. Hash Preservation | Bidirectional | Example | High |
+| A5. One Entry at the Router's URL | Bidirectional | Example + PBT | High |
 | B1. Entry-to-State Matching | History | PBT | Critical |
 | B2. peekBack Index | History | PBT | High |
 | B3. peekForward Index | History | PBT | High |

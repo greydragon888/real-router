@@ -116,12 +116,12 @@ A refused push leaves its own entry one step ahead of the origin, and the next p
 
 A refused `replace` keeps the key of the entry it replaced, so origin and destination are one entry, and `syncUrlToRouterState` rewrites it — `browser.navigate({ history: "replace" })` to the current router state. So does a recovery that finds no origin entry — e.g. a custom `NavigationBrowser` with no `currentEntry` — or whose `traverseTo` throws, which is logged as `Failed to return to the entry the navigation started from`. A navigation the router committed between the refusal and the recovery — a redirect a `TRANSITION_ERROR` listener queues — owns the URL, and nothing is written.
 
-That rewrite carries the query channel: the rebuilt URL passes `currentState.search` at slot 3 and the buffered entry state carries `search`. Drop either and recovery becomes the one writer producing a narrower entry than every other (#1586) — a blocked navigation away from `?tab=a` leaves the user on the bare path while `state.path` still holds the query.
+That rewrite carries the query channel: its URL is the state's own `path`, as `onTransitionSuccess` writes it — the query included, and a trailing slash `trailingSlash: "preserve"` keeps, which a rebuild from the route name drops — and the buffered entry state carries `search`. Drop either and recovery becomes the one writer producing a narrower entry than every other (#1586) — a blocked navigation away from `?tab=a` leaves the user on the bare path while `state.path` still holds the query.
 
 `withRecovery` handles the two error classes:
 
 - **Non-`RouterError`** (unexpected crashes) → `recoverFromNavigateError` — logs `Critical error in navigate handler` + `returnToOrigin`; the intercept rejects with the error.
-- **`RouterError`** — `TRANSITION_CANCELLED` and `SAME_STATES` → nothing, and the intercept resolves (a newer navigation owns the URL, or URL and state already agree); any other code (guard refusal, `ROUTE_NOT_FOUND`, …) → `returnToOrigin`, no logging, and the intercept rejects with the refusal. Router already emitted `TRANSITION_ERROR` / `TRANSITION_CANCEL` — observers can subscribe there.
+- **`RouterError`** — `TRANSITION_CANCELLED` → nothing, and the intercept resolves (a newer navigation owns the URL); `SAME_STATES` → `syncUrlToRouterState` for an entry at another path or query than the router's (#2744), and the intercept resolves — a write ends the browser's navigation, so its `finished` still rejects with `AbortError`; a `SAME_STATES` navigation a newer one has aborted is treated as `TRANSITION_CANCELLED`; any other code (guard refusal, `ROUTE_NOT_FOUND`, …) → `returnToOrigin`, no logging, and the intercept rejects with the refusal. Router already emitted `TRANSITION_ERROR` / `TRANSITION_CANCEL` — observers can subscribe there.
 
 **The intercept rejects after a return, so the browser applies no scroll.** A navigation whose handler resolves has the browser restore the scroll position of the entry it reached onto the page the router stayed on — measured on Chromium 153 for a refused Back. So `finished` of a refused navigation rejects and `navigateerror` fires. The browser marks `finished` as handled: a caller that does not await it sees no `unhandledrejection` (measured on Chromium 153; `MockNavigation` does the same).
 
@@ -182,13 +182,24 @@ Comparison is via `isSameHref(finalUrl, browser.currentEntry?.url)` (`href-utils
 
 **Behavioural consequence**: same-URL transitions no longer fire navigate events. Consumers that subscribed to navigate events for state-only changes must use `router.subscribe` instead; `state.context.navigation.navigationType` still reflects the logical type (`reload` / `replace`).
 
+### A navigation the browser starts rewrites its own entry (#2744)
+
+The browser commits an intercepted navigation's entry before the router runs, at the URL it was given. The router can land on another one — a `forwardTo` source, a trailing slash `trailingSlash: "never"` strips, a query `defaultSearch` adds — and two places give the entry the router's URL:
+
+- **`onTransitionSuccess`**, when the URLs differ, picks push or replace with `shouldReplaceHistory`, as browser-plugin and hash-plugin do. Every transition the navigate handler starts for a matched URL carries `replace: true`, so the plugin rewrites the committed entry rather than pushing a second one. `navigationType` does not decide the write, and stays `"push"` for a push.
+- **`withRecovery`**, on `SAME_STATES` — the router already shows that route — calls `syncUrlToRouterState` when the entry carries another path or query, as the History API plugins resync on `SAME_STATES`. An entry at the router's own path and query is not written: a fragment-only difference is the page's, and a same-URL replace is a cross-document navigation in WKWebView (#580). A navigation a newer one has aborted writes nothing and keeps the newer one's record, as for `TRANSITION_CANCELLED`: the write would abort the newer one.
+
+A fragment the router has not published forces a transition on the route it shows: the handler adds `force` and `hashChange` for the browser's fragment-only navigation (`event.hashChange`) and for an alias of that route with another fragment. Without it, `/old#part` from `/users/list` would end in `SAME_STATES` and lose `#part`. A fragment that changes on the router's own path and query — a third party's `history.replaceState(null, "", "#x")`, for which `event.hashChange` is `false` (measured on Chromium 153) — starts no transition and is not rewritten.
+
+`tests/functional/browser-push-rewritten-url-2744.test.ts` owns the table of rewrites, arcs and fragments; `tests/property/history-model.properties.ts` holds the push of a `forwardTo` source under random sequences.
+
 ### History Extensions Use URL Matching (Not entry.getState())
 
 `peekBack`/`peekForward`/`hasVisited`/`getVisitedRoutes`/`canGoBackTo` use URL matching to resolve `NavigationHistoryEntry` → `State`. They do NOT read `entry.getState()`. Reason: entries before plugin init have no state; entries may be stale after route reconfiguration; entries from other SPAs have foreign state.
 
 ### Explicit `replace: false` on first navigation → push
 
-`router.navigate(name, params, undefined, { replace: false })` before any successful navigation creates a **push** entry (not replace). The `??` operator keeps the explicit `false`. Omit `replace` (or set `true`) if you want replace-on-first behavior.
+`router.navigate(name, params, undefined, { replace: false })` before any successful navigation creates a **push** entry (not replace): `shouldReplaceHistory` replaces a first navigation only when `replace !== false`. Omit `replace` (or set `true`) if you want replace-on-first behavior.
 
 ### replaceHistoryState hash semantics
 

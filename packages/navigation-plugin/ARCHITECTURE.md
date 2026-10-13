@@ -399,7 +399,8 @@ router.navigate(name, params, opts)
         │          (no navigate event fires; URL stays as-is)
         │
         └── otherwise:
-              replace = frozenMeta.navigationType !== "push" || isInitialTransition
+              replace = shouldReplaceHistory(navOptions, toState, fromState)
+                (a transition the navigate handler starts carries replace: true, #2744)
               browser.navigate(finalUrl, { state: historyState, history: replace ? "replace" : "push" })
               (createNavigationBrowser tags the call with info: PLUGIN_SYNC_INFO so the
                re-entrant navigate event is short-circuited by the handler)
@@ -449,9 +450,14 @@ User clicks back/forward/link, submits a form, or navigation.navigate() fires
         │     YES: event.intercept({ handler: () => withRecovery(() =>
         │           api.navigateToState(matchedState, { ...transitionOptions, hash, signal: event.signal }))
         │         })
+        │         (+ force, hashChange when the fragment differs from the one the router
+        │          publishes on the route it shows: event.hashChange, or an alias, #2744)
         │         withRecovery: resolved / SAME_STATES → the router stands on the
         │                                     destination: the record is dropped
-        │                       TRANSITION_CANCELLED → nothing, the record stays
+        │                       SAME_STATES → also syncUrlToRouterState() for an entry
+        │                                     at another path or query (#2744)
+        │                       TRANSITION_CANCELLED, or SAME_STATES of a navigation a
+        │                                     newer one aborted → nothing, the record stays
         │                       other RouterError → returnToOrigin(), rethrow
         │                       non-RouterError → recoverFromNavigateError()
         │                                         → returnToOrigin(), rethrow
@@ -483,7 +489,8 @@ returnToOrigin(record)
   │          traverseTo throws → logged, then the branch below
   │
   └── otherwise (a replace kept origin's key, or no origin is known):
-        syncUrlToRouterState() — browser.navigate(router's URL, { history: "replace" });
+        syncUrlToRouterState() — browser.navigate(router's URL, { history: "replace" }),
+        the URL built from state.path as onTransitionSuccess builds it;
         a failure is logged, never thrown
 
   The handler rejects after it: a navigation that finishes has the browser
@@ -666,7 +673,9 @@ if (
 } else {
   this.#browser.navigate(finalUrl, {
     state: historyState,
-    history: replace ? "replace" : "push",
+    history: shouldReplaceHistory(navOptions, toState, fromState)
+      ? "replace"
+      : "push",
   });
 }
 ```

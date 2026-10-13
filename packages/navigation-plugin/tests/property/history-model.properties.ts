@@ -6,6 +6,7 @@ import {
   LEAF_ROUTE_NAMES,
   NUM_RUNS,
   PARAM_ROUTE_NAME,
+  ROUTES,
   arbLeafRoute,
   arbIdParam,
   createPluginRouterWithMock,
@@ -110,6 +111,49 @@ class NavigateCommand implements fc.AsyncCommand<HistoryModel, HistoryReal> {
     return this.params
       ? `navigate(${this.routeName}, ${JSON.stringify(this.params)})`
       : `navigate(${this.routeName})`;
+  }
+}
+
+/**
+ * A push the browser makes itself — a link, `navigation.navigate()` — which
+ * may land the router on another URL than the one the browser committed: a
+ * `forwardTo` source, from another route or from the one the router shows
+ * (#2744). The navigation adds at most one entry, and the current entry
+ * carries the router's URL.
+ */
+class BrowserPushCommand implements fc.AsyncCommand<HistoryModel, HistoryReal> {
+  constructor(
+    readonly url: string,
+    readonly landsOn: string,
+  ) {}
+
+  check(m: Readonly<HistoryModel>) {
+    return m.started;
+  }
+
+  async run(m: HistoryModel, r: HistoryReal) {
+    const shown = m.stack[m.cursor];
+    // The browser turns a push to the URL it shows into a replace.
+    const sameUrl = r.router.buildPath(shown.name, shown.params) === this.url;
+
+    r.mockNav.navigate(`http://localhost${this.url}`);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    if (!sameUrl) {
+      m.stack = m.stack.slice(0, m.cursor + 1);
+      m.stack.push({ name: this.landsOn, params: {} });
+      m.cursor = m.stack.length - 1;
+    }
+
+    const current = new URL(r.mockNav.currentUrl);
+
+    expect(r.router.getState()?.name).toBe(this.landsOn);
+    expect(r.mockNav.entries()).toHaveLength(m.stack.length);
+    expect(current.pathname + current.search).toBe(r.router.getState()?.path);
+  }
+
+  toString() {
+    return `browserPush(${this.url})`;
   }
 }
 
@@ -688,6 +732,11 @@ const allCommands = [
   arbLeafRoute.map((name) => new NavigateCommand(name)),
   arbLeafRoute.map((name) => new NavigateCommand(name)),
   arbIdParam.map((params) => new NavigateCommand(PARAM_ROUTE_NAME, params)),
+  fc.constantFrom(
+    new BrowserPushCommand("/home", "home"),
+    new BrowserPushCommand("/users/list", "users.list"),
+    new BrowserPushCommand("/old", "users.list"),
+  ),
 
   fc.constant(new BackCommand()),
   fc.constant(new ForwardCommand()),
@@ -717,7 +766,12 @@ describe("Navigation Plugin History Model", () => {
   })(
     "history extensions stay consistent under random navigation sequences",
     async (cmds) => {
-      const { router, mockNav, browser } = createPluginRouterWithMock();
+      // `old` forwards to `users.list`: a push to `/old` lands the router on
+      // another URL than the browser committed.
+      const { router, mockNav, browser } = createPluginRouterWithMock("", [
+        ...ROUTES,
+        { name: "old", path: "/old", forwardTo: "users.list" },
+      ]);
       const api = getPluginApi(router);
 
       const initialRoute = "index";

@@ -295,14 +295,17 @@ export function createPluginRouter(base = ""): Router {
  * - Inspect history entries
  * - Simulate back/forward/traverse operations
  */
-export function createPluginRouterWithMock(base = ""): {
+export function createPluginRouterWithMock(
+  base = "",
+  routes: Route[] = ROUTES,
+): {
   router: Router;
   mockNav: MockNavigation;
   browser: NavigationBrowser;
 } {
   const mockNav = new MockNavigation("http://localhost/");
   const browser = createMockNavigationBrowser(mockNav);
-  const router = createRouter(ROUTES, { defaultRoute: "home" });
+  const router = createRouter(routes, { defaultRoute: "home" });
 
   router.usePlugin(navigationPluginFactory({ base }, browser));
 
