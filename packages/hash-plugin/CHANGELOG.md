@@ -1,5 +1,15 @@
 # @real-router/hash-plugin
 
+## 0.16.1
+
+### Patch Changes
+
+- [#2747](https://github.com/greydragon888/real-router/pull/2747) [`46a5412`](https://github.com/greydragon888/real-router/commit/46a5412be9eb659f853d27463931c0871052628a) Thanks [@greydragon888](https://github.com/greydragon888)! - An entry `router.replaceHistoryState()` writes keeps its state where the host stores `history.state` by reference, as jsdom does ([#2741](https://github.com/greydragon888/real-router/issues/2741))
+
+  `router.replaceHistoryState()` reuses one object for the states it writes. A browser stores a structured clone of each write, so the reuse never showed there. jsdom keeps the object itself, so the entry it wrote read back the state of the next `replaceHistoryState()` call: after a Back to it, `history.state` named the wrong route.
+
+  The plugin now writes a copy of each state and stamps the entry's position on the copy. A browser behaves as before.
+
 ## 0.16.0
 
 ### Minor Changes
