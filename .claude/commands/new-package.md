@@ -46,6 +46,10 @@ $ARGUMENTS
 ### Monorepo integration
 
 - Run `pnpm install` to register workspace package
+- Its commitlint scope: the directory name in `SCOPES` of `commitlint.config.mjs` — `scope-enum` rejects any other scope. `pnpm commit` (`cz.config.js`) offers that list, except for `fix`, which offers its own `scopeOverrides.fix`
+- `.size-limit.js` measures an npm-public package's bundle, or `SIZE_LIMIT_EXCEPTIONS` of `scripts/check-coverage-scope.mjs` says why not — check 4 of `pnpm lint:coverage-scope` fails a public package with neither
+- A consumer of a `shared/` dir names that dir in the inputs of its tasks in its own `turbo.json` — check 5 of `pnpm lint:coverage-scope` names each task that misses it
+- `classify` of `scripts/build-matrix.mjs` puts it in a shard bucket by its dependencies and symlinks, and `scripts/tests/build-matrix.test.mjs` asserts the number of packages in each bucket: raise the count of its bucket and the total, and leave its named lists of buckets alone: other cells build fixtures of a fixed size from them
 - Update `CLAUDE.md` — package count (line 5), See Also link
 - Update `ARCHITECTURE.md` — Package Map tree, Public packages list, Mermaid diagram node + deps
 - Verify `pnpm build` passes with 0 failures — read the task COUNT off the run, never off a number written here
@@ -59,5 +63,5 @@ $ARGUMENTS
 ## Гейты
 
 - `pnpm install` обязателен до первой валидации — иначе фильтр по новому пакету молча не совпадёт.
-- Число задач в графе `pnpm build` смотри прогоном (`turbo run build --dry=json`), а не по памяти: оно растёт с каждым примером.
+- Число задач в графе `pnpm build` смотри прогоном (`turbo run build --dry=json`), а не по памяти: оно меняется с каждым пакетом.
 - Первый publish в npm — человеческий, см. `/release`.

@@ -16,7 +16,6 @@ export const TYPES = [
 export const SCOPES = [
   "core",
   "browser-env",
-  "helpers",
   "browser-plugin",
   "hash-plugin",
   "lifecycle-plugin",

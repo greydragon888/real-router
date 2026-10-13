@@ -26,7 +26,6 @@ export default {
   scopeOverrides: {
     fix: [
       "core",
-      "helpers",
       "browser-plugin",
       "logger-plugin",
       "persistent-params-plugin",

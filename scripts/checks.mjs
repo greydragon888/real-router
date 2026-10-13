@@ -229,9 +229,10 @@ export const CHECKS = [
   {
     // Pre-push alone. A finding here is drift, not a vulnerability: lint:audit
     // holds those in pre-push and CI. In CI every pull request would pay for
-    // installing the examples and the bench, to judge dependency changes few
-    // of them carry. It installs both first, as lint:cross-router does: the
-    // ranges it reads are in each workspace's node_modules. ⚠ That install
+    // installing the workspaces of their own, to judge dependency changes few
+    // of them carry. Its script installs them first, as lint:cross-router
+    // installs cross-router-bench: the ranges it reads are in each
+    // workspace's node_modules. ⚠ That install
     // puts examples that `scripts/checkout-tarballs.mjs` set up from this
     // checkout's tarballs back on the npm versions.
     id: "lint:overrides",

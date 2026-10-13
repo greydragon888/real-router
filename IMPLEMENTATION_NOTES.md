@@ -14723,3 +14723,16 @@ It runs in pre-push alone, by the owner's decision. A finding is drift, not a vu
 ⚠ **"Dead" reads the ranges, not the effect.** A key that narrows a range is needed by the rule even when the narrowing does harm: the root `minimatch@9` narrows the `^9.0.3 || ^10.1.2` of `eslint-plugin-import-x`, which keeps a second, older minimatch in the tree. A key that widens on purpose, such as the vite dedupe pins, reads as dead; the accepted list holds those.
 
 ⚠ **What edits a manifest in memory is invisible to the check.** A `readPackage` hook of `.pnpmfile.mjs` does, and so do pnpm's own package extensions: the lockfile records `typescript: '*'` among the peers of `@volar/typescript` 2.4.28, whose manifest declares none. The check reads the manifest on disk and refuses an edge such an edit adds, when a key could rewrite it. Both hooks today drop peer declarations alone, which adds no edge.
+
+## A new workspace's obligations are a checklist in CLAUDE.md (2026-10-13)
+
+**Problem.** A pnpm workspace of its own touches many places: the copies of the workspace set, the dedupe in four files, its Dependabot entry, its CI job, and the pnpm settings that keep its lockfile one YAML document. No check compares those copies with the workspaces, so most misses show nowhere. A miss in `dependabot-dedupe.yml` shows only after the merge, since `lint:dedupe` is skipped on the Dependabot PR, and a missing `pmOnFail: ignore` writes a lockfile whose second document GitHub's dependency graph does not read. A new package has its own edits, which checks demand one at a time, and `/new-package` listed those of its manifest alone. The commitlint `SCOPES` still offered `helpers`, a package that no longer exists.
+
+**Solution.** `CLAUDE.md` "New Workspace Checklist" names each obligation and each copy of the set, by name and symbol, and the prose by a query rather than a list. The checks of a new workspace's settings and of commit scopes from directories are out of wave 1 by the owner's decision of 2026-10-11, so the checklist names the pnpm settings and `packageManager` itself, and `/new-package` the commitlint scope. `/new-package` also names the edits the checks demand of a new package: its `.size-limit.js` entry, the `shared/` inputs of a consumer's `turbo.json`, and its bucket in `scripts/tests/build-matrix.test.mjs`. `helpers` leaves `SCOPES` in `commitlint.config.mjs` and the `fix` scopes of `cz.config.js`.
+
+**Why.** A new workspace is a rare event, and by the rule RFC-3 follows, a fact that changes with a rare event gets a checklist rather than a mechanism. Measured on the tree:
+
+- Each place the checklist names exists by its exact text, and the census of RFC-3 holds on HEAD with one addition, the `lint:overrides` script, which installs `examples` and `cross-router-bench` by name. Its comment in `scripts/checks.mjs` counted the two in words the checklist's prose query does not match, and names them now in words it does.
+- `examples` and `cross-router-bench` carry each scalar setting of the root `pnpm-workspace.yaml` with the root's value, except `gitTagVersion` and `cleanupUnusedCatalogs`; the examples add `verifyDepsBeforeRun` of their own. The three `packageManager` fields are equal.
+- `Dependency Review` is a required context of the `master` ruleset.
+- No package or `shared/` directory is named `helpers`.
