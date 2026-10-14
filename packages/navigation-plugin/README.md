@@ -301,6 +301,15 @@ A same-origin link, `location.assign()` or GET form to a URL that a route matche
 
 To keep URLs no route matches inside the application, declare a catch-all route such as `/*rest`.
 
+## Limitations
+
+Both concern a navigation to a URL the router rewrites — a `forwardTo` source, a trailing slash `trailingSlash: "never"` strips, a query `defaultSearch` adds, among others:
+
+- **`navigateerror` fires with `AbortError`, and `finished` rejects**, where the plugin cannot give the navigation the router's URL before its commit: on every such navigation in a browser without precommit handlers (Safari; Chrome before 141), and on `history.pushState()` / `replaceState()` in any browser. The scroll is applied all the same, so telemetry that records `navigateerror` sees noise there, not failures.
+- **On those navigations the plugin calls `event.scroll()` once the router lands.** A `navigate` listener of the app's own that intercepts one with `scroll: "manual"` and calls `event.scroll()` after that gets `InvalidStateError`: a navigation scrolls once.
+
+Details: [Wiki — Edge Cases](https://github.com/greydragon888/real-router/wiki/navigation-plugin#edge-cases).
+
 ## SSR Support
 
 The plugin is SSR-safe. In a non-browser environment it falls back to no-ops via `createNavigationFallbackBrowser`:
@@ -320,9 +329,9 @@ router.matchUrl("/does-not-exist"); // returns undefined when no route matches
 Full documentation: [Wiki — navigation-plugin](https://github.com/greydragon888/real-router/wiki/navigation-plugin)
 
 - [Configuration Options](https://github.com/greydragon888/real-router/wiki/navigation-plugin#3-configuration-options)
-- [Lifecycle Hooks](https://github.com/greydragon888/real-router/wiki/navigation-plugin#4-lifecycle-hooks)
-- [History Extensions](https://github.com/greydragon888/real-router/wiki/navigation-plugin#5-history-extensions)
-- [Behavior & Edge Cases](https://github.com/greydragon888/real-router/wiki/navigation-plugin#8-behavior)
+- [Lifecycle Hooks](https://github.com/greydragon888/real-router/wiki/navigation-plugin#5-lifecycle-hooks)
+- [History Extensions](https://github.com/greydragon888/real-router/wiki/navigation-plugin#exclusive-extensions-navigation-api-only)
+- [Behavior & Edge Cases](https://github.com/greydragon888/real-router/wiki/navigation-plugin#9-behavior)
 
 ## Related Packages
 
