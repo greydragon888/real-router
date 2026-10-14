@@ -1,16 +1,33 @@
+import { buildUrl, encodeHashFragment } from "./browser-env";
+
 /**
- * Pure URL-comparison helper extracted from `plugin.ts` so it can be unit and
- * property-tested in isolation. See INVARIANTS.md section K for the formal
- * properties this function satisfies.
- *
- * Sole production call site: the same-URL guard in
- * `NavigationPlugin.onTransitionSuccess` (#580).
+ * The URL the plugin gives an entry for a router state: the state's path
+ * under `base`, and the fragment, encoded as the plugin publishes it.
+ * `onTransitionSuccess` writes it, a recovery writes it, and the navigate
+ * handler redirects a navigation to it before its commit (#2751). One
+ * builder, so the URL a redirect commits is the URL the write compares with.
  */
+export function buildEntryUrl(
+  path: string,
+  hash: string,
+  base: string,
+): string {
+  const url = buildUrl(path, base);
+
+  return hash ? `${url}#${encodeHashFragment(hash)}` : url;
+}
 
 /**
  * Returns `true` when resolving `target` (a relative or absolute URL) against
  * `currentHref` identifies the same logical document — same protocol, host,
  * pathname (with empty pathname normalised to `"/"`), search, and hash.
+ * Extracted from `plugin.ts` so it can be property-tested in isolation; see
+ * INVARIANTS.md section K for the properties it satisfies.
+ *
+ * Production callers: the same-URL guard in
+ * `NavigationPlugin.onTransitionSuccess` (#580), and the navigate handler,
+ * which redirects a navigation the router rewrites before its commit and
+ * leaves alone an entry already at the router's URL (#2751).
  *
  * Why component-wise (not raw `.href` equality):
  *

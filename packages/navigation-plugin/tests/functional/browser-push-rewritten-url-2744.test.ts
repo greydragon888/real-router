@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { navigationPluginFactory } from "../../src";
 import { MockNavigation } from "../helpers/mockNavigation";
+import { REWRITTEN_URLS as CASES } from "../helpers/rewrittenUrls";
 import { createMockNavigationBrowser } from "../helpers/testUtils";
 
 import type {
@@ -12,60 +13,6 @@ import type {
   Options,
   Router,
 } from "@real-router/core";
-
-/**
- * The browser commits an intercepted navigation's entry before the router
- * runs. When the router lands on a URL other than the one the browser
- * committed — a `forwardTo` target, a trailing slash it strips, a default
- * query it adds — the plugin rewrites that entry: the navigation leaves one
- * entry, and Back from it leaves the page.
- */
-const users = { name: "users", path: "/users" };
-
-const CASES: readonly {
-  name: string;
-  routes: Route[];
-  options: Partial<Options>;
-  href: string;
-  landsOn: string;
-}[] = [
-  {
-    name: "a forwardTo source",
-    routes: [
-      { name: "home", path: "/home" },
-      { ...users, children: [{ name: "list", path: "/list" }] },
-      { name: "old", path: "/old", forwardTo: "users.list" },
-    ],
-    options: {},
-    href: "/old",
-    landsOn: "/users/list",
-  },
-  {
-    name: "a trailing slash the router strips",
-    routes: [
-      { name: "home", path: "/home" },
-      { ...users, children: [{ name: "list", path: "/list" }] },
-    ],
-    options: { trailingSlash: "never" },
-    href: "/users/list/",
-    landsOn: "/users/list",
-  },
-  {
-    name: "a default query the router adds",
-    routes: [
-      { name: "home", path: "/home" },
-      {
-        ...users,
-        children: [
-          { name: "list", path: "/list?page", defaultSearch: { page: "1" } },
-        ],
-      },
-    ],
-    options: {},
-    href: "/users/list",
-    landsOn: "/users/list?page=1",
-  },
-];
 
 const paths = (mock: MockNavigation): string[] =>
   mock.entries().map((entry) => {
@@ -100,6 +47,12 @@ async function start(
   return { router, mock };
 }
 
+/**
+ * When the router lands on a URL other than the one a navigation the browser
+ * started was given — a `forwardTo` source, a trailing slash it strips, a
+ * default query it adds — the navigation leaves one entry, at the router's
+ * URL, and Back from it leaves the page.
+ */
 describe("a push the browser makes to a URL the router rewrites (#2744)", () => {
   afterEach(() => {
     router?.stop();
@@ -434,7 +387,9 @@ describe("a navigation the browser makes to an alias of the route the router sho
           }, 0);
         }),
     );
-    mock.navigate("http://localhost/old");
+    // `history.pushState()` commits the alias; a link is redirected before
+    // its commit, and a newer navigation cancels it there (#2751).
+    mock.historyPushState("http://localhost/old");
     mock.navigate("http://localhost/home");
     await settle();
 
@@ -461,7 +416,7 @@ describe("a navigation the browser makes to an alias of the route the router sho
         }),
     );
     lifecycle.addActivateGuard("locked", () => () => false);
-    mock.navigate("http://localhost/old");
+    mock.historyPushState("http://localhost/old");
     mock.navigate("http://localhost/home");
     await new Promise((resolve) => {
       setTimeout(resolve, 0);

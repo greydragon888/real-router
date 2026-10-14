@@ -7,7 +7,6 @@ import {
   createPluginBuildUrl,
   createStartInterceptor,
   createReplaceHistoryState,
-  encodeHashFragment,
   getDecodedHash,
   normalizeHashInput,
   safeParseUrl,
@@ -25,7 +24,7 @@ import {
   canGoForward,
   canGoBackTo,
 } from "./history-extensions";
-import { isSameHref } from "./href-utils";
+import { buildEntryUrl, isSameHref } from "./href-utils";
 import { createNavigateHandler } from "./navigate-handler";
 
 import type { UrlContext } from "./browser-env";
@@ -404,8 +403,11 @@ export class NavigationPlugin {
             }),
           );
 
-          const url = buildUrl(toState.path, this.#options.base);
-          const finalUrl = hash ? `${url}#${encodeHashFragment(hash)}` : url;
+          const finalUrl = buildEntryUrl(
+            toState.path,
+            hash,
+            this.#options.base,
+          );
 
           this.#historyStateBuffer.name = toState.name;
           this.#historyStateBuffer.params = toState.params;

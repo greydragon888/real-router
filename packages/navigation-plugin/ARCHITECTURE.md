@@ -30,7 +30,7 @@ navigation-plugin/
 │   ├── history-extensions.ts  — Navigation API history extensions (peekBack, peekForward, hasVisited, etc.)
 │   ├── navigate-handler.ts    — Navigate event handler (createNavigateHandler, recoverFromNavigateError, withRecovery); plugin-event detection via `event.info === PLUGIN_SYNC_INFO`
 │   ├── navigation-browser.ts  — NavigationBrowser implementation (createNavigationBrowser tags every router-driven nav.navigate / nav.traverseTo call with `info: PLUGIN_SYNC_INFO`); exports the sentinel constant
-│   ├── href-utils.ts          — isSameHref(target, currentHref) pure helper for the same-URL guard (#580); URL-canonical equality predicate
+│   ├── href-utils.ts          — buildEntryUrl(path, hash, base), the URL onTransitionSuccess, a recovery and the precommit redirect use (#2751); isSameHref(target, currentHref), the URL-canonical equality behind the same-URL guard (#580)
 │   ├── ssr-fallback.ts        — createNavigationFallbackBrowser (no-op fallback for SSR)
 │   ├── validation.ts          — Options validation (delegates to browser-env)
 │   ├── constants.ts           — Constants (defaultOptions = sharedUrlPluginDefaults from browser-env, source, LOGGER_CONTEXT)
@@ -48,7 +48,11 @@ index.ts
             │       ├── history-extensions.ts
             │       │       └── browser-env (extractPath)
             │       ├── navigate-handler.ts
-            │       │       └── browser-env (extractPath)
+            │       │       ├── browser-env (normalizeHashInput, urlToPathAndHash)
+            │       │       ├── href-utils.ts (buildEntryUrl, isSameHref)
+            │       │       └── navigation-browser.ts (PLUGIN_SYNC_INFO)
+            │       ├── href-utils.ts (buildEntryUrl, isSameHref)
+            │       │       └── browser-env (buildUrl, encodeHashFragment)
             │       ├── plugin-utils.ts
             │       ├── constants.ts
             │       └── browser-env (shouldReplaceHistory)
@@ -383,9 +387,8 @@ router.navigate(name, params, opts)
         │     hash     = navOptions.hash !== undefined ? normalizeHashInput(navOptions.hash) : prevHash
         │     urlClaim.write(toState, { hash, hashChanged: navOptions.hashChange ?? (hash !== prevHash) })
         │
-        ├── url      = router.buildUrl(toState.name, toState.params)
-        │              └── buildNavigationState().path + buildUrl(path, base)
-        ├── finalUrl = hash ? `${url}#${encodeHashFragment(hash)}` : url
+        ├── finalUrl = buildEntryUrl(toState.path, hash, base)
+        │              (buildUrl(path, base), and `#` + encodeHashFragment(hash) when hash)
         │
         ├── historyState = { name, params, search, path }
         │
@@ -396,7 +399,8 @@ router.navigate(name, params, opts)
         ├── toState.name === UNKNOWN_ROUTE
         │   ── OR ── isSameHref(finalUrl, browser.currentEntry?.url) === true (#580)
         │     YES: browser.updateCurrentEntry({ state: historyState })
-        │          (no navigate event fires; URL stays as-is)
+        │          (no navigate event fires; URL stays as-is — a navigation the
+        │           handler redirected before its commit arrives here, #2751)
         │
         └── otherwise:
               replace = shouldReplaceHistory(navOptions, toState, fromState)
@@ -436,24 +440,39 @@ User clicks back/forward/link, submits a form, or navigation.navigate() fires
         ├── !matchedState && !event.destination.sameDocument?
         │     YES: return — the browser loads the page
         │
-        ├── record = { signal, from, state: router.getState() }
-        │     from: the entry the router stands on — browser.currentEntry's key
-        │     (the event fires before the commit), or the last record's from
-        │     while the router is still in that record's state: that navigation
-        │     was cancelled or is running, and the browser committed its entry
+        ├── record = take(): { signal, from, fromId, fromUrl, state: router.getState() }
+        │     from / fromId / fromUrl: the key, id and URL of the entry the router stands on —
+        │     browser.currentEntry's (the event fires before the commit), or the
+        │     last record's while the router is still in that record's state:
+        │     that navigation was cancelled or is running, and the browser
+        │     committed its entry
         │     record becomes the last navigation taken
         │
-        ├── Set #capturedMeta BEFORE event.intercept()
-        │     (written to toState.context.navigation in onTransitionStart, available in guards)
+        ├── meta = { navigationType, userInitiated, info, direction, sourceElement }
+        │     read off the event (direction needs the entry before the commit);
+        │     each handler that runs a transition stages it — stageMeta() — right
+        │     before it, so a transition that starts while a redirected navigation
+        │     waits for its commit does not take it; nothing is staged once the
+        │     router has no state, nor for a matched navigation already aborted —
+        │     navigateToNotFound() takes no signal and lands (#2751).
+        │     Written to toState.context.navigation in onTransitionStart
         │
         ├── matchedState found?
-        │     YES: event.intercept({ handler: () => withRecovery(() =>
-        │           api.navigateToState(matchedState, { ...transitionOptions, hash, signal: event.signal }))
+        │     YES: event.intercept({
+        │           precommitHandler — redirectBeforeCommit(): only for a navigation that
+        │             leaves the document (!destination.sameDocument) to a URL the router
+        │             rewrites, while the router has a state: redirect() to buildEntryUrl(matchedState.path,
+        │             normalizeHashInput(hash), base), a throw caught (#2751); ignored by
+        │             a browser without precommit handlers
+        │           handler: () => withRecovery(() =>
+        │             api.navigateToState(matchedState, { ...transitionOptions, hash, signal: event.signal }))
         │         })
         │         (+ force, hashChange when the fragment differs from the one the router
         │          publishes on the route it shows: event.hashChange, or an alias, #2744)
         │         withRecovery: resolved / SAME_STATES → the router stands on the
-        │                                     destination: the record is dropped
+        │                                     destination: the record is dropped; a write
+        │                                     after the transition aborted the navigation
+        │                                     → event.scroll() (scrollIfAborted, #2751)
         │                       SAME_STATES → also syncUrlToRouterState() for an entry
         │                                     at another path or query (#2744)
         │                       TRANSITION_CANCELLED, or SAME_STATES of a navigation a
@@ -464,7 +483,9 @@ User clicks back/forward/link, submits a form, or navigation.navigate() fires
         │
         ├── allowNotFound?
         │     YES: event.intercept({ handler: () => router.navigateToNotFound(path) })
-        │          refused (CANNOT_DEACTIVATE) → returnToOrigin(), then rethrow
+        │          refused (CANNOT_DEACTIVATE) → returnToOrigin(), then rethrow;
+        │          otherwise a write that aborted the navigation as the router landed
+        │          → event.scroll(); one a newer navigation aborted before → none (#2751)
         │
         └── otherwise (strict):
               event.intercept({ handler: async () => {
@@ -482,6 +503,10 @@ returnToOrigin(record)
   ├── router.getState() !== record.state?
   │     YES: return — a navigation committed since owns the URL
   │
+  ├── record.fromId known, and browser.currentEntry is that entry, at record.fromUrl?
+  │     YES: return — the browser never left it: a redirected navigation a
+  │          download cancelled before its commit (#2751)
+  │
   ├── record.from in browser.entries() and not the current entry?
   │     YES: browser.traverseTo(record.from) — the return moves no entry;
   │          a refused push leaves its own entry ahead of the origin.
@@ -490,7 +515,8 @@ returnToOrigin(record)
   │
   └── otherwise (a replace kept origin's key, or no origin is known):
         syncUrlToRouterState() — browser.navigate(router's URL, { history: "replace" }),
-        the URL built from state.path as onTransitionSuccess builds it;
+        the URL built by buildEntryUrl from state.path, as onTransitionSuccess builds it;
+        an entry whose URL already is the router's (isSameHref) is left alone;
         a failure is logged, never thrown
 
   The handler rejects after it: a navigation that finishes has the browser
@@ -499,7 +525,7 @@ returnToOrigin(record)
 
 ### Overlapping Navigations
 
-The Navigation API keeps one ongoing navigation: a navigation that starts while another is in flight aborts it, whose `event.signal` aborts the router's transition (`TRANSITION_CANCELLED`). No deferred event queue is needed, unlike browser-plugin's popstate handling. The browser has committed the aborted navigation's entry, which the router never reached, so the next navigation inherits the aborted one's origin while the router is still in the state it took that navigation in. Chromium runs microtasks between the abort and the next `navigate` event — the aborted navigation's handler has finished by then — so the rule asks the router's state, not whether that handler is done.
+The Navigation API keeps one ongoing navigation: a navigation that starts while another is in flight aborts it, whose `event.signal` aborts the router's transition (`TRANSITION_CANCELLED`). No deferred event queue is needed, unlike browser-plugin's popstate handling. The browser has committed the aborted navigation's entry, which the router never reached — unless a redirect held it before the commit, and the abort came first (#2751) — so the next navigation inherits the aborted one's origin while the router is still in the state it took that navigation in. Chromium runs microtasks between the abort and the next `navigate` event — the aborted navigation's handler has finished by then — so the rule asks the router's state, not whether that handler is done.
 
 ## URL Utilities
 
@@ -546,7 +572,7 @@ Navigation metadata is delivered to `state.context.navigation` via the claim-bas
   — claim.release() frees the namespace (called in teardown)
 
 #capturedMeta: NavigationMeta | undefined
-  — Set before event.intercept() in navigate handler
+  — Set by the navigate handler's intercept handler, right before the transition (#2751)
   — Written to toState in onTransitionStart (available in guards)
   — Written again in onTransitionSuccess (final meta on state)
   — Cleared after writing, or on cancel/error
@@ -556,8 +582,8 @@ Navigation metadata is delivered to `state.context.navigation` via the claim-bas
 
 ```
 Navigate event fires (browser-initiated)
-  → setCapturedMeta({ navigationType, userInitiated, info, direction, sourceElement })  ← from event fields
-  → event.intercept({ handler: async () => router.navigate(...) })
+  → meta = { navigationType, userInitiated, info, direction, sourceElement }  ← from event fields
+  → event.intercept({ handler: async () => { setCapturedMeta(meta); api.navigateToState(...) } })
   → onTransitionStart(toState) → claim.write(toState, Object.freeze(#capturedMeta))
   → guards run → toState.context.navigation available
   → onTransitionSuccess → claim.write(toState, Object.freeze(#capturedMeta))

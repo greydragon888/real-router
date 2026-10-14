@@ -100,6 +100,26 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 
 ---
 
+### A6. A Browser Navigation Gets the Browser's Scroll, at the Router's URL (#2751)
+**Category:** Bidirectional Sync  
+**Testable:** Example-based + PBT  
+**Description:** A navigation the browser starts and the router takes ends with the scroll the browser applies when a navigation finishes, also when the router rewrites the URL the navigation was given.
+
+**Precondition:**
+- A push, a replace or a traversal the browser starts, to the router's own URL or to one it rewrites — a `forwardTo` source, a trailing slash `trailingSlash: "never"` strips, a query `defaultSearch` adds, among others
+- The router arrives — the transition commits, the router answers `SAME_STATES`, or `navigateToNotFound()` lands — and no newer navigation cancels this one before it does
+- No other listener intercepted the navigation with `scroll: "manual"`
+
+**Postcondition:**
+- The browser applies the navigation's scroll once, at the URL the document then shows: the router's, or the one an app wrote as the router landed
+- In a browser with precommit handlers, a navigation that leaves the document commits the router's URL, and the plugin's write does not abort it
+
+**Test:** the arcs, rewrites and controls in `tests/functional/rewritten-url-scroll-2751.test.ts`, on a `MockNavigation` whose `scrolls` records each scroll the browser applies; `tests/property/history-model.properties.ts` asserts it for every `browserPush`, `historyPush`, `back()` and `forward()` under random sequences.
+
+**Why it matters:** The plugin's write of the router's URL after the transition is a navigation of its own. It aborts the browser's, and the browser skips the scroll — to the top, to the fragment, to the position a traversal restores — so the new route shows where the old page was scrolled. On a traversal, the position itself comes back in Chromium only; Firefox and WebKit end at the top (measured on Firefox 155 and WebKit 26.6).
+
+---
+
 ## B. History Extensions Invariants
 
 ### B1. Entry-to-State Matching Correctness
@@ -1174,6 +1194,7 @@ agnostic parsing; validation is the matcher's job, not the parser's. See
 | A3. Roundtrip | Bidirectional | PBT | Critical |
 | A4. Hash Preservation | Bidirectional | Example | High |
 | A5. One Entry at the Router's URL | Bidirectional | Example + PBT | High |
+| A6. The Browser's Scroll at the Router's URL (#2751) | Bidirectional | Example + PBT | High |
 | B1. Entry-to-State Matching | History | PBT | Critical |
 | B2. peekBack Index | History | PBT | High |
 | B3. peekForward Index | History | PBT | High |
