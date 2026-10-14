@@ -1,7 +1,8 @@
 import { errorCodes, RouterError } from "@real-router/core";
 import { freezeThrownError } from "@real-router/core/utils";
 
-import { buildUrl, encodeHashFragment, urlToPathAndHash } from "./browser-env";
+import { normalizeHashInput, urlToPathAndHash } from "./browser-env";
+import { buildEntryUrl, isSameHref } from "./href-utils";
 import { PLUGIN_SYNC_INFO } from "./navigation-browser";
 
 import type {
@@ -38,6 +39,10 @@ interface Taken {
   readonly signal: AbortSignal;
   /** The key of the entry the router stood on. */
   readonly from: string | undefined;
+  /** That entry's id: a `replace` keeps an entry's key and changes its id. */
+  readonly fromId: string | undefined;
+  /** That entry's URL. */
+  readonly fromUrl: string | null | undefined;
   /** The router's state then; a navigation committed since owns the URL. */
   readonly state: State | undefined;
 }
@@ -148,19 +153,15 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
     // entry the navigation starts from.
     const origin = browser.currentEntry;
     const state = router.getState();
-    // The router stands there too, unless an earlier navigation it took has
-    // not brought it to its destination — cancelled, or still running: the
-    // browser has committed that one's entry, and the router has not moved.
-    const record: Taken = {
-      signal: event.signal,
-      from:
-        taken !== undefined && taken.state === state ? taken.from : origin?.key,
-      state,
-    };
+    const record = take(event.signal, taken, origin, state);
 
     taken = record;
 
-    deps.setCapturedMeta({
+    // Read off the event, whose origin entry the commit replaces; staged by the
+    // handler, right before the transition that publishes it. A navigation a
+    // redirect holds commits a microtask later (#2751), and a router
+    // navigation started in between must not take its metadata.
+    const meta: NavigationMeta = {
       navigationType: navType,
       userInitiated: event.userInitiated,
       info: event.info,
@@ -170,7 +171,7 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
         origin?.index ?? -1,
       ),
       sourceElement: event.sourceElement ?? null,
-    });
+    };
 
     if (matchedState) {
       // A fragment the router has not published needs a transition on the
@@ -188,7 +189,18 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
               ?.hash ?? ""));
 
       event.intercept({
+        // A router still starting gets the navigation committed within the
+        // call: its start can settle in the microtask a redirect holds the
+        // commit, and the navigation would no longer supersede it.
+        ...(state &&
+          redirectBeforeCommit(event, matchedState.path, hash, base)),
         handler: async () => {
+          // Core refuses a navigation whose signal is already aborted, and
+          // announces no transition that would take the metadata.
+          if (!event.signal.aborted) {
+            stageMeta(deps, meta);
+          }
+
           const arrived = await withRecovery(
             () =>
               // api.navigateToState: matchPath already applied forwardState +
@@ -215,12 +227,20 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
 
           if (arrived) {
             taken = undefined;
+            scrollIfAborted(event);
           }
         },
       });
     } else if (allowNotFound) {
       event.intercept({
         handler: () => {
+          // A navigation a newer one aborted before this handler ran gets no
+          // scroll from the plugin: that one owns it.
+          const superseded = event.signal.aborted;
+
+          // navigateToNotFound() takes no signal: it lands either way.
+          stageMeta(deps, meta);
+
           try {
             router.navigateToNotFound(path);
           } catch (error) {
@@ -228,6 +248,10 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
             returnToOrigin(router, browser, record, base);
 
             throw error;
+          }
+
+          if (!superseded) {
+            scrollIfAborted(event);
           }
         },
       });
@@ -250,6 +274,106 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
       });
     }
   };
+}
+
+/**
+ * A navigation the handler takes, from the entry the router stands on: the
+ * origin, unless an earlier navigation it took has not brought it to its
+ * destination — cancelled, or still running: the browser has committed that
+ * one's entry, and the router has not moved.
+ */
+function take(
+  signal: AbortSignal,
+  earlier: Taken | undefined,
+  origin: NavigationHistoryEntry | null,
+  state: State | undefined,
+): Taken {
+  const { from, fromId, fromUrl } =
+    earlier !== undefined && earlier.state === state
+      ? earlier
+      : { from: origin?.key, fromId: origin?.id, fromUrl: origin?.url };
+
+  return { signal, from, fromId, fromUrl, state };
+}
+
+/**
+ * Stages a navigation's metadata for the transition its handler starts. A
+ * router stopped, disposed or restarting since the event has no state and
+ * refuses that transition without announcing it, so nothing would retire the
+ * metadata before its next transition (#2751). A router on its way to its
+ * first state has none either and takes the transition, which then publishes
+ * metadata derived from it.
+ */
+function stageMeta(deps: NavigateHandlerDeps, meta: NavigationMeta): void {
+  if (deps.router.getState() !== undefined) {
+    deps.setCapturedMeta(meta);
+  }
+}
+
+/**
+ * The router lands on the matched state's path: `forwardTo` and the defaults
+ * are already applied. A navigation that leaves the document gets that URL
+ * before its commit, so the plugin's write after the transition has nothing to
+ * rewrite (#2751). That write is a navigation of its own: it aborts this one,
+ * and the browser skips the scroll it applies when a navigation finishes.
+ *
+ * A same-document navigation commits without a redirect: with a precommit
+ * handler, `history.pushState()` returns before the URL changes, and
+ * `redirect()` refuses a traversal, which the handler takes only within the
+ * document (measured on Chromium 153, Firefox 155 and WebKit 26.6). So does
+ * every navigation in a browser without precommit handlers, which ignores the
+ * option.
+ */
+function redirectBeforeCommit(
+  event: NavigateEvent,
+  path: string,
+  hash: string,
+  base: string,
+): Pick<NavigationInterceptOptions, "precommitHandler"> | undefined {
+  // The fragment as `onTransitionSuccess` publishes it, so the write finds the
+  // entry at its own URL.
+  const url = buildEntryUrl(path, normalizeHashInput(hash), base);
+
+  if (
+    event.destination.sameDocument ||
+    isSameHref(url, event.destination.url)
+  ) {
+    return undefined;
+  }
+
+  return {
+    precommitHandler: (controller) => {
+      // A precommit handler that throws cancels the navigation outright
+      // (measured on Chromium 153, Firefox 155 and WebKit 26.6). A refused
+      // redirect leaves it to commit the URL it was given, and the plugin's
+      // write after the transition rewrites that URL.
+      try {
+        controller.redirect(url);
+      } catch {
+        // The URL it was given commits.
+      }
+    },
+  };
+}
+
+/**
+ * A write after the transition aborted this navigation: the plugin's, on one
+ * {@link redirectBeforeCommit} left alone, or the app's, as the router lands.
+ * The browser applies no scroll to an aborted navigation, so the plugin asks
+ * for the one it skipped (#2751).
+ *
+ * A traversal gets its position back only in Chromium; Firefox and WebKit
+ * end at the top (measured on Firefox 155 and WebKit 26.6).
+ *
+ * The scroll comes even when another listener intercepted the navigation
+ * with `scroll: "manual"`, which the event does not report (measured on
+ * Chromium 153, Firefox 155 and WebKit 26.6). A navigation scrolls once: that
+ * listener's own `event.scroll()` afterwards throws.
+ */
+function scrollIfAborted(event: NavigateEvent): void {
+  if (event.signal.aborted) {
+    event.scroll();
+  }
 }
 
 /**
@@ -362,6 +486,20 @@ function returnToOrigin(
     return;
   }
 
+  const current = browser.currentEntry;
+
+  // The browser never left the entry the router stood on: a navigation a
+  // redirect held before its commit, cancelled there by a download (#2751).
+  // A custom browser's entries without an id leave it to the key below, and
+  // the URL tells apart entries whose id a replace keeps.
+  if (
+    taken.fromId !== undefined &&
+    current?.id === taken.fromId &&
+    current.url === taken.fromUrl
+  ) {
+    return;
+  }
+
   try {
     const origin = browser.entries().find((entry) => entry.key === taken.from);
 
@@ -420,8 +558,14 @@ function syncUrlToRouterState(
     const ctxHash = (
       currentState.context as { url?: { hash?: string } } | undefined
     )?.url?.hash;
-    const path = buildUrl(currentState.path, base);
-    const url = ctxHash ? `${path}#${encodeHashFragment(ctxHash)}` : path;
+    const url = buildEntryUrl(currentState.path, ctxHash ?? "", base);
+
+    // An entry whose URL already is the router's is left alone, as
+    // `onTransitionSuccess` leaves it (#580): the write would abort the
+    // browser's navigation for nothing (#2751).
+    if (isSameHref(url, browser.currentEntry?.url)) {
+      return;
+    }
 
     // browser.navigate inside `createNavigationBrowser` tags `info` with
     // PLUGIN_SYNC_INFO so the navigate event this fires is recognised by

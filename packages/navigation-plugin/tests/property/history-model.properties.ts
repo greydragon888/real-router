@@ -116,10 +116,10 @@ class NavigateCommand implements fc.AsyncCommand<HistoryModel, HistoryReal> {
 
 /**
  * A push the browser makes itself — a link, `navigation.navigate()` — which
- * may land the router on another URL than the one the browser committed: a
+ * may land the router on another URL than the one the browser was given: a
  * `forwardTo` source, from another route or from the one the router shows
- * (#2744). The navigation adds at most one entry, and the current entry
- * carries the router's URL.
+ * (#2744). The navigation adds at most one entry, the current entry carries
+ * the router's URL, and the browser applies its scroll there once (#2751).
  */
 class BrowserPushCommand implements fc.AsyncCommand<HistoryModel, HistoryReal> {
   constructor(
@@ -135,6 +135,7 @@ class BrowserPushCommand implements fc.AsyncCommand<HistoryModel, HistoryReal> {
     const shown = m.stack[m.cursor];
     // The browser turns a push to the URL it shows into a replace.
     const sameUrl = r.router.buildPath(shown.name, shown.params) === this.url;
+    const scrolls = r.mockNav.scrolls.length;
 
     r.mockNav.navigate(`http://localhost${this.url}`);
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -150,10 +151,54 @@ class BrowserPushCommand implements fc.AsyncCommand<HistoryModel, HistoryReal> {
     expect(r.router.getState()?.name).toBe(this.landsOn);
     expect(r.mockNav.entries()).toHaveLength(m.stack.length);
     expect(current.pathname + current.search).toBe(r.router.getState()?.path);
+    expect(r.mockNav.scrolls.slice(scrolls)).toStrictEqual([
+      r.mockNav.currentUrl,
+    ]);
   }
 
   toString() {
     return `browserPush(${this.url})`;
+  }
+}
+
+/**
+ * `history.pushState()` from outside the router: it stays in the document, so
+ * no redirect reaches it, and the plugin's write after the transition — when
+ * the router lands on another URL — aborts it (#2751). It always adds an
+ * entry, and the browser applies its scroll there once.
+ */
+class HistoryPushCommand implements fc.AsyncCommand<HistoryModel, HistoryReal> {
+  constructor(
+    readonly url: string,
+    readonly landsOn: string,
+  ) {}
+
+  check(m: Readonly<HistoryModel>) {
+    return m.started;
+  }
+
+  async run(m: HistoryModel, r: HistoryReal) {
+    const scrolls = r.mockNav.scrolls.length;
+
+    r.mockNav.historyPushState(`http://localhost${this.url}`);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    m.stack = m.stack.slice(0, m.cursor + 1);
+    m.stack.push({ name: this.landsOn, params: {} });
+    m.cursor = m.stack.length - 1;
+
+    const current = new URL(r.mockNav.currentUrl);
+
+    expect(r.router.getState()?.name).toBe(this.landsOn);
+    expect(r.mockNav.entries()).toHaveLength(m.stack.length);
+    expect(current.pathname + current.search).toBe(r.router.getState()?.path);
+    expect(r.mockNav.scrolls.slice(scrolls)).toStrictEqual([
+      r.mockNav.currentUrl,
+    ]);
+  }
+
+  toString() {
+    return `historyPush(${this.url})`;
   }
 }
 
@@ -163,9 +208,16 @@ class BackCommand implements fc.AsyncCommand<HistoryModel, HistoryReal> {
   }
 
   async run(m: HistoryModel, r: HistoryReal) {
+    const scrolls = r.mockNav.scrolls.length;
+
     await r.mockNav.goBack();
     await new Promise((resolve) => setTimeout(resolve, 10));
     m.cursor--;
+
+    // A traversal the router takes gets the browser's scroll once (#2751).
+    expect(r.mockNav.scrolls.slice(scrolls)).toStrictEqual([
+      r.mockNav.currentUrl,
+    ]);
   }
 
   toString() {
@@ -179,9 +231,15 @@ class ForwardCommand implements fc.AsyncCommand<HistoryModel, HistoryReal> {
   }
 
   async run(m: HistoryModel, r: HistoryReal) {
+    const scrolls = r.mockNav.scrolls.length;
+
     await r.mockNav.goForward();
     await new Promise((resolve) => setTimeout(resolve, 10));
     m.cursor++;
+
+    expect(r.mockNav.scrolls.slice(scrolls)).toStrictEqual([
+      r.mockNav.currentUrl,
+    ]);
   }
 
   toString() {
@@ -736,6 +794,10 @@ const allCommands = [
     new BrowserPushCommand("/home", "home"),
     new BrowserPushCommand("/users/list", "users.list"),
     new BrowserPushCommand("/old", "users.list"),
+  ),
+  fc.constantFrom(
+    new HistoryPushCommand("/home", "home"),
+    new HistoryPushCommand("/old", "users.list"),
   ),
 
   fc.constant(new BackCommand()),

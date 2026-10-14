@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-empty-function -- interface stubs */
 
 let entryCounter = 0;
+let idCounter = 0;
 
 /** The promises of a navigation that left the document. */
 const PENDING = new Promise<never>(() => {});
@@ -10,8 +11,11 @@ function generateKey(): string {
   return `key-${++entryCounter}`;
 }
 
+// Every entry gets an id of its own: a replace keeps the key of the entry it
+// replaces and changes its id (measured on Chromium 153, Firefox 155 and
+// WebKit 26.6, #2751).
 function generateId(): string {
-  return `id-${entryCounter}`;
+  return `id-${++idCounter}`;
 }
 
 function isSameOrigin(url: string, base: string): boolean {
@@ -124,7 +128,13 @@ export class MockNavigateEvent extends Event implements NavigateEvent {
   readonly sourceElement: Element | null;
 
   private _interceptHandlers: NavigationInterceptHandler[] = [];
+  private _precommitHandlers: NavigationPrecommitHandler[] = [];
   private _abortController: AbortController;
+  private _manualScroll = false;
+  private _scrolled = false;
+  private readonly _precommitSupported: boolean;
+  /** Records a scroll the browser applies for this navigation. */
+  _onScroll: () => void = () => {};
 
   constructor(options: {
     navigationType: NavigationType;
@@ -137,8 +147,14 @@ export class MockNavigateEvent extends Event implements NavigateEvent {
     sourceElement?: Element | null;
     downloadRequest?: string | null;
     formData?: FormData | null;
+    cancelable?: boolean;
+    precommitSupported?: boolean;
   }) {
-    super("navigate", { cancelable: true, bubbles: false });
+    super("navigate", {
+      cancelable: options.cancelable ?? true,
+      bubbles: false,
+    });
+    this._precommitSupported = options.precommitSupported ?? true;
     this.navigationType = options.navigationType;
     this.destination = options.destination;
     this.canIntercept = options.canIntercept;
@@ -153,16 +169,71 @@ export class MockNavigateEvent extends Event implements NavigateEvent {
   }
 
   intercept(options?: NavigationInterceptOptions): void {
+    // A browser without precommit handlers ignores the option; one with them
+    // refuses it on a navigation that cannot be cancelled — a traversal
+    // without a user activation (measured on Chromium 153, #2740).
+    if (options?.precommitHandler && this._precommitSupported) {
+      if (!this.cancelable) {
+        throw new DOMException(
+          "A navigation that cannot be cancelled takes no precommit handler",
+          "InvalidStateError",
+        );
+      }
+
+      this._precommitHandlers.push(options.precommitHandler);
+    }
+
     if (options?.handler) {
       this._interceptHandlers.push(options.handler);
     }
+
+    if (options?.scroll === "manual") {
+      this._manualScroll = true;
+    }
   }
 
-  scroll(): void {}
+  /**
+   * The scroll the browser applies when a navigation finishes. It works on a
+   * navigation another one has aborted, once per navigation (measured on
+   * Chromium 153, Firefox 155 and WebKit 26.6, #2751).
+   */
+  scroll(): void {
+    if (this._scrolled) {
+      throw new DOMException(
+        "The navigation has already scrolled",
+        "InvalidStateError",
+      );
+    }
+
+    this._scrolled = true;
+    this._onScroll();
+  }
+
+  get _hasPrecommitHandlers(): boolean {
+    return this._precommitHandlers.length > 0;
+  }
+
+  async _runPrecommitHandlers(
+    controller: NavigationPrecommitController,
+  ): Promise<void> {
+    for (const handler of this._precommitHandlers) {
+      await handler(controller);
+    }
+  }
 
   async _runHandlers(): Promise<void> {
     for (const handler of this._interceptHandlers) {
       await handler();
+    }
+  }
+
+  /**
+   * The browser's own scroll when the handlers finish. An aborted navigation
+   * gets none, and neither does a `scroll: "manual"` one.
+   */
+  _finish(): void {
+    if (!this.signal.aborted && !this._manualScroll && !this._scrolled) {
+      this.scroll();
     }
   }
 
@@ -172,6 +243,40 @@ export class MockNavigateEvent extends Event implements NavigateEvent {
 
   _abort(): void {
     this._abortController.abort();
+  }
+}
+
+/** What a precommit handler gets: `redirect()` sets the URL the navigation commits. */
+export class MockNavigationPrecommitController implements NavigationPrecommitController {
+  private readonly _event: MockNavigateEvent;
+  private readonly _from: string;
+  private readonly _onRedirect: (url: string) => void;
+
+  constructor(
+    event: MockNavigateEvent,
+    from: string,
+    onRedirect: (url: string) => void,
+  ) {
+    this._event = event;
+    this._from = from;
+    this._onRedirect = onRedirect;
+  }
+
+  addHandler(handler: NavigationInterceptHandler): void {
+    this._event.intercept({ handler });
+  }
+
+  redirect(url: string | URL): void {
+    const resolved = new URL(url, this._from).href;
+
+    if (!isSameOrigin(resolved, this._from)) {
+      throw new DOMException(
+        "The document cannot have its URL rewritten to the redirect's",
+        "SecurityError",
+      );
+    }
+
+    this._onRedirect(resolved);
   }
 }
 
@@ -273,10 +378,22 @@ export class MockNavigation implements Navigation {
    * browser commits whether or not a listener intercepts it.
    */
   historyPushState(url: string): NavigationResult {
+    return this._historyNavigation("push", url);
+  }
+
+  /** `history.replaceState()` by code outside the router — see `historyPushState`. */
+  historyReplaceState(url: string): NavigationResult {
+    return this._historyNavigation("replace", url);
+  }
+
+  private _historyNavigation(
+    navigationType: "push" | "replace",
+    url: string,
+  ): NavigationResult {
     const resolvedUrl = new URL(url, this.currentUrl).href;
 
     return this._performNavigation({
-      navigationType: "push",
+      navigationType,
       destinationUrl: resolvedUrl,
       destinationState: undefined,
       canIntercept: true,
@@ -448,6 +565,7 @@ export class MockNavigation implements Navigation {
     this._currentIndex = 0;
     this._listeners.clear();
     this._ongoingAbortController = null;
+    this._scrolls.length = 0;
     this._crossDocumentNavigations.length = 0;
     this._downloads.length = 0;
   }
@@ -504,9 +622,19 @@ export class MockNavigation implements Navigation {
       abortController,
       downloadRequest: params.downloadRequest ?? null,
       formData: params.formData ?? null,
+      // A traversal without a user activation cannot be cancelled.
+      cancelable: !isTraverse,
+      precommitSupported: this._precommitSupported,
     });
 
+    event._onScroll = () => {
+      this._scrolls.push(this.currentUrl);
+    };
+
     this._dispatch(event);
+
+    // A precommit handler can redirect the navigation before it commits.
+    let committedUrl = params.destinationUrl;
 
     const applyNavigation = (): MockNavigationEntry => {
       if (params.navigationType === "traverse") {
@@ -528,7 +656,7 @@ export class MockNavigation implements Navigation {
 
       if (params.navigationType === "replace") {
         const currentKey = this.currentEntry?.key ?? generateKey();
-        const newEntry = new MockNavigationEntry(params.destinationUrl, {
+        const newEntry = new MockNavigationEntry(committedUrl, {
           key: currentKey,
           state: params.destinationState,
           index: this._currentIndex,
@@ -540,7 +668,7 @@ export class MockNavigation implements Navigation {
       }
 
       this._entries = this._entries.slice(0, this._currentIndex + 1);
-      const newEntry = new MockNavigationEntry(params.destinationUrl, {
+      const newEntry = new MockNavigationEntry(committedUrl, {
         state: params.destinationState,
         index: this._entries.length,
       });
@@ -552,21 +680,29 @@ export class MockNavigation implements Navigation {
     };
 
     if (event._wasIntercepted) {
-      const committedPromise = new Promise<MockNavigationEntry>(
-        (resolve, reject) => {
-          try {
-            resolve(applyNavigation());
-          } catch (error) {
-            // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- re-throwing caught error
-            reject(error);
-          }
-        },
-      );
+      const committedPromise = event._hasPrecommitHandlers
+        ? this._commitAfterPrecommit(event, applyNavigation, (url) => {
+            committedUrl = url;
+          })
+        : new Promise<MockNavigationEntry>((resolve, reject) => {
+            try {
+              resolve(applyNavigation());
+            } catch (error) {
+              // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- re-throwing caught error
+              reject(error);
+            }
+          });
 
       const finishedPromise = committedPromise.then(async (entry) => {
         try {
           await event._runHandlers();
-          this._ongoingAbortController = null;
+
+          // A newer navigation that aborted this one owns the slot.
+          if (this._ongoingAbortController === abortController) {
+            this._ongoingAbortController = null;
+          }
+
+          event._finish();
 
           return entry;
         } catch (error) {
@@ -605,6 +741,35 @@ export class MockNavigation implements Navigation {
       committed: Promise.resolve(entry),
       finished: Promise.resolve(entry),
     };
+  }
+
+  /**
+   * A navigation with precommit handlers commits once they settle, at the URL
+   * one of them redirected it to: a microtask after the call that started it
+   * at the earliest, `history.pushState()` included. A handler that rejects
+   * cancels the navigation, and so does a newer navigation that starts before
+   * the commit (measured on Chromium 153, Firefox 155 and WebKit 26.6, #2751).
+   */
+  private async _commitAfterPrecommit(
+    event: MockNavigateEvent,
+    applyNavigation: () => MockNavigationEntry,
+    redirect: (url: string) => void,
+  ): Promise<MockNavigationEntry> {
+    try {
+      await event._runPrecommitHandlers(
+        new MockNavigationPrecommitController(event, this.currentUrl, redirect),
+      );
+    } catch (error) {
+      event._abort();
+
+      throw error;
+    }
+
+    if (event.signal.aborted) {
+      throw new DOMException("The navigation was aborted", "AbortError");
+    }
+
+    return applyNavigation();
   }
 
   private _dispatch(event: MockNavigateEvent): void {
@@ -682,6 +847,8 @@ export class MockNavigation implements Navigation {
   }
 
   private _strictIntercept = false;
+  private _precommitSupported = true;
+  private readonly _scrolls: string[] = [];
   private readonly _crossDocumentNavigations: string[] = [];
   private readonly _downloads: string[] = [];
   private _asyncDispatch = false;
@@ -709,6 +876,14 @@ export class MockNavigation implements Navigation {
     this._asyncDispatch = true;
   }
 
+  /**
+   * A browser without precommit handlers — released Safari, Chromium before
+   * 141 (MDN): `intercept()` ignores `precommitHandler`.
+   */
+  disablePrecommit(): void {
+    this._precommitSupported = false;
+  }
+
   /** URLs this document was left for: cross-document navigations no listener intercepted. */
   get crossDocumentNavigations(): readonly string[] {
     return this._crossDocumentNavigations;
@@ -717,5 +892,13 @@ export class MockNavigation implements Navigation {
   /** URLs of `download()` clicks no listener intercepted. */
   get downloads(): readonly string[] {
     return this._downloads;
+  }
+
+  /**
+   * The document's URL each time the browser applied a navigation's scroll:
+   * when its handlers finished, or on `event.scroll()` (#2751).
+   */
+  get scrolls(): readonly string[] {
+    return this._scrolls;
   }
 }
