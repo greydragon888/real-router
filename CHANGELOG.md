@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-10-14]
+
+### @real-router/navigation-plugin@0.14.2
+
+### Patch Changes
+
+- [#2752](https://github.com/greydragon888/real-router/pull/2752) [`8848c45`](https://github.com/greydragon888/real-router/commit/8848c452117fc29842cc5bf943435e9caf849091) Thanks [@greydragon888](https://github.com/greydragon888)! - A navigation the browser makes to a URL the router rewrites scrolls as a navigation to the router's URL does ([#2751](https://github.com/greydragon888/real-router/issues/2751))
+
+  When the router lands on another URL than the one such a navigation was given — a `forwardTo` source, a trailing slash `trailingSlash: "never"` strips, a query `defaultSearch` adds, among others — the plugin wrote the router's URL after the transition. That write is a navigation of its own: it aborted the browser's, and the browser skipped the scroll it applies when a navigation finishes. The new route showed at the old page's scroll position, a link with a fragment did not scroll to it, and Back or Forward onto such an entry did not restore its position. `navigateerror` fired with `AbortError`, and `finished` of the `navigation.navigate()` call rejected with it.
+
+  - In a browser with precommit handlers — Chrome 141 and Firefox 147, no released Safari (MDN) — a link, a GET form, `navigation.navigate()`, `location.assign()` or `location.replace()` gets the router's URL before its commit, from a precommit handler's `redirect()`. The plugin has nothing to rewrite afterwards: the browser scrolls to the top or to the fragment, `finished` resolves, and `navigateerror` does not fire.
+  - Such a navigation commits one microtask after the call that starts it, and the router's transition starts then; both happened within the call. In that microtask it is a pending navigation: a newer navigation or a download cancels it before its commit. A router navigation started in the same task runs first, and one an async guard still holds when the redirected navigation commits is superseded by it. A link the router refuses leaves the entry ahead of the page at the router's URL instead of the one it was given.
+  - Where no redirect is made — `history.pushState()` and `history.replaceState()`, which a precommit handler would make return before the URL changes; Back and Forward, whose traversal `redirect()` refuses; a browser without precommit handlers; a navigation made while the router is starting, which commits within the call as before — the plugin asks the browser for the scroll its write cancelled, with `event.scroll()`. So it does when the app writes the URL as the router lands, as `router.replaceHistoryState()` from a subscriber does, on a URL no route matches too. `navigateerror` still fires there.
+
+  Measured on Chromium 153, Firefox 155 and WebKit 26.6, and on Chromium 139, which has no precommit handlers. Back or Forward onto an entry whose URL the router rewrites gets its scroll position back in Chromium only; Firefox and WebKit end at the top. The scroll `event.scroll()` applies comes even when another `navigate` listener intercepted the navigation with `scroll: "manual"`, and that listener's own `event.scroll()` then throws `InvalidStateError`: a navigation scrolls once.
+
 ## [2026-10-13]
 
 ### @real-router/navigation-plugin@0.14.1
