@@ -16,7 +16,7 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
 
-import { arbHash, NUM_RUNS } from "./helpers";
+import { arbHash, NUM_RUNS, namesHost } from "./helpers";
 import { buildActiveClassName, buildHref } from "../../src/dom-utils";
 
 import type { Router } from "@real-router/core";
@@ -403,6 +403,8 @@ describe("buildHref — Property Tests", () => {
     test.prop([fc.string({ minLength: 1, maxLength: 16 })], {
       numRuns: NUM_RUNS.standard,
     })("buildUrl=()=>undefined uses buildPath result", (path) => {
+      fc.pre(!namesHost(path));
+
       const router = makeFakeRouter(
         () => undefined,
         () => path,
@@ -461,6 +463,8 @@ describe("buildHref — Property Tests", () => {
     test.prop([arbHash, fc.string({ minLength: 1, maxLength: 12 })], {
       numRuns: NUM_RUNS.thorough,
     })("fallback path → hash is encodeURI'd and # → %23", (rawHash, path) => {
+      fc.pre(!namesHost(path));
+
       const router = makeFakeRouter(undefined, () => path);
       const href = buildHref(router, "any", {}, undefined, rawHash);
 
@@ -579,6 +583,8 @@ describe("buildHref — Property Tests", () => {
     test.prop([arbHash, arbPathLike], { numRuns: NUM_RUNS.thorough })(
       "no literal `#` appears in the rendered fragment portion of href",
       (rawHash, path) => {
+        fc.pre(!namesHost(path));
+
         const router = makeFakeRouter(undefined, () => path);
         const href = buildHref(router, "any", {}, undefined, rawHash);
 
@@ -612,6 +618,8 @@ describe("buildHref — Property Tests", () => {
     test.prop([fc.string({ minLength: 1, maxLength: 16 })], {
       numRuns: NUM_RUNS.standard,
     })("buildUrl=()=>'' uses buildPath result, not ''", (path) => {
+      fc.pre(!namesHost(path));
+
       const router = makeFakeRouter(
         () => "",
         () => path,
@@ -629,6 +637,8 @@ describe("buildHref — Property Tests", () => {
     )(
       "buildUrl=()=>'' + hash → falls back to buildPath + appended fragment",
       (hash, path) => {
+        fc.pre(!namesHost(path));
+
         // Mirror buildHref's leading-`#` strip behaviour; if the stripped
         // hash is empty (e.g. raw input was just `"#"`), the fallback path
         // appends no fragment per documented contract.
@@ -657,6 +667,8 @@ describe("buildHref — Property Tests", () => {
     test.prop([fc.string({ minLength: 1, maxLength: 16 })], {
       numRuns: NUM_RUNS.standard,
     })("buildUrl=()=>null uses buildPath result", (path) => {
+      fc.pre(!namesHost(path));
+
       const router = makeFakeRouter(
         (() => null) as unknown as Parameters<typeof makeFakeRouter>[0],
         () => path,

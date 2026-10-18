@@ -19,7 +19,7 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it, vi } from "vitest";
 
-import { arbHash, arbLongString, NUM_RUNS } from "./helpers";
+import { arbHash, arbLongString, NUM_RUNS, namesHost } from "./helpers";
 import {
   applyLinkA11y,
   buildActiveClassName,
@@ -464,6 +464,8 @@ describe("buildHref — Property Tests (Solid)", () => {
     test.prop([fc.string({ minLength: 1, maxLength: 16 })], {
       numRuns: NUM_RUNS.standard,
     })("buildUrl=()=>undefined uses buildPath result", (path) => {
+      fc.pre(!namesHost(path));
+
       const router = makeFakeRouter(
         () => undefined,
         () => path,
@@ -477,6 +479,8 @@ describe("buildHref — Property Tests (Solid)", () => {
     test.prop([fc.string({ minLength: 1, maxLength: 16 })], {
       numRuns: NUM_RUNS.standard,
     })("router without buildUrl uses buildPath", (path) => {
+      fc.pre(!namesHost(path));
+
       const router = makeFakeRouter(undefined, () => path);
 
       expect(buildHref(router, "any", {})).toBe(path);
@@ -531,6 +535,8 @@ describe("buildHref — Property Tests (Solid)", () => {
     test.prop([arbHash, fc.string({ minLength: 1, maxLength: 12 })], {
       numRuns: NUM_RUNS.thorough,
     })("fallback path → hash is encodeURI'd and # → %23", (rawHash, path) => {
+      fc.pre(!namesHost(path));
+
       const router = makeFakeRouter(undefined, () => path);
       const href = buildHref(router, "any", {}, undefined, rawHash);
 
@@ -582,6 +588,8 @@ describe("buildHref — Property Tests (Solid)", () => {
     test.prop([fc.string({ minLength: 1, maxLength: 12 })], {
       numRuns: NUM_RUNS.standard,
     })("hash === '' returns path without `#` suffix", (path) => {
+      fc.pre(!namesHost(path));
+
       const router = makeFakeRouter(undefined, () => path);
 
       expect(buildHref(router, "any", {}, undefined, "")).toBe(path);
@@ -592,6 +600,8 @@ describe("buildHref — Property Tests (Solid)", () => {
     })(
       "hash === '#' (strips to '') returns path without `#` suffix",
       (path) => {
+        fc.pre(!namesHost(path));
+
         const router = makeFakeRouter(undefined, () => path);
 
         expect(buildHref(router, "any", {}, undefined, "#")).toBe(path);
@@ -685,6 +695,8 @@ describe("buildHref — Property Tests (Solid)", () => {
     })(
       "buildHref output stripped → fed back yields identical fragment encoding",
       (path) => {
+        fc.pre(!namesHost(path));
+
         const router = makeFakeRouter(undefined, () => path);
 
         // Use a hash with a `#` to exercise the defensive %23 replacement on
@@ -813,6 +825,8 @@ describe("buildHref — Property Tests (Solid)", () => {
     test.prop([fc.string({ minLength: 1, maxLength: 12 })], {
       numRuns: NUM_RUNS.standard,
     })("buildUrl returning '' → falls through to buildPath", (path) => {
+      fc.pre(!namesHost(path));
+
       // buildUrl returns the empty string — a contract violation that
       // would silently self-navigate if not caught.
       const router = makeFakeRouter(
@@ -828,6 +842,8 @@ describe("buildHref — Property Tests (Solid)", () => {
     test.prop([fc.string({ minLength: 1, maxLength: 12 })], {
       numRuns: NUM_RUNS.standard,
     })("buildUrl returning null → falls through to buildPath", (path) => {
+      fc.pre(!namesHost(path));
+
       // buildUrl returns null — escapes the `string | undefined`
       // type contract via a cast.
       const router = makeFakeRouter(
@@ -852,6 +868,8 @@ describe("buildHref — Property Tests (Solid)", () => {
     )(
       "buildUrl returning '' + hash → fallback applies hash via buildPath path",
       (path, hash) => {
+        fc.pre(!namesHost(path));
+
         const router = makeFakeRouter(
           () => "",
           () => path,

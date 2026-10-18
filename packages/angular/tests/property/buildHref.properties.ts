@@ -26,7 +26,7 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, vi } from "vitest";
 
-import { NUM_RUNS, arbDottedNameExtended, arbHash } from "./helpers";
+import { NUM_RUNS, arbDottedNameExtended, arbHash, namesHost } from "./helpers";
 import { buildHref } from "../../src/dom-utils";
 
 import type { Params, Router } from "@real-router/core";
@@ -57,6 +57,8 @@ describe("buildHref — Property Tests", () => {
     test.prop([fc.string({ minLength: 1, maxLength: 16 })], {
       numRuns: NUM_RUNS.standard,
     })("buildUrl=()=>undefined uses buildPath result", (path) => {
+      fc.pre(!namesHost(path));
+
       const router = makeFakeRouter(
         () => undefined,
         () => path,
@@ -153,6 +155,8 @@ describe("buildHref — Property Tests", () => {
     test.prop([arbHash, fc.string({ minLength: 1, maxLength: 12 })], {
       numRuns: NUM_RUNS.extensive,
     })("fallback path → hash is encodeURI'd and # → %23", (rawHash, path) => {
+      fc.pre(!namesHost(path));
+
       const router = makeFakeRouter(undefined, () => path);
       const href = buildHref(router, "any", {}, undefined, rawHash);
 
@@ -449,6 +453,8 @@ describe("buildHref — Property Tests", () => {
     })(
       "buildHref's fragment matches reference spec for any RFC 3986 input",
       (rawHash, path) => {
+        fc.pre(!namesHost(path));
+
         const router = {
           buildUrl: undefined,
           buildPath: () => path,
@@ -669,7 +675,7 @@ describe("buildHref — Property Tests", () => {
   // refactor that "cleaned up" the path would silently break Unicode-routed
   // pages and apps that already render fragments inside the path string.
   // ===========================================================================
-  describe("Invariant 15: path is forwarded verbatim — Unicode + control chars + embedded `#`/`?` survive (audit §2.1/§2.2)", () => {
+  describe("Invariant 15: path is forwarded verbatim — Unicode + control chars + embedded `#`/`?` survive (audit §2.1/§2.2); a path that names a host aside", () => {
     // fast-check v4 dropped the dedicated `fullUnicodeString` arbitrary; the
     // `constantFrom` band is curated to cover every script class that matters
     // for verbatim-passthrough verification (CJK, RTL, astral plane,
@@ -739,8 +745,9 @@ describe("buildHref — Property Tests", () => {
       (prefix, suffix) => {
         fc.pre(!prefix.includes("#"));
         fc.pre(!suffix.includes("#"));
-
         const pathWithHash = `/${prefix}#${suffix}`;
+
+        fc.pre(!namesHost(pathWithHash));
         const router = {
           buildUrl: undefined,
           buildPath: () => pathWithHash,

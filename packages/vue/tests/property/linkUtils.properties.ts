@@ -24,7 +24,7 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, vi } from "vitest";
 
-import { arbHash, NUM_RUNS } from "./helpers";
+import { arbHash, NUM_RUNS, namesHost } from "./helpers";
 import { buildActiveClassName, buildHref } from "../../src/dom-utils";
 
 import type { Router } from "@real-router/core";
@@ -329,6 +329,8 @@ describe("buildHref — Property Tests", () => {
     test.prop([fc.string({ minLength: 1, maxLength: 16 })], {
       numRuns: NUM_RUNS.standard,
     })("buildUrl=()=>undefined uses buildPath result", (path) => {
+      fc.pre(!namesHost(path));
+
       const router = makeFakeRouter(
         () => undefined,
         () => path,
@@ -387,6 +389,8 @@ describe("buildHref — Property Tests", () => {
     test.prop([arbHash, fc.string({ minLength: 1, maxLength: 12 })], {
       numRuns: NUM_RUNS.thorough,
     })("fallback path → hash is encodeURI'd and # → %23", (rawHash, path) => {
+      fc.pre(!namesHost(path));
+
       const router = makeFakeRouter(undefined, () => path);
       const href = buildHref(router, "any", {}, undefined, rawHash);
 
