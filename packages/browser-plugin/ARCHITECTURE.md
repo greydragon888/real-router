@@ -430,7 +430,7 @@ Preserves search params: the result is `extractPath(pathname, base) + search`.
 
 **`buildUrl(path, base)`**:
 
-Simple concatenation: `base + path`.
+Concatenation: `base + path`. With an empty base, a path that would read as a host — a catch-all route prints `//evil.com` for `rest: "/evil.com"` — gets the `/.` prefix: the URL parser drops the dot segment, so the pathname stays the path and the host stays the page's.
 
 ## Popstate Utilities, Error Recovery
 

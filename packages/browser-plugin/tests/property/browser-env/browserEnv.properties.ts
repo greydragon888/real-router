@@ -163,6 +163,41 @@ describe("Browser-env Properties", () => {
     );
   });
 
+  describe("buildUrl — the URL stays on the page's origin", () => {
+    // Two of `/` and `\\` at the start name a host; the URL parser drops tab
+    // and newline anywhere, so they sit between the two.
+    const arbHostPrefix = fc
+      .array(fc.constantFrom("/", "\\", "\t", "\n", "\r", "."), {
+        maxLength: 5,
+      })
+      .map((chars) => chars.join(""));
+
+    test.prop([arbHostPrefix, fc.string(), arbBasePath], {
+      numRuns: NUM_RUNS.thorough,
+    })(
+      "new URL(buildUrl(path, base), page).origin is the page's origin",
+      (prefix: string, rest: string, rawBase: string) => {
+        const url = buildUrl(prefix + rest, normalizeBase(rawBase));
+
+        expect(new URL(url, "https://app.test/x").origin).toBe(
+          "https://app.test",
+        );
+      },
+    );
+
+    test.prop([fc.integer({ min: 1, max: 3 }), arbUrlPath], {
+      numRuns: NUM_RUNS.standard,
+    })(
+      "a router path that begins with '//' keeps its pathname",
+      (extra: number, path: string) => {
+        const routerPath = "/".repeat(extra) + path;
+        const url = buildUrl(routerPath, "");
+
+        expect(new URL(url, "https://app.test/x").pathname).toBe(routerPath);
+      },
+    );
+  });
+
   describe("urlToPath — total over valid HTTP URLs", () => {
     const arbAbsoluteUrl = fc
       .tuple(arbUrlPath, arbSearchString, arbHashString)

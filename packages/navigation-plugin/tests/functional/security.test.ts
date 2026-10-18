@@ -112,3 +112,55 @@ describe("replaceHistoryState Validation", () => {
     expect(withoutMeta(router.getState()!)).toStrictEqual(stateBefore);
   });
 });
+
+// A splat that begins with "/" prints a router path that begins with "//",
+// and a URL that begins with "//" names a host: `nav.navigate("//evil.com")`
+// leaves the origin. The URL the plugin writes keeps the path a path.
+describe("Same-origin URL writes", () => {
+  const catchAllConfig = [...routerConfig, { name: "any", path: "/*rest" }];
+
+  it("keeps a document opened at an encoded leading slash on its origin", async () => {
+    const mock = new MockNavigation("http://localhost/%2Fevil.com");
+    const browser = createMockNavigationBrowser(mock);
+    const router = createRouter(catchAllConfig);
+
+    router.usePlugin(navigationPluginFactory({ base: "" }, browser));
+    await router.start();
+
+    const url = new URL(mock.currentUrl);
+
+    expect(url.origin).toBe("http://localhost");
+    expect(url.pathname).toBe(router.getState()!.path);
+  });
+
+  it.each(["/evil.com", "//evil.com"])(
+    "keeps router.navigate with splat %j on the origin",
+    async (rest) => {
+      const mock = new MockNavigation("http://localhost/home");
+      const browser = createMockNavigationBrowser(mock);
+      const router = createRouter(catchAllConfig);
+
+      router.usePlugin(navigationPluginFactory({ base: "" }, browser));
+      await router.start("/home");
+      await router.navigate("any", { rest });
+
+      const url = new URL(mock.currentUrl);
+
+      expect(url.origin).toBe("http://localhost");
+      expect(url.pathname).toBe(router.getState()!.path);
+    },
+  );
+
+  it("prints a link href on the origin", async () => {
+    const mock = new MockNavigation("http://localhost/home");
+    const browser = createMockNavigationBrowser(mock);
+    const router = createRouter(catchAllConfig);
+
+    router.usePlugin(navigationPluginFactory({ base: "" }, browser));
+    await router.start("/home");
+
+    const href = router.buildUrl("any", { rest: "/evil.com" });
+
+    expect(new URL(href, mock.currentUrl).origin).toBe("http://localhost");
+  });
+});

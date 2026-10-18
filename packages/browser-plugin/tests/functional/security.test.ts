@@ -384,3 +384,28 @@ describe("Browser Plugin — Security", () => {
     });
   });
 });
+
+// A splat that begins with "/" prints a router path that begins with "//".
+// `history.replaceState` refuses a URL that names another host, so the URL
+// the plugin writes keeps the path a path, or the address bar and the state
+// disagree.
+describe("Browser Plugin — same-origin URL writes", () => {
+  it("writes the router path of a splat that begins with '/' on the origin", async () => {
+    globalThis.history.replaceState({}, "", "/%2Fevil.com");
+
+    const origin = globalThis.location.origin;
+    const router = createRouter([
+      ...routerConfig,
+      { name: "any", path: "/*rest" },
+    ]);
+
+    router.usePlugin(browserPluginFactory({}));
+    await router.start();
+
+    expect(globalThis.location.origin).toBe(origin);
+    expect(globalThis.location.pathname).toBe(router.getState()!.path);
+
+    router.stop();
+    globalThis.history.replaceState({}, "", "/");
+  });
+});
