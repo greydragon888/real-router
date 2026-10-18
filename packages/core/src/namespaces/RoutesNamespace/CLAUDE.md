@@ -88,8 +88,8 @@ refuted it.
 
 `createRouter`, `add` and `replace` refuse a route definition whose own `name`
 contains a dot — the nesting belongs in `children` or `{ parent }`. The message is
-`@real-router/validation-plugin`'s, because the rule is not new: it lives in
-`engine/validation/route-batch.ts` and was reachable only through `validateRoute`.
+`@real-router/validation-plugin`'s: the rule is `assertNoDottedRouteName` in
+`engine/validation/route-name.ts`, which bare-core registration and `validateRoute` both call.
 
 ⚠ Only a DEFINITION's own name. A dotted name is still how a nested route is
 ADDRESSED — `get` / `update` / `remove` / `navigate` / `isActiveRoute` /
@@ -141,8 +141,8 @@ synchronously and both naming `queueMicrotask` as the remedy.
 route is refused too, because judging whether a mutation would have corrupted the
 state is the decision the window exists to avoid.
 
-⚑ It replaced an ownership check at the commit, and the writer set is what
-carries the property now: `revalidation-window-doors-1758.test.ts` walks `src`
+⚑ The writer set is what carries the property:
+`revalidation-window-doors-1758.test.ts` walks `src`
 for every write of `store.matcher` / `store.tree` and asserts each one's entry
 point consults the window. ⚠ `navigateToState`'s own check is a different
 question and stays where it is.
@@ -232,6 +232,11 @@ const unsubscribe = getRoutesApi(router).subscribeChanges((event) => {
     case "clear":
       clearAll();
       break;
+    case "rootPath":
+      rebase(event.previous, event.next);
+      break; // carries no routes — every route keeps its name and moves URL
+    default:
+      break; // the union is open: tolerate an op added later
   }
 });
 ```
@@ -267,15 +272,19 @@ getRoutesApi(router).subscribeChanges((event) => {
       event.added.forEach((r) => this.#validate(r));
       break;
     case "update":
-      if (event.patch.searchSchema) this.#revalidate(event.name);
+      if (event.patch.defaultSearch !== undefined) this.#revalidate(event.name);
       break;
     case "remove":
-      this.#validated.delete(event.name);
+      event.removedSubtree.forEach((r) => this.#validated.delete(r.name));
       break;
     case "replace":
     case "clear":
       this.#validated.clear();
       break;
+    case "rootPath":
+      break; // keyed by route name: a root move renames nothing
+    default:
+      this.#validated.clear(); // an op added later
   }
 });
 ```

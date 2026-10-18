@@ -83,7 +83,7 @@ src/
 │   ├── scroll-restore.ts       # createScrollRestoration — opt-in scroll capture + restore
 │   ├── scroll-spy.ts           # createScrollSpy — IntersectionObserver → URL hash (#575)
 │   ├── view-transitions.ts     # createViewTransitions — subscribeLeave-based VT integration
-│   └── direction-tracker.ts    # createDirectionTracker — back/forward annotation; NOT consumed by the Preact RouterProvider, available via the symlink barrel for consumers who want to install it manually before usePlugin(browserPlugin)
+│   └── direction-tracker.ts    # createDirectionTracker — back/forward annotation; NOT consumed by the Preact RouterProvider; re-exported with its `DirectionTracker` type from the main entry for consumers who install it before usePlugin(browserPlugin) (#2587)
 ├── utils/
 │   └── createHttpStatusSink.ts # /ssr — fresh { code: undefined } sink per request
 ├── RouterProvider.tsx
@@ -132,7 +132,7 @@ dist/
 - `NavigatorContext` - Navigator (stable ref, derived from router)
 - `RouteContext` - Navigator + current route + previous route (reactive): `{ navigator: Navigator } & RouteState`
 
-**Subscription Layer:** Hooks use `@real-router/sources` (`createRouteSource`, `createRouteNodeSource`, `createActiveRouteSource`, `createTransitionSource`, `createErrorSource`) via a custom `useSyncExternalStore` polyfill (useState + useEffect). `RouterErrorBoundary` consumes `createDismissableError`, which composes `createErrorSource` with dismissal state.
+**Subscription Layer:** Hooks use `@real-router/sources` (`createRouteSource`, `createRouteNodeSource`, `createActiveSource`, `getTransitionSource`) via a custom `useSyncExternalStore` polyfill (useState + useEffect). `RouterErrorBoundary` consumes `createDismissableError`, which wraps the cached `getErrorSource` with dismissal state.
 
 ## Hooks
 
@@ -152,9 +152,8 @@ dist/
 | Aspect                  | React                                                 | Preact                                     |
 | ----------------------- | ----------------------------------------------------- | ------------------------------------------ |
 | `useSyncExternalStore`  | Native (React 18+)                                    | Custom polyfill (`useState` + `useEffect`) |
-| Context provider        | `<Context value={...}>` (React 19)                    | `<Context.Provider value={...}>`           |
 | `memo()`                | `react`                                               | `preact/compat`                            |
-| `Children.toArray`      | `react`                                               | `toChildArray` from `preact`               |
+| Child iteration         | `Children.forEach` from `react`                       | `toChildArray` from `preact`               |
 | `keepAlive` / Activity  | React 19.2+                                           | Not available                              |
 | `fallback` / `Suspense` | `react`                                               | `preact/compat` (experimental)             |
 | Entry points            | Main + Legacy + `/ssr` + `/legacy/ssr` + `/ink` + RSC | Main + `/ssr`                              |
@@ -165,7 +164,7 @@ Link uses fire-and-forget navigation via `navigateWithHash` (from `dom-utils/lin
 which adds same-route different-hash detection on top of `router.navigate`:
 
 ```typescript
-navigateWithHash(router, routeName, stableParams, hash, stableOptions).catch(
+navigateWithHash(router, name, paramsForNav, search, hash, routeOptions).catch(
   () => {},
 );
 ```
@@ -237,12 +236,12 @@ const { navigator, route } = useRoute(); // Re-renders on every navigation
 inactivity is a legitimate business state, not a lifecycle error.
 
 ```tsx
-// Before:
+// Unnecessary — `route` is never undefined here:
 const { route } = useRoute<{ id: string }>();
 if (!route) return null;
 const id = route?.params.id;
 
-// After:
+// Correct:
 const { route } = useRoute<{ id: string }>();
 const id = route.params.id;
 ```
@@ -302,7 +301,7 @@ etc.) are NOT compared — they don't affect Link's hooks.
 - `""` — clears the hash.
 - `"value"` — sets the hash; click routes through `navigateWithHash`, which auto-adds `force: true, hashChange: true` when the requested hash differs from `state.context.url.hash` on the same route+params (bypasses core's `SAME_STATES`).
 
-`hash` is a regular Link prop included in `areLinkPropsEqual`. Active state is hash-aware: when `hash` is set, the Link is active iff route matches AND `state.context.url.hash` equals expected. Hash-plugin runtime always returns `false` for hash-aware active checks (consistent with the documented hash-plugin limitation).
+`hash` is a regular Link prop included in `areLinkPropsEqual`. Active state is hash-aware: when `hash` is set, the Link is active iff route matches AND `state.context.url.hash` equals expected. Under hash-plugin (no `url` context namespace — the documented hash-plugin limitation) a non-empty `hash` never matches, while `hash=""` matches whenever the route does.
 
 ### No keepAlive
 
@@ -528,8 +527,8 @@ the navigation downstream. Use `<RouterErrorBoundary>` to catch the rejection
 and surface a user-visible toast; rely on the console message during dev to
 locate typos quickly.
 
-Lock: `Link.test.tsx` "should render href-less <a> when buildHref throws"
-(verifies `<a>` rendered, no `href` attribute, `console.error` called once).
+Lock: `Link.test.tsx` "should render without href and log error for invalid routeName"
+(verifies `<a>` rendered, no `href` attribute, `console.error` called with the route name).
 
 ## SSR
 

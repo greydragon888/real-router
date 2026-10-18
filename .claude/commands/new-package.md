@@ -52,7 +52,7 @@ $ARGUMENTS
 - `classify` of `scripts/build-matrix.mjs` puts it in a shard bucket by its dependencies and symlinks, and `scripts/tests/build-matrix.test.mjs` asserts the number of packages in each bucket: raise the count of its bucket and the total, and leave its named lists of buckets alone: other cells build fixtures of a fixed size from them
 - Update `CLAUDE.md` — package count (line 5), See Also link
 - Update `ARCHITECTURE.md` — Package Map tree, Public packages list, Mermaid diagram node + deps
-- Verify `pnpm build` passes with 0 failures — read the task COUNT off the run, never off a number written here
+- The full graph passes with 0 failures — the pre-push hook runs it; read the task COUNT off that run, never off a number written here
 
 ### Wiki (separate repo: `real-router.wiki/`)
 

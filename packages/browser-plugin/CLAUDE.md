@@ -22,7 +22,7 @@ Router Navigation:
   navigate() → Promise<State> → onTransitionSuccess → pushState/replaceState
 
 Browser Back/Forward:
-  popstate → handler (browser-env) → router.navigate()/navigateToNotFound()/navigateToDefault() → pushState/replaceState
+  popstate → handler (browser-env) → api.navigateToState()/navigateToNotFound()/$$error → pushState/replaceState
 ```
 
 ### Promise-Based API
@@ -30,9 +30,9 @@ Browser Back/Forward:
 All navigation methods return `Promise<State>`:
 
 - `router.start(path?)` — path made optional via `createStartInterceptor` from `browser-env` which injects `browser.getLocation()` when no path given
-- `router.navigate()` used in popstate handler with `await` and try/catch
+- `api.navigateToState()` — what the popstate handler calls for a matched URL, awaited inside try/catch; it skips the `forwardState`/`buildPath` round-trip (#525)
 - `router.navigateToNotFound(path?)` — called when `allowNotFound: true` and URL doesn't match any route on popstate (synchronous, returns `State`)
-- `router.navigateToDefault()` called as fallback when URL doesn't match any route and `allowNotFound` is `false`
+- `allowNotFound: false` + an unmatched URL — the handler emits `$$error` with `ROUTE_NOT_FOUND` via `api.emitTransitionError()` and recovers as for a refused traversal (see "A refused traversal returns to the entry it started from"). No silent `navigateToDefault()` fallback (#483)
 
 ## Gotchas
 
@@ -79,14 +79,14 @@ router.buildPath("users", { id: 1 }); // "/users/1" (core)
 router.buildUrl("users", { id: 1 }); // "/app/users/1" (plugin, with base)
 ```
 
-The two differ on more than the base. **`buildUrl` resolves `forwardTo`; `buildPath` does not** (#2250) — on a source `old → fresh`, `buildUrl("old")` prints the target's URL and `buildPath("old")` prints `/old`. A URL is where the click lands, so the plugin door resolves the chain through `forwardState` and prints with `buildPath` — the pair the render path takes, since the committing door's `reportUndeclaredParamKey` is advice about a state you are about to persist (#2248); `buildPath` is LITERAL by record (core INVARIANTS `makeState` row 8), which is what lets a plugin build a state for an alias without being teleported off it.
+The two differ on more than the base. **`buildUrl` resolves `forwardTo`; `buildPath` does not** (#2250) — on a source `old → fresh`, `buildUrl("old")` prints the target's URL and `buildPath("old")` prints `/old`. A URL is where the click lands, so the plugin door — the shared `createPluginBuildUrl` — resolves the chain through `forwardState` and prints with `buildPathResolved`, one pass of the chain (#2260); it does not ask `buildNavigationState`, whose `reportUndeclaredParamKey` is advice about a state you are about to persist (#2248). `buildPath` is LITERAL by record (core INVARIANTS `makeState` row 8), which is what lets a plugin build a state for an alias without being teleported off it.
 
 ### Hash Fragment Support (#532)
 
 URL fragments are first-class state, owned by the plugin. Stored decoded in `state.context.url` (shared namespace claimed by both URL plugins; mutually exclusive with `@real-router/hash-plugin` at runtime).
 
 - **State namespace**: `state.context.url = { hash: string; hashChanged: boolean }` — hash is decoded, no leading `#`. `hashChanged` is `true` when the committed hash differs from the previous transition's `state.context.url.hash` — any hash change, whether browser-driven (popstate hash-only nav) or programmatic (`navigate({ hash })`).
-- **Tri-state `opts.hash`** in `router.navigate(name, params, search?, { hash })` (options at position 4 since RFC-4 M2, #1548): `undefined` preserves, `""` clears, non-empty value sets. Same widening on `router.buildUrl` and `router.replaceHistoryState`.
+- **Tri-state `opts.hash`** in `router.navigate(name, params, search?, { hash })` (options at position 4, #1548): `undefined` preserves, `""` clears, non-empty value sets. Same widening on `router.buildUrl` and `router.replaceHistoryState`.
 - **Popstate hash detection**: `popstate` events do **not** carry the URL — the plugin samples `location.hash` post-update via `getDecodedHash(browser)`. `createPopstateHandler` receives new `getCurrentHash` and `getCurrentContextHash` deps; same-path-different-hash is forwarded as `{ force: true, hashChange: true, hash }` to bypass `SAME_STATES`.
 - **`rollbackUrlToCurrentState`** takes the committed state's own `path` — which already carries its query — prefixes it through the plugin's `pathToUrl` dep, and appends `currentState.context.url.hash` as the encoded fragment itself (#2250). ⚠ **The dep's ARITY is the guard.** #1586 lost both the query and the fragment because the dep was a NAME-based builder whose slots could drift from the injected one: a 4-arg function is assignable to a 3-arg type and `{ hash }` is structurally a `SearchParams`, so the fragment travelled in the query slot with nothing failing. A single `path` has no slots to reslot; a type-equality pin in `tests/functional/browser-env/popstate-handler.test.ts` fails the build if anyone widens it back.
 - **Cached fragment, not a per-nav `location.hash` read (perf)**. `onTransitionSuccess` reads a cached `currentHash`, **not** `location.hash` — a per-nav `location.*` read forces the browser to synchronously commit the pending `pushState` (~0.04 ms/nav). The cache is seeded once in `onStart` via `getDecodedHash(browser)` (covers F5 / cold-load — `location.hash` already reflects the destination, and `popstate` doesn't fire for the initial document load), kept in sync by the plugin's own navigations (`pushState`/`replaceState` don't fire `hashchange`, so the plugin sets it), and refreshed by the shared `hashchange` listener (`Browser.addHashChangeListener` — the required subscription from #759, no-op in SSR via `createSafeBrowser`) for **external** fragment changes — anchor clicks, manual `location.hash =`. The **popstate** path still samples `location.hash` directly (`getCurrentHash`) — a rare back/forward event, not the per-nav hot path.
@@ -151,7 +151,7 @@ The entry the browser stands on is rewritten with the router's state (`rollbackU
 
 ### Explicit `replace: false` on first navigation → push
 
-`router.navigate(..., { replace: false })` before any successful navigation creates a **push** entry (not replace). The `??` operator keeps the explicit `false`. Omit `replace` (or set `true`) if you want replace-on-first behavior.
+`router.navigate(..., { replace: false })` before any successful navigation creates a **push** entry (not replace): `shouldReplaceHistory` replaces a first navigation only when `replace !== false`. Omit `replace` (or set `true`) if you want replace-on-first behavior.
 
 ### replaceHistoryState hash semantics
 
@@ -159,23 +159,14 @@ The entry the browser stands on is rewritten with the router's state (`rollbackU
 
 **Both halves of the call come from the resolved state (#1585).** `replaceHistoryState`
 resolves the target through `buildNavigationState` and then uses that state
-VERBATIM — as the `history.state` record AND as the input to `buildUrl`. Before
-#1585 only the record did: the URL was built from the caller's raw arguments,
-which reached the plain `buildPath` of the day — no `forwardTo` resolution,
-no `forwardState` seam — so the pair could disagree about the very keys the seam contributes.
-Measured with a `persistent-params`-style injection: the record read
-`/posts/9?tab=new&sort=date&lang=de` and the URL beside it `/posts/9?tab=new&sort=date`;
-for a forwarding route the record said `posts` and the URL `/old`. It was the only
-one of the five history writers reading the caller's bag — `onTransitionSuccess`
-(all three plugins) and `rollbackUrlToCurrentState` all build from a committed
-state, and `navigate` has always kept the pair equal.
-
-Two consequences worth knowing: the state is no longer re-made through
-`api.makeState` (that rebuild was a leftover from `buildState`, which built no
-path of its own — it produced a byte-identical state, so it was redundant work
-per history record), and
-`createReplaceHistoryState` no longer takes a `router` argument, since the
-rebuild was its only use for one.
+VERBATIM — as the `history.state` record AND, through its `path`, as the input to
+`buildUrl`. Building the URL from the caller's raw arguments instead reaches a
+plain `buildPath` — no `forwardTo` resolution, no `forwardState` seam — so the pair
+disagrees about the very keys the seam contributes: a `persistent-params`
+injection lands in the record and not in the URL beside it, and a forwarding
+route writes the source name in the URL and the target in the record. The shared
+factory does not re-make the state through `api.makeState` — the resolved state
+already carries the path, so a rebuild would be redundant work per history record.
 
 ## State in History
 
@@ -189,8 +180,8 @@ history.state = {
 };
 ```
 
-Since RFC-4 M2 (#1548) the buffered state carries a dedicated `search` (query)
-channel alongside path-only `params` — a frozen `{}` when the route has no query.
+The buffered state carries a dedicated `search` (query) channel alongside
+path-only `params` (#1548) — a frozen `{}` when the route has no query.
 
 `position` is the entry's place among the entries the plugin wrote (#2740): `run`
 names a numbering without gaps and `index` the entry's place in it. A run starts
@@ -219,8 +210,8 @@ browser-plugin imports from `browser-env`:
 - `createSafeBrowser`, `normalizeBase`, `safelyEncodePath` — factory setup
 - `createStartInterceptor`, `createReplaceHistoryState` — router extensions
 - `createPopstateHandler`, `createPopstateLifecycle` — popstate lifecycle
-- `shouldReplaceHistory`, `updateBrowserState` — transition handling
-- `safeParseUrl` — URL parsing in `urlToPath`
+- `shouldReplaceHistory`, `createUpdateBrowserState` — transition handling
+- `urlToPath` — URL parsing (it wraps `safeParseUrl`)
 - `createOptionsValidator` — options validation
 
 Plugin uses `api.extendRouter()` to formally register `buildUrl`, `matchUrl`, `replaceHistoryState` on the router instance. The returned unsubscribe function is called in `teardown` to remove them. `declare module` augmentation in `index.ts` provides compile-time types for these methods.
@@ -229,6 +220,6 @@ Plugin uses `api.extendRouter()` to formally register `buildUrl`, `matchUrl`, `r
 
 | Method                                                             | Returns              | Description                                                                                                                                                                                                  |
 | ------------------------------------------------------------------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `buildUrl(name, params?, search?, options?: { hash? })`            | `string`             | Build full URL with base path. Query channel at position 3 (RFC-4 M2, #1548); options shift to 4. Optional `hash` (decoded, no leading `#`) is encoded via `encodeURI(s).replace(/#/g, "%23")` and appended. |
+| `buildUrl(name, params?, search?, options?: { hash? })`            | `string`             | Build full URL with base path. Query channel at position 3, options at position 4 (#1548). Optional `hash` (decoded, no leading `#`) is encoded via `encodeURI(s).replace(/#/g, "%23")` and appended. |
 | `matchUrl(url)`                                                    | `State \| undefined` | Parse URL to router state                                                                                                                                                                                    |
 | `replaceHistoryState(name, params?, search?, options?: { hash? })` | `void`               | Update browser URL without triggering navigation. Tri-state `hash`: `undefined` preserves, `""` clears, value sets.                                                                                          |

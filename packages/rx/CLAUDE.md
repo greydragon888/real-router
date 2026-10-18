@@ -85,7 +85,7 @@ When a stream completes, the subscription's teardown runs and the abort listener
 
 `RxObservable` declares `["@@observable"]()` unconditionally and aliases the same function onto `Symbol.observable` whenever the host defines one — `syncInteropAlias()`, called after the class body and from the constructor. A consumer picks the host's symbol if there is one and the string otherwise; `rxjs@7.8.2` spells that `(typeof Symbol === 'function' && Symbol.observable) || '@@observable'`, so a nullish `??` — what the tests model — is the same rule for the two values a host can actually present.
 
-⚠ `Symbol.observable` is not a well-known symbol — a host has one only if something polyfilled it. Declaring it ambiently (`interface SymbolConstructor { readonly observable: symbol }`) is what makes a computed `[Symbol.observable]()` member type-check while installing it under the **string** `"undefined"` on every host without a polyfill; that shape shipped in every release from `0.1.0` to `0.3.81` (#1739).
+⚠ `Symbol.observable` is not a well-known symbol — a host has one only if something polyfilled it. Declaring it ambiently (`interface SymbolConstructor { readonly observable: symbol }`) is what makes a computed `[Symbol.observable]()` member type-check while installing it under the **string** `"undefined"` on every host without a polyfill (#1739).
 
 ⚠ The guard is `typeof === "symbol"` and not a nullish check, so no other host value can be coerced into a property name. `null` alone does not pin that — a nullish guard skips `null` too — which is why the table in `interop-key.hosts.test.ts` carries defined values as well.
 

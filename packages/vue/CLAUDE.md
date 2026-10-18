@@ -4,20 +4,28 @@
 
 **Perf bench (CodSpeed):** this adapter's hot-path suite lives centrally, not in-package (the cross-cutting multi-framework harness needs one prebuild + one V8-flag-wrapped process — see `benchmarks/CLAUDE.md`): `benchmarks/adapter-bench/benches/vue.bench.mts` + `apps/vue.ts` (benches: navigate-param-swap / navigate-search-active-swap — Vue is the one ASYNC suite, commits settle via `await nextTick()`). Run locally: `pnpm -C benchmarks run bench:adapter vue`. Design record: IMPLEMENTATION_NOTES "adapter-bench slot".
 
-## Single Entry Point
+## Entry Points
 
 ```typescript
+// Main entry — client API
 import {
   RouterProvider,
   useRouteNode,
   Link,
   RouteView,
 } from "@real-router/vue";
+
+// SSR-feature subpath — see "SSR-feature surface" below
+import {
+  ClientOnly,
+  HttpStatusCode,
+  createHttpStatusSink,
+} from "@real-router/vue/ssr";
 ```
 
 **Peer dependency:** `vue` >= 3.3.0
 
-**Architecture:** Flat structure. All code lives in `src/`. Single entry point — no legacy/modern split. RouteView included with native `keepAlive` support via Vue's `<KeepAlive>`.
+**Architecture:** Flat structure. All code lives in `src/`. Two entry points — main (`.`) and `/ssr`; no legacy/modern split. RouteView included with native `keepAlive` support via Vue's `<KeepAlive>`.
 
 **RouterProvider Props:**
 
@@ -66,7 +74,8 @@ src/
 │   ├── route-announcer.ts      # createRouteAnnouncer — WCAG aria-live announcements
 │   ├── scroll-restore.ts       # createScrollRestoration — opt-in scroll capture + restore
 │   ├── scroll-spy.ts           # createScrollSpy — IntersectionObserver → URL hash (#575)
-│   └── view-transitions.ts     # createViewTransitions — subscribeLeave-based VT integration
+│   ├── view-transitions.ts     # createViewTransitions — subscribeLeave-based VT integration
+│   └── direction-tracker.ts    # createDirectionTracker — re-exported from src/index.ts (#2587); RouterProvider does not consume it
 ├── utils/
 │   └── createHttpStatusSink.ts # /ssr — fresh { code: undefined } sink per request
 ├── RouterProvider.ts
@@ -82,16 +91,20 @@ src/
 
 ### Build (tsdown)
 
-Single-entry config:
+Dual-entry config (`index` + `ssr`):
 
 ```
 dist/
 ├── esm/
 │   ├── index.mjs
-│   └── index.d.mts
+│   ├── index.d.mts
+│   ├── ssr.mjs
+│   └── ssr.d.mts
 └── cjs/
     ├── index.js
-    └── index.d.ts
+    ├── index.d.ts
+    ├── ssr.js
+    └── ssr.d.ts
 ```
 
 ## Architecture
@@ -133,8 +146,11 @@ A fourth `@internal` key — `HTTP_STATUS_KEY` (provider/inject pair behind `<Ht
 | `useRouteNode(name)`                                                                       | Composable   | Subscribe to specific node changes                                       |
 | `useRouteUtils()`                                                                          | Composable   | Get route tree utilities                                                 |
 | `useRouterTransition()`                                                                    | Composable   | Subscribe to transition state                                            |
+| `useRouteExit(handler, options?)`                                                          | Composable   | Wraps `router.subscribeLeave` with abort + same-route guards             |
+| `useRouteEnter(handler, options?)`                                                         | Composable   | Fires once on nav-driven mount via `watch(route)` + `transition.from`    |
 | `vLink`                                                                                    | Directive    | Low-level navigation directive (`v-link`)                                |
 | `createRouterPlugin`                                                                       | Factory      | Vue Plugin for `app.use()` installation                                  |
+| `createDirectionTracker` / `DirectionTracker`                                              | Function / Type | Optional back/forward annotation utility (#2587); install before `usePlugin(browserPlugin)` |
 | `RouterKey`/`NavigatorKey`/`RouteKey`                                                      | InjectionKey | Vue `provide`/`inject` keys for advanced integration                     |
 | `LinkProps`                                                                                | Type         | Props for `<Link>`                                                       |
 | `LinkDirectiveValue`                                                                       | Type         | Value type for `v-link` directive                                        |
@@ -150,20 +166,20 @@ A fourth `@internal` key — `HTTP_STATUS_KEY` (provider/inject pair behind `<Ht
 | External store bridge     | `useSyncExternalStore` / polyfill         | `createSignalFromSource`      | `useRefFromSource`                                                                                             |
 | `memo()`                  | Required                                  | Not needed                    | Not needed                                                                                                     |
 | Params stabilization      | `canonicalJson` in `@real-router/sources` | Same                          | Same                                                                                                           |
-| Active class on Link      | `className` string concat                 | `classList` object            | `class` string concat                                                                                          |
-| Context count             | 3 (Preact) / 2 (React)                    | 2                             | 3                                                                                                              |
+| Active class on Link      | `className` string concat                 | `class` string concat         | `class` string concat                                                                                          |
+| Context count             | 3                                         | 2                             | 3                                                                                                              |
 | `keepAlive` / Activity    | React 19.2+ only                          | Not available                 | Vue native `<KeepAlive>`                                                                                       |
-| Entry points              | Main + Legacy (React) / Single (Preact)   | Single                        | Single                                                                                                         |
+| Entry points              | Main + Legacy + `/ssr` + `/legacy/ssr` + `/ink` + RSC (React) / Main + `/ssr` (Preact) | Main + `/ssr` | Main + `/ssr` |
 | Build tool                | tsdown                                    | rollup + babel-preset-solid   | tsdown                                                                                                         |
 | Components                | JSX (.tsx)                                | JSX (.tsx)                    | `defineComponent` + `h()` (.ts)                                                                                |
 | RouteView child detection | Element type checking                     | Symbol-based `$$type` markers | `vnode.type === Match`                                                                                         |
 
 ## Promise-Based Navigation
 
-Link uses `.catch(() => {})` to suppress unhandled rejection warnings:
+Link navigates through `navigateWithHash` (from `dom-utils/link-utils`) and uses `.catch(() => {})` to suppress unhandled rejection warnings:
 
 ```typescript
-router.navigate(routeName, routeParams, routeSearch, routeOptions).catch(() => {});
+navigateWithHash(router, resolved.name, resolved.params ?? EMPTY_PARAMS, resolved.search, props.hash, props.routeOptions).catch(() => {});
 ```
 
 ## SSR-feature surface — `@real-router/vue/ssr`
@@ -271,7 +287,7 @@ watch(route, (newRoute) => {
 
 ### shallowRef Under the Hood (not plain `ref`)
 
-Route snapshots are frozen objects. `useRefFromSource` (`useRoute` path) and `setupRouteProvision` use `shallowRef` so Vue tracks only the reference — it won't try to proxy a frozen target. The composable's public return type is `Readonly<Ref<…>>` (a supertype of both `ShallowRef` and `ComputedRef`); consumers should not assume `shallowRef` semantics beyond identity tracking.
+Route snapshots are frozen objects. `setupRouteProvision` (the `useRoute` path) and `useRefFromSource` (the `useRouteNode` / `useRouterTransition` / `RouterErrorBoundary` path) use `shallowRef` so Vue tracks only the reference — it won't try to proxy a frozen target. The composable's public return type is `Readonly<Ref<…>>` (a supertype of both `ShallowRef` and `ComputedRef`); consumers should not assume `shallowRef` semantics beyond identity tracking.
 
 Don't swap `shallowRef` for `ref` in `useRefFromSource` — the deep proxy would fail on frozen route snapshots at runtime.
 
@@ -343,12 +359,12 @@ state. `useRouteNode(name)` keeps its nullable `Ref<State|undefined>` — node
 inactivity is a legitimate business state.
 
 ```ts
-// Before:
+// Unnecessary — `route.value` is never undefined here:
 const { route } = useRoute<{ id: string }>();
 if (!route.value) return;
 const id = route.value?.params.id;
 
-// After:
+// Correct:
 const { route } = useRoute<{ id: string }>();
 const id = route.value.params.id;
 ```
@@ -481,7 +497,7 @@ that is exactly what keeps the sleeping subtree fresh.
 gate on `onDeactivated` / `onActivated`: a **deactivated** (sleeping) page does NOT
 run its enter/exit handlers on unrelated navigations — a sleeping page's analytics
 won't fire on foreign navs, and (critically) a sleeping page's **async** exit
-handler is no longer spliced into every navigation's leave cycle, where it would
+handler is not spliced into every navigation's leave cycle, where it would
 otherwise block the whole app. This is distinct from the bridge-ref subscriptions
 above (which stay live on purpose, to keep the sleeping subtree's *state* fresh).
 Waking a kept-alive page does NOT re-fire `useRouteEnter` — it was never
@@ -617,7 +633,7 @@ const params = computed(() => ({ filters: [1, 2] }));
 <Link routeName="settings" hash="account">Account</Link>
 ```
 
-`hash` is tracked by `computed`, so reactive sources (`ref`, `computed`) are picked up. Active state is hash-aware: when `hash` is set, the Link is active iff route matches AND `state.context.url.hash` equals expected — sibling tab Links light up independently. Hash-plugin runtime always returns `false` for hash-aware active checks.
+`hash` is tracked by `computed`, so reactive sources (`ref`, `computed`) are picked up. Active state is hash-aware: when `hash` is set, the Link is active iff route matches AND `state.context.url.hash` equals expected — sibling tab Links light up independently. Under hash-plugin (no `url` context namespace) a non-empty `hash` never matches, while `hash=""` matches whenever the route does.
 
 ### No .vue SFC Files
 
@@ -625,7 +641,7 @@ All components use `defineComponent` + `h()` in plain `.ts` files. There are no 
 
 ### Reactive `announceNavigation`
 
-`announceNavigation` is reactive — toggling the prop at runtime creates or destroys the announcer. Implementation uses `watch([router, announceNavigation], ...)`, so changing either re-runs the setup with cleanup.
+`announceNavigation` is reactive — toggling the prop at runtime creates or destroys the announcer. `RouterProvider` routes it through `watchToggleableUtility`, which watches the primitives `[router, enabled, prefix]`: changing the router, the on/off state or `prefix` re-runs the setup with cleanup, while a fresh inline options object carrying the same values does not (`getAnnouncementText` is captured once by the utility).
 
 ### Nested RouterProviders — v-link Router Stack
 
@@ -674,24 +690,24 @@ The `v-link` directive uses a module-level router stack maintained by `RouterPro
 <a v-link="{ name: 'home' }">Home</a>
 ```
 
-For the rare case of using `v-link` outside any `RouterProvider`, the package keeps an `@internal` `setDirectiveRouter(router)` (not exported from `@real-router/vue` — import it directly from `src/directives/vLink` only in tests / app-glue code that owns the lifecycle):
+For the rare case of using `v-link` outside any `RouterProvider`, `src/directives/vLink.ts` keeps an `@internal` `setDirectiveRouter(router)`. Nothing outside the package can reach it — `exports` lists only `.` and `./ssr`, and `files` publishes only `dist/` — so only the package's own tests call it, by relative path:
 
 ```typescript
-// @internal — not part of the public API
-import { setDirectiveRouter } from "@real-router/vue/src/directives/vLink";
+// @internal — as in tests/functional/vLink.test.ts
+import { setDirectiveRouter } from "../../src/directives/vLink";
 
 setDirectiveRouter(router);
 ```
 
 ## SSR
 
-SSR-friendly without a separate entry. The same `RouterProvider`, `Link`, `RouteView`, and composables work under `vue/server-renderer` (`renderToString` / `renderToWebStream`) — no SSR-specific imports and no platform branches in hot paths. The lone environment guard is in `RouterProvider`'s `setup()` (it runs once per mount, not a hot path): it skips the client-only `v-link` directive-stack push on the server (`typeof document !== "undefined"`), which otherwise leaks one router per request (#779).
+The client API needs no SSR variant: the same `RouterProvider`, `Link`, `RouteView`, and composables work under `vue/server-renderer` (`renderToString` / `renderToWebStream`) with no platform branches in hot paths; the SSR-feature components and composables live at `@real-router/vue/ssr` (see "SSR-feature surface" above). The lone environment guard is in `RouterProvider`'s `setup()` (it runs once per mount, not a hot path): it skips the client-only `v-link` directive-stack push on the server (`typeof document !== "undefined"`), which otherwise leaks one router per request (#779).
 
-Verified end-to-end across three example apps:
+Verified end-to-end by the SSR examples under `examples/web/vue/ssr-examples/` (their `e2e/` specs own the scenario counts), among them:
 
-- [`examples/web/vue/ssr-examples/ssr/`](../../examples/web/vue/ssr-examples/ssr) — classical `renderToString` + cookie-based DI + canActivate guards + query params + nested loaders (25 e2e scenarios)
-- [`examples/web/vue/ssr-examples/ssr-streaming/`](../../examples/web/vue/ssr-examples/ssr-streaming) — `renderToWebStream` + `<Suspense>` + `async setup()` + `onErrorCaptured` boundary (14 e2e scenarios, incl. chunked-transfer streaming proof)
-- [`examples/web/vue/ssr-examples/ssg/`](../../examples/web/vue/ssr-examples/ssg) — `getStaticPaths` + per-route meta tags + 404.html + sitemap.xml (16 e2e scenarios)
+- [`examples/web/vue/ssr-examples/ssr/`](../../examples/web/vue/ssr-examples/ssr) — classical `renderToString` + cookie-based DI + canActivate guards + query params + nested loaders
+- [`examples/web/vue/ssr-examples/ssr-streaming/`](../../examples/web/vue/ssr-examples/ssr-streaming) — `renderToWebStream` + `<Suspense>` + `async setup()` + `onErrorCaptured` boundary (incl. a chunked-transfer streaming proof)
+- [`examples/web/vue/ssr-examples/ssg/`](../../examples/web/vue/ssr-examples/ssg) — `getStaticPaths` + per-route meta tags + 404.html + sitemap.xml
 
 ### Verified Patterns
 
@@ -709,12 +725,12 @@ See also: [Vue Integration — Server-Side Rendering](https://github.com/greydra
 - `useRouteNode` uses cached `createRouteNodeSource` from `@real-router/sources` — N consumers of the same `nodeName` share one router subscription
 - `useRouterTransition` uses `getTransitionSource` — shared eager source per router
 - `RouterErrorBoundary` uses `createDismissableError` — shared error source with integrated dismissal state (no local `useRouterError` composable)
-- `<Link>` resolves default-options active state through the shared per-router `createActiveNameSelector` — one `router.subscribe` for any number of distinct-`routeName` Links — via the `internal/createActiveSource` fast/slow builder called from its reactive `watch` (#1416, #1250). Custom params / strict / `ignoreQueryParams: false` / hash fall to cached `createActiveRouteSource` (params hashed via `canonicalJson`, key-order-insensitive). `useRefFromSource` consumes only `subscribe` + `getSnapshot`
+- `<Link>` resolves default-options active state through the shared per-router `createActiveNameSelector` — one `router.subscribe` for any number of distinct-`routeName` Links — via the shared `createActiveSource` fast/slow builder from `@real-router/sources`, called from its reactive `watch` (#1416, #1250). Custom params / strict / `ignoreQueryParams: false` / hash fall to cached `createActiveRouteSource` (params hashed via `canonicalJson`, key-order-insensitive). `useRefFromSource` consumes only `subscribe` + `getSnapshot`
 - No `memo()` needed — Vue tracks ref dependencies automatically
-- `Link` content-stabilizes `routeParams` with `shallowEqual` (Object.is per key, order-insensitive — the same contract as the React adapter's `Link` `memo`), so an inline `:routeParams="{ id }"` literal from a re-rendering parent does **not** re-run `buildHref` or `canonicalJson` every navigation; `href` is `computed()` off the stabilized params, and the active class is `computed()` off the `isActive` ref that `watch` maintains. Same-shape navigations skip both derivations entirely (~18% faster on the Link-heavy `vs-tanstack` Vue bench)
-- All WeakMap caches live in `@real-router/sources` — auto-evicted on router GC, no local caches in this adapter
+- `Link` content-stabilizes `routeParams` with `shallowEqual` (Object.is per key, order-insensitive — the same contract as the React adapter's `Link` `memo`), so an inline `:routeParams="{ id }"` literal from a re-rendering parent does **not** re-run `buildHref` or `canonicalJson` every navigation; `href` is `computed()` off the stabilized params, and the active class is `computed()` off the `isActive` ref that `watch` maintains. Same-shape navigations skip both derivations entirely
+- Router-keyed caches live in `@real-router/sources` — auto-evicted on router GC. The adapter's own caches are keyed per element (`vLink`'s `WeakMap<HTMLElement, Handlers>`) or held per instance (`RouteView`'s keepAlive wrapper `Map`, below)
 - `EMPTY_PARAMS` and `EMPTY_OPTIONS` frozen singletons avoid allocation for default props
 - keepAlive wrapper components cached with `markRaw` to prevent Vue from proxying them
-- `RouteView` runs a single O(n) pass through slot elements per render — `buildRenderList` returns `hasPerMatchKA` as a side-channel so the previous identity-cache on slot output is no longer needed (one walk, not two)
-- `Link` builds forwarded attrs via spread + `delete` (one allocation + one property removal) instead of a per-key copy loop — hot-path optimisation for Link-heavy pages
+- `RouteView` runs a single O(n) pass through slot elements per render — `buildRenderList` returns `hasPerMatchKA` as a side-channel, so one walk yields both the render list and whether any `<Match>` sets `keepAlive`
+- `Link` builds forwarded attrs via spread + `delete` (one allocation + one property removal) — hot-path optimisation for Link-heavy pages
 - `RouterProvider` extracts a single `watchToggleableUtility(deps, factory)` helper for the four reactive utilities (announcer / scroll-restorer / scroll-spy / view-transitions) so the per-utility cleanup contract lives in one place

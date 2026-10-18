@@ -17,7 +17,7 @@
 1. `searchSchemaPlugin(options)` returns a `PluginFactory`
 2. On `router.usePlugin()`: registers `forwardState` interceptor + (dev mode only) subscribes to `TREE_CHANGED` via `getRoutesApi(router).subscribeChanges()`
 3. `forwardState` interceptor: `next()` → schema validate → strip invalid → merge defaults
-4. `TREE_CHANGED` listener: re-validates `defaultParams` on `add` / `replace` (whole added subtree) and `update` (when `defaultParams` changed) — dev mode only. Replaces the old `add` interceptor, which could not see `update`/`replace`
+4. `TREE_CHANGED` listener: re-validates `defaultSearch` on `add` / `replace` (whole added subtree) and `update` (when `defaultSearch` changed) — dev mode only. A tree-change subscription sees `update` and `replace`, which an `add` interceptor would not
 5. Both directions (URL→State and State→URL) go through `forwardState` — single validation point
 
 ## Module Augmentation
@@ -46,6 +46,7 @@ src/
 ├── factory.ts    — searchSchemaPlugin: validates options, freezes config, returns PluginFactory
 ├── plugin.ts     — SearchSchemaPlugin class: forwardState interceptor + TREE_CHANGED subscription, tree validation
 ├── helpers.ts    — getInvalidKeys (extract keys from issues), omitKeys (shallow copy without keys)
+├── validation.ts — validateOptions: mode / strict / onError, TypeError at factory time
 ├── types.ts      — StandardSchemaV1 types (inline), SearchSchemaPluginOptions
 ├── constants.ts  — ERROR_PREFIX
 └── index.ts      — Public exports + Route module augmentation
@@ -61,9 +62,9 @@ Schema runs after `decodeParams` (URL→State) and before `encodeParams` (State�
 
 `router.buildPath()` runs the `forwardState` chain on the caller's intent (core #2087), so a standalone call is validated exactly as `navigate` is. No `buildPath` hook is needed here, and none should be added.
 
-### `defaultParams` > `.default()` priority
+### `.default()` fills before `defaultSearch` does
 
-Core `forwardState` fills undefined params from `defaultParams` via `next()` BEFORE schema runs. So `z.number().default(1)` only fires if the param is still `undefined` after core's merge.
+The schema runs on what `next()` returns: the caller's channels plus any `forwardTo` hop's defaults — not the route's own `defaultSearch`, which core merges under the result afterwards (at `canonicalize`). So `z.number().default(1)` fires whenever the caller omits the key, and the value it produces is caller-side from core's point of view: `defaultSearch` merges under it.
 
 ### `onError` bypasses all built-in error handling
 
@@ -111,10 +112,10 @@ router.usePlugin(persistentParamsPluginFactory({ page: 1 }));
 
 Prefer the recommended order (schema outermost) so `state` is validated as a whole, persistent params included. Use the alternative only when persistent/infra params must deliberately skip schema validation ("schema doesn't touch infra params"). Both are defensible, but the two are **not** interchangeable: swapping the `usePlugin` lines silently flips whether persistent params are validated. (`persistent-params-plugin`'s CLAUDE.md carries the mirror note.)
 
-> **Caveat — the recommended order still never reaches `state.path`.** (#1231, #1563, #1564)
+> **The recommended order governs the query channel, the href and `state.path`.** (#1231, #1563, #1564, #2087)
 >
-> - **What the schema is handed is the QUERY CHANNEL, on both directions (#1564).** The interceptor no longer picks a bag by call shape: it subtracts the route's PATH slots from the params bag and merges `result.search` over the rest, so the schema sees a v1 single-bag caller's query, the explicit `search` argument, AND whatever an inner interceptor injected (persistent-params since #1563) — while a path slot is never shown to it, never rewritten, and never dropped by `strict`. So in the recommended order the persisted values ARE validated on both directions.
-> - **The href is governed, and so is `state.path`.** `router.buildPath` runs the `forwardState` seam (core #2087), so this plugin reaches the href without hooking anything new — and `persistent-params-plugin` now injects on that same seam and nowhere else, so a stored value this schema rejects reaches neither the printed URL nor `state.search`. That plugin's `schema-governs-the-href-1938` pins it from the other side, with a CONTROL cell showing an ACCEPTED value still riding through. (Do **not** add a `buildPath` hook here: the seam this plugin already registers covers the door.)
+> - **What the schema is handed is the QUERY CHANNEL, on both directions (#1564).** The interceptor subtracts the route's PATH slots from the params bag and merges `result.search` over the rest — derived, never picked by call shape — so the schema sees a v1 single-bag caller's query, the explicit `search` argument, AND whatever an inner interceptor injected (persistent-params, #1563) — while a path slot is never shown to it, never rewritten, and never dropped by `strict`. So in the recommended order the persisted values ARE validated on both directions.
+> - **The href is governed, and so is `state.path`.** `router.buildPath` runs the `forwardState` seam (core #2087), so this plugin reaches the href without hooking anything new — and `persistent-params-plugin` injects on that same seam and nowhere else, so a stored value this schema rejects reaches neither the printed URL nor `state.search`. That plugin's `schema-governs-the-href-1938` pins it from the other side, with a CONTROL cell showing an ACCEPTED value still riding through. (Do **not** add a `buildPath` hook here: the seam this plugin already registers covers the door.)
 > - **A route default is NOT a mitigation.** An injected persistent value is the caller-side value from core's point of view, and every route default (`defaultSearch`, `defaultParams`) merges strictly **under** it — verified: `persistentParamsPluginFactory({ page: "bogus" })` commits `page=bogus` on a route declaring `defaultSearch: { page: "1" }`.
 
 ### Dev-time defaultSearch check
@@ -125,7 +126,7 @@ At `usePlugin()` time, validates all existing routes' `defaultSearch` against th
 
 The runtime guarantee ("invalid params never reach `state`") holds for **user input** only. `defaultSearch` (and `defaultParams`) are **developer config** merged in by **core**, at layers _below_ the `forwardState` interceptor this plugin hooks — so an invalid default reaches state (`state.search` for a `defaultSearch` value, `state.params` for a `defaultParams` one — core routes defaults by channel since #1549), `state.path`, `router.buildPath()`, and `isActiveRoute()` comparisons, on every navigation, in every `mode`. The plugin **cannot** strip it from `forwardState`: whatever it returns, core re-applies the defaults afterwards in three uninterceptable spots — `StateNamespace.makeState` (channel-aware since #1549), `RoutesNamespace.buildPath`, `RoutesNamespace.isActiveRoute` (`InterceptableMethodMap` = `start` / `forwardState`; only `forwardState` is hooked). The re-application always lets caller values win, so an interceptor can add or replace a key but cannot **remove** one core will re-fill from config.
 
-Consequence: the restore branch `{ ...defaults, ...stripped }` in `#validateState` is **redundant with `makeState`'s merge** on the navigate/start paths — but it still matters for `PluginApi.buildState` / `forwardState` consumers (which skip `makeState`), so **do not delete it**. The dev-time check above is a **config lint**, not a runtime gate. Documented limitation, not a plugin bug — a runtime fix would require core changes (single-merge-point refactor; see the #802 analysis). Priority-low, no user report; the plugin's honest contract is "invalid _input_ never reaches state".
+Consequence: the restore branch `{ ...defaults, ...stripped }` in `#validateState` is **redundant with `makeState`'s merge** on the navigate/start paths — but it still matters for a direct `PluginApi.forwardState` call (which skips `makeState`), so **do not delete it**. The dev-time check above is a **config lint**, not a runtime gate. Documented limitation, not a plugin bug — a runtime fix would require core changes (single-merge-point refactor; see the #802 analysis). Priority-low, no user report; the plugin's honest contract is "invalid _input_ never reaches state".
 
 Known gap (#802 side-finding): swapping `searchSchema` via `getRoutesApi(router).update(name, { searchSchema })` emits **no** `TREE_CHANGED` (custom fields aren't in `buildStructuralPatch` — only `forwardTo` / `defaultParams` / `defaultSearch` / `encodeParams` / `decodeParams`), so the dev check does **not** re-validate existing `defaultSearch` against a newly-swapped schema.
 

@@ -1,6 +1,6 @@
 # pipeline (`core/src/pipeline`)
 
-The **navigation delivery pipeline** of `@real-router/core` — three primitives over one opaque type (RFC nav-pipeline, all four phases closed). Not a package and not a published subpath (`exports` is `.` / `./types` / `./api` / `./validation`); its consumers are the router's own facade, namespaces and wiring.
+The **navigation delivery pipeline** of `@real-router/core` — three primitives over one opaque type. Not a package and not a published subpath (the subpaths are the `exports` of `packages/core/package.json`); its consumers are the router's own facade, namespaces and wiring.
 
 ## The three primitives
 
@@ -20,7 +20,7 @@ RouteResolver                                                  — the port the 
 
 ## Two compositional forms
 
-Every entry point takes one of them; Phase 2 (#1548) migrated the remaining seven, one per commit.
+Every entry point takes one of them.
 
 | Form        | Call                                           | Entry points                                                     | Resolves `forwardTo`?                     |
 | ----------- | ---------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------- |
@@ -39,7 +39,7 @@ The FACADE runs one seam of its own, above all of this: `router.buildPath` puts 
 
 ## Stage ③ has exactly ONE implementation
 
-`canonicalize` — since Phase 4 folded `StateNamespace.makeState` onto its LITERAL form. There is no parallel copy of ③ or of the mode gate for a fix to land on one terminal and miss the other, which is how #1584's existence precondition went astray when there was. The fold was verified byte-identical across a 71-cell snapshot: the only door to `makeState` is `PluginApi.makeState`. ⚠ P1's guard does **not** refuse exactly the bag the literal form's `withholdFilledSlots` acts on, and could not: P1 reads the caller's object and the producer reads it again, so a bag that answers differently between the two slips past (#1927). What makes the shape unreachable is the check on the SHIPPED bag, which every State-publishing door now runs.
+`canonicalize`. `StateNamespace.makeState` is its LITERAL form, so there is no parallel copy of ③ or of the mode gate for a fix to land on one terminal and miss the other; the only door to `makeState` is `PluginApi.makeState`. ⚠ P1's guard does **not** refuse exactly the bag the literal form's `withholdFilledSlots` acts on, and could not: P1 reads the caller's object and the producer reads it again, so a bag that answers differently between the two slips past (#1927). What makes the shape unreachable is the check on the SHIPPED bag, which every State-publishing door runs.
 
 Ordering is forced by the data, not by discipline: ③ needs the RESOLVED name (target defaults cannot be read before `forwardTo` resolves), so ① always precedes it.
 
@@ -67,21 +67,19 @@ A **read-model over the routes layer — a narrow port, not a new layer.** The m
 
 ⚠ **The two optional sinks must be absent for REAL.** The router implements them as GETTERS returning `undefined` while `validator === null`, not as closures forwarding into an optional-chained validator — a closure is always truthy, so the pipeline's `?.` reads as taken and bare core pays the lookup with nothing to feed. The `| undefined` in the type is what lets the getter say so under `exactOptionalPropertyTypes`.
 
-## Why the stage-② removal took this shape
+## Why the pipeline never repairs a mis-channelled bag
 
-The seam used to run `separateChannels` over whatever left the interceptor chain, moving a declared `?key` out of the params bag behind the producer's back. Three shapes the repair actually hit:
+A seam that moved a declared `?key` out of the params bag behind the producer's back would do three kinds of damage:
 
-- **The producer kept believing its own bag shipped.** A `decodeParams` returning `{ params: { ...params, tag } }` published a state it never wrote.
-- **It laundered values past validation.** `search-schema-plugin` documented the hole with a test named `LEAKS`: an interceptor registered AFTER the schema injected into `params`, the seam moved it into `search`, and an unvalidated value landed in the channel the schema owns.
-- **It inverted caller precedence.** A caller's mis-channelled key and a chain default's query half sat in different bags, where no merge ranks them, and the repair (spreading `search` last) handed the win to the DEFAULT — the #1570 defect.
-
-Measured cost of the removal across 13 packages: 7 tests, all in core + `search-schema-plugin`; every other package was already channel-correct. Two things fell out as dead once nothing was split: the cross-channel withholding loop in the chain fold, and `search-schema-plugin`'s own copy of the split.
+- **The producer would believe its own bag shipped.** A `decodeParams` returning `{ params: { ...params, tag } }` would publish a state it never wrote.
+- **It would launder values past validation.** An interceptor registered AFTER `search-schema-plugin` that injects into `params` would have its value moved into `search` — the channel the schema owns — unvalidated.
+- **It would invert caller precedence.** A caller's mis-channelled key and a chain default's query half sit in different bags, where no merge ranks them, so a repair that spreads `search` last hands the win to the DEFAULT (#1570).
 
 ## Performance notes
 
 - **The fast-path gate is TWO facts, one per side (#1589)** — the CALLER brought no query bag, and the ROUTE carries no default on either slot. Between them stage ③ and the mode gate are provably identity. A third term ("the route declares no `?name`") was redundant against the first and cost ~12 ns per call: the mode gate filters the MERGED bag, whose only sources are `defaultSearch` and the caller's bag, so an empty bag has nothing to drop however many names are declared. ⚠ The two defaults are read ABOVE the gate deliberately — they are its route half AND the slow path's first input, so the fast path pays two hops and the slow path pays nothing extra. A single `mergesNothing()` predicate was built and measured, and the figures live in `canonicalize.ts` beside the code they describe: the alternative BUYS the fast arm a hop (`isActiveRoute-exact` 101 vs 111 ns) and costs **+6.5 %** on the defaults path. The symmetric form wins because it regresses nothing.
 - **`defaultParams` / `defaultSearch` are two accessors, not one returning `{ params, search }`** — the combined form allocated one throwaway object per navigation on the hot path.
-- **`materialize` freezes `params` only, and the asymmetry is measured** — `canonical.query` is already frozen on every path (the fast path hands over the `EMPTY_SEARCH` singleton, the slow one gets it back frozen from `admittedSearch`), and re-freezing a frozen object costs ~8 ns. Freezing both regressed `isActiveRoute-exact` by 9.8 %; freezing one wins 5–12 % on every producer that never publishes.
+- **`materialize` freezes `params` only, and the asymmetry is measured** — `canonical.query` is already frozen on every path (the fast path hands over the `EMPTY_SEARCH` singleton, the slow one gets it back frozen from `admittedSearch`), and re-freezing a frozen object is not free. What moving the query freeze to `materialize` would cost, and on which arm, is measured in `mergeQueryChannel`'s docblock (`src/helpers.ts`); `INVARIANTS.md` canonicalize #4 owns the statement.
 - **`buildNavigateState` costs ONE object literal per navigation** over the pre-pipeline form — the `Canonical`. The deferral is a second entry point (`materializePending`) rather than a flag, so the one required field travels positionally and there is no options bag to allocate (#1976). The merge itself allocates nothing when the route has no defaults.
 
 ## Gotchas
@@ -122,7 +120,7 @@ the query channel, in every position; the router moves nothing between them.
 `params` and `search` meet in exactly one place — the printed URL. Two checks,
 split by what is knowable when:
 
-- **Registration** — `assertRouteDefaultChannels`, an always-on core guard: a
+- **Registration** — `assertRouteDefaultChannels`, core's config-time check: a
   route's own `defaultParams` naming a key the route declares with `?`. Both sides
   are known at every registration door, so it fails at config time with the slot
   to move to, and every door runs it prepare-then-commit.
@@ -141,5 +139,5 @@ split, which defers only the state SHELL.
 
 - [README.md](README.md) — what this subsystem is, in short
 - [../channels/CLAUDE.md](../channels/CLAUDE.md) — the channel-correctness subsystem this pipeline applies (`withholdFilledSlots`, `admittedSearch`)
-- [../../CLAUDE.md](../../CLAUDE.md) — the `@real-router/core` package architecture, incl. the registration/resolution checks that replaced stage ②
+- [../../CLAUDE.md](../../CLAUDE.md) — the `@real-router/core` package rules, incl. the always-on guard list
 - [../../INVARIANTS.md](../../INVARIANTS.md) — property-based invariants per entry point

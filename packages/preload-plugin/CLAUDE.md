@@ -62,9 +62,9 @@ Cache cleared on `onStop` and `teardown` (via `#cleanup`), and also on **any str
 
 All three listeners attach to `document` with `{ capture: true, passive: true }`. No per-anchor DOM manipulation required.
 
-### browser-plugin dependency is duck-typed
+### URL-plugin dependency is duck-typed
 
-`router.matchUrl` is added by `@real-router/browser-plugin`. The preload plugin uses optional chaining (`router.matchUrl?.()`) so it degrades gracefully without the browser plugin — preloads simply never fire.
+`router.matchUrl` is added by the installed URL plugin — `@real-router/browser-plugin`, `@real-router/hash-plugin` or `@real-router/navigation-plugin`. The preload plugin uses optional chaining (`router.matchUrl?.()`) so it degrades gracefully without one — preloads simply never fire.
 
 ### SSR safety
 

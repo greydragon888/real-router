@@ -12,65 +12,68 @@ examples/
       shared/Layout.tsx     ← per-framework shell (header + sidebar + content)
       basic/                ← each example is a standalone Vite app
       nested-routes/
-      ssr-examples/         ← (react, preact) thematic subgroup — server-rendering approaches
-                            ←   react: ssr / ssr-streaming / ssg / ssr-rsc (4 — RSC unique to React)
-                            ←   preact: ssr / ssr-streaming / ssg (3 — no RSC; Preact design choice)
       navigation-api/       ← (react only) navigation-plugin exclusive extensions, 5 UX scenarios
-      hash-examples/        ← (react) thematic subgroup — hash-fragment + scroll coordination
+      hash-examples/        ← (react only) thematic subgroup — hash-fragment + scroll coordination
         link-hash/          ← <Link hash> + state.context.url tab UI demo (#532)
-        scroll-restoration/ ← createScrollRestoration behavior matrix, 7 scenarios / 13 e2e tests
-        scroll-spy/         ← createScrollSpy URL hash tracks visible section (#575, planned)
-      animation-examples/   ← (react) thematic subgroup — four approaches to route animations
+        scroll-restoration/ ← createScrollRestoration behavior matrix, 7 scenarios (table in its README)
+        scroll-spy/         ← createScrollSpy URL hash tracks visible section (#575)
+      animation-examples/   ← (all six frameworks) thematic subgroup — four approaches to route animations
         view-transitions/   ← browser View Transitions API
         route-animations/   ← centralised CSS-classes policy (subscribeLeave + manual FLIP)
         page-animations/    ← distributed per-page useEffect hook
         motion-animations/  ← library-driven (motion, formerly Framer Motion) — AnimatePresence + layoutId
-      ssr-examples/         ← (react) thematic subgroup — four server-rendering approaches
+      ssr-examples/         ← (all six frameworks) thematic subgroup — server-rendering approaches (react's shown)
         ssr/                ← classical Express + Vite SSR (renderToString)
         ssr-streaming/      ← React 19 renderToReadableStream + <Suspense> + use(promise)
-        ssr-rsc/            ← React Server Components + Flight protocol via @vitejs/plugin-rsc
+        ssr-mixed/          ← per-route `ssr` config of ssr-data-plugin: full / client-only / data-only / function form (same in all six)
+        ssr-rsc/            ← (react only) React Server Components + Flight protocol via @vitejs/plugin-rsc
         ssg/                ← static site generation (build-time renderToString per route)
       ...
     preact/
       shared/Layout.tsx
       basic/
-      ssr-examples/         ← (preact) thematic subgroup — three server-rendering approaches
+      ssr-examples/         ← (preact) thematic subgroup — four server-rendering approaches
         ssr/                ← classical Express + Vite SSR (preact-render-to-string renderToString)
         ssr-streaming/      ← Preact 10 renderToReadableStream + chunked transfer (no use(promise) — sync siblings)
+        ssr-mixed/
         ssg/                ← static site generation (build-time renderToString per route)
                             ← NO ssr-rsc/ — Preact does not support RSC by design
       ...
     vue/
       shared/Layout.vue
       basic/
-      ssr-examples/         ← (vue) thematic subgroup — three server-rendering approaches
+      ssr-examples/         ← (vue) thematic subgroup — four server-rendering approaches
         ssr/                ← classical Express + Vite SSR (renderToString)
         ssr-streaming/      ← Vue 3 renderToWebStream + <Suspense> + async setup() (no out-of-order placeholders — see README)
+        ssr-mixed/
         ssg/                ← static site generation (build-time renderToString per route)
       ...
     solid/
       shared/Layout.tsx
       basic/
-      ssr-examples/         ← (solid) thematic subgroup — three server-rendering approaches
+      ssr-examples/         ← (solid) thematic subgroup — four server-rendering approaches
         ssr/                ← classical Express + Vite SSR (renderToString + generateHydrationScript)
         ssr-streaming/      ← Solid renderToStream + <Suspense> + createResource + <ErrorBoundary> (true OOO Suspense + selective hydration)
+        ssr-mixed/
         ssg/                ← static site generation (build-time renderToString per route + dual-mode mount)
       ...
     svelte/
       shared/Layout.svelte
       basic/
-      ssr-examples/         ← (svelte) thematic subgroup — three server-rendering approaches
+      ssr-examples/         ← (svelte) thematic subgroup — four server-rendering approaches
         ssr/                ← classical Express + Vite SSR (await render() + <svelte:head> head injection)
         ssr-streaming/      ← Svelte 5 RSC-like deferred-data SSR via {#await} blocks (server ships pending UI, async resolution on client; no chunked HTTP)
+        ssr-mixed/
         ssg/                ← static site generation (build-time await render() per route + explicit hydrate-vs-mount dual-mode)
       ...
     angular/                ← uses @angular/build (ng build) + sirv for preview, not Vite directly
       shared/Layout.ts
       basic/                ← each example has angular.json + tsconfig.app.json
       nested-routes/
-      ssr-examples/         ← (angular) thematic subgroup — three server-rendering approaches
+      ssr-examples/         ← (angular) thematic subgroup — four server-rendering approaches
         ssr/                ← classical Express + AngularNodeAppEngine (provideRealRouterFactory + REQUEST per request)
         ssr-streaming/      ← AngularNodeAppEngine + @defer (on viewport/hover) + incremental hydration — per-defer block lazy hydration
+        ssr-mixed/
         ssg/                ← static site generation (in-process AngularNodeAppEngine on build-only port + getStaticPaths + sirv preview)
       ...
   desktop/                  ← native-host runtime, webview-based apps
@@ -87,11 +90,11 @@ examples/
 
 Future platforms (`miniapps/`, `mobile/`, …) slot in as additional top-level folders under `examples/`.
 
-Imports from per-framework `shared/Layout` use `../../shared/Layout` (unchanged — shared moved alongside the apps). Imports from top-level `examples/shared/styles.css` use `../../../../shared/styles.css` (one extra `..` segment after reorg).
+Imports from per-framework `shared/Layout` use `../../shared/Layout`; imports from top-level `examples/shared/styles.css` use `../../../../shared/styles.css` (both from an example's `src/`).
 
 ### Thematic subgroups
 
-When **three or more examples** explore the same problem space with different trade-offs, they go into a thematic subgroup directory (e.g. `animation-examples/`, `ssr-examples/`) rather than living flat alongside unrelated examples. Existing subgroups: `animation-examples/` (four route-animation approaches), `ssr-examples/` (four server-rendering approaches: classical SSR, streaming SSR, RSC, SSG), and `hash-examples/` (hash-fragment + scroll coordination: `<Link hash>` tab UI, scroll-restoration anchor scrolling, scroll-spy URL hash tracking).
+When **three or more examples** explore the same problem space with different trade-offs, they go into a thematic subgroup directory (e.g. `animation-examples/`, `ssr-examples/`) rather than living flat alongside unrelated examples. Existing subgroups: `animation-examples/` (four route-animation approaches) and `ssr-examples/` (classical SSR, streaming SSR, per-route mixed SSR and SSG, plus RSC in React) in every framework, and `hash-examples/` in React (hash-fragment + scroll coordination: `<Link hash>` tab UI, scroll-restoration anchor scrolling, scroll-spy URL hash tracking).
 
 Subgrouped examples sit one extra level deeper, so their imports adjust:
 
@@ -101,7 +104,7 @@ Subgrouped examples sit one extra level deeper, so their imports adjust:
 
 The glob `web/*/*/*` in `examples/pnpm-workspace.yaml` registers subgrouped packages.
 
-**When to create a subgroup**: ≥3 examples on one theme. Below that threshold, keep them flat — premature grouping for two examples adds nesting without comparison value. Subgroups should appear in **all relevant adapter directories simultaneously** (e.g. when Phase 2 replicates animation examples to preact/vue/solid/svelte/angular, each adapter gets its own `animation-examples/` subgroup — symmetry is more important than minimising depth).
+**When to create a subgroup**: ≥3 examples on one theme. Below that threshold, keep them flat — premature grouping for two examples adds nesting without comparison value. Subgroups should appear in **all relevant adapter directories simultaneously** (each adapter has its own `animation-examples/` and `ssr-examples/` — symmetry is more important than minimising depth).
 
 ## Workspace
 
@@ -123,9 +126,9 @@ The glob `web/*/*/*` in `examples/pnpm-workspace.yaml` registers subgrouped pack
 ## Desktop-specific notes (`desktop/electron/`, `desktop/tauri/`)
 
 - `desktop/electron/*/` examples have an additional `electron/` directory for the main process (TypeScript) plus a dedicated `electron/tsconfig.json` that emits `dist-electron/`. Dev mode loads `VITE_DEV_SERVER_URL`; prod mode loads `app://` via a custom protocol registered in `main.ts` (or `file://` in `react-hash`).
-- `desktop/tauri/*/` examples have a `src-tauri/` directory (Rust project — `Cargo.toml`, `tauri.conf.json`, `src/{main,lib}.rs`). CI only builds the Vite frontend and runs Playwright against `vite preview` on port 4173. A full `tauri build` is a manual sanity check on a supported OS before merging.
+- `desktop/tauri/*/` examples have a `src-tauri/` directory (Rust project — `Cargo.toml`, `tauri.conf.json`, `src/{main,lib}.rs`). CI only builds the Vite frontend and runs Playwright against `vite preview` on the port its `playwright.config.ts` names. A full `tauri build` is a manual sanity check on a supported OS before merging.
 - `src-tauri/tauri.conf.json` must have a unique `productName` + `identifier` per example — otherwise `tauri build` refuses to generate the bundle on a machine that already has another example installed.
-- `safeParseUrl` is scheme-agnostic (since #496), so `app://`, `tauri://`, and `file://` all work without protocol whitelisting. See [IMPLEMENTATION_NOTES.md](../IMPLEMENTATION_NOTES.md#safeparseurl--scheme-agnostic-parser-496).
+- `safeParseUrl` is scheme-agnostic (#496), so `app://`, `tauri://`, and `file://` all work without protocol whitelisting. See [IMPLEMENTATION_NOTES.md](../IMPLEMENTATION_NOTES.md#safeparseurl--scheme-agnostic-parser-496).
 - See [Desktop Integration Guide](https://github.com/greydragon888/real-router/wiki/Desktop-Integration) in the wiki for the full plugin × runtime compatibility matrix and plugin selection tree.
 
 ## Angular-specific notes
@@ -141,27 +144,27 @@ The glob `web/*/*/*` in `examples/pnpm-workspace.yaml` registers subgrouped pack
 
 ## Rules
 
-- Each example is a standalone Vite app with its own `package.json`
+- Each example is a standalone app with its own `package.json` — a Vite app, except Angular (`@angular/build`) and the Ink console example
 - `@real-router/*` dependencies are `*`; the lockfile records the release (see Workspace)
 - Nothing outside `examples/` is imported — library code comes through a `@real-router/*` package
-- Shared files imported via relative paths: `../../shared/store`
-- Layout imported from `../shared/Layout`
+- Shared files imported via relative paths: `../../../../shared/store` from an example's `src/` (one more `../` per level below it, and in a subgroup)
+- Layout imported from `../../shared/Layout` (same rule)
 - No CSS frameworks — shared `styles.css` only
 - No external state managers — shared microstore (`store.ts`)
 - Data loading via route config `loadData` + plugin, NOT `useEffect`/`onMount`
 
 ## Writing E2E Tests
 
-**MANDATORY: explore the app visually BEFORE writing tests.**
+**Explore the app visually before writing tests.**
 
-1. Build: `pnpm build` — against the `@real-router/*` that is installed: the recorded releases, or this checkout's packages after `pnpm -w run use-checkout`
-2. Start preview: `pnpm preview &`
+1. Build: `pnpm build` (`pnpm build:app` in an SSR example) — against the `@real-router/*` that is installed: the recorded releases, or this checkout's packages after `pnpm -w run use-checkout`
+2. Start preview: `pnpm preview &` — the port differs per example: the `preview` script, `vite.config.ts` or the SSR server sets it, else Vite's default 4173
 3. Use Playwright MCP: `browser_navigate` → `browser_snapshot` → see real DOM
 4. Write tests matching ACTUAL selectors, headings, URLs
-5. Kill preview: `lsof -ti:4173 | xargs kill -9`
+5. Kill preview: `lsof -ti:<that port> | xargs kill -9`
 6. Run: `pnpm test:e2e`
 
-**NEVER guess selectors from source code.** The DOM may differ from what JSX suggests:
+**Take selectors from the running app, not from the source code.** The DOM may differ from what JSX suggests:
 - `forwardTo` changes URLs (sidebar link `/users` may resolve to a different child route via redirect)
 - Route tree swap changes sidebar content at runtime
 - `keepAlive` preserves hidden components in DOM (`.card` selector may match multiple)
@@ -177,24 +180,7 @@ The glob `web/*/*/*` in `examples/pnpm-workspace.yaml` registers subgrouped pack
 
 ## Playwright Config
 
-All examples use the same pattern:
-
-```typescript
-import { defineConfig } from "@playwright/test";
-
-export default defineConfig({
-  testDir: "./e2e",
-  retries: 1,
-  webServer: {
-    command: "pnpm preview",
-    port: 4173,
-    reuseExistingServer: !process.env.CI,
-  },
-  use: {
-    baseURL: "http://localhost:4173",
-  },
-});
-```
+Each example's `playwright.config.ts` sets `testDir: "./e2e"` and pins a port of its own: the `webServer` command starts the preview there, and `port` and `use.baseURL` name the same `<N>`. A Vite example runs `pnpm preview --port <N>`; an Angular example runs `pnpm preview`, whose script carries the port; an SSR example builds first (`pnpm build:app && …`). The Electron examples declare no `webServer`. A new example copies a sibling's config and changes the port.
 
 ## Scenario Plans
 

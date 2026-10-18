@@ -10,7 +10,7 @@
 |--------|---------|
 | `createRouteSource(router)` | Route state observable — emits on every navigation |
 | `createRouteNodeSource(router, node)` | Per-node route observable — **per-router + per-nodeName cached** |
-| `createActiveRouteSource(router, name, params?, search?, opts?)` | Active route boolean — **per-router + canonical-args cached**. Query channel at position 3 (RFC-4 M2, #1548); `opts` shifts to 4. `search` participates in the cache key and reaches `router.isActiveRoute` — it only changes the verdict when `opts.ignoreQueryParams === false` (the default ignores query). `opts.hash` (#532) makes the source hash-aware: matches iff route AND `state.context.url.hash` equal expected. |
+| `createActiveRouteSource(router, name, params?, search?, opts?)` | Active route boolean — **per-router + canonical-args cached**. Query channel at position 3, `opts` at position 4 (#1548). `search` participates in the cache key and reaches `router.isActiveRoute` — it only changes the verdict when `opts.ignoreQueryParams === false` (the default ignores query). `opts.hash` (#532) makes the source hash-aware: matches iff route AND `state.context.url.hash` equal expected. |
 | `createTransitionSource(router)` | Transition state snapshot — **non-cached** advanced-use factory |
 | `getTransitionSource(router)` | Transition state — **per-router cached**, safe for adapters |
 | `createErrorSource(router)` | Navigation error observable — **non-cached** advanced-use factory |
@@ -18,6 +18,7 @@
 | `primeErrorSource(router)` | **Side-effect only** (returns `void`) — eagerly create+subscribe `getErrorSource` IF the router is registered, else no-op. Adapters' `RouterProvider` call it at mount so a boundary mounting after an error still sees it (#778), without crashing on a router-like with no internals (test stub / `Object.create` clone). `getErrorSource` stays strict (throws); this is the don't-crash-the-Provider wrapper. |
 | `createDismissableError(router)` | Dismissable error wrapper over `getErrorSource` — **per-router cached**, snapshot includes `resetError` |
 | `createActiveNameSelector(router)` | O(1) active-name checker — **per-router cached** shared selector (Link fast-path) |
+| `createActiveSource(router, routeName, params, search, strict, ignoreQueryParams, hash)` | `<Link>` active-state `RouterSource<boolean>`: with default options (non-empty name, no `params` / `search`, non-strict, query-ignoring, no `hash`) it reuses `createActiveNameSelector`, otherwise it returns a `createActiveRouteSource`; Svelte, Preact and Angular call it, Solid keeps its own fast/slow decision |
 
 ### Options & utilities
 
@@ -232,6 +233,7 @@ src/
 ├── createRouteSource.ts         — lazy route state observable
 ├── createRouteNodeSource.ts     — per-router + per-nodeName cached node source
 ├── createActiveRouteSource.ts   — per-router + canonical-args cached active-route boolean
+├── createActiveSource.ts        — adapter Link fast/slow builder over the selector and createActiveRouteSource
 ├── createTransitionSource.ts    — eager transition snapshot + cached getTransitionSource
 ├── createErrorSource.ts         — eager error snapshot + cached getErrorSource
 ├── createDismissableError.ts    — derived source: getErrorSource + dismissedVersion state

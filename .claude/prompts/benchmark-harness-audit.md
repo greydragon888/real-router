@@ -83,7 +83,7 @@ downstream: деку (публичная инфографика!), ledger, ко�
 | | `harness/measure.mjs` | fresh-context per sample; warmup + K; `measureInterleaved` (round-robin движки в ОДНОМ браузере, ротация порядка — S4 #1460); CPU-throttle параметр (штамп `throttle` в ячейке) |
 | Статистика | `harness/stats.mjs` | median / p95 / mean / RME (**rme — уже ПРОЦЕНТ**, не доля) |
 | Драйвер | `run.mjs` (ячейка) · `run-all.mjs` (матрица) · `run-subset.mjs` (scoped-подмножество) | vite build+preview (**PROD dist**) → Playwright/CDP → `results/<fw>/<sc>/<eng>.json`; `KNOWN_NA` skip-map (`harness/known-na.mjs`) — соблюдают все три писателя `results/` (`run.mjs` отказывает без `BENCH_ALLOW_KNOWN_NA=1`), и все штампуют env с cpu/runner |
-| Гигиена | `harness/provenance.mjs` (env-штамп `{commit,dirty,dirtyFiles,dirtyCode,realRouterCore}` — какой релиз core измерен; `envStamp` добавляет `date`/`cpu`/`runner`) · `write-cell.mjs` (`N_MIN=10`, смоук не пишется #1455) · `lint-spec-parity.mjs` (O-13: value-parity 7 копий свип-констант) · `sanity-remeasure.mjs` (#1261 mid-run load) · `rme-gate.mjs` (families: stable≤15 / noisy≤40; ⚠K4 07-18: `isSweep=/@\d+$/` вывел ВСЕ `@N` в report-only c5fe977e — включая НЕ-свиповые cold-start/table-heap/mountMs семейства; 5/13 GRID-строк без armed-гейта) | |
+| Гигиена | `harness/provenance.mjs` (env-штамп `{commit,dirty,dirtyFiles,dirtyCode,realRouterCore}` — какой релиз core измерен; `envStamp` добавляет `date`/`cpu`/`runner`) · `write-cell.mjs` (`N_MIN=10`, смоук не пишется #1455) · `lint-spec-parity.mjs` (O-13: value-parity 7 копий свип-констант) · `sanity-remeasure.mjs` (#1261 mid-run load) · `rme-gate.mjs` + `rme-policy.mjs` (families: stable≤15 / noisy≤40 / sweep-point report-only — только single-nav свипы wide/deep/search, по сценарию, а не по суффиксу `@N`; политика общая с `ci-summary`, K4/K16) | |
 | Сценарии | `scenarios/*.mjs` (12) | cold-start · nav-latency · param-nav · nested-switch · active-links · link-build · wide-config · deep-config · search-param-scaling · table-heap · nav-churn · back-forward; свипы греют realm (`WARM_NAVS=12`, F3 #1453) |
 | **Инструмент №2** | `matcher-bench/{run.mjs,matchers.mjs,results.json}` | ИЗОЛИРОВАННЫЙ матчер, чистый Node, µs/match (лог-ось); N_SWEEP [4..256] + DEPTH_SWEEP [3..90]; холдауты: angular-deep (recognizer), mateo (runes) |
 | **Отчёт = дека** | `deck/{deck-config.js,deck-extract.mjs,build-deck.mjs}` → `deck/out/{deck-data.json,deck.html}` (генерируются, в `.gitignore`) | `results/`+matcher → `deck-data.json` (DATA/GRID/SWEEP/META) → deck.html; **verdict-математика в deck-extract** (ratio vs fastest rival; классы g≥1.12 / r≤0.88 / y); WHY-блёрбы КУРИРУЕМЫЕ (staleness-класс) |
@@ -105,7 +105,7 @@ downstream: деку (публичная инфографика!), ledger, ко�
 | `navMsWall@N` | свипы, ТОЛЬКО endpoint | felt на endpoint | clamp ~100µs → quantization-noisy, не headline |
 | `mountMs@N` | link-build | стоимость монтирования | **wall-clock** (#1418), НЕ ScriptDuration |
 | `scriptDurationMs@10` + `fcpMs@10` + `jsHeapMB@10`(+preGc) | cold-start | boot | скрипт-парс+init до первой отрисовки |
-| `jsHeapMB@100` | table-heap | retained route-память | JSHeapUsedSize **после force-GC**; N=100 (НЕ @10000 — старая конвенция умерла) |
+| `jsHeapMB@1` + `jsHeapMB@256` | table-heap | retained route-память | JSHeapUsedSize **после force-GC** в двух точках; route-память = дельта, дека строит `routeTableKB` = (@256 − @1) × 1024 (self-floor вычитает каркас фреймворка и пол движка; @100 и @10000 — мёртвые конвенции) |
 | `heapDeltaKB` + `scriptMsPerNav`/`blinkMsPerNav` + `navsPerSec` | nav-churn | retained-рост + CPU/нав | Δretained после GC; `navsPerSec` — CONFOUNDED (живой диапазон 2.6k–15k у ВСЕХ; rAF-cap ~121 в харнессе НЕ существует — снят F1-фиксом, якорь устарел 07-18) — читать heap+CPU |
 | `µs/match` (matcher-bench) | wide/deep deck-карты | чистый матч | изолированная функция; **браузерные `navMsTask@N` wide/deep остаются в results/, но дека читает ИЗОЛИРОВАННЫЙ** (кроме angular-deep = браузерный холдаут) |
 
@@ -146,7 +146,7 @@ downstream: деку (публичная инфографика!), ledger, ко�
 - **Метрик-семейства** (по одному агенту): **(a) per-nav wall/task** —
   navMsWall/navMsTask + settle-симметрия; **(b) alloc** — gross-семантика,
   include-флаги, interval 256 B (ВЫДЕЛЕННЫЙ — high-value #1417); **(c) retained** —
-  jsHeapMB@100/@10, heapDeltaKB, force-GC точки; **(d) sweep** — warm-механика,
+  jsHeapMB@1/@256 (table-heap) и @10 (cold-start), heapDeltaKB, force-GC точки; **(d) sweep** — warm-механика,
   @N-ключи, quantization, endpoint-конвенция; **(e) mount/boot** — mountMs@N wall,
   cold-start состав.
 - **НОВОЕ — matcher-bench extraction-parity:** для КАЖДОГО извлечённого матчера —

@@ -1447,22 +1447,22 @@
       "7debb29cb71a"
     ],
     "CLAUDE.md": [
-      "8633d138d866",
-      "b7123e951371",
-      "85d1e1f9846f",
+      "fdfa66178671",
+      "cac847f06e1f",
+      "b133891c5a08",
       "f16cdfae654c",
       "b07ea92df218",
-      "ec87a46f95b5",
+      "71e57e860a4e",
       "a417c270bd66",
       "d46204beacb8",
-      "97c03e73c3d4",
-      "9db39c7d69a5",
+      "e640cb872bbe",
+      "1002a4d43e68",
       "c7042207a646",
       "90990832910d",
-      "546608363777",
-      "829bb21f2f3d",
-      "668d782f1141",
-      "c47f391e0256"
+      "1bbe26330639",
+      "d620f46755b4",
+      "6b77148ca30e",
+      "728bee924647"
     ],
     "IMPLEMENTATION_NOTES.md": [
       "0b60c214b5cb",
@@ -1898,45 +1898,41 @@
       "39ce41cb3151"
     ],
     "packages/core/CLAUDE.md": [
-      "e50332d105fd",
+      "7a2d1382b7c6",
       "4b7177988f9f",
       "052ab94e7a6f",
       "1e844b2748ad",
       "f63d566713b2",
-      "e80d27934c59",
-      "07914e95b05c",
+      "062090e2f914",
+      "0f2a9caa7bb1",
       "16ce70ccbacd",
-      "5cddd331f86b",
+      "09f1fe28fab4",
       "ae24a2e3d83c",
       "412ecd6606d9",
       "bbf854bb9a7e",
       "b9454b647a65",
-      "0f085a8c2823",
+      "47f98cb56b4c",
       "179d51fc7f33",
-      "b187df2d160a",
+      "d11687e7c95f",
       "8730854f680f",
-      "26547a730bf1",
+      "fbba3c4dfeda",
       "6037e5d59fea",
       "6320ceb899a5",
       "72c856470915",
-      "06b0db3a8a4d",
-      "0452be800877",
+      "ee356414efef",
+      "86a8fccc3566",
       "b3b01f4063ac",
-      "417a8f532ef4",
+      "6635ca2eecf6",
       "2fce318755c8",
-      "805ab48d17b3",
+      "b46bde109407",
       "53dc68909eff",
-      "0d34daab14fc",
-      "7e48a7706a49",
-      "6f91dff4c9e5",
+      "010879bc3888",
       "ec4c6f85b30d",
-      "8a5c8f458a5b",
       "927abfcbfc7d",
       "40c8d8b41fcb",
       "1e54bc55214b",
       "3f00d93392c3",
-      "e5ceebe3755e",
-      "f59e7e0edc41",
+      "8b43ffcac6d7",
       "c57551dbdc76",
       "0d6d6f0f6b5e",
       "50d5edba145d",
@@ -2024,9 +2020,9 @@
     "packages/core/src/channels/CLAUDE.md": [
       "87dc8219cacc",
       "4fdb517998e6",
-      "54cef150f3ac",
-      "1bd74fd5031f",
-      "f5b1b6942688",
+      "7565cf9d8640",
+      "11fe51525502",
+      "453d976769c2",
       "745aace794e0",
       "c9ffbdc7dda2"
     ],
@@ -2034,10 +2030,10 @@
       "46ed6a9d3b1d"
     ],
     "packages/core/src/engine/CLAUDE.md": [
-      "ed9d4b5a62f2",
-      "c66ab418b9b4",
-      "e6a5fdbed44f",
-      "741b96f735a9",
+      "d3dccba93c91",
+      "c8e4c4392d78",
+      "81a069ad5daa",
+      "d34f92725dfb",
       "082ac37a216b"
     ],
     "packages/core/src/engine/INVARIANTS.md": [
@@ -2073,30 +2069,30 @@
       "6c2d7262d089",
       "160f229b2bc8",
       "15f6ff085e96",
-      "91584f627254",
+      "9f3779b172e0",
       "be3b127c1cc0",
       "3ce3d6701471",
       "188e0faae442"
     ],
     "packages/core/src/pipeline/CLAUDE.md": [
       "5441994dd5a0",
-      "a6adcb23f225",
+      "8569ec805ca5",
       "20a234fccf1d",
-      "ccddf53d6c43",
+      "f72592d37d48",
       "65ad1efb369e"
     ],
     "packages/core/src/pipeline/README.md": [
       "46ed6a9d3b1d"
     ],
     "packages/core/src/utils/event-emitter/CLAUDE.md": [
-      "4f4c73b70bfa"
+      "b0d3af0774f2"
     ],
     "packages/core/src/utils/fsm/ARCHITECTURE.md": [
       "168bf4aea55c"
     ],
     "packages/core/src/utils/fsm/CLAUDE.md": [
-      "b5f3246192f7",
-      "7431af1a5bd2"
+      "24457272bab6",
+      "460d510f657e"
     ],
     "packages/core/src/utils/logger/INVARIANTS.md": [
       "af432506a5f7"
@@ -2106,13 +2102,12 @@
       "c142ac0ba337"
     ],
     "packages/persistent-params-plugin/CLAUDE.md": [
-      "df4d6fe6c106",
+      "476a0fbed6d4",
       "31329257942d"
     ],
     "packages/rsc-server-plugin/CLAUDE.md": [
       "10c00ffeaf61",
-      "895fae40c2bb",
-      "6613084bb1e8"
+      "895fae40c2bb"
     ],
     "packages/rx/ARCHITECTURE.md": [
       "6c840a72bc90",
@@ -2121,7 +2116,7 @@
     ],
     "packages/rx/CLAUDE.md": [
       "90b1e130a70c",
-      "6160b76a7485",
+      "27b158baecab",
       "a8d8470c2eba",
       "f72a699b960f",
       "574e0ee370b2",
@@ -2143,7 +2138,7 @@
       "673f077f6b9f"
     ],
     "packages/ssr-utils/CLAUDE.md": [
-      "87cff76f38e9",
+      "bf3c2a6ca437",
       "be9c5b15b4c6",
       "d7d5aa8c9600",
       "fd510d6f5692",
@@ -2161,8 +2156,10 @@
       "8deaa71710f2"
     ],
     "packages/validation-plugin/CLAUDE.md": [
+      "3400cc879023",
+      "11facbd31523",
       "4319712a7f6e",
-      "88e8a4a2f0d0",
+      "65ac77879191",
       "c460d0800c1d",
       "651b745cc19a",
       "e623c09d4aac",
@@ -2172,7 +2169,6 @@
       "c308cefa4d00",
       "8167174669d4",
       "2a6057651557",
-      "4702974f7abe",
       "7c1820b8cbfb",
       "791e44bf4984",
       "56a35bce4d72",
@@ -2183,10 +2179,11 @@
       "13113acd12d4",
       "f610c7255a78",
       "fe046344a5cf",
-      "2c040fd7c27e",
+      "dc007e60f534",
       "d7e87330e139",
       "4b882f0ccf5f",
-      "9bc488169d45",
+      "6af4c1e40bb5",
+      "36a6e111996b",
       "7bcec890f556",
       "6c43793526e7"
     ],

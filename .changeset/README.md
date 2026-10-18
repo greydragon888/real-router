@@ -271,7 +271,7 @@ push is never blocked. What it checks:
 - If public-package source files changed → a changeset is REQUIRED
 ```
 
-Any change to a public package's source (or shared `*.ts` shipped source) needs a changeset — including comment/JSDoc-only edits. For a no-behaviour-change edit, add a `patch` changeset (`pnpm changeset`); JSDoc on an exported symbol ships in the `.d.ts`, so a patch release is legitimate.
+A change to a public package's code (`packages/*/src/`, or shared `*.ts` shipped source) needs a changeset. A comment-only or JSDoc-only edit, a doc inside `src/` and a diff that touches only tests do not: they go straight to `master` as infrastructure (the Rules of [CLAUDE.md](../CLAUDE.md)), the pre-push hook runs every check on them, and they ship with the package's next release. The pull-request gate above never sees them.
 
 ## Additional Resources
 

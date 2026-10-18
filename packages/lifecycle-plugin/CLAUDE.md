@@ -48,7 +48,7 @@ src/
 
 ### Hooks are fire-and-forget, with per-hook error isolation
 
-Return values are ignored. Each hook is invoked with **per-hook exception isolation** (#798): a throwing hook is caught and re-thrown **asynchronously** via `queueMicrotask`, so it never aborts the handler before a later hook of the same transition runs (the `onNavigate` orthogonality invariant), and never blocks or cancels the transition. The error still surfaces to global error handlers as an async uncaught error — mirroring `BaseSource` / `createActiveNameSelector` in `@real-router/sources`. Note the observable change from the pre-#798 design: a throwing hook surfaces **asynchronously (uncaught)**, not synchronously through the router's EventEmitter "Error in listener" sink. **This covers a throwing hook FACTORY too** (a failing DI init at compile time): `compileHook` runs inside the same `try` (#1222), so a factory throw is isolated identically — same async channel, never swallows a sibling `onNavigate`. A failed compile is not cached, so the factory retries on every navigation.
+Return values are ignored. Each hook is invoked with **per-hook exception isolation** (#798): a throwing hook is caught and re-thrown **asynchronously** via `queueMicrotask`, so it never aborts the handler before a later hook of the same transition runs (the `onNavigate` orthogonality invariant), and never blocks or cancels the transition. The error still surfaces to global error handlers as an async uncaught error — mirroring `BaseSource` / `createActiveNameSelector` in `@real-router/sources` — and not through the router's EventEmitter "Error in listener" sink. **This covers a throwing hook FACTORY too** (a failing DI init at compile time): `compileHook` runs inside the same `try` (#1222), so a factory throw is isolated identically — same async channel, never swallows a sibling `onNavigate`. A failed compile is not cached, so the factory retries on every navigation.
 
 ### onLeave fires at leave-approve, not success
 
@@ -75,7 +75,7 @@ onEnter: (router) => (toState) => {
 
 - `getRoutesApi(router).replace()` revalidation (#950/#1201) that **drops** the active route commits `UNKNOWN_ROUTE` via `navigateToNotFound()`, which emits only `TRANSITION_SUCCESS` — so the dropped route's `onLeave` is **skipped** (the "Cleanup on leave" `webSocket.disconnect()` silently does not run).
 - `replace()` revalidation where the active route **survives** (same name) emits `TRANSITION_SUCCESS` with `revalidate: true`; the plugin does not inspect `navOptions`, so it fires `onStay` **and** `onNavigate` with **no navigation and no param change**.
-- `clear()` is a silent reset (emits only `TREE_CHANGED`) — no lifecycle hook fires for the torn-out route.
+- `clear()` refuses with `ROUTER_NOT_STOPPED` while a state is committed, so it never tears out the route a running router is on; where it does run it emits only `TREE_CHANGED` and fires no lifecycle hook.
 
 Do **not** rely on `onLeave` as a guaranteed cleanup across `replace()` / `clear()` / `navigateToNotFound()`. For teardown that must survive tree mutations, tie cleanup to an external lifecycle (component unmount, `subscribeChanges`). Core root tracked in #1201.
 

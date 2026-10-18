@@ -27,7 +27,7 @@
 | `injectDeferredScripts`        | function | `(stream, deferredMap, opts?) => ReadableStream<Uint8Array>` — wraps an HTML stream with `<script>__rrDefer__("key", json)</script>` tags emitted as each promise resolves. Default `bootstrap: true` prepends the registry installer. |
 | `getDeferBootstrapScript`      | function | Returns the inline JS (no `<script>` wrapper) that installs `__rrDeferRegistry__` + `__rrDefer__` / `__rrDeferError__`. Embed once in `<head>` so React hydration sees a pristine `#root`.                                             |
 | `InjectDeferredScriptsOptions` | type     | `{ serialize?: Serializer; serializeError?: (e: unknown) => string; bootstrap?: boolean }` — opt-in `devalue.stringify` / `superjson.stringify` for non-JSON deferred payloads, custom error shape, or bootstrap suppression.          |
-| `Serializer`                   | type     | `(value: unknown) => string` — alias for `injectDeferredScripts`'s `serialize` slot. Stable contract: must produce a JSON-parseable string (`JSON.parse(serializer(v))` round-trips on the client). Default is `JSON.stringify`.       |
+| `Serializer`                   | type     | `(value: unknown) => string \| undefined` — alias for `injectDeferredScripts`'s `serialize` slot. Stable contract: must produce a JSON-parseable string (`JSON.parse(serializer(v))` round-trips on the client); an `undefined` result — what `JSON.stringify` returns for `undefined`, a function or a symbol — is sent as `null`. Default is `JSON.stringify`. |
 
 Server-only — Node `ReadableStream` / Web Streams. Application server (e.g.
 Express + Vite middleware) splits `index.html` by `<!--defer-bootstrap-->`
@@ -144,6 +144,8 @@ The function-form resolver receives `state` **before** the mode is written to co
 ```
 src/
 ├── factory.ts     — ssrDataPluginFactory: thin adapter that inlines validateLoaders (createLoadersValidator(ERROR_PREFIX)) + delegates to createSsrLoaderPlugin
+├── getSsrDataMode.ts — getSsrDataMode(state): runtime-guarded reader of state.context.ssrDataMode ("full" fallback, never throws)
+├── invalidate.ts  — invalidate(router, "data"): typed wrapper over markStale for CSR revalidation
 ├── types.ts       — DataLoaderFn, DataLoaderFnFactory, DataLoaderFactoryMap, DataRouteEntry, SsrLoaderContext, SsrMode (public-facing types)
 ├── errors.ts      — Re-export from shared-ssr/errors (LoaderRedirect, LoaderNotFound, LoaderTimeout, withTimeout)
 ├── server.ts      — Server-side wire-format helpers: injectDeferredScripts, getDeferBootstrapScript, Serializer (#610). Subpath: @real-router/ssr-data-plugin/server.
@@ -152,7 +154,7 @@ src/
 └── shared-ssr/    — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, errors, defer, deferRegistryClient, deferWireFormat, staleRegistry, types)
 ```
 
-The `factory.ts` is intentionally tiny (`validateLoaders` is a single-line binding inlined here after the deleted `validation.ts`) — the actual try/catch + interceptor + claim logic lives in [`shared/ssr/`](../../../shared/ssr/) and is consumed by both `ssr-data-plugin` (T = `unknown`, namespace = `"data"`) and `rsc-server-plugin` (T = `ReactNode`, namespace = `"rsc"`).
+The `factory.ts` is intentionally tiny (`validateLoaders` is a single-line binding) — the actual try/catch + interceptor + claim logic lives in [`shared/ssr/`](../../shared/ssr/) and is consumed by both `ssr-data-plugin` (T = `unknown`, namespace = `"data"`) and `rsc-server-plugin` (T = `ReactNode`, namespace = `"rsc"`).
 
 ## Gotchas
 
@@ -225,7 +227,7 @@ payload lands first resolves it for both. The namespace is the application's —
 and generic names are exactly what applications pick, so two independently
 authored mounts colliding is the ordinary case rather than an exotic one.
 
-**Give each router on a page distinct key names.** From 2026-09-10 a second
+**Give each router on a page distinct key names.** A second
 claimant on a key is reported once per key with `console.warn`; the promise is
 still shared, because that is what the wire format allows. Splitting it would be
 worse — the settle script resolves exactly one entry, so the second promise would
@@ -397,7 +399,7 @@ The post-hydration scratchpad-skip path uses `Object.hasOwn(context, config.name
 
 In practice this only matters for in-memory hydration paths — JSON-roundtrip strips `undefined` values, so a typical `serializeRouterState(state)` → `<script>window.__SSR_STATE__=…</script>` → `hydrateRouter` flow can't carry `data: undefined` across. The contract is documented here so a future refactor that flips to `!== undefined` knows it's a behaviour change, not a bug fix. Frozen by `tests/functional/data-loader.test.ts` "treats explicit `data: undefined` in hydrated context as missing" (the test name is from the user's perspective: "no value", and the plugin honours that as "server said: no value, stop here").
 
-**The own-key check is preceded by a non-null-object check (#762, widened by #1835).** A hand-built partial source is type-legal via `hydrateRouter`'s `{ path: string }` object-source cast, which stashes it in the scratchpad with no runtime validation — so `context` arrives as whatever the payload carried. `undefined` was guarded first (#762); `null` was not, and it reached `Object.hasOwn`, which throws on it. That throw landed in a **post-commit** interceptor: `hydrateRouter` rejected while the router stayed active over a half-populated context. Anything that is not a non-null object now falls through to the loader — the same answer a missing `context` already got. This is orthogonal to presence-wins, which is about presence of the _namespace key_ within an existing `context`. Frozen by `data-loader.test.ts` "runs the loader instead of crashing when the hydration source has no context" and by the `it.each` table in `shared-ssr/proto-chain-reads-1835.test.ts`.
+**The own-key check is preceded by a non-null-object check (#762, #1835).** A hand-built partial source is type-legal via `hydrateRouter`'s `{ path: string }` object-source cast, which stashes it in the scratchpad with no runtime validation — so `context` arrives as whatever the payload carried. Anything that is not a non-null object falls through to the loader — the same answer a missing `context` gets: `Object.hasOwn` throws on `null`, and a throw there lands in a **post-commit** interceptor, where `hydrateRouter` would reject while the router stays active over a half-populated context. This is orthogonal to presence-wins, which is about presence of the _namespace key_ within an existing `context`. Frozen by `data-loader.test.ts` "runs the loader instead of crashing when the hydration source has no context" and by the `it.each` table in `shared-ssr/proto-chain-reads-1835.test.ts`.
 
 ### Loader errors propagate
 

@@ -55,12 +55,12 @@ import type { AwaitProps, StreamedProps } from "@real-router/react/ssr";
 
 ### Why split `/ssr`?
 
-Trigger reached at #610 (defer + Await + Streamed + useDeferred = 5 SSR-feature exports, ≥3 was the threshold from `.claude/SSR_FEATURE_GAPS_RU.md` §8). Benefits:
+Benefits:
 
 - **Type isolation** — server-only prop types don't leak into the client TypeScript context for app code that doesn't touch SSR
 - **DX clarity** — `import {…} from '@real-router/react/ssr'` self-documents SSR intent
 - **`react-server` condition composition** — `/ssr` has its own type-only RSC entry, so Server Components can import the prop types without pulling client runtime
-- **Future-proofing** — when adapter-specific server-render utilities or `<HttpStatusCode>` ship, they slot into `/ssr` without re-shaping the main entry
+- **Room for server-render utilities** — `<HttpStatusCode>`, `<HttpStatusProvider>` and `createHttpStatusSink` live in `/ssr`, and further server-render utilities slot in there without re-shaping the main entry
 
 Bundle cost is ≈ 0 thanks to `"sideEffects": false` + tree-shaking — the split is about API surface design, not bytes.
 
@@ -171,7 +171,7 @@ Three fallback slots compose with `<RouteView.Match>` inside a `<RouteView nodeN
 **Precedence rules** (`buildRenderList` + `appendFallback`):
 
 1. `<Match>` first-wins — duplicate segments short-circuit via `processMatch.alreadyActive`. Subsequent `<Match>` with the same segment are not rendered.
-2. `<Self>` and `<NotFound>` are both first-wins — only the first `<RouteView.Self>` (resp. first `<RouteView.NotFound>`) contributes; subsequent duplicates are ignored. `recordFallback` guards each with its own `selfFound` / `notFoundFound` flag. (#1220 restored the `<NotFound>` half of this symmetry — it was accidentally last-wins before.)
+2. `<Self>` and `<NotFound>` are both first-wins — only the first `<RouteView.Self>` (resp. first `<RouteView.NotFound>`) contributes; subsequent duplicates are ignored. `recordFallback` guards each with its own `selfFound` / `notFoundFound` flag (#1220).
 3. An activating `<Match>` suppresses both `<Self>` and `<NotFound>` from the render output.
 4. When no `<Match>` activates: `<Self>` wins over `<NotFound>` if both would fire (occurs only when `nodeName === UNKNOWN_ROUTE`, narrow edge case).
 
@@ -189,35 +189,27 @@ Three fallback slots compose with `<RouteView.Match>` inside a `<RouteView nodeN
 </RouteView>
 ```
 
-Property-based tests for the pipeline live in `tests/property/routeView.pipeline.properties.ts` (issue #626) — 8 invariants covering source-order preservation, first-match-wins, Self priority, activeMatchFound suppression, and keepAlive sticky activation.
+Property-based tests for the pipeline live in `tests/property/routeView.pipeline.properties.ts` (issue #626); that file owns the invariant list — source-order preservation, first-match-wins, first-Self / first-NotFound wins, Self priority, activeMatchFound suppression and keepAlive sticky activation among them.
 
 ### Build (tsdown)
 
-Multi-entry config produces shared chunks for code common to both entries:
+`tsdown.config.mts` declares seven entries — `index`, `legacy`, `ink`, `ssr`, `legacy.ssr`, `index.react-server`, `ssr.react-server` — and emits code common to several entries as shared chunks:
 
 ```
 dist/
-├── esm/
-│   ├── index.mjs           # Main (React 19.2+)
-│   ├── index.d.mts
-│   ├── legacy.mjs          # Legacy (React 18+)
-│   ├── legacy.d.mts
-│   └── chunk-*.mjs         # Shared code
-└── cjs/
-    ├── index.js
-    ├── index.d.ts
-    ├── legacy.js
-    └── legacy.d.ts
+├── esm/   # <entry>.mjs + <entry>.d.mts for every entry, plus the shared chunks
+└── cjs/   # <entry>.js + <entry>.d.ts for every entry — ink.js included, which no export condition reaches (see "Ink entry constraints")
 ```
 
 ## Architecture
 
-**Dual Context Pattern:**
+**Triple Context Pattern:**
 
 - `RouterContext` - Raw router instance (imperative calls)
+- `NavigatorContext` - Navigator (stable ref, derived from router)
 - `RouteContext` - Navigator + current route + previous route (reactive): `{ navigator: Navigator } & RouteState`
 
-**Subscription Layer:** Hooks use `@real-router/sources` (`createRouteSource`, `createRouteNodeSource`, `createActiveRouteSource`, `createTransitionSource`, `createErrorSource`) for reactive state subscriptions via `useSyncExternalStore` (React 18+).
+**Subscription Layer:** Hooks use `@real-router/sources` (`createRouteSource`, `createRouteNodeSource`, `createActiveSource`, `getTransitionSource`, `createDismissableError`) for reactive state subscriptions via `useSyncExternalStore` (React 18+).
 
 **DOM commit timing (important for user-code listeners):** `useSyncExternalStore`'s `onStoreChange` is invoked synchronously from `router.subscribe` → `source.updateSnapshot`, but the React rerender + DOM commit are **scheduled** by React's scheduler, not performed synchronously. A `router.subscribe` callback registered alongside `RouterProvider` sees the new router state but the **old DOM**. See `@real-router/sources` CLAUDE.md, section "Notification flow and framework commit timing" for details. For View Transitions or other post-commit work, use `subscribeLeave` (awaited) to capture DOM before commit, not `subscribe`.
 
@@ -229,7 +221,7 @@ dist/
 | `children`           | `ReactNode`                        | —           | Subtree that consumes router context (required — provider would be useless without descendants)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `announceNavigation` | `boolean \| RouteAnnouncerOptions` | `false`     | Enable WCAG-compliant screen reader announcements on route change via `aria-live` region. `true` = defaults; pass `{ prefix?, getAnnouncementText? }` to customize the announced text (falls back to the default h1 → title → route-name chain when the callback returns empty or throws)                                                                                                                                                                                                                                                                                                                                                                                |
 | `scrollRestoration`  | `ScrollRestorationOptions`         | `undefined` | Opt into scroll capture + restoration. `undefined` = off. See [Scroll Restoration](../../real-router.wiki/Scroll-Restoration.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `scrollSpy`          | `ScrollSpyOptions`                 | `undefined` | Opt into router-coordinated `IntersectionObserver`-driven URL hash spy (#575). Tracks the topmost visible anchor inside the configured scroll container and emits `router.navigate(name, params, undefined, { hash, replace: true, force: true, hashChange: true })` (query channel unused — opts at position 4, RFC-4 M2 / #1548). Required: `{ selector: string }` (CSS selector for anchors). Optional `rootMargin`, `scrollContainer`. `undefined` / empty `selector` = off. Requires `browser-plugin` or `navigation-plugin` (hash-plugin / memory-plugin → warn-once + NOOP). See [Scroll Spy guide](https://github.com/greydragon888/real-router/wiki/Scroll-Spy) |
+| `scrollSpy`          | `ScrollSpyOptions`                 | `undefined` | Opt into router-coordinated `IntersectionObserver`-driven URL hash spy (#575). Tracks the topmost visible anchor inside the configured scroll container and emits `router.navigate(state.name, state.params, state.search, { hash, replace: true, force: true, hashChange: true })` — both channels of the current state, so the query survives the hash move (opts at position 4, RFC-4 M2 / #1548). Required: `{ selector: string }` (CSS selector for anchors). Optional `rootMargin`, `scrollContainer`. `undefined` / empty `selector` = off. Requires `browser-plugin` or `navigation-plugin` (hash-plugin / memory-plugin → warn-once + NOOP). See [Scroll Spy guide](https://github.com/greydragon888/real-router/wiki/Scroll-Spy) |
 | `viewTransitions`    | `boolean`                          | `false`     | Opt into View Transitions API integration via `createViewTransitions` utility. No-op on SSR and browsers without `document.startViewTransition`. CSS customization via `::view-transition-*` pseudo-elements                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 ## Hooks
@@ -249,10 +241,10 @@ dist/
 
 ## Promise-Based Navigation
 
-Link uses fire-and-forget navigation:
+Link uses fire-and-forget navigation through `navigateWithHash` (from `dom-utils/link-utils`); the `.catch(() => {})` keeps rejected transitions out of the unhandled-rejection log:
 
 ```typescript
-void router.navigate(routeName, stableParams, stableSearch, stableOptions);
+navigateWithHash(router, name, paramsForNav, search, hash, routeOptions).catch(() => {});
 ```
 
 For per-navigation result handling, call `router.navigate()` in an `onClick` handler:
@@ -374,7 +366,7 @@ const { navigator, route } = useRoute(); // Re-renders on every navigation
 
 ### useRouteExit / useRouteEnter
 
-Two hooks that wrap the `subscribeLeave` / mount-side route windows with the universal guards baked in (reentrant abort pre-check, same-route skip default, latest-handler ref, StrictMode-dedupe) — the guard logic itself is the shared `createRouteEnterGate` / `guardLeaveListener` from `@real-router/sources` (#1435), so react keeps only the effect wiring + latest-handler ref. Both ship in the main entry; both consume `useRoute()` for the route snapshot, so they inherit the post-commit timing guarantee.
+Two hooks that wrap the `subscribeLeave` / mount-side route windows with the universal guards baked in (reentrant abort pre-check, same-route skip default, latest-handler ref, StrictMode-dedupe) — the guard logic itself is the shared `createRouteEnterGate` / `guardLeaveListener` from `@real-router/sources` (#1435), so react keeps only the effect wiring + latest-handler ref. Both ship in the main entry. `useRouteEnter` reads its route snapshot from `useRoute()`, so it inherits the post-commit timing guarantee; `useRouteExit` reads no snapshot — it registers a `router.subscribeLeave` listener from an effect.
 
 ```tsx
 useRouteExit(async ({ signal }) => {
@@ -397,16 +389,16 @@ useRouteEnter(({ route, previousRoute }) => {
 
 `useRoute()` returns `{ navigator, route: State<P>, previousRoute?: State }` —
 `route` is **non-nullable**. The hook throws when the router has no active state
-(unstarted, stopped, or disposed) so consumers no longer have to defend against
-`undefined` on every access:
+(unstarted, stopped, or disposed), so a consumer never guards against
+`undefined`:
 
 ```tsx
-// Before (defensive):
+// Unnecessary — `route` is never undefined here:
 const { route } = useRoute<{ id: string }>();
 if (!route) return null;
 const id = route?.params.id ?? "fallback";
 
-// After (route is guaranteed):
+// Correct:
 const { route } = useRoute<{ id: string }>();
 const id = route.params.id;
 ```
@@ -486,7 +478,7 @@ etc.) are NOT compared — they don't affect Link's hooks.
 
 **Strictly-decoded (#1211).** The value is a DECODED fragment, encoded verbatim (`encodeURI(s).replace(/#/g, "%23")`) at the URL boundary. Do NOT pass raw `location.hash` (which is percent-encoded) — `hash="a%20b"` is the literal fragment `a%20b` and renders `#a%2520b`, not `#a%20b`. Pass `hash="a b"` for the fragment `a b`. The plugin and the adapter obey the one strict contract, so neither layer tolerates the encoded form.
 
-Active state is hash-aware: when `hash` is set, the Link is active iff route matches AND `state.context.url.hash` equals expected — sibling tab Links (same `routeName`, different `hash`) light up independently. Hash-plugin runtime always returns `false` for hash-aware active checks (consistent with the documented hash-plugin limitation).
+Active state is hash-aware: when `hash` is set, the Link is active iff route matches AND `state.context.url.hash` equals expected — sibling tab Links (same `routeName`, different `hash`) light up independently. Under hash-plugin (no `url` context namespace — the documented hash-plugin limitation) a non-empty `hash` never matches, while `hash=""` matches whenever the route does.
 
 ### activeStrict Meaning
 
@@ -593,13 +585,11 @@ so the re-shown Provider renders the **current** route, not the stale one. The
 </RouterProvider>
 ```
 
-Most apps already mount `RouterProvider` at the root, so post-#765 this is a
-correctness-neutral style note rather than a footgun. (Before the reconnect
-reconcile the re-shown Provider replayed its stale snapshot until the next
-navigation — that window is now closed.) A related mount-side effect: on that
-same catch-up the reconciled snapshot carries `previousRoute: undefined`, and
-`useRouteEnter` deliberately **skips** its handler rather than fire it with an
-undefined `previousRoute` — see the PC2 regression in the same file (#1218).
+Most apps already mount `RouterProvider` at the root, so this is a style note
+rather than a correctness concern. A related mount-side effect: on the
+reconnect catch-up the reconciled snapshot carries `previousRoute: undefined`,
+and `useRouteEnter` deliberately **skips** its handler rather than fire it with
+an undefined `previousRoute` — see the PC2 regression in the same file (#1218).
 
 ### Ink entry constraints
 
@@ -618,7 +608,7 @@ undefined `previousRoute` — see the PC2 regression in the same file (#1218).
 
 ## SSR
 
-No built-in SSR support. For SSR:
+SSR-aware components and hooks ship from `@real-router/react/ssr` (React 18: `/legacy/ssr`) — see "SSR-feature surface" above. Server-side integration contract:
 
 - Create router per request (don't share)
 - Initialize with matched URL
