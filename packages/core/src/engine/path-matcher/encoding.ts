@@ -10,7 +10,6 @@
  * Performance-critical code: string concatenation is 2x faster than template
  * literals/String.raw in V8 hot paths. See benchmarks for details.
  */
-/* eslint-disable prefer-template */
 
 import type { URLParamsEncodingType } from "./types";
 
@@ -154,8 +153,23 @@ export const DECODING_METHODS: Record<
 // =============================================================================
 
 /**
+ * The separator `encodeParam` prints after an EMPTY segment. A literal `/` there
+ * makes `//`, which `match` refuses (#2010) and a URL parser reads as a host
+ * (`{ rest: "/evil.com" }` → `//evil.com`). `%2F` comes back as `/` only from
+ * `decodeURIComponent`: `decodeURI` keeps it and `none` decodes nothing, so those
+ * two keep the `/` (engine INVARIANTS, Roundtrip Extensions #2).
+ */
+const SEPARATOR_AFTER_EMPTY: Record<URLParamsEncodingType, string> = {
+  default: "%2F",
+  uri: "/",
+  uriComponent: "%2F",
+  none: "/",
+};
+
+/**
  * Encodes a SPLAT URL parameter value: each `/`-delimited segment is encoded with the
- * strategy's encoder, preserving the `/` separators.
+ * strategy's encoder, preserving the `/` separators — except the one after an empty
+ * segment, see `SEPARATOR_AFTER_EMPTY`.
  *
  * Splat-only by design (#860): a NON-splat param is encoded by `ENCODING_METHODS[encoding]`
  * directly — `registration/buildParts.ts`'s `makeBuildParamSlot` routes only SPLAT slots
@@ -169,6 +183,7 @@ export const DECODING_METHODS: Record<
  * ```typescript
  * encodeParam('docs/readme.md', 'default');   // => 'docs/readme.md'
  * encodeParam('a/hello world', 'default');    // => 'a/hello%20world'
+ * encodeParam('/evil.com', 'default');        // => '%2Fevil.com'
  * ```
  */
 export const encodeParam = (
@@ -176,6 +191,7 @@ export const encodeParam = (
   encoding: URLParamsEncodingType,
 ): string => {
   const encoder = ENCODING_METHODS[encoding];
+  const afterEmpty = SEPARATOR_AFTER_EMPTY[encoding];
   const str = String(param);
 
   // Encode each "/"-segment separately, preserving the separators.
@@ -184,7 +200,8 @@ export const encodeParam = (
   let result = encoder(segments[0]);
 
   for (let i = 1; i < segments.length; i++) {
-    result += "/" + encoder(segments[i]);
+    result +=
+      (segments[i - 1] === "" ? afterEmpty : "/") + encoder(segments[i]);
   }
 
   return result;

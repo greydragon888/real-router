@@ -113,9 +113,10 @@ describe("replaceHistoryState Validation", () => {
   });
 });
 
-// A splat that begins with "/" prints a router path that begins with "//",
-// and a URL that begins with "//" names a host: `nav.navigate("//evil.com")`
-// leaves the origin. The URL the plugin writes keeps the path a path.
+// A URL that begins with "//" names a host: `nav.navigate("//evil.com")`
+// leaves the origin. Under `urlParamsEncoding: "uri"` a splat that begins with
+// "/" prints such a router path (the default writes that slash `%2F`), and the
+// URL the plugin writes keeps it a path.
 describe("Same-origin URL writes", () => {
   const catchAllConfig = [...routerConfig, { name: "any", path: "/*rest" }];
 
@@ -138,7 +139,7 @@ describe("Same-origin URL writes", () => {
     async (rest) => {
       const mock = new MockNavigation("http://localhost/home");
       const browser = createMockNavigationBrowser(mock);
-      const router = createRouter(catchAllConfig);
+      const router = createRouter(catchAllConfig, { urlParamsEncoding: "uri" });
 
       router.usePlugin(navigationPluginFactory({ base: "" }, browser));
       await router.start("/home");
@@ -154,7 +155,7 @@ describe("Same-origin URL writes", () => {
   it("prints a link href on the origin", async () => {
     const mock = new MockNavigation("http://localhost/home");
     const browser = createMockNavigationBrowser(mock);
-    const router = createRouter(catchAllConfig);
+    const router = createRouter(catchAllConfig, { urlParamsEncoding: "uri" });
 
     router.usePlugin(navigationPluginFactory({ base: "" }, browser));
     await router.start("/home");

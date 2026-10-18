@@ -1107,15 +1107,19 @@ describe("anchorTargetsAnotherContext (#1834)", () => {
   });
 });
 
-// Without a URL plugin the href is the router path, and a catch-all route
-// prints `//evil.com` for `rest: "/evil.com"` — a URL that names a host. The
-// prefix is the one `buildUrl` in shared/browser-env gives the same path.
+// Without a URL plugin the href is the router path. Under
+// `urlParamsEncoding: "uri"` a catch-all route prints `//evil.com` for
+// `rest: "/evil.com"` — a URL that names a host. The prefix is the one
+// `buildUrl` in shared/browser-env gives the same path.
 describe("buildHref — a path that would name a host, without a URL plugin", () => {
   it("renders the catch-all href on the page's origin", async () => {
-    const router = createRouter([
-      { name: "home", path: "/home" },
-      { name: "any", path: "/*rest" },
-    ]);
+    const router = createRouter(
+      [
+        { name: "home", path: "/home" },
+        { name: "any", path: "/*rest" },
+      ],
+      { urlParamsEncoding: "uri" },
+    );
 
     await router.start("/home");
 
