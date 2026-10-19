@@ -6,11 +6,14 @@ import {
   arbDistinctRouteNamePair,
   arbDistinctIdPair,
   arbNavigationAttempts,
+  arbSignalAttempts,
   arbSimpleRouteName,
   createAttemptRouter,
   createHookSpies,
   createLifecycleRouter,
   createOrderTrackingRouter,
+  createSignalRouter,
+  navigateBy,
   NUM_RUNS,
 } from "./helpers";
 import { lifecyclePluginFactory } from "../../src";
@@ -170,6 +173,78 @@ describe("hook dispatch: onLeave fires when a route becomes inactive", () => {
       expect(leaveCall!.fromName).toBe(fromRoute);
 
       router.stop();
+    },
+  );
+});
+
+// =============================================================================
+// Signals (#2692)
+// =============================================================================
+
+describe("signals: each aborts exactly when its lifetime ends (#2692)", () => {
+  // Runs the attempts, a trailing `pending` left parked.
+  async function runAttempts(
+    router: ReturnType<typeof createSignalRouter>["router"],
+    attempts: Parameters<typeof navigateBy>[1][],
+  ): Promise<Promise<unknown>[]> {
+    const settled: Promise<unknown>[] = [];
+
+    for (const attempt of attempts) {
+      const navigation = navigateBy(router, attempt).catch(() => {});
+
+      settled.push(navigation);
+
+      if (attempt.kind !== "pending") {
+        await navigation;
+      }
+    }
+
+    return settled;
+  }
+
+  test.prop([arbSimpleRouteName, arbSignalAttempts], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "onEnter's signal aborts when its route is left, the others' when the next navigation commits, and a navigation that does not commit aborts none",
+    async (startRoute, attempts) => {
+      const { router, handed, commits } = createSignalRouter();
+
+      await router.start(startRoute === "home" ? "/" : `/${startRoute}`);
+      const settled = await runAttempts(router, attempts);
+
+      // The lifetime of each signal, read off core's commit stream alone.
+      const expected = handed.map(({ hook, route, commit }) =>
+        hook === "onEnter"
+          ? commits.slice(commit + 1).some((name) => name !== route)
+          : commits.length > commit + 1,
+      );
+
+      expect(handed.length).toBeGreaterThan(0);
+      expect(handed.map(({ signal }) => signal.aborted)).toStrictEqual(
+        expected,
+      );
+
+      router.stop();
+      await Promise.all(settled);
+    },
+  );
+
+  test.prop([arbSimpleRouteName, arbSignalAttempts], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "router.stop() aborts every signal a hook was handed",
+    async (startRoute, attempts) => {
+      const { router, handed } = createSignalRouter();
+
+      await router.start(startRoute === "home" ? "/" : `/${startRoute}`);
+      const settled = await runAttempts(router, attempts);
+
+      expect(handed.some(({ signal }) => !signal.aborted)).toBe(true);
+
+      router.stop();
+      await Promise.all(settled);
+
+      expect(handed.filter(({ signal }) => !signal.aborted)).toStrictEqual([]);
     },
   );
 });

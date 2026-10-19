@@ -42,6 +42,13 @@
 | --- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | `onLeave` fires before `onEnter`                        | When both hooks are defined, `onLeave` always precedes `onEnter` in the call order. Both run in the same `onTransitionSuccess` handler, `onLeave` first. |
 
+## Signals
+
+| #   | Invariant                                               | Description                                                                                                                                                                                  |
+| --- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Each signal aborts exactly when its lifetime ends (#2692) | Over any sequence of navigation attempts — commits to another route, search changes and reloads on the same route, navigations refused by `canActivate`, failed by a throwing guard, or cancelled while an async guard is pending — `onEnter`'s signal is aborted iff a later commit left its route, and `onStay`'s, `onNavigate`'s and `onLeave`'s iff a later commit exists, as `router.subscribe` reports the commits. A navigation that does not commit aborts none. |
+| 2   | `router.stop()` aborts every signal a hook was handed   | After any such sequence, `stop()` leaves no signal a hook received unaborted.                                                                                                                 |
+
 ## Teardown
 
 | #   | Invariant                                               | Description                                                                                                                                                                                  |
@@ -65,4 +72,4 @@
 
 | File                                          | Invariants | Category                                                     |
 | --------------------------------------------- | ---------- | ------------------------------------------------------------ |
-| `tests/property/lifecycle.properties.ts`      | 19         | onEnter dispatch, onLeave dispatch (incl. refused / cancelled navigations, #2691), onStay dispatch, onNavigate dispatch + orthogonality (incl. throwing-hook **and throwing-factory** isolation, #798 / #1222), ordering, teardown, mutual exclusion, compilation |
+| `tests/property/lifecycle.properties.ts`      | 21         | onEnter dispatch, onLeave dispatch (incl. refused / cancelled navigations, #2691), onStay dispatch, onNavigate dispatch + orthogonality (incl. throwing-hook **and throwing-factory** isolation, #798 / #1222), signal lifetimes (#2692), ordering, teardown, mutual exclusion, compilation |
