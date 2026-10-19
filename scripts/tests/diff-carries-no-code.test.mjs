@@ -196,6 +196,36 @@ test("the steps that answer them are pinned: name, id and run, nothing else", ()
   }
 });
 
+test("the job runs them as written: its keys closed, and only the checkout before them", () => {
+  // A job-level `env:` (BASH_ENV, SHELLOPTS), a `defaults:` shell, a
+  // `container:` or a step before the two that writes $GITHUB_PATH changes how
+  // both run while their text stays pinned.
+  assert.deepEqual(
+    checkJob.items.map((pair) => String(pair.key.value)),
+    ["name", "runs-on", "outputs", "steps"],
+    "the keys of the check job",
+  );
+
+  const [checkout, ...rest] = checkJob.get("steps", true).items;
+
+  assert.deepEqual(
+    rest.slice(0, 2).map((step) => step.get("id")),
+    ["changes", "source"],
+    "the two steps, right after the checkout",
+  );
+  assert.deepEqual(
+    checkout.items.map((pair) => String(pair.key.value)),
+    ["name", "uses", "with"],
+    "the keys of the step before them",
+  );
+  assert.match(checkout.get("uses"), /^actions\/checkout@v\d+$/);
+  assert.deepEqual(
+    checkout.get("with", true).items.map((pair) => String(pair.key.value)),
+    ["persist-credentials", "fetch-depth"],
+    "what the checkout is given",
+  );
+});
+
 /**
  * Runs a step's script as the runner would, with the expressions substituted,
  * `git` printing a diff (or failing when it is null), and `node` either the

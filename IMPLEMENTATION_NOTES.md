@@ -14386,6 +14386,8 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 
 > **Updated (2026-10-07).** `node:skip-facts` runs the `no_source` predicate's own table, `diff-carries-no-source.test.mjs`, as well: in the guards group it skipped on the `no-source` it decides, and the steps' cells held the predicate only through the step. Each table also holds its predicate's own file to be code, or source: a predicate taught to skip its own file passed both tables. `node:skip-facts` runs `verify.test.mjs` too (the entry "The links from the skip facts to Repo Lints' contexts are held in every context").
 
+> **Updated (2026-10-19).** The pins held the two steps' text but not the job around them: a job-level `env:` with `BASH_ENV`, a `defaults:` shell, a `container:` or a step before them changed how both ran, and every test stayed green. The job's keys, the checkout before the steps and what it is given are pinned too ("The check job runs its two steps as written").
+
 **Problem.** Two outputs of `ci.yml`'s `check` job decide what CI skips. With `should_run` not `true` the gate requires no job of the pipeline to have run; with `no_source` true Repo Lints skips the checks whose `ciSkip` names `no-source`. No test held either producer: the reconciliation of RFC-4 found the `no_source` step unheld, and `should_run` came from an inline `grep` classification no test read. Each failed toward the skip. The `source` step took exit 0 for "no source", so a predicate that exited 0 without answering skipped the checks: run under bash with `node` exiting 0 at once, it answered `no_source=true` on a diff with code in it. The `changes` step read an empty `grep` output as no code, so a crashed or silent `grep`, or an empty diff, answered `should_run=false`. And `git diff --name-only` lists a renamed file under its new path alone, so code moved into Markdown read as Markdown.
 
 **Solution.**
@@ -14942,3 +14944,11 @@ Five mutants, against a green baseline: the stamp back on the writer's object, a
 - Cells: an output of `check` read through jq is refused; the three cells that change the aggregate (`env`, `$ENV`, `input`) expect the new refusal; the four cells of the removed grammar are gone. Without the comparison the new cell and the three changed ones fail; placed before the input checks, it fails the input cells and the census of refusal places.
 
 **Why.** The table can stand for the runner only while the script reads nothing the harness does not fill. One pinned program needs no grammar, and an edit of the aggregate fails the test until `AGGREGATE` moves with it — the point where someone has to ask what the new program reads.
+
+## The check job runs its two steps as written (2026-10-19)
+
+**Problem.** `diff-carries-no-code.test.mjs` pinned the `changes` and `source` steps — name, id and run, nothing else — but not the job that runs them. A job-level `env:` with `BASH_ENV` naming a file that defines `node`, or a `defaults:` with `shell: "true {0}"`, changed how both steps ran while their text stayed pinned: all 318 tests of the skip facts, the gate, Repo Lints, the registry and closed YAML stayed green, and under `BASH_ENV` the predicate's call answered `NO_CODE` for any diff. The same forms at the workflow level were held already, by Repo Lints' closed reading. A blind control run of `/code-review-rfc` on the RFC-4 range found it.
+
+**Solution.** A cell of `node:skip-facts` holds the job: its keys are `name`, `runs-on`, `outputs` and `steps`; the two steps come right after the checkout; the checkout is `actions/checkout@v<N>`, given `persist-credentials` and `fetch-depth` and nothing else. A job-level `env:`, a `defaults:`, a `container:`, a step before the two and a checkout `ref:` each fail it.
+
+**Why.** A pin of a script holds what the script says, not how it runs, and the job's keys and the steps before it decide that. The cell runs where no context skips it, like the steps' own pins.
