@@ -70,6 +70,8 @@ packages/**/.eslintcache
 !/.claude/rules/
 !/.claude/prompts/
 /.claude/prompts/*
+!/.claude/prompts/audit-convergence-runs.mjs
+!/.claude/prompts/audit-convergence-summary.mjs
 !/.claude/prompts/audit-rfc-probes.md
 !/.claude/prompts/benchmark-harness-audit.md
 !/.claude/prompts/boolean-flag-audit.md
