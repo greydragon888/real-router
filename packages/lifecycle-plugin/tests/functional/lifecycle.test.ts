@@ -1,4 +1,9 @@
-import { createRouter } from "@real-router/core";
+import {
+  createRouter,
+  errorCodes,
+  RouterError,
+  UNKNOWN_ROUTE,
+} from "@real-router/core";
 import { getRoutesApi } from "@real-router/core/api";
 import { describe, afterEach, it, expect, vi } from "vitest";
 
@@ -6,7 +11,7 @@ import { lifecyclePluginFactory } from "../../src";
 import { captureAsyncRethrows } from "../helpers";
 
 import type { LifecycleHook, LifecycleHookFactory } from "../../src";
-import type { Router } from "@real-router/core";
+import type { Route, Router, State } from "@real-router/core";
 
 describe("@real-router/lifecycle-plugin", () => {
   let router: Router;
@@ -133,6 +138,66 @@ describe("@real-router/lifecycle-plugin", () => {
       await router.start("/");
 
       expect(onLeave).not.toHaveBeenCalled();
+    });
+
+    it("should not fire onLeave on a same-route navigation", async () => {
+      const onLeave = vi.fn();
+      const onStay = vi.fn();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "users",
+            path: "/users",
+            children: [
+              {
+                name: "view",
+                path: "/:id",
+                onLeave: () => onLeave,
+                onStay: () => onStay,
+              },
+            ],
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/users/1");
+      await router.navigate("users.view", { id: "2" });
+
+      expect(onStay).toHaveBeenCalledTimes(1);
+      expect(onLeave).not.toHaveBeenCalled();
+
+      // Control: leaving the route does run it.
+      await router.navigate("home");
+
+      expect(onLeave).toHaveBeenCalledTimes(1);
+    });
+
+    it("should not fire onLeave when the plugin is torn down on the route", async () => {
+      const onLeave = vi.fn();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/", onLeave: () => onLeave },
+          { name: "about", path: "/about" },
+        ],
+        { defaultRoute: "home" },
+      );
+      const unsubscribe = router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+      unsubscribe();
+
+      expect(onLeave).not.toHaveBeenCalled();
+
+      // Control: a plugin installed again runs it on the next departure.
+      router.usePlugin(lifecyclePluginFactory());
+      await router.navigate("about");
+
+      expect(onLeave).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -449,6 +514,75 @@ describe("@real-router/lifecycle-plugin", () => {
 
       expect(callOrder).toStrictEqual(["onLeave", "onEnter"]);
     });
+
+    it("runs onLeave after the commit, before the target's onEnter and onNavigate (#2691)", async () => {
+      const callOrder: string[] = [];
+
+      router = createRouter(
+        [
+          {
+            name: "home",
+            path: "/",
+            onLeave: (r) => () => {
+              callOrder.push(`onLeave, state ${r.getState()?.name}`);
+            },
+          },
+          {
+            name: "about",
+            path: "/about",
+            onEnter: () => () => {
+              callOrder.push("onEnter");
+            },
+            onNavigate: () => () => {
+              callOrder.push("onNavigate");
+            },
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+      await router.navigate("about");
+
+      // The router already holds the target when onLeave runs.
+      expect(callOrder).toStrictEqual([
+        "onLeave, state about",
+        "onEnter",
+        "onNavigate",
+      ]);
+    });
+
+    it("runs onStay before onNavigate on a same-route navigation", async () => {
+      const callOrder: string[] = [];
+
+      router = createRouter([
+        { name: "home", path: "/" },
+        {
+          name: "users",
+          path: "/users",
+          children: [
+            {
+              name: "view",
+              path: "/:id",
+              onStay: () => () => {
+                callOrder.push("onStay");
+              },
+              onNavigate: () => () => {
+                callOrder.push("onNavigate");
+              },
+            },
+          ],
+        },
+      ]);
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/users/1");
+      callOrder.length = 0;
+      await router.navigate("users.view", { id: "2" });
+
+      expect(callOrder).toStrictEqual(["onStay", "onNavigate"]);
+    });
   });
 
   describe("nested routes", () => {
@@ -670,6 +804,52 @@ describe("@real-router/lifecycle-plugin", () => {
     // hook-body throw. It must be isolated the same way, else a throwing FACTORY
     // (the common DI-init shape) swallows a sibling onNavigate and re-throws on
     // every navigation (failed compile is not cached).
+    // onLeave shares the success handler with onEnter / onNavigate (#2691).
+    it.each<{ shape: string; onLeave: LifecycleHookFactory }>([
+      {
+        shape: "onLeave throws",
+        onLeave: () => () => {
+          throw new Error("boomL");
+        },
+      },
+      {
+        shape: "the onLeave FACTORY throws",
+        onLeave: () => {
+          throw new Error("boomL");
+        },
+      },
+    ])(
+      "still fires onEnter and onNavigate when $shape",
+      async ({ onLeave }) => {
+        const onEnter = vi.fn();
+        const onNavigate = vi.fn();
+
+        router = createRouter(
+          [
+            { name: "home", path: "/", onLeave },
+            {
+              name: "about",
+              path: "/about",
+              onEnter: () => onEnter,
+              onNavigate: () => onNavigate,
+            },
+          ],
+          { defaultRoute: "home" },
+        );
+        router.usePlugin(lifecyclePluginFactory());
+
+        await router.start("/");
+
+        const rethrown = await withUncaughtCapture(async () => {
+          await router.navigate("about");
+        });
+
+        expect(onEnter).toHaveBeenCalledTimes(1);
+        expect(onNavigate).toHaveBeenCalledTimes(1);
+        expect(rethrown).toStrictEqual([new Error("boomL")]);
+      },
+    );
+
     it("still fires onNavigate when the onEnter FACTORY throws (#1222)", async () => {
       const boom = new Error("factory boomE");
       const throwingFactory: LifecycleHookFactory = () => {
@@ -746,37 +926,327 @@ describe("@real-router/lifecycle-plugin", () => {
     });
   });
 
-  describe("onLeave with failing activation guard", () => {
-    it("should fire onLeave even when activation guard rejects", async () => {
-      const onLeave = vi.fn();
-      const onEnter = vi.fn();
+  describe("onLeave runs only for a navigation that commits (#2691)", () => {
+    // A navigation that does not commit leaves the user on the route, so the
+    // route's cleanup must not have run. `pending`'s canActivate answers only
+    // through `pendingGuard.release`; until then the way out is a cancellation.
+    // It runs after leave-approve, so `entered` proves a navigation got there.
+    const pendingGuard: {
+      release: (allowed: boolean) => void;
+      entered: number;
+    } = { release: () => {}, entered: 0 };
 
-      router = createRouter(
-        [
-          { name: "home", path: "/", onLeave: () => onLeave },
-          {
-            name: "guarded",
-            path: "/guarded",
-            onEnter: () => onEnter,
-            canActivate: () => () => false,
+    // Every target carries `targetHook` as its onEnter and onNavigate.
+    function editorRoutes(
+      onLeave: LifecycleHook,
+      targetHook: LifecycleHook,
+    ): Route[] {
+      const hooks = { onEnter: () => targetHook, onNavigate: () => targetHook };
+
+      pendingGuard.entered = 0;
+
+      return [
+        { name: "editor", path: "/editor", onLeave: () => onLeave },
+        { name: "about", path: "/about", ...hooks },
+        {
+          name: "refused",
+          path: "/refused",
+          canActivate: () => () => false,
+          ...hooks,
+        },
+        {
+          name: "throwing",
+          path: "/throwing",
+          canActivate: () => () => {
+            throw new Error("guard boom");
           },
-        ],
-        { defaultRoute: "home" },
-      );
-      router.usePlugin(lifecyclePluginFactory());
+          ...hooks,
+        },
+        {
+          name: "pending",
+          path: "/pending",
+          canActivate: () => () => {
+            pendingGuard.entered += 1;
 
-      await router.start("/");
+            return new Promise<boolean>((resolve) => {
+              pendingGuard.release = resolve;
+            });
+          },
+          ...hooks,
+        },
+      ];
+    }
 
+    function createEditorRouter(
+      onLeave: LifecycleHook,
+      targetHook: LifecycleHook = () => {},
+    ): Router {
+      return createRouter(editorRoutes(onLeave, targetHook), {
+        defaultRoute: "editor",
+      });
+    }
+
+    // What a navigation ended in: the committed route, or the rejection code
+    // (the message for an error that is not a RouterError).
+    async function settle(navigation: Promise<State>): Promise<string> {
       try {
-        await router.navigate("guarded");
-      } catch {
-        // activation guard blocks — CANNOT_ACTIVATE
-      }
+        const state = await navigation;
 
-      expect(onLeave).toHaveBeenCalledTimes(1);
-      expect(onEnter).not.toHaveBeenCalled();
-      expect(router.getState()?.name).toBe("home");
+        return `committed ${state.name}`;
+      } catch (error) {
+        return error instanceof RouterError
+          ? error.code
+          : (error as Error).message;
+      }
+    }
+
+    it.each<{
+      cause: string;
+      act: (router: Router) => Promise<string[]>;
+      outcomes: string[];
+      pendingEntered: number;
+    }>([
+      {
+        cause: "the target's canActivate returns false",
+        act: async (r) => [await settle(r.navigate("refused"))],
+        outcomes: [errorCodes.CANNOT_ACTIVATE],
+        pendingEntered: 0,
+      },
+      {
+        cause: "the target's canActivate throws",
+        act: async (r) => [await settle(r.navigate("throwing"))],
+        outcomes: [errorCodes.CANNOT_ACTIVATE],
+        pendingEntered: 0,
+      },
+      {
+        cause: "its signal aborts while the target's canActivate is pending",
+        act: async (r) => {
+          const controller = new AbortController();
+          const navigation = settle(
+            r.navigate("pending", {}, {}, { signal: controller.signal }),
+          );
+
+          controller.abort();
+
+          return [await navigation];
+        },
+        outcomes: [errorCodes.TRANSITION_CANCELLED],
+        pendingEntered: 1,
+      },
+      {
+        cause: "a newer navigation, refused in its turn, supersedes it",
+        act: (r) =>
+          Promise.all([
+            settle(r.navigate("pending")),
+            settle(r.navigate("refused")),
+          ]),
+        outcomes: [errorCodes.TRANSITION_CANCELLED, errorCodes.CANNOT_ACTIVATE],
+        pendingEntered: 1,
+      },
+      {
+        cause:
+          "router.stop() cancels it while the target's canActivate is pending",
+        act: async (r) => {
+          const navigation = settle(r.navigate("pending"));
+
+          r.stop();
+          const outcome = await navigation;
+
+          // Started again for the control departure below.
+          await r.start("/editor");
+
+          return [outcome];
+        },
+        outcomes: [errorCodes.TRANSITION_CANCELLED],
+        pendingEntered: 1,
+      },
+      {
+        cause: "the target route is removed while its canActivate is pending",
+        act: async (r) => {
+          const navigation = settle(r.navigate("pending"));
+
+          getRoutesApi(r).remove("pending");
+          pendingGuard.release(true);
+
+          return [await navigation];
+        },
+        outcomes: [errorCodes.ROUTE_NOT_FOUND],
+        pendingEntered: 1,
+      },
+      {
+        cause: "a subscribeLeave listener throws",
+        act: async (r) => {
+          let refuse = true;
+
+          r.subscribeLeave(() => {
+            if (refuse) {
+              refuse = false;
+
+              throw new Error("leave refused");
+            }
+          });
+
+          return [await settle(r.navigate("about"))];
+        },
+        outcomes: ["leave refused"],
+        pendingEntered: 0,
+      },
+    ])(
+      "does not fire onLeave when $cause",
+      async ({ act, outcomes, pendingEntered }) => {
+        const onLeave = vi.fn();
+        const targetHook = vi.fn();
+
+        const routes = editorRoutes(onLeave, targetHook);
+
+        // Every target carries the hooks watched below.
+        expect(
+          routes
+            .filter((route) => typeof route.onEnter === "function")
+            .map((route) => route.name),
+        ).toStrictEqual(["about", "refused", "throwing", "pending"]);
+
+        router = createRouter(routes, { defaultRoute: "editor" });
+        router.usePlugin(lifecyclePluginFactory());
+        await router.start("/editor");
+
+        await expect(act(router)).resolves.toStrictEqual(outcomes);
+        expect(pendingGuard.entered).toBe(pendingEntered);
+        expect(onLeave).not.toHaveBeenCalled();
+        expect(targetHook).not.toHaveBeenCalled();
+
+        // Control: the hooks are wired, and the next departure that commits
+        // runs them — editor's onLeave, then about's onEnter and onNavigate.
+        await router.navigate("about");
+
+        expect(onLeave).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({ name: "about" }),
+          expect.objectContaining({ name: "editor" }),
+        );
+        expect(targetHook).toHaveBeenCalledTimes(2);
+      },
+    );
+
+    it("fires onLeave once, for the navigation that commits, when it supersedes a pending one", async () => {
+      const onLeave = vi.fn();
+
+      router = createEditorRouter(onLeave);
+      router.usePlugin(lifecyclePluginFactory());
+      await router.start("/editor");
+
+      const superseded = settle(router.navigate("pending"));
+
+      await router.navigate("about");
+
+      await expect(superseded).resolves.toBe(errorCodes.TRANSITION_CANCELLED);
+      expect(onLeave).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ name: "about" }),
+        expect.objectContaining({ name: "editor" }),
+      );
     });
+
+    it("fires onLeave when navigateToNotFound() leaves the route", async () => {
+      const onLeave = vi.fn();
+
+      router = createEditorRouter(onLeave);
+      router.usePlugin(lifecyclePluginFactory());
+      await router.start("/editor");
+
+      router.navigateToNotFound("/missing");
+
+      expect(onLeave).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ name: UNKNOWN_ROUTE }),
+        expect.objectContaining({ name: "editor" }),
+      );
+    });
+
+    // `replace()` revalidation commits whatever the active path matches now.
+    // onLeave is read from the route's definition at that commit.
+    it("fires onLeave when replace() moves the active route and another one takes its path", async () => {
+      const onLeave = vi.fn();
+
+      router = createRouter([
+        { name: "home", path: "/" },
+        { name: "editor", path: "/editor", onLeave: () => onLeave },
+      ]);
+      router.usePlugin(lifecyclePluginFactory());
+      await router.start("/editor");
+
+      getRoutesApi(router).replace([
+        { name: "home", path: "/" },
+        { name: "editor", path: "/edit", onLeave: () => onLeave },
+        { name: "legacy", path: "/editor" },
+      ]);
+
+      expect(router.getState()?.name).toBe("legacy");
+      expect(onLeave).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ name: "legacy" }),
+        expect.objectContaining({ name: "editor" }),
+      );
+    });
+
+    it("does not fire onLeave when replace() drops the active route, even for the route that takes its path", async () => {
+      const onLeave = vi.fn();
+
+      router = createRouter([
+        { name: "home", path: "/" },
+        { name: "editor", path: "/editor", onLeave: () => onLeave },
+      ]);
+      router.usePlugin(lifecyclePluginFactory());
+      await router.start("/editor");
+
+      getRoutesApi(router).replace([
+        { name: "home", path: "/" },
+        { name: "legacy", path: "/editor" },
+      ]);
+
+      expect(router.getState()?.name).toBe("legacy");
+      expect(onLeave).not.toHaveBeenCalled();
+    });
+
+    // TRANSITION_SUCCESS listeners run in registration order, so a listener
+    // ahead of the plugin can take the definition away before onLeave is read.
+    it.each<{
+      order: string;
+      register: (router: Router, listener: () => void) => void;
+      calls: number;
+    }>([
+      {
+        order: "before",
+        register: (r, listener) => {
+          r.subscribe(listener);
+          r.usePlugin(lifecyclePluginFactory());
+        },
+        calls: 0,
+      },
+      {
+        order: "after",
+        register: (r, listener) => {
+          r.usePlugin(lifecyclePluginFactory());
+          r.subscribe(listener);
+        },
+        calls: 1,
+      },
+    ])(
+      "calls onLeave $calls time(s) when a commit listener registered $order the plugin removes the route just left",
+      async ({ register, calls }) => {
+        const onLeave = vi.fn();
+
+        router = createRouter([
+          { name: "home", path: "/" },
+          { name: "wizard", path: "/wizard", onLeave: () => onLeave },
+        ]);
+        await router.start("/wizard");
+        register(router, () => {
+          getRoutesApi(router).remove("wizard");
+        });
+
+        await router.navigate("home");
+
+        expect(getRoutesApi(router).has("wizard")).toBe(false);
+        expect(onLeave).toHaveBeenCalledTimes(calls);
+      },
+    );
   });
 
   describe("edge cases", () => {

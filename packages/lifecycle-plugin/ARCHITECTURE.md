@@ -30,8 +30,7 @@ graph LR
     CORE -.->|provides| TYPES["State"]
 
     subgraph plugin [Plugin Instance]
-        LH["onTransitionLeaveApprove"] --> CH[compileHook]
-        SH["onTransitionSuccess"] --> CH
+        SH["onTransitionSuccess"] --> CH[compileHook]
         CH --> GRC["api.getRouteConfig()"]
     end
 ```
@@ -48,18 +47,12 @@ graph LR
 ```
 Navigation: home → users.view
 
-onTransitionLeaveApprove(toState, fromState)
-    │
-    ├── toState.name !== fromState.name?
-    │   ├── YES → compileHook("onLeave", "home") → call if resolved
-    │   └── NO  → skip (same route = onStay, handled later)
-    │
-    ▼
 onTransitionSuccess(toState, fromState)
     │
-    ├── toState.name === fromState.name?
+    ├── toState.name === fromState?.name?
     │   ├── YES → compileHook("onStay", "users.view") → call if resolved
-    │   └── NO  → compileHook("onEnter", "users.view") → call if resolved
+    │   └── NO  → compileHook("onLeave", "home") → call if resolved (no fromState → skipped)
+    │             compileHook("onEnter", "users.view") → call if resolved
     │
     └── compileHook("onNavigate", "users.view") → call if resolved (orthogonal — always consulted)
 ```
@@ -97,13 +90,13 @@ Custom fields are extracted automatically by core's `registerSingleRouteHandlers
 
 ## Design Decisions
 
-### Why two hooks, not one
+### Why every hook runs on the commit
 
-Using both `onTransitionLeaveApprove` and `onTransitionSuccess` instead of just `onTransitionSuccess`:
+All four hooks run from `onTransitionSuccess`; the plugin listens to no pre-commit event.
 
-- `onLeave` semantically belongs to the **leaving** phase — it fires when deactivation guards pass
-- `onEnter`/`onStay` belong to the **success** phase — they confirm the transition completed
-- This matches the mental model: "cleanup before enter"
+- Leave-approve is tentative: after it an activation guard can still refuse, a `subscribeLeave` listener can still fail the navigation, and the caller's `signal`, a newer navigation or `stop()` can still cancel it. The user then stays on the route, so cleanup run there would leave that route torn down — and a cancelled navigation followed by one that commits would run it twice.
+- `onLeave` runs before the target's `onEnter` inside the same handler, which keeps "cleanup before enter"; the per-hook isolation keeps a throwing `onLeave` from swallowing the hooks after it.
+- Work that must happen before the commit, or be undone when the navigation does not commit, has `router.subscribeLeave`, whose `signal` aborts in that case. `onLeave` carries no signal, so it runs where nothing is left to undo.
 
 ### Why leaf route only
 
@@ -135,7 +128,7 @@ The plugin is stateless and has no options. The hooks themselves (defined on rou
 
 ### Why per-hook try/catch (isolation)
 
-Each hook's compile (factory) **and** invocation is wrapped in a per-hook `try/catch` that re-throws asynchronously via `queueMicrotask` (#798, #1222). This exists for one reason: a throwing `onEnter` / `onStay` — whether the **factory** throws at compile (a failing DI init) or the hook **body** throws at invocation — must not abort the `onTransitionSuccess` handler before `onNavigate` of the same transition runs; otherwise the throw silently swallows `onNavigate`, breaking the orthogonality invariant. The `compileHook` call lives **inside** the `try` (#1222): passing a pre-compiled hook as the argument would evaluate the factory *before* the `try` is entered — the `isolate(produce())` anti-pattern — leaking a compile-throw. Re-throwing on a microtask (rather than swallowing with `console.warn`) keeps the developer signal visible to global error handlers while every other hook of the transition still fires; the router continues operating regardless. This mirrors the per-listener isolation in `BaseSource` / `createActiveNameSelector` (`@real-router/sources`).
+Each hook's compile (factory) **and** invocation is wrapped in a per-hook `try/catch` that re-throws asynchronously via `queueMicrotask` (#798, #1222). This exists for one reason: a throwing `onLeave`, `onEnter` or `onStay` — whether the **factory** throws at compile (a failing DI init) or the hook **body** throws at invocation — must not abort the `onTransitionSuccess` handler before the hooks after it run; otherwise the throw silently swallows them, `onNavigate` among them, breaking the orthogonality invariant. The `compileHook` call lives **inside** the `try` (#1222): passing a pre-compiled hook as the argument would evaluate the factory *before* the `try` is entered — the `isolate(produce())` anti-pattern — leaking a compile-throw. Re-throwing on a microtask (rather than swallowing with `console.warn`) keeps the developer signal visible to global error handlers while every other hook of the transition still fires; the router continues operating regardless. This mirrors the per-listener isolation in `BaseSource` / `createActiveNameSelector` (`@real-router/sources`).
 
 The trade-off vs. the earlier "let it propagate to the EventEmitter" design: a throwing hook now surfaces **asynchronously** (uncaught, via the microtask) instead of synchronously through the EventEmitter's "Error in listener" sink. The isolation is applied uniformly to all four hooks via a single local `runHook` helper — a per-site fix, not a shared cross-package `invokeSafely` primitive (deliberately rejected in #1039: a shared helper can't enforce adoption and per-context policies differ; the structural preventer of the forgotten-isolation class is a lint rule, not a primitive).
 

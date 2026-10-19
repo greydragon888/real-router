@@ -85,8 +85,9 @@ function createPlugin(
 
   // Compile AND invoke a hook with per-hook exception isolation. A throwing hook
   // must not abort the handler before a *later* hook of the same transition
-  // runs — otherwise a throwing onEnter/onStay silently swallows onNavigate,
-  // breaking the onNavigate orthogonality invariant (#798). `compileHook` lives
+  // runs — otherwise a throwing onLeave, onEnter or onStay silently swallows the
+  // hooks after it, onNavigate among them, breaking the onNavigate
+  // orthogonality invariant (#798). `compileHook` lives
   // INSIDE the try (#1222): a throwing hook FACTORY (the common DI-init shape) is
   // one seam earlier than a throwing hook body, but must be isolated identically.
   // Passing a pre-compiled hook as the argument would evaluate `compileHook` (and
@@ -111,19 +112,17 @@ function createPlugin(
   }
 
   return {
-    onTransitionLeaveApprove: (
-      toState: State,
-      fromState: State | undefined,
-    ) => {
-      if (fromState && toState.name !== fromState.name) {
-        runHook("onLeave", fromState.name, toState, fromState);
-      }
-    },
-
+    // Every hook runs on the commit (#2691): leave-approve is tentative — an
+    // activation guard can still refuse, or the navigation be cancelled — and
+    // a navigation that does not commit leaves the user on the route.
     onTransitionSuccess: (toState: State, fromState: State | undefined) => {
       if (toState.name === fromState?.name) {
         runHook("onStay", toState.name, toState, fromState);
       } else {
+        if (fromState) {
+          runHook("onLeave", fromState.name, toState, fromState);
+        }
+
         runHook("onEnter", toState.name, toState, fromState);
       }
 

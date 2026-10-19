@@ -5,7 +5,9 @@ import { vi } from "vitest";
 import {
   arbDistinctRouteNamePair,
   arbDistinctIdPair,
+  arbNavigationAttempts,
   arbSimpleRouteName,
+  createAttemptRouter,
   createHookSpies,
   createLifecycleRouter,
   createOrderTrackingRouter,
@@ -88,22 +90,48 @@ describe("hook dispatch: onEnter fires when a route becomes active", () => {
 // =============================================================================
 
 describe("hook dispatch: onLeave fires when a route becomes inactive", () => {
-  test.prop([arbDistinctRouteNamePair], { numRuns: NUM_RUNS.standard })(
-    "onLeave fires once for the source route on navigation",
-    async ([fromRoute, toRoute]) => {
+  test.prop([arbSimpleRouteName, arbNavigationAttempts], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "onLeave fires once per committed departure and never for a navigation that does not commit (#2691)",
+    async (startRoute, attempts) => {
       const hooks = createHookSpies();
-      const router = createLifecycleRouter(hooks);
+      const router = createAttemptRouter(hooks);
+      // The oracle is core's own commit stream.
+      const departures: { toName: string; fromName: string | undefined }[] = [];
 
-      await router.start(`/${fromRoute === "home" ? "" : fromRoute}`);
-      hooks.onLeave.calls.length = 0;
+      await router.start(`/${startRoute === "home" ? "" : startRoute}`);
+      router.subscribe(({ route, previousRoute }) => {
+        if (previousRoute && previousRoute.name !== route.name) {
+          departures.push({ toName: route.name, fromName: previousRoute.name });
+        }
+      });
 
-      await router.navigate(toRoute);
+      const settled: Promise<unknown>[] = [];
 
-      const leaveCalls = hooks.onLeave.calls.filter(
-        (c) => c.fromName === fromRoute,
+      for (const attempt of attempts) {
+        const navigation = router
+          .navigate(attempt.kind === "go" ? attempt.to : attempt.kind)
+          .catch(() => {});
+
+        settled.push(navigation);
+
+        if (attempt.kind !== "pending") {
+          await navigation;
+        }
+      }
+
+      // A closing departure that commits: it cancels a trailing `pending`, and
+      // every run then has a departure to compare.
+      const current = router.getState()?.name;
+
+      await router.navigate(
+        ["home", "about", "contact"].find((name) => name !== current)!,
       );
+      await Promise.all(settled);
 
-      expect(leaveCalls).toHaveLength(1);
+      expect(departures.length).toBeGreaterThan(0);
+      expect(hooks.onLeave.calls).toStrictEqual(departures);
 
       router.stop();
     },

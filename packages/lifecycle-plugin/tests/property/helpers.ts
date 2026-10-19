@@ -44,6 +44,28 @@ export const arbDistinctRouteNamePair: fc.Arbitrary<[string, string]> = fc
   .tuple(arbSimpleRouteName, arbSimpleRouteName)
   .filter(([a, b]) => a !== b);
 
+/**
+ * One navigation attempt (#2691). Only `go` can commit: `refused` and
+ * `throwing` fail in their canActivate, and `pending` waits in an async
+ * canActivate that never answers, so a later navigation cancels it.
+ */
+export type NavigationAttempt =
+  | { readonly kind: "go"; readonly to: string }
+  | { readonly kind: "refused" | "throwing" | "pending" };
+
+export const arbNavigationAttempts: fc.Arbitrary<NavigationAttempt[]> =
+  fc.array(
+    fc.oneof(
+      arbSimpleRouteName.map((to): NavigationAttempt => ({ kind: "go", to })),
+      fc.constantFrom<NavigationAttempt>(
+        { kind: "refused" },
+        { kind: "throwing" },
+        { kind: "pending" },
+      ),
+    ),
+    { minLength: 1, maxLength: 8 },
+  );
+
 /** Pair of distinct param values for same-route navigation */
 export const arbDistinctIdPair: fc.Arbitrary<[string, string]> = fc
   .tuple(
@@ -130,6 +152,41 @@ export function createLifecycleRouter(hooks: HookSpies): Router {
           onStay: () => hooks.onStay,
         },
       ],
+    },
+  ];
+
+  const router = createRouter(routes, { defaultRoute: "home" });
+
+  router.usePlugin(lifecyclePluginFactory());
+
+  return router;
+}
+
+/**
+ * Creates a router whose simple routes carry the hook spies, plus the three
+ * guarded targets a {@link NavigationAttempt} can name besides `go` (#2691).
+ */
+export function createAttemptRouter(hooks: HookSpies): Router {
+  const routes: Route[] = [
+    ...["home", "about", "contact"].map((name) => ({
+      name,
+      path: name === "home" ? "/" : `/${name}`,
+      onEnter: () => hooks.onEnter,
+      onLeave: () => hooks.onLeave,
+      onStay: () => hooks.onStay,
+    })),
+    { name: "refused", path: "/refused", canActivate: () => () => false },
+    {
+      name: "throwing",
+      path: "/throwing",
+      canActivate: () => () => {
+        throw new Error("guard boom");
+      },
+    },
+    {
+      name: "pending",
+      path: "/pending",
+      canActivate: () => () => new Promise<boolean>(() => {}),
     },
   ];
 
