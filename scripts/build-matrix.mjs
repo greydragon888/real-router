@@ -352,8 +352,13 @@ export function buildPlan(
   // workspaces, `shared-sources` among them, and no shardable member.
   //
   // The changed paths answer the question the dep graph cannot: authorship.
+  // Only a file the consumers hash counts — their turbo.json inputs name
+  // `../../shared/<dir>/**/*.ts`. A doc beside the sources
+  // (`shared/dom-utils/CLAUDE.md`) is in no consumer's task, so it shards
+  // nothing, and counted here it trips the #1067 guard below on a plan that is
+  // rightly empty.
   const touchesSharedSources = changedFiles.some((f) =>
-    f.startsWith("shared/"),
+    /^shared\/[^/]+\/.+\.ts$/.test(f),
   );
   // Composition trigger (K re-measure, 2026-07-19): adapters are the ONLY
   // per-package shards — every other group is batched into shards of up to
@@ -457,13 +462,18 @@ export function buildPlan(
 }
 
 /**
- * Files this PR changes, against the same base the affected query uses.
- * Separated so tests never spawn git.
+ * Files this PR changes, against the same base the affected query uses; a
+ * renamed file by both paths (`--no-renames`), so a file moved out of a shared
+ * dir still names it. Separated so the routing tests never spawn git; one cell
+ * runs it in a repository of its own, through `options`.
+ *
+ * @param {import("node:child_process").ExecSyncOptions} [options]
  */
-export function runChangedFilesQuery() {
-  return execSync("git diff --name-only origin/master...HEAD", {
+export function runChangedFilesQuery(options = {}) {
+  return execSync("git diff --name-only --no-renames origin/master...HEAD", {
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
+    ...options,
   });
 }
 

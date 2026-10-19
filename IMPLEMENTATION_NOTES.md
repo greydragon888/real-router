@@ -8211,6 +8211,8 @@ A **second, distinct** way Dependabot errors the whole npm job (→ zero PRs →
 
 > **Updated (2026-10-08).** On turbo 2.11.7 the membership query of a `shared/` edit narrows: an edit to `shared/dom-utils` gives 42 tasks of `test`, `test:properties` and `bundle` instead of 75 on 2.11.5, with none of the tasks whose hash moved left out ("turbo 2.11: `affectedUsingTaskInputs` is off").
 
+> **Updated (2026-10-19).** The shared-source flag counts only a `.ts` under `shared/<dir>/`, what the consumers hash, and reads the diff with `--no-renames` ("The planners read a rename by both paths; the shared trigger counts what the consumers hash").
+
 ### Problem
 
 The horizontal-sharding planner `scripts/build-matrix.mjs` derived **both** the leaf/sharded routing decision **and** the shard membership from one call: `turbo query affected --base origin/master --head HEAD --packages`. That API walks the **declared workspace-dependency graph** (+ changed-file→workspace ownership). But `shared/{browser-env,dom-utils,ssr}` are consumed **only via a symlink (`src/browser-env → ../../../shared/browser-env`) + the `../../shared/**/*.ts` input-glob** — **no consumer declares a dep on `@real-router/shared-sources`**. So `query affected` maps a `shared/*` edit to the `shared-sources` workspace and fans out to **zero `packages/*` consumers**. Since the shards run explicit `--filter=<pkg>` tokens taken from that (empty) set, the genuinely-affected consumers were **never type-checked / tested / bundled**, and CI stayed green. Verified on run 28489824878 (PR #1064, a `shared/browser-env` edit): the `url-plugin` shard ran **only** `hash-plugin`; `browser-plugin` + `navigation-plugin` shipped unbuilt despite the PR changing the `Browser` type both export (and a `browser-plugin` changeset). The **pure** case is worse — a `shared/dom-utils`-only PR gives `mode=sharded` + `matrix={"include":[]}` → base-* jobs only, all 6 adapters skipped. Both proven with `turbo query affected --packages` returning `[@real-router/shared-sources]` vs the old monolith's `...[origin/master]` returning 33 packages incl. all 6 adapters. Filed as #1067. The gap is **exclusively** shared-source → symlink-consumer: root configs already fan out (turbo treats them as global → all 32), declared deps fan correctly, and the leaf path runs input-aware `...[origin/master]` so it self-corrects — only the sharded path was blind.
@@ -14952,3 +14954,19 @@ Five mutants, against a green baseline: the stamp back on the writer's object, a
 **Solution.** A cell of `node:skip-facts` holds the job: its keys are `name`, `runs-on`, `outputs` and `steps`; the two steps come right after the checkout; the checkout is `actions/checkout@v<N>`, given `persist-credentials` and `fetch-depth` and nothing else. A job-level `env:`, a `defaults:`, a `container:`, a step before the two and a checkout `ref:` each fail it.
 
 **Why.** A pin of a script holds what the script says, not how it runs, and the job's keys and the steps before it decide that. The cell runs where no context skips it, like the steps' own pins.
+
+## The planners read a rename by both paths; the shared trigger counts what the consumers hash (2026-10-19)
+
+**Problem.**
+
+- `build-matrix.mjs` raised its shared-source flag on any changed path under `shared/`. `shared/dom-utils/CLAUDE.md` is in no consumer's task inputs, so a diff holding it forced the sharded path, the input-aware membership found no shard, and the #1067 guard refused the plan. The `cli-entry` cell that runs `build-matrix.mjs` failed on `master`, whose unpushed `18cb64ea2` edits that file, and pre-push would have refused the push.
+- `build-matrix.mjs` and `examples-plan.mjs` read the diff with git's rename detection, which names a renamed file by its new path alone. A source moved out of `shared/` into one package raised no flag, so the other consumers of its dir got no shard; a file moved out of an example was not counted against that example. `codspeed-gate.mjs` already reads its diff with `--no-renames`.
+- Blind control runs of `/code-review-rfc` on the RFC-4 range found the renames; the guard tripped in the gate run of the same session.
+
+**Solution.**
+
+- The flag counts a changed path only when it is a `.ts` under `shared/<dir>/`, the glob the consumers' `turbo.json` inputs name.
+- Both planners read the diff with `--no-renames`. `runChangedFilesQuery` and the new `changedPaths` take options, so a cell runs each in a repository of its own.
+- Cells: a doc beside the shared sources does not shard, while a source of the same dir still trips the guard; a file moved out of a shared dir, and one moved out of an example, are listed by both paths. Each cell fails on the code before it.
+
+**Why.** The flag asks whether the consumers' tasks moved, and only what they hash moves them. A rename is a deletion at the old path, and a planner that does not see the deletion plans for a tree that still has the file.

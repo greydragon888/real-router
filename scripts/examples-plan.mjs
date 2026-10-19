@@ -111,6 +111,29 @@ export function missingLintScript(packages) {
     .map((pkg) => pkg.name);
 }
 
+/**
+ * The paths `git diff` names between two commits, a renamed file by both
+ * (`--no-renames`): the example a file leaves still counts as changed.
+ *
+ * @param {string} base
+ * @param {string} head
+ * @param {import("node:child_process").ExecFileSyncOptions} [options]
+ * @returns {string[]}
+ */
+export function changedPaths(base, head, options = {}) {
+  return execFileSync(
+    "git",
+    ["diff", "--name-only", "--no-renames", base, head],
+    {
+      cwd: ROOT,
+      encoding: "utf8",
+      ...options,
+    },
+  )
+    .split("\n")
+    .filter(Boolean);
+}
+
 export function main(argv) {
   const examplesDir = path.join(ROOT, "examples");
 
@@ -137,12 +160,7 @@ export function main(argv) {
     throw new Error("examples-plan: examples/ is not a pnpm workspace");
   }
 
-  const changed = execFileSync("git", ["diff", "--name-only", base, head], {
-    cwd: ROOT,
-    encoding: "utf8",
-  })
-    .split("\n")
-    .filter(Boolean);
+  const changed = changedPaths(base, head);
   const names = planExamples(changed, examplePackages(examplesDir));
 
   process.stdout.write(
