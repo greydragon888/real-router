@@ -105,7 +105,7 @@ Every hook runs when the navigation commits. On a navigation to another route, `
 
 A navigation that does not commit — refused by a guard, cancelled, or failed — runs none of them, so a route the user stays on is never cleaned up.
 
-When `onLeave` runs, the router already holds the new state: `router.getState()` returns the target, and the route being left is the hook's `fromState`. A `router.subscribe` listener or a plugin registered before this one sees the commit first. Work that has to happen before the commit, or be undone when the navigation does not commit, belongs in `router.subscribeLeave`: its listeners, awaited ones included, run before `onLeave`, and their `signal` aborts when the navigation does not commit.
+When `onLeave` runs, the router already holds the new state: `router.getState()` returns the target, and the route being left is the hook's `fromState`. A `router.subscribe` listener or a plugin registered before this one sees the commit first. On a navigation the router starts, a URL plugin registered after this one has not written the history entry yet when the hooks run, so register it first when a hook reads `location` or `state.context.url`. Work that has to happen before the commit, or be undone when the navigation does not commit, belongs in `router.subscribeLeave`: its listeners, awaited ones included, run before `onLeave`, and their `signal` aborts when the navigation does not commit.
 
 ### Cancelling work with `signal`
 
