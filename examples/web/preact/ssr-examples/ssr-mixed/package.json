@@ -22,12 +22,12 @@
     "preact-render-to-string": "~6.7.0"
   },
   "devDependencies": {
-    "@playwright/test": "1.63.0",
+    "@playwright/test": "1.64.0",
     "@preact/preset-vite": "2.10.6",
     "@types/express": "5.0.6",
-    "@types/node": "24.19.0",
+    "@types/node": "24.19.2",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
-    "vite": "8.3.1"
+    "vite": "8.3.4"
   }
 }

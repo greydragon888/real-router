@@ -30,9 +30,9 @@
     "@angular/cli": "~22.2.0",
     "@angular/compiler": "~22.2.0",
     "@angular/compiler-cli": "~22.2.0",
-    "@playwright/test": "1.63.0",
+    "@playwright/test": "1.64.0",
     "@types/express": "5.0.6",
-    "@types/node": "24.19.0",
+    "@types/node": "24.19.2",
     "typescript": "6.0.3"
   }
 }
