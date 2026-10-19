@@ -76,7 +76,7 @@ await router.start("/catalog");
 | `onNavigate` | Any successful navigation to the route  | Data loading, analytics, UI reset (default) |
 | `onEnter`    | Route is entered                        | Entry-only setup (open socket, scroll top)  |
 | `onStay`     | Same route name (params may be unchanged)  | Stay-only logic (incremental updates)       |
-| `onLeave`    | Route is left                           | Cleanup timers, save state                  |
+| `onLeave`    | A navigation away from the route commits | Cleanup timers, save state                 |
 
 **Orthogonal dispatch:** `onEnter` / `onStay` / `onNavigate` fire independently based on their own conditions. On entry, `onEnter` **and** `onNavigate` fire. On param-change, `onStay` **and** `onNavigate` fire. Each hook is composable — declaring one never silences another.
 
@@ -98,7 +98,11 @@ onEnter: (router, getDependency) => (toState) => {
 
 ### Execution order
 
-`onLeave` fires first (at leave-approve phase), then `onEnter` or `onStay` (at transition success).
+Every hook runs when the navigation commits. On a navigation to another route, `onLeave` of the route being left runs first, then `onEnter` of the target; on the same route, `onStay` runs instead of both. `onNavigate` runs last.
+
+A navigation that does not commit — refused by a guard, cancelled, or failed — runs none of them, so a route the user stays on is never cleaned up.
+
+When `onLeave` runs, the router already holds the new state: `router.getState()` returns the target, and the route being left is the hook's `fromState`. A `router.subscribe` listener or a plugin registered before this one sees the commit first. Work that has to happen before the commit, or be undone when the navigation does not commit, belongs in `router.subscribeLeave`: its listeners, awaited ones included, run before `onLeave`, and their `signal` aborts when the navigation does not commit.
 
 ### Redirect from a hook
 
@@ -144,7 +148,7 @@ Redirecting with a **synchronous** `router.navigate()` inside a hook throws `REE
 }
 ```
 
-> **Caveat:** `onLeave` fires only on a guarded `navigate()` (via `onTransitionLeaveApprove`). It does **not** fire for a route torn out by a tree mutation — `getRoutesApi(router).replace()` / `clear()` / a `navigateToNotFound()` commit skip the leave phase, so cleanup here is not guaranteed across tree mutations (#1201).
+> **Caveat:** `onLeave` runs on every commit that leaves the route, a `navigateToNotFound()` commit included. It does **not** run for a route whose definition is gone when the commit reaches the plugin: a `getRoutesApi(router).replace()` that drops the active route, or a `remove()` from a commit listener registered before the plugin, takes the hook with it, and `clear()` commits nothing — so cleanup here is not guaranteed across tree mutations (#1201).
 
 ### React to param changes
 

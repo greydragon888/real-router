@@ -14,7 +14,7 @@
 
 | #   | Invariant                                               | Description                                                                                                                                                                                  |
 | --- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `onLeave` fires when a route becomes inactive           | Navigating away from a route calls `onLeave` on the leaving route exactly once. Confirms that deactivation is detected for arbitrary route transitions.                                      |
+| 1   | `onLeave` fires once per committed departure (#2691)    | Over any sequence of navigation attempts — committed, refused by `canActivate`, failed by a throwing guard, or cancelled while an async guard is pending — the `onLeave` calls equal the departures core commits, in order, as `router.subscribe` reports them. A navigation that does not commit calls no `onLeave`. |
 | 2   | `onLeave` does not fire on initial start                | `router.start()` has no previous route, so `onLeave` is never called. Prevents phantom leave events during initialization.                                                                   |
 | 3   | `onLeave` receives correct states                       | The `fromState` argument matches the route being left. Verifies hook arguments reflect the actual transition for arbitrary source routes.                                                     |
 
@@ -40,7 +40,7 @@
 
 | #   | Invariant                                               | Description                                                                                                                                                                                  |
 | --- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `onLeave` fires before `onEnter`                        | When both hooks are defined, `onLeave` always precedes `onEnter` in the call order. This is structural: `onLeave` fires on `onTransitionLeaveApprove`, `onEnter` fires on `onTransitionSuccess`. |
+| 1   | `onLeave` fires before `onEnter`                        | When both hooks are defined, `onLeave` always precedes `onEnter` in the call order. Both run in the same `onTransitionSuccess` handler, `onLeave` first. |
 
 ## Teardown
 
@@ -65,4 +65,4 @@
 
 | File                                          | Invariants | Category                                                     |
 | --------------------------------------------- | ---------- | ------------------------------------------------------------ |
-| `tests/property/lifecycle.properties.ts`      | 19         | onEnter dispatch, onLeave dispatch, onStay dispatch, onNavigate dispatch + orthogonality (incl. throwing-hook **and throwing-factory** isolation, #798 / #1222), ordering, teardown, mutual exclusion, compilation |
+| `tests/property/lifecycle.properties.ts`      | 19         | onEnter dispatch, onLeave dispatch (incl. refused / cancelled navigations, #2691), onStay dispatch, onNavigate dispatch + orthogonality (incl. throwing-hook **and throwing-factory** isolation, #798 / #1222), ordering, teardown, mutual exclusion, compilation |

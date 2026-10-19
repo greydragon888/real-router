@@ -2661,7 +2661,7 @@ describe("how many times core reads a caller-owned SCALAR slot (#2085)", () => {
       "packages/core/src/api/getRoutesApi.ts · replaceRoutes · currentState.path": 3,
       "packages/core/src/transitionPath.ts · computeTransitionPath · fromState.name": 3,
       "packages/core/src/transitionPath.ts · computeTransitionPath · toState.name": 4,
-      "packages/lifecycle-plugin/src/factory.ts · onTransitionLeaveApprove · fromState.name": 2,
+      "packages/lifecycle-plugin/src/factory.ts · onTransitionSuccess · fromState.name": 2,
       "packages/lifecycle-plugin/src/factory.ts · onTransitionSuccess · toState.name": 4,
       "packages/navigation-plugin/src/plugin.ts · onTransitionSuccess · toState.name": 2,
       "packages/navigation-plugin/src/plugin.ts · onTransitionSuccess · toState.path": 2,

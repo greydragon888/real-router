@@ -14,8 +14,7 @@
 
 1. `lifecyclePluginFactory()` returns a `PluginFactory` (no configuration)
 2. On `router.usePlugin()`: gets `PluginApi` via `getPluginApi(router)`
-3. On `onTransitionLeaveApprove`: if route changed → calls `onLeave` on the leaving route
-4. On `onTransitionSuccess`: calls `onEnter` or `onStay` (depending on route name change) AND `onNavigate` — hooks are orthogonal, each fires independently based on its own condition
+3. On `onTransitionSuccess` — the commit, the only transition event the plugin listens to: if the route name changed → `onLeave` on the route being left, then `onEnter` on the target; otherwise `onStay`. Then `onNavigate` — hooks are orthogonal, each fires independently based on its own condition
 
 Hook lookup: `api.getRouteConfig(routeName)?.[hookName]` — reads hook factory from route definition, compiles it lazily via `factory(router, getDependency)`, and caches the compiled hook per `hookName:routeName`. Same DI pattern as `GuardFnFactory`. Config changes — including hot-swapping a hook via `getRoutesApi(router).update(name, { onNavigate })` (#797), `replace`, or `remove`+`add` — are picked up lazily (recompiles when the `factory` reference differs); removed routes are evicted eagerly via a `getRoutesApi(router).subscribeChanges()` subscription (drops `hookName:routeName` entries on `remove`/`replace`, clears all on `clear`) so they don't linger as dead memory. The subscription is removed in `teardown`.
 
@@ -23,7 +22,7 @@ Hook lookup: `api.getRouteConfig(routeName)?.[hookName]` — reads hook factory 
 
 | Hook         | Fires when                                  | Event                        | Route checked    |
 | ------------ | ------------------------------------------- | ---------------------------- | ---------------- |
-| `onLeave`    | Navigating away from a route                | `onTransitionLeaveApprove`   | `fromState.name` |
+| `onLeave`    | A navigation away from the route commits    | `onTransitionSuccess`, before `onEnter` | `fromState.name` |
 | `onStay`     | Same route name (params may be unchanged: `reload:true` / revalidation) | `onTransitionSuccess` | `toState.name`   |
 | `onEnter`    | Navigating to a new route                   | `onTransitionSuccess`        | `toState.name`   |
 | `onNavigate` | Any successful navigation to the route      | `onTransitionSuccess`        | `toState.name`   |
@@ -39,7 +38,7 @@ Hooks fire only for the **leaf route** (the route matching `toState.name` / `fro
 ```
 src/
 ├── factory.ts  — lifecyclePluginFactory, compileHook (lazy compile + cache),
-│                 onTransitionLeaveApprove + onTransitionSuccess handlers
+│                 onTransitionSuccess handler
 ├── types.ts    — LifecycleHook, LifecycleHookFactory types
 └── index.ts    — Public exports + declare module augmentation (Route interface)
 ```
@@ -50,9 +49,14 @@ src/
 
 Return values are ignored. Each hook is invoked with **per-hook exception isolation** (#798): a throwing hook is caught and re-thrown **asynchronously** via `queueMicrotask`, so it never aborts the handler before a later hook of the same transition runs (the `onNavigate` orthogonality invariant), and never blocks or cancels the transition. The error still surfaces to global error handlers as an async uncaught error — mirroring `BaseSource` / `createActiveNameSelector` in `@real-router/sources`. Note the observable change from the pre-#798 design: a throwing hook surfaces **asynchronously (uncaught)**, not synchronously through the router's EventEmitter "Error in listener" sink. **This covers a throwing hook FACTORY too** (a failing DI init at compile time): `compileHook` runs inside the same `try` (#1222), so a factory throw is isolated identically — same async channel, never swallows a sibling `onNavigate`. A failed compile is not cached, so the factory retries on every navigation.
 
-### onLeave fires at leave-approve, not success
+### onLeave runs on the commit, not at leave-approve
 
-`onLeave` uses `onTransitionLeaveApprove` — it fires after deactivation guards pass but before activation guards run. This means `onLeave` fires even if the transition later fails at activation. `onEnter` and `onStay` only fire on `onTransitionSuccess`.
+`onLeave` runs from `onTransitionSuccess`, before the target's `onEnter` / `onNavigate` (#2691). Leave-approve is tentative, and a navigation that does not commit leaves the user on the route — refused by `canActivate`, failed by a throwing guard or `subscribeLeave` listener, failed because its target was removed, or cancelled by its `signal`, a newer navigation or `stop()`. Such a navigation runs no hook at all; `tests/functional/lifecycle.test.ts` › "onLeave runs only for a navigation that commits" holds the arcs.
+
+- `router.getState()` inside `onLeave` already returns the target; the route being left is the hook's `fromState`.
+- `TRANSITION_SUCCESS` listeners run in registration order, so a `router.subscribe` listener or a plugin registered before this one sees the commit before `onLeave` runs.
+- `onLeave` cannot cancel its navigation: `stop()`, `dispose()` or aborting the navigation's `signal` from inside it acts on a router that has already committed.
+- Work that must happen before the commit, or be undone when the navigation does not commit, belongs in `router.subscribeLeave`: its listeners, awaited ones included, run before `onLeave`, and their `signal` aborts when the navigation does not commit.
 
 ### Redirect from a hook
 
@@ -71,13 +75,15 @@ onEnter: (router) => (toState) => {
 
 ### `onLeave` is not a guaranteed cleanup across tree mutations
 
-`onLeave` fires on `onTransitionLeaveApprove`, emitted only by the guarded `navigate()` pipeline. Structural route-tree mutations that tear out the active route do **not** run that phase:
+`onLeave` is read from the route's definition when the commit reaches the plugin, and runs on every commit that leaves a route still carrying it — a `navigateToNotFound()` commit included. A tree mutation that tears the route out takes the hook with it; `tests/functional/lifecycle.test.ts` › "onLeave runs only for a navigation that commits" holds the `replace()` and listener cells:
 
-- `getRoutesApi(router).replace()` revalidation (#950/#1201) that **drops** the active route commits `UNKNOWN_ROUTE` via `navigateToNotFound()`, which emits only `TRANSITION_SUCCESS` — so the dropped route's `onLeave` is **skipped** (the "Cleanup on leave" `webSocket.disconnect()` silently does not run).
+- `getRoutesApi(router).replace()` revalidation (#950/#1201) that **drops** the active route commits whatever its old path matches now — another route, or `UNKNOWN_ROUTE` — and the dropped route has no definition left to read `onLeave` from, so its `onLeave` is **skipped** (the "Cleanup on leave" `webSocket.disconnect()` silently does not run).
+- `replace()` revalidation that gives the active route a new path while another route takes the old one commits a departure, and the old route's `onLeave` runs, read from its new definition.
+- A commit listener registered before this plugin — a `router.subscribe` listener or another plugin — that removes the route just left runs first, so the plugin finds no definition and `onLeave` is skipped.
 - `replace()` revalidation where the active route **survives** (same name) emits `TRANSITION_SUCCESS` with `revalidate: true`; the plugin does not inspect `navOptions`, so it fires `onStay` **and** `onNavigate` with **no navigation and no param change**.
 - `clear()` is a silent reset (emits only `TREE_CHANGED`) — no lifecycle hook fires for the torn-out route.
 
-Do **not** rely on `onLeave` as a guaranteed cleanup across `replace()` / `clear()` / `navigateToNotFound()`. For teardown that must survive tree mutations, tie cleanup to an external lifecycle (component unmount, `subscribeChanges`). Core root tracked in #1201.
+Do **not** rely on `onLeave` as a guaranteed cleanup across tree mutations. For teardown that must survive tree mutations, tie cleanup to an external lifecycle (component unmount, `subscribeChanges`). Core root tracked in #1201.
 
 ### No configuration
 
