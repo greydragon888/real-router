@@ -54,7 +54,9 @@ export default {
     "scope-enum": [2, "always", SCOPES],
     "scope-empty": [0],
     "subject-case": [0], // Allow any case in subject
-    "subject-max-length": [2, "always", 100],
+    // The whole header, `type(scope): ` included. config-conventional sets the
+    // same limit; it is restated so that this file shows the one that applies.
+    "header-max-length": [2, "always", 100],
     "body-max-line-length": [2, "always", 100],
     // Off: the parser treats the last paragraph of a prose body as a "footer"
     // whenever it opens with a token-looking word ("Note:", "Verified …"), then

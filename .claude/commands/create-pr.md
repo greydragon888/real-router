@@ -55,10 +55,11 @@ $ARGUMENTS
 
 ### Заголовок (Conventional Commits, как squash-commit)
 
+- **Не длиннее 92 символов целиком**: squash-коммит получит заголовок PR и суффикс ` (#<номер PR>)` от GitHub, а `header-max-length` ставит 100 на всю строку. Проверка — как в `/commit-msg`, с суффиксом: `printf '%s\n' "<заголовок> (#9999)" | pnpm exec commitlint`.
 - **Одна задача**: `<type>(<scope>): <description> (#N)`
 - **Несколько задач**: каждый клауз со своим `(#N)`, через `+` —
-  `fix(memory-plugin): same-tick navigate-after-back() (#807) + short-circuit no-emission contract (#808)`
-- `<type>`: `fix` для баг-фиксов, `feat` для фич (определи по changeset-бампу и характеру задач). `<scope>` — из changeset-пакета / скоупов коммитов.
+  `fix(memory-plugin): same-tick navigate-after-back() (#807) + no-emission contract (#808)`
+- `<type>`: `fix` для баг-фиксов, `feat` для фич (определи по changeset-бампу и характеру задач). `<scope>` — из changeset-пакета / скоупов коммитов, и только из `SCOPES` в `commitlint.config.mjs`.
 - **Смешанные типы в батче** (`refactor` + `fix` + `perf` и т.п.): НЕ выводи несколько `type:`-префиксов в одном заголовке. Возьми один наиболее значимый тип как префикс (`fix` > `feat` > `perf` > `refactor` > `chore`), а `(#N)` каждой задачи оставь инлайн в её клаузе.
 - **Одинаковый тип, разные скоупы** (например, `perf` в `core` И `sources`): один префикс с объединённым скоупом через `/` — `perf(core/sources): <клауз A> (#N) + <клауз B> (#M)`. Не повторяй `type(...)` во втором клаузе.
 

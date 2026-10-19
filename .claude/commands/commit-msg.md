@@ -2,11 +2,11 @@
 
 Шаги:
 
-1. Выполни `git diff --stat` для обзора изменённых файлов
-2. Выполни `git diff` для анализа содержимого изменений
-3. Определи тип изменений — только из `TYPES` в `commitlint.config.mjs` (`type-enum` отвергает любой другой)
-4. Сформулируй краткое описание — не длиннее 100 символов (`subject-max-length`)
-5. При необходимости добавь детали в body
+1. Одним вызовом: `git status --short -- <свои пути>` (видит и новые файлы) и `git log --format=%s -8 -- <пути>` (стиль соседей); из worktree — через `git -C <worktree>`. Полный `git diff` читай только для правки, которой нет в твоём контексте (чужой или сделанной до компакции).
+2. Тип — только из `TYPES` в `commitlint.config.mjs` (`type-enum` отвергает любой другой; что значит каждый, сказано в комментарии рядом).
+3. Scope — только из `SCOPES` (ниже), а не по прецеденту в `git log`: там есть и scope, которые commitlint сейчас отвергает.
+4. Заголовок `type(scope): описание` — не длиннее 100 символов ЦЕЛИКОМ (`header-max-length`): после `docs(config): ` на описание остаётся 86, а каждый scope списка и `(#N)` в конце отнимают ещё.
+5. Тело — по правилам ниже; затем проверка (ниже).
 
 Формат Conventional Commits:
 
@@ -16,31 +16,27 @@
 [optional body]
 ```
 
-Типы (`TYPES` в `commitlint.config.mjs`):
+Scopes — только из `SCOPES` в `commitlint.config.mjs`: `scope-enum` отвергает любой другой, а `pnpm commit` (`cz.config.js`) предлагает тот же список. Scope необязателен; несколько — через запятую без пробела: `fix(core,validation-plugin): …`. Пакет — это имя его папки в `packages/`; имя другой папки, группы пакетов или инструмента (`docs`, `scripts`, `examples`, `adapters`, `plugins`, `lint`, `sonar`) scope-ом не бывает:
 
-- feat: новая функциональность
-- fix: исправление бага
-- refactor: рефакторинг без изменения поведения
-- docs: только документация
-- chore: обслуживание (deps, configs)
-- ci: CI/CD изменения
-- test: только тесты
-- perf: оптимизация производительности
-- build: система сборки и внешние зависимости
-- style: форматирование, не меняющее смысла кода
-- revert: откат коммита
-- release: релизный коммит
-
-Scopes — только из `SCOPES` в `commitlint.config.mjs`: `scope-enum` отвергает любой другой, а `pnpm commit` (`cz.config.js`) предлагает тот же список.
+- `.claude/**` → `docs(config): <команда> — <суть>`;
+- `shared/<dir>` → `<dir>` (`browser-env`, `dom-utils`, `ssr`); `benchmarks/` → `benchmarks`;
+- бамп зависимостей → `deps` / `deps-dev` (`chore(deps): …`, `build(deps): …`);
+- корень, `scripts/`, `.github/`, `.husky/`, `examples/`, `cross-router-bench/` → без scope (`ci: …`, `build: …`, `docs: …`, `test: …`) или `ci` / `config`.
 
 Правила:
 
-- Описание в imperative mood ("add", не "added")
-- Scope — только из `SCOPES` (кастомный commitlint отвергнет)
-- Не начинай с заглавной буквы после двоеточия
-- Без точки в конце description
-- Body через пустую строку, каждый пункт с "- "
-- Строки body не длиннее 100 символов (`body-max-line-length`): длинный пункт переноси с отступом в два пробела. Проверка — `pnpm exec commitlint < msg.txt`.
+- Всё сообщение — по-английски, тело тоже.
+- Описание — в настоящем времени (`add`, `points`), не в прошедшем; не с заглавной буквы; без точки в конце (`subject-full-stop`).
+- Тело — через пустую строку, абзацами прозы; в `git commit` каждый абзац — свой `-m`. Строки переноси вручную, около 72 символов: строка тела или футера длиннее 100 (`body-max-line-length`, `footer-max-line-length`) — отказ, а абзац одной строкой длиннее почти всегда.
+- Закрывающее слово (close/fix/resolve и их формы) рядом с `#N` закрывает задачу, как только коммит попадает в `master`, — и в бэктиках тоже. Коммит, который сам решает задачу и идёт прямо в `master`, несёт `Closes #N`, а решает её частично — `Refs #N`. Коммит ветки под PR несёт `(#N)` в конце заголовка; закрывающую строку пишет тело PR. Чужой номер в прозе — без закрывающего слова рядом.
+
+Проверка — до вывода сообщения, а если коммитишь сам — в вызове, который сверяет индекс перед `git commit` (не в одной строке с коммитом); аргументы — те же, что пойдут в `-m`, по порядку:
+
+```
+printf '%s\n\n' "<заголовок>" "<абзац 1>" "<абзац 2>" | pnpm exec commitlint
+```
+
+commitlint молчит — можно коммитить. Длину не меряй `awk` или `wc -c`: они считают байты, а `—` — три байта. Хук `commit-msg` git запускает только после всего pre-commit (от десятков секунд до минут), а `--no-verify` пропускает и его.
 
 Примеры:
 
@@ -49,11 +45,10 @@ feat(core): add route guards support
 ```
 
 ```
-fix(lint): add dependency check rule, fix unlinted property tests
+docs(config): commit-msg — the header limit counts the type and the scope
 
-- Add eslint rule to catch missing dependencies
-- Add missing logger dependency to browser-plugin and logger-plugin
-- Fix duplicate imports in property tests
+header-max-length caps the whole header, so docs(config): leaves 86
+characters for the description, and each extra scope takes more.
 ```
 
 Выведи только готовый commit message без пояснений.
