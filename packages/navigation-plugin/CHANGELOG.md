@@ -1,5 +1,16 @@
 # @real-router/navigation-plugin
 
+## 0.14.3
+
+### Patch Changes
+
+- [#2759](https://github.com/greydragon888/real-router/pull/2759) [`53a724f`](https://github.com/greydragon888/real-router/commit/53a724f16eee7997ec063554e4f28e2f21e1b3f0) Thanks [@greydragon888](https://github.com/greydragon888)! - A router path that starts with `//` is written as a URL on the page's own origin ([#2758](https://github.com/greydragon888/real-router/issues/2758))
+
+  With an empty `base`, the URL the plugin wrote and `router.buildUrl` returned was the router path as is, and a URL that starts with `//` names a host: the Navigation API navigated to that host. Such a path — a splat value that begins with `/` under `urlParamsEncoding: "uri"` or `"none"` — now gets a `/.` prefix. The browser drops the dot segment, so the pathname is the router path and the host is the page's.
+
+- Updated dependencies [[`53a724f`](https://github.com/greydragon888/real-router/commit/53a724f16eee7997ec063554e4f28e2f21e1b3f0)]:
+  - @real-router/core@0.148.1
+
 ## 0.14.2
 
 ### Patch Changes
