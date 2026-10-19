@@ -14,7 +14,7 @@
 lifecycle-plugin/
 ├── src/
 │   ├── factory.ts    — compileHook (lazy compile + cache with factory invalidation),
-│   │                   createPlugin, lifecyclePluginFactory
+│   │                   the two signal controllers, createPlugin, lifecyclePluginFactory
 │   ├── types.ts      — LifecycleHook, LifecycleHookFactory types
 │   └── index.ts      — Public exports + Route module augmentation
 ```
@@ -49,12 +49,17 @@ Navigation: home → users.view
 
 onTransitionSuccess(toState, fromState)
     │
-    ├── toState.name === fromState?.name?
-    │   ├── YES → compileHook("onStay", "users.view") → call if resolved
-    │   └── NO  → compileHook("onLeave", "home") → call if resolved (no fromState → skipped)
-    │             compileHook("onEnter", "users.view") → call if resolved
+    ├── abort the previous commit's signal
     │
-    └── compileHook("onNavigate", "users.view") → call if resolved (orthogonal — always consulted)
+    ├── toState.name === fromState?.name?
+    │   ├── YES → compileHook("onStay", "users.view") → call if resolved (commit signal)
+    │   └── NO  → abort the left route's onEnter signal
+    │             compileHook("onLeave", "home") → call if resolved (commit signal; no fromState → skipped)
+    │             compileHook("onEnter", "users.view") → call if resolved (route signal)
+    │
+    └── compileHook("onNavigate", "users.view") → call if resolved (commit signal; orthogonal — always consulted)
+
+onStop / teardown → abort both signals
 ```
 
 `onNavigate` fires independently of `onEnter` / `onStay` — if both are defined, both fire. Each hook is dispatched based on its own condition.
@@ -96,7 +101,24 @@ All four hooks run from `onTransitionSuccess`; the plugin listens to no pre-comm
 
 - Leave-approve is tentative: after it an activation guard can still refuse, a `subscribeLeave` listener can still fail the navigation, and the caller's `signal`, a newer navigation or `stop()` can still cancel it. The user then stays on the route, so cleanup run there would leave that route torn down — and a cancelled navigation followed by one that commits would run it twice.
 - `onLeave` runs before the target's `onEnter` inside the same handler, which keeps "cleanup before enter"; the per-hook isolation keeps a throwing `onLeave` from swallowing the hooks after it.
-- Work that must happen before the commit, or be undone when the navigation does not commit, has `router.subscribeLeave`, whose `signal` aborts in that case. `onLeave` carries no signal, so it runs where nothing is left to undo.
+- Work that must happen before the commit, or be undone when the navigation does not commit, has `router.subscribeLeave`, whose `signal` aborts in that case. `onLeave` runs only for a navigation that committed, so its own signal aborts only when the next one commits.
+
+### Why two signal lifetimes
+
+A hook's signal aborts when the work it started is superseded, and what supersedes it follows from when the hook runs again:
+
+- `onStay`, `onNavigate` and `onLeave` answer one navigation, and the next commit is the next answer — they share one controller per commit, aborted there.
+- `onEnter` answers the visit. A param or search change on the same route runs `onStay` and `onNavigate` but not `onEnter`, so aborting `onEnter`'s signal there would end work that nothing restarts. Its controller aborts when the route is left.
+- `stop()`, `dispose()` and teardown abort both: after them no commit reaches the plugin.
+- A navigation that does not commit aborts nothing — the user stays on the route, and the work is still wanted.
+
+The price of the second lifetime is a load split between `onEnter` and `onStay`: the entry load's signal outlives the first `onStay` load, and the two race. Data that depends on params or search belongs in `onNavigate`, where the lifetimes agree.
+
+A controller is opened by the first hook handed its signal, so a route without hooks pays nothing. The `ended` flag — set by `onStop` and teardown, cleared by the next commit — makes a controller opened after them within the same dispatch born aborted: a hook, or an abort listener, may stop the router while the rest of the commit's hooks still run.
+
+### Why the abort reason is a fresh `AbortError`
+
+`controller.abort()` without an argument gives every abort its own `DOMException` named `AbortError`, the name abort-aware code filters on — `fetch` rejects with it. A `RouterError` carries a different `name`. A shared reason has its `stack` rewritten by Node's `fetch` on every abort, and a frozen one — a frozen `State` included — makes Node's `fetch` reject with a `TypeError` instead of the reason. The price is the stack each `DOMException` captures, paid once per abort.
 
 ### Why leaf route only
 

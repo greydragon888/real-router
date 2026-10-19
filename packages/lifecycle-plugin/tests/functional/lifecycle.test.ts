@@ -39,6 +39,7 @@ describe("@real-router/lifecycle-plugin", () => {
       expect(onEnter).toHaveBeenCalledExactlyOnceWith(
         expect.objectContaining({ name: "home" }),
         undefined,
+        expect.any(AbortSignal),
       );
     });
 
@@ -60,6 +61,7 @@ describe("@real-router/lifecycle-plugin", () => {
       expect(onEnter).toHaveBeenCalledExactlyOnceWith(
         expect.objectContaining({ name: "about" }),
         expect.objectContaining({ name: "home" }),
+        expect.any(AbortSignal),
       );
     });
 
@@ -103,6 +105,7 @@ describe("@real-router/lifecycle-plugin", () => {
       expect(onLeave).toHaveBeenCalledExactlyOnceWith(
         expect.objectContaining({ name: "about" }),
         expect.objectContaining({ name: "home" }),
+        expect.any(AbortSignal),
       );
     });
 
@@ -227,6 +230,7 @@ describe("@real-router/lifecycle-plugin", () => {
       expect(onStay).toHaveBeenCalledExactlyOnceWith(
         expect.objectContaining({ name: "users.view", params: { id: "2" } }),
         expect.objectContaining({ name: "users.view", params: { id: "1" } }),
+        expect.any(AbortSignal),
       );
     });
 
@@ -283,6 +287,7 @@ describe("@real-router/lifecycle-plugin", () => {
       expect(onNavigate).toHaveBeenCalledExactlyOnceWith(
         expect.objectContaining({ name: "home" }),
         undefined,
+        expect.any(AbortSignal),
       );
     });
 
@@ -304,6 +309,7 @@ describe("@real-router/lifecycle-plugin", () => {
       expect(onNavigate).toHaveBeenCalledExactlyOnceWith(
         expect.objectContaining({ name: "about" }),
         expect.objectContaining({ name: "home" }),
+        expect.any(AbortSignal),
       );
     });
 
@@ -338,6 +344,7 @@ describe("@real-router/lifecycle-plugin", () => {
       expect(onNavigate).toHaveBeenCalledExactlyOnceWith(
         expect.objectContaining({ name: "users.view", params: { id: "2" } }),
         expect.objectContaining({ name: "users.view", params: { id: "1" } }),
+        expect.any(AbortSignal),
       );
     });
 
@@ -486,6 +493,7 @@ describe("@real-router/lifecycle-plugin", () => {
       expect(onNavigate).toHaveBeenLastCalledWith(
         expect.objectContaining({ name: "chat", params: { roomId: "b" } }),
         expect.objectContaining({ name: "chat", params: { roomId: "a" } }),
+        expect.any(AbortSignal),
       );
     });
   });
@@ -1122,6 +1130,7 @@ describe("@real-router/lifecycle-plugin", () => {
         expect(onLeave).toHaveBeenCalledExactlyOnceWith(
           expect.objectContaining({ name: "about" }),
           expect.objectContaining({ name: "editor" }),
+          expect.any(AbortSignal),
         );
         expect(targetHook).toHaveBeenCalledTimes(2);
       },
@@ -1142,6 +1151,7 @@ describe("@real-router/lifecycle-plugin", () => {
       expect(onLeave).toHaveBeenCalledExactlyOnceWith(
         expect.objectContaining({ name: "about" }),
         expect.objectContaining({ name: "editor" }),
+        expect.any(AbortSignal),
       );
     });
 
@@ -1157,6 +1167,7 @@ describe("@real-router/lifecycle-plugin", () => {
       expect(onLeave).toHaveBeenCalledExactlyOnceWith(
         expect.objectContaining({ name: UNKNOWN_ROUTE }),
         expect.objectContaining({ name: "editor" }),
+        expect.any(AbortSignal),
       );
     });
 
@@ -1182,6 +1193,7 @@ describe("@real-router/lifecycle-plugin", () => {
       expect(onLeave).toHaveBeenCalledExactlyOnceWith(
         expect.objectContaining({ name: "legacy" }),
         expect.objectContaining({ name: "editor" }),
+        expect.any(AbortSignal),
       );
     });
 
@@ -1247,6 +1259,562 @@ describe("@real-router/lifecycle-plugin", () => {
         expect(onLeave).toHaveBeenCalledTimes(calls);
       },
     );
+  });
+
+  describe("hooks receive an AbortSignal (#2692)", () => {
+    // `pending`'s canActivate answers only through `pendingGuard.release`, so
+    // a navigation to it ends in a cancellation; `entered` proves it got there.
+    const pendingGuard: {
+      release: (allowed: boolean) => void;
+      entered: number;
+    } = { release: () => {}, entered: 0 };
+
+    interface Handed {
+      readonly key: string;
+      readonly signal: AbortSignal;
+    }
+
+    // Every hook of `list` and `other` records the signal it is handed under
+    // `<hook>:<route>`. `list` declares `?q`, so a search change commits on
+    // the same route.
+    function createSignalRouter(): {
+      routes: Route[];
+      signalOf: (key: string, nth?: number) => AbortSignal;
+      unsubscribe: () => void;
+    } {
+      const handed: Handed[] = [];
+      const record =
+        (key: string): LifecycleHookFactory =>
+        () =>
+        (_toState, _fromState, signal) => {
+          handed.push({ key, signal });
+        };
+      const hooksOf = (
+        name: string,
+      ): Pick<Route, "onEnter" | "onStay" | "onLeave" | "onNavigate"> => ({
+        onEnter: record(`onEnter:${name}`),
+        onStay: record(`onStay:${name}`),
+        onLeave: record(`onLeave:${name}`),
+        onNavigate: record(`onNavigate:${name}`),
+      });
+      const routes: Route[] = [
+        { name: "list", path: "/list?q", ...hooksOf("list") },
+        { name: "other", path: "/other", ...hooksOf("other") },
+        { name: "refused", path: "/refused", canActivate: () => () => false },
+        {
+          name: "throwing",
+          path: "/throwing",
+          canActivate: () => () => {
+            throw new Error("guard boom");
+          },
+        },
+        {
+          name: "pending",
+          path: "/pending",
+          canActivate: () => () => {
+            pendingGuard.entered += 1;
+
+            return new Promise<boolean>((resolve) => {
+              pendingGuard.release = resolve;
+            });
+          },
+        },
+      ];
+
+      pendingGuard.entered = 0;
+      router = createRouter(routes, { defaultRoute: "list" });
+
+      return {
+        routes,
+        signalOf: (key, nth = 0) => {
+          const found = handed.filter((entry) => entry.key === key).at(nth);
+
+          if (found === undefined) {
+            throw new Error(`no signal handed to ${key} #${nth}`);
+          }
+
+          return found.signal;
+        },
+        unsubscribe: router.usePlugin(lifecyclePluginFactory()),
+      };
+    }
+
+    it("onNavigate's and onStay's signals abort when the next navigation commits on the same route", async () => {
+      const { signalOf } = createSignalRouter();
+
+      await router.start("/list?q=a");
+      const entry = signalOf("onNavigate:list");
+
+      expect(entry).toBeInstanceOf(AbortSignal);
+      expect(entry.aborted).toBe(false);
+
+      await router.navigate("list", {}, { q: "b" });
+
+      expect(entry.aborted).toBe(true);
+      expect(signalOf("onStay:list").aborted).toBe(false);
+      expect(signalOf("onNavigate:list", 1).aborted).toBe(false);
+
+      await router.navigate("list", {}, { q: "c" });
+
+      expect(signalOf("onStay:list").aborted).toBe(true);
+      expect(signalOf("onNavigate:list", 1).aborted).toBe(true);
+    });
+
+    it("onEnter's signal outlives a search change, a reload and a revalidation, and aborts when the route is left", async () => {
+      const { routes, signalOf } = createSignalRouter();
+
+      await router.start("/list?q=a");
+      const entered = signalOf("onEnter:list");
+
+      expect(entered).toBeInstanceOf(AbortSignal);
+
+      await router.navigate("list", {}, { q: "b" });
+      await router.navigate("list", {}, { q: "b" }, { reload: true });
+      getRoutesApi(router).replace(routes);
+
+      // Four commits on `list`, the last one the revalidation's.
+      expect(signalOf("onNavigate:list", 2).aborted).toBe(true);
+      expect(signalOf("onNavigate:list", 3).aborted).toBe(false);
+      expect(entered.aborted).toBe(false);
+
+      await router.navigate("other");
+
+      expect(entered.aborted).toBe(true);
+      expect(signalOf("onEnter:other").aborted).toBe(false);
+    });
+
+    it("onLeave's signal aborts when the next navigation commits", async () => {
+      const { signalOf } = createSignalRouter();
+
+      await router.start("/list?q=a");
+      await router.navigate("other");
+      const leaving = signalOf("onLeave:list");
+
+      expect(leaving).toBeInstanceOf(AbortSignal);
+      expect(leaving.aborted).toBe(false);
+
+      await router.navigate("list", {}, { q: "c" });
+
+      expect(leaving.aborted).toBe(true);
+    });
+
+    it("a commit aborts the previous signals before any of its hooks runs", async () => {
+      let entered: AbortSignal | undefined;
+      let navigated: AbortSignal | undefined;
+      // [entered.aborted, navigated.aborted] as each hook found them.
+      const seen: Record<string, (boolean | undefined)[]> = {};
+      const observe =
+        (key: string): LifecycleHookFactory =>
+        () =>
+        () => {
+          seen[key] = [entered?.aborted, navigated?.aborted];
+        };
+
+      router = createRouter(
+        [
+          {
+            name: "list",
+            path: "/list?q",
+            onEnter: () => (_toState, _fromState, signal) => {
+              entered = signal;
+            },
+            onStay: observe("onStay:list"),
+            onLeave: observe("onLeave:list"),
+            onNavigate: () => (_toState, _fromState, signal) => {
+              navigated = signal;
+            },
+          },
+          {
+            name: "other",
+            path: "/other",
+            onEnter: observe("onEnter:other"),
+            onNavigate: observe("onNavigate:other"),
+          },
+        ],
+        { defaultRoute: "list" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/list?q=a");
+      await router.navigate("list", {}, { q: "b" });
+      await router.navigate("other");
+
+      expect(seen).toStrictEqual({
+        "onStay:list": [false, true],
+        "onLeave:list": [true, true],
+        "onEnter:other": [true, true],
+        "onNavigate:other": [true, true],
+      });
+    });
+
+    it.each<{
+      cause: string;
+      act: (router: Router) => Promise<unknown>;
+      pendingEntered: number;
+    }>([
+      {
+        cause: "the target's canActivate returns false",
+        act: (r) => r.navigate("refused").catch(() => {}),
+        pendingEntered: 0,
+      },
+      {
+        cause: "the target's canActivate throws",
+        act: (r) => r.navigate("throwing").catch(() => {}),
+        pendingEntered: 0,
+      },
+      {
+        cause:
+          "its own signal aborts while the target's canActivate is pending",
+        act: async (r) => {
+          const controller = new AbortController();
+          const navigation = r
+            .navigate("pending", {}, {}, { signal: controller.signal })
+            .catch(() => {});
+
+          controller.abort();
+          await navigation;
+        },
+        pendingEntered: 1,
+      },
+      {
+        cause: "a newer navigation, refused in its turn, supersedes it",
+        act: (r) =>
+          Promise.all([
+            r.navigate("pending").catch(() => {}),
+            r.navigate("refused").catch(() => {}),
+          ]),
+        pendingEntered: 1,
+      },
+      {
+        cause: "it targets the current state",
+        act: (r) => r.navigate("list", {}, { q: "a" }).catch(() => {}),
+        pendingEntered: 0,
+      },
+    ])(
+      "a navigation that does not commit aborts no signal: $cause",
+      async ({ act, pendingEntered }) => {
+        const { signalOf } = createSignalRouter();
+
+        await router.start("/list?q=a");
+        const live = [signalOf("onEnter:list"), signalOf("onNavigate:list")];
+
+        await act(router);
+
+        expect(pendingGuard.entered).toBe(pendingEntered);
+        expect(router.getState()?.search).toStrictEqual({ q: "a" });
+        expect(live.map((signal) => signal.aborted)).toStrictEqual([
+          false,
+          false,
+        ]);
+
+        // The control: the signals were live, and a navigation that commits
+        // ends them.
+        await router.navigate("other");
+
+        expect(live.map((signal) => signal.aborted)).toStrictEqual([
+          true,
+          true,
+        ]);
+      },
+    );
+
+    it.each<{
+      how: string;
+      end: (router: Router, unsubscribe: () => void) => void;
+    }>([
+      {
+        how: "router.stop()",
+        end: (r) => {
+          r.stop();
+        },
+      },
+      {
+        how: "router.dispose()",
+        end: (r) => {
+          r.dispose();
+          // dispose() is terminal; the shared afterEach stops a fresh router.
+          router = createRouter([{ name: "home", path: "/" }]);
+        },
+      },
+      {
+        how: "removing the plugin",
+        end: (_r, unsubscribe) => {
+          unsubscribe();
+        },
+      },
+    ])("$how aborts every live signal", async ({ end }) => {
+      const { signalOf, unsubscribe } = createSignalRouter();
+
+      await router.start("/list?q=a");
+      await router.navigate("other");
+      const live = [
+        signalOf("onLeave:list"),
+        signalOf("onEnter:other"),
+        signalOf("onNavigate:other"),
+      ];
+
+      expect(live.map((signal) => signal.aborted)).toStrictEqual([
+        false,
+        false,
+        false,
+      ]);
+
+      end(router, unsubscribe);
+
+      expect(live.map((signal) => signal.aborted)).toStrictEqual([
+        true,
+        true,
+        true,
+      ]);
+    });
+
+    it("a start() after stop() hands out live signals again", async () => {
+      const { signalOf } = createSignalRouter();
+
+      await router.start("/list?q=a");
+      router.stop();
+      await router.start("/list?q=b");
+
+      expect(signalOf("onEnter:list").aborted).toBe(true);
+      expect(signalOf("onEnter:list", 1).aborted).toBe(false);
+      expect(signalOf("onNavigate:list", 1).aborted).toBe(false);
+    });
+
+    it("a replace() that drops the active route aborts its signals, though its onLeave does not run", async () => {
+      const { routes, signalOf } = createSignalRouter();
+
+      await router.start("/list?q=a");
+      const live = [signalOf("onEnter:list"), signalOf("onNavigate:list")];
+
+      getRoutesApi(router).replace(
+        routes.filter((route) => route.name !== "list"),
+      );
+
+      expect(router.getState()?.name).toBe(UNKNOWN_ROUTE);
+      expect(() => signalOf("onLeave:list")).toThrow(
+        "no signal handed to onLeave:list #0",
+      );
+      expect(live.map((signal) => signal.aborted)).toStrictEqual([true, true]);
+    });
+
+    it("navigateToNotFound() leaves the route, so it aborts the route's signals", async () => {
+      const { signalOf } = createSignalRouter();
+
+      await router.start("/list?q=a");
+      const live = [signalOf("onEnter:list"), signalOf("onNavigate:list")];
+
+      router.navigateToNotFound("/missing");
+
+      expect(router.getState()?.name).toBe(UNKNOWN_ROUTE);
+      expect(signalOf("onLeave:list").aborted).toBe(false);
+      expect(live.map((signal) => signal.aborted)).toStrictEqual([true, true]);
+    });
+
+    it("a hook that stops the router hands the hooks after it an aborted signal", async () => {
+      const handed: AbortSignal[] = [];
+      const recordSignal: LifecycleHookFactory =
+        () => (_toState, _fromState, signal) => {
+          handed.push(signal);
+        };
+
+      router = createRouter(
+        [
+          { name: "home", path: "/", onNavigate: recordSignal },
+          {
+            name: "stopper",
+            path: "/stopper",
+            onEnter: (r) => () => {
+              r.stop();
+            },
+            onNavigate: recordSignal,
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+      await router.navigate("stopper");
+
+      expect(router.isActive()).toBe(false);
+      expect(handed.map((signal) => signal.aborted)).toStrictEqual([
+        true,
+        true,
+      ]);
+
+      // A new run hands out live signals again.
+      await router.start("/");
+
+      expect(handed.map((signal) => signal.aborted)).toStrictEqual([
+        true,
+        true,
+        false,
+      ]);
+    });
+
+    it("an abort listener that stops the router hands the rest of that commit's hooks an aborted signal", async () => {
+      const handed: AbortSignal[] = [];
+
+      router = createRouter(
+        [
+          {
+            name: "list",
+            path: "/list?q",
+            onNavigate: (r) => (_toState, _fromState, signal) => {
+              handed.push(signal);
+              signal.addEventListener("abort", () => {
+                r.stop();
+              });
+            },
+          },
+        ],
+        { defaultRoute: "list" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/list?q=a");
+      // The commit aborts the first signal, and its listener stops the router
+      // before this commit's own onNavigate runs.
+      await router.navigate("list", {}, { q: "b" });
+
+      expect(router.isActive()).toBe(false);
+      expect(handed.map((signal) => signal.aborted)).toStrictEqual([
+        true,
+        true,
+      ]);
+    });
+
+    it("a hook that removes the plugin hands the hooks after it an aborted signal", async () => {
+      const handed: AbortSignal[] = [];
+      let unsubscribe = (): void => {};
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "remover",
+            path: "/remover",
+            onEnter: () => () => {
+              unsubscribe();
+            },
+            onNavigate: () => (_toState, _fromState, signal) => {
+              handed.push(signal);
+            },
+          },
+        ],
+        { defaultRoute: "home" },
+      );
+      unsubscribe = router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+      await router.navigate("remover");
+
+      expect(handed).toHaveLength(1);
+      expect(handed[0].aborted).toBe(true);
+    });
+
+    it("every abort carries a fresh AbortError", async () => {
+      const { signalOf } = createSignalRouter();
+
+      await router.start("/list?q=a");
+      await router.navigate("list", {}, { q: "b" });
+      await router.navigate("list", {}, { q: "c" });
+
+      const first: unknown = signalOf("onNavigate:list", 0).reason;
+      const second: unknown = signalOf("onNavigate:list", 1).reason;
+
+      expect(first).toBeInstanceOf(DOMException);
+      expect((first as DOMException).name).toBe("AbortError");
+      expect(second).toBeInstanceOf(DOMException);
+      expect(second).not.toBe(first);
+    });
+
+    it("a commit that runs no hook opens no AbortController", async () => {
+      const Native = AbortController;
+      let opened = 0;
+
+      vi.stubGlobal(
+        "AbortController",
+        class extends Native {
+          constructor() {
+            super();
+            opened += 1;
+          }
+        },
+      );
+
+      try {
+        router = createRouter(
+          [
+            { name: "home", path: "/" },
+            { name: "about", path: "/about" },
+            { name: "list", path: "/list?q", onNavigate: () => () => {} },
+          ],
+          { defaultRoute: "home" },
+        );
+        router.usePlugin(lifecyclePluginFactory());
+
+        await router.start("/");
+        await router.navigate("about");
+        await router.navigate("home");
+
+        expect(opened).toBe(0);
+
+        // The control: a route with a hook opens one per commit.
+        await router.navigate("list");
+        await router.navigate("list", {}, { q: "x" });
+
+        expect(opened).toBe(2);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it("an earlier, slower load aborted by the signal cannot land after a later one", async () => {
+      const shown: string[] = [];
+      const wait = (ms: number, signal: AbortSignal): Promise<void> =>
+        new Promise((resolve, reject) => {
+          const timer = setTimeout(resolve, ms);
+
+          signal.addEventListener(
+            "abort",
+            () => {
+              clearTimeout(timer);
+              reject(signal.reason as Error);
+            },
+            { once: true },
+          );
+        });
+
+      router = createRouter(
+        [
+          {
+            name: "list",
+            path: "/list?q",
+            onNavigate: () => (toState, _fromState, signal) => {
+              const query = String(toState.search.q);
+
+              wait(query === "slow" ? 30 : 1, signal).then(
+                () => {
+                  shown.push(query);
+                },
+                () => {},
+              );
+            },
+          },
+        ],
+        { defaultRoute: "list" },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/list?q=slow");
+      await router.navigate("list", {}, { q: "fast" });
+      await new Promise((resolve) => {
+        setTimeout(resolve, 50);
+      });
+
+      expect(shown).toStrictEqual(["fast"]);
+    });
   });
 
   describe("edge cases", () => {

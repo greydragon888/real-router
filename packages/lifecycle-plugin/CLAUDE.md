@@ -7,25 +7,28 @@
 | Export                   | Kind     | Description                                                       |
 | ------------------------ | -------- | ----------------------------------------------------------------- |
 | `lifecyclePluginFactory` | function | Plugin factory — pass to `router.usePlugin()`. No args            |
-| `LifecycleHook`          | type     | Compiled hook signature: `(toState, fromState?) => void`          |
+| `LifecycleHook`          | type     | Compiled hook signature: `(toState, fromState, signal) => void`   |
 | `LifecycleHookFactory`   | type     | Factory signature: `(router, getDependency) => LifecycleHook`     |
 
 ## How It Works
 
 1. `lifecyclePluginFactory()` returns a `PluginFactory` (no configuration)
 2. On `router.usePlugin()`: gets `PluginApi` via `getPluginApi(router)`
-3. On `onTransitionSuccess` — the commit, the only transition event the plugin listens to: if the route name changed → `onLeave` on the route being left, then `onEnter` on the target; otherwise `onStay`. Then `onNavigate` — hooks are orthogonal, each fires independently based on its own condition
+3. On `onTransitionSuccess` — the commit, the only transition event the plugin listens to: the previous commit's signal aborts first. If the route name changed → the left route's `onEnter` signal aborts, then `onLeave` on the route being left, then `onEnter` on the target; otherwise `onStay`. Then `onNavigate` — hooks are orthogonal, each fires independently based on its own condition
+4. On `onStop` and `teardown`: every live signal aborts
 
 Hook lookup: `api.getRouteConfig(routeName)?.[hookName]` — reads hook factory from route definition, compiles it lazily via `factory(router, getDependency)`, and caches the compiled hook per `hookName:routeName`. Same DI pattern as `GuardFnFactory`. Config changes — including hot-swapping a hook via `getRoutesApi(router).update(name, { onNavigate })` (#797), `replace`, or `remove`+`add` — are picked up lazily (recompiles when the `factory` reference differs); removed routes are evicted eagerly via a `getRoutesApi(router).subscribeChanges()` subscription (drops `hookName:routeName` entries on `remove`/`replace`, clears all on `clear`) so they don't linger as dead memory. The subscription is removed in `teardown`.
 
 ## Hook Semantics
 
-| Hook         | Fires when                                  | Event                        | Route checked    |
-| ------------ | ------------------------------------------- | ---------------------------- | ---------------- |
-| `onLeave`    | A navigation away from the route commits    | `onTransitionSuccess`, before `onEnter` | `fromState.name` |
-| `onStay`     | Same route name (params may be unchanged: `reload:true` / revalidation) | `onTransitionSuccess` | `toState.name`   |
-| `onEnter`    | Navigating to a new route                   | `onTransitionSuccess`        | `toState.name`   |
-| `onNavigate` | Any successful navigation to the route      | `onTransitionSuccess`        | `toState.name`   |
+| Hook         | Fires when                                  | Event                        | Route checked    | `signal` aborts when        |
+| ------------ | ------------------------------------------- | ---------------------------- | ---------------- | --------------------------- |
+| `onLeave`    | A navigation away from the route commits    | `onTransitionSuccess`, before `onEnter` | `fromState.name` | the next navigation commits |
+| `onStay`     | Same route name (params may be unchanged: `reload:true` / revalidation) | `onTransitionSuccess` | `toState.name`   | the next navigation commits |
+| `onEnter`    | Navigating to a new route                   | `onTransitionSuccess`        | `toState.name`   | the route is left           |
+| `onNavigate` | Any successful navigation to the route      | `onTransitionSuccess`        | `toState.name`   | the next navigation commits |
+
+Every signal also aborts on `stop()`, `dispose()` and plugin teardown; a navigation that does not commit aborts none.
 
 Hooks fire only for the **leaf route** (the route matching `toState.name` / `fromState.name`), not for parent segments.
 
@@ -38,7 +41,7 @@ Hooks fire only for the **leaf route** (the route matching `toState.name` / `fro
 ```
 src/
 ├── factory.ts  — lifecyclePluginFactory, compileHook (lazy compile + cache),
-│                 onTransitionSuccess handler
+│                 the two signal controllers, onTransitionSuccess / onStop handlers
 ├── types.ts    — LifecycleHook, LifecycleHookFactory types
 └── index.ts    — Public exports + declare module augmentation (Route interface)
 ```
@@ -57,6 +60,15 @@ Return values are ignored. Each hook is invoked with **per-hook exception isolat
 - `TRANSITION_SUCCESS` listeners run in registration order, so a `router.subscribe` listener or a plugin registered before this one sees the commit before `onLeave` runs.
 - `onLeave` cannot cancel its navigation: `stop()`, `dispose()` or aborting the navigation's `signal` from inside it acts on a router that has already committed.
 - Work that must happen before the commit, or be undone when the navigation does not commit, belongs in `router.subscribeLeave`: its listeners, awaited ones included, run before `onLeave`, and their `signal` aborts when the navigation does not commit.
+
+### Each hook gets an `AbortSignal`, with one of two lifetimes
+
+`onEnter`'s signal aborts when its route is left; `onStay`'s, `onNavigate`'s and `onLeave`'s when the next navigation commits — those three share one controller per commit. `stop()`, `dispose()` and teardown abort them all; a navigation that does not commit aborts none. `tests/functional/lifecycle.test.ts` › "hooks receive an AbortSignal (#2692)" holds the cells, and `tests/property/lifecycle.properties.ts` › "signals: each aborts exactly when its lifetime ends" holds the class.
+
+- A commit aborts the previous signals before any of its hooks runs: when `onLeave` runs, the left route's `onEnter` signal is already aborted.
+- A controller is opened only by a hook handed its signal, so a commit that runs no hook opens none.
+- `stop()` or teardown from inside a hook, or from an abort listener, does not stop the rest of that commit's hooks: they run, and the controller they open is born aborted (the `ended` flag).
+- The reason is a fresh `AbortError` `DOMException` per abort — `controller.abort()` without an argument. Not a shared one, whose `stack` Node's `fetch` rewrites on every abort, and not a frozen one, which makes Node's `fetch` reject with a `TypeError` instead.
 
 ### Redirect from a hook
 
@@ -83,7 +95,7 @@ onEnter: (router) => (toState) => {
 - `replace()` revalidation where the active route **survives** (same name) emits `TRANSITION_SUCCESS` with `revalidate: true`; the plugin does not inspect `navOptions`, so it fires `onStay` **and** `onNavigate` with **no navigation and no param change**.
 - `clear()` refuses with `ROUTER_NOT_STOPPED` while a state is committed, so it never tears out the route a running router is on; where it does run it emits only `TREE_CHANGED` and fires no lifecycle hook.
 
-Do **not** rely on `onLeave` as a guaranteed cleanup across tree mutations. For teardown that must survive tree mutations, tie cleanup to an external lifecycle (component unmount, `subscribeChanges`). Core root tracked in #1201.
+Do **not** rely on `onLeave` as a guaranteed cleanup across tree mutations. `onEnter`'s signal is one: the commit that leaves the route aborts it whatever became of the route's definition — the `replace()` cell of "hooks receive an AbortSignal (#2692)" holds it — and `clear()` needs a stopped router, whose `stop()` already aborted it. Core root tracked in #1201.
 
 ### No configuration
 

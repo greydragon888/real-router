@@ -53,6 +53,54 @@ function createPlugin(
   const removeChangesSubscription =
     getRoutesApi(router).subscribeChanges(onTreeChanged);
 
+  // The signals the hooks are handed (#2692): `onEnter` gets `routeController`'s,
+  // aborted when its route is left; `onStay`, `onNavigate` and `onLeave` get
+  // `commitController`'s, aborted by the next commit. A controller is opened by
+  // the first hook handed its signal, so a commit that runs no hook opens none.
+  let routeController: AbortController | undefined;
+  let commitController: AbortController | undefined;
+  // Set by `stop()` and teardown, cleared by the next commit. A hook may stop
+  // the router or remove the plugin, and the hooks after it in the same commit
+  // still run — the controller they open is born aborted.
+  let ended = false;
+
+  const open = (): AbortController => {
+    const controller = new AbortController();
+
+    if (ended) {
+      controller.abort();
+    }
+
+    return controller;
+  };
+  // `onEnter` is its only taker, and the leave branch empties the slot first.
+  const routeSignal = (): AbortSignal => {
+    routeController = open();
+
+    return routeController.signal;
+  };
+  const commitSignal = (): AbortSignal => {
+    commitController ??= open();
+
+    return commitController.signal;
+  };
+
+  const endCommit = (): void => {
+    commitController?.abort();
+    commitController = undefined;
+  };
+  // Emptying the slot drops the plugin's reference to the aborted controller,
+  // and to the listeners the hooks hung on its signal.
+  const endRoute = (): void => {
+    routeController?.abort();
+    routeController = undefined;
+  };
+  const end = (): void => {
+    ended = true;
+    endCommit();
+    endRoute();
+  };
+
   function compileHook(
     hookName: "onEnter" | "onStay" | "onLeave" | "onNavigate",
     routeName: string,
@@ -96,14 +144,17 @@ function createPlugin(
   // `BaseSource` / `createActiveNameSelector` (@real-router/sources): re-throw
   // asynchronously via `queueMicrotask` so the developer signal still surfaces to
   // global error handlers / test harnesses without aborting the sync dispatch.
+  // `signal()` is an argument of the optional call, so it opens a controller
+  // only for a route that carries the hook.
   function runHook(
     hookName: "onEnter" | "onStay" | "onLeave" | "onNavigate",
     routeName: string,
     toState: State,
     fromState: State | undefined,
+    signal: () => AbortSignal,
   ): void {
     try {
-      compileHook(hookName, routeName)?.(toState, fromState);
+      compileHook(hookName, routeName)?.(toState, fromState, signal());
     } catch (error) {
       queueMicrotask(() => {
         throw error;
@@ -115,22 +166,31 @@ function createPlugin(
     // Every hook runs on the commit (#2691): leave-approve is tentative — an
     // activation guard can still refuse, or the navigation be cancelled — and
     // a navigation that does not commit leaves the user on the route.
+    // A commit ends the previous one's signals before any of its hooks runs.
     onTransitionSuccess: (toState: State, fromState: State | undefined) => {
+      ended = false;
+      endCommit();
+
       if (toState.name === fromState?.name) {
-        runHook("onStay", toState.name, toState, fromState);
+        runHook("onStay", toState.name, toState, fromState, commitSignal);
       } else {
+        endRoute();
+
         if (fromState) {
-          runHook("onLeave", fromState.name, toState, fromState);
+          runHook("onLeave", fromState.name, toState, fromState, commitSignal);
         }
 
-        runHook("onEnter", toState.name, toState, fromState);
+        runHook("onEnter", toState.name, toState, fromState, routeSignal);
       }
 
-      runHook("onNavigate", toState.name, toState, fromState);
+      runHook("onNavigate", toState.name, toState, fromState, commitSignal);
     },
+
+    onStop: end,
 
     teardown: () => {
       removeChangesSubscription();
+      end();
     },
   };
 }
