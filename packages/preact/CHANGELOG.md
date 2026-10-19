@@ -1,5 +1,16 @@
 # @real-router/preact
 
+## 0.24.2
+
+### Patch Changes
+
+- [#2759](https://github.com/greydragon888/real-router/pull/2759) [`53a724f`](https://github.com/greydragon888/real-router/commit/53a724f16eee7997ec063554e4f28e2f21e1b3f0) Thanks [@greydragon888](https://github.com/greydragon888)! - `<Link>` without a URL plugin keeps an href that starts with `//` on the page's own origin ([#2758](https://github.com/greydragon888/real-router/issues/2758))
+
+  Without a URL plugin the href is the router path, and an href that starts with `//` names a host — the one a modifier click, a middle click or "open in new tab" follows. Such a path, a splat value that begins with `/` under `urlParamsEncoding: "uri"` or `"none"`, now gets the `/.` prefix the URL plugins give it.
+
+- Updated dependencies [[`53a724f`](https://github.com/greydragon888/real-router/commit/53a724f16eee7997ec063554e4f28e2f21e1b3f0)]:
+  - @real-router/core@0.148.1
+
 ## 0.24.1
 
 ### Patch Changes

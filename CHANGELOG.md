@@ -5,6 +5,104 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-10-19]
+
+### @real-router/angular@0.24.4
+
+### Patch Changes
+
+- [#2759](https://github.com/greydragon888/real-router/pull/2759) [`53a724f`](https://github.com/greydragon888/real-router/commit/53a724f16eee7997ec063554e4f28e2f21e1b3f0) Thanks [@greydragon888](https://github.com/greydragon888)! - `a[realLink]` without a URL plugin keeps an href that starts with `//` on the page's own origin ([#2758](https://github.com/greydragon888/real-router/issues/2758))
+
+  Without a URL plugin the href is the router path, and an href that starts with `//` names a host — the one a modifier click, a middle click or "open in new tab" follows. Such a path, a splat value that begins with `/` under `urlParamsEncoding: "uri"` or `"none"`, now gets the `/.` prefix the URL plugins give it.
+
+- Updated dependencies [[`53a724f`](https://github.com/greydragon888/real-router/commit/53a724f16eee7997ec063554e4f28e2f21e1b3f0)]:
+  - @real-router/core@0.148.1
+
+### @real-router/browser-plugin@0.26.2
+
+### Patch Changes
+
+- [#2759](https://github.com/greydragon888/real-router/pull/2759) [`53a724f`](https://github.com/greydragon888/real-router/commit/53a724f16eee7997ec063554e4f28e2f21e1b3f0) Thanks [@greydragon888](https://github.com/greydragon888)! - A router path that starts with `//` is written as a URL on the page's own origin ([#2758](https://github.com/greydragon888/real-router/issues/2758))
+
+  With an empty `base`, the URL the plugin wrote and `router.buildUrl` returned was the router path as is, and a URL that starts with `//` names a host: `history.replaceState` refused it, so the address bar and the router's state disagreed. Such a path — a splat value that begins with `/` under `urlParamsEncoding: "uri"` or `"none"` — now gets a `/.` prefix. The browser drops the dot segment, so the pathname is the router path and the host is the page's.
+
+- Updated dependencies [[`53a724f`](https://github.com/greydragon888/real-router/commit/53a724f16eee7997ec063554e4f28e2f21e1b3f0)]:
+  - @real-router/core@0.148.1
+
+### @real-router/core@0.148.1
+
+### Patch Changes
+
+- [#2759](https://github.com/greydragon888/real-router/pull/2759) [`53a724f`](https://github.com/greydragon888/real-router/commit/53a724f16eee7997ec063554e4f28e2f21e1b3f0) Thanks [@greydragon888](https://github.com/greydragon888)! - A splat value with an empty segment builds a path the router matches back ([#2758](https://github.com/greydragon888/real-router/issues/2758))
+
+  `buildPath` printed every `/` of a splat value as is, so a value with an empty segment — `{ rest: "/x" }`, which `matchPath("/%2Fx")` returns — built `//x`, a path `matchPath` refuses. Under `urlParamsEncoding: "default"` and `"uriComponent"` the separator after an empty segment is printed `%2F`: `{ rest: "/x" }` builds `/%2Fx`, and `matchPath("/%2Fx")` keeps that path in `state.path`. `"uri"` and `"none"` keep the `/`, since their decoding cannot turn `%2F` back into it.
+
+### @real-router/navigation-plugin@0.14.3
+
+### Patch Changes
+
+- [#2759](https://github.com/greydragon888/real-router/pull/2759) [`53a724f`](https://github.com/greydragon888/real-router/commit/53a724f16eee7997ec063554e4f28e2f21e1b3f0) Thanks [@greydragon888](https://github.com/greydragon888)! - A router path that starts with `//` is written as a URL on the page's own origin ([#2758](https://github.com/greydragon888/real-router/issues/2758))
+
+  With an empty `base`, the URL the plugin wrote and `router.buildUrl` returned was the router path as is, and a URL that starts with `//` names a host: the Navigation API navigated to that host. Such a path — a splat value that begins with `/` under `urlParamsEncoding: "uri"` or `"none"` — now gets a `/.` prefix. The browser drops the dot segment, so the pathname is the router path and the host is the page's.
+
+- Updated dependencies [[`53a724f`](https://github.com/greydragon888/real-router/commit/53a724f16eee7997ec063554e4f28e2f21e1b3f0)]:
+  - @real-router/core@0.148.1
+
+### @real-router/preact@0.24.2
+
+### Patch Changes
+
+- [#2759](https://github.com/greydragon888/real-router/pull/2759) [`53a724f`](https://github.com/greydragon888/real-router/commit/53a724f16eee7997ec063554e4f28e2f21e1b3f0) Thanks [@greydragon888](https://github.com/greydragon888)! - `<Link>` without a URL plugin keeps an href that starts with `//` on the page's own origin ([#2758](https://github.com/greydragon888/real-router/issues/2758))
+
+  Without a URL plugin the href is the router path, and an href that starts with `//` names a host — the one a modifier click, a middle click or "open in new tab" follows. Such a path, a splat value that begins with `/` under `urlParamsEncoding: "uri"` or `"none"`, now gets the `/.` prefix the URL plugins give it.
+
+- Updated dependencies [[`53a724f`](https://github.com/greydragon888/real-router/commit/53a724f16eee7997ec063554e4f28e2f21e1b3f0)]:
+  - @real-router/core@0.148.1
+
+### @real-router/react@0.37.2
+
+### Patch Changes
+
+- [#2759](https://github.com/greydragon888/real-router/pull/2759) [`53a724f`](https://github.com/greydragon888/real-router/commit/53a724f16eee7997ec063554e4f28e2f21e1b3f0) Thanks [@greydragon888](https://github.com/greydragon888)! - `<Link>` without a URL plugin keeps an href that starts with `//` on the page's own origin ([#2758](https://github.com/greydragon888/real-router/issues/2758))
+
+  Without a URL plugin the href is the router path, and an href that starts with `//` names a host — the one a modifier click, a middle click or "open in new tab" follows. Such a path, a splat value that begins with `/` under `urlParamsEncoding: "uri"` or `"none"`, now gets the `/.` prefix the URL plugins give it.
+
+- Updated dependencies [[`53a724f`](https://github.com/greydragon888/real-router/commit/53a724f16eee7997ec063554e4f28e2f21e1b3f0)]:
+  - @real-router/core@0.148.1
+
+### @real-router/solid@0.26.3
+
+### Patch Changes
+
+- [#2759](https://github.com/greydragon888/real-router/pull/2759) [`53a724f`](https://github.com/greydragon888/real-router/commit/53a724f16eee7997ec063554e4f28e2f21e1b3f0) Thanks [@greydragon888](https://github.com/greydragon888)! - `<Link>` and `use:link` without a URL plugin keeps an href that starts with `//` on the page's own origin ([#2758](https://github.com/greydragon888/real-router/issues/2758))
+
+  Without a URL plugin the href is the router path, and an href that starts with `//` names a host — the one a modifier click, a middle click or "open in new tab" follows. Such a path, a splat value that begins with `/` under `urlParamsEncoding: "uri"` or `"none"`, now gets the `/.` prefix the URL plugins give it.
+
+- Updated dependencies [[`53a724f`](https://github.com/greydragon888/real-router/commit/53a724f16eee7997ec063554e4f28e2f21e1b3f0)]:
+  - @real-router/core@0.148.1
+
+### @real-router/svelte@0.24.2
+
+### Patch Changes
+
+- [#2759](https://github.com/greydragon888/real-router/pull/2759) [`53a724f`](https://github.com/greydragon888/real-router/commit/53a724f16eee7997ec063554e4f28e2f21e1b3f0) Thanks [@greydragon888](https://github.com/greydragon888)! - `<Link>` without a URL plugin keeps an href that starts with `//` on the page's own origin ([#2758](https://github.com/greydragon888/real-router/issues/2758))
+
+  Without a URL plugin the href is the router path, and an href that starts with `//` names a host — the one a modifier click, a middle click or "open in new tab" follows. Such a path, a splat value that begins with `/` under `urlParamsEncoding: "uri"` or `"none"`, now gets the `/.` prefix the URL plugins give it.
+
+- Updated dependencies [[`53a724f`](https://github.com/greydragon888/real-router/commit/53a724f16eee7997ec063554e4f28e2f21e1b3f0)]:
+  - @real-router/core@0.148.1
+
+### @real-router/vue@0.25.2
+
+### Patch Changes
+
+- [#2759](https://github.com/greydragon888/real-router/pull/2759) [`53a724f`](https://github.com/greydragon888/real-router/commit/53a724f16eee7997ec063554e4f28e2f21e1b3f0) Thanks [@greydragon888](https://github.com/greydragon888)! - `<Link>` without a URL plugin keeps an href that starts with `//` on the page's own origin ([#2758](https://github.com/greydragon888/real-router/issues/2758))
+
+  Without a URL plugin the href is the router path, and an href that starts with `//` names a host — the one a modifier click, a middle click or "open in new tab" follows. Such a path, a splat value that begins with `/` under `urlParamsEncoding: "uri"` or `"none"`, now gets the `/.` prefix the URL plugins give it.
+
+- Updated dependencies [[`53a724f`](https://github.com/greydragon888/real-router/commit/53a724f16eee7997ec063554e4f28e2f21e1b3f0)]:
+  - @real-router/core@0.148.1
+
 ## [2026-10-14]
 
 ### @real-router/navigation-plugin@0.14.2

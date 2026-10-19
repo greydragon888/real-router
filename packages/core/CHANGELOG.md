@@ -1,5 +1,13 @@
 # @real-router/core
 
+## 0.148.1
+
+### Patch Changes
+
+- [#2759](https://github.com/greydragon888/real-router/pull/2759) [`53a724f`](https://github.com/greydragon888/real-router/commit/53a724f16eee7997ec063554e4f28e2f21e1b3f0) Thanks [@greydragon888](https://github.com/greydragon888)! - A splat value with an empty segment builds a path the router matches back ([#2758](https://github.com/greydragon888/real-router/issues/2758))
+
+  `buildPath` printed every `/` of a splat value as is, so a value with an empty segment — `{ rest: "/x" }`, which `matchPath("/%2Fx")` returns — built `//x`, a path `matchPath` refuses. Under `urlParamsEncoding: "default"` and `"uriComponent"` the separator after an empty segment is printed `%2F`: `{ rest: "/x" }` builds `/%2Fx`, and `matchPath("/%2Fx")` keeps that path in `state.path`. `"uri"` and `"none"` keep the `/`, since their decoding cannot turn `%2F` back into it.
+
 ## 0.148.0
 
 ### Minor Changes
