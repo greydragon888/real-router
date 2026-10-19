@@ -14348,6 +14348,8 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 
 > **Updated (2026-10-07).** The cells did not reach every refused form: the reconciliation of RFC-4 R39 → R49 counted 23 of 49 refusals no cell held. Every place the reader refuses now has a cell, and the test counts them ("Every place the gate's reader refuses has a cell that reaches it").
 
+> **Updated (2026-10-19).** The program of `jq` was read as a closed list of words with its field names free, and the harness fills only each job's result and two outputs of `check`: a program that read another output of `check` passed the reader and every state of the table. The program is now the aggregate, byte for byte ("The gate's jq program is the aggregate as written").
+
 **Problem.** `ci-gate-completeness.test.mjs` executes the gate's script over every state of its table, and the table sees only what the harness passes: the expressions it substitutes and the step's `env:`. The runner gives a script more — its `GITHUB_*` and `RUNNER_*` variables, the workflow's `env:`, the event file — and a line that branched on any of them passed the test. The reconciliation of RFC-4 found `if [[ "${GITHUB_EVENT_NAME:-}" == "pull_request" ]]; then exit 0; fi` and `case "${GITHUB_ACTOR:-}" in *"[bot]") exit 0 ;; esac` green in all 75 tests of the file, the second a form `.github/actions/setup` and `post-merge.yml` already use. On GitHub either would pass every skip the table forbids, the first on every pull request. The harness ran the script in the test's own environment, so in place on CI the first was red by accident; in the copy the tooling tests run in, which holds no `GITHUB_*` or `RUNNER_*`, it passed as well.
 
 **Solution.**
@@ -14928,3 +14930,15 @@ Five mutants, against a green baseline: the stamp back on the writer's object, a
 **Scope.** The other line readers of the workflows assert the value they look for — `coverage-threshold-authority`, `sonar-producer`, `check-semgrep`, and `release-workflow` for the release job's `runs-on` and `id-token` grant — so a key in quotes fails them rather than passes. One form passes `release-workflow`: a job's `permissions:` key in quotes under a workflow-level grant reads as the workflow's grant; `changesets.yml` grants nothing at the workflow level (`permissions: {}`).
 
 **Why.** A trigger the test cannot read is a link it never checked, and a renamed or misspelled target stops the dependent workflow without a word. Refusing the form keeps such a link from passing unseen.
+
+## The gate's jq program is the aggregate as written (2026-10-19)
+
+**Problem.** The reader of the gate's script took a `jq` program made of a closed list of words and did not judge a field name after a dot. The harness fills `toJSON(needs)` with each job's result and two outputs of `check`, `should_run` and `mode`; GitHub passes every output. `CROSS=$(jq -r '.check.outputs.cross_router' <<<"$NEEDS")` and a branch on it passed the reader and all 170 tests of the gate, and with every output of `check` present, as on GitHub, a forbidden skip — `pipeline-leaf` skipped in leaf mode — exited 0 once `cross_router` was `true`. A list of field names would not close it: `to_entries` and `select(.key == "outputs")` reach the same output through a string. A blind control run of `/code-review-rfc` on the RFC-4 range found it.
+
+**Solution.**
+
+- `scripts/gate-script.mjs` compares the program with `AGGREGATE`, the aggregate as its step writes it, and refuses any other ("runs a jq program other than the aggregate"). `readJqProgram` and `JQ_WORDS` are gone with the grammar they judged.
+- The comparison runs after the checks of jq's input, so a call with a wrong input is still refused by its own rule and its cell still reaches it.
+- Cells: an output of `check` read through jq is refused; the three cells that change the aggregate (`env`, `$ENV`, `input`) expect the new refusal; the four cells of the removed grammar are gone. Without the comparison the new cell and the three changed ones fail; placed before the input checks, it fails the input cells and the census of refusal places.
+
+**Why.** The table can stand for the runner only while the script reads nothing the harness does not fill. One pinned program needs no grammar, and an edit of the aggregate fails the test until `AGGREGATE` moves with it — the point where someone has to ask what the new program reads.

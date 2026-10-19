@@ -1213,15 +1213,21 @@ const OUTSIDE_THE_LIST = {
       "if length == 1",
       "if (env.GITHUB_ACTOR | length) > 0 and length == 1",
     ),
-    /calls jq's env, which is outside its closed list/,
+    /runs a jq program other than the aggregate/,
   ],
   "$ENV in the jq program": [
     inProgram("if length == 1", "if ($ENV | length) > 0 and length == 1"),
-    /has a jq character it does not use: "\$"/,
+    /runs a jq program other than the aggregate/,
   ],
   "input in the jq program": [
     inProgram(".[0] | to_entries[]", "input | to_entries[]"),
-    /calls jq's input, which is outside its closed list/,
+    /runs a jq program other than the aggregate/,
+  ],
+  "an output of check the harness does not fill, read through jq": [
+    after(
+      `CROSS=$(jq -r '.check.outputs.cross_router' <<<"$NEEDS")\nif [[ "$CROSS" == "true" ]]; then exit 0; fi`,
+    ),
+    /runs a jq program other than the aggregate/,
   ],
   "a write to the step summary": [
     after('echo "x" >> "$GITHUB_STEP_SUMMARY"'),
@@ -1351,22 +1357,6 @@ const OUTSIDE_THE_LIST = {
   "an unterminated $(": [
     atEnd(`X=$(jq '.' <<<"$NEEDS"`),
     /has an unterminated \$\(/,
-  ],
-  "a jq string that does not end": [
-    after(`X=$(jq '"x' <<<"$NEEDS")`),
-    /has a jq string that does not end/,
-  ],
-  "a jq escape outside its list": [
-    after(`X=$(jq '"\\x"' <<<"$NEEDS")`),
-    /has a jq escape it does not use: \\x/,
-  ],
-  "an unbalanced ) in the jq program": [
-    after(`X=$(jq '.)' <<<"$NEEDS")`),
-    /has an unbalanced \) in its jq program/,
-  ],
-  "an unbalanced ( in the jq program": [
-    after(`X=$(jq '(.' <<<"$NEEDS")`),
-    /has an unbalanced \( in its jq program/,
   ],
   "a reserved word missing at the end": [
     atEnd('if [[ -n "$NEEDS" ]];'),
