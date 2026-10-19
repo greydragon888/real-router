@@ -25,21 +25,18 @@ loads only when you read files there.
 | **which doors exist, and who reaches them**                            | [tests/functional/door-census/](tests/functional/door-census/README.md)                      |
 
 ⚑ **Before arguing from "nobody calls this" or "that is not a door", read the
-census.** Seven tests DERIVE the door set rather than listing it — what each
-handed-out surface contains, what a manifest publishes, who reaches for a
-member and which factories shipped code merely calls, what an application fills
-on core and on the plugins and adapters, what core takes back from a callback,
-and how many there are in total. Its README states the definition of a door in
-use and names the two axes it deliberately leaves to other authorities. Every
-hand-written answer to these questions in this repository has been wrong at
-least once; the derivation is green or it is red.
+census.** Its tests DERIVE the door set rather than listing it, and the README's
+"What each file owns" table — which `readme.test.ts` holds against the folder —
+names the question each one answers. The README also states the definition of
+a door in use and names the two axes it deliberately leaves to other
+authorities. Every hand-written answer to these questions in this repository
+has been wrong at least once; the derivation is green or it is red.
 
 ## Invariant Guards (always active, no plugin required)
 
 Ten, and the criterion for another is **(a)** silent corruption or **(b)** a
 deferred crash in a user-facing API. (The count is written as a cardinal, not an
-ordinal naming "the next one": it went stale twice as `five`, and an ordinal adds
-a second edit to every addition.)
+ordinal naming "the next one": an ordinal adds a second edit to every addition.)
 
 - **`subscribe(listener)`** — `typeof listener === "function"`, so a non-function
   cannot reach the emitter and crash on the next navigation. `subscribeLeave`
@@ -137,16 +134,16 @@ InterceptableMethodMap]: K }` ties it to the type in both directions: a seam
     than the cost. `buildPath` prints exactly what the caller's bag means and
     `isActiveRoute` judges the location that bag builds, so a declared query name
     carrying a value there is not a silence to break: wiring the guard reddens the
-    location-predicate pin in `tests/functional/utils.test.ts`, and #1978 is the
-    bug where a location predicate answering `false` for the URL the user is
-    already on broke `<Link hash>`.
-  - ⚠ Cost is NOT what keeps it out, and the figure is recorded so the question is
-    not re-argued from shape: wired at both doors it costs **+8 to +30 ns per
-    call** across the render-path arms of `benchmarks/seam-rig` (A/A floor
-    ≤ 1.9 %) — 0.019 % of a 16 ms frame at a hundred `<Link>`s. The dominant term
-    is the `getQueryParams` lookup; the predicate itself reads the route's cached
-    query names and short-circuits on a route that declares none, so it never
-    walks the caller's bag.
+    location-predicate pin in `tests/functional/utils.test.ts`, and a location
+    predicate answering `false` for the URL the user is already on breaks
+    `<Link hash>` (#1978).
+  - ⚠ Cost is NOT what keeps it out. Wired at both doors, the guard costs
+    nanoseconds per call — negligible in a frame even at a hundred `<Link>`s —
+    and `benchmarks/seam-rig/README.md` ("What was recorded, 2026-09-10") holds
+    the per-arm figures, so the question is not re-argued from shape. The
+    dominant term is the `getQueryParams` lookup; the predicate itself reads the
+    route's cached query names and short-circuits on a route that declares none,
+    so it never walks the caller's bag.
   - `canNavigateTo` is not blind regardless — it consults the same predicate and
     answers `false`.
 
@@ -157,10 +154,8 @@ the plugin rejects them rather than core paying a per-navigate value scan.
 
 ### Two doors deliberately left unguarded (#2303)
 
-The surface census walked every member of every handed-out surface and found no
-guard worth removing. It found two members carrying none, and the criterion above
-is honestly not met by either — recorded here so the question is answered rather
-than re-opened.
+Two members of the handed-out surfaces carry no guard, and neither meets the
+criterion above:
 
 - **`getInternals(router).logger` is handed out bare.** It is the one member of
   that surface with neither a guard nor a recorded carve-out, and overwriting it
@@ -185,8 +180,7 @@ than re-opened.
 ⚑ **The analyser's REACH is the discriminator, and it is mechanical.** `logger`
 is consumed and stripped at construction (#724), so the retrospective pass at
 `usePlugin` never sees it — core refuses an unknown key there because nothing
-else can, and a `validateLoggerOption` in the plugin was dead on the live path
-and removed (#789). `queryParams` IS in what that pass reads, so core stays
+else can (#789). `queryParams` IS in what that pass reads, so core stays
 neutral and the plugin names a mis-spelled option — the `⚠` in
 `src/namespaces/OptionsNamespace/adoption.ts` states that slot's side of this
 and names the test that pins the reach.
@@ -207,15 +201,13 @@ answers without it diverges between the build the author tests and the build
 the user runs. That is the intended shape — the analyser is stricter — and it
 is the reason a refusal belongs to the plugin only where core can keep working.
 
-⚑ **Worked application — the four plugin-facing doors of #2247, closed by this
-rule.** That issue asked whether `RouterValidator` should grow a member for each;
-the rule above was decided after it was written and answers all four without one.
-Recorded here so the question is answered rather than re-opened.
+⚑ **Worked application — four plugin-facing doors (#2247).** The rule answers
+each without a new `RouterValidator` member:
 
 | door                              | outcome                                          | measured reason                                                                                                                                                                           |
 | --------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PluginApi.addInterceptor`        | always-on, already there                         | `assertInterceptableSeam` — core cannot run a seam it cannot call                                                                                                                         |
-| `PluginApi.claimContextNamespace` | always-on, already there                         | a non-string or empty namespace would key the claim registry on nothing, so core cannot keep working                                                                                      |
+| `PluginApi.addInterceptor`        | always-on                                        | `assertInterceptableSeam` — core cannot run a seam it cannot call                                                                                                                         |
+| `PluginApi.claimContextNamespace` | always-on                                        | a non-string or empty namespace would key the claim registry on nothing, so core cannot keep working                                                                                      |
 | `PluginApi.getRouteConfig`        | neither — core stays neutral                     | `hasRoute` gates before the lookup, so `__proto__`, `constructor`, `toString`, a Symbol, `42`, `null` and an unknown name all answer `undefined`. Nothing to corrupt and nothing to print |
 | `PluginApi.emitTransitionError`   | neither — the record is the `#2303` bullet above | —                                                                                                                                                                                         |
 
@@ -242,13 +234,13 @@ pass-through Proxies over plain objects — they report own-enumerable keys
 normally.
 
 ⚠ **What the TARGET is still decides, and a `Proxy` cannot talk its way out of
-it (#2282).** The shape gates read the prototype, which a proxy traps, so a
-proxy over an ARRAY presented itself as plain and had its indices copied. The
-predicates therefore ask `Array.isArray` as well — the one question the spec
-makes a proxy answer for its target. A proxy over a plain object is unaffected;
-a proxy over a class instance, a `Map` or a `Date` is still admitted and still
-inert, because none of them has own enumerable keys to copy except the fields
-the instance's own author declared.
+it (#2282).** The shape gates read the prototype, which a proxy traps, so to
+that read a proxy over an ARRAY looks plain, and its indices would be copied.
+The predicates therefore ask `Array.isArray` as well — the one question the
+spec makes a proxy answer for its target. A proxy over a plain object is
+unaffected; a proxy over a class instance, a `Map` or a `Date` is still
+admitted and still inert, because none of them has own enumerable keys to copy
+except the fields the instance's own author declared.
 
 ⚠ **The `queryParams` CONFIG bag is exempt, deliberately.** Its format names are
 read by NAME rather than spread, so the lookup walks the prototype chain and one
@@ -258,10 +250,9 @@ collapses that to plain own data at construction, and
 
 ⚠ **A class instance is the shape that bites.** `new VM("7")` with a `get q()` on
 the prototype and the constructor argument stored as an own field prints the
-internal field, not the accessor. The migration is one line — return an own-keyed
-object — and it applies to what a route's **codecs RETURN**, the one source that
-reaches the matcher without passing through the normaliser. The caller's own bags
-never accepted an inherited key.
+internal field, not the accessor. The fix is one line — return an own-keyed
+object — and it matters for what a route's **codecs RETURN**, the one source
+that reaches the matcher without passing through the normaliser.
 
 ⚠ **A route DEFINITION is the one place this is REFUSED rather than degraded.**
 `guardRouteStructure` asks the caller's own object whether it is a plain object
@@ -312,10 +303,10 @@ non-enumerable. Where a hard throw IS right it stays narrow and at registration
 time: route names, declared param names, context namespaces, enum option values.
 
 ⚠ **Omitting a guard needs OWNERSHIP, not reachability.** "No foreign input can
-get here" is a claim about an object core does not own, and two of them have
-already been wrong. "Every bag this site is handed is one core BUILT" survives a
-hole upstream and is checkable from the call graph. Write the second reason or
-write the guard.
+get here" is a claim about an object core does not own, and it breaks when
+anything upstream changes. "Every bag this site is handed is one core BUILT"
+survives a hole upstream and is checkable from the call graph. Write the
+second reason or write the guard.
 
 ### `RouterInternals` promises what its guarded sibling promises (#2259)
 
@@ -328,9 +319,9 @@ values from either side. `RouterInternals` is not a trusted fast path and must
 not be documented as one.
 
 ⚠ **The guards belong in the `RouterInternals` ADAPTER, not in the namespace
-primitive.** The chain is three layers — `PluginApi` holds the guards, the
-adapter in `Router.ts` is a thin arrow onto a namespace method, and the namespace
-method is the primitive. Guarding the adapter costs its callers (the facade,
+primitive.** The chain is three layers — `PluginApi` is a thin arrow onto the
+adapter in `Router.ts`, the adapter holds the guards, and the namespace method it
+calls is the primitive. Guarding the adapter costs its callers (the facade,
 `getRoutesApi`'s revalidation, and plugin authors); guarding the primitive would
 also charge the navigation pipeline, which reaches `matchPath` through a
 DIFFERENT adapter in `wiring/wireNamespaces.ts` and must not pay for a
@@ -344,11 +335,10 @@ Its guards stay on the facade and the divergence is RECORDED in the parity
 ledger rather than closed. Where a door is reached internally, the adapter is
 not a boundary.
 
-⚠ **A "deliberately unguarded tier" was refused on evidence, not taste.** Most
+⚠ **A "deliberately unguarded tier" is refused on evidence, not taste.** Most
 facade guards are `ctx.validator?.…`, so the gap WIDENS when an application
 installs `@real-router/validation-plugin` — a tier whose contract changes with a
-plugin is not a contract. Measured: three doors diverge in bare core, seven with
-the plugin installed.
+plugin is not a contract.
 
 ⚑ **Three outcomes, and only the first is a defect.** A door may BYPASS (the
 guarded side refuses, the internal side accepts), be a PLAIN ALIAS (`X: ctx.X`,
@@ -357,10 +347,11 @@ throw against an asynchronous rejection — the asymmetry `internals.ts` already
 records for `navigateToState`). A census that does not separate the three reports
 the last two as work.
 
-⚠ **The set is derived, never listed.** A list read off the source was wrong twice
-while this was being decided — once too wide, once too narrow — because a door
-that refuses one bad input can still accept another. `#2258` owns the derivation;
-until it lands, treat any hand-written set as a sample.
+⚠ **The set is derived, never listed** — a door that refuses one bad input can
+still accept another. `internals-parity-authority-2258.test.ts`
+(`packages/validation-plugin/tests/functional/`) derives the pairs from the live
+objects, and its `BASELINE_BARE` / `BASELINE_WITH_PLUGIN` ledgers hold the
+current verdict per door; treat any hand-written set as a sample.
 
 ### What earns a member a place on `PluginApi` (#2339)
 
@@ -369,8 +360,8 @@ until it lands, treat any hand-written set as a sample.
 
 Derived from the surface as it stands, not invented. Designing a member for
 `PluginApi` out of one that fails (b) is the same work as choosing a published
-type for it — measured when #2339 slice 1 had to publish `AdoptedOrigins` before
-`getAdoptedOrigins` could move.
+type for it — `getAdoptedOrigins` passes (b) because `AdoptedOrigins` is
+published (#2339).
 
 **(b) is derived by `door-census/membership.test.ts`** (#2350): it asks the
 compiler which types every member of every handed-out surface references, and
@@ -390,23 +381,13 @@ syntactic walk beside the typed one still undercounts — what it cannot see is
 asserted as a difference rather than described, so a new invisible idiom is an
 event rather than a silence.
 
-⚑ **The rule is not merely descriptive, and that half is settled (#2388).** It
-has reddened a cell and changed the work twice, both times on an ADDITION:
-`addCheck` failed clause (a) until the slice grew a shipped consumer for it, and
-`subscribeDiagnostic` failed clause (b) until `DiagnosticEventMap` moved to a
-published subpath. A description cannot fail a test, so "indistinguishable from
-a description of the current set" no longer holds.
-
-⚠ **What is still open is narrower: no QUALIFIED member has ever been turned
-away.** Both cases above were admitted once fixed. The rule enforcing itself and
-the rule exercising judgement beyond its own conjunction are different
-properties, and only the first is demonstrated. The first member that satisfies
-both clauses and is STILL kept off `PluginApi` is the one that shows the second
-— write that refusal down when it happens.
-
-⚑ **Expect it on an addition, not on an inventory.** The conjunction judges a
-candidate when it appears, which is why a census of the existing surface found
-nothing to refuse.
+⚑ **The rule refuses on ADDITIONS (#2388).** A candidate that fails a clause
+reddens a census cell — `addCheck` waited on a shipped consumer for clause (a),
+`subscribeDiagnostic` on `DiagnosticEventMap` reaching a published subpath for
+clause (b) — and the conjunction judges a candidate when it appears, so a census
+of the existing surface has nothing to refuse. Every refusal on record is a
+failed clause: no member satisfying both has been kept off `PluginApi`, and when
+one is, write that refusal down here.
 
 ### Before adding an aggregating entity, ask what could REFUSE a member
 
@@ -428,11 +409,11 @@ them read exactly once, which is the CORRECT shape for an injected dependency,
 and `RoutesStore` has no unread member at all. What separates an accreting entity
 from a large one is the absence of a refusal.
 
-⚠ **The two that accreted are the two that had no rule.** `RouterInternals`,
-whose members landed by default rather than by decision (#2339), and `PluginApi`,
-which gets its first criterion in the section above. A declared VOCABULARY is the
-same shape and fails the same way — #2362 and #2363 are values a public type
-promises and nothing produces.
+**The two that accreted are the two that had no rule.** `RouterInternals` has
+none — its members land by default rather than by decision (#2339) — and
+`PluginApi`'s is the section above. A declared VOCABULARY is the same shape and
+fails the same way — #2362 and #2363 are values a public type promises and
+nothing produces.
 
 ## Gotchas
 
@@ -452,7 +433,7 @@ fails the navigation the way a throwing guard does rather than reading as
 // WRONG — GuardFn returns boolean only
 lifecycle.addActivateGuard(
   "admin",
-  (router) => () => router.makeState("login"),
+  (router) => () => getPluginApi(router).makeState("login"),
 );
 
 // CORRECT
@@ -491,17 +472,13 @@ that signal rather than repair the staleness. ⚑ All six announce themselves �
 of the union carrying no routes, because it leaves every route in place and
 sends every one of them to a new URL.
 
-⚑ **That member REVERSES a recorded decision, and the reason is dated.**
-`.claude/rfc-tree-mutation-event.md` closed О-6 with "no emission", on the ground
-that `TREE_CHANGED` consumers want to know WHICH routes changed rather than where
-the base moved — true of every consumer on 2026-06-06, and false from 2026-06-28,
-when #805 shipped `preload-plugin`'s `default` branch whose contract is the
-opposite: **any** structural mutation restales its href-keyed cache. That plugin
-is the measured victim, and it needed no edit — its `default` absorbs the new
-`op`. ⚠ О-6 prescribed a separate `ROOT_PATH_CHANGED` channel instead; a member
-was taken because the separate channel loses that free repair and grows a public
-subscription door for one consumer, while the union's own docblock already tells
-consumers to tolerate future ops.
+⚑ **`rootPath` is a member of the union, and that overrides an RFC decision.**
+О-6 of `.claude/rfc-tree-mutation-event.md` resolves to "no emission" and
+prescribes a separate `ROOT_PATH_CHANGED` channel instead. A consumer keyed by
+`href` restales on **any** structural mutation — `preload-plugin`'s `default`
+branch does, and absorbs the new `op` with no edit (#805) — so a separate channel
+would lose that repair and grow a public subscription door for one consumer. The
+union's own docblock tells consumers to tolerate future ops.
 
 ⚑ **What `setRootPath` still does NOT do is rebuild the state the router is
 already on, and that is a recorded decision rather than an omission (#1752 gap
@@ -579,7 +556,7 @@ sides, so a removal marker does not count as "filled".
 
 **Value comparison is provenance-tolerant, not `===`.** The URL direction parses
 query values while an intent keeps whatever the caller passed, so a strict
-comparison reported two states on the SAME location as unequal.
+comparison would report two states on the SAME location as unequal.
 `areParamValuesEqual` treats values as equal when they print into the same URL:
 `string` / `number` / `boolean` by printed form, arrays element-wise, and a
 singleton array against a bare scalar. `null`, `undefined` and objects stay strict
@@ -624,21 +601,22 @@ touches private fields.
 `getInternals(router)`.
 
 **Adding validation:** call `ctx.validator?.ns.validateXxxArgs(...)`, add the
-method to `RouterValidator`, implement it in the namespace's `validators.ts`, and
-wire it in `validationPlugin.ts`.
+method to `RouterValidator`, implement it in `@real-router/validation-plugin`'s
+`src/validators/<namespace>.ts`, and wire it in that package's
+`validationPlugin.ts`.
 
 **Message prefixes:** name the facade call the message comes from, not the class
 raising it — `[router.buildPath]`, or bare `[router]` where several doors reach
 one raiser. `tests/functional/message-prefix-authority-1845.test.ts` derives the
 rule and owns ONE register rather than carve-outs: the refusals that carry no
-prefix at all (#2456). It is EMPTY since #2459 adjudicated it — twelve of its
-thirteen rows were reachable from a door and took the bare `[router]`, and the
-thirteenth was `EventEmitter`'s callback check, retired with the method. A refusal
-no caller input can reach takes O-1's `Internal error (please report): ` marker
+prefix at all (#2456). It is EMPTY (#2459). A refusal no caller input can reach
+takes O-1's `Internal error (please report): ` marker
 instead of a class-name prefix (#2487).
 
 **Logger channels take the same rule, and the vocabulary is the DOOR** — `clear`
-logs and raises under `router.clearRoutes`, `add` under `router.addRoute` (#2461).
+logs and raises under `router.clear` (#2461). The route-CRUD names that keep
+core's verb to match the plugin's wording, `router.addRoute` and its siblings,
+are a set `door-reachability-authority-2479.test.ts` holds.
 The channel is the first argument of every `logger.*` call, printed as
 `[channel] message` and handed to the consumer's `callback` verbatim, so it is
 observable surface rather than an internal label.
@@ -649,9 +627,9 @@ declaration, because the call site of an imported one holds only the name.
 
 ### Modifying Existing Methods
 
-Validation changes go in the namespace's `validators.ts`; logic changes in the
-namespace method or the `api/` function. `Router.ts` only CALLS validators — it
-never implements validation.
+Validation changes go in `@real-router/validation-plugin`'s
+`src/validators/<namespace>.ts`; logic changes in the namespace method or the
+`api/` function. `Router.ts` only CALLS validators — it never implements one.
 
 ### Type Locations
 
@@ -704,7 +682,7 @@ TypeScript-enforced invariants, and always give the reason.
 
 ### Mutation testing (Stryker)
 
-The honest ceiling is ~90–92 %, and the remainder is structurally not worth
+The score stops short of 100 %, and the remainder is structurally not worth
 disabling: **entangled** mutators (a killed and a survived variant on one line),
 **equivalents** (no test can kill them), and **validator-opt-in** branches that are
 dead in core and covered in the plugin.

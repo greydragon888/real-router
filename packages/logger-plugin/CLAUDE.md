@@ -44,7 +44,7 @@ teardown()                 → resetTransitionState
 
 ### `LoggerPlugin` class with `getPlugin()` pattern
 
-Follows the same pattern as `BrowserPlugin` and `PersistentParamsPlugin`. The class holds private state (transition timing, labels, perf marks) and pre-computed flags. `getPlugin()` returns a plain `Plugin` object with closures over `this`. No `getPluginApi()`, no interceptors, no module augmentation.
+Follows the same pattern as `HashPlugin` and `PersistentParamsPlugin`. The class holds private state (transition timing, labels, perf marks) and pre-computed flags. `getPlugin()` returns a plain `Plugin` object with closures over `this`. No `getPluginApi()`, no interceptors, no module augmentation.
 
 ### Pre-computed flags avoid runtime branching
 

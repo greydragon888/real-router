@@ -197,7 +197,7 @@ IDENTITY — see `NavigationContext` in `types.ts`, which owns why.
 
 **Non-cooperative guards are bounded.** `finishAsyncNavigation` races the guard
 completion against the controller's abort, so an async guard whose Promise never
-settles and ignores `signal` no longer wedges `navigate()` forever.
+settles and ignores `signal` cannot wedge `navigate()`.
 
 `AbortError` thrown in a guard is auto-converted to `TRANSITION_CANCELLED`, and a
 guard may throw `RouterError(TRANSITION_CANCELLED)` directly for a quiet cancel —

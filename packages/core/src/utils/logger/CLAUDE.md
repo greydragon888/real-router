@@ -1,15 +1,10 @@
 # RouterLogger (`core/src/utils/logger`)
 
 > [!NOTE]
-> **Dissolved into `@real-router/core` (#724).** The standalone `@real-router/logger`
-> package is gone — its code now lives here at `core/src/utils/logger/`. The former
-> process-global **singleton** is replaced by a **per-router `RouterLogger` instance**,
-> built from `options.logger` in the `Router` constructor and stored on
-> `RouterInternals.logger` (the `ctx`); each router owns its own logger, so `configure()`
-> no longer leaks across routers. Reached via `getInternals(router).logger`; namespaces get
-> it through their deps, plugins/validators via `ctx.logger`. This doc is co-located
-> as-is pending full integration — treat "published package" / "singleton" phrasing below
-> as historical.
+> **One `RouterLogger` per router (#724)**, built from `options.logger` in the
+> `Router` constructor and stored on `RouterInternals.logger` (the `ctx`). Reached via
+> `getInternals(router).logger`; namespaces get it through their deps,
+> plugins/validators via `ctx.logger`.
 
 `RouterLogger` provides configurable-level, callback-capable logging for a single router
 instance.
@@ -41,9 +36,6 @@ core/src/utils/logger/
 ├── constants.ts     -- LOG_LEVELS, LEVEL_CONFIGS numeric mappings
 └── index.ts         -- exports { RouterLogger }
 ```
-
-(The `LogLevel` / `LogLevelConfig` / `LogCallback` / `LoggerConfig` types moved to
-`core/src/types/router.ts` — the former local `types.ts` is gone.)
 
 ## Gotchas
 

@@ -38,7 +38,7 @@ import {
 | `scrollSpy`          | `ScrollSpyOptions`                 | `undefined` | Opt into router-coordinated `IntersectionObserver`-driven URL hash spy (#575). `{ selector, rootMargin?, scrollContainer? }`. Empty `selector` / `undefined` = off. Wired through a dedicated `onMount` block (not `mountFeature` helper) so the `selector === ""` opt-out branches before the spy factory runs. Read once on mount (Solid `onMount` is non-reactive). Requires `browser-plugin` or `navigation-plugin`; under hash-plugin / memory-plugin → warn-once + NOOP. |
 | `viewTransitions`    | `boolean`                          | `false`     | Opt into View Transitions API integration via `createViewTransitions` utility. Read once on `onMount` — non-reactive. No-op on SSR and browsers without `document.startViewTransition`. CSS customization via `::view-transition-*` pseudo-elements                                                                                                                                                                                                                            |
 
-**Announcer internals:** `announceNavigation` enables the shared `createRouteAnnouncer` helper from `shared/dom-utils/route-announcer.ts`. The helper supports `prefix` (default `"Navigated to "`) and `getAnnouncementText(route)` customization options; pass a `RouteAnnouncerOptions` object as `announceNavigation` (`announceNavigation={{ getAnnouncementText }}`) to override them — `mountFeature` forwards the object to `createRouteAnnouncer`. With `announceNavigation` set to `true` the announcer speaks the default `"Navigated to <route.name>"`. A Safari-ready window of `100ms` queues early announcements (regression test: `RouterProvider.a11y.test.tsx` — `"rapid navigation before Safari-ready delay..."`); announcements are cleared after `7000ms`.
+**Announcer internals:** `announceNavigation` enables the shared `createRouteAnnouncer` helper from `shared/dom-utils/route-announcer.ts`. The helper supports `prefix` (default `"Navigated to "`) and `getAnnouncementText(route)` customization options; pass a `RouteAnnouncerOptions` object as `announceNavigation` (`announceNavigation={{ getAnnouncementText }}`) to override them — `mountFeature` forwards the object to `createRouteAnnouncer`. With `announceNavigation` set to `true` the announcer speaks `"Navigated to "` followed by the first non-empty of the page's `<h1>` text, `document.title`, the route name (skipped for internal `@@` routes) and `location.pathname`. A Safari-ready window of `100ms` queues early announcements (regression test: `RouterProvider.a11y.test.tsx` — `"rapid navigation before Safari-ready delay..."`); announcements are cleared after `7000ms`.
 
 ### Source Structure
 
@@ -157,6 +157,7 @@ dist/
 | `RouterContext`                    | Context   | Solid context carrying `RouterContextValue` (`{ router, navigator, routeSelector }`). Prefer `useRouter` / `useNavigator` for read-only access — consume `RouterContext` directly only for advanced composition (custom hook bridges, testing, multi-provider wrappers). |
 | `RouteContext`                     | Context   | Solid context carrying `Accessor<RouteState>` — the reactive route snapshot. Prefer `useRoute` for normal use; consume directly when building custom hooks that need to layer effects on the existing accessor.                                                          |
 | `RouterContextValue`               | Type      | Shape of `RouterContext` — `{ router, navigator, routeSelector }`. Re-exported for type-only consumers writing their own provider wrappers.                                                                                                                              |
+| `createDirectionTracker`           | Function  | Optional back/forward annotation utility, re-exported with its `DirectionTracker` type (#2587). Install it before `usePlugin(browserPlugin)`; `RouterProvider` does not consume it.                                                                                     |
 
 ## Differences from React and Preact Adapters
 
@@ -167,19 +168,19 @@ dist/
 | `memo()`                  | Required                                | Not needed — components run once |
 | `useCallback`             | Required for stable refs                | Not needed                       |
 | Params stabilization      | `canonicalJson` in sources              | `canonicalJson` in sources       |
-| Active class on Link      | `className` string concat               | `classList` object               |
+| Active class on Link      | `className` string concat               | `class` string concat            |
 | Context count             | 3 (Router, Navigator, Route)            | 2 (Router+Navigator, Route)      |
 | `keepAlive` / Activity    | React 19.2+ only                        | Not available                    |
-| Entry points              | Main + Legacy (React) / Single (Preact) | Single                           |
+| Entry points              | Main + Legacy + `/ssr` + `/legacy/ssr` + `/ink` + RSC (React) / Main + `/ssr` (Preact) | Main + `/ssr` |
 | Build tool                | tsdown                                  | rollup + babel-preset-solid      |
 | RouteView child detection | Element type checking                   | Symbol-based `$$type` markers    |
 
 ## Promise-Based Navigation
 
-Link uses `.catch(() => {})` to suppress unhandled rejection warnings:
+Link navigates through `navigateWithHash` (from `dom-utils/link-utils`) and uses `.catch(() => {})` to suppress unhandled rejection warnings:
 
 ```typescript
-router.navigate(routeName, routeParams, routeSearch, routeOptions).catch(() => {});
+navigateWithHash(router, resolved.name, resolved.params ?? EMPTY_PARAMS, resolved.search, local.hash, local.routeOptions).catch(() => {});
 ```
 
 ## SSR-feature surface — `@real-router/solid/ssr`
@@ -312,11 +313,11 @@ const { route } = routeState(); // Read inside reactive context
 a legitimate business state, not a lifecycle error.
 
 ```tsx
-// Before:
+// Unnecessary — `route` is never undefined here:
 const state = useRoute();
 return <Show when={state().route}>{(r) => <p>{r().name}</p>}</Show>;
 
-// After (route is guaranteed):
+// Correct:
 const state = useRoute();
 return <p>{state().route.name}</p>;
 ```
@@ -553,7 +554,7 @@ The `useFastPath` decision itself is also captured at init — changing `activeS
 - `""` — clears the hash.
 - `"value"` — sets the hash; click routes through `navigateWithHash`, which auto-adds `force: true, hashChange: true` when the requested hash differs from `state.context.url.hash` on the same route+params (bypasses core's `SAME_STATES`).
 
-`hash` participates in the cached `createActiveRouteSource` key on the slow path. Active state is hash-aware: when `hash` is set, the Link is active iff route matches AND `state.context.url.hash` equals expected. The fast-path `routeSelector` is hash-agnostic — passing `hash` forces the slow path (see "Link Props Are Captured at Init (Slow Path)" above for the init-capture caveat). Hash-plugin runtime always returns `false` for hash-aware active checks.
+`hash` participates in the cached `createActiveRouteSource` key on the slow path. Active state is hash-aware: when `hash` is set, the Link is active iff route matches AND `state.context.url.hash` equals expected. The fast-path `routeSelector` is hash-agnostic — passing `hash` forces the slow path (see "Link Props Are Captured at Init (Slow Path)" above for the init-capture caveat). Under hash-plugin (no `url` context namespace) a non-empty `hash` never matches, while `hash=""` matches whenever the route does.
 
 ### use:link Options Are Captured Once
 
@@ -563,17 +564,14 @@ The `use:link` directive calls `accessor()` once at init. If the accessor return
 
 For reactive navigation links, use the `<Link>` component instead.
 
-> **Testing note (audit-4 LOW recommendation #3 — corrected 2026-06-26):**
-> The signal-reactivity gotcha IS unit-tested. `link-directive.test.tsx` →
+> **Testing note:** the signal-reactivity gotcha is unit-tested. `link-directive.test.tsx` →
 > `"should NOT track Solid signal changes"` mounts `<a use:link={{ routeName: signal() }}>`,
-> flips the signal, and asserts `href` stays at its captured-once value. This works because
-> `vitest.config.mts` runs `vite-plugin-solid` — the **same** `babel-preset-solid` pipeline
-> as production — so the JSX compiles for real (the earlier claim that "vitest does not
-> provide a Solid JSX compile pipeline in isolation" was wrong; the plugin is in the config).
-> The test uses the object-literal form `{ routeName: signal() }` with the signal read inside —
-> the only valid `use:link` form (see "use:link Takes the OBJECT Form" below; #976).
-> `examples/web/solid/use-link-directive` remains as an additional end-to-end pin (full Vite
-> build + browser), no longer the only one.
+> flips the signal, and asserts `href` stays at its captured-once value. `vitest.config.mts`
+> runs `vite-plugin-solid` — the **same** `babel-preset-solid` pipeline as production — so the
+> JSX compiles for real. The test uses the object-literal form `{ routeName: signal() }` with
+> the signal read inside — the only valid `use:link` form (see "use:link Takes the OBJECT
+> Form" below; #976). `examples/web/solid/use-link-directive` adds an end-to-end pin (full
+> Vite build + browser).
 
 ### use:link Requires useRouter Context
 
@@ -616,7 +614,7 @@ reactive route switching, use the `<Link>` component instead.
 
 ### Hook Caching via `@real-router/sources`
 
-All source caches live inside `@real-router/sources` — no local WeakMaps in this adapter. N components calling `useRouteNode("users")` against the same router share ONE source — one router subscription, one `shouldUpdate` call per navigation, not N.
+All **source** caches live inside `@real-router/sources`. The adapter keeps two caches of its own: `useRouteUtils` memoizes `RouteUtils` per router in a module-level `WeakMap<Router, { tree, utils }>` (rebuilt when the router's tree is replaced), and `RouteView`'s `helpers.tsx` holds a module-scoped `Map` of segment candidates keyed by route name. N components calling `useRouteNode("users")` against the same router share ONE source — one router subscription, one `shouldUpdate` call per navigation, not N.
 
 | Hook / Component          | Source factory                                                                                                                                                                                                                     |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -639,17 +637,17 @@ All source caches live inside `@real-router/sources` — no local WeakMaps in th
 > for a single shared store call `useRouteStore()` once high in the tree and pass
 > the store down through your own context.
 
-Routers are WeakMap keys in sources, so per-router state is automatically released when the router is GC'd — no explicit teardown needed. Lazy sources disconnect from the router when their last listener unsubscribes. On re-subscription **both lazy sources reconcile** their snapshot — `createRouteNodeSource` **and** `createRouteSource`, since sources 0.9.0 ([#765](https://github.com/greydragon888/real-router/issues/765)) — so signals never observe stale values: a lifted `createRouteSource` bridged through `createSignalFromSource` and re-subscribed after a disconnect (e.g. the only reader behind a `<Show>` toggled off → navigate → on) catches up the missed navigation in `onFirstSubscribe` (`stabilizeState` against the current router state) and reads the **current** route, not the stale pre-disconnect snapshot. Pinned by `tests/functional/reactive-lifecycle.test.tsx` (P1: "a lifted createRouteSource bridged inside `<Show>` is fresh after off → navigate → on"). No workaround needed — the sole reader may be gated behind `<Show>`.
+Routers are WeakMap keys in sources, so per-router state is automatically released when the router is GC'd — no explicit teardown needed. Lazy sources disconnect from the router when their last listener unsubscribes. On re-subscription **both lazy sources reconcile** their snapshot — `createRouteNodeSource` **and** `createRouteSource` ([#765](https://github.com/greydragon888/real-router/issues/765)) — so signals never observe stale values: a lifted `createRouteSource` bridged through `createSignalFromSource` and re-subscribed after a disconnect (e.g. the only reader behind a `<Show>` toggled off → navigate → on) catches up the missed navigation in `onFirstSubscribe` (`stabilizeState` against the current router state) and reads the **current** route, not the stale pre-disconnect snapshot. Pinned by `tests/functional/reactive-lifecycle.test.tsx` (P1: "a lifted createRouteSource bridged inside `<Show>` is fresh after off → navigate → on"). No workaround needed — the sole reader may be gated behind `<Show>`.
 
 ## SSR
 
-SSR-friendly without a separate entry. The same `RouterProvider`, `Link`, and composables work under `solid-js/web` (`renderToString` / `renderToStream`) — no SSR-specific imports, no `if (typeof window !== "undefined")` shims, no platform branches in hot paths.
+The client API needs no SSR variant: the same `RouterProvider`, `Link`, and hooks work under `solid-js/web` (`renderToString` / `renderToStream`) — no `if (typeof window !== "undefined")` shims, no platform branches in hot paths. The SSR-feature components and hooks live at `@real-router/solid/ssr` (see "SSR-feature surface" above).
 
-Verified end-to-end across three example apps:
+Verified end-to-end by the SSR examples under `examples/web/solid/ssr-examples/` (their `e2e/` specs own the scenario counts), among them:
 
-- [`examples/web/solid/ssr-examples/ssr/`](../../examples/web/solid/ssr-examples/ssr) — classical `renderToString` + `generateHydrationScript()` + cookie-based DI + `canActivate` guards + query params + nested loaders (~27 e2e scenarios)
-- [`examples/web/solid/ssr-examples/ssr-streaming/`](../../examples/web/solid/ssr-examples/ssr-streaming) — `renderToStream` + `<Suspense>` + `createResource` + `<ErrorBoundary>` (true OOO Suspense placeholders + selective hydration, ~15 e2e scenarios incl. `<template id="...">` chunk proof)
-- [`examples/web/solid/ssr-examples/ssg/`](../../examples/web/solid/ssr-examples/ssg) — `getStaticPaths` + per-route meta tags + dual-mode mount (`hydrate` vs `render` ternary) + 404.html + sitemap.xml (~17 e2e scenarios)
+- [`examples/web/solid/ssr-examples/ssr/`](../../examples/web/solid/ssr-examples/ssr) — classical `renderToString` + `generateHydrationScript()` + cookie-based DI + `canActivate` guards + query params + nested loaders
+- [`examples/web/solid/ssr-examples/ssr-streaming/`](../../examples/web/solid/ssr-examples/ssr-streaming) — `renderToStream` + `<Suspense>` + `createResource` + `<ErrorBoundary>` (true OOO Suspense placeholders + selective hydration, incl. a `<template id="...">` chunk proof)
+- [`examples/web/solid/ssr-examples/ssg/`](../../examples/web/solid/ssr-examples/ssg) — `getStaticPaths` + per-route meta tags + dual-mode mount (`hydrate` vs `render` ternary) + 404.html + sitemap.xml
 
 ### Verified Patterns
 
@@ -668,6 +666,6 @@ See also: [Solid Integration — Server-Side Rendering](https://github.com/greyd
 - `useRouteNode` uses cached `createRouteNodeSource` from `@real-router/sources` — one router subscription per `(router, nodeName)` shared across all consumers
 - No `memo()` needed — Solid components run once, signals handle granular updates
 - No params stabilization needed — `createActiveRouteSource` hashes params via `canonicalJson` (key-order-insensitive)
-- `Link` uses `createSelector` from `RouterProvider` for O(1) active route detection (only 2 links update per navigation instead of n). Falls back to cached per-(router, key) `createActiveRouteSource` when `activeStrict`, custom `routeParams`, or `ignoreQueryParams: false` are used.
-- All WeakMap caches live in `@real-router/sources` — auto-evicted on router GC, no local caches in this adapter
+- `Link` uses `createSelector` from `RouterProvider` for O(1) active route detection (only 2 links update per navigation instead of n). Falls back to cached per-(router, key) `createActiveRouteSource` under the slow-path conditions listed in "Link Props Are Captured at Init (Slow Path)".
+- Source caches live in `@real-router/sources` and are auto-evicted on router GC; the adapter's own caches are `useRouteUtils`'s per-router `WeakMap` (also released with the router) and `RouteView`'s module-scoped candidate `Map` (bounded by the number of route names)
 - `EMPTY_PARAMS` and `EMPTY_OPTIONS` frozen singletons avoid allocation for default props

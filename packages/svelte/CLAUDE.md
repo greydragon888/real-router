@@ -4,15 +4,23 @@
 
 **Perf bench (CodSpeed):** this adapter's hot-path suite lives centrally, not in-package (the cross-cutting multi-framework harness needs one prebuild + one V8-flag-wrapped process — see `benchmarks/CLAUDE.md`): `benchmarks/adapter-bench/benches/svelte.bench.mts` + `apps/svelte/` (`.svelte` components — benches: navigate-param-swap / navigate-search-active-swap, commits drained via `flushSync()` from `svelte`). Run locally: `pnpm -C benchmarks run bench:adapter svelte`. Design record: IMPLEMENTATION_NOTES "adapter-bench slot".
 
-## Single Entry Point
+## Entry Points
 
 ```typescript
+// Main entry — client API
 import {
   RouterProvider,
   useRouteNode,
   Link,
   RouteView,
 } from "@real-router/svelte";
+
+// SSR-feature subpath — see "SSR-feature surface" below
+import {
+  ClientOnly,
+  HttpStatusCode,
+  createHttpStatusSink,
+} from "@real-router/svelte/ssr";
 ```
 
 **Peer dependency:** `svelte` >= 5.7.0
@@ -47,6 +55,7 @@ src/
 ├── components/                           # Svelte components (.svelte) — 10 total (4 client + 6 SSR)
 │   ├── Link.svelte
 │   ├── RouteView.svelte                  # Declarative route matching via named snippets
+│   ├── RouteView.helpers.ts              # getActiveSegment + RESERVED_SLOT_NAMES (`self`, `notFound`)
 │   ├── Lazy.svelte                       # Lazy-load route content with fallback
 │   ├── RouterErrorBoundary.svelte        # Declarative error handling — uses createDismissableError
 │   ├── ClientOnly.svelte                 # /ssr — server fallback → client children swap
@@ -145,6 +154,7 @@ dist/
 | `useRouteExit(handler, options?)`                                | Composable | Subscribe to `subscribeLeave` with abort + same-route guards |
 | `useRouteEnter(handler, options?)`                               | Composable | Fire once on nav-driven mount via `$effect`                  |
 | `createLinkAction`                                               | Factory    | Create navigation action (`use:link`)                        |
+| `createDirectionTracker` / `DirectionTracker`                    | Function / Type | Optional back/forward annotation utility (#2587); install before `usePlugin(browserPlugin)` |
 | `ROUTER_KEY`, `NAVIGATOR_KEY`, `ROUTE_KEY`                       | Constants  | Svelte context keys (re-exported for advanced patterns)      |
 | `LinkProps`, `RouteContext`, `LinkActionParams`                  | Types      | Adapter-specific public types                                |
 | `RouteExitContext`, `RouteExitHandler`, `UseRouteExitOptions`    | Types      | `useRouteExit` API surface                                   |
@@ -186,10 +196,10 @@ under the same rule. That is the price of the rows above, not a blanket pass.
 | External store bridge     | `useSyncExternalStore` / polyfill       | `useRefFromSource`              | `createSignalFromSource`    | `createReactiveSource`           |
 | `memo()`                  | Required                                | Not needed                      | Not needed                  | Not needed                       |
 | Params stabilization      | `canonicalJson` in sources              | Same                            | Same                        | Same                             |
-| Active class on Link      | `className` string concat               | `class` string concat           | `classList` object          | `class` string concat            |
-| Context count             | 3 (Preact) / 2 (React)                  | 3                               | 2                           | 3                                |
+| Active class on Link      | `className` string concat               | `class` string concat           | `class` string concat       | `class` string concat            |
+| Context count             | 3                                       | 3                               | 2                           | 3                                |
 | `keepAlive` / Activity    | React 19.2+ only                        | Vue native `<KeepAlive>`        | Not available               | Not available                    |
-| Entry points              | Main + Legacy (React) / Single (Preact) | Single                          | Single                      | Single                           |
+| Entry points              | Main + Legacy + `/ssr` + `/legacy/ssr` + `/ink` + RSC (React) / Main + `/ssr` (Preact) | Main + `/ssr` | Main + `/ssr` | Main + `/ssr` |
 | Build tool                | tsdown                                  | tsdown                          | rollup + babel-preset-solid | svelte-package                   |
 | Components                | JSX (.tsx)                              | `defineComponent` + `h()` (.ts) | JSX (.tsx)                  | `.svelte` SFC                    |
 | Composable files          | .tsx                                    | .ts                             | .tsx                        | `.svelte.ts`                     |
@@ -197,10 +207,10 @@ under the same rule. That is the price of the rows above, not a blanket pass.
 
 ## Promise-Based Navigation
 
-Link uses `.catch(() => {})` to suppress unhandled rejection warnings:
+Link navigates through `navigateWithHash` (from `dom-utils/link-utils`) and uses `.catch(NOOP)` to suppress unhandled rejection warnings:
 
 ```typescript
-router.navigate(routeName, routeParams, routeSearch, routeOptions).catch(() => {});
+navigateWithHash(router, resolved.name, resolved.params ?? EMPTY_PARAMS, resolved.search, hash, routeOptions).catch(NOOP);
 ```
 
 ## SSR-feature surface — `@real-router/svelte/ssr`
@@ -357,14 +367,14 @@ realistic auth-flow pattern.
 
 The subscription simply drops whenever **no** reader is mounted — a single live
 `RouteView`, a `useRoute()` consumer, or a template `{route.current}` anywhere
-keeps it connected. The catch-up on re-show is the `@real-router/sources` #765
-reconcile ([shipped in sources 0.9.0](https://github.com/greydragon888/real-router/issues/765)),
+keeps it connected. The catch-up on re-show is the `@real-router/sources`
+reconcile ([#765](https://github.com/greydragon888/real-router/issues/765)),
 pinned by `tests/functional/reactive-lifecycle.test.ts` (P1: "a {#if}-gated
 route.current reader is fresh after off → navigate → on").
 
 ### Snippet Names Must Be Valid JS Identifiers
 
-`RouteView` uses rest `$props()` to collect named snippets. Snippet names must be valid JavaScript identifiers and must match the route segment name exactly. `notFound` is reserved for the fallback:
+`RouteView` uses rest `$props()` to collect named snippets. Snippet names must be valid JavaScript identifiers and must match the route segment name exactly. `self` (exact match on `nodeName`) and `notFound` (the `UNKNOWN_ROUTE` fallback) are reserved:
 
 ```svelte
 <!-- CORRECT — segment "users" matches route "users.*" -->
@@ -424,12 +434,12 @@ disposed). `useRouteNode(name)` keeps its nullable `current` — node inactivity
 is a legitimate business state, not lifecycle misuse.
 
 ```svelte
-<!-- Before -->
+<!-- Unnecessary — route.current is never undefined here -->
 {#if route.current}
   <p>{route.current?.name}</p>
 {/if}
 
-<!-- After -->
+<!-- Correct -->
 <p>{route.current.name}</p>
 ```
 
@@ -545,7 +555,7 @@ internal `$effect` that recreates the source on prop change. Pinned by
 <Link routeName="settings" hash="account">Account</Link>
 ```
 
-`href` is reactive via Svelte 5 `$derived` — passing a `$state` rune updates the rendered href when `hash` changes. **However**, `<Link>`'s active state is captured at mount (see "Link Active State Is Captured At Mount" gotcha above) — same-Link reactive `hash` swap does NOT update the active class. For tab-style UIs, mount one `<Link>` per tab (each with a static `hash`) rather than swapping the prop on a single Link. Hash-plugin runtime always returns `false` for hash-aware active checks.
+`href` is reactive via Svelte 5 `$derived` — passing a `$state` rune updates the rendered href when `hash` changes. **However**, `<Link>`'s active state is captured at mount (see "Link Active State Is Captured At Mount" gotcha above) — same-Link reactive `hash` swap does NOT update the active class. For tab-style UIs, mount one `<Link>` per tab (each with a static `hash`) rather than swapping the prop on a single Link. Under hash-plugin (no `url` context namespace) a non-empty `hash` never matches, while `hash=""` matches whenever the route does.
 
 ### `target` Is Honored on Both `<Link>` and `use:link`
 
@@ -557,9 +567,9 @@ An anchor's `target` names the browsing context the URL should load into. Three 
 
 ⚠ The split is by spelling, not by where the value resolves. `_parent` and `_top` fall back to the current context in a document with no ancestor, and `_SELF` matches `_self` case-insensitively — so all three reach the right destination by a full page load rather than an SPA transition. That is the price of the compare React Router and TanStack Router both use.
 
-### Snippet Name `notFound` Is Reserved in `RouteView`
+### Snippet Names `self` and `notFound` Are Reserved in `RouteView`
 
-`notFound` is reserved as the fallback snippet for `UNKNOWN_ROUTE`. Even if you have a literal route named `notFound` (or `notFound.detail`), the `notFound` snippet is **never** picked as a regular segment match — only as the fallback. Use a different snippet name if you need to render a route literally called `notFound`.
+`self` renders when the active route name equals `nodeName`, and `notFound` is the fallback for `UNKNOWN_ROUTE`. `RESERVED_SLOT_NAMES` in `components/RouteView.helpers.ts` keeps both out of segment matching: even with a literal route named `self` or `notFound` (or `notFound.detail`), the snippet is **never** picked as a regular segment match. Use a different snippet name if you need to render a route literally called `self` or `notFound`.
 
 ### `RouterErrorBoundary.onError` Throws Are Swallowed
 
@@ -609,7 +619,7 @@ The factory returns an action function that can be used with the `use:` directiv
 listener on `document` (a per-router singleton, `WeakMap<Router, …>`), and each
 node registers its params into a `WeakMap`. The delegated handler walks up from
 `event.target` to the nearest registered node. This gives **O(1) listeners for
-any number of links** (was 2 per node) — matching sv-router's global delegation
+any number of links** — matching sv-router's global delegation
 and making `use:link` the light path for nav menus / sitemaps / paginated lists.
 `applyLinkA11y` stays per-node (it sets `role`/`tabindex` attributes, not
 listeners). The two `document` listeners attach on the first registered node and
@@ -618,13 +628,12 @@ lazy connect/disconnect), so a stopped/disposed router stays GC-able.
 
 Two behavioral consequences of delegation:
 
-- **`stopPropagation()` on a descendant blocks navigation.** A per-node listener
-  fired regardless; the delegated handler only sees events that bubble to
-  `document`. If a child element calls `event.stopPropagation()` on click before
-  the event reaches `document`, the link won't navigate. Rare, but a real change
-  — don't stop propagation inside a `use:link` element (or put an explicit
-  `onclick` on the `<a>` itself).
-- **A manually-detached element no longer navigates.** Removing the element from
+- **`stopPropagation()` on a descendant blocks navigation.** The delegated
+  handler only sees events that bubble to `document`: if a child element calls
+  `event.stopPropagation()` on click before the event reaches `document`, the
+  link won't navigate. Don't stop propagation inside a `use:link` element (or put
+  an explicit `onclick` on the `<a>` itself).
+- **A manually-detached element does not navigate.** Removing the element from
   the DOM *without* Svelte unmount (`element.remove()`) leaves its `WeakMap`
   entry intact, but a click on a detached node doesn't bubble to `document`, so
   nothing fires. Under Svelte's normal `use:` lifecycle this is irrelevant —
@@ -632,13 +641,13 @@ Two behavioral consequences of delegation:
 
 ## SSR
 
-SSR-friendly without a separate entry. The same `RouterProvider`, `RouteView`, `Link`, and composables work under `svelte/server` (`render`) — no SSR-specific imports, no `if (typeof window !== "undefined")` shims, no platform branches in hot paths.
+The client API needs no SSR variant: the same `RouterProvider`, `RouteView`, `Link`, and composables work under `svelte/server` (`render`) — no `if (typeof window !== "undefined")` shims, no platform branches in hot paths. The SSR-feature components and composables live at `@real-router/svelte/ssr` (see "SSR-feature surface" above).
 
-Verified end-to-end across three example apps:
+Verified end-to-end by the SSR examples under `examples/web/svelte/ssr-examples/` (their `e2e/` specs own the scenario counts), among them:
 
-- [`examples/web/svelte/ssr-examples/ssr/`](../../examples/web/svelte/ssr-examples/ssr) — classical `await render()` + `<svelte:head>` injection + cookie-based DI + `canActivate` guards + query params + nested loaders (~25 e2e scenarios)
-- [`examples/web/svelte/ssr-examples/ssr-streaming/`](../../examples/web/svelte/ssr-examples/ssr-streaming) — RSC-like deferred-data SSR via `{#await}` blocks. **Svelte 5 stable does not stream chunked HTTP** — server ships pending UI in a single response, async resolution happens entirely on the client after hydration. ~11 e2e scenarios (cross-cutting + Svelte-specific pending-first proofs)
-- [`examples/web/svelte/ssr-examples/ssg/`](../../examples/web/svelte/ssr-examples/ssg) — `getStaticPaths` + per-route meta tags + dual-mode mount (explicit `if (firstElementChild) hydrate else mount`) + 404.html + sitemap.xml (~16 e2e scenarios)
+- [`examples/web/svelte/ssr-examples/ssr/`](../../examples/web/svelte/ssr-examples/ssr) — classical `await render()` + `<svelte:head>` injection + cookie-based DI + `canActivate` guards + query params + nested loaders
+- [`examples/web/svelte/ssr-examples/ssr-streaming/`](../../examples/web/svelte/ssr-examples/ssr-streaming) — RSC-like deferred-data SSR via `{#await}` blocks. **Svelte 5 stable does not stream chunked HTTP** — server ships pending UI in a single response, async resolution happens entirely on the client after hydration (the specs include Svelte-specific pending-first proofs)
+- [`examples/web/svelte/ssr-examples/ssg/`](../../examples/web/svelte/ssr-examples/ssg) — `getStaticPaths` + per-route meta tags + dual-mode mount (explicit `if (firstElementChild) hydrate else mount`) + 404.html + sitemap.xml
 
 ### Verified Patterns
 

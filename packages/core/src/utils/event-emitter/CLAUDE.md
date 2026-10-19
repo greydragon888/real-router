@@ -1,11 +1,7 @@
 # event-emitter
 
-> **Folded into core (live source of truth).** This is the LIVE typed event
-> emitter `@real-router/core` uses for all internal eventing — formerly the
-> standalone private `event-emitter` package, now dissolved into core (its
-> package directory is gone). **Edit HERE.** The docs below are co-located as-is;
-> a few cross-links may still use the old standalone package layout (pending doc
-> integration — see root `IMPLEMENTATION_NOTES.md`).
+> **The live typed event emitter `@real-router/core` uses for all internal
+> eventing, and the only copy — edit here.**
 
 Generic typed event emitter for Real-Router, used by core for all internal eventing.
 
@@ -37,7 +33,7 @@ Limits default to `{ maxListeners: 0, warnListeners: 0 }` -- all zeros mean disa
 ## Module Structure
 
 ```
-src/
+packages/core/src/utils/event-emitter/
 ├── EventEmitter.ts  -- EventEmitter class (emit, on, off, re-entrancy coalescing)
 ├── types.ts         -- EventEmitterLimits, EventEmitterOptions, Unsubscribe
 └── index.ts         -- re-exports
@@ -45,14 +41,14 @@ src/
 
 ## Gotchas
 
-- **Re-entrant emit is coalesced (#1033)** -- emitting an event that is already being dispatched (a listener that synchronously re-emits the **same** event) is a **no-op**, guarded by the per-event `#dispatching` set. An event can never re-enter its own dispatch (depth ≤ 1), so recursion is structurally impossible — no depth bound, no stack-overflow path. Re-emitting a **different** event from a listener is unaffected. (This replaced the former `maxEventDepth` depth bound + `RecursionDepthError` sentinel.)
+- **Re-entrant emit is coalesced (#1033)** -- emitting an event that is already being dispatched (a listener that synchronously re-emits the **same** event) is a **no-op**, guarded by the per-event `#dispatching` set. An event can never re-enter its own dispatch (depth ≤ 1), so recursion is structurally impossible — no depth bound, no stack-overflow path. Re-emitting a **different** event from a listener is unaffected.
 - **Duplicate listeners throw** -- calling `on()` with the same function reference twice for the same event throws an Error, not a silent no-op
 - **`onListenerWarn` is latched, throw-first** -- the warning fires **exactly once per emitter+event** (off/on churn around the threshold does not re-fire; the latch is released by `clearAll()` or by removing the event's last listener). The `maxListeners` throw is checked **before** the warn, so a registration that hits the hard limit never warns (`warnListeners === maxListeners` → warn is unreachable)
 - **`off()` releases the per-event record** -- when the last listener for an event is removed, the now-empty `Set` (and its warn latch) is deleted from the internal map. This prevents an unbounded heap leak for consumers with **dynamic event names** (`listenerCount()` returns 0 either way, so the leak was invisible to it). See #750. The re-entrancy guard `#dispatching` likewise self-releases per emit (in a `finally`), so it never accumulates.
 - **Snapshot iteration** -- `emit()` snapshots the listener set before iteration; listeners added/removed during emit do not affect the current invocation
-- **Per-listener error isolation (sync throws + async rejections, #1412)** -- `emit()` isolates each listener two ways, both routed to the `onListenerError` callback (if provided) so other listeners still execute: (1) a **synchronous** throw is caught by the surrounding `try/catch`; (2) a listener typed `=> void` that nonetheless returns a **Promise** at runtime (an `async` router hook, or an `any`-cast misuse) has its **rejection** isolated too — `emit` reads the return value's `.then` **once**, and if that read answered a function it CALLS that same function with a rejection handler forwarding to `onListenerError`. Without (2) an async listener's rejection would escape as a Node `unhandledRejection` (fatal under `--unhandled-rejections=strict`, the Node 22+ default). ⚑ The single read is the contract, not an implementation detail (#2136): `Promise.resolve(…).catch(…)` re-asks the slot to adopt the thenable, so a `then` answering differently between the two reads was judged on one value and invoked on another — and a later read answering a non-function made the object be taken for a plain value, with its rejection reaching nobody. All listener failures are isolated — there is no re-thrown sentinel. (This central isolation is why core's `subscribe` wrapper no longer needs its own per-site `.catch`, #944 — it just returns the listener's value to the emitter.)
+- **Per-listener error isolation (sync throws + async rejections, #1412)** -- `emit()` isolates each listener two ways, both routed to the `onListenerError` callback (if provided) so other listeners still execute: (1) a **synchronous** throw is caught by the surrounding `try/catch`; (2) a listener typed `=> void` that nonetheless returns a **Promise** at runtime (an `async` router hook, or an `any`-cast misuse) has its **rejection** isolated too — `emit` reads the return value's `.then` **once**, and if that read answered a function it CALLS that same function with a rejection handler forwarding to `onListenerError`. Without (2) an async listener's rejection would escape as a Node `unhandledRejection` (fatal under `--unhandled-rejections=strict`, the Node 22+ default). ⚑ The single read is the contract, not an implementation detail (#2136): `Promise.resolve(…).catch(…)` re-asks the slot to adopt the thenable, so a `then` answering differently between the two reads would be judged on one value and invoked on another — and a later read answering a non-function would make the object be taken for a plain value, with its rejection reaching nobody. All listener failures are isolated — there is no re-thrown sentinel. Core's `subscribe` wrapper relies on this central isolation and simply returns the listener's value to the emitter (#944).
 - **Explicit args, not rest params** -- `emit()` takes up to 4 explicit args to avoid V8 array materialization overhead; extra `undefined` args are harmless (JS ignores extra function arguments)
 - **Fast path for single listener** -- when a set has exactly one listener, `emit` skips the `[...set]` array spread (direct call). Single-subscriber events (the common router case) get the shortcut, avoiding the snapshot allocation
 - **No dependencies** -- zero runtime dependencies; fully self-contained
-- **Property-based tests** -- `tests/property/` contains fast-check generative tests for emitter invariants
-- **Heap-stress tests** -- `tests/stress/` (`pnpm -F event-emitter test:stress`, runs with `--expose-gc`) guards against the dynamic-event-name heap leak in `#callbacks` (#750); thresholds are anchored to measured healthy vs leak deltas
+- **Property-based tests** -- `packages/core/tests/property/utils/event-emitter/` contains fast-check generative tests for emitter invariants
+- **Heap-stress tests** -- `packages/core/tests/stress/utils/event-emitter/` (run by `pnpm -F @real-router/core test:stress`, whose `vitest.config.stress.mts` passes `--expose-gc`) guards against the dynamic-event-name heap leak in `#callbacks` (#750); thresholds are anchored to measured healthy vs leak deltas

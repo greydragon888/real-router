@@ -24,7 +24,10 @@
 //     one form, the value of an assignment: `$(jq [-r] [--slurp] '<program>'
 //     <<<"$<a variable its step passes>")`, with no line end between the
 //     words of `$( )` outside quotes — the program may span lines inside
-//     them — and the program's words from `JQ_WORDS`;
+//     them — and with the aggregate, as written, for its program (`AGGREGATE`): the
+//     harness fills `needs.<job>.result` and two outputs of `check`, while
+//     `toJSON(needs)` carries every output, so a program that read more
+//     would pass every state of the table;
 //   - it defines a function at its top level, like a variable's first
 //     assignment, under a name no bash builtin takes (`BUILTINS`) and not the
 //     one bash calls by itself, so a call of one runs the script's function
@@ -191,19 +194,19 @@ const BUILTINS = new Set([
   "wait",
 ]);
 
-/** The words of the `jq` program, field names aside. */
-const JQ_WORDS = new Set([
-  "and",
-  "else",
-  "end",
-  "error",
-  "if",
-  "length",
-  "select",
-  "then",
-  "to_entries",
-  "type",
-]);
+/**
+ * The one `jq` program the script runs: the aggregate, as its step writes it.
+ * A field name or a string in another program could reach an output of
+ * `toJSON(needs)` the harness does not fill.
+ */
+const AGGREGATE = [
+  "",
+  '  if length == 1 and (.[0] | type) == "object" and (.[0] | length) > 0',
+  "  then .[0] | to_entries[]",
+  '    | select(.value.result != "success" and .value.result != "skipped")',
+  '    | "\\(.key): \\(.value.result)"',
+  '  else error("the needs context is not one non-empty JSON object") end',
+].join("\n");
 
 const JQ_OPTIONS = new Set(["-r", "--slurp"]);
 
@@ -391,83 +394,6 @@ function describe(token) {
 }
 
 /**
- * Throws unless a `jq` program uses only the words of `JQ_WORDS` and field
- * names: no `$`, so neither `$ENV` nor a variable, and no `@`.
- *
- * @param {string} program
- */
-function readJqProgram(program) {
-  let i = 0;
-
-  const scan = (depth) => {
-    while (i < program.length) {
-      const c = program[i];
-
-      if (c === " " || c === "\n") {
-        i++;
-        continue;
-      }
-      if (c === "#") {
-        while (i < program.length && program[i] !== "\n") i++;
-        continue;
-      }
-      if (c === '"') {
-        i++;
-        for (;;) {
-          if (i >= program.length) refuse("has a jq string that does not end");
-          const e = program[i];
-          if (e === '"') {
-            i++;
-            break;
-          }
-          if (e === "\\") {
-            const f = program[i + 1] ?? "";
-            if (f === "(") {
-              i += 2;
-              scan(1);
-              continue;
-            }
-            if (!'"\\/bfnrt'.includes(f)) {
-              refuse(`has a jq escape it does not use: \\${f}`);
-            }
-            i += 2;
-            continue;
-          }
-          i++;
-        }
-        continue;
-      }
-      if (c === "(") {
-        i++;
-        scan(depth + 1);
-        continue;
-      }
-      if (c === ")") {
-        if (depth === 0) refuse("has an unbalanced ) in its jq program");
-        i++;
-        return;
-      }
-      if (/[A-Za-z_]/.test(c)) {
-        const word = /^[A-Za-z_][A-Za-z0-9_]*/.exec(program.slice(i))[0];
-        if (program[i - 1] !== "." && !JQ_WORDS.has(word)) {
-          refuse(`calls jq's ${word}, which is outside its closed list`);
-        }
-        i += word.length;
-        continue;
-      }
-      if (/[0-9.|,[\]=!<>+*/%?-]/.test(c)) {
-        i++;
-        continue;
-      }
-      refuse(`has a jq character it does not use: ${JSON.stringify(c)}`);
-    }
-    if (depth > 0) refuse("has an unbalanced ( in its jq program");
-  };
-
-  scan(0);
-}
-
-/**
  * What the gate's script reads and calls, and the literals it compares with
  * in `[[ ]]` and `case`. A form outside the closed list throws an error that
  * names it.
@@ -563,7 +489,6 @@ export function readGateScript(run, stepEnv) {
         `passes jq ${describe(program)} where its single-quoted program belongs`,
       );
     }
-    readJqProgram(program.segments[0].value);
     if (!isOp(inner[k + 1], "<<<")) {
       refuse(`gives jq ${describe(inner[k + 1])} where its <<< input belongs`);
     }
@@ -577,6 +502,9 @@ export function readGateScript(run, stepEnv) {
     }
     if (inner.length !== k + 3) {
       refuse(`gives jq ${describe(inner[k + 3])} after its input`);
+    }
+    if (program.segments[0].value !== AGGREGATE) {
+      refuse("runs a jq program other than the aggregate");
     }
     calls.add("jq");
   };

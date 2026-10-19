@@ -3,17 +3,27 @@
 // Run:  node --test scripts/tests/examples-plan.test.mjs
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  changedPaths,
   examplePackages,
   missingLintScript,
   planExamples,
   workspaceGlobs,
 } from "../examples-plan.mjs";
+import { withoutGitEnv } from "../git-env.mjs";
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -64,6 +74,47 @@ test("a file directly under examples/ is the workspace's own and builds every ex
       PACKAGES.map((pkg) => pkg.name).toSorted(),
       file,
     );
+  }
+});
+
+test("changedPaths names a file moved out of an example by its old path too", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "examples-plan-renames-"));
+  const env = {
+    ...withoutGitEnv(process.env),
+    GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_CONFIG_SYSTEM: "/dev/null",
+  };
+  const git = (...args) =>
+    execFileSync(
+      "git",
+      ["-c", "user.name=t", "-c", "user.email=t@t", ...args],
+      {
+        cwd: dir,
+        env,
+        stdio: "pipe",
+      },
+    );
+
+  try {
+    mkdirSync(path.join(dir, "examples", "demo", "src"), { recursive: true });
+    mkdirSync(path.join(dir, "notes"));
+    writeFileSync(
+      path.join(dir, "examples", "demo", "src", "a.ts"),
+      "export const a = 1;\n",
+    );
+    git("init", "-q");
+    git("add", "-A");
+    git("commit", "-qm", "base");
+    git("mv", "examples/demo/src/a.ts", "notes/a.md");
+    git("commit", "-qm", "move");
+
+    // Without the old path the example the file left builds nowhere.
+    assert.deepEqual(changedPaths("HEAD~1", "HEAD", { cwd: dir, env }).sort(), [
+      "examples/demo/src/a.ts",
+      "notes/a.md",
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

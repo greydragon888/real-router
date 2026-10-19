@@ -8,8 +8,10 @@
 |------------------------|-----------------|--------------------------------------------------|
 | `memoryPluginFactory`  | `PluginFactory` | Factory function, accepts `MemoryPluginOptions`  |
 | `MemoryPluginOptions`  | Type            | `{ maxHistoryLength?: number }`                  |
+| `MemoryContext`        | Type            | `{ direction, historyIndex }` — published on `state.context.memory` |
+| `MemoryDirection`      | Type            | `"back" \| "forward" \| "navigate"`              |
 
-Module augmentation adds to `Router`: `back()`, `forward()`, `go(delta)`, `canGoBack()`, `canGoForward()`.
+Module augmentation adds to `Router`: `back()`, `forward()`, `go(delta)`, `canGoBack()`, `canGoForward()`; and `memory?: MemoryContext` to `StateContext`.
 
 ## Module Structure
 
@@ -56,7 +58,7 @@ The `.catch()` reverts `#index` **only when it is still the optimistic target** 
 
 When `back()`/`forward()`/`go()` navigate, `onTransitionSuccess` skips pushing a new entry because `#navigatingFromHistory` is `true`. The restore navigation is tagged `source: MEMORY_RESTORE` (the same `source` convention the browser/hash URL plugins use), and the flag is consumed **only when the committing navigation carries that tag** — attributing it to the navigation that set it, by **identity**, not by timing.
 
-This closes two faces of one root. #807 first moved the reset off a microtask into `onTransitionSuccess` (core commits `navigateToState` synchronously, so a `navigate()` fired in the **same tick** as `back()` otherwise saw the stale flag and was swallowed as a phantom history-restore — no push, stale `direction`/`historyIndex`, orphan forward leg). But timing-based consumption ("the first commit after the flag was set") still mis-fired when an async `canActivate` on the back target kept the restore in flight and a concurrent `navigate()` committed first — [#1234]. The `source` tag fixes both: a foreign commit falls through to the normal push branch; only the plugin's own tagged restore consumes the flag.
+Identity, not timing, because both timing rules fail. A reset on a microtask lets a `navigate()` fired in the **same tick** as `back()` see the stale flag — core commits `navigateToState` synchronously — and be swallowed as a phantom history-restore: no push, stale `direction`/`historyIndex`, orphan forward leg ([#807]). Consuming on "the first commit after the flag was set" mis-fires when an async `canActivate` on the back target keeps the restore in flight and a concurrent `navigate()` commits first ([#1234]). With the `source` tag, a foreign commit falls through to the normal push branch; only the plugin's own tagged restore consumes the flag.
 
 A guard-blocked, rejected, or cancelled replay never consumes the flag in `onTransitionSuccess`, so the `.catch()` handler clears it (gated by the `#goGeneration` guard so an older superseded `#go` no-ops on settle). See the `#index` gotcha above for how the same `.catch()` reverts the optimistic index by the same identity check.
 
@@ -68,7 +70,7 @@ Accepts: non-negative integers. Rejects (throws `TypeError`): negatives, `NaN`, 
 
 ### `go(0)` / `go(NaN)` / `go(±Infinity)` / `go(0.5)` are no-ops
 
-`#go(delta)` guards against zero, non-integer, and non-finite input. Passing any of `0`, `NaN`, `±Infinity`, or fractional deltas returns immediately without calling `api.navigateToState` — silent no-op, no throw. (Earlier versions crashed with `TypeError: Cannot read properties of undefined (reading 'path')` when `targetIndex` landed on a non-integer slot.) The check is `!Number.isInteger(delta) || delta === 0`.
+`#go(delta)` guards against zero, non-integer, and non-finite input. Passing any of `0`, `NaN`, `±Infinity`, or fractional deltas returns immediately without calling `api.navigateToState` — silent no-op, no throw; a non-integer `targetIndex` would otherwise read a missing slot and throw on `.path`. The check is `!Number.isInteger(delta) || delta === 0`.
 
 ### `back()`/`forward()` to entry with same path → sync `#index` update + context rewrite
 
@@ -76,7 +78,7 @@ When `back(-1)` or `forward(+1)` would land on a history entry whose `path` equa
 
 `state.context.memory` is rewritten in place during the short-circuit — `direction` is set to `"back"` or `"forward"` and `historyIndex` to the new `#index` value. The state object identity is preserved (same reference as before), but its `context.memory` payload is current, so a **synchronous** `router.getState().context.memory` read right after `back()`/`forward()` reflects the new direction/index (fix for #508).
 
-**No `TRANSITION_SUCCESS` is emitted on a short-circuit**, however — it returns before `api.navigateToState`. So `router.subscribe` listeners and framework adapters (`@real-router/sources` + `useSyncExternalStore`, keyed on `TRANSITION_SUCCESS`) are **not** notified and do not re-render: a same-path `back()`/`forward()` is a metadata-only move (the visible route is unchanged). Event-based consumers observe the updated `context.memory` only on the next emitted transition (#808). (Earlier docs wrongly claimed subscribers "receive the same signal" for short-circuit moves — they receive zero events.)
+**No `TRANSITION_SUCCESS` is emitted on a short-circuit**, however — it returns before `api.navigateToState`. So `router.subscribe` listeners and framework adapters (`@real-router/sources` + `useSyncExternalStore`, keyed on `TRANSITION_SUCCESS`) are **not** notified and do not re-render: a same-path `back()`/`forward()` is a metadata-only move (the visible route is unchanged). Event-based consumers observe the updated `context.memory` only on the next emitted transition (#808).
 
 ### `replace` option replaces current entry
 

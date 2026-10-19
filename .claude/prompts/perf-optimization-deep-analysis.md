@@ -64,7 +64,7 @@ adversarial-верификация КАЖДОГО кандидата → complet
 |---|---|---|
 | URL-матчер (segment trie) | `packages/core/src/engine/path-matcher` | `SegmentMatcher.ts` (match-walk `#traverseFrom`, `#scanPath`, static-cache), `registration/{index,trie,trieNodes}.ts` (построение трие), `pathUtils.ts` (`createSegmentNode`), `types.ts` (`SegmentNode`), `parseSegment.ts` (токенайзер) |
 | Матчер-фабрика | `packages/core/src/engine` | `createMatcher.ts` |
-| Ядро (FSM + immutable state) | `packages/core/src` | `helpers.ts` (`freezeStateShell`, `mergePathChannel`, `mergeQueryChannel`), `namespaces/NavigationNamespace/*` (transition, commit-gate), `namespaces/EventBusNamespace/*` (`#setupFSMActions`), `namespaces/StateNamespace/*` (`makeState`), `completeTransition.ts`, `routerFSM.ts` |
+| Ядро (FSM + immutable state) | `packages/core/src` | `helpers.ts` (`freezeStateShell`, `mergePathChannel`, `mergeQueryChannel`), `namespaces/NavigationNamespace/*` (transition, commit-gate), `namespaces/EventBusNamespace/*` (`#setupFSMActions`), `namespaces/StateNamespace/*` (`makeState`), `namespaces/NavigationNamespace/transition/completeTransition.ts`, `routerFSM.ts` |
 | FSM-движок | `packages/core/src/utils/fsm` | `fsm.ts` (`send`/dispatch, `#actions`-таблица) |
 | Reactive-слой (UI-байндинги) | `packages/sources/src` | `BaseSource`, `createRouteSource`, `createActiveRouteSource`, `createActiveNameSelector`, `canonicalJson` |
 | Адаптеры | `packages/{react,vue,solid,svelte,angular}/src` | react `hooks/useIsActiveRoute.tsx` + `components/Link.tsx`; vue `Link.ts`; angular `RealLink.ts`; solid/svelte Link |
@@ -99,33 +99,18 @@ matcher/tree ~33 KB. Минимальное приложение, вызвав `
 
 ### 2.3 Карта метрик — правильная headline на КАЖДЫЙ сценарий (НЕ бери первую)
 
-> ⚠️ **Аудит харнесса 2026-07-12** (`.claude/benchmark-harness-audit-2026-07-12.md`)
-> нашёл flip-дефекты в оси per-nav CPU — **до фикса харнесса и ре-рана**:
-> **F1** blink-слагаемое `totalMs` взято из paced-режима (gap=80) и инфлировано
-> idle-wake ~5-15× (в sub-ms итогах blink = 46-95% — величины и near-tie ранги
-> не годны; `_baseline` платит тот же blink); **F2** `ScriptDuration` слеп к
-> promise-microtask работе — vue-router/@solidjs/router/tanstack-solid
-> недосчитаны до 22-41×, rr (sync) посчитан полностью → script-ранги vue/solid
-> занижали rr; **F3** sweep-`scriptMs@N` (wide/deep/search) = холодная ПЕРВАЯ
-> навигация после reload — кросс-движковые АБСОЛЮТЫ @N нелегитимны (solid rr
-> cold-excess +0.29 ms vs solid-router ~0), кривые/slope валидны; **F4**
-> cold-start `jsHeapMB` — БЕЗ force-GC (retained+мусор; angular-флип). До
-> ре-рана из per-nav-CPU строк доверяй только рангам react-когорты
-> (направление) и внутри-движковым КРИВЫМ; alloc/retained-оси чисты.
-
-> ⚠️ **Аудит харнесса 2026-07-18** (`.claude/benchmark-harness-audit-2026-07-18.md`) —
-> F1-F6 ЗАКРЫТЫ+landed, ре-ран СОСТОЯЛСЯ (база n=50 @`b1d40f23`, 181 ячейка,
-> эпоха единая) — ограничения «до ре-рана» из блока 07-12 СНЯТЫ, но ключи
-> СМЕНИЛИСЬ: **таблица ниже — историческая эпоха `totalMs`, ключи из неё НЕ брать.**
+> ⚠️ **Карта — по аудиту харнесса 2026-07-18** (`.claude/benchmark-harness-audit-2026-07-18.md`:
+> F1-F6 закрыты, ре-ран n=50 @`b1d40f23`). Аддитивный `totalMs` из харнесса снят — ключи
+> на нём не бери; живые ключи сверяй с `scenarios/*.mjs` и `deck/deck-extract.mjs`.
 > Живая карта: per-nav headline = **`navMsWall`** (felt wall) + **`navMsTask`**
 > (ΔTaskDuration CPU); свипы = **`navMsTask@N`** (⚠K9: single-nav несёт
 > внеокно-довесок p50 ~0.15 ms, движко-зависимый — кратности browser-sweep карт
 > консервативнее felt до 1.7×), `navMsWall@N` только endpoint (клэмп-квантован);
 > `scriptDurationMs`/`blinkMs` = ⚠-диагностика; link-build = **`mountMs@N`** (wall).
-> **table-heap = `jsHeapMB@100`** (бар @100, НЕ @10000), и величина = **total-app
-> retained heap** — route-таблица лишь 0.3–5.1% показанного; по Δ-growth оси
-> (@100−@10, обе в results/) движки различаются 5–20×, дека-вывод «route memory
-> isn't where they differ» = артефакт аддитивного floor'а (K1-FLIP).
+> Свипы (wide/deep/search) читай по КРИВОЙ/наклону, не по абсолюту @N.
+> **table-heap** = две точки, `jsHeapMB@1` (пол app+движок) и `jsHeapMB@256`;
+> память route-таблицы — их дельта, дека строит её как `routeTableKB` =
+> (@256 − @1) × 1024; абсолют любой точки = **total-app retained heap**.
 > **cold-start (бар @10)** = `scriptDurationMs@10` (boot-CPU) + `fcpMs@10` (felt)
 > + `jsHeapMB@10` (retained ПОСЛЕ force-GC, F4 закрыт) + `jsHeapPreGcMB` (диаг):
 > на felt-оси angular-плитка r 2.93 → **WASH** (fcp 28≈28 ms; K2-FLIP) — CPU-факт
@@ -133,26 +118,14 @@ matcher/tree ~33 KB. Минимальное приложение, вызвав `
 > **nav-churn `heapDeltaKB`** = Δ за 200-нав ОКНО (НЕ per-nav; 80-87% warmup,
 > #1462); `navsPerSec` живой диапазон 2.6k–15k — **rAF-cap ~121 в харнессе НЕ
 > существует** (снят F1-фиксом). **alloc gc-per-nav @256** = среднее 50/50
-> тоггла @256↔@1 — буквальный @256-нав до ~2× выше у lazy-движков (K8).
+> тоггла @256↔@1 — буквальный @256-нав до ~2× выше у lazy-движков (K8);
+> alloc-ранг (`allocKBPerNav`, gross) МОЖЕТ расходиться с CPU-рангом.
 > **matcher-bench:** react-router таймируется с construct-фазой (flatten+rank
 > per call), которую его Data-mode апп амортизирует — публичные «~2000×» =
 > per-call; амортизированно ~40× endpoint / ~109× scan-only (K6+G1p); остальные
 > экстракции parity-чисты, tanstack-deep фикс ПРИМЕНЁН. Первые точки SWEEP-полос
 > nested/active/wide завышены неравномерно (first-point bump, K10) — @1/@4-классы
 > сигналом не считать.
-
-| сценарий | headline-метрика | почему |
-|---|---|---|
-| cold-start | `scriptDurationMs` (boot) + `jsHeapMB` | rr тяжелее грузится (eager core, ~100 KB parse); ⚠️F4: heap пока = used без GC — footprint-выводы только после фикса |
-| nav-latency · param-nav · nested-switch · active-links | **`totalMs`** (script + Blink) | **НЕ script-only** — script завышает разрыв в разы; Blink pushState ~уравнивает (vue-router 2× Blink/nav). ⚠️F1/F2: сумма пока режим-несовместима, а script слеп к microtask (vue/solid) — читать event-count + script-only и только для sync-движков |
-| wide-config | `totalMs@1000` | matcher-breadth: flat=trie, rising=O(N)-scan — **читать КРИВУЮ**; ⚠️F3: абсолюты @N cold-контаминированы |
-| deep-config | `totalMs@90` | rr deep = render-композиция, не матчер; ⚠️F2: flat-кривые async-конкурентов (solid-router 0.07@90) — undercount-артефакт; ⚠️F3 для абсолютов |
-| search-param-scaling | наклон (slope), НЕ абсолюты | eager-immutable плоский vs O(count)-материализация; ⚠️F3: `totalMs@N` = first-nav cold (solid «@1 crushes rr» был 100% артефактом, «@50 converge» прятал rr WIN ~5×) |
-| table-heap | `jsHeapMB@10000` | память route-таблицы (retained, форсит GC) — ось чиста (RME ~0%) |
-| nav-churn | **`heapDeltaKB`** + `scriptMsPerNav` | **НЕ `navsPerSec`** — frame-capped ~121 (confounded; solid rr 15k = sync-семантика); ⚠️F1: `totalMsPerNav` нарушает wall-bound (0.355 > wall 0.066) — до фикса брать script-часть; heapDeltaKB ~80% warmup-транзиент, не leak |
-| link-build | `mountMs` (wall-clock, #1418) | rr WIN vs компонент-конкурентов, LAST vs plain-`<a>`; окно = DOM-commit (pre-paint, common-mode) |
-| back-forward | `totalMs` (popstate) | отдельный history-path; ⚠️F1 (blink-доминирован — величины мягкие, 2×→1× событий rr после #1353 остаётся структурным фактом) |
-| alloc (nav-lat/param/search/back-fwd) | `allocKBPerNav` | GC-pressure = transient bytes/nav; alloc-ранг МОЖЕТ расходиться с CPU-рангом. **Самая здоровая ось бенча** (аудит: эстиматор несмещён, gross подтверждён пробой) |
 
 ### 2.4 Как мерить (критично для любого A/B)
 
@@ -241,7 +214,7 @@ view-transitions), interceptor-chain глубина, subscribeLeave/leave-approv
 корректность (тесты, инварианты); (4) даёт **измеримый** выигрыш на правильной
 метрике (§2.3). Не проходит хотя бы один пункт → не REAL.
 
-**Micro-ROI ловушка:** рычаг, невидимый в `totalMs` (sub-noise, ~0.02% script-бюджета),
+**Micro-ROI ловушка:** рычаг, невидимый в headline-метрике сценария (§2.3; sub-noise, ~0.02% script-бюджета),
 торгующий capability/контракт ради долей µs — **НЕ стоит того**, даже если
 технически «устраним». Пометь INHERENT/не-стоит, не REAL.
 
@@ -266,10 +239,10 @@ view-transitions), interceptor-chain глубина, subscribeLeave/leave-approv
   via `EventBusNamespace.#setupFSMActions`; commit-gate `NavigationNamespace.ts:~343`).
   **НЕВИДИМА в totalMs** (~0.02% от ~620 µs script-бюджета; ~0.1 µs microbench-дельта).
   Refactor E ОТГРУЖЕН — не «to-do».
-- **Cold-start** — introspection (`./api`), SSR (`./utils`), validation-подсистемы
-  **уже расщеплены в subpath-экспорты** (не парсятся в минимальном апе); остаток
-  eager-машинерии — **first-paint-critical** (`start()` гонит первый рендер через
-  полный FSM/guard/transition pipeline).
+- **Cold-start** — introspection (`./api`) и validation (`./validation`) **уже расщеплены в
+  subpath-экспорты**, SSR-хелперы вынесены в пакет `@real-router/ssr-utils` (ни то, ни
+  другое не парсится в минимальном апе); остаток eager-машинерии — **first-paint-critical**
+  (`start()` гонит первый рендер через полный FSM/guard/transition pipeline).
 - **Matcher static-cache БАЙПАСИТ trie-walk** — все-статик роуты резолвятся через
   ОДИН O(1) `Map.get` (shared frozen result, zero alloc); `#traverseFrom` не бежит.
   ⇒ проигрыши wide@1000/deep@90 ультра-лёгким = **фиксированный N-независимый
@@ -286,8 +259,9 @@ view-transitions), interceptor-chain глубина, subscribeLeave/leave-approv
 ### 5.2 SHIPPED — уже сделано (не переделывать)
 
 - Link fast-paths **#1094** (solid RouteView), **#1099/#1101** (svelte Link),
-  **#1103/#1104** (angular Link), **#1248** (react active-name selector): 1000
-  router-подписок → 1 shared `createActiveNameSelector`.
+  **#1103/#1104** (angular Link), **#1248** (react active-name selector), **#1416**
+  (vue Link — через общий `createActiveSource`): 1000 router-подписок → 1 shared
+  `createActiveNameSelector`.
 - Matcher **static-cache**; **#1027** `EMPTY_PARAMS` singleton; **#1009**
   hidden-class sentinels (uniform node shape, frozen `EMPTY_*`); **#1169** commit-gate;
   **#1353** skip no-op popstate replaceState; **#1332** parse-segment токенайзер-унификация.
@@ -309,9 +283,6 @@ view-transitions), interceptor-chain глубина, subscribeLeave/leave-approv
 
 ### 5.4 Открытые probe-worthy (низкий ROI — оцени, но не жди чуда)
 
-- **Vue Link #1257 gap** — vue `Link.ts:~166` строит полный `createActiveRouteSource`
-  в watch, НЕ гоняет default-линки через shared `createActiveNameSelector` (react/
-  svelte/angular гоняют). Адаптерная асимметрия (симметричный долг).
 - **Unbounded active-source кэш** — `createActiveRouteSource` кэширует по
   `canonicalJson(params)` с noop-destroy, **никогда не эвиктит** (Map растёт); в
   param-heavy апе неограниченный рост. Bounded LRU рискует корректностью (CORRECTNESS-RISK).
@@ -337,7 +308,7 @@ view-transitions), interceptor-chain глубина, subscribeLeave/leave-approv
    (термал/нагрузка); memory/matcher/link-build стабильны ~5%. «Улучшилось vs
    прошлый прогон» на sub-ms без same-session A/B — не доказано.
 3. **Числа — из `results/`, НЕ из прозы деки и ledger** (проза отстаёт). Ранжируй по
-   ПРАВИЛЬНОЙ headline-метрике (§2.3) + правильному endpoint (@1000/@90/@50/@10k).
+   ПРАВИЛЬНОЙ headline-метрике (§2.3) + правильному endpoint (тому, что читает дека, — `deck/deck-extract.mjs`).
 4. **Load-bearing / неожиданный claim перепроверь САМ** — компиляция (`tsc`), прогон
    (`node`/бенч), трассировка code-path. Вердикт субагента = гипотеза, не факт.
 5. **Measurement-realism** — помни, что бенч может недо-представлять прод (1 vs 3-4
@@ -395,7 +366,7 @@ view-transitions), interceptor-chain глубина, subscribeLeave/leave-approv
 - **Не** выдавай «конкурент X легче» за рычаг rr без «потому что делает МЕНЬШЕ».
 - **Не** воскрешай §5.3 (DEBUNKED) и не переделывай §5.2 (SHIPPED) без нового
   доказательства.
-- **Не** гонись за micro-ROI, невидимым в totalMs, ценой capability/контракта (§4).
+- **Не** гонись за micro-ROI, невидимым в headline-метрике (§2.3), ценой capability/контракта (§4).
 - **Не** доверяй node micro-bench-абсолюту для памяти (§6.1) и кросс-сессионному
   sub-ms (§6.2).
 - **Не** ранжируй по script-only (завышает); **не** читай nav-churn по `navsPerSec`.

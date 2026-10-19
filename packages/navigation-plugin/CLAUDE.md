@@ -78,17 +78,17 @@ router.buildPath("users", { id: 1 }); // "/users/1" (core)
 router.buildUrl("users", { id: 1 }); // "/app/users/1" (plugin, with base)
 ```
 
-The two differ on more than the base. **`buildUrl` resolves `forwardTo`; `buildPath` does not** (#2250) — on a source `old → fresh`, `buildUrl("old")` prints the target's URL and `buildPath("old")` prints `/old`. A URL is where the click lands, so the plugin door asks `buildNavigationState`; `buildPath` is LITERAL by record (core INVARIANTS `makeState` row 8), which is what lets a plugin build a state for an alias without being teleported off it.
+The two differ on more than the base. **`buildUrl` resolves `forwardTo`; `buildPath` does not** (#2250) — on a source `old → fresh`, `buildUrl("old")` prints the target's URL and `buildPath("old")` prints `/old`. A URL is where the click lands, so the plugin door — the shared `createPluginBuildUrl` — resolves the chain through `forwardState` and prints with `buildPathResolved`, one pass of the chain (#2260); it does not ask `buildNavigationState`, whose `reportUndeclaredParamKey` is advice about a state you are about to persist (#2248). `buildPath` is LITERAL by record (core INVARIANTS `makeState` row 8), which is what lets a plugin build a state for an alias without being teleported off it.
 
 ### Hash Fragment Support (#532)
 
 URL fragments are first-class state, owned by the plugin (not by core). Stored decoded in `state.context.url` (shared namespace claimed by both URL plugins; mutually exclusive with `@real-router/hash-plugin` at runtime).
 
-- **State namespace**: `state.context.url = { hash: string; hashChanged: boolean }` — hash is decoded, no leading `#` (symmetric to params). `hashChanged` is `true` only on browser-driven hash-only navigation (`event.hashChange === true`).
-- **Tri-state `opts.hash`** in `router.navigate(name, params, search?, { hash })` (options at position 4 since RFC-4 M2, #1548): `undefined` preserves current hash, `""` clears, non-empty value sets. Same widening on `router.buildUrl` and `router.replaceHistoryState`.
+- **State namespace**: `state.context.url = { hash: string; hashChanged: boolean }` — hash is decoded, no leading `#` (symmetric to params). `hashChanged` is `true` when the committed hash differs from the previous transition's `state.context.url.hash` — any hash change, browser-driven (`event.hashChange`) or programmatic (`navigate({ hash })`).
+- **Tri-state `opts.hash`** in `router.navigate(name, params, search?, { hash })` (options at position 4, #1548): `undefined` preserves current hash, `""` clears, non-empty value sets. Same widening on `router.buildUrl` and `router.replaceHistoryState`.
 - **Browser-driven hash-only click**: `navigate-handler.ts` reads `event.hashChange` and forwards `{ force: true, hashChange: true, hash }` to `api.navigateToState` — bypasses core's `SAME_STATES` rejection. Subscribers disambiguate via `state.context.url.hashChanged`, not via the overloaded `force` flag.
 - **Recovery paths preserve hash**: a refused navigation returns to the entry it started from, whose URL carries its own fragment; the rewrite a refused `replace` takes, `syncUrlToRouterState`, reads `currentState.context.url.hash` to rebuild the URL — without this, `CANNOT_DEACTIVATE` would silently strip the fragment.
-- **F5 / cold-load: lazy read in `onTransitionSuccess`**. On the first transition (`!fromState`), the plugin calls `getDecodedHash(browser)` to read the previous hash. **NOT in the constructor** — by the time `onTransitionSuccess` fires, `location.hash` already reflects the destination URL, so F5 on `/page#section` is recovered without explicit priming. This is **separate** from the `navigationType` priming via `getActivationType()` documented in "Cross-document Activation Priming" — that priming is Navigation-API-only metadata and does not touch the URL fragment.
+- **F5 / cold-load: lazy read in `onTransitionSuccess`**. When `opts.hash` is omitted, `onTransitionSuccess` reads the destination fragment with `getDecodedHash(browser)` — on the first transition as on every later one; the previous hash comes from `fromState.context.url.hash`. **NOT in the constructor** — by the time `onTransitionSuccess` fires, `location.hash` already reflects the destination URL, so F5 on `/page#section` is recovered without explicit priming. This is **separate** from the `navigationType` priming via `getActivationType()` documented in "Cross-document Activation Priming" — that priming is Navigation-API-only metadata and does not touch the URL fragment.
 
 See [IMPLEMENTATION_NOTES.md](../../IMPLEMENTATION_NOTES.md) section "URL Fragment ('hash') Support" for the full design rationale.
 
@@ -141,7 +141,7 @@ See #524 for why the "swallow silently" path was broken (URL committed, router s
 
 Mechanism: `createNavigationBrowser` (`navigation-browser.ts`) tags every router-driven mutation with `info: PLUGIN_SYNC_INFO` — a stable string sentinel exported alongside it. The handler in `navigate-handler.ts` checks `event.info === PLUGIN_SYNC_INFO` at entry and intercepts with a noop handler. The bare `return` is not enough — per Navigation API spec, a same-origin `canIntercept` event left un-intercepted triggers Chromium's cross-document fallback (full reload). The noop intercept cancels the fallback without running router logic; state was already committed by the synchronous call site.
 
-Why `info` rather than a synchronous flag: identity travels with the event, so the check is timing-independent. The previous `SyncingFlag` mechanism (raise-before / lower-in-finally inside `wrapNavigationBrowserWithSyncing`) assumed sync delivery and failed under Safari WKWebView — by the time the event arrived, the flag had already been lowered, and the loop fired. `updateCurrentEntry` is **not** tagged: it dispatches `currententrychange`, not `navigate`, so there is no event to short-circuit.
+Why `info` rather than a synchronous flag: identity travels with the event, so the check is timing-independent — a flag raised around the call is already lowered by the time WKWebView delivers the event on a later task. `updateCurrentEntry` is **not** tagged: it dispatches `currententrychange`, not `navigate`, so there is no event to short-circuit.
 
 Consumers supplying a custom `NavigationBrowser` must pass `PLUGIN_SYNC_INFO` as `info` in their `nav.navigate` / `nav.traverseTo` calls (the constant is exported from the package barrel) — otherwise the handler will treat plugin-driven events as user-initiated under any browser. The built-in factory path (`createNavigationBrowser` and `createNavigationFallbackBrowser`) does this automatically.
 
@@ -159,7 +159,7 @@ Exception — first transition after a cross-document load: the constructor prim
 
 On F5, browser back/forward across the JS context boundary, or a fresh URL bar entry, the prior JS context is destroyed. The `navigate` event handler in `onStart` never sees the activation event. Without priming, `deriveNavigationType` falls through to `"replace"` for every initial transition — breaking scroll restoration on reload (#497) and any consumer branching on `state.context.navigation.navigationType`.
 
-The plugin reads `navigation.activation.navigationType` ([Baseline 2026](https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigationactivation-navigationtype): Chrome 123+, Firefox 147+, Safari 26.2+) **once in the constructor** via `browser.getActivationType()` and primes `#capturedMeta` accordingly. The primed meta is consumed by the first `onTransitionStart`/`onTransitionSuccess` and cleared at line ~230 — subsequent same-document transitions use the existing `deriveNavigationType` flow.
+The plugin reads `navigation.activation.navigationType` ([Baseline 2026](https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigationactivation-navigationtype): Chrome 123+, Firefox 147+, Safari 26.2+) **once in the constructor** via `browser.getActivationType()` and primes `#capturedMeta` accordingly. The primed meta is consumed by the first `onTransitionStart`/`onTransitionSuccess` and cleared in `onTransitionSuccess` — subsequent same-document transitions use the existing `deriveNavigationType` flow.
 
 Limitations:
 
@@ -182,7 +182,7 @@ This avoids two problems:
 
 Comparison is via `isSameHref(finalUrl, browser.currentEntry?.url)` (`href-utils.ts`) — both URLs are run through the `URL` constructor so `scheme://host` and `scheme://host/` (special-scheme trailing-slash canonicalisation) compare equal. When `currentEntry?.url` is null or malformed the guard returns `false` and the plugin falls back to the navigate path.
 
-**Behavioural consequence**: same-URL transitions no longer fire navigate events. Consumers that subscribed to navigate events for state-only changes must use `router.subscribe` instead; `state.context.navigation.navigationType` still reflects the logical type (`reload` / `replace`).
+**Behavioural consequence**: a same-URL transition fires no navigate event. Observe state-only changes with `router.subscribe`; `state.context.navigation.navigationType` still reflects the logical type (`reload` / `replace`).
 
 ### A navigation the browser starts rewrites its own entry (#2744)
 
@@ -224,23 +224,14 @@ A traversal onto an entry whose URL the router rewrites gets its position back i
 
 **Both halves of the call come from the resolved state (#1585).** `replaceHistoryState`
 resolves the target through `buildNavigationState` and then uses that state
-VERBATIM — as the `history.state` record AND as the input to `buildUrl`. Before
-#1585 only the record did: the URL was built from the caller's raw arguments,
-which reached the plain `buildPath` of the day — no `forwardTo` resolution,
-no `forwardState` seam — so the pair could disagree about the very keys the seam contributes.
-Measured with a `persistent-params`-style injection: the record read
-`/posts/9?tab=new&sort=date&lang=de` and the URL beside it `/posts/9?tab=new&sort=date`;
-for a forwarding route the record said `posts` and the URL `/old`. It was the only
-one of the five history writers reading the caller's bag — `onTransitionSuccess`
-(all three plugins) and `rollbackUrlToCurrentState` all build from a committed
-state, and `navigate` has always kept the pair equal.
-
-Two consequences worth knowing: the state is no longer re-made through
-`api.makeState` (that rebuild was a leftover from `buildState`, which built no
-path of its own — it produced a byte-identical state, so it was redundant work
-per history record), and
-`createReplaceHistoryState` no longer takes a `router` argument, since the
-rebuild was its only use for one.
+VERBATIM — as the entry's state record AND, through its `path`, as the input to
+`buildUrl`. Building the URL from the caller's raw arguments instead reaches a
+plain `buildPath` — no `forwardTo` resolution, no `forwardState` seam — so the pair
+disagrees about the very keys the seam contributes: a `persistent-params`
+injection lands in the record and not in the URL beside it, and a forwarding
+route writes the source name in the URL and the target in the record. The shared
+factory does not re-make the state through `api.makeState` — the resolved state
+already carries the path, so a rebuild would be redundant work per history record.
 
 ### traverseToLast Excludes Current Entry
 
@@ -327,9 +318,9 @@ entry.getState() = {
 };
 ```
 
-Note: since RFC-4 M2 (#1548) the buffered state carries a dedicated `search`
-(query) channel alongside path-only `params` — `search` is a frozen `{}` when the
-route has no query.
+Note: the buffered state carries a dedicated `search` (query) channel alongside
+path-only `params` (#1548) — `search` is a frozen `{}` when the route has no
+query.
 
 Note: no `meta` field (unlike browser-plugin's `history.state`). Navigation metadata lives on `state.context.navigation`, not in browser history state.
 
@@ -375,7 +366,7 @@ Plugin uses `api.extendRouter()` to register all extensions. The returned unsubs
 
 | Method                                                             | Returns              | Description                                                                                                                                                                                                  |
 | ------------------------------------------------------------------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `buildUrl(name, params?, search?, options?: { hash? })`            | `string`             | Build full URL with base path. Query channel at position 3 (RFC-4 M2, #1548); options shift to 4. Optional `hash` (decoded, no leading `#`) is encoded via `encodeURI(s).replace(/#/g, "%23")` and appended. |
+| `buildUrl(name, params?, search?, options?: { hash? })`            | `string`             | Build full URL with base path. Query channel at position 3, options at position 4 (#1548). Optional `hash` (decoded, no leading `#`) is encoded via `encodeURI(s).replace(/#/g, "%23")` and appended. |
 | `matchUrl(url)`                                                    | `State \| undefined` | Parse URL to router state                                                                                                                                                                                    |
 | `replaceHistoryState(name, params?, search?, options?: { hash? })` | `void`               | Update browser URL without triggering navigation. Tri-state `hash`: `undefined` preserves, `""` clears, value sets.                                                                                          |
 

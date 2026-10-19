@@ -14,7 +14,17 @@
 // Plus routing (buildPlan): K boundary, touchesCore override, fanout shapes.
 
 import assert from "node:assert/strict";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -28,8 +38,10 @@ import {
   deriveMembership,
   K,
   MAX_PER_SHARD,
+  runChangedFilesQuery,
   runMembershipQuery,
 } from "../build-matrix.mjs";
+import { withoutGitEnv } from "../git-env.mjs";
 
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 
@@ -469,6 +481,70 @@ test("routing: shared-source is keyed on the DIFF, not on the dep fanout (#2378)
     () => buildPlan([], dirOf, [], ["shared/dom-utils/x.ts"]),
     /empty|no.*shard|misdetection/i,
   );
+});
+
+test("routing: a doc beside the shared sources is no shared-source change — the consumers hash only its .ts (#1067)", () => {
+  const dirOf = new Map([
+    ...realDirOf,
+    ["@real-router/shared-sources", "shared"],
+  ]);
+
+  // `shared/dom-utils/CLAUDE.md` is in no consumer's task inputs, so it shards
+  // nothing; counted as a shared source it forced sharded, and the guard
+  // refused the plan that was rightly empty.
+  const plan = buildPlan([], dirOf, [], ["shared/dom-utils/CLAUDE.md"]);
+  assert.notEqual(plan.mode, "sharded");
+
+  // CONTROL — a source of the same dir still forces sharded, and the guard
+  // with it.
+  assert.throws(
+    () => buildPlan([], dirOf, [], ["shared/dom-utils/x.ts"]),
+    /empty|no.*shard|misdetection/i,
+  );
+});
+
+test("the changed files name a file moved out of a shared dir by its old path too", () => {
+  const dir = mkdtempSync(join(tmpdir(), "build-matrix-renames-"));
+  const env = {
+    ...withoutGitEnv(process.env),
+    GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_CONFIG_SYSTEM: "/dev/null",
+  };
+  const git = (...args) =>
+    execFileSync(
+      "git",
+      ["-c", "user.name=t", "-c", "user.email=t@t", ...args],
+      {
+        cwd: dir,
+        env,
+        stdio: "pipe",
+      },
+    );
+
+  try {
+    mkdirSync(join(dir, "shared", "dom-utils"), { recursive: true });
+    mkdirSync(join(dir, "packages", "react", "src"), { recursive: true });
+    writeFileSync(
+      join(dir, "shared", "dom-utils", "a.ts"),
+      "export const a = 1;\n",
+    );
+    git("init", "-q");
+    git("add", "-A");
+    git("commit", "-qm", "base");
+    git("update-ref", "refs/remotes/origin/master", "HEAD");
+    git("mv", "shared/dom-utils/a.ts", "packages/react/src/a.ts");
+    git("commit", "-qm", "move");
+
+    assert.deepEqual(
+      runChangedFilesQuery({ cwd: dir, env })
+        .split("\n")
+        .filter(Boolean)
+        .sort(),
+      ["packages/react/src/a.ts", "shared/dom-utils/a.ts"],
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("routing: a shared source anywhere in the diff still forces sharded (#2378 control)", () => {

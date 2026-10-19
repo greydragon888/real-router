@@ -48,13 +48,11 @@ src/                            # Main entry — client API
 │   ├── RouteSelf.ts            # ng-template marker for exact-match on the node itself
 │   ├── RouteNotFound.ts        # ng-template marker for not-found
 │   ├── RealLink.ts             # <a realLink> navigation directive
-│   ├── RealLinkActive.ts       # [realLinkActive] active class directive
-│   └── index.ts
+│   └── RealLinkActive.ts       # [realLinkActive] active class directive
 ├── components/                 # Components
 │   ├── RouteView.ts            # Declarative route matching (Match → Self → NotFound priority)
 │   ├── RouterErrorBoundary.ts  # Error handling component
-│   ├── NavigationAnnouncer.ts  # Accessibility announcer
-│   └── index.ts
+│   └── NavigationAnnouncer.ts  # Accessibility announcer
 ├── dom-utils/                  # Symlink → shared/dom-utils/, as in the other adapters (#2552)
 │   ├── link-utils.ts           # buildHref, buildActiveClassName, applyLinkA11y, navigateWithHash, shallowEqual, shouldNavigate, targetsAnotherContext, anchorTargetsAnotherContext
 │   ├── route-announcer.ts      # createRouteAnnouncer
@@ -65,7 +63,7 @@ src/                            # Main entry — client API
 │   └── index.ts
 ├── internal/                   # Internal helpers (not re-exported)
 │   ├── install.ts              # installScrollRestoration + installScrollSpy + installViewTransitions — shared by providers + providersFactory
-│   ├── subscribeSourceToSignal.ts  # subscribe → setState → cleanup pattern (RealLink, RealLinkActive, RouteView)
+│   ├── subscribeSourceToSignal.ts  # subscribe → setState → cleanup pattern (RealLink, RealLinkActive; RouteView subscribes inline so it can call `detectChanges()`)
 │   └── createStableParams.ts   # shallowEqual content-stabilization for routeParams (RealLink, RealLinkActive) — #988
 ├── tokens.ts                   # ROUTER, NAVIGATOR, ROUTE InjectionTokens (leaf module — providers.ts re-exports them; declaring them in providers formed a value cycle with internal/install.ts, #1525)
 ├── providers.ts                # provideRealRouter (re-exports the tokens from ./tokens)
@@ -74,7 +72,7 @@ src/                            # Main entry — client API
 ├── types.ts                    # RouteSignals, ErrorContext interfaces
 ├── index.ts                    # Main entry — public exports
 └── ssr/                        # /ssr subpath — SSR-feature surface
-    ├── public_api.ts           # Public exports (8 names + 1 type)
+    ├── public_api.ts           # Public exports (7 names + 1 type)
     ├── components/
     │   ├── ClientOnly.ts       # <client-only [fallback]>
     │   ├── ServerOnly.ts       # <server-only>
@@ -119,6 +117,7 @@ ssr/
 | `RouteNotFound`                                                  | Directive      | Not-found marker — renders when `state.name === UNKNOWN_ROUTE`                                                                                                                                                                                                                                                                                                                                                   |
 | `RealLink`                                                       | Directive      | Navigation link directive for `<a>` elements (hash-aware via `[hash]`)                                                                                                                                                                                                                                                                                                                                           |
 | `RealLinkActive`                                                 | Directive      | Active route class directive for any element. **Note**: does NOT accept a `hash` or `routeSearch` input — hash-aware active state and the query (search) channel are `RealLink`-only                                                                                                                                                                                                                             |
+| `createDirectionTracker(router)` / `DirectionTracker`            | Function / Type | Optional back/forward annotation utility, re-exported from the main entry (#2587). Install it before `usePlugin(browserPlugin)`; `provideRealRouter` does not consume it.                                                                                                                                                                                                                                       |
 | `RouteSignals<P>`                                                | Type           | `{ routeState: Signal<RouteSnapshot<P>>; navigator }` — return shape of `injectRouteNode` (nullable `route`)                                                                                                                                                                                                                                                                                                     |
 | `ErrorContext`                                                   | Type           | `{ $implicit: RouterError; resetError: () => void }` — `RouterErrorBoundary` template context                                                                                                                                                                                                                                                                                                                    |
 | `RouteSnapshot<P>` re-export                                     | Type           | From `@real-router/sources` — emitted by `RouteSignals.routeState()`                                                                                                                                                                                                                                                                                                                                             |
@@ -256,7 +255,7 @@ export class Reviews {
 - `<client-only>`/`<server-only>`: `signal(false)` + `afterNextRender(() => mounted.set(true))`. `afterNextRender` is a no-op on the server (Angular runtime guarantees), so SSR emits the SSR-side branch — projected children for `<server-only>`, the bound `[fallback]` `TemplateRef` for `<client-only>`. After the first browser render the signal flips and the `@if` branch swaps.
 - `<http-status-code>`: writes to `inject(HTTP_STATUS_SINK, { optional: true })` in `ngOnInit` (after the input binding has fired). `code` is declared as optional `input<number>()` rather than `input.required<number>()` to keep the JIT/TestBed test path safe (`NG0950` would fire under JIT signal-input limitations) — the body skips the write when the value is `undefined`. Loader-driven errors (`LoaderNotFound` → 404, `LoaderRedirect` → 30x) keep working as before; this component covers render-time decisions only.
 - **Asymmetric Angular**: no `<Await>` / `<Streamed>` adapter components. Angular has no native `<Suspense>` / `use(promise)` analogue, so `injectDeferred()` returns a `Signal<T | undefined>` (starts undefined, updates on settle) instead. Compose with `@if (signal()) { … } @else { … }`, the `async` pipe (`from(deferredPromise)`), or native `@defer` blocks for chunk-level lazy hydration.
-- Trigger reached at #610 (defer + injectDeferred + ClientOnly + ServerOnly = 3 SSR-feature exports, ≥3 was the threshold from `.claude/SSR_FEATURE_GAPS_RU.md` §8). Built as a ng-packagr secondary entry-point: ng-packagr names the subpath after the directory of `ssr/ng-package.json`, whose `entryFile` is `../src/ssr/public_api.ts` — produces `dist/fesm2022/real-router-angular-ssr.mjs` + `dist/types/real-router-angular-ssr.d.ts`.
+- Built as a ng-packagr secondary entry-point: ng-packagr names the subpath after the directory of `ssr/ng-package.json`, whose `entryFile` is `../src/ssr/public_api.ts` — produces `dist/fesm2022/real-router-angular-ssr.mjs` + `dist/types/real-router-angular-ssr.d.ts`.
 - The sources sit in `src/ssr/` so that every list naming the package's code reaches them. `ssr/ng-package.json` is the one file outside `src/`, and `turbo.json` names it in the `bundle` inputs. ⚠ Nothing in ng-packagr checks where `entryFile` points: `scripts/finalize-dist-manifest.mjs` fails the build when the built manifest's subpaths differ from the package's, and check 6 of `pnpm lint:coverage-scope` fails code outside `src/` (#2627).
 
 ## Gotchas
@@ -321,11 +320,11 @@ stopped/disposed). `injectRouteNode(name)` keeps its nullable `route` — node
 inactivity is a legitimate business state, not a lifecycle error.
 
 ```ts
-// Before:
+// Unnecessary — `route` is never undefined here:
 const route = injectRoute<{ id: string }>();
 const id = computed(() => route.routeState().route?.params.id ?? "fallback");
 
-// After:
+// Correct:
 const route = injectRoute<{ id: string }>();
 const id = computed(() => route.routeState().route.params.id);
 ```
@@ -370,19 +369,17 @@ Angular 22 JIT mode (used in TestBed without the Angular Vite plugin) does not s
 
 ### Directives use constructor + `effect()` for input-dependent reactive setup (#630)
 
-`RealLink`, `RealLinkActive`, and `RouteView` create their subscription sources inside `effect(...)` blocks scheduled from the constructor. The effect reads signal inputs in its body, so any change to `[realLink]`, `[routeParams]`, `[routeSearch]`, `[hash]`, `[realLinkActive]`, or `[routeNode]` re-runs the effect → tears down the previous source via `onCleanup` → creates a new one with the current inputs.
+`RealLink`, `RealLinkActive`, and `RouteView` create their subscription sources inside `effect(...)` blocks scheduled from the constructor. The effect reads signal inputs in its body, so any change to `[routeName]`, `[routeParams]`, `[routeSearch]`, `[hash]`, `[realLinkActive]`, or `[routeNode]` re-runs the effect → tears down the previous source via `onCleanup` → creates a new one with the current inputs.
 
-This pattern replaces the legacy `ngOnInit`-based setup that captured input values once at mount — that pattern produced a real AOT bug (active class drifted when bindings updated, see [#630](https://github.com/greydragon888/real-router/issues/630)). The Angular 16+ signal-input model makes `ngOnInit` redundant: the effect's first run is scheduled after the input bindings have been applied, so reading inputs inside the effect is safe at first execution.
+Do not move this setup into `ngOnInit`: a one-time read there captures the input values at mount, and the active class then drifts when bindings update ([#630](https://github.com/greydragon888/real-router/issues/630)). The effect's first run is scheduled after the input bindings have been applied, so reading inputs inside the effect is safe at first execution.
 
 Effect cleanup is bound automatically to the host directive's injection-context `DestroyRef` — no explicit `inject(DestroyRef).onDestroy(...)` wiring is required (effects self-register).
 
-**`routeParams` is content-stabilized before the effect reads it (#988).** Angular re-allocates an inline `[routeParams]="{ id: 1 }"` literal on every change detection, so reading the raw input signal inside the effect would re-create the cached active-route source (`canonicalJson` cache-key churn + sub/unsub) and re-run `buildHref` on every navigation even when the param content is unchanged. `RealLink` / `RealLinkActive` route their `routeParams` through the internal `createStableParams` helper (`computed` + `shallowEqual`), which re-emits a reference-stable value until the param content actually changes — so the source-creation effect and the `href` computed bail on same-content navigations. Binding a stable reference (a component field or signal) already produced zero churn; this closes the gap for inline-literal binds. Mirrors the Vue `<Link>` fix. Behavior is unchanged — the stabilized params are always content-equal to the input. Nested-object param _values_ fall back to per-render recompute (`shallowEqual` compares them by reference) — bind a stable `signal`/`computed` if it matters.
+**`routeParams` is content-stabilized before the effect reads it (#988).** Angular re-allocates an inline `[routeParams]="{ id: 1 }"` literal on every change detection, so reading the raw input signal inside the effect would re-create the cached active-route source (`canonicalJson` cache-key churn + sub/unsub) and re-run `buildHref` on every navigation even when the param content is unchanged. `RealLink` / `RealLinkActive` route their `routeParams` through the internal `createStableParams` helper (`computed` + `shallowEqual`), which re-emits a reference-stable value until the param content actually changes — so the source-creation effect and the `href` computed bail on same-content navigations. A stable reference (a component field or signal) produces no churn either way; the stabilized params are always content-equal to the input, and the Vue `<Link>` stabilizes the same way. Nested-object param _values_ fall back to per-render recompute (`shallowEqual` compares them by reference) — bind a stable `signal`/`computed` if it matters.
 
 **Consequence for tests**: full reactive-input verification (e.g., changing `[routeName]="signal()"` on `<a realLink>` and asserting `.active` class re-binds) requires AOT compilation — JIT mode rejects signal-input template bindings with `NG0303`. Use `@analogjs/vite-plugin-angular` or e2e via Playwright against a production-mode example app. The content-stabilization is unit-tested via the JIT-safe toy pattern (`tests/functional/createStableParams.test.ts`) — a plain `signal<Params>()` drives the same `createStableParams` helper the directives feed their input signal into (the effect-re-run mechanism is identical for `input()` and `signal()`).
 
-**Historical — distinct `[routeParams]` / `[realLink]` keys on a reused node once accumulated eternal sources (#766, fixed in sources 0.9.0).** Each effect rebuild creates a `createActiveRouteSource` for the new `(name | params | hash)` key. Before the lazy-connection fix these sources subscribed to the router eagerly and never disconnected (`destroy()` is a no-op; `onCleanup` only tears down the _bridge subscription_), so a node that genuinely cycled through many **distinct** keys — the textbook case a long virtual list / `@for` with **track-identity** reuse, where a single `<a realLink [routeParams]="item().params">` is re-bound to thousands of param values as the user scrolls — left one permanent router listener per unique key and walked monotonically toward the `EventEmitter` `[router] Listener limit (10000)` crash. It was the lowest-threshold path to #766 in the adapter series: one reused directive, no thousands of `RealLink` instances (React/Preact/Vue), no remount workaround (Svelte `{#key}`).
-
-**Fixed in sources 0.9.0 (lazy connect / disconnect).** The active-route source now connects on its first listener and disconnects when its last one unsubscribes — the bridge's `onCleanup` **is** that last unsubscribe, so re-binding across an unbounded key space no longer accumulates. The cache **entry** (a closure) still lives with the router, but it holds **no** router subscription without a live listener — "never released" was only ever true of the closure, never of the subscription (the accumulation source). Simultaneously-live consumers still cost **one** router subscription each: expected cost, not a leak, released when the last listener unsubscribes or the router is GC'd. The P3 regression test (`tests/functional/reactive-lifecycle.test.ts`) pins it — one directive cycling 200 distinct `[routeParams]` holds `active ≤ 1` router subscription, not 200. (Content-stabilization, #988 above, remains an orthogonal optimization that collapses inline-literal churn when the param _content_ is unchanged.)
+**Re-binding across many distinct keys stays bounded (#766).** Each effect rebuild creates a `createActiveRouteSource` for the new `(name | params | hash)` key. An active-route source connects to the router on its first listener and disconnects when its last one unsubscribes — the bridge's `onCleanup` **is** that last unsubscribe — so a single reused directive re-bound across an unbounded key space (a long virtual list, or `@for` with **track-identity** reuse, where one `<a realLink [routeParams]="item().params">` is re-bound to thousands of param values as the user scrolls) does not accumulate router listeners toward the `EventEmitter` `[router] Listener limit (10000)`. The cache **entry** (a closure) lives as long as the router but holds **no** router subscription without a live listener; simultaneously-live consumers cost one router subscription each, released when the last listener unsubscribes or the router is GC'd. The P3 regression test (`tests/functional/reactive-lifecycle.test.ts`) pins it — one directive cycling 200 distinct `[routeParams]` holds `active ≤ 1` router subscription, not 200. (Content-stabilization, #988 above, is an orthogonal optimization that collapses inline-literal churn when the param _content_ is unchanged.)
 
 ### No RxJS
 
@@ -394,7 +391,7 @@ Signal-first approach. No `rxjs` or `@angular/core/rxjs-interop` dependencies.
 
 ### RealLink mutates DOM directly, bypassing Angular CD
 
-`RealLink.updateDom()` calls `this.anchor.setAttribute("href", href)` and `this.anchor.classList.toggle(activeClass, this.isActive())` **directly on the native element** from inside the `createActiveRouteSource` subscribe callback. This bypasses Angular's change detection — there is no template binding for `href` or `class` to invalidate.
+`RealLink`'s `updateHref()` / `updateActiveClass()` call `this.anchor.setAttribute("href", href)` and `this.anchor.classList.toggle(activeClass, this.isActive())` **directly on the native element** from inside the active-source subscribe callback (the source `createActiveSource` returns — the shared name selector or a cached `createActiveRouteSource`). This bypasses Angular's change detection — there is no template binding for `href` or `class` to invalidate.
 
 **Why this is intentional**:
 
@@ -415,7 +412,7 @@ Signal-first approach. No `rxjs` or `@angular/core/rxjs-interop` dependencies.
 - **Initial snapshot is NOT `detectChanges()`d.** The effect's first run applies `source.getSnapshot()` while inside the initial CD, where a re-entrant `detectChanges()` would throw. Only subsequent navigation emissions (which fire from `navigate()`, outside CD) sync-commit.
 - **The render now lands in-task**, so CPU-metric sweeps (`wide`/`deep`/`search-param` `navMsTask@N`) tick up a few µs — this is the same render relocating into the measured window, not new work (the deferred flush did it later); real-router stays far ahead of `@angular/router` on all of them.
 - **Re-entrant `router.navigate()` during a CD pass** (e.g. from a user `effect()`) would make this `detectChanges()` re-entrant — an anti-pattern the lifecycle handlers already ban (`REENTRANT_NAVIGATION`); defer such navigations (`queueMicrotask`). In dev this may surface `ExpressionChangedAfterItHasBeenChecked`.
-- **RouteView covers the outlet swap; `injectRoute` / `injectRouteNode` cover the leaf displays.** A component that reads route state via `injectRoute()` and shows it in a template (`{{ params.id }}`, active content, route name) hits the **same** deferred-CD gap — and `RouteView`'s swap doesn't reach it (same-route param change, or a view with no `RouteView` at all). So `injectRoute` / `injectRouteNode` **also** sync-commit their consuming component on route change: they subscribe to the (cached) route source and call `detectChanges()` on the consumer's `ChangeDetectorRef` (injected `{ optional: true }` — environment-context usage stays deferred). This is why param-nav (`navMsWall` 0.77 → 0.10, ~8×) and active-links (0.73 → 0.08, ~9×) collapse even though neither is a route-switch. `subscribe` fires on navigations only (not initial), so there's no in-CD setup re-entrancy. `@angular/router` structurally can't match this — its route bindings flow through `@Input` / CD.
+- **RouteView covers the outlet swap; `injectRoute` / `injectRouteNode` cover the leaf displays.** A component that reads route state via `injectRoute()` and shows it in a template (`{{ params.id }}`, active content, route name) hits the **same** deferred-CD gap — and `RouteView`'s swap doesn't reach it (same-route param change, or a view with no `RouteView` at all). So `injectRoute` / `injectRouteNode` **also** sync-commit their consuming component on route change: they subscribe a route source — a fresh `createRouteSource` per `injectRoute` call (torn down on `DestroyRef`), the cached `createRouteNodeSource` for `injectRouteNode` — and call `detectChanges()` on the consumer's `ChangeDetectorRef` (injected `{ optional: true }` — environment-context usage stays deferred). This is why param-nav (`navMsWall` 0.77 → 0.10, ~8×) and active-links (0.73 → 0.08, ~9×) collapse even though neither is a route-switch. `subscribe` fires on navigations only (not initial), so there's no in-CD setup re-entrancy. `@angular/router` structurally can't match this — its route bindings flow through `@Input` / CD.
 
 ### Internal `@@`-prefixed routes are stripped from announcements
 
@@ -438,7 +435,7 @@ Signal-first approach. No `rxjs` or `@angular/core/rxjs-interop` dependencies.
 <a realLink [routeName]="'settings'" [hash]="'account'">Account</a>
 ```
 
-`hash` is a signal input — bind a `signal()`/`computed()` to react to changes. **Active state is hash-aware on `<a realLink [hash]="…">` only** — the directive lights up iff route matches AND `state.context.url.hash` equals the expected fragment. `[realLinkActive]` is the styling-only counterpart and does NOT accept a `hash` input: it tracks the route+params combination without fragment disambiguation. For tab-style UIs where each tab must light up its own active class, prefer `<a realLink [hash]>` (one anchor per tab) over `<li [realLinkActive]>` plus a child `<a realLink>` — the latter cannot tell tabs apart. Hash-plugin runtime always returns `false` for hash-aware active checks (consistent with the documented hash-plugin limitation).
+`hash` is a signal input — bind a `signal()`/`computed()` to react to changes. **Active state is hash-aware on `<a realLink [hash]="…">` only** — the directive lights up iff route matches AND `state.context.url.hash` equals the expected fragment. `[realLinkActive]` is the styling-only counterpart and does NOT accept a `hash` input: it tracks the route+params combination without fragment disambiguation. For tab-style UIs where each tab must light up its own active class, prefer `<a realLink [hash]>` (one anchor per tab) over `<li [realLinkActive]>` plus a child `<a realLink>` — the latter cannot tell tabs apart. Under hash-plugin (no `url` context namespace — the documented hash-plugin limitation) a non-empty `hash` never matches, while `hash=""` matches whenever the route does.
 
 ### `encodeFragmentInline` is NOT idempotent — DECODED input contract
 
@@ -454,7 +451,7 @@ Signal-first approach. No `rxjs` or `@angular/core/rxjs-interop` dependencies.
 
 ### `RouterErrorBoundary.onError.subscribe(...)` is not RxJS
 
-Despite the `subscribe` method name and `output()` source, the boundary's `onError` is an Angular `OutputEmitterRef` — NOT an `Observable`. Calling `.subscribe(callback)` returns an `OutputRefSubscription` (with `unsubscribe`), not an RxJS `Subscription`. The "No RxJS" policy (Gotcha #10 below) holds — no `rxjs` import is required to consume `onError`.
+Despite the `subscribe` method name and `output()` source, the boundary's `onError` is an Angular `OutputEmitterRef` — NOT an `Observable`. Calling `.subscribe(callback)` returns an `OutputRefSubscription` (with `unsubscribe`), not an RxJS `Subscription`. The "No RxJS" policy (see the "No RxJS" gotcha above) holds — no `rxjs` import is required to consume `onError`.
 
 ### `history.scrollRestoration` setter may throw — defensively caught
 
@@ -472,14 +469,14 @@ What keeps the floor below 100 is structural: **merge duplicates** (files tested
 
 The package's `vitest.config.mts` declares two `test.projects` in ONE run:
 
-- **`jit`** — the whole pre-existing suite, esbuild-transpiled, exactly as before. Tests pinning empty-query behavior (`"JIT: notFounds empty"`) belong here and stay valid.
+- **`jit`** — every `tests/**/*.test.ts` outside `tests/aot/**`, esbuild-transpiled. Tests pinning empty-query behavior (`"JIT: notFounds empty"`) belong here and stay valid.
 - **`aot`** — only `tests/aot/**`, compiled by `@analogjs/vite-plugin-angular` (full Ivy). Hosts the `RouteView` fallback/duplicate-marker fixtures (K0 canary + S1/S2/M1-M4 from RFC #1439 §5) that are structurally unreachable under JIT. Fixtures asserting populated `contentChildren` live ONLY here — added to the jit project they would fail (empty queries), correctly.
 
-Coverage is a root-only vitest option: both projects merge into one report, which is what lets the former `/* v8 ignore */` in `RouteView.ts` stay removed — AOT-only hits count toward the thresholds.
+Coverage is a root-only vitest option: both projects merge into one report, so AOT-only hits count toward the thresholds and `RouteView.ts` needs no `/* v8 ignore */`.
 
-Gotchas baked into the setup (hard-won on 2026-07-18, see RFC `.claude/rfc-1512-aot-unit-coverage-ru.md`):
+Gotchas baked into the setup (RFC `.claude/rfc-1512-aot-unit-coverage-ru.md`):
 
-- **`tsconfig.spec.aot.json` must force `module: ES2022` + `moduleResolution: bundler`.** The analog plugin emits by tsconfig `module`; the root's `NodeNext` + this package's `"type": "commonjs"` produce CJS emit → vitest 4 rejects `require("vitest")`. This was the historical "type: commonjs × vitest ESM" PoC barrier — an emit-format issue, solved entirely inside the spec tsconfig.
+- **`tsconfig.spec.aot.json` must force `module: ES2022` + `moduleResolution: bundler`.** The analog plugin emits by tsconfig `module`; the root's `NodeNext` + this package's `"type": "commonjs"` produce CJS emit → vitest 4 rejects `require("vitest")`. It is an emit-format issue, solved entirely inside the spec tsconfig.
 - **`transformFilter` keeps the AOT emit down to the fixtures + `RouteView.ts` + `src/directives/`.** Every file the Angular compiler emits gets DIFFERENT function/statement source-ranges than esbuild, and the jit+aot coverage merge then double-counts that file's entries (a package-wide filter collapsed the functions metric 98.18% → 87.19%). Widen the filter only together with fixtures that actually execute the newly AOT-compiled file.
 - **`esbuild: {}` in the aot project config is load-bearing.** The plugin disables vite's built-in esbuild transform unless the user config sets one — without it, every `.ts` outside the transformFilter reaches the module runner as raw TS and rollup fails on `import type`.
 - **Merge duplicates in the merged report are expected.** Lines of dual-tested files that only AOT can run show as uncovered: the jit copy cannot run them, and the aot copy's coverage map does not hold them — the Angular emit maps few statements, so `pnpm test --project aot` shows no gap there without showing the lines run. The aot tests' assertions are what show it. Don't chase these lines with more jit tests; they are unreachable there by construction. Nor does compiling the dual-tested files with the Angular compiler in the jit project help: the jit copy then maps as coarsely, and the report reads 100 % on a third of their code (IMPLEMENTATION_NOTES, "Angular keeps its coverage floors").
@@ -558,9 +555,9 @@ plugins: (request) => request
 
 The static form (`plugins: [a, b]`) applies the same set on both sides — only safe when no plugin is browser-only.
 
-### Backward compatibility
+### One API per application
 
-`provideRealRouter(router)` is unchanged — all existing examples continue to work without modification. Both APIs ship in parallel; choose one for the entire application (mixing them on the same `ROUTER` token is undefined behavior).
+Both APIs ship in parallel; choose one for the entire application (mixing them on the same `ROUTER` token is undefined behavior).
 
 ### Post-hydration loader skip via TransferState bridge (#599)
 
@@ -574,12 +571,14 @@ Parity with the other 5 adapters that consume `<script>window.__SSR_STATE__</scr
 
 ### Examples
 
-| Example                                                                                                     | Demonstrates                                                                                                                                                                     | E2e count |
-| ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| [`examples/web/angular/ssr-examples/ssr/`](../../examples/web/angular/ssr-examples/ssr)                     | Classical SSR — Express + AngularNodeAppEngine, per-request `provideRealRouterFactory`, cookie-based DI, auth guards (CANNOT_ACTIVATE → 302 middleware redirect), nested loaders | 50        |
-| [`examples/web/angular/ssr-examples/ssr-mixed/`](../../examples/web/angular/ssr-examples/ssr-mixed)         | Mixed SSR/CSR — some routes server-rendered, others CSR-only                                                                                                                     | 8         |
-| [`examples/web/angular/ssr-examples/ssr-streaming/`](../../examples/web/angular/ssr-examples/ssr-streaming) | Streaming SSR — `@defer (on viewport)` for Reviews, `@defer (on hover)` for RelatedItems, per-block incremental hydration                                                        | 28        |
-| [`examples/web/angular/ssr-examples/ssg/`](../../examples/web/angular/ssr-examples/ssg)                     | Static site generation — `getStaticPaths()` + in-process `AngularNodeAppEngine` on build-only port, per-page `<title>` + `<meta>`, `404.html`, `sitemap.xml`                     | 24        |
+| Example                                                                                                     | Demonstrates                                                                                                                                                                     |
+| ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`examples/web/angular/ssr-examples/ssr/`](../../examples/web/angular/ssr-examples/ssr)                     | Classical SSR — Express + AngularNodeAppEngine, per-request `provideRealRouterFactory`, cookie-based DI, auth guards (CANNOT_ACTIVATE → 302 middleware redirect), nested loaders |
+| [`examples/web/angular/ssr-examples/ssr-mixed/`](../../examples/web/angular/ssr-examples/ssr-mixed)         | Mixed SSR/CSR — some routes server-rendered, others CSR-only                                                                                                                     |
+| [`examples/web/angular/ssr-examples/ssr-streaming/`](../../examples/web/angular/ssr-examples/ssr-streaming) | Streaming SSR — `@defer (on viewport)` for Reviews, `@defer (on hover)` for RelatedItems, per-block incremental hydration                                                        |
+| [`examples/web/angular/ssr-examples/ssg/`](../../examples/web/angular/ssr-examples/ssg)                     | Static site generation — `getStaticPaths()` + in-process `AngularNodeAppEngine` on build-only port, per-page `<title>` + `<meta>`, `404.html`, `sitemap.xml`                     |
+
+Each example's `e2e/` specs own its scenario count.
 
 All four examples use `provideRealRouterFactory` (not `provideRealRouter`); existing 8 examples (`basic`, `combined`, `dynamic-routes`, `hash-routing`, `lazy-loading`, `nested-routes`, `persistent-params`, `animation-examples/*`) continue to use `provideRealRouter` for SPA scenarios — both APIs ship in parallel.
 

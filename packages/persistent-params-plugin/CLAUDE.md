@@ -53,7 +53,7 @@ onTransitionSuccess(toState)   ← only fires if the transition actually committ
 - A single-bag `router.buildPath(name, params)` — what an adapter `<Link>` makes — prints the injected values because the seam RETURNS them in the query channel, not because the caller's params bag is read as a query source.
 - On a route that declares `defaultSearch`, core's `search` channel is defined even for a single-bag call. Injecting into `search` is what keeps `buildPath` and `navigate` on one answer.
 
-⚠ **The legacy single-bag form is gone (#1572).** A key the route declares with `?name` passed in the path bag now throws a `TypeError` from `navigate` / `makeState` / `buildNavigationState` — tracked values ride the `search` argument: `navigate("page", {}, { lang: "fr" })`. In the query channel the caller's value wins over the stored one; a declared query name in the path bag is ignored, exactly as core ignores it, so the href prints the stored value rather than one `navigate` refuses. (An UNDECLARED tracked key is unaffected: the guard only fires on declared query names.)
+⚠ **A declared query name in the path bag throws (#1572).** A key the route declares with `?name` passed in the path bag throws a `TypeError` from `navigate` / `makeState` / `buildNavigationState` — tracked values ride the `search` argument: `navigate("page", {}, { lang: "fr" })`. In the query channel the caller's value wins over the stored one; a declared query name in the path bag is ignored, exactly as core ignores it, so the href prints the stored value rather than one `navigate` refuses. (An UNDECLARED tracked key is unaffected: the guard only fires on declared query names.)
 
 **Permanent removal happens in `onTransitionSuccess`, not in the interceptor** — keyed on the committed state, so a rejected/cancelled navigation never drops the param (#803).
 
@@ -137,10 +137,10 @@ router.usePlugin(persistentParamsPluginFactory({ page: 1 }));
 
 Register this plugin **before** `search-schema-plugin` if you want persistent params validated by the schema (the safer default); register it after only when they must deliberately skip validation. This is a pure ordering choice — no code change, LIFO is working as documented. (`search-schema-plugin`'s CLAUDE.md and README carry the mirror note. #801)
 
-> **The order decides validation, and it now decides it everywhere.** (#1231, #1563, #1564, #2087)
+> **The order decides validation, on both directions and on the href.** (#1231, #1563, #1564, #2087)
 >
 > - **Both directions ARE validated (#1564).** `search-schema-plugin` intercepts `forwardState` — the seam both directions pass through — and validates the route's whole query channel off the state that comes back: the explicit `search` argument, a v1 single-bag caller's query, and this plugin's injection alike. The channel is DERIVED (everything the state carries that is not a path slot), never selected by call shape, and that is what makes the coverage symmetric.
-> - **One seam, so one answer.** This plugin injects at `forwardState` and nowhere else; `search-schema-plugin` validates the result of that same seam, and `router.buildPath` runs it (core #2087). A stored value the schema rejects therefore reaches neither `state.search` nor the printed URL — pinned by `schema-governs-the-href-1938`, whose CONTROL cell shows an ACCEPTED value still riding through, so the first assertion is not satisfied by a plugin that injects nothing. (The #802 "injection channels below the validation seam" class had its second exhibit here; the `defaultSearch` one below is the remaining one.)
+> - **One seam, so one answer.** This plugin injects at `forwardState` and nowhere else; `search-schema-plugin` validates the result of that same seam, and `router.buildPath` runs it (core #2087). A stored value the schema rejects therefore reaches neither `state.search` nor the printed URL — pinned by `schema-governs-the-href-1938`, whose CONTROL cell shows an ACCEPTED value still riding through, so the first assertion is not satisfied by a plugin that injects nothing. Route defaults (`defaultSearch`, #802) are the injection channel that stays below the validation seam — `search-schema-plugin`'s CLAUDE.md, "Invalid `defaultSearch` reaches state at runtime".
 > - **A route default is NOT a mitigation.** An injected persistent value is the caller-side value from core's point of view, and every route default (`defaultSearch`, `defaultParams`) merges strictly **under** it — verified: a plugin configured `{ page: "bogus" }` commits `page=bogus` on a route declaring `defaultSearch: { page: "1" }`. What keeps the leak small is the capture rule: persisted values are taken from committed states, and the plugin's own `validateParamValue` rejects non-primitives on the way in.
 
 ## Module Structure
@@ -153,6 +153,7 @@ src/
 │                     claims "persistentParams" context namespace,
 │                     exposes getPlugin() returning { onTransitionSuccess, teardown }
 ├── param-utils.ts  — extractOwnParams (own-keys-only copy), mergeParams (merge logic)
+├── is-primitive-value.ts — isPrimitiveValue (string / finite number / boolean; NaN and ±Infinity refused)
 ├── validation.ts   — validateConfig (factory-time; refuses `__proto__` as a param
 │                     name, #1810), validateParamValue (nav-time),
 │                     isValidParamsConfig, validateParamKey

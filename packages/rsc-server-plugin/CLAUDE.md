@@ -9,9 +9,11 @@
 | `rscServerPluginFactory`  | function | Plugin factory — pass loaders map, claims `"rsc"` and `"ssrRscMode"` namespaces |
 | `rscActionPluginFactory`  | function | Plugin factory — pass `() => RscActionResult \| undefined`, claims `"rscAction"` |
 | `getSsrRscMode`           | function | Read `state.context.ssrRscMode` with `"full"` fallback                      |
+| `buildRscPayload`         | function | `(state, rootOverride?) => RscPayload` — `{ root, returnValue?, formState? }` from `state.context.rsc` / `rscAction`; see "`buildRscPayload(state, rootOverride?)` — wire-format helper" |
 | `invalidate`              | function | `(router, "rsc") => void` — mark `"rsc"` stale; next navigation re-runs the RSC loader |
-| `RscLoaderFn`             | type     | Compiled loader signature: `({ params, search }) => Promise<ReactNode> \| ReactNode` (RFC-4 M2 / #1548) |
+| `RscLoaderFn`             | type     | Compiled loader signature: `({ params, search }, context?: { signal: AbortSignal }) => Promise<ReactNode> \| ReactNode` (RFC-4 M2 / #1548) |
 | `RscLoaderTarget`         | type     | `{ params, search }` — the two destination channels handed to a loader     |
+| `SsrLoaderContext`        | type     | `{ signal: AbortSignal }` — passed by the leave handler so cancellation-aware loaders can abort in-flight work |
 | `RscLoaderFnFactory`      | type     | Factory signature: `(router, getDependency) => RscLoaderFn`                |
 | `RscRouteEntry`           | type     | Per-route entry: factory (short form) or `{ ssr?, loader? }` object        |
 | `RscLoaderFactoryMap`     | type     | Record of route entries — pass to `rscServerPluginFactory()`               |
@@ -54,13 +56,20 @@ Intercepts only `start()`, not `navigate()`. Same rationale as `ssr-data-plugin`
 - CSR `navigate()` resolves state synchronously; the interceptor would arrive after render
 - CSR data fetching belongs in application layer (React Query, Suspense, RSC re-fetch endpoint)
 
-The plugin **does** register a single `subscribeLeave` listener for the
-`invalidate(router, "rsc")` revalidation channel (#605). The listener is
-cheap when no flag is set — a `WeakMap` lookup + `Set.has` early-return —
-and only re-runs the loader when the application has explicitly marked
-the namespace stale. This is opt-in CSR refetch with honest semantics
-(loader runs in the awaited LEAVE_APPROVE phase, fresh `ReactNode` lands
-on `state.context.rsc` *before* `TRANSITION_SUCCESS` fires).
+The plugin **does** register a single `subscribeLeave` listener, and it does two
+things on every navigation:
+
+1. **Publishes the SSR mode marker** (`ssrRscMode`) for the destination route
+   (#1915) — a `Map.get`, a `claim.write`, and, for the function form, the
+   resolver call — so `getSsrRscMode` answers for the route the client is on.
+2. **Re-runs the loader** for the `invalidate(router, "rsc")` revalidation
+   channel (#605) — but only when the application has explicitly marked the
+   namespace stale. That half stays a `WeakMap` lookup + `Set.has` early-return
+   when no flag is set.
+
+The loader half is opt-in CSR refetch with honest semantics: it runs in the
+awaited LEAVE_APPROVE phase, so a fresh `ReactNode` lands on `state.context.rsc`
+_before_ `TRANSITION_SUCCESS` fires.
 
 ## Configuration
 
@@ -106,7 +115,7 @@ Validation at factory time: rejects `null`, non-objects, non-function values, un
 > `"rsc"` is present in the hydrated `state.context` — an **in-memory / object
 > handoff**. Under the package's own recommended `excludeContext: ["rsc"]`
 > serialization (a `ReactNode` can't survive JSON), the namespace is cut from the
-> payload → the scratchpad `in`-check is false → the loader **re-runs** on the
+> payload → the scratchpad's own-key check (`Object.hasOwn`) is false → the loader **re-runs** on the
 > client (validated: `clientLoaderCalls === 1`). So with the recommended
 > `excludeContext`, do **not** register this plugin on the client — there is no
 > server value to reuse and the loader would run again. The skip is real only for
@@ -154,7 +163,7 @@ src/
 └── shared-ssr/         — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, staleRegistry, errors)
 ```
 
-`factory.ts` is intentionally a tiny adapter — the actual try/catch + interceptor + claim logic lives in [`shared/ssr/`](../../../shared/ssr/) and is consumed by both `rsc-server-plugin` (`T = ReactNode`, namespace = `"rsc"`) and `ssr-data-plugin` (`T = unknown`, namespace = `"data"`). The previous standalone `validation.ts` was inlined into `factory.ts` (single-use binding, no other importer) — the validator factory itself remains shared at `shared-ssr/createLoadersValidator.ts`.
+`factory.ts` is intentionally a tiny adapter — the actual try/catch + interceptor + claim logic lives in [`shared/ssr/`](../../shared/ssr/) and is consumed by both `rsc-server-plugin` (`T = ReactNode`, namespace = `"rsc"`) and `ssr-data-plugin` (`T = unknown`, namespace = `"data"`). `factory.ts` binds `validateLoaders` itself (one consumer, no other importer); the validator factory is shared at `shared-ssr/createLoadersValidator.ts`.
 
 ## Gotchas
 
@@ -180,7 +189,7 @@ The Flight payload travels via the bundler's stream renderer; the router state J
 
 ### No bundler dependency
 
-This package depends ONLY on `react` (peer) and `@real-router/core` (peer); the manifest declares no regular dependencies. Notably absent: `react-server-dom-*`, `@vitejs/plugin-rsc`, `react-dom`. The caller wires the renderer.
+This package's peers are `react` and `@real-router/core`; its one regular dependency is `@real-router/ssr-utils`, whose hydration scratchpad `shared/ssr/createSsrLoaderPlugin.ts` reads through `getHydrationState` (`ssr-utils`'s CLAUDE.md says why a dependency rather than a peer). Notably absent: `react-server-dom-*`, `@vitejs/plugin-rsc`, `react-dom`. The caller wires the renderer.
 
 ### Single rsc-server-plugin per router
 
@@ -341,20 +350,4 @@ const payload = buildRscPayload<MyData, ReactFormState>(state, wrapped);
 
 Composition is verified by invariants 14-15 in [INVARIANTS.md](INVARIANTS.md) — both plugins coexist without cross-namespace mutation; teardown of one does not affect the other.
 
-⚠ **Deferred key names are PAGE-GLOBAL, not per router (#2061).** The client
-registry lives on `globalThis` under one key and is indexed by the bare name, and
-the settle transport the server streams — `__rrDefer__("<key>", json)` — carries
-that bare name too. Two routers on one page that declare the same key therefore
-do not merely see equal values: they hold the SAME promise object, and whichever
-payload lands first resolves it for both. The namespace is the application's —
-`defer({ deferred: { reviews } })` claims `"reviews"` for the whole document —
-and generic names are exactly what applications pick, so two independently
-authored mounts colliding is the ordinary case rather than an exotic one.
-
-**Give each router on a page distinct key names.** From 2026-09-10 a second
-claimant on a key is reported once per key with `console.warn`; the promise is
-still shared, because that is what the wire format allows. Splitting it would be
-worse — the settle script resolves exactly one entry, so the second promise would
-never settle at all. Real isolation needs a per-router prefix in the wire format,
-which needs an identity surviving SSR → client that `SerializedRouterState` does
-not carry; #2061 records why that was not taken.
+`defer()` belongs to `ssr-data-plugin`: this plugin has no deferred channel, and a loader that returns a `defer()` payload throws (`… returned a defer() payload, but this plugin has no deferred channel`). When both plugins run on one page, `ssr-data-plugin`'s deferred key names are page-global — its CLAUDE.md, `defer({ critical, deferred })`, says what that means.

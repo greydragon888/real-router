@@ -23,10 +23,10 @@ Router Navigation:
   navigate() → Promise<State> → onTransitionSuccess → pushState/replaceState
 
 Browser Back/Forward:
-  popstate → handler (browser-env) → router.navigate()/navigateToNotFound()/navigateToDefault() → pushState/replaceState
+  popstate → handler (browser-env) → api.navigateToState()/navigateToNotFound()/$$error → pushState/replaceState
 
 External Fragment Change (native <a href="#/x">, address-bar edit, location.hash=):
-  hashchange → handler (browser-env) → router.navigate()/navigateToNotFound() → replaceState
+  hashchange → handler (browser-env) → api.navigateToState()/navigateToNotFound()/$$error → replaceState
 ```
 
 Both `popstate` and `hashchange` route through the **same** `createPopstateHandler`. A hash-changing history traversal fires **both** events; `createHashSyncLifecycle` dedups the pair (see [Gotchas](#hashchange-listener--popstatehashchange-dedup-759)) so exactly one navigation runs.
@@ -36,9 +36,9 @@ Both `popstate` and `hashchange` route through the **same** `createPopstateHandl
 All navigation methods return `Promise<State>`:
 
 - `router.start(path?)` — path made optional via `createStartInterceptor` from `browser-env` which injects `browser.getLocation()` when no path given
-- `router.navigate()` used in popstate handler with `await` and try/catch
+- `api.navigateToState()` — what the popstate handler calls for a matched URL, awaited inside try/catch; it skips the `forwardState`/`buildPath` round-trip (#525)
 - `router.navigateToNotFound(path?)` — called when `allowNotFound: true` and URL doesn't match any route on popstate (synchronous, returns `State`)
-- `router.navigateToDefault()` called as fallback when URL doesn't match any route and `allowNotFound` is `false`
+- `allowNotFound: false` + an unmatched URL — the handler emits `$$error` with `ROUTE_NOT_FOUND` via `api.emitTransitionError()` and recovers as for a refused traversal (see "A refused traversal returns to the entry it started from"). No silent `navigateToDefault()` fallback (#483)
 
 ## Gotchas
 
@@ -122,13 +122,13 @@ Unlike browser-plugin, there is no hash preservation — the hash IS the route.
 
 ### Limitations: URL Fragments via `<Link hash>` / `opts.hash` (#532)
 
-`@real-router/browser-plugin` and `@real-router/navigation-plugin` ship a first-class URL-fragment surface: `<Link hash>`, `router.navigate(name, params, search, { hash })`, `router.buildUrl(name, params, search, { hash })` (options at position 4 since RFC-4 M2, #1548), and a `state.context.url = { hash, hashChanged }` namespace.
+`@real-router/browser-plugin` and `@real-router/navigation-plugin` ship a first-class URL-fragment surface: `<Link hash>`, `router.navigate(name, params, search, { hash })`, `router.buildUrl(name, params, search, { hash })` (options at position 4, #1548), and a `state.context.url = { hash, hashChanged }` namespace.
 
 Hash-plugin **does not** support this surface — `#` is the route delimiter here, so URL fragments are structurally incompatible:
 
 - `pluginBuildUrl` accepts the `{ hash }` option for typing parity (TS interface merge requires identical signatures across all 3 URL plugins) but ignores it at runtime.
 - A one-time `console.warn` is emitted on the first invocation with `opts.hash !== undefined`, telling the user to switch to browser-plugin / navigation-plugin if URL fragments are required. Inline `let warned = false` pattern.
-- `state.context.url` is **not** claimed by hash-plugin → `state.context.url === undefined` at runtime. Hash-aware sources (`createActiveRouteSource({ hash })`, `useIsActiveRoute(..., hash)`) consequently return `false` for any non-undefined `hash`.
+- `state.context.url` is **not** claimed by hash-plugin → `state.context.url === undefined` at runtime. Hash-aware sources (`createActiveRouteSource({ hash })`, `useIsActiveRoute(..., hash)`) collapse the missing namespace to `""`: a non-empty `hash` never matches, and `hash: ""` matches an active route (`@real-router/sources` CLAUDE.md, "Hash-aware stabilization & active state").
 - Mutually exclusive with browser-plugin / navigation-plugin: only one URL plugin may be installed per router instance.
 
 See [IMPLEMENTATION_NOTES.md](../../IMPLEMENTATION_NOTES.md) section "URL Fragment ('hash') Support" for design context.
@@ -214,7 +214,7 @@ hash-plugin imports from `browser-env`:
 
 - `createSafeBrowser`, `normalizeBase`, `safelyEncodePath` — factory setup
 - `createStartInterceptor`, `createReplaceHistoryState` — router extensions
-- `createPopstateHandler`, `createPopstateLifecycle` — popstate lifecycle
+- `createPopstateHandler`, `createHashSyncLifecycle` — popstate + hashchange lifecycle
 - `shouldReplaceHistory`, `updateBrowserState` — transition handling
 - `safeParseUrl` — URL parsing in `hashUrlToPath`
 - `createOptionsValidator` — options validation

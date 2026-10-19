@@ -8211,6 +8211,8 @@ A **second, distinct** way Dependabot errors the whole npm job (→ zero PRs →
 
 > **Updated (2026-10-08).** On turbo 2.11.7 the membership query of a `shared/` edit narrows: an edit to `shared/dom-utils` gives 42 tasks of `test`, `test:properties` and `bundle` instead of 75 on 2.11.5, with none of the tasks whose hash moved left out ("turbo 2.11: `affectedUsingTaskInputs` is off").
 
+> **Updated (2026-10-19).** The shared-source flag counts only a `.ts` under `shared/<dir>/`, what the consumers hash, and reads the diff with `--no-renames` ("The planners read a rename by both paths; the shared trigger counts what the consumers hash").
+
 ### Problem
 
 The horizontal-sharding planner `scripts/build-matrix.mjs` derived **both** the leaf/sharded routing decision **and** the shard membership from one call: `turbo query affected --base origin/master --head HEAD --packages`. That API walks the **declared workspace-dependency graph** (+ changed-file→workspace ownership). But `shared/{browser-env,dom-utils,ssr}` are consumed **only via a symlink (`src/browser-env → ../../../shared/browser-env`) + the `../../shared/**/*.ts` input-glob** — **no consumer declares a dep on `@real-router/shared-sources`**. So `query affected` maps a `shared/*` edit to the `shared-sources` workspace and fans out to **zero `packages/*` consumers**. Since the shards run explicit `--filter=<pkg>` tokens taken from that (empty) set, the genuinely-affected consumers were **never type-checked / tested / bundled**, and CI stayed green. Verified on run 28489824878 (PR #1064, a `shared/browser-env` edit): the `url-plugin` shard ran **only** `hash-plugin`; `browser-plugin` + `navigation-plugin` shipped unbuilt despite the PR changing the `Browser` type both export (and a `browser-plugin` changeset). The **pure** case is worse — a `shared/dom-utils`-only PR gives `mode=sharded` + `matrix={"include":[]}` → base-* jobs only, all 6 adapters skipped. Both proven with `turbo query affected --packages` returning `[@real-router/shared-sources]` vs the old monolith's `...[origin/master]` returning 33 packages incl. all 6 adapters. Filed as #1067. The gap is **exclusively** shared-source → symlink-consumer: root configs already fan out (turbo treats them as global → all 32), declared deps fan correctly, and the leaf path runs input-aware `...[origin/master]` so it self-corrects — only the sharded path was blind.
@@ -14044,6 +14046,8 @@ zizmor did not report one more: `sonar-trusted.yml` holds four scanner arguments
 
 > **Updated (2026-10-06).** `checks-registry.test.mjs` reads each job's `run` scripts, and `workflow-path-filters.test.mjs` the trigger filters, through the parser as well, so the last sentence of the Scope below no longer holds for them ("The registry and path-filter tests read the workflows through the closed parser").
 
+> **Updated (2026-10-19).** `workflow-run-names.test.mjs` reads `name:` and the `workflow_run` triggers through the parser as well ("`workflow-run-names` reads the workflows through the closed parser").
+
 **Problem.** `scripts/ci-gate.mjs` read ci.yml line by line — `parseJobs`, `jobLines`, `parseNeeds`, `readLastStep`, `parseGateStep`, `topLevelKeysClosed`, `workflowEnvClosed`. The #1127 entry chose that over a YAML library: "the extractors are ~30 lines and fail closed". They had grown to 383 lines, and three rounds of fixes in one day answered forms the audits of RFC-4 found them reading otherwise than GitHub: a multi-line or scalar `needs` read as none, and a key behind a lone CR, NEL, LS or PS went unread; a quoted key, or one with a space before its colon, read as absent; a continuation line under `if: always()` could have skipped the gate. Each round extended the grammar by the forms just found, or refused them.
 
 **Solution.**
@@ -14346,6 +14350,8 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 
 > **Updated (2026-10-07).** The cells did not reach every refused form: the reconciliation of RFC-4 R39 → R49 counted 23 of 49 refusals no cell held. Every place the reader refuses now has a cell, and the test counts them ("Every place the gate's reader refuses has a cell that reaches it").
 
+> **Updated (2026-10-19).** The program of `jq` was read as a closed list of words with its field names free, and the harness fills only each job's result and two outputs of `check`: a program that read another output of `check` passed the reader and every state of the table. The program is now the aggregate, byte for byte ("The gate's jq program is the aggregate as written").
+
 **Problem.** `ci-gate-completeness.test.mjs` executes the gate's script over every state of its table, and the table sees only what the harness passes: the expressions it substitutes and the step's `env:`. The runner gives a script more — its `GITHUB_*` and `RUNNER_*` variables, the workflow's `env:`, the event file — and a line that branched on any of them passed the test. The reconciliation of RFC-4 found `if [[ "${GITHUB_EVENT_NAME:-}" == "pull_request" ]]; then exit 0; fi` and `case "${GITHUB_ACTOR:-}" in *"[bot]") exit 0 ;; esac` green in all 75 tests of the file, the second a form `.github/actions/setup` and `post-merge.yml` already use. On GitHub either would pass every skip the table forbids, the first on every pull request. The harness ran the script in the test's own environment, so in place on CI the first was red by accident; in the copy the tooling tests run in, which holds no `GITHUB_*` or `RUNNER_*`, it passed as well.
 
 **Solution.**
@@ -14381,6 +14387,8 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 ## The check job's skip facts come from a predicate's exact answer (2026-10-06)
 
 > **Updated (2026-10-07).** `node:skip-facts` runs the `no_source` predicate's own table, `diff-carries-no-source.test.mjs`, as well: in the guards group it skipped on the `no-source` it decides, and the steps' cells held the predicate only through the step. Each table also holds its predicate's own file to be code, or source: a predicate taught to skip its own file passed both tables. `node:skip-facts` runs `verify.test.mjs` too (the entry "The links from the skip facts to Repo Lints' contexts are held in every context").
+
+> **Updated (2026-10-19).** The pins held the two steps' text but not the job around them: a job-level `env:` with `BASH_ENV`, a `defaults:` shell, a `container:` or a step before them changed how both ran, and every test stayed green. The job's keys, the checkout before the steps and what it is given are pinned too ("The check job runs its two steps as written").
 
 **Problem.** Two outputs of `ci.yml`'s `check` job decide what CI skips. With `should_run` not `true` the gate requires no job of the pipeline to have run; with `no_source` true Repo Lints skips the checks whose `ciSkip` names `no-source`. No test held either producer: the reconciliation of RFC-4 found the `no_source` step unheld, and `should_run` came from an inline `grep` classification no test read. Each failed toward the skip. The `source` step took exit 0 for "no source", so a predicate that exited 0 without answering skipped the checks: run under bash with `node` exiting 0 at once, it answered `no_source=true` on a diff with code in it. The `changes` step read an empty `grep` output as no code, so a crashed or silent `grep`, or an empty diff, answered `should_run=false`. And `git diff --name-only` lists a renamed file under its new path alone, so code moved into Markdown read as Markdown.
 
@@ -14905,3 +14913,60 @@ The arms overlap: one allocation per write sits inside the run-to-run spread. Ne
 Five mutants, against a green baseline: the stamp back on the writer's object, a copy without the position, `null` copied too, and each of the two writes of `MockNavigation` keeping a reference. Each fails tests: the first one fails the #2740 tests as well, now that they run on jsdom's own history.
 
 **Limitation.** jsdom still keeps the objects application code passes to `pushState` and `replaceState`; that half is jsdom's own `TODO`.
+
+## Tests, comments and docs inside `src` are infrastructure; the full build is the pre-push hook's (2026-10-18)
+
+**Problem.** Three delivery rules disagreed with how the owner works. `CLAUDE.md` told every session to run `pnpm build` after a task while eight skills told it to leave the full build to the owner, so outside a skill a session ran the graph the pre-push hook runs again. A diff that touches only tests went through a branch and a pull request in `/test-gap-batch` and `/doc-batch`, and straight to `master` in `/bugfix` and `/class-hunt`. `.changeset/README.md` required a changeset for a comment-only or JSDoc-only edit in `src/`, while `/wiki-sync`, `/bump-eslint` and `/comment-audit` delivered such an edit to `master` without one.
+
+**Solution.** The owner decided on 2026-10-18, during the prompt audit of the agent configuration. The full build belongs to the pre-push hook: a session validates the packages it touched. A diff that touches only tests, a comment-only edit in `packages/*/src/` or `shared/<dir>/*.ts`, and a doc inside `src/` are infrastructure — straight to `master`, no pull request, no changeset. A change to code in those trees goes through a branch, a pull request and a changeset. `CLAUDE.md`, `.changeset/README.md` and the skills that rule on delivery state that one definition.
+
+**Why.** The pre-push hook runs `turbo run build lint:package lint:types`, `test:stress` and the rest of its stage in `scripts/checks.mjs`, so a full build inside the session repeats the most expensive run without adding a check. A changeset records a change in what a package ships, and a comment, a doc or a test changes nothing a release note would describe. `changeset-check.yml` runs on pull requests only, so it never sees these commits; on a pull request its regex still asks for a changeset for any file under a public package's `src/`.
+
+## `workflow-run-names` reads the workflows through the closed parser (2026-10-19)
+
+**Problem.** The test found a trigger by a `workflow_run:` line and a workflow's name by a `name:` line, so a key in quotes matched neither. A trigger under `"workflow_run":` read as none, and a misspelled target under it passed, though the header promised that the extractors fail on a shape they cannot read; a workflow named under `"name":` read as nameless. `workflows: []` read as an empty list, and `on: workflow_run` as no trigger. A blind control run of `/code-review-rfc` on the CI-guards wave found the quoted trigger key.
+
+**Solution.**
+
+- `workflowName` and `workflowRunTargets` read through `readClosedYaml`. A `workflow_run` whose `workflows:` is not a non-empty list of strings is refused, and so is `workflow_run` named as a bare event of `on`.
+- Two cells hold it: keys in quotes — `name:`, `workflow_run:` and `workflows:` — are read, and six forms are refused. Both fail on the line reader, and six mutants of the new reader each fail one of them.
+
+**Scope.** The other line readers of the workflows assert the value they look for — `coverage-threshold-authority`, `sonar-producer`, `check-semgrep`, and `release-workflow` for the release job's `runs-on` and `id-token` grant — so a key in quotes fails them rather than passes. One form passes `release-workflow`: a job's `permissions:` key in quotes under a workflow-level grant reads as the workflow's grant; `changesets.yml` grants nothing at the workflow level (`permissions: {}`).
+
+**Why.** A trigger the test cannot read is a link it never checked, and a renamed or misspelled target stops the dependent workflow without a word. Refusing the form keeps such a link from passing unseen.
+
+## The gate's jq program is the aggregate as written (2026-10-19)
+
+**Problem.** The reader of the gate's script took a `jq` program made of a closed list of words and did not judge a field name after a dot. The harness fills `toJSON(needs)` with each job's result and two outputs of `check`, `should_run` and `mode`; GitHub passes every output. `CROSS=$(jq -r '.check.outputs.cross_router' <<<"$NEEDS")` and a branch on it passed the reader and all 170 tests of the gate, and with every output of `check` present, as on GitHub, a forbidden skip — `pipeline-leaf` skipped in leaf mode — exited 0 once `cross_router` was `true`. A list of field names would not close it: `to_entries` and `select(.key == "outputs")` reach the same output through a string. A blind control run of `/code-review-rfc` on the RFC-4 range found it.
+
+**Solution.**
+
+- `scripts/gate-script.mjs` compares the program with `AGGREGATE`, the aggregate as its step writes it, and refuses any other ("runs a jq program other than the aggregate"). `readJqProgram` and `JQ_WORDS` are gone with the grammar they judged.
+- The comparison runs after the checks of jq's input, so a call with a wrong input is still refused by its own rule and its cell still reaches it.
+- Cells: an output of `check` read through jq is refused; the three cells that change the aggregate (`env`, `$ENV`, `input`) expect the new refusal; the four cells of the removed grammar are gone. Without the comparison the new cell and the three changed ones fail; placed before the input checks, it fails the input cells and the census of refusal places.
+
+**Why.** The table can stand for the runner only while the script reads nothing the harness does not fill. One pinned program needs no grammar, and an edit of the aggregate fails the test until `AGGREGATE` moves with it — the point where someone has to ask what the new program reads.
+
+## The check job runs its two steps as written (2026-10-19)
+
+**Problem.** `diff-carries-no-code.test.mjs` pinned the `changes` and `source` steps — name, id and run, nothing else — but not the job that runs them. A job-level `env:` with `BASH_ENV` naming a file that defines `node`, or a `defaults:` with `shell: "true {0}"`, changed how both steps ran while their text stayed pinned: all 318 tests of the skip facts, the gate, Repo Lints, the registry and closed YAML stayed green, and under `BASH_ENV` the predicate's call answered `NO_CODE` for any diff. The same forms at the workflow level were held already, by Repo Lints' closed reading. A blind control run of `/code-review-rfc` on the RFC-4 range found it.
+
+**Solution.** A cell of `node:skip-facts` holds the job: its keys are `name`, `runs-on`, `outputs` and `steps`; the two steps come right after the checkout; the checkout is `actions/checkout@v<N>`, given `persist-credentials` and `fetch-depth` and nothing else. A job-level `env:`, a `defaults:`, a `container:`, a step before the two and a checkout `ref:` each fail it.
+
+**Why.** A pin of a script holds what the script says, not how it runs, and the job's keys and the steps before it decide that. The cell runs where no context skips it, like the steps' own pins.
+
+## The planners read a rename by both paths; the shared trigger counts what the consumers hash (2026-10-19)
+
+**Problem.**
+
+- `build-matrix.mjs` raised its shared-source flag on any changed path under `shared/`. `shared/dom-utils/CLAUDE.md` is in no consumer's task inputs, so a diff holding it forced the sharded path, the input-aware membership found no shard, and the #1067 guard refused the plan. The `cli-entry` cell that runs `build-matrix.mjs` failed on `master`, whose unpushed `18cb64ea2` edits that file, and pre-push would have refused the push.
+- `build-matrix.mjs` and `examples-plan.mjs` read the diff with git's rename detection, which names a renamed file by its new path alone. A source moved out of `shared/` into one package raised no flag, so the other consumers of its dir got no shard; a file moved out of an example was not counted against that example. `codspeed-gate.mjs` already reads its diff with `--no-renames`.
+- Blind control runs of `/code-review-rfc` on the RFC-4 range found the renames; the guard tripped in the gate run of the same session.
+
+**Solution.**
+
+- The flag counts a changed path only when it is a `.ts` under `shared/<dir>/`, the glob the consumers' `turbo.json` inputs name.
+- Both planners read the diff with `--no-renames`. `runChangedFilesQuery` and the new `changedPaths` take options, so a cell runs each in a repository of its own.
+- Cells: a doc beside the shared sources does not shard, while a source of the same dir still trips the guard; a file moved out of a shared dir, and one moved out of an example, are listed by both paths. Each cell fails on the code before it.
+
+**Why.** The flag asks whether the consumers' tasks moved, and only what they hash moves them. A rename is a deletion at the old path, and a planner that does not see the deletion plans for a tree that still has the file.

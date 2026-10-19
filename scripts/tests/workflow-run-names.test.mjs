@@ -10,9 +10,12 @@
 // fork path of the SonarCloud check (`sonar-trusted.yml` waits for "CI") and the
 // master coverage upload (`coverage-master.yml`).
 //
-// No YAML library reads the files: the extractors are single-purpose and fail
-// on a shape they cannot read. `isWorkflowFile` comes from `runner-labels.mjs`,
-// which loads `yaml` for T9.
+// The workflows are read by the `yaml` parser, closed (`scripts/closed-yaml.mjs`),
+// so a key in quotes or a flow list reads as GitHub reads it. A `workflow_run`
+// whose `workflows:` is not a non-empty list of strings is refused rather than
+// skipped, and so is `workflow_run` named as a bare event: a trigger this
+// cannot read never passes as one whose targets all exist.
+// `isWorkflowFile` comes from `runner-labels.mjs`.
 
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
@@ -20,22 +23,26 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { isMap, isScalar, isSeq } from "yaml";
+
+import { readClosedYaml } from "../closed-yaml.mjs";
 import { isWorkflowFile } from "../runner-labels.mjs";
 
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const WORKFLOWS = join(repoRoot, ".github", "workflows");
 
-const unquote = (value) => value.trim().replace(/^(["'])(.*)\1$/, "$2");
+/** A scalar whose value is a string. */
+const isString = (node) => isScalar(node) && typeof node.value === "string";
 
 /**
- * A workflow's top-level `name:`.
+ * A workflow's top-level `name:`, when it is a string.
  *
  * @param {string} yaml
  * @returns {string | undefined}
  */
 export function workflowName(yaml) {
-  const match = /^name:[ \t]*(.+?)[ \t]*$/m.exec(yaml);
-  return match ? unquote(match[1]) : undefined;
+  const name = readClosedYaml(yaml).get("name", true);
+  return isString(name) ? name.value : undefined;
 }
 
 /**
@@ -44,33 +51,31 @@ export function workflowName(yaml) {
  *
  * @param {string} yaml
  * @returns {string[]}
+ * @throws {Error} on a `workflow_run` without a non-empty list of strings
+ *   under `workflows:`
  */
 export function workflowRunTargets(yaml) {
-  const lines = yaml.split("\n");
-  const at = lines.findIndex((line) => /^\s+workflow_run:\s*$/.test(line));
-  if (at === -1) return [];
-  const indent = /^(\s*)/.exec(lines[at])[1].length;
+  const on = readClosedYaml(yaml).get("on", true);
+  const bare =
+    (isScalar(on) && on.value === "workflow_run") ||
+    (isSeq(on) &&
+      on.items.some(
+        (event) => isScalar(event) && event.value === "workflow_run",
+      ));
+  const trigger = isMap(on) ? on.get("workflow_run", true) : undefined;
 
-  for (let i = at + 1; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.trim() === "" || line.trim().startsWith("#")) continue;
-    if (/^(\s*)/.exec(line)[1].length <= indent) break;
+  if (trigger === undefined && !bare) return [];
 
-    const flow = /^\s+workflows:\s*\[(.*)\]\s*$/.exec(line);
-    if (flow) return flow[1].split(",").map(unquote).filter(Boolean);
+  const workflows = isMap(trigger) ? trigger.get("workflows", true) : undefined;
 
-    if (/^\s+workflows:\s*$/.test(line)) {
-      const items = [];
-      for (let j = i + 1; j < lines.length; j++) {
-        const item = /^\s+-\s+(.+?)\s*$/.exec(lines[j]);
-        if (!item) break;
-        items.push(unquote(item[1]));
-      }
-      if (items.length === 0) throw new Error("empty workflows: block list");
-      return items;
-    }
+  if (
+    !isSeq(workflows) ||
+    workflows.items.length === 0 ||
+    !workflows.items.every(isString)
+  ) {
+    throw new Error("workflow_run without a readable workflows: list");
   }
-  throw new Error("workflow_run without a readable workflows: list");
+  return workflows.items.map((item) => item.value);
 }
 
 /**
@@ -139,6 +144,36 @@ test("fixture: the block-list form is read", () => {
     "",
   ].join("\n");
   assert.deepEqual(workflowRunTargets(yaml), ["CI", "Post-Merge Build"]);
+});
+
+test("fixture: keys in quotes read as GitHub reads them", () => {
+  const files = new Map([
+    ["build.yml", '"name": Post-Merge Build\non:\n  push:\n'],
+    [
+      "release.yml",
+      'name: Release\non:\n  "workflow_run":\n    "workflows": [Post-Merge Build, Post-merge Build]\n',
+    ],
+  ]);
+  assert.deepEqual(findDanglingReferences(files), [
+    'release.yml: workflow_run names "Post-merge Build", which no workflow is called',
+  ]);
+});
+
+test("fixture: a workflow_run this cannot read is refused, not skipped", () => {
+  for (const on of [
+    "on: workflow_run\n",
+    "on: [push, workflow_run]\n",
+    "on:\n  workflow_run:\n",
+    "on:\n  workflow_run:\n    workflows: CI\n",
+    "on:\n  workflow_run:\n    workflows: []\n",
+    "on:\n  workflow_run:\n    workflows: [CI, 1]\n",
+  ]) {
+    assert.throws(
+      () => workflowRunTargets(`name: Release\n${on}`),
+      /workflow_run without a readable workflows: list/,
+      on,
+    );
+  }
 });
 
 test("fixture: a renamed target workflow leaves its dependants dangling", () => {
