@@ -54,9 +54,17 @@
 | --- | --------- | ----------- |
 | 1   | A refused traversal returns to the entry it started from | After any journey of router navigations, a Back, Forward or `go(±n)` to an entry of another route that `canDeactivate` or `canActivate` refuses leaves the browser on the entry it started from, with the router's state unchanged, and the entry it reached keeps its URL: the same traversal after `stop()` lands on it. |
 
+## Same-Origin URL
+
+| #   | Invariant | Description |
+| --- | --------- | ----------- |
+| 1   | `buildUrl` never names another host | For any path and normalized base, the URL resolves on the page's origin. A path that begins with two of `/` and `\` — tab and newline between them do not count, the URL parser drops them — gets the `/.` prefix. |
+| 2   | A router path that begins with `//` keeps its pathname | `new URL(buildUrl(path, ""), page).pathname === path`: the parser removes the dot segment, so the prefix changes the host the URL resolves to and nothing else. |
+
 ## Test Files
 
 | File                                         | Invariants | Category                                                                                              |
 | -------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------- |
 | `tests/property/browserPlugin.properties.ts` | 15         | URL roundtrip, base path, trailing slash, query string resilience, path extraction, negative matching |
 | `tests/property/refused-traversal.properties.ts` | 1 | refused traversal |
+| `tests/property/browser-env/browserEnv.properties.ts` | 2 of its properties | same-origin URL |

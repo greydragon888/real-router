@@ -925,7 +925,7 @@ The guard is implemented by the pure helper `isSameHref(target, currentHref)` in
 
 **Postcondition:**
 - `buildUrl(path, base)` returns `/app/users/123`
-- If base is empty, returns path unchanged
+- If base is empty, returns path unchanged — unless it begins with two of `/` and `\` (tab and newline between them do not count), which a URL parser reads as a host; then it returns `/.` + path, which resolves to the same pathname on the page's origin
 
 **Why it matters:** Ensures URLs are built with correct base path.
 

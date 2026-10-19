@@ -372,3 +372,11 @@ function recordOfDepth(depth: number): fc.Arbitrary<Record<string, unknown>> {
 export const arbDeepRecord: fc.Arbitrary<Record<string, unknown>> = fc
   .integer({ min: 1, max: 3 })
   .chain((depth) => recordOfDepth(depth));
+
+/**
+ * A path the no-URL-plugin `buildHref` gives the `/.` prefix, because it would
+ * name a host. react's `tests/functional/dom-utils/link-utils.test.ts` owns the
+ * prefix; a property about the path or the fragment draws no such path.
+ */
+export const namesHost = (path: string): boolean =>
+  /^\/[\t\n\r]*[/\\]/.test(path);

@@ -65,6 +65,14 @@ describe("buildUrl", () => {
     expect(buildUrl("/users", "")).toBe("/users");
   });
 
+  // `//evil.com` names a host; the dot segment keeps it a path on the origin.
+  it("prefixes '/.' when the path would read as a host (empty base)", () => {
+    expect(buildUrl("//evil.com", "")).toBe("/.//evil.com");
+    expect(new URL(buildUrl("//evil.com", ""), "https://app.test/x").href).toBe(
+      "https://app.test//evil.com",
+    );
+  });
+
   it("joins base + path directly when path starts with /", () => {
     expect(buildUrl("/users", "/app")).toBe("/app/users");
   });

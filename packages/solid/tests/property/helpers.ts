@@ -294,3 +294,11 @@ export const arbSnapshot: fc.Arbitrary<RouteSnapshotLike> = fc.record({
     { nil: undefined },
   ),
 });
+
+/**
+ * A path the no-URL-plugin `buildHref` gives the `/.` prefix, because it would
+ * name a host. react's `tests/functional/dom-utils/link-utils.test.ts` owns the
+ * prefix; a property about the path or the fragment draws no such path.
+ */
+export const namesHost = (path: string): boolean =>
+  /^\/[\t\n\r]*[/\\]/.test(path);

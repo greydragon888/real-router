@@ -15,13 +15,23 @@ export function extractPath(pathname: string, base: string): string {
   return pathname.startsWith("/") ? pathname : `/${pathname}`;
 }
 
+// A URL that starts with two of `/` and `\` names a host — `//evil.com` leaves
+// the origin. The URL parser drops tab and newline anywhere, and reads `\` as
+// `/` in http(s).
+const HOST_PREFIX = /^\/[\t\n\r]*[/\\]/;
+
 export function buildUrl(path: string, base: string): string {
   if (!path) {
     return base;
   }
 
   if (!base) {
-    return path.startsWith("/") ? path : `/${path}`;
+    const url = path.startsWith("/") ? path : `/${path}`;
+
+    // The parser removes the "." segment, so the pathname is still `path`
+    // and the host stays the page's — the form the URL Standard serializes
+    // such a path in.
+    return HOST_PREFIX.test(url) ? `/.${url}` : url;
   }
 
   // Path "/" with a non-empty base would otherwise produce `"${base}/"` —

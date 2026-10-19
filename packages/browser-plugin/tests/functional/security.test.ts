@@ -384,3 +384,49 @@ describe("Browser Plugin — Security", () => {
     });
   });
 });
+
+// `history.pushState` and `replaceState` refuse a URL that names another host,
+// so the URL the plugin writes keeps a router path that begins with "//" a
+// path, or the address bar and the state disagree. Under
+// `urlParamsEncoding: "uri"` a splat that begins with "/" prints such a path.
+describe("Browser Plugin — same-origin URL writes", () => {
+  it("writes the router path of a splat that begins with '/' on the origin", async () => {
+    globalThis.history.replaceState({}, "", "/%2Fevil.com");
+
+    const origin = globalThis.location.origin;
+    const router = createRouter([
+      ...routerConfig,
+      { name: "any", path: "/*rest" },
+    ]);
+
+    router.usePlugin(browserPluginFactory({}));
+    await router.start();
+
+    expect(globalThis.location.origin).toBe(origin);
+    expect(globalThis.location.pathname).toBe(router.getState()!.path);
+
+    router.stop();
+    globalThis.history.replaceState({}, "", "/");
+  });
+
+  it("writes a splat that begins with '/' on the origin under uri encoding", async () => {
+    globalThis.history.replaceState({}, "", "/");
+
+    const origin = globalThis.location.origin;
+    const router = createRouter(
+      [...routerConfig, { name: "any", path: "/*rest" }],
+      { urlParamsEncoding: "uri" },
+    );
+
+    router.usePlugin(browserPluginFactory({}));
+    await router.start();
+    await router.navigate("any", { rest: "/evil.com" });
+
+    expect(router.getState()!.path).toBe("//evil.com");
+    expect(globalThis.location.origin).toBe(origin);
+    expect(globalThis.location.pathname).toBe("//evil.com");
+
+    router.stop();
+    globalThis.history.replaceState({}, "", "/");
+  });
+});

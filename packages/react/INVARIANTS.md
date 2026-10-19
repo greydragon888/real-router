@@ -48,6 +48,7 @@
 | 5   | Leading `#` is stripped before encoding/forwarding | `<Link hash="#section">` and `<Link hash="section">` produce identical hrefs — the leading `#` is a convenience for callers and is not part of the fragment.                                                                                                                                             |
 | 6   | `buildUrl` receives `{ hash }` only when defined   | No-hash call → `buildUrl(name, params, search, undefined)`; with-hash call → `buildUrl(name, params, search, { hash: <stripped> })`. Query channel at position 3 (RFC-4 M2 / #1548), hash options at position 4. The helper must NOT pass `{ hash: undefined }` — plugins distinguish absent from empty. |
 | 7   | No literal `#` in fragment                         | Generalizes the implicit assertion in #4: across all input shapes (incl. emoji / RTL / ZWJ-composed text) the fragment portion of the rendered href never contains a literal `#` — only `%23`.                                                                                                           |
+| 8   | The fallback href never names another host | On the no-URL-plugin fallback, a path that begins with two of `/` and `\` — a catch-all route prints `//evil.com` for `rest: "/evil.com"` — gets the `/.` prefix, the one `buildUrl` in `shared/browser-env` gives it, so the href resolves on the page's origin. Owned by `tests/functional/dom-utils/link-utils.test.ts`. |
 
 ## Navigate Helper (navigateWithHash, #532)
 

@@ -21,6 +21,7 @@ import {
   arbDottedNameExtended,
   arbHash,
   arbParamsExtended,
+  namesHost,
 } from "./helpers";
 import { buildHref } from "../../src/dom-utils";
 
@@ -58,6 +59,8 @@ describe("buildHref — Property Tests", () => {
     test.prop([fc.string({ minLength: 1, maxLength: 16 })], {
       numRuns: NUM_RUNS.thorough,
     })("buildUrl=()=>undefined uses buildPath result", (path) => {
+      fc.pre(!namesHost(path));
+
       const router = makeFakeRouter(
         () => undefined,
         () => path,
@@ -208,6 +211,8 @@ describe("buildHref — Property Tests", () => {
     test.prop([arbHash, fc.string({ minLength: 1, maxLength: 12 })], {
       numRuns: NUM_RUNS.thorough,
     })("fallback path → hash is encodeURI'd and # → %23", (rawHash, path) => {
+      fc.pre(!namesHost(path));
+
       const router = makeFakeRouter(undefined, () => path);
       const href = buildHref(router, "any", {}, undefined, rawHash);
 
@@ -637,6 +642,8 @@ describe("buildHref — Property Tests", () => {
     })(
       "buildHref's fragment matches reference spec for any RFC 3986 input",
       (rawHash, path) => {
+        fc.pre(!namesHost(path));
+
         const router = {
           buildUrl: undefined,
           buildPath: () => path,

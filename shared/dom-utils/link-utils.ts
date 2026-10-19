@@ -230,6 +230,12 @@ function encodeFragmentInline(decoded: string): string {
   return encodeURI(decoded).replaceAll("#", "%23");
 }
 
+// A router path whose leading `/` is followed by `/` or `\` names a host, and
+// `/.` keeps it a path on the page's origin. A copy of `HOST_PREFIX` in
+// `shared/browser-env/url-utils.ts`: the dom-utils symlink graph does not reach
+// browser-env.
+const HOST_PREFIX = /^\/[\t\n\r]*[/\\]/;
+
 type BuildUrlFn = (
   name: string,
   params: Params,
@@ -376,7 +382,9 @@ export function buildHref(
       return undefined;
     }
 
-    return normHash ? `${path}#${encodeFragmentInline(normHash)}` : path;
+    const href = HOST_PREFIX.test(path) ? `/.${path}` : path;
+
+    return normHash ? `${href}#${encodeFragmentInline(normHash)}` : href;
   } catch {
     console.error(
       `[real-router] Route "${routeName}" is not defined. The element will render without an href attribute.`,

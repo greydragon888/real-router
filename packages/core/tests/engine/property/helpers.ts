@@ -294,9 +294,8 @@ export const arbQueryParamNames: fc.Arbitrary<string[]> = fc
  * Splat param value: 1–4 NON-empty path segments joined by a single "/". Each
  * segment now spans the encoding class (`% # ? & =`, space, unicode) — buildPath
  * percent-encodes each segment and match decodes it. Segments never contain "/"
- * (the separator) nor are empty, so a degenerate "//" (which match never emits,
- * i.e. outside the splat-value domain) is excluded by construction, not to hide a
- * bug.
+ * (the separator) nor are empty: a value with an empty segment is
+ * `arbSplatValueWithEmptySegment`'s.
  */
 export const arbSplatValue: fc.Arbitrary<string> = fc
   .array(
@@ -318,6 +317,23 @@ export const arbSplatValue: fc.Arbitrary<string> = fc
     { minLength: 1, maxLength: 4 },
   )
   .map((segments) => segments.join("/"));
+
+/**
+ * A splat value with at least one empty segment (`/x`, `a//b`, `//x`). `match`
+ * emits one when the URL carries the separator encoded: `/%2Fx` matches
+ * `{ rest: "/x" }`. The last segment is not empty — a trailing `/` belongs to
+ * the trailing-slash rule.
+ */
+export const arbSplatValueWithEmptySegment: fc.Arbitrary<string> = fc
+  .tuple(
+    fc.array(fc.oneof(fc.constant(""), fc.stringMatching(/^[a-z0-9]{1,6}$/)), {
+      minLength: 1,
+      maxLength: 4,
+    }),
+    fc.stringMatching(/^[a-z0-9]{1,6}$/),
+  )
+  .filter(([head]) => head.includes(""))
+  .map(([head, last]) => [...head, last].join("/"));
 
 /**
  * Array of 1–4 string items for array query param tests. Items span the encoding

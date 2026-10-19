@@ -1106,3 +1106,50 @@ describe("anchorTargetsAnotherContext (#1834)", () => {
     frame.remove();
   });
 });
+
+// Without a URL plugin the href is the router path. Under
+// `urlParamsEncoding: "uri"` a catch-all route prints `//evil.com` for
+// `rest: "/evil.com"` — a URL that names a host. The prefix is the one
+// `buildUrl` in shared/browser-env gives the same path.
+describe("buildHref — a path that would name a host, without a URL plugin", () => {
+  it("renders the catch-all href on the page's origin", async () => {
+    const router = createRouter(
+      [
+        { name: "home", path: "/home" },
+        { name: "any", path: "/*rest" },
+      ],
+      { urlParamsEncoding: "uri" },
+    );
+
+    await router.start("/home");
+
+    const href = buildHref(
+      router,
+      "any",
+      { rest: "/evil.com" },
+      undefined,
+      "x",
+    );
+
+    expect(href).toBe("/.//evil.com#x");
+    expect(new URL(href!, "https://app.test/home").host).toBe("app.test");
+
+    router.stop();
+  });
+
+  it.each([
+    ["//evil.com", "/.//evil.com"],
+    ["///evil.com", "/.///evil.com"],
+    [String.raw`/\evil.com`, String.raw`/./\evil.com`],
+    ["/\t/evil.com", "/./\t/evil.com"],
+    ["/evil.com", "/evil.com"],
+  ])("prints %j as %j", (path, expected) => {
+    const router = {
+      buildPath: vi.fn().mockReturnValue(path),
+    } as unknown as Router;
+    const href = buildHref(router, "r", {});
+
+    expect(href).toBe(expected);
+    expect(new URL(href!, "https://app.test/home").host).toBe("app.test");
+  });
+});

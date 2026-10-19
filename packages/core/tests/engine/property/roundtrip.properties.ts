@@ -8,6 +8,7 @@ import {
   arbAnyParamValue,
   arbAnyQueryValue,
   arbSplatValue,
+  arbSplatValueWithEmptySegment,
   createArrayMatcher,
   createMixedMatcher,
   createParamMatcher,
@@ -43,7 +44,9 @@ describe("Roundtrip Properties", () => {
   describe("splat buildPath→match", () => {
     const matcher = createSplatMatcher();
 
-    test.prop([arbSplatValue], { numRuns: NUM_RUNS.thorough })(
+    test.prop([fc.oneof(arbSplatValue, arbSplatValueWithEmptySegment)], {
+      numRuns: NUM_RUNS.thorough,
+    })(
       "splat param is preserved through buildPath→match roundtrip",
       (splatPath: string) => {
         const path = matcher.buildPath("files.catchAll", { path: splatPath });
