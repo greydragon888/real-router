@@ -13804,6 +13804,8 @@ Kept, because none of them points at a record: measurement dates, which say when
 
 ## braces and http-cache-semantics are allowlisted: neither has a fixed release (2026-10-03)
 
+> **Updated (2026-10-19).** http-cache-semantics 4.3.0, published 2026-10-04, is clean by api.osv.dev, where 4.2.0 is still affected. `cacheable-request` 7.0.4 declares `^4.0.0`, so the examples lockfile takes 4.3.0 with no other change, and GHSA-ch52-4w7c-c8xp left `scripts/osv-scanner.toml` and `allow-ghsas`; the Dependabot alert closes on the lockfile. The advisory still names no fixed version, which is why Dependabot opened no update. The braces entry stands.
+
 **Problem.** Pre-push `lint:audit` went red on two High advisories, both published on 2026-09-18 and turned into failures only after OSV modified them on 2026-10-02 at 22:45Z. GHSA-vfj7-8cjw-p6xm affects `braces` up to 3.0.3, in the root lockfile; GHSA-ch52-4w7c-c8xp affects `http-cache-semantics` up to 4.2.0, in the examples lockfile. Each range ends at the package's latest release, so there is nothing to bump to.
 
 **Solution.** Both ids enter `scripts/osv-scanner.toml` and the mirrored `allow-ghsas:` in `.github/workflows/codeql.yml`.

@@ -82,7 +82,6 @@ allow-ghsas:
   - GHSA-wrw7-89jp-8q8g
   - GHSA-86w9-cpqp-85rv
   - GHSA-vfj7-8cjw-p6xm
-  - GHSA-ch52-4w7c-c8xp
   - GHSA-jp82-f5mq-hwhp
   - GHSA-p6vx-979v-rg4c
   - GHSA-hp3w-g68c-fv3c

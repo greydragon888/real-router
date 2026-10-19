@@ -34,18 +34,6 @@ reason = "No fixed node-forge release (<= 1.4.0, the latest). Only dependent: ro
 id = "GHSA-vfj7-8cjw-p6xm"  # braces stack-exhaustion DoS through deeply nested patterns
 reason = "No fixed braces release (<= 3.0.3, the latest). Only path: root devDependency danger 14.0.7 -> micromatch 4.0.8, which expands only the patterns a dangerfile passes to fileMatch and linesOfCode; dangerfile.ts calls neither. Not in any published @real-router/* package."
 
-# http-cache-semantics has no fixed release: every version through 4.2.0, the
-# latest, is affected. It arrives only in the examples lockfile, through
-# electron-builder (a devDependency of the three Electron examples) ->
-# @electron/get -> got 11 -> cacheable-request. got builds that HTTP cache only
-# when it is given a `cache` option; electron-builder gives it none, and the
-# examples configure no download options. The examples are never published.
-# Drop it when http-cache-semantics ships a fix — ask api.osv.dev per version.
-
-[[IgnoredVulns]]
-id = "GHSA-ch52-4w7c-c8xp"  # http-cache-semantics max-stale cross-user disclosure
-reason = "No fixed http-cache-semantics release (<= 4.2.0, the latest). Only path: electron-builder 26.15.3 (devDependency of examples/desktop/electron/*) -> @electron/get 3.1.0 -> got 11.8.6 -> cacheable-request 7.0.4; got builds that HTTP cache only when given a `cache` option, which neither electron-builder nor the examples pass. examples/ is never published."
-
 # seroval's fix, 1.6.3, is outside the range solid-js 1.9.15 pins (`~1.5.4`,
 # with seroval-plugins), and solid-js has no newer 1.9 release. The affected
 # seroval is in the three lockfiles only through solid-js: in the root for
