@@ -14044,6 +14044,8 @@ zizmor did not report one more: `sonar-trusted.yml` holds four scanner arguments
 
 > **Updated (2026-10-06).** `checks-registry.test.mjs` reads each job's `run` scripts, and `workflow-path-filters.test.mjs` the trigger filters, through the parser as well, so the last sentence of the Scope below no longer holds for them ("The registry and path-filter tests read the workflows through the closed parser").
 
+> **Updated (2026-10-19).** `workflow-run-names.test.mjs` reads `name:` and the `workflow_run` triggers through the parser as well ("`workflow-run-names` reads the workflows through the closed parser").
+
 **Problem.** `scripts/ci-gate.mjs` read ci.yml line by line — `parseJobs`, `jobLines`, `parseNeeds`, `readLastStep`, `parseGateStep`, `topLevelKeysClosed`, `workflowEnvClosed`. The #1127 entry chose that over a YAML library: "the extractors are ~30 lines and fail closed". They had grown to 383 lines, and three rounds of fixes in one day answered forms the audits of RFC-4 found them reading otherwise than GitHub: a multi-line or scalar `needs` read as none, and a key behind a lone CR, NEL, LS or PS went unread; a quoted key, or one with a space before its colon, read as absent; a continuation line under `if: always()` could have skipped the gate. Each round extended the grammar by the forms just found, or refused them.
 
 **Solution.**
@@ -14913,3 +14915,16 @@ Five mutants, against a green baseline: the stamp back on the writer's object, a
 **Solution.** The owner decided on 2026-10-18, during the prompt audit of the agent configuration. The full build belongs to the pre-push hook: a session validates the packages it touched. A diff that touches only tests, a comment-only edit in `packages/*/src/` or `shared/<dir>/*.ts`, and a doc inside `src/` are infrastructure — straight to `master`, no pull request, no changeset. A change to code in those trees goes through a branch, a pull request and a changeset. `CLAUDE.md`, `.changeset/README.md` and the skills that rule on delivery state that one definition.
 
 **Why.** The pre-push hook runs `turbo run build lint:package lint:types`, `test:stress` and the rest of its stage in `scripts/checks.mjs`, so a full build inside the session repeats the most expensive run without adding a check. A changeset records a change in what a package ships, and a comment, a doc or a test changes nothing a release note would describe. `changeset-check.yml` runs on pull requests only, so it never sees these commits; on a pull request its regex still asks for a changeset for any file under a public package's `src/`.
+
+## `workflow-run-names` reads the workflows through the closed parser (2026-10-19)
+
+**Problem.** The test found a trigger by a `workflow_run:` line and a workflow's name by a `name:` line, so a key in quotes matched neither. A trigger under `"workflow_run":` read as none, and a misspelled target under it passed, though the header promised that the extractors fail on a shape they cannot read; a workflow named under `"name":` read as nameless. `workflows: []` read as an empty list, and `on: workflow_run` as no trigger. A blind control run of `/code-review-rfc` on the CI-guards wave found the quoted trigger key.
+
+**Solution.**
+
+- `workflowName` and `workflowRunTargets` read through `readClosedYaml`. A `workflow_run` whose `workflows:` is not a non-empty list of strings is refused, and so is `workflow_run` named as a bare event of `on`.
+- Two cells hold it: keys in quotes — `name:`, `workflow_run:` and `workflows:` — are read, and six forms are refused. Both fail on the line reader, and six mutants of the new reader each fail one of them.
+
+**Scope.** The other line readers of the workflows assert the value they look for — `coverage-threshold-authority`, `sonar-producer`, `check-semgrep`, and `release-workflow` for the release job's `runs-on` and `id-token` grant — so a key in quotes fails them rather than passes. One form passes `release-workflow`: a job's `permissions:` key in quotes under a workflow-level grant reads as the workflow's grant; `changesets.yml` grants nothing at the workflow level (`permissions: {}`).
+
+**Why.** A trigger the test cannot read is a link it never checked, and a renamed or misspelled target stops the dependent workflow without a word. Refusing the form keeps such a link from passing unseen.
