@@ -82,10 +82,19 @@ exception before 1.0: an incompatible change takes `minor`, not `major`.
 The public API is what a package declares: its exported types and its
 documented behavior. A bug fix fixes incorrect behavior, whatever result it
 changes on the way; refusing earlier an input the declared API already rules
-out is one. Changing documented behavior is an incompatible change, inside a bug
-task too. An incompatible change says what the consumer changes — see the
-Breaking Change example below. `pnpm lint:changeset` refuses a `patch` whose
-description labels the change breaking.
+out is one. An incompatible change is any of these, inside a bug task too:
+
+- a new refusal — a throw, a rejection, a failed build — of an input the declared
+  API accepts;
+- an export, option or `exports` path removed or renamed, or a public type
+  narrowed;
+- a required member added to an interface a consumer implements, a plugin's
+  validator included;
+- documented behavior changed.
+
+An incompatible change says what the consumer changes — see the Breaking Change
+example below. `pnpm lint:changeset` refuses a `patch` whose description labels
+the change breaking.
 
 ## Examples
 
