@@ -197,23 +197,24 @@ describe("a traversal the router refuses returns to the entry it started from (#
   it("a second Back while the guard decides is dropped with the first, and the guard is asked once", async () => {
     const r = await setup();
     let asked = 0;
+    let answer: ((allowed: boolean) => void) | undefined;
 
     await r.navigate("users.list");
     await r.navigate("users.view", { id: "42" });
+    // Answered by the test, not by a timer: a timer races the second Back.
     getLifecycleApi(r).addDeactivateGuard("users.view", () => () => {
       asked++;
 
       return new Promise<boolean>((resolve) => {
-        setTimeout(() => {
-          resolve(false);
-        }, 20);
+        answer = resolve;
       });
     });
 
     globalThis.history.back();
     await settle();
     globalThis.history.back();
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    await settle();
+    answer?.(false);
     await settle();
 
     expect(asked).toBe(1);
