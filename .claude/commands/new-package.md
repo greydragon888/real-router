@@ -63,4 +63,13 @@ $ARGUMENTS
 
 - `pnpm install` обязателен до первой валидации — иначе фильтр по новому пакету молча не совпадёт.
 - Число задач в графе `pnpm build` смотри прогоном (`turbo run build --dry=json`), а не по памяти: оно меняется с каждым пакетом.
-- Первый publish в npm — человеческий, см. `/release`.
+- Первый publish в npm — человеческий: trusted publisher цепляется только к пакету, который уже есть в реестре ([npm/cli#8544](https://github.com/npm/cli/issues/8544)), а второй фактор аккаунта — ключ WebAuthn без TOTP, поэтому ни агент, ни CI этот шаг не сделают (без браузера npm падает с `EOTP`). Скажи владельцу выполнить и остановись:
+
+  ```bash
+  npm login --auth-type=web          # браузер → «Use security key»
+  pnpm publish --filter <pkg>
+  npm trust github <pkg> --file changesets.yml \
+    --repo greydragon888/real-router --allow-publish
+  ```
+
+  `--allow-publish` обязателен: конфигурация trusted publisher, созданная после 2026-05-20, должна назвать хотя бы одно действие. npm-токен в обход OIDC не предлагай никогда. Пропущенный шаг ловит предрелизная проверка `.changeset/unpublished-packages.mjs` — она печатает эту же процедуру.

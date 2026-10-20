@@ -154,7 +154,7 @@ pnpm resolve:dependabot <PR#>  # Rebase+dedupe a Dependabot PR — conflicting O
 
 ## Release Process
 
-**Only workflow:** `changesets.yml` — publishing via npm OIDC Trusted Publishing, tokenless, with SLSA provenance. There is no `release.yml`. Adding a package to npm needs a one-time MANUAL first publish that cannot be scripted or delegated (the account's 2FA is a WebAuthn key). Run **`/release`** for the full procedure and its gates.
+**Only workflow:** `changesets.yml` — publishing via npm OIDC Trusted Publishing, tokenless, with SLSA provenance. There is no `release.yml`. Adding a package to npm needs a one-time MANUAL first publish that cannot be scripted or delegated (the account's 2FA is a WebAuthn key). The procedure is in `/new-package` § Гейты, and the release run's preflight (`.changeset/unpublished-packages.mjs`) prints it for a package that was never published.
 
 ## Versioning
 
