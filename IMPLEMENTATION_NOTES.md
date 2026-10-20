@@ -10250,6 +10250,10 @@ The half that is new is `scripts/check-sarif-paths.mjs`, run between the scan an
 > entry per pnpm workspace, `/` and `/examples`. See "The examples are a pnpm
 > workspace of their own".
 
+> ⚠ Also superseded, on 2026-09-12: `/bump-dep` applies a bump outside the root
+> manifest unless the package is a `peerDependencies` entry of a public package.
+> The refusal described below holds for such peers alone.
+
 **Problem.** `/bump-dep` opens with a hard gate — absent from the ROOT manifest, stop — and the gate is right: it is what structurally guarantees "passed the gate ⇒ devDep ⇒ no changeset". But the refusal ended there, and it turns out to end there for the majority of the repo. Re-derive the split rather than trusting these numbers:
 
 ```bash

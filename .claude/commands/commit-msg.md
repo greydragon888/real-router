@@ -20,7 +20,7 @@ Scopes — только из `SCOPES` в `commitlint.config.mjs`: `scope-enum` �
 
 - `.claude/**` → `docs(config): <команда> — <суть>`;
 - `shared/<dir>` → `<dir>` (`browser-env`, `dom-utils`, `ssr`); `benchmarks/` → `benchmarks`;
-- бамп зависимостей → `deps` / `deps-dev` (`chore(deps): …`, `build(deps): …`);
+- бамп зависимостей → `deps` (`chore(deps): …`; `deps-dev` ставит Dependabot);
 - корень, `scripts/`, `.github/`, `.husky/`, `examples/`, `cross-router-bench/` → без scope (`ci: …`, `build: …`, `docs: …`, `test: …`) или `ci` / `config`.
 
 Правила:
