@@ -132,7 +132,7 @@ Perf-аналог «воспроизведи баг эмпирически» (`/
 
 1. **Точечная валидация затронутых пакетов** (`/bugfix` 4, НЕ полный `pnpm build` — [[feedback_no_full_build]]): на каждый — `pnpm -F <pkg> type-check`, `lint`, `test -- --run` (+ `test:properties`/`test:stress`, если правил core-timing/инвариант/память — [[feedback_sweep_properties_stress_on_timing_change]]). 100% coverage; для адаптеров с пониженным порогом (`grep -A6 thresholds packages/*/vitest.config.mts`) проверяй **per-file** строку coverage-таблицы = 100%, не только `Tests N passed`. Финальный lint большого пакета — свежим (`rm .eslintcache`), в фоне, читая собственный exit-код.
 2. **Discriminator-тест из Фазы 5.1 остаётся постоянным** (доказывает, что fast-path достигается — не «просто быстрее»). Бенч-числа в коммит НЕ пиннятся (флейк); дискриминатор пиннит структурный факт.
-3. **Changeset** через `/changeset` — если правил `packages/*/src` публичного пакета (perf-фикс = `patch`; в pre-1.0 breaking → `minor`). Правки harness/ledger (не трогают `packages/*/src`) — в master без changeset.
+3. **Changeset** — вызовом Skill `changeset`, если правил `packages/*/src` публичного пакета. Правки harness/ledger (не трогают `packages/*/src`) — в master без changeset.
 
 ## Фаза 7 — Ledger (обязательно) + docs/wiki
 

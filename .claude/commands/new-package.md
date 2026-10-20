@@ -39,8 +39,7 @@ $ARGUMENTS
 
 ### Changesets
 
-- Create changeset file(s) per [.changeset/README.md](.changeset/README.md) rules
-- One file per affected public package, `minor` bump for new packages (pre-1.0)
+- Write the changesets through the Skill tool (`/changeset`): one file per affected public package, the bump from the table in [.changeset/README.md](.changeset/README.md)
 - If the new package required core changes — separate changeset for core
 
 ### Monorepo integration

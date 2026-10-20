@@ -24,6 +24,8 @@
  * NOT checked here (semantic — not derivable from the file text): "one logical
  * change per file", "don't mix features/fixes", "right bump for the change type",
  * "descriptive title". Those need understanding of the diff, not the changeset.
+ * The one bump error the text itself states IS checked: a `patch` whose
+ * description labels the change breaking.
  *
  * Two consumers, one validator (no drift):
  *   - pre-push CLI: `node check-changeset.mjs` → human-readable, exit 1 on error.
@@ -45,6 +47,10 @@ const ROOT = join(import.meta.dirname, "..");
 const CHANGESET_DIR = join(ROOT, ".changeset");
 const PKG_DIR = join(ROOT, "packages");
 const VALID_LEVELS = new Set(["major", "minor", "patch"]);
+// A line opening with "Breaking"/"BREAKING", after a quote, list or emphasis
+// marker or a ⚠.
+const BREAKING_LABEL =
+  /^[\t >*_-]*(?:⚠️?[\t ]*)?(?:\*\*|__)?(?:Breaking|BREAKING)\b/;
 
 /**
  * Registry of workspace packages: name → { private, version }.
@@ -164,6 +170,17 @@ function validateChangeset(name, content, registry) {
   const body = content.slice(fm[0].length);
   if (!/#\d+/.test(body)) {
     errors.push("missing PR/issue reference (#NN) in the description");
+  }
+
+  // A description that labels the change breaking is not a patch: a breaking
+  // change takes "minor" before 1.0 and "major" after it. The label is a line
+  // that opens with the capitalised word, so prose that uses it in passing
+  // ("… breaking the round-trip", "a breaking change tracked in #N") is not one.
+  const label = body.split(/\r?\n/).find((line) => BREAKING_LABEL.test(line));
+  if (label && entries.some(({ level }) => level === "patch")) {
+    errors.push(
+      `"patch" beside a description that calls the change breaking ("${label.trim().slice(0, 60)}") — raise the bump, or say what changes without the label`,
+    );
   }
 
   return { errors, warnings };

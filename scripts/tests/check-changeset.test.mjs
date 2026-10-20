@@ -1,5 +1,6 @@
 // check-changeset.test.mjs — `lint:changeset` validates the `.changeset/` of
-// its own checkout from any directory.
+// its own checkout from any directory, and refuses a `patch` whose description
+// labels the change breaking.
 //
 // Run:  node --test scripts/tests/check-changeset.test.mjs
 //
@@ -107,6 +108,40 @@ test("an invalid changeset blocks, from any directory", () => {
       /^❌ \.changeset\/a-change\.md: missing PR\/issue reference \(#NN\) in the description$/m,
     );
   }
+});
+
+test("a patch whose description labels the change breaking blocks", () => {
+  const head = '---\n"@real-router/core": patch\n---\n\nA change (#1234)\n\n';
+  const root = fixture({
+    "emphasis.md": `${head}⚠ **Breaking for anyone matching on messages**\n`,
+    "heading.md": `${head}**Breaking Change:** a field is removed\n`,
+    "plain.md": `${head}Breaking for read-modify-write on a config.\n`,
+  });
+  const { status, output } = run(root);
+
+  assert.equal(status, 1, output);
+  for (const file of ["emphasis", "heading", "plain"]) {
+    assert.match(
+      output,
+      new RegExp(
+        `^❌ \\.changeset/${file}\\.md: "patch" beside a description that calls the change breaking`,
+        "m",
+      ),
+    );
+  }
+});
+
+test("control: the label on a minor, and the word in passing on a patch, pass", () => {
+  const root = fixture({
+    "labelled-minor.md":
+      '---\n"@real-router/core": minor\n---\n\nA change (#1234)\n\n**Breaking Change:** a field is removed\n',
+    "word-in-prose.md":
+      '---\n"@real-router/core": patch\n---\n\nA change (#1234)\n\nThe codec kept\nbreaking the round-trip; a breaking change stays tracked in #1235.\n',
+  });
+  const { status, output } = run(root);
+
+  assert.equal(status, 0, output);
+  assert.equal(output, "✅ 2 changeset file(s) valid.\n");
 });
 
 test("--json reports the same files from any directory", () => {

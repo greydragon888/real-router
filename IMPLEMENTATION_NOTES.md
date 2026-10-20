@@ -2196,6 +2196,22 @@ The full build orchestrator (`pnpm turbo run build`) is wired in `turbo.json` to
 
 **Why pre-push, not CI.** The rules are author-facing policy — better heard before the push than after a red CI round-trip. It's a static `git`-free filesystem read (~10 ms), cheaper than every other pre-push gate, so it earns first place among them (the push guard, which precedes it, checks the push rather than the code). **Not** machine-checked (semantic, left to the author): "one logical change per file", "don't mix features/fixes", "right bump for the change type". The same commit corrected `.changeset/README.md`, which contradicted itself — Principles + a "Multiple Packages — Single File" example permitted multi-package files while the CI-Integration section forbade them; the real practice (and now the linter) is **one package per file, always**.
 
+#### A `patch` changeset that labels itself breaking is refused
+
+**Problem.** Three released changesets were `patch` while their own description said `⚠ Breaking` — `options-subbag-adoption-2171.md` and `route-config-adoption-2172.md` in core 0.126.7, `lucky-pianos-repeat.md` in core 0.136.5. A patch release reaches every consumer on a caret range, so a change its author had already called breaking arrived as a fix. The level and the text are written in the same sitting, and nothing compared them: the validator read the frontmatter and the `#NN`, never the two together.
+
+**Solution.** `check-changeset.mjs` refuses a `patch` whose description has a line that opens with `Breaking` or `BREAKING` — after a quote, list or emphasis marker or a `⚠`. The author raises the bump to `minor`, or says what changes without the label. `scripts/tests/check-changeset.test.mjs` holds three label forms and a control: the same label on a `minor`, and the word in passing on a `patch`.
+
+**Why the label, not the word.** The word occurs in prose about the defect (`breaking the round-trip …`) and in deferrals (`a breaking change … tracked as its own issue`). Over the changesets `master` added in 2026 — 1000 `patch`, 693 `minor` — the line-opening form matches those three patches and no other; 27 patches use the word in passing. It is the only bump error the text states by itself; the rest of "right bump for the change type" stays with the author and the table in `.changeset/README.md`.
+
+#### The bump rule has one home, and changesets are written by `/changeset`
+
+**Problem.** The rule that picks a changeset's bump was written in nine places — the table in `.changeset/README.md`, `CLAUDE.md`, the `/changeset` skill, `/bugfix` Phase 4.2, `/perf-optimize`, `/bump-dep`, `/code-review-rfc`, `/new-package` and `/brainstorm` — and the copies disagreed with the README table and with each other. Until 2026-10-18 `CLAUDE.md` said "Use `minor` for all changes"; until 2026-10-14 the skill gave `minor` to any observable change, a bug fix included. An audit of the 252 changesets `master` added from 2026-09-06 found 24 bug fixes released as `minor` and 4 breaking changes released as `patch`. In the session transcripts 7 of ≈148 changesets were written through the skill; the rest were written by hand or copied across packages by a script, so the copy in context at the moment of writing decided the level.
+
+**Solution.** The rule is Semantic Versioning with one exception before 1.0 — an incompatible change takes `minor` — and the table in `.changeset/README.md` § Version Bump Guidelines is the only place it is written; every other text points at it. `CLAUDE.md` § Changesets routes every changeset through the `/changeset` skill, called with the Skill tool, and each skill that needs a changeset calls it rather than writing the file — the copies a `shared/` change needs included.
+
+**Why one home.** A second copy goes stale on its own schedule and is believed anyway, because it sits where the reader already is. Here a stale copy did not wait to be found: it was the text the author had in context when choosing the level.
+
 #### Local SAST: semgrep diff scan + eslint-plugin-security
 
 **Problem.** Security findings (e.g. the `js/incomplete-multi-character-sanitization` CodeQL alert on `validateRoutePath`) surfaced only in **cloud CodeQL**, after pushing and opening a PR — a slow feedback loop, and CodeQL's interprocedural taint engine is far too heavy (minutes of DB build) to run on pre-push. There was no fast, local SAST layer to catch the common classes before they reached CI.

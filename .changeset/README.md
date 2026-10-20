@@ -56,7 +56,7 @@ file listing many packages. See the separate-files example below.
 ### Frontmatter (YAML)
 
 - **Package names** must match exactly (with quotes)
-- **Version bump** must be one of: `major`, `minor`, `patch` (pre-1.0 packages never take `major` — use `minor` for breaking changes)
+- **Version bump** must be one of: `major`, `minor`, `patch` — which one, the table in [Version Bump Guidelines](#version-bump-guidelines) decides
 - Exactly **one public** package per file
 
 ### Description
@@ -67,24 +67,25 @@ file listing many packages. See the separate-files example below.
 
 ## Version Bump Guidelines
 
-### Pre-1.0 Phase (Current)
+This section is the only place the bump rule is written. `/changeset`, the
+other skills and `CLAUDE.md` point here instead of restating it.
 
-| Change Type       | Bump    | Rationale                                |
-| ----------------- | ------- | ---------------------------------------- |
-| New feature       | `minor` | Adds functionality                       |
-| Breaking change   | `minor` | Pre-1.0 allows breaking changes in minor |
-| Bug fix           | `patch` | Fixes incorrect behavior                 |
-| Performance       | `patch` | Improves existing functionality          |
-| Internal refactor | `patch` | No API changes                           |
-| Documentation     | `patch` | Improves clarity                         |
+The bump follows [Semantic Versioning 2.0.0](https://semver.org/), with one
+exception before 1.0: an incompatible change takes `minor`, not `major`.
 
-### Post-1.0 (Future)
+| The change                                                    | Before 1.0 | From 1.0 |
+| ------------------------------------------------------------- | ---------- | -------- |
+| Incompatible change to the public API                         | `minor`    | `major`  |
+| New functionality, backward compatible                        | `minor`    | `minor`  |
+| Bug fix, performance or refactoring that keeps the public API | `patch`    | `patch`  |
 
-Follow [Semantic Versioning](https://semver.org/):
-
-- `major` — breaking changes
-- `minor` — new features (backward compatible)
-- `patch` — bug fixes
+The public API is what a package declares: its exported types and its
+documented behavior. A bug fix fixes incorrect behavior, whatever result it
+changes on the way; refusing earlier an input the declared API already rules
+out is one. Changing documented behavior is an incompatible change, inside a bug
+task too. An incompatible change says what the consumer changes — see the
+Breaking Change example below. `pnpm lint:changeset` refuses a `patch` whose
+description labels the change breaking.
 
 ## Examples
 
@@ -220,7 +221,7 @@ Add new `noValidate` option
 
 **Problem:** New feature should be `minor`, not `patch`.
 
-**Solution:** Use `minor` for new features.
+**Solution:** Take the bump from the table in [Version Bump Guidelines](#version-bump-guidelines) — a new option is new functionality.
 
 ### ❌ Missing Package Quotes
 
@@ -260,10 +261,12 @@ push is never blocked. What it checks:
 - The package is public (not "private": true)
 - Exactly one package per file
 - A PR/issue reference (#NN) appears in the description
+- A patch has no description line that opens with "Breaking"
 ```
 
 > Not machine-checked (semantic): "one logical change per file", "don't mix
-> features/fixes", "right bump for the change type". Those are on the author.
+> features/fixes", "right bump for the change type" beyond that one label.
+> Those are on the author.
 
 **CI — changeset presence** (`.github/workflows/changeset-check.yml`, blocks PR merge):
 

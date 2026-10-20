@@ -158,12 +158,12 @@ pnpm resolve:dependabot <PR#>  # Rebase+dedupe a Dependabot PR — conflicting O
 
 ## Versioning
 
-- **Pre-1.0 phase:** a breaking change takes `minor`, never `major`; every other change takes the bump in the [.changeset/README.md](.changeset/README.md) table (a bug fix is `patch`)
+- **Pre-1.0 phase:** the bump comes from the table in [.changeset/README.md](.changeset/README.md) § Version Bump Guidelines, the only place it is written
 - Major version bump only when full scope of work is complete and ready for stable release
 
 ## Changesets
 
-Follow the rules in [.changeset/README.md](.changeset/README.md) — file naming, one package per file, PR/issue reference, version bump guidelines. Read it before creating changesets.
+Every changeset is written by the `/changeset` skill, called through the Skill tool from whatever skill or task needs one — never by hand, by a heredoc, or by a script that copies one text across packages. The skill picks the packages, takes the bump from the table in [.changeset/README.md](.changeset/README.md) and checks each file against the code of its own package.
 
 ## New Package Checklist
 
