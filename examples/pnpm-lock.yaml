@@ -3334,7 +3334,7 @@ importers:
     dependencies:
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.15
@@ -3349,7 +3349,7 @@ importers:
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.15
@@ -3380,7 +3380,7 @@ importers:
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.15
@@ -3408,7 +3408,7 @@ importers:
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.15
@@ -3436,7 +3436,7 @@ importers:
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.15
@@ -3464,7 +3464,7 @@ importers:
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.15
@@ -3507,7 +3507,7 @@ importers:
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.15
@@ -3550,7 +3550,7 @@ importers:
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.15
@@ -3590,7 +3590,7 @@ importers:
         version: 0.7.0(@real-router/core@0.148.0)
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.15
@@ -3642,7 +3642,7 @@ importers:
         version: 0.8.0(@real-router/core@0.148.0)
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.15
@@ -3670,7 +3670,7 @@ importers:
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.15
@@ -3713,7 +3713,7 @@ importers:
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.15
@@ -3756,7 +3756,7 @@ importers:
         version: 0.15.0(@real-router/core@0.148.0)
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.15
@@ -3784,7 +3784,7 @@ importers:
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.15
@@ -3809,7 +3809,7 @@ importers:
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.15
@@ -3855,7 +3855,7 @@ importers:
         version: 0.7.0(@real-router/core@0.148.0)
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.15
@@ -3883,7 +3883,7 @@ importers:
         version: 0.7.0(@real-router/core@0.148.0)
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.15
@@ -3914,7 +3914,7 @@ importers:
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.6.0(@real-router/core@0.148.0)
@@ -3954,7 +3954,7 @@ importers:
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.6.0(@real-router/core@0.148.0)
@@ -4003,7 +4003,7 @@ importers:
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.6.0(@real-router/core@0.148.0)
@@ -4046,7 +4046,7 @@ importers:
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.6.0(@real-router/core@0.148.0)
@@ -4092,7 +4092,7 @@ importers:
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.15
@@ -4117,7 +4117,7 @@ importers:
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.15
@@ -7485,8 +7485,8 @@ packages:
     peerDependencies:
       '@real-router/core': '>=0.135.0'
 
-  '@real-router/solid@0.26.0':
-    resolution: {integrity: sha512-kl2YWXYuZcMsCenqoSupcxcHcrreNTkoyC4UkLx36DonePXCb/J3pZ/kh7JlfeTBxcZK/+XgCSsn9tbF+wItBw==}
+  '@real-router/solid@0.26.1':
+    resolution: {integrity: sha512-brsMpbEqXRYc0UUt50UYOWA8VgmOrh5myqaRkIEUHq5G5G6fDfEd/GJhngIP/P9VwUGNr2y/12tMrJ9H4zT3Ew==}
     peerDependencies:
       '@real-router/core': '>=0.148.0'
       solid-js: '>=1.7.0'
@@ -13408,7 +13408,7 @@ snapshots:
     dependencies:
       '@real-router/core': 0.148.0
 
-  '@real-router/solid@0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)':
+  '@real-router/solid@0.26.1(@real-router/core@0.148.0)(solid-js@1.9.15)':
     dependencies:
       '@real-router/core': 0.148.0
       '@real-router/route-utils': 0.4.0(@real-router/core@0.148.0)
