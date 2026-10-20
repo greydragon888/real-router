@@ -8,6 +8,7 @@ import { createMockNavigationBrowser, noop } from "../helpers/testUtils";
 
 import type { NavigationBrowser, NavigationMeta } from "../../src/types";
 import type { Router, State } from "@real-router/core";
+import type { LoggerConfig } from "@real-router/core/types";
 
 /**
  * A navigation's record — its metadata and, for `traverseToLast`, the entry to
@@ -21,15 +22,14 @@ import type { Router, State } from "@real-router/core";
  *   leaves the record of the transition in flight alone.
  * - No navigation takes a record staged for another: not one a guard starts
  *   inside the staging call, not a commit after a failed transition or after
- *   one whose end core did not deliver, not a transition of a router restarted
- *   from code that call ran, not one whose call is nested in another's. The
- *   boundary: a commit an app makes during the plugin's not-found call takes
- *   that call's record.
- * - Unsupported: a navigation an app starts from inside another's call or
- *   from inside a router notification — an abort handler of the navigation
- *   that call supersedes, a listener that restarts the router — can take the
- *   other's record, or leave it without one. The pinned cell is the restart
- *   from a listener of the transition traverseToLast() supersedes.
+ *   one an earlier listener ended before the plugin heard it start, not a
+ *   transition of a router a guard of that call restarted, not one whose call
+ *   is nested in another's. The boundary: a commit an app makes during the
+ *   plugin's not-found call takes that call's record.
+ * - Core refuses a navigation an app starts from inside a router notification
+ *   — a listener, an abort handler of the navigation a call supersedes — and
+ *   a restart from there (#2778). The cells that try one pin the refusal and
+ *   that each call keeps its record.
  * - The activation's record goes to the router's first transition or commit,
  *   on a router whose `getState()` and `getPreviousState()` are `undefined`.
  *
@@ -128,6 +128,7 @@ function createUnstartedEnv(
     readonly activation?: NavigationType;
     /** Registers what must run before the navigation plugin's hooks. */
     readonly before?: (router: Router) => void;
+    readonly logger?: Partial<LoggerConfig>;
   },
 ): Env {
   const mock = new MockNavigation(url);
@@ -209,7 +210,11 @@ function createUnstartedEnv(
         children: [{ name: "list", path: "/list", canActivate }],
       },
     ],
-    { defaultRoute: "home", allowNotFound: options.allowNotFound },
+    {
+      defaultRoute: "home",
+      allowNotFound: options.allowNotFound,
+      ...(options.logger && { logger: options.logger }),
+    },
   );
 
   options.before?.(router);
@@ -286,6 +291,24 @@ function codeOf(promise: Promise<unknown>): Promise<string | undefined> {
     () => "resolved",
     (error: unknown) => (error as { code?: string }).code,
   );
+}
+
+/**
+ * `stop()` and `start(path)` from inside a router notification: core refuses the
+ * start synchronously (#2778), so the router stays stopped. The refusal's code,
+ * or `"accepted"`.
+ */
+function restartInside(router: Router, path: string): string | undefined {
+  router.stop();
+
+  // eslint-disable-next-line sonarjs/no-try-promise -- the try captures the SYNC reentrancy throw; the rejection half is handled by .catch()
+  try {
+    router.start(path).catch(noop);
+  } catch (error) {
+    return (error as { code?: string }).code;
+  }
+
+  return "accepted";
 }
 
 /** A browser navigation's `finished`, which rejects when another aborts it. */
@@ -833,9 +856,9 @@ describe("a navigation takes no record staged for another", () => {
     env.router.stop();
   });
 
-  it("a transition an earlier listener ended by restarting the router, refused, leaves none for the next commit", async () => {
+  it("a transition an earlier listener of its start ended, refused a restart there, leaves none for the next commit", async () => {
     let stopOn: string | undefined;
-    let deny: (name: string) => void = noop;
+    let refused: string | undefined;
     const env = createUnstartedEnv(`${ORIGIN}/home`, {
       allowNotFound: true,
       before: (router) => {
@@ -843,16 +866,12 @@ describe("a navigation takes no record staged for another", () => {
           onTransitionStart: (toState: State) => {
             if (toState.name === stopOn) {
               stopOn = undefined;
-              router.stop();
-              deny("other");
-              router.start("/other").catch(noop);
+              refused = restartInside(router, "/other");
             }
           },
         }));
       },
     });
-
-    deny = env.deny;
 
     await env.router.start("/home");
     await env.router.navigate("about");
@@ -864,6 +883,8 @@ describe("a navigation takes no record staged for another", () => {
     );
 
     await settle();
+
+    expect(refused).toBe(errorCodes.REENTRANT_NAVIGATION);
 
     env.traversals.length = 0;
     await env.router.start("/nope");
@@ -925,28 +946,22 @@ describe("a navigation takes no record staged for another", () => {
     env.router.stop();
   });
 
-  it("a transition whose error core did not deliver leaves none for the router's next start", async () => {
+  it("a restart refused inside a listener of a refusal within traverseToLast()'s call leaves none for the router's next start", async () => {
     let restart = false;
-    let deny: (name: string) => void = noop;
+    let refused: string | undefined;
     const env = createUnstartedEnv(`${ORIGIN}/home`, {
       allowNotFound: true,
       before: (router) => {
         router.usePlugin(() => ({
-          // A restart inside a TRANSITION_ERROR listener: core delivers the
-          // restart's start, and drops its error inside the one it is emitting.
           onTransitionError: () => {
             if (restart) {
               restart = false;
-              router.stop();
-              deny("other");
-              router.start("/other").catch(noop);
+              refused = restartInside(router, "/other");
             }
           },
         }));
       },
     });
-
-    deny = env.deny;
 
     await env.router.start("/home");
     await env.router.navigate("about");
@@ -961,10 +976,8 @@ describe("a navigation takes no record staged for another", () => {
 
     await settle();
 
-    expect(restart).toBe(false);
-    // The restart ran inside traverseToLast()'s call: its guard reads none of
-    // the traverse's record.
-    expect(env.reads.get("other")).toBe("none");
+    expect(refused).toBe(errorCodes.REENTRANT_NAVIGATION);
+    expect(env.reads.has("other")).toBe(false);
 
     env.traversals.length = 0;
     await env.router.start("/nope");
@@ -978,39 +991,31 @@ describe("a navigation takes no record staged for another", () => {
     env.router.stop();
   });
 
-  it("a restart from a listener of traverseToLast()'s refusal, held by a guard, takes none of its record", async () => {
-    let restart = false;
-    let hold: (name: string) => void = noop;
-    const env = createUnstartedEnv(`${ORIGIN}/home`, {
-      allowNotFound: true,
-      before: (router) => {
-        router.usePlugin(() => ({
-          onTransitionError: () => {
-            if (restart) {
-              restart = false;
-              router.stop();
-              hold("other");
-              router.start("/other").catch(noop);
-            }
-          },
-        }));
-      },
-    });
-
-    hold = env.hold;
+  // A guard is the code a staging call runs that may still restart the router:
+  // core refuses a restart from a router notification (#2778), not from a guard.
+  it("a restart from a guard of traverseToLast()'s transition, held by a guard, takes none of its record", async () => {
+    const env = createUnstartedEnv(`${ORIGIN}/home`, { allowNotFound: true });
 
     await env.router.start("/home");
     await env.router.navigate("about");
     await env.router.navigate("home");
-    restart = true;
 
-    await expect(codeOf(env.router.traverseToLast("home"))).resolves.toBe(
-      errorCodes.SAME_STATES,
+    let restarted = false;
+
+    env.redirect("about", () => {
+      restarted = true;
+      env.router.stop();
+      env.hold("other");
+      env.router.start("/other").catch(noop);
+    });
+
+    await expect(codeOf(env.router.traverseToLast("about"))).resolves.toBe(
+      errorCodes.TRANSITION_CANCELLED,
     );
 
     await settle();
 
-    expect(restart).toBe(false);
+    expect(restarted).toBe(true);
 
     env.traversals.length = 0;
     env.release();
@@ -1027,51 +1032,101 @@ describe("a navigation takes no record staged for another", () => {
     env.router.stop();
   });
 
-  // Subscribed before the plugin, the restart runs ahead of the plugin's
-  // onTransitionSuccess for the transition whose success core is emitting.
-  it.each(["/about", "/nope"])(
-    "a traverseToLast() whose success an earlier listener interrupts with a restart onto %s publishes its own record",
-    async (restartTo) => {
-      let restartOn: string | undefined;
-      const env = createUnstartedEnv(`${ORIGIN}/home`, {
-        allowNotFound: true,
-        before: (router) => {
-          router.subscribe(({ route }) => {
-            if (route.name === restartOn) {
-              restartOn = undefined;
-              router.stop();
-              router.start(restartTo).catch(noop);
-            }
-          });
+  // The logger's callback is code core runs inside a staging call, before
+  // the call's transition starts, that core does not refuse a restart from.
+  // `onStart` keeps the restart's start transition from taking the record.
+  it("a restart from the logger's callback inside traverseToLast()'s call takes none of its record", async () => {
+    let restartOnWarn = false;
+    let restarted = false;
+    let router: Router | undefined;
+    const env = createUnstartedEnv(`${ORIGIN}/home`, {
+      allowNotFound: true,
+      logger: {
+        level: "none",
+        callbackIgnoresLevel: true,
+        callback: (level) => {
+          if (level !== "warn" || !restartOnWarn || router === undefined) {
+            return;
+          }
+
+          restartOnWarn = false;
+          restarted = true;
+          router.stop();
+          router.start("/other").catch(noop);
         },
-      });
+      },
+    });
 
-      await env.router.start("/home");
-      await env.router.navigate("about");
-      await env.router.navigate("home");
-      await env.router.navigate("users.list");
-      env.traversals.length = 0;
-      restartOn = "about";
+    router = env.router;
 
-      const arrived = await env.router.traverseToLast("about");
+    await env.router.start("/home");
+    await env.router.navigate("about");
+    await env.router.navigate("home");
+    await env.router.navigate("users.list");
+    env.reads.clear();
+    env.traversals.length = 0;
+    env.hold("slow");
 
-      await settle();
+    const superseded = codeOf(env.router.navigate("slow"));
 
-      expect(restartOn).toBeUndefined();
-      expect(arrived.context.navigation?.navigationType).toBe("traverse");
-      expect(env.traversals).toStrictEqual(["/about"]);
-      expect(env.mock.entries()).toHaveLength(4);
+    await settle();
+    // traverseToLast() supersedes `slow`: core warns of the concurrent
+    // navigation before it cancels `slow`.
+    restartOnWarn = true;
+    await codeOf(env.router.traverseToLast("about"));
+    await superseded;
+    await settle();
 
-      env.router.stop();
-    },
-  );
+    expect(restarted).toBe(true);
+    expect(env.reads.get("other")).toBe("none");
+    expect(env.traversals).toStrictEqual([]);
 
-  // Unsupported, pinned as it behaves: a restart from code that a staging call
-  // runs, before that call's own transition starts, leaves that transition
-  // without its record.
-  it("a restart from a listener of the transition traverseToLast() supersedes leaves its own transition no record", async () => {
+    env.release();
+    await settle();
+    env.router.stop();
+  });
+
+  // Subscribed before the plugin, the listener runs ahead of the plugin's
+  // onTransitionSuccess for the transition whose success core is emitting.
+  it("a traverseToLast() whose success an earlier listener interrupts with a refused restart publishes its own record", async () => {
     let restartOn: string | undefined;
-    let hold: (name: string) => void = noop;
+    let refused: string | undefined;
+    const env = createUnstartedEnv(`${ORIGIN}/home`, {
+      allowNotFound: true,
+      before: (router) => {
+        router.subscribe(({ route }) => {
+          if (route.name === restartOn) {
+            restartOn = undefined;
+            refused = restartInside(router, "/nope");
+          }
+        });
+      },
+    });
+
+    await env.router.start("/home");
+    await env.router.navigate("about");
+    await env.router.navigate("home");
+    await env.router.navigate("users.list");
+    env.traversals.length = 0;
+    restartOn = "about";
+
+    const arrived = await env.router.traverseToLast("about");
+
+    await settle();
+
+    expect(refused).toBe(errorCodes.REENTRANT_NAVIGATION);
+    expect(arrived.context.navigation?.navigationType).toBe("traverse");
+    expect(env.traversals).toStrictEqual(["/about"]);
+    expect(env.mock.entries()).toHaveLength(4);
+
+    env.router.stop();
+  });
+
+  // Core refuses the restart (#2778). The listener's stop() still stops the
+  // router, so traverseToLast()'s call starts no transition of its own.
+  it("a restart from a listener of the transition traverseToLast() supersedes is refused, and the call takes no record", async () => {
+    let restartOn: string | undefined;
+    let refused: string | undefined;
     const env = createUnstartedEnv(`${ORIGIN}/home`, {
       allowNotFound: true,
       before: (router) => {
@@ -1079,16 +1134,12 @@ describe("a navigation takes no record staged for another", () => {
           onTransitionCancel: (toState: State) => {
             if (toState.name === restartOn) {
               restartOn = undefined;
-              router.stop();
-              hold("other");
-              router.start("/other").catch(noop);
+              refused = restartInside(router, "/other");
             }
           },
         }));
       },
     });
-
-    hold = env.hold;
 
     await env.router.start("/home");
     await env.router.navigate("about");
@@ -1104,51 +1155,17 @@ describe("a navigation takes no record staged for another", () => {
     restartOn = "slow";
 
     await expect(codeOf(env.router.traverseToLast("about"))).resolves.toBe(
-      "resolved",
+      errorCodes.TRANSITION_CANCELLED,
     );
     await expect(superseded).resolves.toBe(errorCodes.TRANSITION_CANCELLED);
 
-    expect(restartOn).toBeUndefined();
-    expect(env.router.getState()?.name).toBe("about");
-    expect(env.reads.get("about")).toBe("none");
-    expect(env.router.getState()?.context.navigation?.navigationType).toBe(
-      "push",
-    );
+    expect(refused).toBe(errorCodes.REENTRANT_NAVIGATION);
+    expect(env.router.getState()).toBeUndefined();
+    expect(env.reads.has("about")).toBe(false);
     expect(env.traversals).toStrictEqual([]);
 
     env.release();
     await settle();
-    env.router.stop();
-  });
-
-  it("a commit that starts no transition, after a transition whose success core did not deliver", async () => {
-    const control = await alone(PUSH_UNMATCHED);
-    const env = await createEnv();
-    let restartOn: string | undefined = "about";
-
-    // A restart inside a TRANSITION_SUCCESS listener: core delivers the
-    // restart's start, and coalesces its success into the one it is emitting.
-    env.router.subscribe(({ route }) => {
-      if (route.name === restartOn) {
-        restartOn = undefined;
-        env.router.stop();
-        env.router.start("/users/list").catch(noop);
-      }
-    });
-
-    await env.router.navigate("about");
-    await settle();
-
-    env.traversals.length = 0;
-    await PUSH_UNMATCHED.run(env);
-    await settle();
-
-    expect(env.router.getState()?.context.navigation).toStrictEqual(
-      control.meta,
-    );
-    expect(env.traversals).toStrictEqual([]);
-
-    env.router.stop();
   });
 
   it("a navigation to a URL no route matches, nested in another's call, leaves the outer one its record", async () => {
@@ -1289,26 +1306,21 @@ describe("the activation's record reaches the router's first transition or commi
   });
 
   it("a start transition an earlier listener ended before the plugin heard it takes it along", async () => {
-    let restart = true;
-    let deny: (name: string) => void = noop;
+    let stop = true;
     const env = createUnstartedEnv(`${ORIGIN}/home`, {
       allowNotFound: true,
       activation: "reload",
       before: (router) => {
         router.usePlugin(() => ({
           onTransitionStart: () => {
-            if (restart) {
-              restart = false;
+            if (stop) {
+              stop = false;
               router.stop();
-              deny("other");
-              router.start("/other").catch(noop);
             }
           },
         }));
       },
     });
-
-    deny = env.deny;
 
     await expect(codeOf(env.router.start("/home"))).resolves.toBe(
       errorCodes.TRANSITION_CANCELLED,
@@ -1347,8 +1359,9 @@ describe("the activation's record reaches the router's first transition or commi
     env.router.stop();
   });
 
-  it("the start transition whose success an earlier listener interrupts with a restart publishes it", async () => {
+  it("the start transition whose success an earlier listener interrupts with a refused restart publishes it", async () => {
     let restart = true;
+    let refused: string | undefined;
     const env = createUnstartedEnv(`${ORIGIN}/home`, {
       allowNotFound: true,
       activation: "reload",
@@ -1356,8 +1369,7 @@ describe("the activation's record reaches the router's first transition or commi
         router.subscribe(() => {
           if (restart) {
             restart = false;
-            router.stop();
-            router.start("/home").catch(noop);
+            refused = restartInside(router, "/home");
           }
         });
       },
@@ -1367,40 +1379,8 @@ describe("the activation's record reaches the router's first transition or commi
 
     await settle();
 
-    expect(restart).toBe(false);
+    expect(refused).toBe(errorCodes.REENTRANT_NAVIGATION);
     expect(first.context.navigation?.navigationType).toBe("reload");
-
-    env.router.stop();
-  });
-
-  it("a restart's success the plugin hears before the start an earlier listener ended takes it", async () => {
-    let restart = true;
-    const env = createUnstartedEnv(`${ORIGIN}/home`, {
-      allowNotFound: true,
-      activation: "reload",
-      before: (router) => {
-        router.usePlugin(() => ({
-          onTransitionStart: () => {
-            if (restart) {
-              restart = false;
-              router.stop();
-              router.start("/other").catch(noop);
-            }
-          },
-        }));
-      },
-    });
-
-    await expect(codeOf(env.router.start("/home"))).resolves.toBe(
-      errorCodes.TRANSITION_CANCELLED,
-    );
-
-    await settle();
-
-    expect(env.router.getState()?.name).toBe("other");
-    expect(env.router.getState()?.context.navigation?.navigationType).toBe(
-      "reload",
-    );
 
     env.router.stop();
   });

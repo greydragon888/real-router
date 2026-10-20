@@ -1503,6 +1503,11 @@ export class Router<
       return Promise.reject(CACHED_ALREADY_STARTED_ERROR);
     }
 
+    // BELOW the `canStart()` refusal (#2778): the ban refuses a restart, and a
+    // `start()` on a started router restarts nothing, so it keeps the
+    // rejection it gets everywhere else.
+    this.#assertNotReentrant();
+
     getInternals(this).validator?.navigation.validateStartArgs(startPath);
 
     // FSM bookkeeping is split across the facade and RouterLifecycleNamespace by
@@ -1550,22 +1555,25 @@ export class Router<
   }
 
   /**
-   * Rejects a synchronous reentrant navigation — `navigate` /
-   * `navigateToDefault` / `navigateToState` / `navigateToNotFound` called from
-   * inside a navigation core has not finished with. Throws synchronously: inside
-   * a listener the emit's `onListenerError` isolation surfaces it (visible,
-   * non-fatal); a DEFERRED (async / microtask) navigate runs after the window
-   * closes and is allowed. Always-on core invariant guard (not validator-gated).
+   * Rejects a synchronous reentrant navigation — which calls, and from which
+   * windows, is `INVARIANTS.md` "Reentrancy & dispatch" rows 1 and 4. Throws
+   * synchronously: inside an emitter listener the emit's `onListenerError`
+   * isolation surfaces it (visible, non-fatal); inside an `abort` listener the
+   * platform reports it as an uncaught exception, which ends a Node process. A
+   * DEFERRED (async / microtask) navigate runs after the window closes and is
+   * allowed. Always-on core invariant guard (not validator-gated).
    *
-   * TWO windows, because application code runs in two places core does not
-   * control, on opposite sides of the announce:
+   * TWO windows around the announce, because application code runs in two
+   * places core does not control, on opposite sides of it (the third,
+   * `replace()`'s revalidation, is commented at its check below):
    *
    * - **Dispatch** (`isProcessing`) — a transition-event listener, mid-emit
    *   (RFC navigation-cancellation-unification §4) — and, since #1647, a
    *   `$start` listener too: a plugin's `onStart` runs on a READY machine that
    *   still owes the boot's commit, so a navigation from there would run to
    *   completion and the boot would overwrite it. Counting the `$start` emit
-   *   puts that window under this rule rather than a predicate of its own.
+   *   puts that window under this rule rather than a predicate of its own. So
+   *   is an `abort` listener while `EventBusNamespace.dispatchAbort` runs it.
    * - **Pre-start** (`isPreparing`, #1610) — application code running BEFORE the
    *   first emit. `INVARIANTS.md` row 4 owns the site list and the exclusions;
    *   what belongs here is why the window needs a predicate of its own: the
@@ -1577,7 +1585,7 @@ export class Router<
    * the classic guard-redirect (`navigate(...)` then `return false`) stays a
    * plain supersede.
    *
-   * ⚑ The two windows get DIFFERENT messages (#1665), and that is not polish.
+   * ⚑ The windows get DIFFERENT messages (#1665), and that is not polish.
    * The code names a rule the caller broke, and unlike a state error
    * (`ROUTER_DISPOSED`, `SAME_STATES`) the remedy does not follow from the name
    * — which is why the bare code produced two docs issues (#1203, #1219) and
@@ -1591,7 +1599,7 @@ export class Router<
     if (this.#eventBus.isProcessing()) {
       throw atRouter.code(
         errorCodes.REENTRANT_NAVIGATION,
-      )`cannot start a navigation from inside a router event listener — the nested navigation would commit a state the outer one overwrites. Defer it: queueMicrotask(() => router.navigate(...)), await the current transition, or use an async listener.`;
+      )`cannot start a navigation from inside a router event listener or an abort listener of a navigation's signal — the nested navigation would commit a state the outer one overwrites. Defer it: queueMicrotask(() => router.navigate(...)), await the current transition, or use an async listener.`;
     }
 
     if (this.#navigation.isPreparing()) {

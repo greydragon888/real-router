@@ -365,6 +365,9 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     cancelNavigation: (reason) => {
       ns.eventBus.sendCancelIfPossible(ns.state.get(), reason);
     },
+    dispatchAbort: (controller, reason) => {
+      ns.eventBus.dispatchAbort(controller, reason);
+    },
     // The bridge's LATE moment (#1690). The EARLY one needs no wire at all — it
     // is the `NAVIGATE` action, inside the same namespace (#1724).
     bridgeExternalSignal: (plan) => {

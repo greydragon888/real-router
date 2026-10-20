@@ -297,8 +297,9 @@ export class NavigationPlugin {
 
       onStart: () => {
         // A router that starts during a staging call was restarted from code
-        // that call ran — a listener or an interceptor: its start transition is
-        // not the call's.
+        // that call ran before its own transition started. Core refuses a
+        // restart from a router notification there (#2778), not from the
+        // logger's callback. Its start transition is not the call's.
         this.#staged = undefined;
         lifecycle.onStart();
       },

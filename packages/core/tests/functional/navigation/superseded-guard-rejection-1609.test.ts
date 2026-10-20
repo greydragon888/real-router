@@ -399,9 +399,11 @@ describe("#1609 — a cancelled navigation's rejecting async guard, by source", 
 
 /**
  * #1609 sibling — the SYNCHRONOUS arc (`handleNavigateError`) carries the same
- * defect, reached without any async guard: a `subscribeLeave` listener that
- * tears the navigation down and then throws. The throw is reported for a
- * navigation the listener itself already cancelled.
+ * defect, reached without any async guard: a `subscribeLeave` listener or a
+ * guard that tears the navigation down and then throws. The throw is reported
+ * for a navigation the throwing code itself already cancelled. The cells that
+ * also restart the router do it from a guard: a restart from a leave listener
+ * is refused `REENTRANT_NAVIGATION` (#2778), and a guard's is not.
  *
  * It asks whether the FSM still holds this transition rather than reading
  * `controller.signal.aborted`, and that is a deliberate difference of QUESTION,
@@ -432,19 +434,41 @@ describe("#1609 — a torn-down navigation's synchronous throw", () => {
     return { router, log };
   };
 
-  it("emits no TRANSITION_ERROR when a leave listener stopped and restarted the router before throwing", async () => {
+  it("emits no TRANSITION_ERROR when a leave listener stopped the router before throwing", async () => {
     const { router, log } = setup();
 
     await router.start("/");
 
     router.subscribeLeave(() => {
       router.stop();
+
+      throw new Error("sync-leave-boom");
+    });
+
+    const code = await router.navigate("a").then(
+      () => undefined,
+      (error: unknown) => codeOf(error),
+    );
+
+    await tick(30);
+
+    expect(code).toBe(errorCodes.TRANSITION_CANCELLED);
+    expect(log.some((entry) => entry.startsWith("ERROR:a"))).toBe(false);
+  });
+
+  it("emits no TRANSITION_ERROR when a guard stopped and restarted the router before throwing", async () => {
+    const { router, log } = setup();
+
+    await router.start("/");
+
+    getLifecycleApi(router).addActivateGuard("a", () => () => {
+      router.stop();
       void router.start("/b").then(
         () => log.push("start-ok"),
         () => log.push("start-rejected"),
       );
 
-      throw new Error("sync-leave-boom");
+      throw new Error("sync-guard-boom");
     });
 
     const code = await router.navigate("a").then(
@@ -479,14 +503,14 @@ describe("#1609 — a torn-down navigation's synchronous throw", () => {
     await router.start("/");
     park = true;
 
-    router.subscribeLeave(() => {
+    getLifecycleApi(router).addActivateGuard("a", () => () => {
       router.stop();
       void router.start("/b").then(
         () => log.push("start-ok"),
         () => log.push("start-rejected"),
       );
 
-      throw new Error("sync-leave-boom");
+      throw new Error("sync-guard-boom");
     });
 
     await expect(router.navigate("a")).rejects.toBeDefined();

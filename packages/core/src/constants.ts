@@ -37,7 +37,7 @@ export const errorCodes: ErrorCodeToValueMap = Object.freeze({
   ROUTER_DISPOSED: "DISPOSED", // Router has been disposed
   PLUGIN_CONFLICT: "PLUGIN_CONFLICT", // Plugin tried to extend router with already-existing property
   CONTEXT_NAMESPACE_ALREADY_CLAIMED: "CONTEXT_NAMESPACE_ALREADY_CLAIMED", // Plugin tried to claim a context namespace already owned by another plugin
-  REENTRANT_NAVIGATION: "REENTRANT_NAVIGATION", // navigate() called synchronously from inside a transition-event listener (banned — use await/async listener)
+  REENTRANT_NAVIGATION: "REENTRANT_NAVIGATION", // a navigation (the navigate family, or start() restarting the router) called synchronously from inside a navigation core has not finished with (banned — defer it)
   REENTRANT_TREE_MUTATION: "REENTRANT_TREE_MUTATION", // a tree mutator — route-CRUD or setRootPath (#1751) — called synchronously from inside a subscribeChanges handler (banned — use await/async/queueMicrotask)
   ROUTER_NOT_STOPPED: "NOT_STOPPED", // clear() called while a state is committed — tear down with stop() first, or swap the tree with replace() (#1612)
   WRONG_CHANNEL: "WRONG_CHANNEL", // a declared query key was supplied in the path channel (`params`) instead of `search` (#1572)

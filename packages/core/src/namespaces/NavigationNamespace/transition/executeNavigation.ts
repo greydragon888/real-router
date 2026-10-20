@@ -802,12 +802,17 @@ interface AttemptedNavigation {
  *
  * **Has the FSM left my transition?** is the precondition for sending `FAIL`,
  * and `isActive()` is the looser approximation that gets a case wrong: a
- * listener running `stop()` and then a `start()` PARKED in an async interceptor
+ * guard running `stop()` and then a `start()` PARKED in an async interceptor
  * leaves the FSM in `STARTING`, where `isActive()` is true again — for a
  * different lifecycle, whose start the stale `FAIL` would kill
  * (`STARTING --FAIL--> IDLE`). Measured: swapping the predicate for
- * `isActive()` reds 115 tests. The predicate stands alone — an identity term
- * beside it decides nothing, in any configuration (#1734).
+ * `isActive()` reds the restart cells of `superseded-guard-rejection-1609.test.ts`
+ * and the removal cells of `getRoutesApi/removeRoute.test.ts`.
+ *
+ * ⚠ It asks whether the machine holds A transition, not this one. After a guard
+ * redirects to a route an async guard holds and then refuses, it answers for
+ * the redirect: the refused navigation rejects with its guard's code although
+ * `TRANSITION_CANCEL` announced it cancelled.
  *
  * The restatement below is `asCancellation` — see `./errorHandling` for what it
  * measures.
@@ -822,7 +827,9 @@ function handleNavigateError(
   // The failing navigation's OWN controller, read off the plan so both arcs are
   // covered (#1684); `undefined` is the born-dead case — nothing was announced,
   // so there is nothing to abort. Pinned by `leave-signal-cancellation` (#722).
-  nav?.controller?.abort(error);
+  // Counted, because its `abort` listeners run while this arc still settles
+  // the outcome below (#2778).
+  deps.dispatchAbort(nav?.controller, error);
 
   if (nav !== undefined) {
     const outcome = deps.isTransitioning() ? error : asCancellation(error);
@@ -874,36 +881,16 @@ function handleNoGuardsLeave(
     // like every other one.
     const controller = openController(plan);
 
-    let leaveResult: Promise<void> | undefined;
-
-    // This catches the SYNCHRONOUS throw only — a leave listener that throws
-    // inline, before any Promise exists (three tests in
-    // `leave-signal-cancellation.test.ts` fail without it: the sync-throw
-    // rejection, its `signal.reason` (#943), and the reentrant-navigate abort).
-    // A rejection of the RETURNED Promise is deliberately not caught here: it is
-    // awaited in `finishAsyncNavigation`, which routes it through
-    // `routeTransitionError` with the controller released as cancelled. Sonar's
-    // S4822 flags the shape (a promise-returning call inside `try`) and cannot
-    // see that split.
-    try {
-      // NOSONAR -- S4822: the try is for the sync listener throw, never for the Promise
-      leaveResult = deps.awaitLeaveListeners(
-        toState,
-        fromState,
-        controller.signal,
-      );
-    } catch (error) {
-      // A sync listener threw — the navigation fails; abort the leave signal
-      // with the thrown value so a listener that captured the signal sees the
-      // real cause via `signal.reason`, not a generic AbortError (#943).
-      // `handleNavigateError` would abort it too, with the same value and
-      // idempotently; kept here because this is where the reason is KNOWN to be
-      // the thrown one, and the three pins in `leave-signal-cancellation.test.ts`
-      // are about that, not about the unwind.
-      controller.abort(error);
-
-      throw error;
-    }
+    // A listener that throws inline fails the navigation through
+    // `handleNavigateError`, which aborts this controller — the plan's — with
+    // the thrown value, so a listener that captured the signal sees the real
+    // cause via `signal.reason` (#943). A rejection of the RETURNED Promise is
+    // awaited in `finishAsyncNavigation` instead.
+    const leaveResult = deps.awaitLeaveListeners(
+      toState,
+      fromState,
+      controller.signal,
+    );
 
     if (leaveResult !== undefined) {
       return finishAsyncNavigation(deps, leaveResult, plan, controller);

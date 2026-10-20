@@ -191,8 +191,9 @@ export class EventBusNamespace {
 
   // Depth of the synchronous router-dispatch window — elevated while a
   // transition event is being emitted (`emitTransition*`), while `$start` is
-  // being emitted (#1647) or while a `subscribeLeave`
-  // listener batch runs. `isProcessing()` reads it so the navigation facade can
+  // being emitted (#1647), while a `subscribeLeave` listener batch runs, or
+  // while a navigation's controller is aborted (`dispatchAbort`, #2778).
+  // `isProcessing()` reads it so the navigation facade can
   // reject a synchronous reentrant navigate() from inside a transition listener
   // with REENTRANT_NAVIGATION (RFC navigation-cancellation-unification §4). A
   // counter (not a boolean) tolerates legitimately-nested transition emits. The
@@ -321,14 +322,52 @@ export class EventBusNamespace {
   }
 
   /**
-   * True while a router event is being dispatched synchronously — an
-   * `emitTransition*` call, the `$start` emit (#1647), or a `subscribeLeave`
-   * listener batch is on the stack. The navigation facade reads this to reject a
+   * Aborts a navigation's controller as a counted dispatch (#2778).
+   *
+   * `abort()` runs the signal's `abort` listeners synchronously, and the signal
+   * was handed to application code — a guard, a `subscribeLeave` listener — so
+   * the call is a dispatch of application code like an `emitTransition*`.
+   * Uncounted, a navigation started from such a listener would run to
+   * completion inside the cancel or the failure that aborted the controller,
+   * while core was still settling it.
+   *
+   * ⚠ Two raw aborts do not come here. `finishAsyncNavigation` releases its
+   * controller after `routeTransitionError`, so a navigation started from that
+   * abort is a new one; `openController` aborts a controller nobody has
+   * listened to yet. `abort-dispatch-authority-2778.test.ts` holds the set.
+   */
+  dispatchAbort(
+    controller: AbortController | undefined,
+    reason: unknown,
+  ): void {
+    if (controller === undefined) {
+      return;
+    }
+
+    this.#dispatchDepth++;
+    try {
+      controller.abort(reason);
+    } finally {
+      this.#dispatchDepth--;
+    }
+  }
+
+  /**
+   * True while a router event is being dispatched synchronously — while an
+   * `emitTransition*` call, the `$start` emit (#1647), a `subscribeLeave`
+   * listener batch, or a `dispatchAbort` is on the stack. The navigation facade
+   * reads this to reject a
    * synchronous reentrant navigate() from inside such a listener (RFC §4).
    *
    * `$stop` is deliberately NOT in that set: its action runs after the swap, so
    * the machine is already IDLE and the doors refuse `ROUTER_NOT_STARTED` from
    * the table anyway — a second mechanism there would buy nothing (#1647 §5.6a).
+   * The one door the table admits there is `start()`, and a `$stop` listener
+   * of a top-level `stop()` restarts a router with nothing of its old
+   * lifecycle left to run; a `stop()` called inside another dispatch emits
+   * `$stop` inside that dispatch's depth. ⚠ `dispose()` emits `$stop` too and
+   * then disposes, so a restart from that listener boots a router about to be
+   * disposed — an open door the reentrancy ban does not cover.
    */
   isProcessing(): boolean {
     return this.#dispatchDepth > 0;
@@ -1224,7 +1263,8 @@ export class EventBusNamespace {
       // this line finds nothing and the abort arrives AFTER the emit below,
       // inverting the order stated above. The controller is a field of
       // `ctx.inflight`, so there is no second slot to fall out of step with.
-      // `?.` because allocating one is conditional (cut A allocates none).
+      // It may be absent, because allocating one is conditional (cut A
+      // allocates none), and `dispatchAbort` skips an absent one.
       //
       // Only the fallback is frozen: a `reason` handed in belongs to whoever
       // aborted, and `freezeThrownError` leaves a foreign value untouched.
@@ -1233,13 +1273,13 @@ export class EventBusNamespace {
         freezeThrownError(new RouterError(errorCodes.TRANSITION_CANCELLED));
 
       // ⚑ RECORD first, abort second (#1706). The controller is allocated
-      // lazily by whichever consumer needs a signal, so `?.` here is not "no
-      // controller, nothing to do" — it is "the consumer has not opened one
+      // lazily by whichever consumer needs a signal, so a missing one here is
+      // not "no controller, nothing to do" — it is "the consumer has not opened one
       // YET", and the one it opens moments later would be born unaborted. The
       // record costs no allocation, which is what keeps cut A and the
       // born-dead arcs at zero controllers; `openController` replays it.
       inflight.cancelReason = cancelReason;
-      inflight.controller?.abort(cancelReason);
+      this.dispatchAbort(inflight.controller, cancelReason);
 
       // ⚑ Closing the cancellability scope is this edge's job (#1716). BEFORE
       // the emit deliberately: no observer of

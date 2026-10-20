@@ -479,17 +479,17 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 **Precondition:**
 - A transition held by an async guard — `router.navigate()`, `traverseToLast()`, a push the browser started, Back — and an unrelated `router.navigate()` refused as `SAME_STATES` or `ROUTE_NOT_FOUND`; or
 - A `traverseToLast()` or a browser navigation refused by a guard — or a `traverseToLast()` whose `browser.traverseTo()` threw, or a navigation to a URL no route matches refused by `canDeactivate` — then a commit that starts no transition; or
-- A transition an earlier `TRANSITION_START` listener ended before the plugin heard it start — by `router.stop()`, by restarting the router into a refused start, or by aborting a browser navigation — then a commit that starts no transition; or
-- A transition whose success core did not deliver — the router restarted inside a `TRANSITION_SUCCESS` listener — then a browser navigation to a URL no route matches; or
-- A router restarted inside a `TRANSITION_ERROR` listener during `traverseToLast()`'s call, its start refused or held by a guard; or
-- A transition whose success an earlier `TRANSITION_SUCCESS` listener interrupts with a restart
+- A transition an earlier `TRANSITION_START` listener ended before the plugin heard it start — by `router.stop()`, with or without a restart core refuses there, or by aborting a browser navigation — then a commit that starts no transition; or
+- A restart core refuses inside a `TRANSITION_ERROR` listener during `traverseToLast()`'s call, then a start; or
+- A router restarted from a guard of `traverseToLast()`'s transition, its start held by a guard, or from the logger's callback inside its call; or
+- A transition whose success an earlier `TRANSITION_SUCCESS` listener interrupts with `router.stop()` and a restart core refuses
 
 **Postcondition:**
 - The transition in flight ends with its own metadata, as it does without the refusal, and no hook of the plugin throws
 - The commit or transition after the refused, ended or restarted one publishes its own metadata and traverses nowhere; the restarted router's guards read none of the record
-- A transition whose success a restart interrupts publishes its own record
+- A transition whose success such a listener interrupts publishes its own record
 
-**Unsupported:** a navigation an app starts from inside another navigation's router call — from an abort handler of the navigation that call supersedes, or by restarting the router from a listener — or from inside a router notification. It can take the call's record or the activation, and the call's own transition or commit then goes without it; the cell restarting from a listener of the transition `traverseToLast()` supersedes pins one such order as it behaves.
+**Refused by core (#2778):** a navigation an app starts from inside a router notification — a listener, the abort handler of the navigation a call supersedes — and a restart there: `start()` throws `REENTRANT_NAVIGATION`, as the navigate family does. The cells that try a restart from a listener pin the refusal.
 
 **Test:** `tests/functional/transition-record-2753-2754.test.ts`
 
@@ -551,7 +551,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 ### C9. Activation Priming on Cross-Document Load (#531)
 **Category:** NavigationMeta
 **Testable:** Example-based
-**Description:** When the plugin constructor runs and `browser.getActivationType()` returns one of `"reload" | "traverse" | "push" | "replace"`, the constructor stages a record from it BEFORE `router.start()` is called, unless `router.getState()` or `router.getPreviousState()` returns a state. The first transition start or commit the plugin hears takes it: the router's first transition, whose guards see it and whose success publishes it; its first commit, when `start()` lands on a URL no route matches; or, when an earlier listener restarts the router before the plugin hears the first start, the restart's success, whose guards do not see it. The transition that takes it keeps it if it fails — refused, cancelled, or ended by an earlier listener before the plugin heard it start. A start that commits nothing leaves the previous state `undefined`, so a plugin installed after one stages the record again. A `start()` refused before it begins a transition leaves the record to the next `start()`, and so does a `traverseToLast()` refused before the router starts or a refused navigation the browser handles in another plugin's `onStart`. Subsequent same-document transitions derive meta from `navOptions` as usual.
+**Description:** When the plugin constructor runs and `browser.getActivationType()` returns one of `"reload" | "traverse" | "push" | "replace"`, the constructor stages a record from it BEFORE `router.start()` is called, unless `router.getState()` or `router.getPreviousState()` returns a state. The first transition start or commit the plugin hears takes it: the router's first transition, whose guards see it and whose success publishes it, or its first commit, when `start()` lands on a URL no route matches. The transition that takes it keeps it if it fails — refused, cancelled, or ended by an earlier listener before the plugin heard it start. A start that commits nothing leaves the previous state `undefined`, so a plugin installed after one stages the record again. A `start()` refused before it begins a transition leaves the record to the next `start()`, and so does a `traverseToLast()` refused before the router starts or a refused navigation the browser handles in another plugin's `onStart`. Subsequent same-document transitions derive meta from `navOptions` as usual.
 
 **Precondition:**
 - Browser exposes `navigation.activation` (Chrome 123+, Firefox 147+, Safari 26.2+)
