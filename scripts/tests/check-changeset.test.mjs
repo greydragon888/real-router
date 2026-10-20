@@ -41,10 +41,20 @@ const INVALID = '---\n"@real-router/core": minor\n---\n\nA change\n';
 const changeset = (...lines) =>
   `---\n${lines.join("\n")}\n---\n\nA change (#1234)\n`;
 
-/** The fixture's public packages by directory, before and after 1.0. */
+/**
+ * The fixture's packages by directory: public ones before and after 1.0, a
+ * private one at `shared/` as in this repository, and one in a directory the
+ * workspace does not list.
+ */
 const PACKAGES = {
   "packages/core": { name: "@real-router/core", version: "0.3.0" },
   "packages/stable": { name: "@real-router/stable", version: "1.2.0" },
+  shared: {
+    name: "@real-router/shared-sources",
+    private: true,
+    version: "0.0.0",
+  },
+  "examples/app": { name: "example-app", version: "1.0.0" },
 };
 
 const fixtures = [];
@@ -53,8 +63,9 @@ after(() => {
 });
 
 /**
- * A checkout holding a byte copy of the validator, the packages of `PACKAGES`,
- * and `changesets` (file name → text) beside the validator.
+ * A checkout holding a byte copy of the validator, a `pnpm-workspace.yaml`
+ * that lists `packages/*` and `shared`, the packages of `PACKAGES`, and
+ * `changesets` (file name → text) beside the validator.
  */
 function fixture(changesets = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "changeset-")));
@@ -62,6 +73,10 @@ function fixture(changesets = {}) {
   mkdirSync(join(root, ".changeset"));
   copyFileSync(SCRIPT, join(root, ".changeset", "check-changeset.mjs"));
   writeFileSync(join(root, ".changeset", "README.md"), "# Changesets\n");
+  writeFileSync(
+    join(root, "pnpm-workspace.yaml"),
+    'packages:\n  - "packages/*"\n  - "shared"\n',
+  );
   for (const [dir, manifest] of Object.entries(PACKAGES)) {
     mkdirSync(join(root, dir), { recursive: true });
     writeFileSync(join(root, dir, "package.json"), JSON.stringify(manifest));
@@ -138,6 +153,16 @@ const REFUSED = [
     error: /^missing or unterminated YAML frontmatter/,
   },
   {
+    name: "an empty frontmatter, as prettier leaves `changeset --empty`",
+    text: "---\n---\n\nA change (#1234)\n",
+    error: /^frontmatter lists no packages$/,
+  },
+  {
+    name: "an empty frontmatter above a `---` rule in the description",
+    text: "---\n---\n\nA change (#1234)\n\n---\n\nMore.\n",
+    error: /^frontmatter lists no packages$/,
+  },
+  {
     name: "an unquoted package name, given the quoted line to write",
     text: changeset("@real-router/core: minor"),
     error: /^package name must be quoted: `"@real-router\/core": minor`$/,
@@ -166,6 +191,16 @@ const REFUSED = [
     error: /^unknown package "@real-router\/cor"/,
   },
   {
+    name: "a package in a directory the workspace does not list",
+    text: changeset('"example-app": minor'),
+    error: /^unknown package "example-app" — not a workspace package$/,
+  },
+  {
+    name: "the private package of the README's example",
+    text: changeset('"@real-router/shared-sources": patch'),
+    error: /^"@real-router\/shared-sources" is private/,
+  },
+  {
     name: "a major on a package before 1.0",
     text: changeset('"@real-router/core": major'),
     error: /^"@real-router\/core" is pre-1\.0 \(0\.3\.0\) — use "minor"/,
@@ -183,6 +218,15 @@ for (const { name, text, error } of REFUSED) {
     assert.match(errors[0], error);
   });
 }
+
+test("a pnpm-workspace.yaml without a `packages:` list stops the run", () => {
+  const root = fixture({ "a-change.md": VALID });
+  writeFileSync(join(root, "pnpm-workspace.yaml"), "overrides: {}\n");
+  const { status, output } = run(root);
+
+  assert.equal(status, 1, output);
+  assert.match(output, /pnpm-workspace\.yaml has no `packages:` list/);
+});
 
 test("control: CRLF, blank frontmatter lines and a major after 1.0 pass", () => {
   const root = fixture({

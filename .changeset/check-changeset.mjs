@@ -18,8 +18,9 @@
  *
  * Why a separate script (not the CI workflow): the rules are policy that the
  * author should hear *before* push, not after a red CI round-trip. The package
- * registry (name → private/version) is read straight from each package.json,
- * so "unknown package" and "private package" can never drift from reality.
+ * registry (name → private/version) is read straight from the package.json of
+ * each package `pnpm-workspace.yaml` lists, so "unknown package" and "private
+ * package" can never drift from reality.
  *
  * NOT checked here (semantic — not derivable from the file text): "one logical
  * change per file", "don't mix features/fixes", "right bump for the change type",
@@ -45,12 +46,29 @@ import { join } from "node:path";
 // from `packages/` has no `.changeset/` to validate.
 const ROOT = join(import.meta.dirname, "..");
 const CHANGESET_DIR = join(ROOT, ".changeset");
-const PKG_DIR = join(ROOT, "packages");
 const VALID_LEVELS = new Set(["major", "minor", "patch"]);
 // A line opening with "Breaking"/"BREAKING", after a quote, list or emphasis
 // marker or a ⚠.
 const BREAKING_LABEL =
   /^[\t >*_-]*(?:⚠️?[\t ]*)?(?:\*\*|__)?(?:Breaking|BREAKING)\b/;
+
+/**
+ * The workspace's package directories: an entry of the `packages:` list in
+ * `pnpm-workspace.yaml` names one, or with a trailing `/*` each one under it.
+ * @returns {string[]}
+ */
+function workspaceDirs() {
+  const yaml = readFileSync(join(ROOT, "pnpm-workspace.yaml"), "utf8");
+  const list = /^packages:\n((?:[ \t]+-[^\n]*\n?)+)/m.exec(yaml);
+  if (!list) throw new Error("pnpm-workspace.yaml has no `packages:` list");
+  return [...list[1].matchAll(/-\s*["']([^"']+)["']/g)].flatMap(([, entry]) =>
+    entry.endsWith("/*")
+      ? readdirSync(join(ROOT, entry.slice(0, -2))).map((dir) =>
+          join(ROOT, entry.slice(0, -2), dir),
+        )
+      : [join(ROOT, entry)],
+  );
+}
 
 /**
  * Registry of workspace packages: name → { private, version }.
@@ -59,8 +77,8 @@ const BREAKING_LABEL =
  */
 function loadPackages() {
   const registry = new Map();
-  for (const entry of readdirSync(PKG_DIR)) {
-    const pkgJsonPath = join(PKG_DIR, entry, "package.json");
+  for (const dir of workspaceDirs()) {
+    const pkgJsonPath = join(dir, "package.json");
     if (!existsSync(pkgJsonPath)) continue;
     try {
       const pkg = JSON.parse(readFileSync(pkgJsonPath, "utf8"));
@@ -95,8 +113,9 @@ function validateChangeset(name, content, registry) {
     );
   }
 
-  // Frontmatter must be present and terminated.
-  const fm = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  // Frontmatter must be present and terminated; an empty one closes on the
+  // next line (`---\n---`, as prettier leaves `changeset --empty`).
+  const fm = content.match(/^---\r?\n(?:([\s\S]*?)\r?\n)??---/);
   if (!fm) {
     errors.push("missing or unterminated YAML frontmatter (--- … ---)");
     return { errors, warnings };
@@ -105,7 +124,7 @@ function validateChangeset(name, content, registry) {
   // Parse frontmatter entries — one `"package": level` per non-empty line.
   const entries = [];
   let nonEmptyLines = 0;
-  for (const rawLine of fm[1].split(/\r?\n/)) {
+  for (const rawLine of (fm[1] ?? "").split(/\r?\n/)) {
     const line = rawLine.trim();
     if (line === "") continue;
     nonEmptyLines++;
