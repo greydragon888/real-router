@@ -138,7 +138,7 @@ Perf-аналог «воспроизведи баг эмпирически» (`/
 
 1. **Запись в `SCENARIO-LAG-ANALYSIS.md` — обязательна для КАЖДОГО прогона класса (a)** (даже терминал «не рычаг» из Фазы 2), это проектная дисциплина «record every investigation here, not only in memory». **Для классов (b)–(d) ledger НЕПРИМЕНИМ и искать в нём запись не надо:** у такой задачи нет cohort/scenario/competitor, то есть нет ни строки Summary matrix, ни Detailed-полей; терминал = комментарий в issue + локальные доки (Фаза 7.2). По разделу «How to add an entry»: (1) строка в **Summary matrix** (cohort · scenario · margin · cause-class · confidence · verdict); (2) на A/B-proven/значимый trace — **Detailed subsection**: numbers (median+RME+n), A/B recipe/result ИЛИ code-trace `file:line`, root cause в один параграф, verdict; (3) cite issue/PR; (4) **commit directly to `master`, no changeset** (benchmark infra). Confidence честно: `A/B-proven` только если same-session A/B пинил причину; иначе `code-traced`/`inferred` (помечай, пока A/B не апгрейдит).
 2. **Локальные доки + вики** (`/bugfix` 5) — perf-фикс часто означает расхождение задокументированного контракта: `packages/<pkg>/CLAUDE.md` (секции «Performance Notes»), `ARCHITECTURE.md` (если тронут инвариант / O-нотация — #1316 урок: «ARCHITECTURE заявлял O(n), а было O(n²)»), `IMPLEMENTATION_NOTES.md` (Problem→Solution→Why для structural-фикса). Вики — абсолютным путём (`Additional working directories`), коммить ТОЛЬКО свои файлы.
-3. **Симметричные сиблинги/долги, не покрытые в прогоне** → `/create-issue` (родословная + class-guard), назови в отчёте.
+3. **Симметричные сиблинги/долги, не покрытые в прогоне** → `/create-issue` (в тело — родословная и class-guard, найденные в прогоне), назови в отчёте.
 
 ## Фаза 8 — Commit + issue-comment
 
