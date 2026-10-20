@@ -10,7 +10,7 @@ $ARGUMENTS
 
 ## Когда этот скилл, а когда `/bump-dep`
 
-Этот скилл — **только** для eslint-экосистемы. Признаки пакета: `eslint`, `@eslint/js`, `eslint-plugin-*`, `@*/eslint-plugin` (напр. `@vitest/eslint-plugin`, `@eslint-react/eslint-plugin`), `eslint-config-*`, `typescript-eslint`, `@typescript-eslint/*`, `@stylistic/*`, `eslint-import-resolver-*`. Всё остальное (включая прочий dev-тулинг и runtime-зависимости) → обычный `/bump-dep`.
+Этот скилл — **только** для eslint-экосистемы. Признаки пакета: `eslint`, `@eslint/js`, `eslint-plugin-*`, `@*/eslint-plugin` (напр. `@vitest/eslint-plugin`, `@eslint-react/eslint-plugin`), `eslint-config-*`, `typescript-eslint`, `@typescript-eslint/*`, `@stylistic/*`, `eslint-import-resolver-*`. Исключение — `eslint-config-turbo`: его бампает `/bump-dep` вместе с turbo. Всё остальное (включая прочий dev-тулинг и runtime-зависимости) → обычный `/bump-dep`.
 
 Почему отдельно: у линтера бамп влияет не через «трогает ли он наш код», а через **набор активных правил и их детекцию**. Release notes для этого ненадёжны — источник правды — diff фактических наборов правил между установленными версиями + реальный прогон eslint. Это отдельный процесс, его и кодифицирует этот скилл.
 

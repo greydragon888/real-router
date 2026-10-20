@@ -5,7 +5,7 @@ $ARGUMENTS
 
 Формат аргументов: имя зависимости (`tsdown`) или семейство связанных пакетов одной строкой (`size-limit @size-limit/preset-small-lib`); опционально целевая версия (`tsdown@0.23.0`).
 
-> **Пакет eslint-экосистемы — не этот скил.** `eslint`, `@eslint/js`, `eslint-plugin-*`, `@*/eslint-plugin`, `eslint-config-*`, `typescript-eslint`, `@typescript-eslint/*`, `@stylistic/*`, `eslint-import-resolver-*` → останови и используй `/bump-eslint`: линтер влияет набором активных правил, и процесс там свой.
+> **Пакет eslint-экосистемы — не этот скил.** `eslint`, `@eslint/js`, `eslint-plugin-*`, `@*/eslint-plugin`, `eslint-config-*`, `typescript-eslint`, `@typescript-eslint/*`, `@stylistic/*`, `eslint-import-resolver-*` → останови и используй `/bump-eslint`: линтер влияет набором активных правил, и процесс там свой. Исключение — `eslint-config-turbo`: он выходит одной версией с turbo и идёт с ним одним семейством (группа `turbo` в `.github/dependabot.yml`); его единственное правило `turbo/no-undeclared-env-vars` мерь как сканер-гейт.
 
 ## Бюджет токенов
 
