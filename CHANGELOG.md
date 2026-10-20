@@ -7,6 +7,105 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-10-20]
 
+### @real-router/angular@0.24.5
+
+### Patch Changes
+
+- [#2783](https://github.com/greydragon888/real-router/pull/2783) [`9213241`](https://github.com/greydragon888/real-router/commit/9213241980e2a73002420032ab4a1760d85e6db1) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` keeps the transition in flight through a refusal that starts no transition ([#2779](https://github.com/greydragon888/real-router/issues/2779))
+
+  Core reports a navigation it refuses before starting one (`SAME_STATES` or `ROUTE_NOT_FOUND`, for instance) on `TRANSITION_ERROR`, and may do so while another transition is in flight. The tracker read any `TRANSITION_ERROR` as the end of the transition in flight, so a Back was published as `<html data-nav-direction="forward">` when such a refusal came in while an async `canDeactivate` guard held the Back, or while a navigation the Back then cancelled was in flight. It now settles on an error only when it is the transition's own, the one whose `toState` carries that transition's `context`; with no transition in flight every error settles, as before.
+
+  When a listener registered before the tracker ends a transition inside `TRANSITION_START` — by aborting its signal or stopping the router — the tracker hears the end before the start and takes the transition to be in flight until the next navigation, as before. An unrelated refusal no longer cuts that short.
+
+- Updated dependencies [[`9213241`](https://github.com/greydragon888/real-router/commit/9213241980e2a73002420032ab4a1760d85e6db1)]:
+  - @real-router/sources@0.15.1
+
+### @real-router/logger-plugin@0.7.1
+
+### Patch Changes
+
+- [#2783](https://github.com/greydragon888/real-router/pull/2783) [`9213241`](https://github.com/greydragon888/real-router/commit/9213241980e2a73002420032ab4a1760d85e6db1) Thanks [@greydragon888](https://github.com/greydragon888)! - A refusal that starts no transition no longer ends the log of the transition in flight ([#2779](https://github.com/greydragon888/real-router/issues/2779))
+
+  Core reports a navigation it refuses before starting one (`SAME_STATES` or `ROUTE_NOT_FOUND`, for instance) on `onTransitionError`, and may do so while another transition is in flight. The plugin read any such error as the end of that transition: it logged the refusal with the transition's timing, measured `router:transition-failed:<label>` from the transition's start mark and closed its console group, so the transition's success was logged outside the group and without its timing, and its `router:transition-end:` mark and `router:transition:` measure carried an empty label. The refusal is now logged on its own, without timing, and the transition keeps its group, timing and marks until its own terminal event — for an error, the one whose `toState` carries that transition's `context`.
+
+  When a plugin registered before the logger ends a transition inside `onTransitionStart`, the logger opens that transition's group after its end, as before. An unrelated refusal no longer happens to close the group; the next transition's end does.
+
+### @real-router/preact@0.24.3
+
+### Patch Changes
+
+- [#2783](https://github.com/greydragon888/real-router/pull/2783) [`9213241`](https://github.com/greydragon888/real-router/commit/9213241980e2a73002420032ab4a1760d85e6db1) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` keeps the transition in flight through a refusal that starts no transition ([#2779](https://github.com/greydragon888/real-router/issues/2779))
+
+  Core reports a navigation it refuses before starting one (`SAME_STATES` or `ROUTE_NOT_FOUND`, for instance) on `TRANSITION_ERROR`, and may do so while another transition is in flight. The tracker read any `TRANSITION_ERROR` as the end of the transition in flight, so a Back was published as `<html data-nav-direction="forward">` when such a refusal came in while an async `canDeactivate` guard held the Back, or while a navigation the Back then cancelled was in flight. It now settles on an error only when it is the transition's own, the one whose `toState` carries that transition's `context`; with no transition in flight every error settles, as before.
+
+  When a listener registered before the tracker ends a transition inside `TRANSITION_START` — by aborting its signal or stopping the router — the tracker hears the end before the start and takes the transition to be in flight until the next navigation, as before. An unrelated refusal no longer cuts that short.
+
+- Updated dependencies [[`9213241`](https://github.com/greydragon888/real-router/commit/9213241980e2a73002420032ab4a1760d85e6db1)]:
+  - @real-router/sources@0.15.1
+
+### @real-router/react@0.37.3
+
+### Patch Changes
+
+- [#2783](https://github.com/greydragon888/real-router/pull/2783) [`9213241`](https://github.com/greydragon888/real-router/commit/9213241980e2a73002420032ab4a1760d85e6db1) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` keeps the transition in flight through a refusal that starts no transition ([#2779](https://github.com/greydragon888/real-router/issues/2779))
+
+  Core reports a navigation it refuses before starting one (`SAME_STATES` or `ROUTE_NOT_FOUND`, for instance) on `TRANSITION_ERROR`, and may do so while another transition is in flight. The tracker read any `TRANSITION_ERROR` as the end of the transition in flight, so a Back was published as `<html data-nav-direction="forward">` when such a refusal came in while an async `canDeactivate` guard held the Back, or while a navigation the Back then cancelled was in flight. It now settles on an error only when it is the transition's own, the one whose `toState` carries that transition's `context`; with no transition in flight every error settles, as before.
+
+  When a listener registered before the tracker ends a transition inside `TRANSITION_START` — by aborting its signal or stopping the router — the tracker hears the end before the start and takes the transition to be in flight until the next navigation, as before. An unrelated refusal no longer cuts that short.
+
+- Updated dependencies [[`9213241`](https://github.com/greydragon888/real-router/commit/9213241980e2a73002420032ab4a1760d85e6db1)]:
+  - @real-router/sources@0.15.1
+
+### @real-router/solid@0.26.4
+
+### Patch Changes
+
+- [#2783](https://github.com/greydragon888/real-router/pull/2783) [`9213241`](https://github.com/greydragon888/real-router/commit/9213241980e2a73002420032ab4a1760d85e6db1) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` keeps the transition in flight through a refusal that starts no transition ([#2779](https://github.com/greydragon888/real-router/issues/2779))
+
+  Core reports a navigation it refuses before starting one (`SAME_STATES` or `ROUTE_NOT_FOUND`, for instance) on `TRANSITION_ERROR`, and may do so while another transition is in flight. The tracker read any `TRANSITION_ERROR` as the end of the transition in flight, so a Back was published as `<html data-nav-direction="forward">` when such a refusal came in while an async `canDeactivate` guard held the Back, or while a navigation the Back then cancelled was in flight. It now settles on an error only when it is the transition's own, the one whose `toState` carries that transition's `context`; with no transition in flight every error settles, as before.
+
+  When a listener registered before the tracker ends a transition inside `TRANSITION_START` — by aborting its signal or stopping the router — the tracker hears the end before the start and takes the transition to be in flight until the next navigation, as before. An unrelated refusal no longer cuts that short.
+
+- Updated dependencies [[`9213241`](https://github.com/greydragon888/real-router/commit/9213241980e2a73002420032ab4a1760d85e6db1)]:
+  - @real-router/sources@0.15.1
+
+### @real-router/sources@0.15.1
+
+### Patch Changes
+
+- [#2783](https://github.com/greydragon888/real-router/pull/2783) [`9213241`](https://github.com/greydragon888/real-router/commit/9213241980e2a73002420032ab4a1760d85e6db1) Thanks [@greydragon888](https://github.com/greydragon888)! - `createTransitionSource` keeps the transition in flight through a refusal that starts no transition ([#2779](https://github.com/greydragon888/real-router/issues/2779))
+
+  Core reports a navigation it refuses before starting one (`SAME_STATES` or an unknown route name, for instance) and a plugin's `emitTransitionError` on `TRANSITION_ERROR`, and may do so while another transition is in flight. The source read any `TRANSITION_ERROR` as the end of the transition in flight, so a click on a link to the route the router still showed, while a guard held a navigation, reset the snapshot to idle — `isTransitioning`, `isLeaveApproved`, `toRoute` and `fromRoute` — while that navigation was still pending. It now ends the transition only on its own error, the one whose `toState` carries that transition's `context`. Every adapter reads this source: `useRouterTransition` (`injectRouterTransition` in Angular), and the scroll spy, which skips its emits while a transition is in flight.
+
+  When a listener registered before the source ends a transition inside `TRANSITION_START` — by aborting its signal or stopping the router — the source hears the end before the start and shows the transition in flight, as before. An unrelated refusal no longer happens to clear that; the next navigation does.
+
+### @real-router/svelte@0.24.3
+
+### Patch Changes
+
+- [#2783](https://github.com/greydragon888/real-router/pull/2783) [`9213241`](https://github.com/greydragon888/real-router/commit/9213241980e2a73002420032ab4a1760d85e6db1) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` keeps the transition in flight through a refusal that starts no transition ([#2779](https://github.com/greydragon888/real-router/issues/2779))
+
+  Core reports a navigation it refuses before starting one (`SAME_STATES` or `ROUTE_NOT_FOUND`, for instance) on `TRANSITION_ERROR`, and may do so while another transition is in flight. The tracker read any `TRANSITION_ERROR` as the end of the transition in flight, so a Back was published as `<html data-nav-direction="forward">` when such a refusal came in while an async `canDeactivate` guard held the Back, or while a navigation the Back then cancelled was in flight. It now settles on an error only when it is the transition's own, the one whose `toState` carries that transition's `context`; with no transition in flight every error settles, as before.
+
+  When a listener registered before the tracker ends a transition inside `TRANSITION_START` — by aborting its signal or stopping the router — the tracker hears the end before the start and takes the transition to be in flight until the next navigation, as before. An unrelated refusal no longer cuts that short.
+
+- Updated dependencies [[`9213241`](https://github.com/greydragon888/real-router/commit/9213241980e2a73002420032ab4a1760d85e6db1)]:
+  - @real-router/sources@0.15.1
+
+### @real-router/vue@0.25.3
+
+### Patch Changes
+
+- [#2783](https://github.com/greydragon888/real-router/pull/2783) [`9213241`](https://github.com/greydragon888/real-router/commit/9213241980e2a73002420032ab4a1760d85e6db1) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` keeps the transition in flight through a refusal that starts no transition ([#2779](https://github.com/greydragon888/real-router/issues/2779))
+
+  Core reports a navigation it refuses before starting one (`SAME_STATES` or `ROUTE_NOT_FOUND`, for instance) on `TRANSITION_ERROR`, and may do so while another transition is in flight. The tracker read any `TRANSITION_ERROR` as the end of the transition in flight, so a Back was published as `<html data-nav-direction="forward">` when such a refusal came in while an async `canDeactivate` guard held the Back, or while a navigation the Back then cancelled was in flight. It now settles on an error only when it is the transition's own, the one whose `toState` carries that transition's `context`; with no transition in flight every error settles, as before.
+
+  When a listener registered before the tracker ends a transition inside `TRANSITION_START` — by aborting its signal or stopping the router — the tracker hears the end before the start and takes the transition to be in flight until the next navigation, as before. An unrelated refusal no longer cuts that short.
+
+- Updated dependencies [[`9213241`](https://github.com/greydragon888/real-router/commit/9213241980e2a73002420032ab4a1760d85e6db1)]:
+  - @real-router/sources@0.15.1
+
+
 ### @real-router/navigation-plugin@0.14.4
 
 ### Patch Changes
