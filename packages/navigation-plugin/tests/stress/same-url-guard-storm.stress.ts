@@ -10,7 +10,7 @@
  *        under high load. Verifies info-sentinel detection does not depend
  *        on dispatch timing even when many events are queued back-to-back.
  *   NC2  Alternating same-URL / different-URL storm — verifies the guard
- *        switches branches cleanly without leaking `#capturedMeta` between
+ *        switches branches cleanly without leaking metadata between
  *        transitions and that both branches produce correct NavigationMeta.
  *   NC3  PLUGIN_SYNC_INFO literal-string collision under load — documents
  *        the limitation that a consumer passing the exact sentinel string
@@ -114,9 +114,9 @@ describe("Same-URL guard + info-sentinel — stress (#580)", () => {
     // Alternates between reload-on-current-route (same URL →
     // updateCurrentEntry branch, navigationType "reload") and navigate-to-
     // other-route (different URL → nav.navigate branch, navigationType
-    // "push"). A regression that let `#capturedMeta` leak between branches
-    // (e.g., updateCurrentEntry path forgetting to consume the captured
-    // meta) would surface as a wrong navigationType on one branch — e.g.,
+    // "push"). A regression that let metadata leak between branches
+    // (e.g., the updateCurrentEntry path publishing another transition's
+    // metadata) would surface as a wrong navigationType on one branch — e.g.,
     // the "reload" intended for the same-URL transition appearing on the
     // next push to a different route, or vice versa.
     const result = createStressRouter();

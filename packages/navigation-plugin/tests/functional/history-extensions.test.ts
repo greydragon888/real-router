@@ -316,7 +316,7 @@ describe("Navigation Plugin — History Extensions", () => {
       );
     });
 
-    it("sets pendingTraverseKey — onTransitionSuccess uses browser.traverseTo", async () => {
+    it("stages the entry's key — onTransitionSuccess uses browser.traverseTo", async () => {
       await router.start();
       await router.navigate("users.list");
       await router.navigate("home");
@@ -331,7 +331,7 @@ describe("Navigation Plugin — History Extensions", () => {
 
       await router.traverseToLast("users.list");
 
-      // Assert the EXACT key captured from #pendingTraverseKey — a regression
+      // Assert the EXACT key the traverse staged — a regression
       // that passes an arbitrary or stale key (e.g., current entry's key)
       // would be caught here, not by `expect.any(String)`.
       expect(traverseToSpy).toHaveBeenCalledWith(usersListEntry!.key);
@@ -352,8 +352,22 @@ describe("Navigation Plugin — History Extensions", () => {
         state.context as { url?: { hash: string; hashChanged: boolean } }
       ).url;
 
-      expect(url).toBeDefined();
-      expect(url!.hash).toBe("");
+      expect(url).toStrictEqual({ hash: "", hashChanged: false });
+      expect(Object.isFrozen(url)).toBe(true);
+    });
+
+    it("reports hashChanged for a traverse onto a fragment the previous state did not publish", async () => {
+      mockNav.reset("http://localhost/");
+      await router.start();
+      await router.navigate("users.list", {}, undefined, { hash: "anchor" });
+      await router.navigate("home", {}, undefined, { hash: "" });
+
+      const state = await router.traverseToLast("users.list");
+
+      expect(state.context.url).toStrictEqual({
+        hash: "anchor",
+        hashChanged: true,
+      });
     });
 
     it("preserves the destination entry's hash on traverseToLast (B1, #532 parity)", async () => {

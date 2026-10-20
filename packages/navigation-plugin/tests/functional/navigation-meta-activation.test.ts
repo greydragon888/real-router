@@ -17,7 +17,7 @@ import type { Router, Unsubscribe } from "@real-router/core";
  *
  * Each test creates its own router/plugin so that mockNav.activation can be set
  * BEFORE usePlugin() — the plugin reads activation in its constructor and
- * primes #capturedMeta exactly once.
+ * stages its record exactly once.
  */
 describe("Navigation Plugin — activation priming (#531)", () => {
   let router: Router | undefined;
@@ -56,7 +56,7 @@ describe("Navigation Plugin — activation priming (#531)", () => {
     return { router: newRouter, mockNav };
   }
 
-  describe("primes #capturedMeta from navigation.activation.navigationType", () => {
+  describe("stages a record from navigation.activation.navigationType", () => {
     it('activation "reload" → first transition has navigationType "reload"', async () => {
       const { router } = setup("reload");
 

@@ -164,7 +164,7 @@ describe("Navigation Plugin — NavigationMeta", () => {
     });
   });
 
-  describe("state.context.navigation in guards — capturedMeta written in onTransitionStart", () => {
+  describe("state.context.navigation in guards — the record's meta written in onTransitionStart", () => {
     it("meta is available in activation guard during browser-initiated navigation", async () => {
       await router.start();
 
@@ -208,8 +208,8 @@ describe("Navigation Plugin — NavigationMeta", () => {
     });
   });
 
-  describe("NavigationMeta cleanup on cancel/error", () => {
-    it("capturedMeta cleared on guard rejection (onTransitionError)", async () => {
+  describe("NavigationMeta after a refused or cancelled navigation", () => {
+    it("a navigation a deactivate guard refuses leaves the router on its route", async () => {
       await router.start();
       await router.navigate("users.list");
 
@@ -226,7 +226,7 @@ describe("Navigation Plugin — NavigationMeta", () => {
       expect(state.name).toBe("users.list");
     });
 
-    it("capturedMeta cleared on guard throw (onTransitionError)", async () => {
+    it("the navigation after one a throwing guard refused derives its own metadata", async () => {
       await router.start();
 
       const lifecycle = getLifecycleApi(router);
@@ -239,9 +239,9 @@ describe("Navigation Plugin — NavigationMeta", () => {
         code: errorCodes.CANNOT_ACTIVATE,
       });
 
-      // If capturedMeta were leaked from the failed users.list attempt,
-      // the next transition would inherit it. Fresh programmatic navigate
-      // must start with a newly-derived meta (navigationType: "push").
+      // router.navigate() stages no record, so nothing of the refused
+      // attempt reaches the next navigation: it derives its own metadata
+      // (navigationType: "push").
       const state = await router.navigate("users.view", { id: "1" });
 
       expect(state.context.navigation).toStrictEqual({
@@ -252,7 +252,7 @@ describe("Navigation Plugin — NavigationMeta", () => {
       });
     });
 
-    it("capturedMeta cleared on transition cancel (superseding navigation)", async () => {
+    it("a browser navigation superseded while a guard holds it leaves the next navigation its own metadata", async () => {
       await router.start();
 
       const lifecycle = getLifecycleApi(router);
@@ -285,7 +285,7 @@ describe("Navigation Plugin — NavigationMeta", () => {
       });
     });
 
-    it("pendingTraverseKey cleared on cancel/error", async () => {
+    it("a traverseToLast() a guard refuses leaves no traverse for the next navigation", async () => {
       await router.start();
       await router.navigate("users.list");
       await router.navigate("home");
@@ -300,7 +300,7 @@ describe("Navigation Plugin — NavigationMeta", () => {
 
       expect(router.getState()!.name).toBe("home");
 
-      // Observable check: if #pendingTraverseKey had leaked, the next
+      // Observable check: if the traverse record had leaked, the next
       // successful navigate would dispatch browser.traverseTo(stale-key)
       // instead of browser.navigate(newUrl).
       lifecycle.removeDeactivateGuard("home");
@@ -407,10 +407,10 @@ describe("Navigation Plugin — NavigationMeta", () => {
       const currentKey = mockNav.currentEntry!.key;
       const result = mockNav.traverseTo(currentKey);
 
-      // SAME_STATES is a RouterError. After #524, the plugin catches it,
-      // syncs URL back manually and resolves finished. The captured meta
-      // from the navigate event (before the router rejected) still has
-      // direction "unknown" for equal indices — that's what we assert.
+      // SAME_STATES is a RouterError: the plugin catches it and resolves
+      // finished, writing nothing — the entry is at the router's own URL
+      // (#2744). The refused navigation publishes nothing, so the state is the start
+      // transition's, whose derived direction is "unknown".
       await result.finished;
 
       const state = router.getState()!;

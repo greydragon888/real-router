@@ -538,14 +538,15 @@ describe("createNavigateHandler — direct", () => {
       matchPath: vi.fn(),
     } as unknown as Parameters<typeof createNavigateHandler>[0]["api"],
     browser: {} as NavigationBrowser,
-    setCapturedMeta: vi.fn(),
+    stage: (_meta, start) => start(),
+    stageCommit: (_meta, commit) => commit(),
     base: "",
     transitionOptions: { source: "navigate", replace: true as const },
     ...overrides,
   });
 
   it("skips event when router is not active", () => {
-    const setCapturedMeta = vi.fn();
+    const stage = vi.fn();
     const handler = createNavigateHandler(
       makeHandlerDeps({
         router: {
@@ -554,7 +555,7 @@ describe("createNavigateHandler — direct", () => {
           navigateToNotFound: vi.fn(),
           navigateToDefault: vi.fn(),
         } as unknown as Router,
-        setCapturedMeta,
+        stage,
       }),
     );
     const event = makeEvent();
@@ -562,18 +563,18 @@ describe("createNavigateHandler — direct", () => {
     handler(event);
 
     expect(event.intercept).not.toHaveBeenCalled();
-    expect(setCapturedMeta).not.toHaveBeenCalled();
+    expect(stage).not.toHaveBeenCalled();
   });
 
   it("skips event when canIntercept is false", () => {
-    const setCapturedMeta = vi.fn();
-    const handler = createNavigateHandler(makeHandlerDeps({ setCapturedMeta }));
+    const stage = vi.fn();
+    const handler = createNavigateHandler(makeHandlerDeps({ stage }));
     const event = makeEvent({ canIntercept: false });
 
     handler(event);
 
     expect(event.intercept).not.toHaveBeenCalled();
-    expect(setCapturedMeta).not.toHaveBeenCalled();
+    expect(stage).not.toHaveBeenCalled();
   });
 
   it("intercepts with noop handler when event.info === PLUGIN_SYNC_INFO — #518, #580", async () => {
@@ -588,7 +589,7 @@ describe("createNavigateHandler — direct", () => {
     // tagged at the createNavigationBrowser layer), so it works regardless
     // of whether the navigate event is delivered synchronously (Chromium) or
     // asynchronously on a subsequent task (Safari 26.2 WKWebView — #580).
-    const setCapturedMeta = vi.fn();
+    const stage = vi.fn();
     const routerNavigateMock = vi.fn();
     const handler = createNavigateHandler(
       makeHandlerDeps({
@@ -598,7 +599,7 @@ describe("createNavigateHandler — direct", () => {
           navigateToNotFound: vi.fn(),
           navigateToDefault: vi.fn(),
         } as unknown as Router,
-        setCapturedMeta,
+        stage,
       }),
     );
     const interceptSpy = vi.fn();
@@ -621,8 +622,8 @@ describe("createNavigateHandler — direct", () => {
 
     expect(routerNavigateMock).not.toHaveBeenCalled();
 
-    // Must NOT capture meta — the plugin-initiated navigation already has it.
-    expect(setCapturedMeta).not.toHaveBeenCalled();
+    // Must NOT stage meta — the plugin-initiated navigation already has it.
+    expect(stage).not.toHaveBeenCalled();
   });
 });
 
@@ -992,7 +993,8 @@ describe("Error Recovery", () => {
         }),
       } as unknown as Parameters<typeof createNavigateHandler>[0]["api"],
       browser: mockBrowser,
-      setCapturedMeta: vi.fn(),
+      stage: (_meta, start) => start(),
+      stageCommit: (_meta, commit) => commit(),
       base: "",
       transitionOptions: { source: "navigate", replace: true as const },
     });

@@ -16,7 +16,7 @@ Contains no navigation business logic — only URL synchronization and navigate 
 - `claimContextNamespace("navigation")` — claims the `navigation` namespace on `state.context` for writing `NavigationMeta`
 - `declare module "@real-router/core/types"` — augments `StateContext` with `navigation?: NavigationMeta`
 - `declare module "@real-router/core"` — adds compile-time types for extension methods to the `Router` interface
-- Plugin hooks (`onStart`, `onStop`, `onTransitionStart`, `onTransitionSuccess`, `onTransitionCancel`, `onTransitionError`, `teardown`) — react to router events
+- Plugin hooks (`onStart`, `onStop`, `onTransitionStart`, `onTransitionSuccess`, `teardown`) — react to router events
 
 ## Package Structure
 
@@ -187,8 +187,8 @@ interface NavigationBrowser {
   /**
    * Type of the cross-document navigation that activated this document.
    * Reads `navigation.activation.navigationType`. Returns `undefined` when
-   * unavailable (older browsers, SSR fallback). Consumed once by the plugin's
-   * constructor to prime `#capturedMeta` for the first transition (#531).
+   * unavailable (older browsers, SSR fallback). Read once by the plugin's
+   * constructor to stage the record of the router's first transition or commit.
    */
   getActivationType: () => NavigationMeta["navigationType"] | undefined;
 }
@@ -318,17 +318,21 @@ router.usePlugin(navigationPluginFactory(opts))
         ├── new NavigationPlugin(...)
         │     ├── api.claimContextNamespace("navigation") → stores #claim
         │     ├── Registers start interceptor
-        │     ├── browser.getActivationType() → if defined, primes #capturedMeta
+        │     ├── browser.getActivationType() → if defined, and getState() and
+        │     │     getPreviousState() are both undefined, stages the record of
+        │     │     the router's first transition or commit
         │     │     (cross-document load: F5/back-forward/typed URL — see C9)
         │     └── api.extendRouter({buildUrl, matchUrl, replaceHistoryState, ...9 exclusive})
         │           → stores returned unsubscribe as #removeExtensions
         │
-        └── plugin.getPlugin() → { onStart, onStop, onTransitionStart, onTransitionSuccess, onTransitionCancel, onTransitionError, teardown }
+        └── plugin.getPlugin() → { onStart, onStop, onTransitionStart, onTransitionSuccess, teardown }
 
 router.start()
         │
         ▼
   Plugin.onStart()
+        ├── Drops a staged transition record: a start during a staging call is
+        │   a restart from code that call ran
         ├── Removes previous navigate listener (if any, via shared.removeNavigateListener)
         └── Registers new navigate listener
 
@@ -336,21 +340,25 @@ router.navigate() → transition starts
         │
         ▼
   Plugin.onTransitionStart(toState)
-        └── If #capturedMeta exists: claim.write(toState, Object.freeze(#capturedMeta))
+        ├── Takes the record staged for the transition, or the activation's,
+        │   and files it under toState.context
+        └── If it has one: claim.write(toState, record.meta)
             (makes meta available in guards via toState.context.navigation)
 
 router.navigate() → success
         │
         ▼
-  Plugin.onTransitionSuccess()
+  Plugin.onTransitionSuccess(toState, fromState)
+        ├── Takes the record filed under toState.context — the committed state
+        │   carries its start's context — or, for a success the plugin heard no
+        │   start for, the record staged for the commit, or the activation's
         ├── claim.write(toState, Object.freeze(meta)) — final meta on state
         └── navigation.navigate() or navigation.updateCurrentEntry() or navigation.traverseTo()
 
 router.navigate() → cancelled or error
         │
         ▼
-  Plugin.onTransitionCancel() / Plugin.onTransitionError()
-        └── Clears #capturedMeta and #pendingTraverseKey
+  No hook: the transition's record is never looked up again
 
 router.stop()
         │
@@ -379,7 +387,7 @@ router.navigate(name, params, opts)
         ▼
   Plugin.onTransitionSuccess(toState, fromState, navOptions)
         │
-        ├── Derive or use #capturedMeta (navigationType, userInitiated, info, direction, sourceElement)
+        ├── Use the record's meta, or derive it (navigationType, userInitiated, info, direction, sourceElement)
         │     └── claim.write(toState, Object.freeze(meta)) → state.context.navigation
         │
         ├── Resolve hash via tri-state opts.hash (#532):
@@ -392,8 +400,8 @@ router.navigate(name, params, opts)
         │
         ├── historyState = { name, params, search, path }
         │
-        ├── #pendingTraverseKey set?
-        │     YES: browser.traverseTo(key)
+        ├── record.traverse set?
+        │     YES: browser.traverseTo(record.traverse.key)
         │          (createNavigationBrowser tags the call with info: PLUGIN_SYNC_INFO)
         │
         ├── toState.name === UNKNOWN_ROUTE
@@ -450,11 +458,11 @@ User clicks back/forward/link, submits a form, or navigation.navigate() fires
         │
         ├── meta = { navigationType, userInitiated, info, direction, sourceElement }
         │     read off the event (direction needs the entry before the commit);
-        │     each handler that runs a transition stages it — stageMeta() — right
-        │     before it, so a transition that starts while a redirected navigation
-        │     waits for its commit does not take it; nothing is staged once the
-        │     router has no state, nor for a matched navigation already aborted —
-        │     navigateToNotFound() takes no signal and lands (#2751).
+        │     each handler stages it for the router call it makes —
+        │     deps.stage(meta, call) for a transition, deps.stageCommit(meta, call)
+        │     for navigateToNotFound()'s commit — so a transition that starts while
+        │     a redirected navigation waits for its commit does not take it, and a
+        │     call core refuses without starting a transition drops it.
         │     Written to toState.context.navigation in onTransitionStart
         │
         ├── matchedState found?
@@ -568,40 +576,65 @@ Navigation metadata is delivered to `state.context.navigation` via the claim-bas
 
 ```
 #claim = api.claimContextNamespace("navigation")
-  — claim.write(state, meta) attaches frozen NavigationMeta to state.context.navigation
+  — claim.write(state, meta) attaches NavigationMeta to state.context.navigation;
+    the committed state's is frozen
   — claim.release() frees the namespace (called in teardown)
 
-#capturedMeta: NavigationMeta | undefined
-  — Set by the navigate handler's intercept handler, right before the transition (#2751)
-  — Written to toState in onTransitionStart (available in guards)
-  — Written again in onTransitionSuccess (final meta on state)
-  — Cleared after writing, or on cancel/error
+#staged: NavigationRecord | undefined   — NavigationRecord = { meta, traverse?: { key, hash } }
+  — Set by #stage for the length of the router call that starts a transition
+    (the navigate handler's, traverseToLast's); the call puts back what the
+    slot held when it returns
+  — Taken by onTransitionStart; dropped by onStart
+
+#stagedCommit: NavigationRecord | undefined
+  — Set by #stageCommit for the length of navigateToNotFound()'s call; the
+    call puts back what the slot held when it returns
+  — Read by the onTransitionSuccess of a commit made during the call, never
+    by onTransitionStart
+
+#activation: NavigationRecord | undefined
+  — Set by the constructor when getState() and getPreviousState() are both
+    undefined
+  — Taken by the router's first transition or commit
+
+#transitions: WeakMap<object, NavigationRecord | undefined>
+  — The record each transition the plugin heard start took, filed under its
+    toState.context by onTransitionStart
+  — Read by the onTransitionSuccess whose committed state carries that
+    context; nothing else reads it
 ```
 
-### capturedMeta Flow
+### Record Flow
 
 ```
 Navigate event fires (browser-initiated)
   → meta = { navigationType, userInitiated, info, direction, sourceElement }  ← from event fields
-  → event.intercept({ handler: async () => { setCapturedMeta(meta); api.navigateToState(...) } })
-  → onTransitionStart(toState) → claim.write(toState, Object.freeze(#capturedMeta))
+  → event.intercept({ handler: async () => { stage(meta, () => api.navigateToState(...)) } })
+      → onTransitionStart(toState) → takes the record → claim.write(toState, meta)
+      (core announces the transition within the call)
   → guards run → toState.context.navigation available
-  → onTransitionSuccess → claim.write(toState, Object.freeze(#capturedMeta))
-  → #capturedMeta = undefined
+  → onTransitionSuccess → claim.write(toState, Object.freeze(meta))
 ```
 
 For router-initiated navigation (no navigate event):
 
 ```
 router.navigate() called
-  → onTransitionStart → #capturedMeta is undefined → no write
+  → onTransitionStart → no record staged → no write
   → onTransitionSuccess
-  → #capturedMeta is undefined → derive from navOptions:
+  → no record → derive from navOptions:
       reload && same path → "reload"
       shouldReplaceHistory → "replace"
       otherwise → "push"
   → claim.write(toState, Object.freeze(derivedMeta))
 ```
+
+Every navigation's state gets a `context` of its own, and `completeTransition`
+commits a spread of the state the transition started with, so each success
+finds the record filed under its own transition's context. A navigation that
+supersedes another starts a transition with a context of its own: the
+superseded transition's record is never looked up, and the newer one's success
+publishes its own.
 
 ## History Extensions
 
@@ -641,7 +674,7 @@ URL matching is always authoritative — it reflects the current route config.
 
 ### traverseToLast
 
-`traverseToLast(routeName)` finds the last history entry matching the route (excluding the current entry to avoid `SAME_STATES`), sets `#capturedMeta` and `#pendingTraverseKey`, then calls `router.navigate()`. On `onTransitionSuccess`, the plugin calls `browser.traverseTo(key)` instead of `browser.navigate()`.
+`traverseToLast(routeName)` finds the last history entry matching the route (excluding the current entry to avoid `SAME_STATES`) and stages a record — `navigationType: "traverse"` metadata, the entry's key and its fragment — for the `router.navigate()` call it makes. On `onTransitionSuccess` of the transition that call starts, the plugin calls `browser.traverseTo(key)` instead of `browser.navigate()`.
 
 ## NavigationSharedState
 

@@ -30,7 +30,7 @@ describe("N20 — traverseTo to an evicted or invalid key", () => {
     vi.restoreAllMocks();
   });
 
-  it("N20.1: browser.traverseTo throws for evicted key — plugin clears pendingTraverseKey, next navigate uses browser.navigate", async () => {
+  it("N20.1: browser.traverseTo throws for evicted key — the next navigate uses browser.navigate, not the traverse record", async () => {
     // Scenario: traverseToLast captures a key and begins router.navigate.
     // Before onTransitionSuccess fires, the browser evicts that entry
     // (simulated here by mocking browser.traverseTo to throw, since
@@ -39,8 +39,8 @@ describe("N20 — traverseTo to an evicted or invalid key", () => {
     // resolves — we're pinning the plugin's tolerance for that.
     //
     // Contract: even if traverseTo throws inside onTransitionSuccess, the
-    // plugin must clear #pendingTraverseKey *before* the attempt, so the
-    // NEXT transition does not replay the traverse against the stale key.
+    // NEXT transition does not replay the traverse against the stale key:
+    // its success reads the record filed under its own toState.context.
     // (router.navigate itself may resolve successfully — the core router
     // does not observe success-hook errors.)
     const result = createStressRouter();
@@ -68,7 +68,7 @@ describe("N20 — traverseTo to an evicted or invalid key", () => {
 
     // traverseToLast resolves the router.navigate — onTransitionSuccess
     // errors are swallowed by the core. We don't care whether it throws
-    // or resolves; we care that the key is cleared.
+    // or resolves; we care that the next navigation does not traverse.
     await router.traverseToLast("users.list").catch(noop);
 
     expect(traverseToSpy).toHaveBeenCalled();
@@ -78,7 +78,7 @@ describe("N20 — traverseTo to an evicted or invalid key", () => {
     traverseToSpy.mockRestore();
 
     // Router must still be usable. Most importantly, a subsequent navigation
-    // must not accidentally pick up a stale pendingTraverseKey — the next
+    // must not accidentally pick up a stale traverse record — the next
     // call should go through browser.navigate, not browser.traverseTo.
     const navigateSpy = vi.spyOn(browser, "navigate");
     const traverseAfterSpy = vi.spyOn(browser, "traverseTo");
