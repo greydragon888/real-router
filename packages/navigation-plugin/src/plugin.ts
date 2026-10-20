@@ -280,7 +280,7 @@ export class NavigationPlugin {
     // carried a query — and the browser is about to traverse to that very
     // entry. Committing the path alone leaves the address bar and the router
     // describing different pages.
-    return this.#stage(record, () =>
+    return await this.#stage(record, () =>
       this.#router.navigate(
         matchedState.name,
         matchedState.params,
