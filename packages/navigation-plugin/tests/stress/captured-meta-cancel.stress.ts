@@ -16,7 +16,7 @@ import type { Router, Unsubscribe } from "@real-router/core";
 let router: Router;
 let unsubscribe: Unsubscribe;
 
-describe("N14 — capturedMeta cleanup under cancel storm", () => {
+describe("N14 — metadata after a cancel storm", () => {
   beforeAll(() => {
     vi.spyOn(console, "warn").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
@@ -31,7 +31,7 @@ describe("N14 — capturedMeta cleanup under cancel storm", () => {
     vi.restoreAllMocks();
   });
 
-  it("N14.1: capturedMeta is cleared after a storm of cancelled async transitions", async () => {
+  it("N14.1: the navigation after a storm of cancelled async transitions derives its own metadata", async () => {
     const result = createStressRouter();
 
     router = result.router;
@@ -63,8 +63,8 @@ describe("N14 — capturedMeta cleanup under cancel storm", () => {
     await Promise.allSettled(promises);
     await waitForTransitions(150);
 
-    // Final navigation drives meta to a known-good value. If capturedMeta
-    // had been leaked from a cancelled transition, its `navigationType`
+    // Final navigation drives meta to a known-good value. If anything of a
+    // cancelled transition reached it, its `navigationType`
     // would be stale (e.g., a "reload" flag from an aborted call).
     await router.navigate("users.view", { id: "42" });
 

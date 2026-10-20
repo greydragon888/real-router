@@ -45,6 +45,16 @@ import type { PluginApi } from "@real-router/core/api";
 /** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
 const freeze = Object.freeze;
 
+/**
+ * What a navigation hands the transition or the commit its router call makes:
+ * the metadata it publishes and, for `traverseToLast`, the entry the browser
+ * traverses to and that entry's fragment.
+ */
+interface NavigationRecord {
+  readonly meta: NavigationMeta;
+  readonly traverse?: { readonly key: string; readonly hash: string };
+}
+
 export function deriveNavigationType(
   navOptions: NavigationOptions,
   toState: State,
@@ -76,23 +86,18 @@ export class NavigationPlugin {
     write: (state: State, value: UrlContext) => void;
     release: () => void;
   };
-  readonly #lifecycle: Pick<Plugin, "onStart" | "onStop" | "teardown">;
+  readonly #lifecycle: NavigateLifecycle;
 
-  #capturedMeta: NavigationMeta | undefined;
-  // The staged record's OWNER, when `traverseToLast` staged it (#2067). The
-  // record is one plugin-global slot, so a cancel hook cannot tell whose it is:
-  // when call B supersedes call A, core fires A's `onTransitionCancel` and by
-  // then the slot holds B's record. `undefined` means the record came from the
-  // browser-driven path, which has no competing owner and is retired by the
-  // hooks as before.
-  #recordOwner: number | undefined;
-  #traverseSeq = 0;
-  #pendingTraverseKey: string | undefined;
-  // Always set together with #pendingTraverseKey; `""` means "destination has
-  // no fragment". Typed as `string` (not `string | undefined`) so the traverse
-  // branch reads it without a redundant `?? ""` fallback that coverage cannot
-  // exercise.
-  #pendingTraverseHash = "";
+  // The record of the navigation whose router call is running, for the
+  // transition that call starts or for the commit it makes without one — see
+  // `#stage` and `#stageCommit`.
+  #staged: NavigationRecord | undefined;
+  #stagedCommit: NavigationRecord | undefined;
+  // The activation's record, for the router's first transition or commit.
+  #activation: NavigationRecord | undefined;
+  // The record each transition this plugin heard start took, by that
+  // transition's `toState.context` — see `#takeRecord`.
+  readonly #transitions = new WeakMap<object, NavigationRecord | undefined>();
   // Reusable buffer for the {name, params, path} payload passed to
   // browser.navigate / browser.updateCurrentEntry. The Navigation API
   // structured-clones state synchronously inside the call, so this object
@@ -143,15 +148,23 @@ export class NavigationPlugin {
     // reload (#497) and any consumer branching on navigationType.
     // navigation.activation reflects the cross-document navigation that
     // activated this document; it stays constant across same-document
-    // navigations, so this only affects the FIRST transition.
+    // navigations, so this only affects the FIRST transition — and a plugin
+    // installed on a router that holds a current or a previous state has none
+    // left.
     const activationType = this.#browser.getActivationType();
 
-    if (activationType) {
-      this.#capturedMeta = {
-        navigationType: activationType,
-        userInitiated: false,
-        direction: activationType === "push" ? "forward" : "unknown",
-        sourceElement: null,
+    if (
+      activationType &&
+      router.getState() === undefined &&
+      router.getPreviousState() === undefined
+    ) {
+      this.#activation = {
+        meta: {
+          navigationType: activationType,
+          userInitiated: false,
+          direction: activationType === "push" ? "forward" : "unknown",
+          sourceElement: null,
+        },
       };
     }
 
@@ -195,9 +208,8 @@ export class NavigationPlugin {
       router,
       api,
       browser: this.#browser,
-      setCapturedMeta: (meta) => {
-        this.#capturedMeta = meta;
-      },
+      stage: (meta, start) => this.#stage({ meta }, start),
+      stageCommit: (meta, commit) => this.#stageCommit({ meta }, commit),
       base: options.base,
       transitionOptions,
     });
@@ -250,70 +262,58 @@ export class NavigationPlugin {
       );
     }
 
-    this.#capturedMeta = {
-      navigationType: "traverse",
-      userInitiated: false,
-      direction: entry.index > currentEntry.index ? "forward" : "back",
-      sourceElement: null,
+    const record: NavigationRecord = {
+      meta: {
+        navigationType: "traverse",
+        userInitiated: false,
+        direction: entry.index > currentEntry.index ? "forward" : "back",
+        sourceElement: null,
+      },
+      // The destination entry's fragment, which onTransitionSuccess publishes
+      // in state.context.url — as navigate-handler passes navOptions.hash for
+      // a browser-initiated navigation.
+      traverse: { key: entry.key, hash: extractHashFromEntryUrl(entryUrl) },
     };
-    this.#recordOwner = ++this.#traverseSeq;
-    this.#pendingTraverseKey = entry.key;
-    // Capture the destination entry's hash so onTransitionSuccess can populate
-    // state.context.url for the traverse branch — mirrors what navigate-handler
-    // does via navOptions.hash for browser-initiated navigation.
-    this.#pendingTraverseHash = extractHashFromEntryUrl(entryUrl);
 
     // Both channels, not just the path (#1586). `matchedState` came from
     // matching the entry's URL, so its `search` is populated whenever that URL
     // carried a query — and the browser is about to traverse to that very
     // entry. Committing the path alone leaves the address bar and the router
     // describing different pages.
-    let navigation: Promise<State>;
-
-    // eslint-disable-next-line sonarjs/no-try-promise -- S4822 sees a Promise inside a `try`; the split it cannot see is spelled out in the catch below
-    try {
-      navigation = this.#router.navigate(
+    return this.#stage(record, () =>
+      this.#router.navigate(
         matchedState.name,
         matchedState.params,
         matchedState.search,
-      );
-    } catch (error) {
-      // A navigation refused SYNCHRONOUSLY at the facade — the reentrancy ban
-      // (#1610) — emits no lifecycle hook, and the hooks are the only other
-      // writers that retire this record. Left standing, it sends the next,
-      // unrelated transition to this entry wearing this entry's metadata
-      // (#1802).
-      //
-      // ⚠ The synchronous door only — do not await inside the try. A rejection
-      // arrives late enough that a fresh traverseToLast may already own the
-      // record, and this catch would retire its successor's — the shape the
-      // cancel hook has (#2067).
-      this.#retirePendingNavigation();
-
-      throw error;
-    }
-
-    // The ASYNC door, and it must be owned. A rejection arrives late enough that
-    // a fresh `traverseToLast` may already hold the slot; retiring unconditionally
-    // here is the very defect the cancel hook had (#2067) moved one frame over.
-    const owner = this.#recordOwner;
-
-    return navigation.catch((error: unknown) => {
-      if (this.#recordOwner === owner) {
-        this.#retirePendingNavigation();
-      }
-
-      throw error;
-    });
+      ),
+    );
   }
 
   getPlugin(): Plugin {
+    const lifecycle = this.#lifecycle;
+
     return {
-      ...this.#lifecycle,
+      ...lifecycle,
+
+      onStart: () => {
+        // A router that starts during a staging call was restarted from code
+        // that call ran — a listener or an interceptor: its start transition is
+        // not the call's.
+        this.#staged = undefined;
+        lifecycle.onStart();
+      },
 
       onTransitionStart: (toState: State) => {
-        if (this.#capturedMeta) {
-          this.#claim.write(toState, this.#capturedMeta);
+        // The router's first transition takes the activation's record, unless
+        // its call staged one of its own.
+        const record = this.#staged ?? this.#activation;
+
+        this.#staged = undefined;
+        this.#activation = undefined;
+        this.#transitions.set(toState.context, record);
+
+        if (record) {
+          this.#claim.write(toState, record.meta);
         }
       },
 
@@ -322,14 +322,17 @@ export class NavigationPlugin {
         fromState: State | undefined,
         navOptions: NavigationOptions,
       ) => {
-        if (!this.#capturedMeta) {
+        const record = this.#takeRecord(toState);
+        let meta = record?.meta;
+
+        if (!meta) {
           const navigationType = deriveNavigationType(
             navOptions,
             toState,
             fromState,
           );
 
-          this.#capturedMeta = {
+          meta = {
             navigationType,
             userInitiated: false,
             direction: navigationType === "push" ? "forward" : "unknown",
@@ -337,28 +340,13 @@ export class NavigationPlugin {
           };
         }
 
-        const frozenMeta = freeze(this.#capturedMeta);
-
-        this.#claim.write(toState, frozenMeta);
-        this.#capturedMeta = undefined;
-
-        // Consume pendingTraverseKey BEFORE calling browser.traverseTo.
-        // If traverseTo throws (Navigation API can reject on evicted keys
-        // under memory pressure), we must not leave the stale key behind —
-        // otherwise the NEXT transition's onTransitionSuccess would see it
-        // and replay the traverse against the same already-broken key.
-        const traverseKey = this.#pendingTraverseKey;
-        const traverseHash = this.#pendingTraverseHash;
-
-        this.#pendingTraverseKey = undefined;
-        this.#pendingTraverseHash = "";
-        // The owner goes with the record it owned; leaving it set would make
-        // `#retireUnownedRecord` a permanent no-op for every later transition.
-        this.#recordOwner = undefined;
+        this.#claim.write(toState, freeze(meta));
 
         const publishedPrevHash = readPublishedHash(fromState);
 
-        if (traverseKey) {
+        if (record?.traverse) {
+          const { key, hash } = record.traverse;
+
           // Mirror the urlClaim.write the `else` branch does for non-traverse
           // navigations — without this, `router.traverseToLast(name)` leaves
           // state.context.url undefined for subscribers (#urlClaim was set in
@@ -367,11 +355,11 @@ export class NavigationPlugin {
           this.#urlClaim.write(
             toState,
             freeze({
-              hash: traverseHash,
-              hashChanged: traverseHash !== publishedPrevHash,
+              hash,
+              hashChanged: hash !== publishedPrevHash,
             }),
           );
-          this.#browser.traverseTo(traverseKey);
+          this.#browser.traverseTo(key);
         } else {
           // Tri-state hash resolution (#532).
           //   navOptions.hash === undefined → preserve current browser hash
@@ -453,41 +441,77 @@ export class NavigationPlugin {
           }
         }
       },
-
-      // ⚠ Only an UNOWNED record. A `traverseToLast` record is retired by the
-      // call that staged it, on its own promise — see #2067: these hooks fire
-      // for the transition that LOST, and the slot by then belongs to the one
-      // that won.
-      onTransitionCancel: () => {
-        this.#retireUnownedRecord();
-      },
-
-      onTransitionError: () => {
-        this.#retireUnownedRecord();
-      },
     };
   }
 
   /**
-   * Drops everything staged for the transition that is about to start — the
-   * captured metadata and the pending traverse key/hash. Every exit from that
-   * transition passes through here: success consumes the fields inline, and
-   * cancel, error and a refusal that never starts a transition all call this.
+   * Stages `record` for the transition `start` begins, for the length of the
+   * call, and then puts back what the slot held. Core announces that
+   * transition within the call, so a record still staged when the call
+   * returns belongs to a navigation core refused without starting one — at
+   * the facade (#1802), as `SAME_STATES`, on an aborted signal or a router
+   * that has not started, among others — and a call nested in another, such
+   * as a navigation the browser handles synchronously inside a hook, leaves
+   * the outer call's record in place.
    */
-  #retirePendingNavigation(): void {
-    this.#capturedMeta = undefined;
-    this.#recordOwner = undefined;
-    this.#pendingTraverseKey = undefined;
-    this.#pendingTraverseHash = "";
-  }
+  #stage<T>(record: NavigationRecord, start: () => T): T {
+    const outer = this.#staged;
 
-  /** Retires the record only when no `traverseToLast` call owns it (#2067). */
-  #retireUnownedRecord(): void {
-    if (this.#recordOwner === undefined) {
-      this.#retirePendingNavigation();
+    this.#staged = record;
+
+    try {
+      return start();
+    } finally {
+      this.#staged = outer;
     }
   }
+
+  /**
+   * `#stage` for the commit `commit` makes without a transition —
+   * `navigateToNotFound()`. `onTransitionStart` never reads it, so a
+   * transition a `canDeactivate` guard of the current route starts inside that
+   * call takes none of it; a commit an app makes from that guard reads it too.
+   */
+  #stageCommit<T>(record: NavigationRecord, commit: () => T): T {
+    const outer = this.#stagedCommit;
+
+    this.#stagedCommit = record;
+
+    try {
+      return commit();
+    } finally {
+      this.#stagedCommit = outer;
+    }
+  }
+
+  /**
+   * The record a success publishes. Every navigation's state gets a
+   * `context` of its own, and the state a transition commits carries the one
+   * its start hook received — `completeTransition` spreads it — so a
+   * transition publishes the record it took at its start (#2754) and no other.
+   * A success this plugin heard no start for — a commit that starts no
+   * transition, `navigateToNotFound()` among others, or a transition whose
+   * start core did not deliver to it — takes the record `#stageCommit` holds,
+   * or the activation's.
+   */
+  #takeRecord(toState: State): NavigationRecord | undefined {
+    const context = toState.context;
+
+    if (this.#transitions.has(context)) {
+      return this.#transitions.get(context);
+    }
+
+    const record = this.#stagedCommit ?? this.#activation;
+
+    this.#activation = undefined;
+
+    return record;
+  }
 }
+
+type NavigateLifecycle = Required<
+  Pick<Plugin, "onStart" | "onStop" | "teardown">
+>;
 
 interface NavigateLifecycleDeps {
   browser: NavigationBrowser;
@@ -525,7 +549,9 @@ function extractHashFromEntryUrl(entryUrl: string): string {
   return rawHash ? decodeHashFragment(rawHash.slice(1)) : "";
 }
 
-function createNavigateLifecycle(deps: NavigateLifecycleDeps): Plugin {
+function createNavigateLifecycle(
+  deps: NavigateLifecycleDeps,
+): NavigateLifecycle {
   // Captured at onStart so onStop/teardown clear the shared slot ONLY while we
   // still own it — a later router's onStart replaces it (last-wins, #758);
   // clearing it unconditionally on the earlier router's stop/dispose

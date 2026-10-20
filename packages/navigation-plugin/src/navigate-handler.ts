@@ -51,7 +51,10 @@ interface NavigateHandlerDeps {
   router: Router;
   api: PluginApi;
   browser: NavigationBrowser;
-  setCapturedMeta: (meta: NavigationMeta) => void;
+  /** Stages `meta` for the transition `start` begins (`NavigationPlugin`). */
+  stage: <T>(meta: NavigationMeta, start: () => T) => T;
+  /** Stages `meta` for the commit `commit` makes without a transition. */
+  stageCommit: <T>(meta: NavigationMeta, commit: () => T) => T;
   base: string;
   transitionOptions: {
     source: string;
@@ -77,7 +80,8 @@ export function computeDirection(
 }
 
 export function createNavigateHandler(deps: NavigateHandlerDeps) {
-  const { router, api, browser, base, transitionOptions } = deps;
+  const { router, api, browser, stage, stageCommit, base, transitionOptions } =
+    deps;
   const { allowNotFound } = api.getOptions();
   // The last navigation this handler took, until the router reaches its
   // destination or the plugin next writes the router's own URL.
@@ -195,30 +199,28 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
         ...(state &&
           redirectBeforeCommit(event, matchedState.path, hash, base)),
         handler: async () => {
-          // Core refuses a navigation whose signal is already aborted, and
-          // announces no transition that would take the metadata.
-          if (!event.signal.aborted) {
-            stageMeta(deps, meta);
-          }
-
           const arrived = await withRecovery(
             () =>
-              // api.navigateToState: matchPath already applied forwardState +
-              // matchSourceTrailingSlash; reusing the State avoids the redundant
-              // round-trip and preserves trailing slashes (#525). Plugin-only
-              // entry point — not on the public Router/Navigator surface.
-              //
-              // Hash extraction (#532): pass through the destination's hash so
-              // onTransitionSuccess sets state.context.url.hash. A fragment
-              // change adds force+hashChange to bypass SAME_STATES —
-              // subscribers disambiguate via state.context.url.hashChanged,
-              // not via the overloaded force flag.
-              api.navigateToState(matchedState, {
-                ...transitionOptions,
-                hash,
-                ...(hashChange && { force: true, hashChange: true }),
-                signal: event.signal,
-              }),
+              stage(meta, () =>
+                // api.navigateToState: matchPath already applied forwardState
+                // + matchSourceTrailingSlash; reusing the State avoids the
+                // redundant round-trip and preserves trailing slashes (#525).
+                // Plugin-only entry point — not on the public
+                // Router/Navigator surface.
+                //
+                // Hash extraction (#532): pass through the destination's hash
+                // so onTransitionSuccess sets state.context.url.hash. A
+                // fragment change adds force+hashChange to bypass
+                // SAME_STATES — subscribers disambiguate via
+                // state.context.url.hashChanged, not via the overloaded force
+                // flag.
+                api.navigateToState(matchedState, {
+                  ...transitionOptions,
+                  hash,
+                  ...(hashChange && { force: true, hashChange: true }),
+                  signal: event.signal,
+                }),
+              ),
             router,
             browser,
             record,
@@ -238,11 +240,9 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
           // scroll from the plugin: that one owns it.
           const superseded = event.signal.aborted;
 
-          // navigateToNotFound() takes no signal: it lands either way.
-          stageMeta(deps, meta);
-
           try {
-            router.navigateToNotFound(path);
+            // navigateToNotFound() takes no signal: it lands either way.
+            stageCommit(meta, () => router.navigateToNotFound(path));
           } catch (error) {
             // The router refused to leave the current route (#2740).
             returnToOrigin(router, browser, record, base);
@@ -294,20 +294,6 @@ function take(
       : { from: origin?.key, fromId: origin?.id, fromUrl: origin?.url };
 
   return { signal, from, fromId, fromUrl, state };
-}
-
-/**
- * Stages a navigation's metadata for the transition its handler starts. A
- * router stopped, disposed or restarting since the event has no state and
- * refuses that transition without announcing it, so nothing would retire the
- * metadata before its next transition (#2751). A router on its way to its
- * first state has none either and takes the transition, which then publishes
- * metadata derived from it.
- */
-function stageMeta(deps: NavigateHandlerDeps, meta: NavigationMeta): void {
-  if (deps.router.getState() !== undefined) {
-    deps.setCapturedMeta(meta);
-  }
 }
 
 /**

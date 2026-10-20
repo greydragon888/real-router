@@ -82,8 +82,18 @@ describe("N6: History extensions storm", () => {
     unsubscribe();
   });
 
-  it("N6.3: traverseToLast under rapid navigation — pendingTraverseKey cleanup", async () => {
-    const { router, unsubscribe } = createStressRouter();
+  it("N6.3: traverseToLast after rapid sequential navigation lands on the last matching entry", async () => {
+    const { router, mockNav, unsubscribe } = createStressRouter();
+    // The entry traverseToLast() goes to: the last `home` entry but the
+    // current one.
+    const lastHomeEntry = (): number | undefined =>
+      mockNav
+        .entries()
+        .findLast(
+          (entry) =>
+            entry !== mockNav.currentEntry &&
+            new URL(entry.url).pathname === router.buildPath("home"),
+        )?.index;
 
     await router.start();
 
@@ -95,16 +105,21 @@ describe("N6: History extensions storm", () => {
     await router.navigate("home");
     await router.navigate("users.view", { id: "2" });
 
+    const target = lastHomeEntry();
     const state = await router.traverseToLast("home");
 
     expect(state.name).toBe("home");
+    expect(target).toBeDefined();
+    expect(mockNav.currentEntry?.index).toBe(target);
 
     await router.navigate("users.list");
     await router.navigate("users.view", { id: "3" });
 
+    const target2 = lastHomeEntry();
     const state2 = await router.traverseToLast("home");
 
     expect(state2.name).toBe("home");
+    expect(mockNav.currentEntry?.index).toBe(target2);
 
     router.stop();
     unsubscribe();

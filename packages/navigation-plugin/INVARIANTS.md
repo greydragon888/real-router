@@ -337,8 +337,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 **Postcondition:**
 - Throws `Error` with message containing "No history entry for route"
 - Router state is unchanged
-- `pendingMeta` is cleared
-- `pendingTraverseKey` is cleared
+- No record is staged: the throw comes before `traverseToLast()` stages one
 
 **Why it matters:** Prevents silent failures when trying to traverse to non-existent routes.
 
@@ -431,57 +430,70 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 
 ---
 
-### C3. pendingMeta Lifecycle
+### C3. Record Lifecycle
 **Category:** NavigationMeta  
 **Testable:** Example-based  
-**Description:** `pendingMeta` must follow a strict lifecycle: set → written to `toState.context.navigation` in `onTransitionStart` → written again in `onTransitionSuccess` → cleared.
+**Description:** A navigation's record follows a strict lifecycle: staged for the router call → taken by the transition's `onTransitionStart`, which files it under `toState.context` and writes its metadata to `toState.context.navigation` → frozen and written again by the `onTransitionSuccess` whose committed state carries that `context`.
 
 **Precondition:**
-- Call `router.navigate("users.list")`
+- A browser-initiated navigation, or `traverseToLast()`
 
 **Postcondition:**
-- Before transition: `pendingMeta` is `undefined`
-- During transition (in guards): `toState.context.navigation` contains the frozen pendingMeta (for browser-initiated navigation)
-- After `onTransitionSuccess`: `pendingMeta` is cleared to `undefined`
-- `toState.context.navigation` contains the frozen meta
+- Before the router call: no record is staged
+- During the transition (in guards): `toState.context.navigation` holds the record's metadata, not yet frozen
+- After the transition's `onTransitionSuccess`: `state.context.navigation` holds the frozen metadata, and no other success reads the record; a commit's record stays staged until its call returns
+
+**Boundary:** a commit an app makes during the plugin's not-found call — `navigateToNotFound()` from a `canDeactivate` guard — reads that call's record too: the slot cannot tell it from the plugin's own commit.
 
 **Why it matters:** Prevents meta from leaking between transitions.
 
 ---
 
-### C4. pendingMeta Cleanup on Cancel
+### C4. A Superseded Transition Keeps Its Record to Itself
 **Category:** NavigationMeta  
 **Testable:** Example-based  
-**Description:** `pendingMeta` must be cleared when a transition is cancelled.
+**Description:** A navigation's record — its metadata and, for `traverseToLast()`, the entry to traverse to — belongs to the transition its call starts. `onTransitionSuccess` publishes the record filed under the committed state's `context`, the one that transition's start took, and no other; a superseded transition's record is never looked up.
 
 **Precondition:**
-- Call `router.navigate("users.list")`
-- Guard returns `false`, cancelling the transition
+- A `router.navigate()` or a `traverseToLast()` held by an async guard
+- A navigation supersedes it: Back, `navigation.navigate()` (push or replace), `history.pushState()` to a matched or an unmatched URL, `router.navigate()`, `traverseToLast()`
 
 **Postcondition:**
-- `onTransitionCancel` is called
-- `pendingMeta` is set to `undefined`
-- `pendingTraverseKey` is set to `undefined`
+- The superseded call rejects with `TRANSITION_CANCELLED`
+- The superseding navigation ends as it ends with nothing in flight: the same router URL and browser entry, the same `state.context.navigation`, the same metadata in its guards, and no `traverseTo()` but its own
+- A navigation a guard starts synchronously within a staging call — a `canActivate` of `traverseToLast()`'s target, or the current route's `canDeactivate` inside `navigateToNotFound()` — takes none of its record
+- A navigation nested in another's call — a refused one in `traverseToLast()`'s, one to a URL no route matches in the router's check of another such URL — leaves the outer record in place
+- A browser navigation that supersedes a held browser navigation publishes its own metadata too
 
-**Why it matters:** Prevents cancelled transitions from affecting subsequent navigations.
+**Test:** `tests/functional/transition-record-2753-2754.test.ts`
+
+**Why it matters:** A cancel hook that retires any record takes the superseding navigation's: its guards read no metadata and its state publishes `"replace"` / `"unknown"` (#2753). A success that consumes any record sends the browser to the superseded `traverseToLast()`'s entry while the router commits the newer route (#2754).
 
 ---
 
-### C5. pendingMeta Cleanup on Error
+### C5. A Refused or Ended Transition's Record Reaches No Other Navigation
 **Category:** NavigationMeta  
 **Testable:** Example-based  
-**Description:** `pendingMeta` must be cleared when a transition errors.
+**Description:** A refusal that starts no transition — `SAME_STATES`, `ROUTE_NOT_FOUND` — leaves the transition in flight its record. A transition that is refused, cancelled, or ends without core delivering its end to the plugin leaves its record to no later navigation, since no other state carries its `context`. A router restarted from code a staging call runs does not give that call's record to its start transition (`onStart` drops it).
 
 **Precondition:**
-- Call `router.navigate("users.list")`
-- Guard throws an error
+- A transition held by an async guard — `router.navigate()`, `traverseToLast()`, a push the browser started, Back — and an unrelated `router.navigate()` refused as `SAME_STATES` or `ROUTE_NOT_FOUND`; or
+- A `traverseToLast()` or a browser navigation refused by a guard — or a `traverseToLast()` whose `browser.traverseTo()` threw, or a navigation to a URL no route matches refused by `canDeactivate` — then a commit that starts no transition; or
+- A transition an earlier `TRANSITION_START` listener ended before the plugin heard it start — by `router.stop()`, by restarting the router into a refused start, or by aborting a browser navigation — then a commit that starts no transition; or
+- A transition whose success core did not deliver — the router restarted inside a `TRANSITION_SUCCESS` listener — then a browser navigation to a URL no route matches; or
+- A router restarted inside a `TRANSITION_ERROR` listener during `traverseToLast()`'s call, its start refused or held by a guard; or
+- A transition whose success an earlier `TRANSITION_SUCCESS` listener interrupts with a restart
 
 **Postcondition:**
-- `onTransitionError` is called
-- `pendingMeta` is set to `undefined`
-- `pendingTraverseKey` is set to `undefined`
+- The transition in flight ends with its own metadata, as it does without the refusal, and no hook of the plugin throws
+- The commit or transition after the refused, ended or restarted one publishes its own metadata and traverses nowhere; the restarted router's guards read none of the record
+- A transition whose success a restart interrupts publishes its own record
 
-**Why it matters:** Prevents errored transitions from affecting subsequent navigations.
+**Unsupported:** a navigation an app starts from inside another navigation's router call — from an abort handler of the navigation that call supersedes, or by restarting the router from a listener — or from inside a router notification. It can take the call's record or the activation, and the call's own transition or commit then goes without it; the cell restarting from a listener of the transition `traverseToLast()` supersedes pins one such order as it behaves.
+
+**Test:** `tests/functional/transition-record-2753-2754.test.ts`
+
+**Why it matters:** Prevents a refused or unrelated call from taking metadata that belongs to the transition still in flight, and a refused transition's record from reaching a later commit.
 
 ---
 
@@ -532,14 +544,14 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 - `deriveNavigationType({ reload: true }, toState, undefined) === "replace"`
 - NOT `"reload"` — there is no previous state to reload
 
-**Why it matters:** Documents a subtle asymmetry of the **pure function** `deriveNavigationType`. As of #531 the plugin no longer relies on `deriveNavigationType` alone for the first transition — it primes `#capturedMeta` from `navigation.activation.navigationType` in the constructor (see C9). So consumers now see `"reload"` after F5 in production. C8 still pins the pure function's behavior, which serves as the legacy fallback when `navigation.activation` is absent (Chrome 102–122).
+**Why it matters:** Documents a subtle asymmetry of the **pure function** `deriveNavigationType`. As of #531 the plugin no longer relies on `deriveNavigationType` alone for the first transition — it stages a record from `navigation.activation.navigationType` in the constructor (see C9). So consumers now see `"reload"` after F5 in production. C8 still pins the pure function's behavior, which serves as the legacy fallback when `navigation.activation` is absent (Chrome 102–122).
 
 ---
 
 ### C9. Activation Priming on Cross-Document Load (#531)
 **Category:** NavigationMeta
 **Testable:** Example-based
-**Description:** When the plugin constructor runs and `browser.getActivationType()` returns one of `"reload" | "traverse" | "push" | "replace"`, `#capturedMeta` is primed BEFORE `router.start()` is called. The primed meta is consumed by the first `onTransitionStart` (visible in guards) and the first `onTransitionSuccess` (visible in subscribers), then cleared. Subsequent same-document transitions derive meta from `navOptions` as usual.
+**Description:** When the plugin constructor runs and `browser.getActivationType()` returns one of `"reload" | "traverse" | "push" | "replace"`, the constructor stages a record from it BEFORE `router.start()` is called, unless `router.getState()` or `router.getPreviousState()` returns a state. The first transition start or commit the plugin hears takes it: the router's first transition, whose guards see it and whose success publishes it; its first commit, when `start()` lands on a URL no route matches; or, when an earlier listener restarts the router before the plugin hears the first start, the restart's success, whose guards do not see it. The transition that takes it keeps it if it fails — refused, cancelled, or ended by an earlier listener before the plugin heard it start. A start that commits nothing leaves the previous state `undefined`, so a plugin installed after one stages the record again. A `start()` refused before it begins a transition leaves the record to the next `start()`, and so does a `traverseToLast()` refused before the router starts or a refused navigation the browser handles in another plugin's `onStart`. Subsequent same-document transitions derive meta from `navOptions` as usual.
 
 **Precondition:**
 - Browser exposes `navigation.activation` (Chrome 123+, Firefox 147+, Safari 26.2+)
@@ -549,7 +561,9 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 - First transition's `state.context.navigation.navigationType` matches `navigation.activation.navigationType`
 - `direction === "forward"` for `"push"`, `"unknown"` otherwise
 - `userInitiated === false` (browser does not expose F5 vs `location.reload()`)
-- Second and later transitions are unaffected — `#capturedMeta` is consumed exactly once
+- Second and later transitions are unaffected — the record is consumed exactly once
+
+**Tests:** `tests/functional/navigation-meta-activation.test.ts`; the start edge cases in `tests/functional/transition-record-2753-2754.test.ts`
 
 **Fallback:** If `getActivationType()` returns `undefined` (Chrome 102–122, custom mocks, SSR), no priming happens and C8 takes over for the first transition.
 
@@ -1212,12 +1226,13 @@ agnostic parsing; validation is the matcher's job, not the parser's. See
 | B15. Visit Count Sum Consistency | History | PBT | High |
 | C1. Meta Attachment | NavigationMeta | Example | Critical |
 | C2. deriveNavigationType | NavigationMeta | PBT | High |
-| C3. pendingMeta Lifecycle | NavigationMeta | Example | Critical |
-| C4. pendingMeta Cancel | NavigationMeta | Example | High |
-| C5. pendingMeta Error | NavigationMeta | Example | High |
+| C3. Record Lifecycle | NavigationMeta | Example | Critical |
+| C4. A Superseded Transition Keeps Its Record to Itself | NavigationMeta | Example | Critical |
+| C5. A Refused or Ended Transition's Record Reaches No Other Navigation | NavigationMeta | Example | High |
 | C6. userInitiated Accuracy | NavigationMeta | Example | High |
 | C7. info Preservation | NavigationMeta | Example | Medium |
 | C8. deriveNavigationType on Initial with reload | NavigationMeta | PBT | Medium |
+| C9. Activation Priming on Cross-Document Load | NavigationMeta | Example | High |
 | D1. isSyncingFromRouter Loop Prevention | Syncing | Example | Critical |
 | D2. isSyncingFromRouter Scope (onTransitionSuccess) | Syncing | Example | Critical |
 | D3. isSyncingFromRouter Scope (replaceHistoryState) | Syncing | Example | Critical |

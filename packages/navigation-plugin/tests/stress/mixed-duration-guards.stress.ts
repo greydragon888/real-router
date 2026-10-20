@@ -19,15 +19,14 @@ let unsubscribe: Unsubscribe;
 /**
  * N22 — Mixed-duration async guards. The 2026-05-18 audit (§7.2) flagged
  * that N1.2 exercises async guards but with a SINGLE timeout (100ms). Race
- * conditions in `#capturedMeta` / `#pendingTraverseKey` only show up when
+ * conditions in the plugin's per-transition metadata only show up when
  * a slow guard is cancelled by a fast one — i.e., when the cancel/start
  * order interleaves across different timescales. This file simulates that.
  *
  * Scenario: install three guards with timeouts 5ms / 50ms / 500ms on three
  * different routes, then fire navigations to them in a tight loop. The order
- * of resolution diverges from the order of dispatch — long-running cancels
- * leak `#capturedMeta` into subsequent transitions if the cleanup hooks
- * don't fire correctly.
+ * of resolution diverges from the order of dispatch — a long-running
+ * cancelled transition must leave nothing for the transitions after it.
  */
 
 describe("N22 — Mixed-duration async guards", () => {
@@ -84,7 +83,7 @@ describe("N22 — Mixed-duration async guards", () => {
     await waitForTransitions(700);
 
     // Final navigate to a known-clean route resolves the storm. If
-    // #capturedMeta leaked from a cancelled slow guard, the meta for this
+    // metadata leaked from a cancelled slow guard, the meta for this
     // navigation would carry a stale `direction` or `navigationType`.
     const finalState = await router.navigate("home").catch(noop);
 

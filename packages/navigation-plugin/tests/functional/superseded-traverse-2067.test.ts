@@ -11,13 +11,12 @@ import type { Route, Router } from "@real-router/core";
 /**
  * A superseded traverse must not retire its SUCCESSOR's record (#2067).
  *
- * ⚑ **The record is a plugin-global slot with no owner.** `traverseToLast`
- * stages `#capturedMeta` / `#pendingTraverseKey` synchronously, then calls
- * `navigate()`. When a second call stages its own record and supersedes the
- * first, core fires the FIRST transition's `onTransitionCancel` — which retires
- * whatever is in the slot, and by then that is the second call's record. The
- * second navigation goes on to succeed, finds no `traverseKey`, and degrades
- * into a plain `push`.
+ * ⚑ **The second call stages its record before core cancels the first.**
+ * `traverseToLast` stages its record synchronously, then calls `navigate()`.
+ * When a second call supersedes the first, core cancels the FIRST transition
+ * while the second call's record is already staged. A cancel that retired
+ * whatever record it found would leave the second navigation to succeed with
+ * no traverse key, degraded into a plain `push`.
  *
  * ⚠ **Not #1802, and the two pull in opposite directions.** There the record
  * SURVIVES a navigation that never started, so a later unrelated navigation

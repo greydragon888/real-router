@@ -17,8 +17,8 @@ import type { Route, Router } from "@real-router/core";
  * the navigation it is.
  *
  * The discriminating shape is the facade's reentrancy refusal: it emits no
- * lifecycle hook at all, and the three hooks are the only writers that retire
- * the record. `ROUTE_NOT_FOUND` is absent from the table on purpose —
+ * lifecycle hook at all, so no hook can retire the record — the call that
+ * staged it drops it when it returns. `ROUTE_NOT_FOUND` is absent from the table on purpose —
  * `resolveEntryToMatchedState` throws above the record's assignment, so an
  * unmatched entry never reaches `navigate()`.
  */

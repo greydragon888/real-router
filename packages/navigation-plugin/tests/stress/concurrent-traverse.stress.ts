@@ -1,3 +1,5 @@
+import { errorCodes } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 import {
   describe,
   it,
@@ -14,6 +16,23 @@ import type { Router, Unsubscribe } from "@real-router/core";
 
 let router: Router;
 let unsubscribe: Unsubscribe;
+
+/**
+ * Holds every activation of `users.list` for a few milliseconds. Without it a
+ * `traverseToLast("users.list")` completes inside its own call, and a navigate
+ * issued after it never overlaps it (#2754).
+ */
+function holdTraverseTarget(): void {
+  getLifecycleApi(router).addActivateGuard(
+    "users.list",
+    () => () =>
+      new Promise<boolean>((resolve) => {
+        setTimeout(() => {
+          resolve(true);
+        }, 5);
+      }),
+  );
+}
 
 describe("N13 — concurrent traverseToLast", () => {
   beforeAll(() => {
@@ -62,14 +81,14 @@ describe("N13 — concurrent traverseToLast", () => {
     expect(typeof router.canGoForward()).toBe("boolean");
   });
 
-  it("N13.2: traverseToLast vs concurrent router.navigate — pendingTraverseKey does not leak across transitions", async () => {
-    // Race scenario: traverseToLast captures #pendingTraverseKey, calls
-    // router.navigate internally. While that promise is in flight, a
-    // concurrent router.navigate fires. If #pendingTraverseKey were leaked
-    // between the two transitions, onTransitionSuccess would call
-    // browser.traverseTo(stale-key) for the second navigation and push the
-    // browser history into an inconsistent state — URL matches the first
-    // traversal target while the router state matches the second navigate.
+  it("N13.2: traverseToLast vs concurrent router.navigate — the traverse record does not leak across transitions", async () => {
+    // Race scenario: traverseToLast stages its record — the entry to traverse
+    // to — and calls router.navigate internally. While that transition is in
+    // flight, a concurrent router.navigate supersedes it. If the second
+    // transition consumed the first one's record, onTransitionSuccess would
+    // call browser.traverseTo(stale-key) for it and push the browser history
+    // into an inconsistent state — URL matches the first traversal target
+    // while the router state matches the second navigate.
     const result = createStressRouter();
 
     router = result.router;
@@ -85,6 +104,7 @@ describe("N13 — concurrent traverseToLast", () => {
     await router.navigate("users.list");
     await router.navigate("users.view", { id: "2" });
     await router.navigate("home");
+    holdTraverseTarget();
 
     for (let cycle = 0; cycle < 30; cycle++) {
       // traverseToLast("users.list") and navigate("users.view", ...) race.
@@ -99,13 +119,18 @@ describe("N13 — concurrent traverseToLast", () => {
       await Promise.allSettled([traverseP, navigateP]);
       await waitForTransitions();
 
+      // The two overlapped: the navigate superseded the held traverse.
+      await expect(traverseP).resolves.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+
       const state = router.getState();
       const url = mockNav.currentUrl;
 
       expect(state).toBeDefined();
 
       // Consistency invariant: the URL in the browser history must match the
-      // router's current state. If pendingTraverseKey leaked, the browser
+      // router's current state. If the traverse record leaked, the browser
       // would be on the traverseTo target while the router thinks it's on
       // the navigate target (or vice versa).
       const expectedPath = state!.path;
@@ -126,27 +151,31 @@ describe("N13 — concurrent traverseToLast", () => {
     expect(router.getState()?.name).toBe("home");
   });
 
-  it("N13.3: router.navigate supersedes pending traverseToLast — no stale key leaks into next transition", async () => {
-    // Verifies that if a transition is cancelled/superseded between setting
-    // #pendingTraverseKey (inside traverseToLast) and the onTransitionSuccess
-    // hook, the key does NOT leak into whatever transition succeeds next.
-    // The core's TRANSITION_CANCEL and TRANSITION_ERROR hooks must clear it;
-    // with the clear-before-attempt fix in plugin.ts onTransitionSuccess,
-    // even a throw at the traverse site cannot poison subsequent transitions.
+  it("N13.3: router.navigate supersedes pending traverseToLast — no stale key leaks into a later transition", async () => {
+    // Verifies that if a traverse is superseded before its onTransitionSuccess,
+    // its record — the entry to traverse to — does NOT leak into a transition
+    // that succeeds afterwards: the superseding one, nor the one after it. A
+    // superseded transition's record is filed under its own toState.context,
+    // which no later state carries, so no later success finds it — not even
+    // after a throw at the traverse site.
     const result = createStressRouter();
 
     router = result.router;
     unsubscribe = result.unsubscribe;
 
-    const { browser } = result;
+    const { browser, mockNav } = result;
 
     await router.start();
     await router.navigate("users.list");
     await router.navigate("home");
     await router.navigate("users.view", { id: "1" });
+    holdTraverseTarget();
 
-    // Fire traverseToLast without awaiting — it will set #pendingTraverseKey
-    // synchronously and start the navigation.
+    const navigateSpy = vi.spyOn(browser, "navigate");
+    const traverseSpy = vi.spyOn(browser, "traverseTo");
+
+    // Fire traverseToLast without awaiting — it stages its record
+    // synchronously and starts the navigation, which the guard holds.
     const traverseP = router
       .traverseToLast("users.list")
       .catch((error: unknown) => error);
@@ -159,13 +188,13 @@ describe("N13 — concurrent traverseToLast", () => {
     await Promise.allSettled([traverseP, supersedeP]);
     await waitForTransitions();
 
-    // After the race settled, fire a fresh programmatic navigate and verify
-    // it goes through browser.navigate — never browser.traverseTo with a
-    // stale key. This is the invariant: cleanup hooks must have cleared
-    // #pendingTraverseKey before the next transition starts.
-    const navigateSpy = vi.spyOn(browser, "navigate");
-    const traverseSpy = vi.spyOn(browser, "traverseTo");
+    // The superseding navigation lands the browser on its own URL.
+    expect(router.getState()?.path).toBe("/users/view/2");
+    expect(mockNav.currentUrl).toContain("/users/view/2");
 
+    // A fresh programmatic navigate goes through browser.navigate — never
+    // browser.traverseTo with a stale key.
+    navigateSpy.mockClear();
     await router.navigate("home");
 
     // Router reached "home" via a push (normal flow), NOT via a traverseTo
