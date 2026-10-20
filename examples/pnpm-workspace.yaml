@@ -82,9 +82,6 @@ overrides:
   brace-expansion@1: 1.1.21
   brace-expansion@2: 2.1.7
   brace-expansion@5: 5.0.12
-  # body-parser < 2.3.0 (GHSA-v422-hmwv-36x6, Low) — example-only (express@5), not shipped. Drop
-  # when express pulls >=2.3.0.
-  body-parser: '>=2.3.0'
   picomatch@2: 2.3.2
   # At the version @angular-devkit/core and @angular/build pin exactly (4.0.7);
   # every other parent's range admits it.
