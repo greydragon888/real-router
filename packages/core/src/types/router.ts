@@ -287,6 +287,13 @@ export interface Plugin {
   onTransitionStart?: (toState: State, fromState?: State) => void;
   onTransitionLeaveApprove?: (toState: State, fromState?: State) => void;
   onTransitionCancel?: (toState: State, fromState?: State) => void;
+  /**
+   * Also called for a navigation refused before it starts — `SAME_STATES`,
+   * for one — and for a plugin's `emitTransitionError`, and that may happen
+   * while another transition is in flight. A transition's own error carries a
+   * `toState` with the `context` its `onTransitionStart` received; a refusal's
+   * `toState` is `undefined` or a state with a `context` of its own (#2779).
+   */
   onTransitionError?: (
     toState: State | undefined,
     fromState: State | undefined,

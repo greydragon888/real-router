@@ -500,6 +500,8 @@ Errors during navigation are routed through two different paths depending on FSM
 | **Via FSM**     | `sendFail()` → FSM FAIL | A transition failed: FSM is in `STARTING`, `TRANSITION_STARTED` or `LEAVE_APPROVED`                                                                  | FSM transitions → action emits `$$error` |
 | **Direct emit** | `emitTransitionError()` | A REPORT to observers, not a transition failure: early refusals (ROUTE_NOT_FOUND, SAME_STATES, the P3 channel guard) and the plugin-facing primitive | Emits directly, FSM state unchanged      |
 
+A listener tells a transition's failure from a direct emit by the `context` of the `toState` (#2779). The FAIL action on `TRANSITION_STARTED` / `LEAVE_APPROVED` emits `ctx.inflight.toState`: the object `TRANSITION_START` carried, or the committed copy once `completeTransition` has written it back — and both carry that transition's `context`. A direct emit carries `undefined` or a state with a `context` of its own, and may arrive while a transition is in flight. `tests/property/transitionAttribution.properties.ts` holds the rule against `isTransitioning()`.
+
 **The row is never chosen at runtime, and that is the design.** Each has a fixed set of senders: a sender that reports to observers without a transition to fail always emits directly, and it neither knows nor should decide whether one is in flight. There is no `READY --FAIL--> READY` edge for it to take, so a stale `FAIL` in `READY` is a table no-op structurally — and since the emit rides the edge's action, it emits nothing at all rather than being filtered.
 
 ### navigateToNotFound() — Pipeline Bypass
@@ -567,6 +569,8 @@ Plugin hooks are bound to router events via `addEventListener()`:
 | `onTransitionCancel`       | `$$cancel`       | Navigation cancelled                          |
 
 **Note:** `onTransitionSuccess` can fire without a preceding `onTransitionStart` — via `navigateToNotFound()`.
+
+**Note:** `onTransitionError` can fire without a preceding `onTransitionStart` — for a navigation refused before it starts, or a plugin's `emitTransitionError` — and while another transition is in flight. See [Error Routing](#error-routing) for how to tell the two apart.
 
 #### What a plugin is
 

@@ -88,6 +88,7 @@ readonly #prefix = `[${config.context}]`;
 
 ```typescript
 // Private fields on LoggerPlugin — created per router instance
+#announced: State | undefined = undefined; // toState of the last onTransitionStart
 #transitionStartTime: number | null = null;
 #transitionLabel = "";
 #startMarkName = "";
@@ -154,10 +155,11 @@ onTransitionCancel(toState, fromState?)
     └── resetTransitionState()
 
 onTransitionError(toState?, fromState?, err)
-    ├── perf.mark("router:transition-error:{label}")
-    ├── perf.measure("router:transition-failed:{label}", start, error)
-    ├── if logError → console.error("[ctx] Transition error: {code} (Xms)", { error, stack, to, from })
-    └── resetTransitionState()
+    ├── ends = toState?.context === #announced?.context   (not for a refusal that starts no transition, #2779)
+    ├── if ends → perf.mark("router:transition-error:{label}")
+    ├── if ends → perf.measure("router:transition-failed:{label}", start, error)
+    ├── if logError → console.error("[ctx] Transition error: {code} (Xms when ends)", { error, stack, to, from })
+    └── if ends → resetTransitionState()
 
 onStop()
     ├── groups.close()
@@ -226,7 +228,7 @@ Channel-agnostic — called once for `state.params` (path) and once for `state.s
 
 ### console-groups.ts — Group Manager
 
-Closure-based `isOpened` flag prevents duplicate `console.group()` calls. Opens on `onTransitionStart`, closes on `resetTransitionState` (success/cancel/error/stop/teardown).
+Closure-based `isOpened` flag prevents duplicate `console.group()` calls. Opens on `onTransitionStart`, closes on `resetTransitionState` (success/cancel/the transition's own error/stop/teardown).
 
 ### performance-marks.ts — Performance Tracker
 
@@ -261,7 +263,7 @@ All marks/measures are visible in browser DevTools Performance tab.
 | `onTransitionStart`   | `console.log`   | `logTransition`   | `[ctx] Transition: {from} → {to}`       |
 | `onTransitionSuccess` | `console.log`   | `logTransition`   | `[ctx] Transition success (Xms)`        |
 | `onTransitionCancel`  | `console.warn`  | `logWarning`      | `[ctx] Transition cancelled (Xms)`      |
-| `onTransitionError`   | `console.error` | `logError`        | `[ctx] Transition error: {code} (Xms)`  |
+| `onTransitionError`   | `console.error` | `logError`        | `[ctx] Transition error: {code} (Xms)` — no timing on a refusal that starts no transition |
 | params diff (`state.params`) | `console.log` | `shouldLogParams` | `[ctx]  params Changed: { ... }` |
 | search diff (`state.search`) | `console.log` | `shouldLogParams` | `[ctx]  search Changed: { ... }` |
 

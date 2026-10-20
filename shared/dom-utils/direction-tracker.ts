@@ -1,7 +1,7 @@
 import { events } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 
-import type { Params, Router, SearchParams } from "@real-router/core";
+import type { Params, Router, SearchParams, State } from "@real-router/core";
 
 type BuildUrl = (
   name: string,
@@ -50,7 +50,8 @@ export function createDirectionTracker(router: Router): DirectionTracker {
 
   document.documentElement.dataset.navDirection = "forward";
 
-  let transitionInFlight = false;
+  // The `toState` the transition in flight was announced with.
+  let inFlight: State | undefined;
   let armedMidTransition = false;
 
   // ⚑ The flag is SPENT by the transition it belongs to, whether or not that
@@ -106,7 +107,7 @@ export function createDirectionTracker(router: Router): DirectionTracker {
     popstateFlag = true;
     // A deferred event belongs to the replay, not to the transition running
     // now, so that transition's terminal event must not spend it.
-    armedMidTransition = transitionInFlight;
+    armedMidTransition = inFlight !== undefined;
   };
 
   // IMPORTANT — listener-ordering: `popstate` fires on `window`, which
@@ -121,7 +122,7 @@ export function createDirectionTracker(router: Router): DirectionTracker {
   const api = getPluginApi(router);
 
   const onSettled = (): void => {
-    transitionInFlight = false;
+    inFlight = undefined;
 
     if (armedMidTransition) {
       armedMidTransition = false;
@@ -132,12 +133,30 @@ export function createDirectionTracker(router: Router): DirectionTracker {
     popstateFlag = false;
   };
 
+  // Core also reports a refusal that starts no transition on
+  // `TRANSITION_ERROR`, and may do so while another transition runs. A
+  // transition's own error carries a `toState` with that transition's
+  // `context`, so another one does not settle it (#2779). With nothing in
+  // flight every error settles: the `SAME_STATES` arc above spends the flag
+  // that way.
+  const onError = (toState: State | undefined): void => {
+    if (inFlight === undefined || toState?.context === inFlight.context) {
+      onSettled();
+    } else {
+      // A popstate armed while the transition runs may be the one this
+      // refusal answers: a URL plugin handles a popstate that arrives during a
+      // programmatic transition on the spot. So that transition's terminal
+      // spends the flag instead of keeping it for a replay.
+      armedMidTransition = false;
+    }
+  };
+
   const unsubs = [
-    api.addEventListener(events.TRANSITION_START, () => {
-      transitionInFlight = true;
+    api.addEventListener(events.TRANSITION_START, (toState: State) => {
+      inFlight = toState;
     }),
     api.addEventListener(events.TRANSITION_SUCCESS, onSettled),
-    api.addEventListener(events.TRANSITION_ERROR, onSettled),
+    api.addEventListener(events.TRANSITION_ERROR, onError),
     api.addEventListener(events.TRANSITION_CANCEL, onSettled),
     router.subscribeLeave(() => {
       document.documentElement.dataset.navDirection = popstateFlag
