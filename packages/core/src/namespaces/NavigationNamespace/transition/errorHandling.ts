@@ -53,8 +53,10 @@ function isTransitionCancelled(error: unknown): boolean {
  * ⚠ The table does not make this redundant. `STARTING --FAIL--> IDLE` is how a
  * failed `start()` unwinds — unconditional, so a stale `FAIL` there kills a
  * RESTART — and which error `navigate()` rejects with is a contract, not an
- * edge. Measured: neutralising this reds 6 tests, five in
- * `superseded-guard-rejection-1609.test.ts`.
+ * edge. Measured: neutralising this reds the torn-down cells of
+ * `superseded-guard-rejection-1609.test.ts`, the removal cells of
+ * `getRoutesApi/removeRoute.test.ts` and the `dispose()` cell of
+ * `commit-gate-1169.test.ts`.
  */
 export function asCancellation(error: unknown): unknown {
   return isTransitionCancelled(error)

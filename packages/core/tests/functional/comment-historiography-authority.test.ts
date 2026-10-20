@@ -1330,11 +1330,6 @@ const COUNT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    file: "packages/core/src/namespaces/NavigationNamespace/transition/executeNavigation.ts",
-    form: "N tests/files/sends",
-    count: 1,
-  },
-  {
     file: "packages/core/src/namespaces/NavigationNamespace/transition/navigateToNotFound.ts",
     form: "N code-artifacts",
     count: 2,

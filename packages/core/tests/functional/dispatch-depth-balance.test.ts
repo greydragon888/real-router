@@ -5,19 +5,22 @@
 // increment does not fail one navigation: it bans EVERY later top-level
 // navigate, for the life of the router, with a false REENTRANT_NAVIGATION.
 // `dispatch-depth-reset.properties.ts` is the behavioural half and it is
-// mutation-proven — but its domain is a sequence of navigate outcomes, so it
-// reaches six of the seven raise sites and cannot reach the seventh.
+// mutation-proven — but its domain is a sequence of navigate outcomes, and two
+// of the raise sites it cannot test for a restore moved out of its `finally`.
 //
-// The seventh is the `$start` emit (#1647). Its leak is not merely uncovered,
-// it is behaviourally UNREACHABLE: a leak needs `emit` itself to throw, and
-// every path into the emitter's error sink is isolated twice — `#invokeIsolated`
-// catches the listener, and `RouterLogger.#invokeCallback` catches the user
-// callback the sink ends in. Measured: stripping that site's `finally` reds
-// nothing across the functional and property tiers. So the guarantee there is
-// structural, and so is its guard.
+// The two are the `$start` emit (#1647) and `dispatchAbort` (#2778). Such a
+// leak is not merely uncovered there, it is behaviourally UNREACHABLE. At
+// `$start` it needs `emit` itself to throw, and every path into the emitter's
+// error sink is isolated twice — `#invokeIsolated` catches the listener, and
+// `RouterLogger.#invokeCallback` catches the user callback the sink ends in.
+// At `dispatchAbort` it needs `abort()` to throw, and the platform reports a
+// throwing `abort` listener instead of propagating it. Measured: moving either
+// site's restore out of its `finally` reds no behavioural test across the
+// functional and property tiers. So the guarantee there is structural, and so
+// is its guard.
 //
 // Checking the SHAPE rather than the behaviour is also what makes this survive
-// an eighth site: a new raise added without a `finally` fails here on the day it
+// a ninth site: a new raise added without a `finally` fails here on the day it
 // is written, before anything routes user code through it.
 
 import { readFileSync } from "node:fs";
@@ -185,9 +188,12 @@ describe(`#1034 — every ${FIELD} increment is restored in a finally`, () => {
   it("finds every raise site — the scan is not vacuously green", () => {
     // Positive control, and a deliberate tripwire: adding a raise site is a
     // decision about the reentrancy ban's reach (a plugin `onStart` came under
-    // it this way, #1647), so it should be made on purpose and land here.
-    // Five `emitTransition*` + the sync `subscribeLeave` batch + `$start`.
-    expect(raises).toHaveLength(7);
+    // it this way, #1647, and an `abort` listener of a router-owned signal,
+    // #2778), so it should be made on purpose and land here — and give the new
+    // window a cell in `navigation/reentrant-start-and-abort-2778.test.ts`.
+    // Five `emitTransition*` + the sync `subscribeLeave` batch + `$start` +
+    // `dispatchAbort`.
+    expect(raises).toHaveLength(8);
   });
 
   it("balances every raise with a restore", () => {

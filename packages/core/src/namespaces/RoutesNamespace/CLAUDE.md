@@ -134,8 +134,9 @@ navigation.** Both arms run application code there — the survivor arm through 
 route's own `decodeParams`, the identity arm additionally through the guards it
 consults, and both after the `TREE_CHANGED` dispatch — while the router still
 holds a state it has not revalidated. All six route-CRUD doors answer
-`REENTRANT_TREE_MUTATION` and the navigate family `REENTRANT_NAVIGATION`, both
-synchronously and both naming `queueMicrotask` as the remedy.
+`REENTRANT_TREE_MUTATION`, and the navigate family and a `start()` after
+`stop()` `REENTRANT_NAVIGATION`, both synchronously and both naming
+`queueMicrotask` as the remedy.
 
 ⚠ The rule is about the PHASE, not about what the mutation touches: an unrelated
 route is refused too, because judging whether a mutation would have corrupted the

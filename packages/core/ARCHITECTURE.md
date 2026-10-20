@@ -622,10 +622,11 @@ because merging the result is this seam's documented idiom and an own
 `"__proto__"` riding through swaps the merging plugin's own prototype. Spread it
 as before; do not rely on its identity.
 
-**An interceptor may NOT start a navigation.** The four navigation entry points
-called from a `forwardState` interceptor, a route's `encodeParams`
-or dynamic `forwardTo` callback, an option callback, or the `$start` dispatch
-throw `REENTRANT_NAVIGATION` synchronously. Defer instead.
+**An interceptor may NOT start a navigation.** The four navigation entry points,
+and a `start()` on a router that is not running, called while a navigation is
+being prepared — from a `forwardState` interceptor, a route's `encodeParams` or
+dynamic `forwardTo` callback, an option callback — or from the `$start`
+dispatch throw `REENTRANT_NAVIGATION` synchronously. Defer instead.
 
 - ⚠ **`decodeParams` is NOT in that list** — it serves the URL→state direction and
   runs from `matchPath`, which prepares no navigation.
@@ -703,7 +704,10 @@ synchronous throw flows through, so it does not leak as a Node
 `unhandledRejection`. The same isolation covers **raw plugin hooks**.
 
 A **synchronous** reentrant navigation from inside a transition listener is
-**banned**. Deferred navigation is allowed.
+**banned**, a `start()` on a router that is not running included, and so is one
+from an `abort` listener of a navigation's signal while core cancels that
+navigation or settles its synchronous failure: those aborts are counted
+dispatches too. Deferred navigation is allowed.
 
 **`navigateToNotFound()` bypasses plugins and ACTIVATION guards** — plugins see
 only `onTransitionSuccess`, and there is nothing to activate at `UNKNOWN_ROUTE`.

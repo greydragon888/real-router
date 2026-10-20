@@ -1,7 +1,8 @@
 // #1179 — the ONE load-bearing dispatch-depth `finally` under load.
 //
-// `#dispatchDepth` is restored in a `finally` around six sites: the 5 emitTransition*
-// wrappers AND the synchronous subscribeLeave batch. For the 5 emit wrappers the
+// `#dispatchDepth` is restored in a `finally` at every raise site
+// (`dispatch-depth-balance.test.ts` holds the set), the 5 emitTransition* wrappers
+// AND the synchronous subscribeLeave batch among them. For the 5 emit wrappers the
 // `finally` is DEFENSIVE — the EventEmitter isolates listener throws, so the emit
 // body never throws (event-depth-stress already hammers 1000 throwing SUCCESS
 // listeners and stays green regardless of that `finally`).

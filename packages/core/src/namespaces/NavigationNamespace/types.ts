@@ -344,6 +344,16 @@ export interface NavigationDependencies {
   cancelNavigation: (reason?: unknown) => void;
 
   /**
+   * Abort a failing navigation's controller as a counted dispatch, so a
+   * navigation started from one of its `abort` listeners is refused
+   * `REENTRANT_NAVIGATION` (#2778). No-op without a controller.
+   */
+  dispatchAbort: (
+    controller: AbortController | undefined,
+    reason: unknown,
+  ) => void;
+
+  /**
    * Open the cancellability scope onto the caller's `opts.signal` — the LATE of
    * the bridge's two moments (#1690), the only one the pipeline still asks for.
    *

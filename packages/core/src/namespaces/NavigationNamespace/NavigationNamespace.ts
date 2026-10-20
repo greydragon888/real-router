@@ -128,22 +128,22 @@ export class NavigationNamespace {
    * interceptor chain, a dynamic `forwardTo`, a route's `encodeParams` — but
    * NOT `decodeParams`, which serves the URL→state direction and prepares no
    * navigation) and `resolveDefault` (each of the
-   * three default options may be a dependency-resolved callback). Everything
-   * else before the announce is core's own code, except `abortPreviousNavigation`'s
-   * `CANCEL` emit, which the dispatch depth covers already. That depth is why
+   * three default options may be a dependency-resolved callback). Other
+   * application code runs before the announce too: `abortPreviousNavigation`'s
+   * `CANCEL` action, whose abort and emit the dispatch depth counts (#2778),
+   * and — counted by no window — accessor reads of the caller's `params`,
+   * `opts` and `signal`, and the logger's callback. The dispatch depth is why
    * the reentrancy ban missed this window: it keys off the emitter, and there
    * has been no emit yet.
    *
    * A DEPTH raised inline, not a boolean set by a wrapper: the wrapper allocated
    * a closure per navigation on the #307 hot path. Each site lowers it in a
-   * `finally`, because the early refusals exit through this window too
-   * (`ROUTE_NOT_FOUND`, `WRONG_CHANNEL`, any throw from user code) and a marker
-   * left raised deadlocks the router against its own next call.
+   * `finally`; `INVARIANTS.md` "Reentrancy & dispatch" row 4 says why.
    *
    * Read by `Router.#assertNotReentrant` beside `EventBus.isProcessing()`;
-   * between them they span every window where application code runs inside a
-   * navigation core has not finished setting up. A GUARD is deliberately in
-   * neither: it runs after the announce, so a guard-redirect stays a supersede.
+   * between them they span the windows where application code runs inside a
+   * navigation core has not finished setting up, except the reads and the
+   * callback above. A guard is in neither, for the reason the same row gives.
    *
    * Interim form — pre-start becoming a STATE of the machine absorbs it, and a
    * nested navigation is then an ordinary supersede needing no marker.
