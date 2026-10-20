@@ -35,7 +35,7 @@ onTransitionStart()        → groups.open + record timing + perf.mark + log + p
 onTransitionLeaveApprove() → perf.mark("router:leave-approved:{label}") + log "Leave approved" if logTransition
 onTransitionSuccess()      → perf.mark + perf.measure + log with timing + resetTransitionState
 onTransitionCancel()       → perf.mark + perf.measure + warn + resetTransitionState
-onTransitionError()        → perf.mark + perf.measure + error with code + resetTransitionState
+onTransitionError()        → error with code; for the transition's own error also perf.mark + perf.measure + timing + resetTransitionState
 onStop()                   → groups.close + perf.mark + perf.measure("router:lifetime") + log if logLifecycle
 teardown()                 → resetTransitionState
 ```
@@ -53,6 +53,10 @@ All `config.level` checks are resolved once in the constructor into boolean flag
 ### `#resetTransitionState()` ordering
 
 Called **after** timing is read — preserves `#transitionStartTime` until the log message is formatted. Clears: `#groups.close()`, `#transitionLabel = ""`, `#startMarkName = ""`, `#transitionStartTime = null`.
+
+### A refusal is not the transition's error
+
+Core reports a refusal that starts no transition (`SAME_STATES`, for one) on `onTransitionError`, possibly while another transition is in flight. `#announced` holds the `toState` the last `onTransitionStart` received, and an error ends the transition only when its `toState` carries that state's `context`. Any other error is logged without timing and leaves the marks and the group to the transition's own end (#2779); `tests/functional/early-refusal-2779.test.ts` holds the cases.
 
 ### Monotonic time fallback
 

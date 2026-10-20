@@ -194,7 +194,9 @@ All cached factories use `WeakMap<Router, T>` (or `WeakMap<Router, Map<key, T>>`
 
 ### Transition state lifecycle
 
-The `isLeaveApproved` flag is set to `true` only when `TRANSITION_LEAVE_APPROVE` event fires. It resets to `false` on `TRANSITION_SUCCESS`, `TRANSITION_ERROR`, or `TRANSITION_CANCEL`. This allows UI to show a "loading" state during the activation phase after deactivation guards pass.
+The `isLeaveApproved` flag is set to `true` only when `TRANSITION_LEAVE_APPROVE` event fires. It resets to `false` on `TRANSITION_SUCCESS`, the transition's own `TRANSITION_ERROR`, or `TRANSITION_CANCEL`. This allows UI to show a "loading" state during the activation phase after deactivation guards pass.
+
+A `TRANSITION_ERROR` is the transition's own when its `toState` carries the `context` of the one the snapshot shows — from its `TRANSITION_START`, or its `TRANSITION_LEAVE_APPROVE` for a source created after the start. Core reports a refusal that starts no transition on the same event, possibly while a transition is in flight, and that refusal leaves the snapshot alone (#2779); `tests/functional/early-refusal-2779.test.ts` holds the cases.
 
 ### Cached sources ignore external destroy()
 

@@ -110,10 +110,12 @@ export function completeTransition(
   // alternating-process harness at 150 000 × 15: the extra object sits at the
   // noise floor (deltas −0.8 % and +0.1 % against an A/A floor of +0.3 %).
   //
-  // ⚠ `finalState` is NOT the object the guards saw. The two readers of state
-  // identity are safe by construction: `transitionPath`'s cache keys on the
-  // PENDING pair inside the transition, and `createTransitionSource` compares an
-  // event argument with itself.
+  // ⚠ `finalState` is NOT the object the guards saw, nor the one
+  // `TRANSITION_START` carried — and once it is written back below, a FAIL
+  // that follows reports it too. What ties one transition's events together
+  // is the `context`, which the spread keeps
+  // (`transitionAttribution.properties.ts`); `transitionPath`'s cache keys on
+  // the pending pair inside the transition.
   // ⚑ Annotated AT the literal, like `#copyChannels`: both censuses in
   // `state-freeze-authority` key on the TYPE, so the contextual form would make
   // this State constructor — and the shell freeze taking it — invisible to the

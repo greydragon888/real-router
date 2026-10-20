@@ -1,5 +1,6 @@
 import { fc, test } from "@fast-check/vitest";
-import { getLifecycleApi } from "@real-router/core/api";
+import { createRouter, events } from "@real-router/core";
+import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 import { describe, expect, vi } from "vitest";
 
 import {
@@ -9,10 +10,13 @@ import {
   createStartedRouter,
   IDLE_TRANSITION,
   NUM_RUNS,
+  ROUTES,
   channelsForRoute,
   paramsForRoute,
 } from "./helpers";
 import { createTransitionSource } from "../../src";
+
+import type { Router } from "@real-router/core";
 
 describe("createTransitionSource — state machine", () => {
   test.prop([arbNavigationSeq], { numRuns: NUM_RUNS.standard })(
@@ -613,6 +617,104 @@ describe("createTransitionSource — destroy", () => {
       }).not.toThrow();
 
       router.stop();
+    },
+  );
+});
+
+// Core reports a refusal that starts no transition on `TRANSITION_ERROR`, with
+// no `TRANSITION_START` before it, and may do so while another transition is
+// in flight (#2779). Each refusal reaches a different emission site.
+const REFUSALS: Record<string, (router: Router) => Promise<unknown> | void> = {
+  SAME_STATES: (router) => router.navigate("home").catch(() => {}),
+  ROUTE_NOT_FOUND: (router) => router.navigate("nowhere").catch(() => {}),
+  WRONG_CHANNEL: async (router) => {
+    const api = getPluginApi(router);
+    const state = api.makeState("search", {});
+
+    try {
+      await api.navigateToState({ ...state, params: { q: "1" } });
+    } catch {
+      // The refusal is the point.
+    }
+  },
+  "a plugin's report": (router) => {
+    getPluginApi(router).emitTransitionError(new Error("plugin report"));
+  },
+};
+
+describe("createTransitionSource — a refusal that starts no transition (#2779)", () => {
+  test.prop(
+    [
+      arbRouteName,
+      fc.constantFrom("deactivate", "activate"),
+      fc.array(fc.constantFrom(...Object.keys(REFUSALS)), {
+        minLength: 1,
+        maxLength: 4,
+      }),
+      fc.boolean(),
+    ],
+    { numRuns: NUM_RUNS.async },
+  )(
+    "leaves the snapshot of the transition in flight alone; the transition's own terminal still ends it",
+    async (routeName, holdOn, refusals, allow) => {
+      fc.pre(routeName !== "home");
+
+      // WRONG_CHANNEL is not an expected rejection, so core logs it.
+      const router = createRouter(ROUTES, { logger: { level: "none" } });
+
+      await router.start("/");
+
+      let release!: (allowed: boolean) => void;
+      const hold = () =>
+        new Promise<boolean>((resolve) => {
+          release = resolve;
+        });
+      const lifecycle = getLifecycleApi(router);
+
+      if (holdOn === "deactivate") {
+        lifecycle.addDeactivateGuard("home", () => hold);
+      } else {
+        lifecycle.addActivateGuard(routeName, () => hold);
+      }
+
+      let errors = 0;
+
+      getPluginApi(router).addEventListener(events.TRANSITION_ERROR, () => {
+        errors++;
+      });
+
+      const source = createTransitionSource(router);
+      const listener = vi.fn();
+
+      source.subscribe(listener);
+
+      const navigation = router
+        .navigate(routeName, ...channelsForRoute(routeName))
+        .catch(() => {});
+
+      await Promise.resolve();
+
+      const held = source.getSnapshot();
+      const notified = listener.mock.calls.length;
+
+      expect(held.isTransitioning).toBe(true);
+
+      for (const refusal of refusals) {
+        await REFUSALS[refusal](router);
+      }
+
+      // Every refusal reached `TRANSITION_ERROR`.
+      expect(errors).toBe(refusals.length);
+      expect(source.getSnapshot()).toBe(held);
+      expect(listener).toHaveBeenCalledTimes(notified);
+
+      release(allow);
+      await navigation;
+
+      expect(source.getSnapshot()).toStrictEqual(IDLE_TRANSITION);
+
+      router.stop();
+      source.destroy();
     },
   );
 });

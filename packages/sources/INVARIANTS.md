@@ -144,6 +144,7 @@
 | 6   | fromRoute at TRANSITION_START matches the prior router state         | During a transition, `fromRoute.name` equals the route that was active before the navigation started.                                              |
 | 7   | All IDLE snapshots are the same object reference                     | Every time the source returns to IDLE, `getSnapshot()` returns the exact same object (Object.is equality). IDLE is a singleton reference.          |
 | 8   | Listener is invoked on each transition state change                  | The listener is called at least twice during an async navigation: once at TRANSITION_START and at least once more when the transition resolves.    |
+| 9   | A refusal that starts no transition leaves the snapshot alone (#2779) | While a transition is in flight, a refusal that starts no transition or a plugin's `emitTransitionError` — reported on `TRANSITION_ERROR` with no `TRANSITION_START` of its own; the property draws `SAME_STATES`, `ROUTE_NOT_FOUND` and `WRONG_CHANNEL` — keeps the snapshot reference and notifies no listener; the transition's own terminal event still restores IDLE. |
 
 ## createTransitionSource — Concurrent Navigation
 
@@ -158,7 +159,7 @@
 | #   | Invariant                                                                | Description                                                                                                                          |
 | --- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
 | 1   | `isLeaveApproved` goes `true` on `TRANSITION_LEAVE_APPROVE`, then `false` on `TRANSITION_SUCCESS` | The flag tracks the activation-pending window; SUCCESS restores IDLE.                                                |
-| 2   | `isLeaveApproved` resets to `false` on `TRANSITION_ERROR` (activate-guard rejection) | Any terminal error event restores IDLE.                                                                                       |
+| 2   | `isLeaveApproved` resets to `false` on `TRANSITION_ERROR` (activate-guard rejection) | The transition's own error event restores IDLE.                                                                               |
 | 3   | `isLeaveApproved` resets to `false` on `TRANSITION_CANCEL`               | A concurrent navigation that cancels the current one restores IDLE.                                                                  |
 
 ## createTransitionSource — Destroy
@@ -342,7 +343,7 @@ The property file draws every object key without a backslash: rows 3 and 5 hand 
 | `tests/property/routeEnterGate.properties.ts`              | 2          | `createRouteEnterGate` same-reference at-most-once dispatch (StrictMode idempotence), dispatch-implies-guards-passed (#1218) |
 | `tests/property/routeNodeSource.properties.ts`             | 23         | `createRouteNodeSource` node scoping, lazy-connection + reconnection, cache identity (per-router × nodeName), destroy |
 | `tests/property/activeRouteSource.properties.ts`           | 19         | `createActiveRouteSource` boolean tracking (hash-aware via `arbActiveOptions`), filter, cache identity (canonicalJson + hash isolation), lazy-connection + reconnection (#766), destroy |
-| `tests/property/transitionSource.properties.ts`            | 20         | `createTransitionSource` state machine, isLeaveApproved monotonicity, concurrent navigation (async-guard cancellation), destroy |
+| `tests/property/transitionSource.properties.ts`            | 21         | `createTransitionSource` state machine, isLeaveApproved monotonicity, concurrent navigation (async-guard cancellation), destroy, a refusal that starts no transition (#2779) |
 | `tests/property/errorSource.properties.ts`                 | 9          | `createErrorSource` error tracking, version monotonicity (incl. long-run + SUCCESS-doesn't-advance), CANCEL no-op, destroy |
 | `tests/property/stabilizeState.properties.ts`              | 20         | `stabilizeState` reflexivity, path/hash/reload-aware path-equivalence, idempotency, nullish-handling, transitivity, hash×reload interaction, defensive read |
 | `tests/property/computeSnapshot.properties.ts`             | 15         | `computeSnapshot` reference stability, idempotency, root dominance, subtree containment, unrelated-route, containment monotonicity, `.`-boundary prefix-match |

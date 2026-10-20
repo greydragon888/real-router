@@ -103,11 +103,29 @@ export function createTransitionSource(
 
   const api = getPluginApi(router);
 
+  // The transition the snapshot shows, by the `toState` its
+  // `TRANSITION_START` carried — or its `TRANSITION_LEAVE_APPROVE`, for a
+  // source created after the start.
+  let shown: State | undefined;
+
   const resetToIdle = (): void => {
     source.updateSnapshot(IDLE_SNAPSHOT);
   };
 
+  // Core also reports a refusal that starts no transition (`SAME_STATES`, for
+  // one) on `TRANSITION_ERROR`, and may do so while another transition runs.
+  // A transition's own error carries a `toState` with that transition's
+  // `context` — the committed copy's, when the commit itself fails — and a
+  // refusal never does (#2779). With nothing shown the snapshot is idle.
+  const onTransitionError = (toState: State | undefined): void => {
+    if (toState?.context === shown?.context) {
+      resetToIdle();
+    }
+  };
+
   const onTransitionStart = (toState: State, fromState?: State): void => {
+    shown = toState;
+
     // The same-paths dedup branch inside nextTransitionStartSnapshot is
     // structurally unreachable after #605 (every router-emitted
     // TRANSITION_START carries a fresh State per navigate()), but the
@@ -130,6 +148,8 @@ export function createTransitionSource(
   };
 
   const onLeaveApprove = (toState: State, fromState?: State): void => {
+    shown = toState;
+
     const next = nextLeaveApproveSnapshot(
       source.getSnapshot(),
       toState,
@@ -163,7 +183,9 @@ export function createTransitionSource(
       api.addEventListener(events.TRANSITION_LEAVE_APPROVE, onLeaveApprove),
     );
     unsubs.push(api.addEventListener(events.TRANSITION_SUCCESS, resetToIdle));
-    unsubs.push(api.addEventListener(events.TRANSITION_ERROR, resetToIdle));
+    unsubs.push(
+      api.addEventListener(events.TRANSITION_ERROR, onTransitionError),
+    );
     unsubs.push(api.addEventListener(events.TRANSITION_CANCEL, resetToIdle));
   } catch (error) {
     for (const unsub of unsubs) {

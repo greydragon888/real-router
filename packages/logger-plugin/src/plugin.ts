@@ -34,6 +34,8 @@ export class LoggerPlugin {
   readonly #perf: PerformanceTracker;
 
   // Transition state
+  // The `toState` the last `onTransitionStart` carried.
+  #announced: State | undefined = undefined;
   #transitionStartTime: number | null = null;
   #transitionLabel = "";
   #startMarkName = "";
@@ -87,6 +89,7 @@ export class LoggerPlugin {
           this.#groups.open("Router transition");
         }
 
+        this.#announced = toState;
         this.#transitionStartTime = this.#shouldShowTiming ? now() : null;
 
         const fromRoute = formatRouteName(fromState);
@@ -184,11 +187,17 @@ export class LoggerPlugin {
         fromState: State | undefined,
         err: RouterError,
       ) => {
-        // Skip the perf branch when the slot was already cleared by a prior
-        // terminal (guard-redirect double terminal, or a ROUTE_NOT_FOUND with
-        // no preceding start) — there is no start mark to measure against, so
+        // Core also reports a refusal that starts no transition here, and
+        // may do so while another transition runs. A transition's own error
+        // carries a `toState` with that transition's `context`, so another one
+        // is logged without the transition's timing or marks and leaves its
+        // group open (#2779).
+        const endsTransition = toState?.context === this.#announced?.context;
+
+        // Skip the perf branch when there is no start mark to measure against —
+        // the plugin heard no start and the error carries no `toState` — since
         // measuring would only emit an empty-label mark + a console.warn (#793).
-        if (this.#usePerf && this.#startMarkName !== "") {
+        if (endsTransition && this.#usePerf && this.#startMarkName !== "") {
           const label = this.#transitionLabel;
           const errorMark = `router:transition-error:${label}`;
 
@@ -201,9 +210,10 @@ export class LoggerPlugin {
         }
 
         if (this.#logError) {
-          const timing = this.#shouldShowTiming
-            ? formatTiming(this.#transitionStartTime, now)
-            : "";
+          const timing =
+            endsTransition && this.#shouldShowTiming
+              ? formatTiming(this.#transitionStartTime, now)
+              : "";
 
           console.error(
             `${this.#prefix} Transition error: ${err.code}${timing}`,
@@ -216,7 +226,9 @@ export class LoggerPlugin {
           );
         }
 
-        this.#resetTransitionState();
+        if (endsTransition) {
+          this.#resetTransitionState();
+        }
       },
 
       teardown: () => {

@@ -1063,7 +1063,7 @@ const NARRATION_BASELINE: readonly Row[] = [
   {
     file: "packages/logger-plugin/src/plugin.ts",
     form: "was/were + state",
-    count: 3,
+    count: 2,
   },
   {
     file: "packages/navigation-plugin/src/navigation-browser.ts",
