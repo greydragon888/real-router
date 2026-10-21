@@ -690,8 +690,12 @@ treat the leave as tentative for non-idempotent side effects. Payload:
 
 **Async semantics.** Listeners are **awaited** (`Promise.allSettled`) — the only
 subscription that blocks the pipeline. A sync throw rejects `navigate()` with that
-**original error** and emits `TRANSITION_ERROR`; it is not converted to
-`TRANSITION_CANCELLED`, and the first sync throw wins.
+**original error** — a value that is not an `Error` arrives wrapped in one — and
+emits `TRANSITION_ERROR`; it is not converted to `TRANSITION_CANCELLED`, and the
+first sync throw wins. The exception is a listener throwing or rejecting with a
+`RouterError(TRANSITION_CANCELLED)`: that cancels the navigation — `navigate()`
+rejects with the same error, and `TRANSITION_CANCEL` is emitted instead of
+`TRANSITION_ERROR`.
 
 The `signal` aborts when the navigation is **cancelled or fails**, and **never** on
 success — a listener that captured it still observes `aborted === false` after the
