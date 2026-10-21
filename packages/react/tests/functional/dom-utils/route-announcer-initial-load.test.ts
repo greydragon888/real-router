@@ -5,10 +5,12 @@ import { createRouteAnnouncer } from "../../../src/dom-utils";
 
 /**
  * The announcer leaves out the initial page load: the commit of `start()`,
- * the one with no previous route. Which commit that is does not depend on
- * when the announcer subscribed — the canonical mount order is
- * `await router.start()`, then render, and the provider's effect creates the
- * announcer after the initial commit. The CONTROL creates it before `start()`.
+ * the one with no previous route, of a router that had committed nothing when
+ * the announcer was created. Which commit that is does not depend on when the
+ * announcer subscribed — the canonical mount order is `await router.start()`,
+ * then render, and the provider's effect creates the announcer after the
+ * initial commit. The CONTROL creates it before `start()`. A `start()` after
+ * `stop()` changes the page with no load, and is announced.
  */
 
 const ROUTES = [
@@ -73,4 +75,27 @@ describe("route announcer — the initial page load is the start() commit", () =
     announcer.destroy();
     router.stop();
   });
+
+  it.each(["after", "before"] as const)(
+    "an announcer created %s start() announces the start() of a restart",
+    async (created) => {
+      const router = createRouter(ROUTES);
+      let announcer =
+        created === "before" ? createRouteAnnouncer(router) : undefined;
+
+      await router.start("/");
+      announcer ??= createRouteAnnouncer(router);
+      vi.advanceTimersByTime(100);
+      document.title = "About";
+      await router.navigate("about");
+      router.stop();
+      document.title = "Contact";
+      await router.start("/contact");
+
+      expect(announced()).toBe("Navigated to Contact");
+
+      announcer.destroy();
+      router.stop();
+    },
+  );
 });

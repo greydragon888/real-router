@@ -1607,6 +1607,7 @@ const LEDGER: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   "shared/dom-utils/route-announcer.ts": {
     "createRouteAnnouncer › sign:subscribe": OBJECT,
     "createRouteAnnouncer › slot:clearTimeoutId": NO,
+    "createRouteAnnouncer › slot:initialLoadPending": OBJECT,
     "createRouteAnnouncer › slot:isDestroyed": NO,
     "createRouteAnnouncer › slot:isReady": NO,
     "createRouteAnnouncer › slot:lastAnnouncedText": NO,
@@ -1728,6 +1729,7 @@ const CELL = {
   trackerHeld: `${REACT_DOM}/direction-tracker-overlapping-traversals.test.ts › a Back held before its leave and a second one behind it are both labelled back`,
   trackerAddress: `${REACT_DOM}/direction-tracker-overlapping-traversals.test.ts › a refusal that names another address leaves a Back behind a held one labelled back`,
   announcer: `${REACT_DOM}/route-announcer-initial-load.test.ts › an announcer created after start() announces the first navigation it sees`,
+  announcerRestart: `${REACT_DOM}/route-announcer-initial-load.test.ts › an announcer created %s start() announces the start() of a restart`,
   vtSignal: `${REACT_DOM}/view-transitions.test.ts › reentrant abort — signal aborted before listener runs, utility skips VT entirely`,
   vtCurrent: `${REACT_DOM}/view-transitions.test.ts › control: when the success resolver runs BEFORE the next leave, cancellation skips VT-2`,
   ssrSignal:
@@ -1886,6 +1888,10 @@ const CELLS = new Map<string, string>([
   [
     "shared/dom-utils/route-announcer.ts › createRouteAnnouncer › sign:subscribe",
     CELL.announcer,
+  ],
+  [
+    "shared/dom-utils/route-announcer.ts › createRouteAnnouncer › slot:initialLoadPending",
+    CELL.announcerRestart,
   ],
   [`${VT} › sign:subscribeLeave`, CELL.vtSignal],
   [`${VT} › slot:currentVT`, CELL.vtCurrent],

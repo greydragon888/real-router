@@ -35,9 +35,11 @@ const ANNOUNCER_SEL = "[data-real-router-announcer]";
 function makeFakeRouter(): FakeRouter {
   const subscribers: Subscriber[] = [];
   // Like the router's own payload: every emit after the first carries the
-  // route before it, so the first emit is the start() commit.
+  // route before it, so the first emit is the start() commit. `getState()`
+  // answers the last one.
   let previousRoute: State | undefined;
   const router = {
+    getState: () => previousRoute,
     subscribe(cb: Subscriber["cb"]) {
       const sub = { cb };
 
