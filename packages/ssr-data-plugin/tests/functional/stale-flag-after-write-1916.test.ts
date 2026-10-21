@@ -1,16 +1,10 @@
 /**
- * The staleness flag is cleared after the write, not before it (#1916).
+ * A write that throws leaves the staleness flag set (#1916).
  *
- * ⚑ The comment above the leave listener already states the contract — *"Flag is
- * cleared only after a successful, non-cancelled loader write"* — and
- * `clearStale` ran one line ahead of the write. A write that throws therefore
- * consumed the retry: the navigation rejected, the data was never written, and
- * the next navigation did not refresh because the flag was gone.
- *
- * The reachable trigger is a loader that resolves and produces a value the write
- * refuses — a branded payload with no `deferred` bag (#1835). A loader that
- * throws never reaches `clearStale` at all, which is why this survived the
- * suites that cover loader rejection.
+ * The reachable trigger is a loader that resolves and produces a value the
+ * write refuses — a branded payload with no `deferred` bag (#1835). The throw
+ * rejects the navigation, which then never commits, so the next navigation
+ * refreshes again.
  */
 
 import { createRouter } from "@real-router/core";

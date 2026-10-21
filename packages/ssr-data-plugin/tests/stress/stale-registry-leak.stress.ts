@@ -2,7 +2,7 @@ import { createRouter } from "@real-router/core";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { invalidate, ssrDataPluginFactory } from "../../src";
-import { clearStale, isStale, markStale } from "../../src/shared-ssr";
+import { clearStaleMark, markStale, staleMark } from "../../src/shared-ssr";
 
 import type { DataLoaderFactoryMap } from "../../src";
 
@@ -27,14 +27,13 @@ describe("Stale registry leak budget", () => {
     vi.restoreAllMocks();
   });
 
-  it("10000 invalidate→navigate cycles: per-router Set stays singleton (no monotonic growth)", async () => {
-    // Each iteration: invalidate() bumps the per-router `Set<namespace>`,
-    // then the navigate's leave handler runs the loader and clears the
-    // flag. After every cycle the set should be empty (isStale === false).
-    // A latent bug — e.g. a Set that accumulated namespaces faster than
-    // they were cleared — would surface as `isStale === true` even after
-    // a successful navigation, or as a Set-size assertion drift on a
-    // long run.
+  it("10000 invalidate→navigate cycles: the per-router registry never accumulates", async () => {
+    // Each iteration: invalidate() records a mark in the per-router
+    // registry, then the navigate's leave handler runs the loader and its
+    // commit clears the flag. After every cycle the namespace should not
+    // be stale. A latent bug — e.g. a registry that accumulated marks
+    // faster than they were cleared — would surface as a stale namespace
+    // even after a successful navigation.
     const loaders: DataLoaderFactoryMap = {
       "users.profile":
         () =>
@@ -52,8 +51,8 @@ describe("Stale registry leak budget", () => {
       invalidate(router, "data");
 
       // Same-route reload — guarantees the leave handler fires and the
-      // loader writes data (which is the only branch that clears the
-      // stale flag).
+      // loader writes data, so the commit carries a refresh (the only
+      // branch that clears the stale flag).
       await router.navigate("users.profile", { id: `i${i}` }, undefined, {
         reload: true,
       });
@@ -65,38 +64,43 @@ describe("Stale registry leak budget", () => {
       // signal (a regression that re-arms the flag would land on at
       // least one sampled point).
       if (i % 1000 === 0) {
-        sampledFlags.push({ i, stale: isStale(router, "data") });
+        sampledFlags.push({
+          i,
+          stale: staleMark(router, "data") !== undefined,
+        });
       }
     }
 
     expect(sampledFlags.every(({ stale }) => !stale)).toBe(true);
-    expect(isStale(router, "data")).toBe(false);
+    expect(staleMark(router, "data")).toBeUndefined();
 
     router.stop();
   });
 
-  it("1000 markStale → leave-handler clear → clearStale cycles: Set never accumulates", async () => {
+  it("1000 markStale → clearStaleMark cycles: the registry never accumulates", async () => {
     // Lower-level loop that exercises the staleRegistry primitives
-    // without going through the navigation pipeline. Set behaviour is
-    // O(1) amortised — the assertion is about correctness, not perf:
-    // after every cycle `isStale` must be false.
+    // without going through the navigation pipeline — the assertion is
+    // about correctness, not perf: after every cycle the namespace must
+    // not be stale.
     const router = createRouter(routes, { defaultRoute: "home" });
 
     for (let i = 0; i < 1000; i++) {
       markStale(router, "data");
 
-      expect(isStale(router, "data")).toBe(true);
+      const mark = staleMark(router, "data");
 
-      // Two paths that should both leave the set empty: explicit clear
-      // (the path the plugin uses after a successful loader write) and
-      // a no-op clear on an already-empty set.
-      clearStale(router, "data");
+      expect(mark).toBeDefined();
 
-      expect(isStale(router, "data")).toBe(false);
+      // Two paths that should both leave the namespace clear: a clear with
+      // the latest mark (the path a committed refresh takes) and a no-op
+      // clear on an already-clear namespace.
+      clearStaleMark(router, "data", mark ?? Number.NaN);
 
-      clearStale(router, "data");
+      expect(staleMark(router, "data")).toBeUndefined();
 
-      expect(isStale(router, "data")).toBe(false);
+      clearStaleMark(router, "data", mark ?? Number.NaN);
+
+      expect(staleMark(router, "data")).toBeUndefined();
     }
 
     router.stop();

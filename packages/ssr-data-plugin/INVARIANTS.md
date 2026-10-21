@@ -118,15 +118,16 @@
 | 4   | `getDeferBootstrapScript` is HTML-safe                    | The bootstrap body contains no `</script` and no raw U+2028/U+2029.                                                                                                                     |
 | 5   | `formatSettleScript` routes by `isError`                  | For `isError === true`, the output contains `__rrDeferError__(` and NOT `__rrDefer__(`; for `isError === false`, the reverse. Pinned because a flipped branch silently turns errors into successful resolutions on the client.                                                                                |
 
-## `markStale` / `isStale` / `clearStale` (stale-registry algebra)
+## `markStale` / `staleMark` / `clearStaleMark` (stale-registry algebra)
 
 | #   | Invariant                                                | Description                                                                                                                                                     |
 | --- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Idempotency: markStale × N ≡ markStale × 1               | For any namespace `ns` and any `N ≥ 1`, calling `markStale(router, ns)` N times leaves the flag set; `clearStale(router, ns)` once clears it.                |
-| 2   | Round trip: mark → peek=true → clear → peek=false        | The three operations form a clean lifecycle: initial state is unset, mark sets, peek observes without mutation, clear unsets.                               |
-| 3   | Idempotency of clearStale: N≥1 clears ≡ 1 clear          | Multiple `clearStale` calls between marks never resurrect the flag.                                                                                            |
-| 4   | Per-router isolation                                     | `markStale(routerA, ns)` does not affect `isStale(routerB, ns)` for any pair of routers — comes free from the `WeakMap<Router, Set<string>>` key identity. |
-| 5   | Per-namespace isolation                                  | `markStale(router, A)` does not affect `isStale(router, B)` when `A !== B` — the per-router Set is keyed by namespace string.                              |
+| 1   | Idempotency: markStale × N ≡ markStale × 1               | For any namespace `ns` and any `N ≥ 1`, calling `markStale(router, ns)` N times leaves `ns` stale; one `clearStaleMark(router, ns, mark)` with the latest mark clears it. |
+| 2   | Round trip: mark → peek=mark → clear → peek=undefined    | The three operations form a clean lifecycle: initial state is unset, mark sets, peek (`staleMark`) returns the latest mark without mutation, a clear with that mark unsets. |
+| 3   | Idempotency of clearStaleMark: N≥1 clears ≡ 1 clear      | N ≥ 1 `clearStaleMark` calls with one mark leave `ns` not stale, as a single call does — repeating the clear never resurrects the flag.                         |
+| 4   | Per-router isolation                                     | `markStale(routerA, ns)` does not affect `staleMark(routerB, ns)` for any pair of routers — comes free from the `WeakMap<Router, Map<string, number>>` key identity. |
+| 5   | Per-namespace isolation                                  | `markStale(router, A)` does not affect `staleMark(router, B)` when `A !== B` — the per-router `Map` is keyed by namespace string.                          |
+| 6   | A clear with an older mark leaves a newer one            | With `older` taken after one `markStale(router, ns)` and N ≥ 1 marks made after it, `clearStaleMark(router, ns, older)` leaves `staleMark(router, ns)` at the latest mark, and a clear with the latest mark then clears it. A refresh clears only the mark it answered. |
 
 ## `getSsrDataMode` (pure read-side guard)
 
@@ -141,11 +142,11 @@
 
 | #   | Invariant                                                                        | Description                                                                                                                                                                                                  |
 | --- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | `invalidate(childA, "data")` never triggers childB's loader on the next nav      | The stale registry is `WeakMap<Router, Set<string>>` — per-router isolation comes free from the WeakMap key identity. Two clones from the same base router prove the invariant end-to-end through `subscribeLeave`. |
+| 1   | `invalidate(childA, "data")` never triggers childB's loader on the next nav      | The stale registry is `WeakMap<Router, Map<string, number>>` — per-router isolation comes free from the WeakMap key identity. Two clones from the same base router prove the invariant end-to-end through `subscribeLeave`. |
 
 ## Test Files
 
 | File                                         | Invariants | Category                                                                            |
 | -------------------------------------------- | ---------- | ----------------------------------------------------------------------------------- |
 | `tests/functional/data-loader.test.ts`       | 3          | getDependency integration, no caching                                                                                     |
-| `tests/property/ssr-data.properties.ts`      | 58         | Validation, loader invocation, loader arguments, data retrieval, prototype safety, teardown, isolation, factory invocation, SSR mode (×4), `escapeForScript` (×8), `defer()` / `isDeferred` (×9), stale registry (×5), `getSsrDataMode` (×4), `invalidate` cloneRouter isolation (×1), `withTimeout` (×3), `validateLoaders` (×6), `formatSettleScript`/`getDeferBootstrapScript` (×5) |
+| `tests/property/ssr-data.properties.ts`      | 59         | Validation, loader invocation, loader arguments, data retrieval, prototype safety, teardown, isolation, factory invocation, SSR mode (×4), `escapeForScript` (×8), `defer()` / `isDeferred` (×9), stale registry (×6), `getSsrDataMode` (×4), `invalidate` cloneRouter isolation (×1), `withTimeout` (×3), `validateLoaders` (×6), `formatSettleScript`/`getDeferBootstrapScript` (×5) |

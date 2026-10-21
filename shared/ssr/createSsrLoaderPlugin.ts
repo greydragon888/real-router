@@ -3,7 +3,7 @@ import { getHydrationState } from "@real-router/ssr-utils";
 
 import { isDeferred } from "./defer.js";
 import { ensureRegistryPromise } from "./deferRegistryClient.js";
-import { clearStale, isStale } from "./staleRegistry.js";
+import { clearStaleMark, staleMark } from "./staleRegistry.js";
 import { ALL_SSR_MODES } from "./types.js";
 
 import type {
@@ -595,11 +595,16 @@ export function createSsrLoaderPlugin<
       },
     );
 
+    // The navigations carrying a refresh, each with the stale mark its loader
+    // answered — keyed by the `context` of the navigation it was written to.
+    const refreshes = new WeakMap<object, number>();
+
     // CSR revalidation channel for `invalidate(router, namespace)`.
     // Runs in the awaited LEAVE_APPROVE phase so fresh data lands on
     // `nextRoute.context` before `TRANSITION_SUCCESS` fires.
-    // Flag is cleared only after a successful, non-cancelled loader write —
-    // no-entry / client-only / cancelled navigations preserve it for retry.
+    // The flag is cleared when a navigation carrying a refresh commits — a
+    // navigation refused or cancelled after its leave never shows the data,
+    // and it preserves the flag for retry, as no-entry / client-only ones do.
     const removeLeaveListener = router.subscribeLeave(
       async ({ nextRoute, signal }) => {
         // ⚑ The mode marker is published on EVERY navigation, ahead of the
@@ -614,8 +619,9 @@ export function createSsrLoaderPlugin<
         // for the function form only, the resolver call the docs already
         // describe as per-navigation.
         const entry = prepareEntry(nextRoute);
+        const mark = staleMark(router, config.namespace);
 
-        if (!isStale(router, config.namespace)) {
+        if (mark === undefined) {
           return;
         }
 
@@ -637,19 +643,24 @@ export function createSsrLoaderPlugin<
           return;
         }
 
-        // ⚑ Write first, then clear (#1916). The contract stated above this
-        // listener is "cleared only after a successful, non-cancelled loader
-        // write", and `writeLoaderResult` can throw — a branded payload with no
-        // `deferred` bag, or one handed to a plugin with no deferred channel.
-        // Clearing ahead of it consumes the retry for a refresh that does not
-        // happen: the navigation rejects, no data is written, and the next
-        // navigation sees a clean flag and does not try again.
+        // ⚑ `writeLoaderResult` can throw — a branded payload with no
+        // `deferred` bag, or one handed to a plugin with no deferred channel —
+        // and the throw rejects this navigation, which then never commits: the
+        // flag stays for the next attempt (#1916).
         writeLoaderResult(nextRoute, data);
-        clearStale(router, config.namespace);
+        refreshes.set(nextRoute.context, mark);
       },
     );
 
     return {
+      onTransitionSuccess(toState) {
+        const mark = refreshes.get(toState.context);
+
+        if (mark !== undefined) {
+          clearStaleMark(router, config.namespace, mark);
+        }
+      },
+
       teardown() {
         removeStartInterceptor();
         removeLeaveListener();

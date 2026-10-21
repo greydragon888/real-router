@@ -64,7 +64,7 @@ things on every navigation:
    resolver call — so `getSsrRscMode` answers for the route the client is on.
 2. **Re-runs the loader** for the `invalidate(router, "rsc")` revalidation
    channel (#605) — but only when the application has explicitly marked the
-   namespace stale. That half stays a `WeakMap` lookup + `Set.has` early-return
+   namespace stale. That half stays a `WeakMap.get` + `Map.get` early-return
    when no flag is set.
 
 The loader half is opt-in CSR refetch with honest semantics: it runs in the
@@ -201,7 +201,7 @@ The `"rsc"` namespace is exclusive (collision detection in `claimContextNamespac
 
 ### Stale flag survives plugin teardown until router is GC'd
 
-The per-router stale flag set by `invalidate(router, "rsc")` lives in a module-level `WeakMap<Router, Set<string>>` and is **not** cleared on `unsubscribe()`. Teardown removes the consumer (the `subscribeLeave` listener) but not the producer's mark. Concretely:
+The per-router stale flag set by `invalidate(router, "rsc")` lives in a module-level `WeakMap<Router, Map<string, number>>` and is **not** cleared on `unsubscribe()`. Teardown removes the consumer (the `subscribeLeave` listener) but not the producer's mark. Concretely:
 
 ```typescript
 invalidate(router, "rsc");          // flag set
@@ -212,7 +212,7 @@ await router.navigate(...);          // ← new listener picks up the pre-existi
 
 This is **the intended behaviour** for hot-swap scenarios on a long-lived router instance. The flag becomes unreachable (and GC'd) only when the router itself is GC'd — `cloneRouter()` clones get a fresh registry entry via WeakMap key isolation, so per-request SSR is unaffected.
 
-If you need to drop the flag without disposing the router, navigate to a route with a registered loader once after `invalidate` to consume it, OR re-architect to avoid the hot-swap (typical apps don't).
+If you need to drop the flag without disposing the router, let one navigation to a route with a registered loader commit after `invalidate` to consume it, OR re-architect to avoid the hot-swap (typical apps don't).
 
 ### `invalidate(router, "rsc")` — CSR revalidation
 
@@ -227,13 +227,15 @@ invalidate(router, "rsc");
 await router.navigate(state.name, state.params, state.search, { reload: true });
 ```
 
-Mechanics: `invalidate()` flips a per-router `Set<namespace>` flag (`WeakMap` keyed by router). The plugin's `subscribeLeave` listener peeks the flag in the awaited LEAVE_APPROVE phase of **every** navigation, and consumes it on the first one whose destination has a loader-bearing entry — re-runs the RSC loader for the destination route (`nextRoute.name`), writes a fresh `ReactNode` to `nextRoute.context.rsc`, then resolves. Activation guards run, `completeTransition` fires `TRANSITION_SUCCESS`, and subscribers see the new payload.
+Mechanics: `invalidate()` records a fresh mark for the namespace in a per-router `Map<namespace, mark>` (`WeakMap` keyed by router); the namespace is stale while it holds a mark. The plugin's `subscribeLeave` listener peeks the latest mark (`staleMark`) in the awaited LEAVE_APPROVE phase of **every** navigation, and on one whose destination has a loader-bearing entry it re-runs the RSC loader for the destination route (`nextRoute.name`), writes a fresh `ReactNode` to `nextRoute.context.rsc`, then records the refresh: the mark it answered, keyed by `nextRoute.context`. Activation guards run, `completeTransition` fires `TRANSITION_SUCCESS`, and subscribers see the new payload. The plugin's `onTransitionSuccess` clears the flag with `clearStaleMark` when the committed state carries a refresh — and only if the mark it answered is still the latest.
+
+A navigation refused or cancelled after its leave — an activation guard refusing it, or a newer navigation cancelling one an async activation guard holds — never commits: its `ReactNode` never reaches the router, the flag stays, and the next navigation runs the loader again. An `invalidate()` made after the listener read the flag — while the loader runs, or while an async activation guard holds the navigation — survives that navigation's commit, so the following navigation refreshes again.
 
 ⚠ **A navigation already in flight ABSORBS the refresh** when `invalidate()` lands before that navigation's leave dispatch — from `onTransitionStart`, or from a deactivation guard. Measured: parked in a deactivation guard, the current transition ran the loader once and committed the fresh payload. Only from an activation guard onwards is the refresh deferred to the following navigation, and an in-flight `start()` never absorbs it at all, because a navigation with no `fromState` dispatches no leave listeners (`EventBusNamespace.ts`). Do not read the deferral as a general rule; `IMPLEMENTATION_NOTES.md` records it as the *intent*.
 
-Idempotent — multiple `invalidate()` calls before the next navigation collapse to a single re-run. Cheap when not stale: a single `WeakMap` lookup + `Set.has` check per navigation. Surgical for multi-namespace routes — only `"rsc"` re-runs. Nothing is cached across states: `state.context` is rebuilt empty for every navigation, so `state.context.data` is absent unless that plugin's own `invalidate()` was also called on the same transition.
+Idempotent — multiple `invalidate()` calls before the next navigation collapse to a single re-run. Cheap when not stale: a `WeakMap.get` + `Map.get` in the leave listener, plus one `WeakMap.get` in `onTransitionSuccess` per committed navigation. Surgical for multi-namespace routes — only `"rsc"` re-runs. Nothing is cached across states: `state.context` is rebuilt empty for every navigation, so `state.context.data` is absent unless that plugin's own `invalidate()` was also called on the same transition.
 
-**Failure semantics (intended, but sharp).** The refresh loader runs in the awaited LEAVE_APPROVE phase with **no internal `try/catch`** (`shared/ssr/createSsrLoaderPlugin.ts`, the `subscribeLeave` handler), so a rejecting loader **rejects the consuming `navigate()`** — a navigation that would have succeeded *without* `invalidate`. And because the stale flag is cleared only *after* a successful write, a rejection **keeps the flag set**: every subsequent navigation to a loader-bearing route re-runs the loader and fails again until it recovers. The degradation escalates from "stale payload" to "cannot navigate." This is intended (ARCHITECTURE lists loader rejections among the flag-preserving outcomes, and a test pins the propagation) — mitigate on the caller side: `catch` the `navigate()` rejection, or make the loader infallible (`catch` → previous payload).
+**Failure semantics (intended, but sharp).** The refresh loader runs in the awaited LEAVE_APPROVE phase with **no internal `try/catch`** (`shared/ssr/createSsrLoaderPlugin.ts`, the `subscribeLeave` handler), so a rejecting loader **rejects the consuming `navigate()`** — a navigation that would have succeeded *without* `invalidate`. And because the stale flag is cleared only when a navigation carrying a refresh commits, a rejection **keeps the flag set**: every subsequent navigation to a loader-bearing route re-runs the loader and fails again until it recovers. The degradation escalates from "stale payload" to "cannot navigate." This is intended (ARCHITECTURE lists loader rejections among the flag-preserving outcomes, and a test pins the propagation) — mitigate on the caller side: `catch` the `navigate()` rejection, or make the loader infallible (`catch` → previous payload).
 
 ### Loader errors propagate
 

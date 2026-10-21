@@ -12,10 +12,10 @@
 
 - `api.claimContextNamespace("data" | "ssrDataMode" | "ssrDataDeferred" | "ssrDataDeferredKeys")` — claims exclusive ownership of all four state.context namespaces written by the plugin
 - `addInterceptor("start", ...)` — wraps `start()` to load data after route resolution (SSR boot path)
-- `router.subscribeLeave(...)` — registers a leave listener consuming the `invalidate(router, "data")` stale flag (CSR revalidation channel)
+- `router.subscribeLeave(...)` — registers a leave listener that re-runs the loader while the `invalidate(router, "data")` stale flag is set (CSR revalidation channel)
 - `claim.write(state, data)` — writes loader result + mode marker + deferred payload to the state's context
 - `claim.release()` — releases each namespace claim on teardown
-- Plugin hook (`teardown`) — removes interceptor + leave listener and releases all four claims
+- Plugin hooks (`onTransitionSuccess`, `teardown`) — `onTransitionSuccess` clears the stale flag when the committed state carries a refresh; `teardown` removes interceptor + leave listener and releases all four claims
 
 ## Package Structure
 
@@ -41,7 +41,7 @@ index.ts
     │       ├── constants.ts (ERROR_PREFIX)
     │       ├── shared-ssr/createLoadersValidator.ts (inlined validateLoaders binding)
     │       ├── shared-ssr/createSsrLoaderPlugin.ts
-    │       │       ├── shared-ssr/staleRegistry.ts (isStale + clearStale)
+    │       │       ├── shared-ssr/staleRegistry.ts (staleMark + clearStaleMark)
     │       │       ├── shared-ssr/defer.ts (isDeferred — slow-path branch in writeLoaderResult)
     │       │       └── shared-ssr/deferRegistryClient.ts (ensureRegistryPromise — client-side hydration path; #761)
     │       └── types.ts
@@ -69,13 +69,13 @@ The shared module exports:
 
 - `createSsrLoaderPlugin<T, D>(loaders, { namespace, errorPrefix })` — generic factory implementing the validate-compile-loop + start-interceptor + subscribeLeave-handler + claim/teardown pattern. Parameterised over loader return type `T` and dependency map `D`.
 - `createLoadersValidator(errorPrefix)` — generic shape validator (non-null object → function values).
-- `markStale` / `isStale` / `clearStale` — per-router stale registry backing the `invalidate()` helper. WeakMap-keyed by router instance; `Set<string>` per router holds the stale namespaces.
+- `markStale` / `staleMark` / `clearStaleMark` — per-router stale registry backing the `invalidate()` helper. WeakMap-keyed by router instance; a `Map<string, number>` per router holds each stale namespace's latest mark.
 
-`@real-router/rsc-server-plugin` consumes the same helpers with a different namespace (`"rsc"`) and `T = ReactNode`. Because the shared logic is symlinked source (not a published package), bug fixes in one plugin's behaviour automatically apply to the other. The stale registry is one shared `WeakMap` — but namespace isolation comes free from the Set value, so `invalidate(router, "data")` and `invalidate(router, "rsc")` operate independently.
+`@real-router/rsc-server-plugin` consumes the same helpers with a different namespace (`"rsc"`) and `T = ReactNode`. Because the shared logic is symlinked source (not a published package), bug fixes in one plugin's behaviour automatically apply to the other. The stale registry is one shared `WeakMap` — but namespace isolation comes free from the per-router `Map`'s namespace keys, so `invalidate(router, "data")` and `invalidate(router, "rsc")` operate independently.
 
 ## Factory Pattern
 
-The plugin uses a plain closure (not a class) — no mutable state to encapsulate. The closure logic itself lives in [`shared/ssr/createSsrLoaderPlugin.ts`](../../shared/ssr/createSsrLoaderPlugin.ts); `ssrDataPluginFactory` is a thin adapter that runs validation and forwards to the shared factory:
+The plugin uses a plain closure (not a class) — the one collection it mutates after construction, `refreshes`, lives in that closure. The closure logic itself lives in [`shared/ssr/createSsrLoaderPlugin.ts`](../../shared/ssr/createSsrLoaderPlugin.ts); `ssrDataPluginFactory` is a thin adapter that runs validation and forwards to the shared factory:
 
 ```
 ssrDataPluginFactory(loaders)                ← factory.ts (~20 LOC)
@@ -105,16 +105,17 @@ ssrDataPluginFactory(loaders)                ← factory.ts (~20 LOC)
                 ├── removeStartInterceptor = api.addInterceptor("start", ...)
                 │       └── scratchpad-hit OR await loader → write critical/mode/deferred/keys
                 ├── removeLeaveListener = router.subscribeLeave(...)
-                │       └── peek isStale → await loader → clearStale + write critical/mode/deferred/keys
-                └── return { teardown }
-                        └── removeStartInterceptor() + removeLeaveListener()
+                │       └── write mode → peek staleMark → await loader → write critical/deferred/keys → record the refresh in refreshes
+                └── return { onTransitionSuccess, teardown }
+                        ├── onTransitionSuccess: committed state carries a refresh → clearStaleMark
+                        └── teardown: removeStartInterceptor() + removeLeaveListener()
                             + dataClaim.release() + modeClaim.release()
                             + deferredClaim.release() + deferredKeysClaim.release()
 ```
 
 **Why a closure instead of a class?**
 
-- Bindings are write-once at construction (`dataClaim`, `modeClaim`, `deferredClaim`, `deferredKeysClaim`, `compiledLoaders`, listener removers) — no instance state mutates after `usePlugin()` returns.
+- Bindings are write-once at construction (`dataClaim`, `modeClaim`, `deferredClaim`, `deferredKeysClaim`, `compiledLoaders`, listener removers) — after `usePlugin()` returns, the only instance state that changes is the contents of `refreshes`, which carries each refresh from the leave listener to `onTransitionSuccess`.
 - No cross-method coordination across instances — each binding is used by exactly one site (interceptor writes, teardown removes).
 - Fewer files, fewer abstractions — proportional to the plugin's complexity.
 
@@ -160,7 +161,7 @@ The interceptor runs **after** route resolution. If guards block the navigation,
 
 ### subscribeLeave handler — CSR revalidation
 
-A second listener registered alongside the start interceptor consumes the per-router stale flag set by `invalidate(router, "data")`. Runs in the awaited LEAVE_APPROVE phase, so fresh data lands on `nextRoute.context` *before* `TRANSITION_SUCCESS` fires.
+A second listener registered alongside the start interceptor answers the per-router stale flag set by `invalidate(router, "data")`, and the plugin's `onTransitionSuccess` hook clears the flag when that navigation commits, unless a newer mark arrived meanwhile. The listener runs in the awaited LEAVE_APPROVE phase, so fresh data lands on `nextRoute.context` *before* `TRANSITION_SUCCESS` fires.
 
 ```
 router.navigate(...) (any CSR navigation)
@@ -174,28 +175,32 @@ router.navigate(...) (any CSR navigation)
         ▼
   subscribeLeave handler
         │
-        ├── isStale(router, "data")? no  → return (cheap WeakMap.get + Set.has)
+        ├── compiledLoaders.get(nextRoute.name)? entry → modeClaim.write(nextRoute, mode)
         │
-        ├── compiledLoaders.get(nextRoute.name)? none → return (flag preserved)
+        ├── mark = staleMark(router, "data")? undefined → return (cheap WeakMap.get + Map.get)
         │
-        ├── modeClaim.write(nextRoute, mode)
-        │
-        ├── client-only / no-loader entry → return (flag preserved)
+        ├── no entry / client-only / no-loader entry → return (flag preserved)
         │
         ├── data = await loader({ params: nextRoute.params, search: nextRoute.search })
         │
         ├── signal.aborted? yes → return (flag preserved for the new nav)
         │
-        ├── clearStale(router, "data")
-        └── dataClaim.write(nextRoute, data)
+        ├── writeLoaderResult(nextRoute, data)   ← a throw records nothing (flag preserved)
+        └── refreshes.set(nextRoute.context, mark)
         │
         ▼
   activation guards → completeTransition → TRANSITION_SUCCESS
+        │
+        ▼
+  onTransitionSuccess(toState)
+        │
+        └── refreshes.get(toState.context)? mark → clearStaleMark(router, "data", mark)
+                                                   (clears only if mark is still the latest)
 ```
 
-**Peek-then-clear-after-write**: the flag is cleared only on a successful, non-cancelled loader write. This makes `invalidate()` survive every "non-refresh" outcome — no-entry hops, client-only mode, mode-only entries, cancellation by a newer navigation, and loader rejections all leave the flag for the next attempt.
+**Peek, refresh, clear on commit**: the handler records the mark its loader answered against `nextRoute.context`, and `onTransitionSuccess` clears the flag with `clearStaleMark` only when the committed state carries that record. This makes `invalidate()` survive every outcome that commits no refresh — no-entry hops, client-only mode, mode-only entries, cancellation by a newer navigation, loader rejections, a throwing write, and a navigation that an activation guard refuses or a newer navigation cancels after its leave all leave the flag for the next attempt. `clearStaleMark` clears only the latest mark, so a mark made after the handler read the flag survives that refresh's commit.
 
-The flag itself lives in `shared/ssr/staleRegistry.ts` — a module-level `WeakMap<Router, Set<string>>` so per-router isolation comes free from WeakMap key identity (`cloneRouter()` clones get their own flag set).
+The flag itself lives in `shared/ssr/staleRegistry.ts` — a module-level `WeakMap<Router, Map<string, number>>`, each stale namespace mapped to its latest mark, so per-router isolation comes free from WeakMap key identity (`cloneRouter()` clones get their own flags).
 
 ### Accessing data
 
@@ -349,7 +354,7 @@ This tests:
 | Teardown under load         | `dispose()` of one clone corrupts another's state          |
 | Loader dispatch correctness | Wrong `state.name` → wrong loader called under concurrency |
 
-Property-based tests (58 invariants in `tests/property/`) complement functional and stress tests — see INVARIANTS.md for the full list, including the security-critical `escapeForScript` family (`numRuns: 1000`, 8 invariants), the `defer()` / `isDeferred` payload-constructor invariants (9, incl. anti-bypass + key-order), the stale-registry algebra (`markStale`/`isStale`/`clearStale` idempotency + per-router/per-namespace isolation), `getSsrDataMode` totality + idempotency, `withTimeout` race semantics, `validateLoaders` structural acceptance/rejection, `formatSettleScript`/`getDeferBootstrapScript` HTML safety, and `invalidate()` cloneRouter isolation. The stress test covers the one dimension unit tests cannot: concurrent access patterns that mirror real SSR server load.
+Property-based tests (59 invariants in `tests/property/`) complement functional and stress tests — see INVARIANTS.md for the full list, including the security-critical `escapeForScript` family (`numRuns: 1000`, 8 invariants), the `defer()` / `isDeferred` payload-constructor invariants (9, incl. anti-bypass + key-order), the stale-registry algebra (`markStale`/`staleMark`/`clearStaleMark` idempotency, a clear with an older mark leaving a newer one + per-router/per-namespace isolation), `getSsrDataMode` totality + idempotency, `withTimeout` race semantics, `validateLoaders` structural acceptance/rejection, `formatSettleScript`/`getDeferBootstrapScript` HTML safety, and `invalidate()` cloneRouter isolation. The stress test covers the one dimension unit tests cannot: concurrent access patterns that mirror real SSR server load.
 
 ## Related Documents
 

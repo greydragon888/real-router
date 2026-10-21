@@ -71,7 +71,7 @@ things on every navigation:
    any client navigation, which is the opposite of what the route declares.
 2. **Re-runs the loader** for the `invalidate(router, "data")` revalidation
    channel (#605) — but only when the application has explicitly marked the
-   namespace stale. That half stays a `WeakMap` lookup + `Set.has` early-return
+   namespace stale. That half stays a `WeakMap.get` + `Map.get` early-return
    when no flag is set.
 
 The loader half is opt-in CSR refetch with honest semantics: it runs in the
@@ -307,17 +307,19 @@ invalidate(router, "data");
 await router.navigate(state.name, state.params, state.search, { reload: true });
 ```
 
-Mechanics: `invalidate()` flips a per-router `Set<namespace>` flag (`WeakMap` keyed by router). The plugin's `subscribeLeave` listener peeks the flag in the awaited LEAVE_APPROVE phase of every navigation. When the destination route has a loader-bearing entry, it runs the loader for `nextRoute.name`, writes fresh data to `nextRoute.context.data` and a mode marker to `nextRoute.context.ssrDataMode`, then clears the flag. Activation guards run, `completeTransition` fires `TRANSITION_SUCCESS`, and subscribers see the new payload.
+Mechanics: `invalidate()` records a fresh mark for the namespace in a per-router `Map<namespace, mark>` (`WeakMap` keyed by router); the namespace is stale while it holds a mark. The plugin's `subscribeLeave` listener peeks the latest mark (`staleMark`) in the awaited LEAVE_APPROVE phase of every navigation. When the destination route has a loader-bearing entry, it runs the loader for `nextRoute.name`, writes fresh data to `nextRoute.context.data` and a mode marker to `nextRoute.context.ssrDataMode`, then records the refresh: the mark it answered, keyed by `nextRoute.context`. Activation guards run, `completeTransition` fires `TRANSITION_SUCCESS`, and subscribers see the new payload. The plugin's `onTransitionSuccess` clears the flag with `clearStaleMark` when the committed state carries a refresh — and only if the mark it answered is still the latest.
 
-**Peek-then-clear-after-write** semantics — the flag is cleared _only_ after a successful, non-cancelled loader write. So:
+**Peek, refresh, clear on commit** semantics — the flag is cleared _only_ when a navigation that carries a refresh commits. So:
 
 - **No-entry navigation** (route not in loaders map) — listener no-ops, flag preserved for the next attempt.
 - **Client-only / no-loader entry** — mode marker written, loader skipped, flag preserved.
 - **Cancelled navigation** (newer `navigate()` aborts the older controller) — late-resolving loader sees `signal.aborted`, skips the write, flag preserved for the new navigation to consume.
-- **The write itself throws** (a branded payload with no `deferred` bag, or one handed to a plugin with no deferred channel) — flag preserved (#1916). `clearStale` runs _after_ `writeLoaderResult`, so a refresh that produced a value the write refuses does not consume the retry. Clearing ahead of the write left the navigation rejected, no data written, and the next navigation seeing a clean flag.
-- **Loader rejection** — the leave handler awaits the refresh loader with **no `try/catch`**, so the rejection **rejects the whole `navigate()`** — a navigation that would have succeeded _without_ `invalidate`. The flag is preserved (cleared only after a successful write), so **every** subsequent navigation to a loader-bearing route re-runs the loader and fails again until it recovers — the degradation escalates from "stale data" to "cannot navigate." Intended (ARCHITECTURE lists it among the flag-preserving outcomes; a test pins the propagation), but mitigate on the caller side: `catch` the `navigate()` rejection, or make the loader infallible (`catch` → previous payload).
+- **Refused or cancelled after its leave** (an activation guard refuses the navigation, or a newer navigation cancels one an async activation guard holds) — the loader ran and its data was written to `nextRoute.context`, but that navigation never commits, so the data never reaches the router; flag preserved, and the next navigation runs the loader again.
+- **`invalidate()` after the refresh read the flag** (while its loader runs, or while an async activation guard holds the navigation) — `clearStaleMark` clears only the mark the refresh answered, so the newer mark survives that navigation's commit and the following navigation refreshes again.
+- **The write itself throws** (a branded payload with no `deferred` bag, or one handed to a plugin with no deferred channel) — flag preserved (#1916). The refresh is recorded _after_ `writeLoaderResult`, so a refresh that produced a value the write refuses records nothing and does not consume the retry.
+- **Loader rejection** — the leave handler awaits the refresh loader with **no `try/catch`**, so the rejection **rejects the whole `navigate()`** — a navigation that would have succeeded _without_ `invalidate`. The flag is preserved (cleared only when a navigation carrying a refresh commits), so **every** subsequent navigation to a loader-bearing route re-runs the loader and fails again until it recovers — the degradation escalates from "stale data" to "cannot navigate." Intended (ARCHITECTURE lists it among the flag-preserving outcomes; a test pins the propagation), but mitigate on the caller side: `catch` the `navigate()` rejection, or make the loader infallible (`catch` → previous payload).
 
-Idempotent — multiple `invalidate()` calls before the next refresh collapse to a single re-run (Set-deduplicated). Cheap when not stale: a single `WeakMap.get` + `Set.has` check per navigation. Survives `cloneRouter()` boundaries — the `WeakMap` is keyed by router instance, each clone has its own flag set.
+Idempotent — multiple `invalidate()` calls before the next refresh collapse to a single re-run: a namespace is stale or not, however many marks it took. Cheap when not stale: a `WeakMap.get` + `Map.get` in the leave listener, plus one `WeakMap.get` in `onTransitionSuccess` per committed navigation. Survives `cloneRouter()` boundaries — the `WeakMap` is keyed by router instance, each clone has its own flag set.
 
 #### Cancellation-aware loaders (#605)
 

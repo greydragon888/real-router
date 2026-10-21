@@ -1788,7 +1788,7 @@ describe("@real-router/ssr-data-plugin", () => {
       // Loader rejects with AbortError; navigation rejects.
       await expect(navA).rejects.toThrow(/cancel|abort/i);
 
-      // Flag preserved (loader rejection bypasses clearStale). Retry
+      // Flag preserved (a rejected navigation never commits). Retry
       // succeeds with fresh, non-aborted signal.
       await router.navigate("users.profile", { id: "42" }, undefined, {
         reload: true,
@@ -2185,13 +2185,12 @@ describe("@real-router/ssr-data-plugin", () => {
   });
 
   describe("markStale edge cases", () => {
-    it("markStale(router, '') is a silent no-op for downstream isStale('data')", async () => {
+    it("markStale(router, '') is a silent no-op for the 'data' namespace", async () => {
       // Document the contract: `markStale` does not validate the namespace
       // string. An empty-string namespace successfully lands in the per-
-      // router Set (the underlying Set#add accepts any string), but a
-      // subsequent `isStale(router, "data")` peek returns `false` — the
-      // plugin's `subscribeLeave` listener is keyed on its own namespace
-      // and never observes a foreign mark. The shape mirrors the broader
+      // router registry (a `Map` accepts any string key), but the plugin's
+      // `subscribeLeave` listener is keyed on its own namespace and never
+      // observes a foreign mark. The shape mirrors the broader
       // per-namespace orthogonality guarantee documented in CLAUDE.md.
       const loader = vi.fn().mockResolvedValue({ page: "v1" });
 

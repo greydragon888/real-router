@@ -162,8 +162,8 @@ describe("invalidate() race conditions", () => {
 
   it("100 iterations of repeated invalidate() between two navigations: collapses to single re-run", async () => {
     // N invalidate() calls between navigations must collapse to a single
-    // re-run thanks to Set-deduplication in markStale. Stress-grade
-    // version of the unit test that does this 3 times.
+    // re-run: a namespace holds one mark at a time, however many marks it
+    // took. Stress-grade version of the unit test that does this 3 times.
     const router = createRouter(routes, { defaultRoute: "home" });
     let loaderCalls = 0;
     const loader = vi.fn().mockImplementation(() => {

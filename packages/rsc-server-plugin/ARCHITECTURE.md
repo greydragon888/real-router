@@ -20,7 +20,7 @@
 - `addInterceptor("start", ...)` — wraps `start()` to load the ReactNode after route resolution
 - `claim.write(state, node)` — writes the loader result to the state's context
 - `claim.release()` — releases the namespace claim on teardown
-- Plugin hook (`teardown`) — removes interceptor and releases claim
+- Plugin hooks (`onTransitionSuccess`, `teardown`) — `onTransitionSuccess` clears the `invalidate()` stale flag when the committed state carries a refresh; `teardown` removes interceptor and releases claim
 
 ## Package Structure
 
@@ -47,7 +47,7 @@ index.ts
     │       ├── constants.ts (ERROR_PREFIX, ALLOWED_RSC_MODES)
     │       ├── shared-ssr/createLoadersValidator.ts (inlined validateLoaders binding)
     │       ├── shared-ssr/createSsrLoaderPlugin.ts
-    │       │       ├── shared-ssr/staleRegistry.ts (isStale + clearStale)
+    │       │       ├── shared-ssr/staleRegistry.ts (staleMark + clearStaleMark)
     │       │       └── shared-ssr/defer.ts (isDeferred — this plugin has no deferred
     │       │                                 channel, so a defer() payload is REFUSED
     │       │                                 rather than written to the rsc slot)
@@ -108,7 +108,7 @@ The original R&D document (`.claude/research-rsc-integration-ru.md`, "Урове
 
 ## Factory Pattern
 
-Same closure-based factory as `ssr-data-plugin` — no class, no mutable state beyond the immutable `claim` binding. The closure logic itself lives in [`shared/ssr/createSsrLoaderPlugin.ts`](../../shared/ssr/createSsrLoaderPlugin.ts); `rscServerPluginFactory` is a thin adapter:
+Same closure-based factory as `ssr-data-plugin` — no class; after `usePlugin()` returns, the only instance state that changes is the contents of `refreshes`, which carries each refresh from the leave listener to `onTransitionSuccess`. The closure logic itself lives in [`shared/ssr/createSsrLoaderPlugin.ts`](../../shared/ssr/createSsrLoaderPlugin.ts); `rscServerPluginFactory` is a thin adapter:
 
 ```
 rscServerPluginFactory(loaders)              ← factory.ts (~25 LOC incl. JSDoc)
@@ -131,9 +131,11 @@ rscServerPluginFactory(loaders)              ← factory.ts (~25 LOC incl. JSDoc
                 │   catch: rollback(acquired) — release ALL acquired claims in reverse order + rethrow
                 ├── api.addInterceptor("start", ...)
                 │       └── claim.write(state, await loader({ params: state.params, search: state.search })) + modeClaim.write(state, resolveMode(...))
-                ├── api.subscribeLeave(consumesStaleFlag)
-                └── return { teardown }
-                        └── removeStartInterceptor() + removeLeaveListener() + claim.release() + modeClaim.release()
+                ├── router.subscribeLeave(...)
+                │       └── write mode → peek staleMark → await loader → write ReactNode → record the refresh in refreshes
+                └── return { onTransitionSuccess, teardown }
+                        ├── onTransitionSuccess: committed state carries a refresh → clearStaleMark
+                        └── teardown: removeStartInterceptor() + removeLeaveListener() + claim.release() + modeClaim.release()
 ```
 
 ## Sibling: `rscActionPluginFactory` (Server Actions)
@@ -231,7 +233,7 @@ The interceptor runs **after** route resolution. If guards block the navigation,
 
 ### subscribeLeave handler — CSR revalidation
 
-A second listener registered alongside the start interceptor consumes the per-router stale flag set by `invalidate(router, "rsc")`. Runs in the awaited LEAVE_APPROVE phase, so a fresh `ReactNode` lands on `nextRoute.context` *before* `TRANSITION_SUCCESS` fires.
+A second listener registered alongside the start interceptor answers the per-router stale flag set by `invalidate(router, "rsc")`, and the plugin's `onTransitionSuccess` hook clears the flag when that navigation commits, unless a newer mark arrived meanwhile. The listener runs in the awaited LEAVE_APPROVE phase, so a fresh `ReactNode` lands on `nextRoute.context` *before* `TRANSITION_SUCCESS` fires.
 
 ```
 router.navigate(...) (any CSR navigation)
@@ -245,28 +247,32 @@ router.navigate(...) (any CSR navigation)
         ▼
   subscribeLeave handler
         │
-        ├── isStale(router, "rsc")? no  → return (cheap WeakMap.get + Set.has)
+        ├── compiledLoaders.get(nextRoute.name)? entry → modeClaim.write(nextRoute, mode)
         │
-        ├── compiledLoaders.get(nextRoute.name)? none → return (flag preserved)
+        ├── mark = staleMark(router, "rsc")? undefined → return (cheap WeakMap.get + Map.get)
         │
-        ├── modeClaim.write(nextRoute, mode)
-        │
-        ├── client-only / no-loader entry → return (flag preserved)
+        ├── no entry / client-only / no-loader entry → return (flag preserved)
         │
         ├── rsc = await loader({ params: nextRoute.params, search: nextRoute.search })
         │
         ├── signal.aborted? yes → return (flag preserved for the new nav)
         │
-        ├── clearStale(router, "rsc")
-        └── claim.write(nextRoute, rsc)   ← writes ReactNode to nextRoute.context.rsc
+        ├── writeLoaderResult(nextRoute, rsc)   ← writes ReactNode to nextRoute.context.rsc; a throw records nothing (flag preserved)
+        └── refreshes.set(nextRoute.context, mark)
         │
         ▼
   activation guards → completeTransition → TRANSITION_SUCCESS
+        │
+        ▼
+  onTransitionSuccess(toState)
+        │
+        └── refreshes.get(toState.context)? mark → clearStaleMark(router, "rsc", mark)
+                                                   (clears only if mark is still the latest)
 ```
 
-**Peek-then-clear-after-write**: the flag is cleared only on a successful, non-cancelled loader write. Every "non-refresh" outcome — no-entry hops, client-only mode, mode-only entries, cancellation by a newer navigation, loader rejections — leaves the flag set for the next attempt.
+**Peek, refresh, clear on commit**: the handler records the mark its loader answered against `nextRoute.context`, and `onTransitionSuccess` clears the flag with `clearStaleMark` only when the committed state carries that record. Every outcome that commits no refresh — no-entry hops, client-only mode, mode-only entries, cancellation by a newer navigation, loader rejections, a throwing write, a navigation that an activation guard refuses or a newer navigation cancels after its leave — leaves the flag set for the next attempt. `clearStaleMark` clears only the latest mark, so a mark made after the handler read the flag survives that refresh's commit.
 
-The flag itself lives in `shared/ssr/staleRegistry.ts` — a module-level `WeakMap<Router, Set<string>>` shared with `ssr-data-plugin`. Per-router and per-namespace isolation comes free from the WeakMap key + Set value pairing: `invalidate(router, "data")` and `invalidate(router, "rsc")` are independent, and `cloneRouter()` clones get their own flag set.
+The flag itself lives in `shared/ssr/staleRegistry.ts` — a module-level `WeakMap<Router, Map<string, number>>` shared with `ssr-data-plugin`, each stale namespace mapped to its latest mark. Per-router and per-namespace isolation comes free from the WeakMap key + Map key pairing: `invalidate(router, "data")` and `invalidate(router, "rsc")` are independent, and `cloneRouter()` clones get their own flags.
 
 ### Accessing the RSC payload
 
