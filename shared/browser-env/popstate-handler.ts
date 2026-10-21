@@ -341,12 +341,19 @@ export function createPopstateHandler(
       position: deps.positions?.current,
       state: deps.router.getState(),
     };
-    // The router now stands on the entry the browser does; a write skipped as
-    // a no-op (#1353) did not record it.
+    // The entry this traversal arrived at: the event's own state, since the
+    // browser may have moved on by the time the transition lands (#757). A
+    // `hashchange` carries none — its entry is the one the browser stands on.
+    const arrivedState =
+      "state" in evt ? (evt.state as unknown) : deps.browser.getState?.();
+    // The router now stands on the entry the traversal reached; a write skipped
+    // as a no-op (#1353) did not record it.
     const adoptLanded = (): void => {
-      deps.positions?.adopt(deps.browser.getState?.());
+      deps.positions?.adopt(arrivedState);
     };
     const newer = watchNewerNavigations(deps.api);
+
+    deps.positions?.arrive(arrivedState);
 
     try {
       const restored = getRouteFromEvent(evt, deps.api, location);
@@ -417,6 +424,7 @@ export function createPopstateHandler(
       }
     } finally {
       newer.stop();
+      deps.positions?.depart();
       isTransitioning = false;
       processDeferredEvent();
     }

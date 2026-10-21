@@ -106,6 +106,10 @@ function scan(pick: (node: ts.Node) => boolean): Site[] {
  * the read fails the test.
  */
 const CHAIN_WALK_REASONS: Record<string, string> = {
+  'popstate-handler.ts :: "state" in evt':
+    "REQUIRED. The accessor `popstate-utils.ts` reads: `state` lives on " +
+    "PopStateEvent's prototype, and the read tells a popstate, which names the " +
+    "entry its traversal arrived at, from a `hashchange`, which carries none.",
   'popstate-utils.ts :: "state" in evt':
     "REQUIRED. `evt` is a PopStateEvent, and `state` is an accessor on its " +
     "prototype — measured in jsdom, `Object.hasOwn(new PopStateEvent('popstate'), " +

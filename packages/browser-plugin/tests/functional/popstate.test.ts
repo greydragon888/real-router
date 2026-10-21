@@ -927,6 +927,46 @@ describe("Browser Plugin — Popstate", () => {
       legacyRouter.stop();
     });
 
+    it("KEEPS replaceState when the Browser exposes no getState, on an entry carrying a position", async () => {
+      // A traversal drops its write only where the plugin MEASURES that the
+      // browser has left the entry it reached; without a state reader it
+      // cannot, so the write stays.
+      router.stop();
+      const legacyBrowser = createMockedBrowser(noop);
+
+      delete (legacyBrowser as { getState?: unknown }).getState;
+
+      const legacyRouter = createRouter(routerConfig, {
+        defaultRoute: "home",
+        queryParamsMode: "default",
+      });
+
+      legacyRouter.usePlugin(browserPluginFactory({}, legacyBrowser));
+      await legacyRouter.start();
+      await legacyRouter.navigate("users.view", { id: "1" });
+
+      const restored = {
+        name: "index",
+        params: {},
+        path: "/",
+        position: { run: "positioned", index: 0 },
+      };
+
+      globalThis.history.replaceState(restored, "", "/");
+
+      const replaceSpy = vi.spyOn(legacyBrowser, "replaceState");
+
+      globalThis.dispatchEvent(
+        new PopStateEvent("popstate", { state: restored }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(legacyRouter.getState()?.name).toBe("index");
+      expect(replaceSpy).toHaveBeenCalled();
+
+      legacyRouter.stop();
+    });
+
     it("does not skip a forward navigation (pushState still fires)", async () => {
       const pushSpy = vi.spyOn(mockedBrowser, "pushState");
 

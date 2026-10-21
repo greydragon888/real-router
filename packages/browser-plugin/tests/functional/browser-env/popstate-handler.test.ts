@@ -16,6 +16,7 @@ import {
 } from "vitest";
 
 import {
+  createEntryPositions,
   createPopstateHandler,
   createPopstateLifecycle,
   createHashSyncLifecycle,
@@ -142,6 +143,30 @@ describe("popstate handler", () => {
   }
 
   describe("createPopstateHandler", () => {
+    it("a hashchange arrives at the entry the browser stands on: the event carries no state", async () => {
+      const positions = createEntryPositions();
+      const position = { run: "hashchange-run", index: 4 };
+      const deps = makeDeps({
+        browser: {
+          ...makeFakeBrowser("/users"),
+          getState: () => ({
+            name: "users",
+            params: {},
+            path: "/users",
+            position,
+          }),
+        },
+        positions,
+      });
+      const handler = createPopstateHandler(deps);
+
+      handler(makeHashChangeEvent());
+      await flushAsync();
+
+      expect(router.getState()?.name).toBe("users");
+      expect(positions.current).toStrictEqual(position);
+    });
+
     it("navigates to the matched state without hash augmentation (hash-plugin wiring)", async () => {
       const deps = makeDeps();
       const handler = createPopstateHandler(deps);

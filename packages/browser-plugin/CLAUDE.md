@@ -48,6 +48,8 @@ Transition completes → process deferred event
 
 Only the **last** deferred event is kept (intermediate states skipped). A transition the router refuses drops it when the plugin travels back to the entry the refused one started from: it describes a traversal from an entry the browser leaves (#2740).
 
+The transition of a traversal the browser has since left writes nothing over the entry the browser stands on — the History API writes only the current entry, and that one is the waiting traversal's — and the router's position is the entry its traversal reached, read off the event. So two overlapping Backs keep every entry's page whichever order they settle in (`tests/functional/overlapping-traversals-keep-their-entries.test.ts`). Where the plugin cannot measure the distance — an entry without a position, a custom `Browser` without `getState` — it writes as before.
+
 The queue is emptied on `stop()` and `teardown()` too, via `PopstateHandler.discard` (#1922). Removing the listener is not enough — the in-flight transition's `finally` drains the queue unconditionally, so a queued event replayed after the plugin was gone: it navigated a router the plugin no longer serves, and on the strict-mode branch it wrote history directly (`rollbackUrlToCurrentState` is called by the handler, not by a hook, so removing the hooks does not stop it). `discard` runs unconditionally, outside the `#1213` shared-slot identity check — the queue belongs to this handler whoever owns the shared listener.
 
 ### Not-Found Popstate Same-State Short-Circuit (#1448)
