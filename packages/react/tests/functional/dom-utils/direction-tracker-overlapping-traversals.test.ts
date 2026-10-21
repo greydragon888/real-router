@@ -84,15 +84,52 @@ function holdFirst(): {
 }
 
 /**
+ * A guard that holds its first call until `end` gives the verdict — a refusal
+ * or a quiet cancel — and allows the rest.
+ */
+function holdFirstUntil(): {
+  guard: () => () => boolean | Promise<boolean>;
+  end: (verdict: "refuses" | "cancels quietly") => void;
+} {
+  let decide: ((allowed: boolean) => void) | undefined;
+  let cancel: ((error: unknown) => void) | undefined;
+
+  return {
+    guard: () => () => {
+      if (decide !== undefined) {
+        return true;
+      }
+
+      return new Promise<boolean>((resolve, reject) => {
+        decide = resolve;
+        cancel = reject;
+      });
+    },
+    end: (verdict) => {
+      if (verdict === "refuses") {
+        decide?.(false);
+      } else {
+        cancel?.(new RouterError(errorCodes.TRANSITION_CANCELLED));
+      }
+    },
+  };
+}
+
+/**
  * Two Backs from "contact"; the first is held before its leave. With
  * `sequential` it is released before the second. Returns where the router
- * lands and the label it lands with.
+ * lands, then the label of each leave.
  */
-async function backsHeldBeforeLeave(sequential: boolean): Promise<string> {
+async function backsHeldBeforeLeave(sequential: boolean): Promise<string[]> {
   const created = await install();
   const held = holdFirst();
+  const labels: string[] = [];
 
   getLifecycleApi(created).addDeactivateGuard("contact", held.guard);
+  // Registered after the tracker, so it reads what the tracker wrote.
+  created.subscribeLeave(() => {
+    labels.push(String(direction()));
+  });
 
   globalThis.history.back(); // to /about, held before its leave
   await settle();
@@ -107,7 +144,7 @@ async function backsHeldBeforeLeave(sequential: boolean): Promise<string> {
   held.release();
   await settle();
 
-  return `${created.getState()?.name}:${direction()}`;
+  return [String(created.getState()?.name), ...labels];
 }
 
 /**
@@ -150,11 +187,19 @@ describe("createDirectionTracker — overlapping traversals", () => {
   });
 
   it("a Back held before its leave and a second one behind it are both labelled back", async () => {
-    await expect(backsHeldBeforeLeave(false)).resolves.toBe("home:back");
+    await expect(backsHeldBeforeLeave(false)).resolves.toStrictEqual([
+      "home",
+      "back",
+      "back",
+    ]);
   });
 
   it("CONTROL — the first Back lands before the second", async () => {
-    await expect(backsHeldBeforeLeave(true)).resolves.toBe("home:back");
+    await expect(backsHeldBeforeLeave(true)).resolves.toStrictEqual([
+      "home",
+      "back",
+      "back",
+    ]);
   });
 
   it("a refusal that names another address leaves a Back behind a held one labelled back", async () => {
@@ -175,31 +220,15 @@ describe("createDirectionTracker — overlapping traversals", () => {
     "a Back behind one a guard %s is dropped with the plugin's return, and the next navigation is labelled forward",
     async (verdict) => {
       const created = await install();
-      let decide: ((allowed: boolean) => void) | undefined;
-      let cancel: ((error: unknown) => void) | undefined;
+      const held = holdFirstUntil();
 
-      getLifecycleApi(created).addDeactivateGuard("contact", () => () => {
-        if (decide !== undefined) {
-          return true;
-        }
-
-        return new Promise<boolean>((resolve, reject) => {
-          decide = resolve;
-          cancel = reject;
-        });
-      });
+      getLifecycleApi(created).addDeactivateGuard("contact", held.guard);
 
       globalThis.history.back(); // to /about, held before its leave
       await settle();
       globalThis.history.back(); // to /, waiting behind it
       await settle();
-
-      if (verdict === "refuses") {
-        decide?.(false);
-      } else {
-        cancel?.(new RouterError(errorCodes.TRANSITION_CANCELLED));
-      }
-
+      held.end(verdict);
       await settle(); // the plugin returns to /contact and drops the second
 
       expect(created.getState()?.name).toBe("contact");

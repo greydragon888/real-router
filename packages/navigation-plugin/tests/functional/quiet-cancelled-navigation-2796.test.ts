@@ -1,5 +1,10 @@
-import { createRouter, errorCodes, RouterError } from "@real-router/core";
-import { getLifecycleApi } from "@real-router/core/api";
+import {
+  createRouter,
+  errorCodes,
+  events,
+  RouterError,
+} from "@real-router/core";
+import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { navigationPluginFactory } from "../../src";
@@ -200,6 +205,24 @@ describe("#2796 — a navigation a guard cancels quietly returns to the entry it
       });
     });
   });
+
+  it("a newer navigation the browser starts owns the URL even when the router never announces it", async () => {
+    const { mock, router: r } = await setup();
+
+    getLifecycleApi(r).addActivateGuard(
+      "users.list",
+      () => () => new Promise<boolean>(() => {}),
+    );
+
+    mock.navigate("http://localhost/users/list");
+    await settle();
+    // The router still shows "home": the handler takes this one, and the
+    // router answers it SAME_STATES without announcing it.
+    mock.navigate("http://localhost/home");
+    await settle();
+
+    expect(where(mock)).toMatchObject({ index: 2, route: "home" });
+  });
 });
 
 describe("the watch over newer navigations ends with the navigation", () => {
@@ -236,6 +259,34 @@ describe("the watch over newer navigations ends with the navigation", () => {
 
     expect(router.getState()?.path).toBe("/users/list");
     expect(mock.entries()).toHaveLength(destinations.length + 1);
+  });
+
+  it("the watch ends with a refused navigation: three refusals leave no listener of it", async () => {
+    const mock = new MockNavigation("http://localhost/home");
+
+    router = createRouter(routerConfig, {
+      defaultRoute: "home",
+      allowNotFound: true,
+      limits: { maxListeners: 3 },
+    });
+    router.usePlugin(
+      navigationPluginFactory({}, createMockNavigationBrowser(mock)),
+    );
+    await router.start();
+    getLifecycleApi(router).addActivateGuard("users.list", () => () => false);
+
+    for (let round = 0; round < 3; round++) {
+      mock.navigate("http://localhost/users/list");
+      await settle();
+    }
+
+    const api = getPluginApi(router);
+
+    for (let slot = 0; slot < 3; slot++) {
+      expect(() =>
+        api.addEventListener(events.TRANSITION_ERROR, () => {}),
+      ).not.toThrow();
+    }
   });
 
   it("a router whose listener limit refuses the watch still takes the navigation", async () => {

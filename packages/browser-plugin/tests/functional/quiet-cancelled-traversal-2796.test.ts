@@ -227,6 +227,49 @@ describe("#2796 — a Back a guard cancels quietly returns to the entry it start
     },
   );
 
+  it("the watch ends with a refused traversal: three refusals leave no listener of it", async () => {
+    globalThis.history.replaceState(null, "", "/sentinel");
+    globalThis.history.pushState(null, "", "/home");
+
+    const created = createRouter(routerConfig, {
+      defaultRoute: "home",
+      allowNotFound: true,
+      limits: { maxListeners: 3 },
+    });
+
+    created.usePlugin(
+      browserPluginFactory(
+        {},
+        createSafeBrowser(
+          () => globalThis.location.pathname + globalThis.location.search,
+          "browser-plugin",
+        ),
+      ),
+    );
+    await created.start();
+    router = created;
+    await created.navigate("users.list");
+    getLifecycleApi(created).addDeactivateGuard(
+      "users.list",
+      () => () => false,
+    );
+
+    for (let round = 0; round < 3; round++) {
+      globalThis.history.back();
+      await settle();
+    }
+
+    expect(at()).toStrictEqual({ path: "/users/list", route: "users.list" });
+
+    const api = getPluginApi(created);
+
+    for (let slot = 0; slot < 3; slot++) {
+      expect(() =>
+        api.addEventListener(events.TRANSITION_ERROR, () => {}),
+      ).not.toThrow();
+    }
+  });
+
   it("unwatched, a quiet cancel is taken for a newer navigation's: the Back refuses nothing", async () => {
     globalThis.history.replaceState(null, "", "/sentinel");
     globalThis.history.pushState(null, "", "/home");
