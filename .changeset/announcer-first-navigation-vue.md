@@ -1,0 +1,7 @@
+---
+"@real-router/vue": patch
+---
+
+Announce the first navigation after `RouterProvider` with `announceNavigation` mounts, or after the prop is switched on (#2796)
+
+The announcer leaves out the initial page load — the commit of `router.start()`, the one with no previous route. It skipped the first navigation it observed instead, so in the canonical order, `await router.start()` and then mount, the first navigation after mount was never announced, and neither was the first one after `announceNavigation` turned on. The same class of defect as #2796.

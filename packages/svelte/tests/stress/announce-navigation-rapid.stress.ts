@@ -164,7 +164,7 @@ describe("Stress: announceNavigation rapid navigations", () => {
     flushSync();
     vi.advanceTimersByTime(100);
 
-    // Warm-up navigation so isInitialNavigation flips off.
+    // A first navigation, announced like every navigation after start().
     await router.navigate("route1").catch(() => undefined);
     flushSync();
 

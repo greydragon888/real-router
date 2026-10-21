@@ -16,10 +16,10 @@
  *     mid-stream
  *   - `lastAnnouncedText` dedupe — repeat-navigation that resolves to the
  *     same announcement text does not re-write
- *   - `isInitialNavigation` — the FIRST `TRANSITION_SUCCESS` after the
- *     announcer subscribes is treated as the post-hydration "initial" event
- *     and skipped. Every test below fires a warm-up navigation to consume
- *     that initial event before measuring announcer behaviour.
+ *   - the initial page load — the `start()` commit, the one with no previous
+ *     route — is not announced. The router starts before the provider
+ *     mounts, so every navigation a test makes is announced; each test lands
+ *     a first one before measuring announcer behaviour.
  *
  * Test design — no `<h1>` element is rendered: `resolveText` falls through
  * to `route.name`, so each distinct route name produces distinct announcer
@@ -65,10 +65,10 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Consumes the announcer's `isInitialNavigation` skip. Returns the
- * announcer element so callers can keep observing it.
+ * Lands a first announced navigation — a force-nav on the start route — and
+ * returns the announcer element so callers can keep observing it.
  */
-async function consumeInitialNav(router: Router): Promise<Element> {
+async function landFirstNav(router: Router): Promise<Element> {
   await router
     .navigate("route0", {}, undefined, { force: true })
     .catch(() => {});
@@ -77,7 +77,7 @@ async function consumeInitialNav(router: Router): Promise<Element> {
   const announcer = document.querySelector(ANNOUNCER_SELECTOR);
 
   if (!announcer) {
-    throw new Error("announcer not in DOM after consumeInitialNav");
+    throw new Error("announcer not in DOM after landFirstNav");
   }
 
   return announcer;
@@ -115,7 +115,7 @@ describe("§7.2 #14 — announceNavigation rapid navigations (Vue)", () => {
     });
 
     await sleep(SAFARI_READY_WAIT_MS);
-    const announcer = await consumeInitialNav(router);
+    const announcer = await landFirstNav(router);
 
     const observed: (string | null)[] = [];
 
@@ -151,7 +151,7 @@ describe("§7.2 #14 — announceNavigation rapid navigations (Vue)", () => {
     });
 
     await sleep(SAFARI_READY_WAIT_MS);
-    const announcer = await consumeInitialNav(router);
+    const announcer = await landFirstNav(router);
 
     await router.navigate("route1").catch(() => {});
     await flushAnnouncerPipeline();
@@ -185,7 +185,7 @@ describe("§7.2 #14 — announceNavigation rapid navigations (Vue)", () => {
     });
 
     await sleep(SAFARI_READY_WAIT_MS);
-    const announcer = await consumeInitialNav(router);
+    const announcer = await landFirstNav(router);
 
     await router.navigate("route1").catch(() => {});
     await flushAnnouncerPipeline();
@@ -251,7 +251,7 @@ describe("§7.2 #14 — announceNavigation rapid navigations (Vue)", () => {
     });
 
     await sleep(SAFARI_READY_WAIT_MS);
-    await consumeInitialNav(router);
+    await landFirstNav(router);
 
     for (let i = 0; i < 50; i++) {
       await router.navigate(i % 2 === 0 ? "route1" : "route2").catch(() => {});
