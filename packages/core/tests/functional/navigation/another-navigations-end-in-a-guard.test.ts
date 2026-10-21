@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { createRouter, errorCodes, RouterError } from "@real-router/core";
 
@@ -17,14 +17,15 @@ import type { Route, Router, State } from "@real-router/core";
  * or `AbortError` is still a quiet cancel, and so is the end of its OWN
  * navigation. A fresh `AbortError` minted by someone else's request carries no
  * identity, so it stays a quiet cancel — the contract, not a choice made here.
+ * So does a value the APPLICATION handed in, whichever navigation ended with
+ * it: the reason a caller aborted its `opts.signal` with, one cancel a guard
+ * throws on every navigation.
  */
 
 type Cell =
   | "request rejects with the superseded navigation's signal reason"
   | "the same reason, thrown synchronously"
   | "the superseded navigation's own promise"
-  | "the reason the superseded navigation's caller aborted it with"
-  | "the signal holds a copy of the reason"
   | "a canDeactivate guard on the request";
 
 type Control =
@@ -33,14 +34,13 @@ type Control =
   | "its own RouterError(TRANSITION_CANCELLED), rejected"
   | "its own RouterError(TRANSITION_CANCELLED), thrown"
   | "its own AbortError"
-  | "a fresh AbortError from the request (no identity)";
+  | "a fresh AbortError from the request (no identity)"
+  | "the reason the superseded navigation's caller aborted it with (the caller's own)";
 
 const CELLS: readonly Cell[] = [
   "request rejects with the superseded navigation's signal reason",
   "the same reason, thrown synchronously",
   "the superseded navigation's own promise",
-  "the reason the superseded navigation's caller aborted it with",
-  "the signal holds a copy of the reason",
   "a canDeactivate guard on the request",
 ];
 
@@ -51,6 +51,7 @@ const CONTROLS: readonly Control[] = [
   "its own RouterError(TRANSITION_CANCELLED), thrown",
   "its own AbortError",
   "a fresh AbortError from the request (no identity)",
+  "the reason the superseded navigation's caller aborted it with (the caller's own)",
 ];
 
 const codeOf = (error: unknown): unknown =>
@@ -221,32 +222,6 @@ function runCell(cell: Cell): Promise<Run> {
         wait: ({ first }) => first.then(() => true),
       });
     }
-    case "the reason the superseded navigation's caller aborted it with": {
-      return supersede({
-        settleOnAbort: reasonOf,
-        callerAborts: true,
-        wait: ({ request }) => request.then(() => true),
-      });
-    }
-    case "the signal holds a copy of the reason": {
-      const abort = AbortController.prototype.abort;
-
-      // What a signal handed a COPY of the recorded reason looks like: the
-      // request rejects with the copy, never with the object core recorded.
-      vi.spyOn(AbortController.prototype, "abort").mockImplementation(function (
-        this: AbortController,
-        reason?: unknown,
-      ) {
-        Reflect.apply(abort, this, [
-          reason instanceof RouterError ? new RouterError(reason.code) : reason,
-        ]);
-      });
-
-      return supersede({
-        settleOnAbort: reasonOf,
-        wait: ({ request }) => request.then(() => true),
-      });
-    }
     case "a canDeactivate guard on the request": {
       return supersede({
         settleOnAbort: reasonOf,
@@ -258,14 +233,10 @@ function runCell(cell: Cell): Promise<Run> {
 }
 
 describe("a guard waiting on another navigation's work fails when that navigation is cancelled", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it("the cell tables hold each cell once", () => {
     expect(CELLS).toHaveLength(new Set(CELLS).size);
     expect(CONTROLS).toHaveLength(new Set(CONTROLS).size);
-    expect(CELLS.length + CONTROLS.length).toBe(12);
+    expect(CELLS.length + CONTROLS.length).toBe(11);
   });
 
   it.each(CELLS)(
@@ -356,6 +327,15 @@ describe("controls — a guard's own cancellation is still a quiet cancel (#933)
       case "a fresh AbortError from the request (no identity)": {
         run = await supersede({
           settleOnAbort: () => new DOMException("aborted", "AbortError"),
+          wait: ({ request }) => request.then(() => true),
+        });
+
+        break;
+      }
+      case "the reason the superseded navigation's caller aborted it with (the caller's own)": {
+        run = await supersede({
+          settleOnAbort: reasonOf,
+          callerAborts: true,
           wait: ({ request }) => request.then(() => true),
         });
 
@@ -481,5 +461,93 @@ describe("the promise of a navigation that failed on the synchronous arc", () =>
     expect(router.getState()?.name).toBe("home");
 
     router.dispose();
+  });
+});
+
+describe("a value the application handed in stays its own, whichever navigation ended with it", () => {
+  /** Two navigations to `p`, whose guard `raise` decides; the log of both. */
+  async function twice(
+    raise: () => boolean | Promise<boolean>,
+    before?: (router: Router) => Promise<void>,
+  ): Promise<{ codes: unknown[]; log: string[] }> {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      {
+        name: "slow",
+        path: "/slow",
+        canActivate: () => () => new Promise<boolean>(() => {}),
+      },
+      { name: "p", path: "/p", canActivate: () => raise },
+    ]);
+    const log: string[] = [];
+
+    await router.start("/");
+    await before?.(router);
+
+    router.usePlugin(() => ({
+      onTransitionCancel: (toState: State) =>
+        log.push(`CANCEL:${toState.name}`),
+      onTransitionError: (
+        toState: State | undefined,
+        _fromState: State | undefined,
+        error: unknown,
+      ) => log.push(`ERROR:${toState?.name}:${String(codeOf(error))}`),
+    }));
+
+    const codes = [
+      await router.navigate("p").catch(codeOf),
+      await router.navigate("p").catch(codeOf),
+    ];
+
+    router.dispose();
+
+    return { codes, log };
+  }
+
+  const quietTwice = {
+    codes: [errorCodes.TRANSITION_CANCELLED, errorCodes.TRANSITION_CANCELLED],
+    log: ["CANCEL:p", "CANCEL:p"],
+  };
+
+  it("one RouterError(TRANSITION_CANCELLED) a guard throws on every navigation", async () => {
+    const cancel = new RouterError(errorCodes.TRANSITION_CANCELLED);
+
+    await expect(
+      twice(() => {
+        throw cancel;
+      }),
+    ).resolves.toStrictEqual(quietTwice);
+  });
+
+  it("one RouterError(TRANSITION_CANCELLED) a guard rejects with on every navigation", async () => {
+    const cancel = new RouterError(errorCodes.TRANSITION_CANCELLED);
+
+    await expect(twice(() => Promise.reject(cancel))).resolves.toStrictEqual(
+      quietTwice,
+    );
+  });
+
+  it("the reason of a signal the application passed to an earlier navigation", async () => {
+    const session = new AbortController();
+
+    await expect(
+      twice(
+        () => {
+          session.signal.throwIfAborted();
+
+          return true;
+        },
+        async (router) => {
+          const slow = router
+            .navigate("slow", {}, undefined, { signal: session.signal })
+            .catch(codeOf);
+
+          await tick();
+          session.abort();
+
+          await expect(slow).resolves.toBe(errorCodes.TRANSITION_CANCELLED);
+        },
+      ),
+    ).resolves.toStrictEqual(quietTwice);
   });
 });

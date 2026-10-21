@@ -736,7 +736,8 @@
       "59045aff1bd7"
     ],
     "packages/core/src/navigationEnds.ts": [
-      "41bd5a7b2bca"
+      "a9726b75cfe0",
+      "ae40a744ea8b"
     ],
     "packages/core/src/pipeline/canonicalize.ts": [
       "1a9864dfed80",
@@ -832,13 +833,11 @@
       "e9a3f2a064a6"
     ],
     "packages/core/src/RouterError.ts": [
-      "cf0845010fb9",
-      "7b81b354abe9",
-      "45d4cea8e701",
       "c4904040b6e3",
       "b78881a1eeb4",
       "4d068979501f",
       "a837d3c0c7c7",
+      "576268a2a083",
       "a5d2004d474e",
       "85464716c733",
       "919662fab5c7",
@@ -848,7 +847,10 @@
       "919662fab5c7",
       "96ba553f2d81",
       "6640b5f1748d",
-      "9cda6166a10c"
+      "9cda6166a10c",
+      "cf0845010fb9",
+      "7b81b354abe9",
+      "45d4cea8e701"
     ],
     "packages/core/src/routerFSM.ts": [
       "138fa606bb95",
@@ -2063,7 +2065,7 @@
       "9ecad603960c",
       "861a0aeb9025",
       "b479ef11988e",
-      "8aee6a8ce8c1"
+      "babf0ed962a3"
     ],
     "packages/core/src/namespaces/RoutesNamespace/CLAUDE.md": [
       "56d7f818b3b6",

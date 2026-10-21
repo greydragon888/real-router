@@ -983,6 +983,10 @@ const LEDGER = new Map<string, string>([
     "navigationEnds.ts › isNavigationEnd › read:registry",
     "identity:end-record",
   ], // row 28
+  [
+    "navigationEnds.ts › recordNavigationEnd › read:registry",
+    "identity:end-record",
+  ], // row 28
 
   // The start.
   [`${LIFECYCLE} › isMissingRoute › code:.code`, NOT], // row 31
