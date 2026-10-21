@@ -1,5 +1,10 @@
-import { createRouter, errorCodes, RouterError } from "@real-router/core";
-import { getLifecycleApi } from "@real-router/core/api";
+import {
+  createRouter,
+  errorCodes,
+  events,
+  RouterError,
+} from "@real-router/core";
+import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { browserPluginFactory } from "@real-router/browser-plugin";
@@ -172,6 +177,99 @@ describe("#2796 — a Back a guard cancels quietly returns to the entry it start
     }
 
     expect(at()).toStrictEqual({ path: "/users/list", route: "users.list" });
+  });
+
+  it.each([
+    ["first", events.TRANSITION_START],
+    ["last", events.TRANSITION_CANCEL],
+  ] as const)(
+    "a router whose listener limit refuses the watch's %s listener takes the Back, and the watch keeps none",
+    async (_which, taken) => {
+      globalThis.history.replaceState(null, "", "/sentinel");
+      globalThis.history.pushState(null, "", "/home");
+
+      const created = createRouter(routerConfig, {
+        defaultRoute: "home",
+        allowNotFound: true,
+        limits: { maxListeners: 1 },
+      });
+
+      created.usePlugin(
+        browserPluginFactory(
+          {},
+          createSafeBrowser(
+            () => globalThis.location.pathname + globalThis.location.search,
+            "browser-plugin",
+          ),
+        ),
+      );
+      await created.start();
+      router = created;
+
+      const api = getPluginApi(created);
+      const removeTaken = api.addEventListener(taken, () => {});
+
+      await created.navigate("users.list");
+      globalThis.history.back();
+      await settle();
+
+      expect(at()).toStrictEqual({ path: "/home", route: "home" });
+
+      removeTaken();
+
+      for (const event of [
+        events.TRANSITION_START,
+        events.TRANSITION_ERROR,
+        events.TRANSITION_CANCEL,
+      ]) {
+        expect(() => api.addEventListener(event, () => {})).not.toThrow();
+      }
+    },
+  );
+
+  it("unwatched, a quiet cancel is taken for a newer navigation's: the Back refuses nothing", async () => {
+    globalThis.history.replaceState(null, "", "/sentinel");
+    globalThis.history.pushState(null, "", "/home");
+    travelled = 0;
+
+    const created = createRouter(routerConfig, {
+      defaultRoute: "home",
+      allowNotFound: true,
+      limits: { maxListeners: 1 },
+    });
+    const browser = createSafeBrowser(
+      () => globalThis.location.pathname + globalThis.location.search,
+      "browser-plugin",
+    );
+
+    created.usePlugin(
+      browserPluginFactory(
+        {},
+        {
+          ...browser,
+          go: (delta) => {
+            travelled++;
+            browser.go?.(delta);
+          },
+        },
+      ),
+    );
+    await created.start();
+    router = created;
+    getPluginApi(created).addEventListener(events.TRANSITION_START, () => {});
+    await created.navigate("users.view", { id: "42" });
+    getLifecycleApi(created).addDeactivateGuard("users.view", () => () => {
+      throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+    });
+
+    globalThis.history.back();
+    await settle();
+
+    expect(travelled).toBe(0);
+    expect(at()).toStrictEqual({
+      path: "/users/view/42",
+      route: "users.view",
+    });
   });
 
   describe("a newer navigation behind the cancel", () => {

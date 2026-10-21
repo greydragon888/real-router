@@ -16,6 +16,10 @@ export interface NewerNavigations {
  * navigation, and it owns the URL. With none left — a guard of the plugin's
  * navigation cancels it quietly, or the router refuses the newer one — nothing
  * does (#2796).
+ *
+ * ⚠ A router at its listener limit (`limits.maxListeners`) refuses the watch:
+ * the listeners it took are removed, and `ownTheUrl` answers `true`, so a
+ * cancel refuses nothing.
  */
 export function watchNewerNavigations(api: PluginApi): NewerNavigations {
   const owners = new Set<object>();
@@ -24,20 +28,35 @@ export function watchNewerNavigations(api: PluginApi): NewerNavigations {
       owners.delete(toState.context);
     }
   };
-  const removers = [
-    api.addEventListener(events.TRANSITION_START, (toState) => {
-      owners.add(toState.context);
-    }),
-    api.addEventListener(events.TRANSITION_ERROR, ended),
-    api.addEventListener(events.TRANSITION_CANCEL, ended),
+  const registrations: (() => () => void)[] = [
+    () =>
+      api.addEventListener(events.TRANSITION_START, (toState) => {
+        owners.add(toState.context);
+      }),
+    () => api.addEventListener(events.TRANSITION_ERROR, ended),
+    () => api.addEventListener(events.TRANSITION_CANCEL, ended),
   ];
-
-  return {
-    ownTheUrl: () => owners.size > 0,
-    stop: () => {
-      for (const remove of removers) {
-        remove();
-      }
-    },
+  const removers: (() => void)[] = [];
+  const stop = (): void => {
+    for (const remove of removers) {
+      remove();
+    }
   };
+
+  try {
+    for (const register of registrations) {
+      removers.push(register());
+    }
+  } catch {
+    stop();
+
+    return {
+      ownTheUrl: () => true,
+      stop: () => {
+        /* nothing left to remove */
+      },
+    };
+  }
+
+  return { ownTheUrl: () => owners.size > 0, stop };
 }

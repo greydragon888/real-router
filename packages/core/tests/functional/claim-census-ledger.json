@@ -1303,6 +1303,9 @@
     "packages/vue/src/composables/useRouteExit.ts": [
       "117882e62801"
     ],
+    "shared/browser-env/newer-navigations.ts": [
+      "e707a2d0fce7"
+    ],
     "shared/browser-env/plugin-utils.ts": [
       "bc9199ba1389",
       "966193703e68",

@@ -237,6 +237,26 @@ describe("the watch over newer navigations ends with the navigation", () => {
     expect(router.getState()?.path).toBe("/users/list");
     expect(mock.entries()).toHaveLength(destinations.length + 1);
   });
+
+  it("a router whose listener limit refuses the watch still takes the navigation", async () => {
+    const mock = new MockNavigation("http://localhost/home");
+
+    // The plugin's own `onTransitionStart` holds the one `$$start` slot.
+    router = createRouter(routerConfig, {
+      defaultRoute: "home",
+      allowNotFound: true,
+      limits: { maxListeners: 1 },
+    });
+    router.usePlugin(
+      navigationPluginFactory({}, createMockNavigationBrowser(mock)),
+    );
+    await router.start();
+
+    mock.navigate("http://localhost/users/list");
+    await settle();
+
+    expect(router.getState()?.path).toBe("/users/list");
+  });
 });
 
 describe("the handler's record belongs to the navigation it took", () => {
