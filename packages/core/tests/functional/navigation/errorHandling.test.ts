@@ -14,8 +14,9 @@ import type { GuardFn, Router } from "@real-router/core";
  *   - the rejected `RouterError` carries `code` (handleGuardError / rethrow) plus
  *     the `wrapSyncError` metadata (`segment`, `cause`, spread own-props, #39
  *     reserved-prop filtering);
- *   - an `onTransitionError` plugin observes `routeTransitionError`'s suppression
- *     list (cancelled / not-found are swallowed; genuine errors are reported once).
+ *   - an `onTransitionError` plugin observes how `routeTransitionError` routes
+ *     the outcome (a cancellation leaves through `CANCEL`, never reaching it; a
+ *     genuine error is reported once, `completeTransition`'s own not-found too).
  */
 
 const ROUTES = [
@@ -44,7 +45,7 @@ async function navigateError(
   );
 }
 
-describe("routeTransitionError — suppression list (via onTransitionError plugin)", () => {
+describe("routeTransitionError — what reaches onTransitionError (via a plugin)", () => {
   it("reports a genuine error (CANNOT_ACTIVATE) exactly once", async () => {
     const onTransitionError = vi.fn();
     const router = routerWithActivateGuard(() => {
@@ -64,7 +65,7 @@ describe("routeTransitionError — suppression list (via onTransitionError plugi
     );
   });
 
-  it("swallows TRANSITION_CANCELLED (AbortError guard) — no onTransitionError", async () => {
+  it("a guard's AbortError is a cancellation — no onTransitionError", async () => {
     const onTransitionError = vi.fn();
     const router = routerWithActivateGuard(() => {
       throw new DOMException("aborted", "AbortError");
@@ -78,11 +79,11 @@ describe("routeTransitionError — suppression list (via onTransitionError plugi
     expect(onTransitionError).not.toHaveBeenCalled();
   });
 
-  it("swallows ROUTE_NOT_FOUND when a route vanishes mid-transition (reports once, not twice)", async () => {
+  it("reports ROUTE_NOT_FOUND once when a route vanishes mid-transition", async () => {
     // The target route is removed while an async activation guard is pending.
     // completeTransition then sees `!hasRoute` → emits the fail ITSELF and throws
-    // ROUTE_NOT_FOUND; routeTransitionError must swallow it so the error is
-    // reported exactly once (a missing suppression would double-report).
+    // ROUTE_NOT_FOUND; the machine has left the band by then, so
+    // routeTransitionError sends nothing more and the error is reported once.
     const onTransitionError = vi.fn();
     const router = createRouter(ROUTES, { defaultRoute: "home" });
 

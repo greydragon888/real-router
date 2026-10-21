@@ -348,45 +348,28 @@ export function createInitialRouterFSMContext(): RouterFSMContext {
  * was one the sender had read out of the machine and stamped by hand — so the
  * table could only check what it was given honestly.
  *
- * ⚠ **This predicate cannot currently refuse, and that is measured, not
- * assumed (#1646).** Instrumented over the whole functional tier it returns
- * `false` ZERO times — never once for a dead navigation. Re-measured 2026-09-08:
- * still zero. The ask COUNT is deliberately not quoted; it tracks the size of
- * the tier and says nothing the refusal count does not.
- * The reason is structural rather than lucky: only the NAVIGATE update ever
- * puts a navigation THERE (the other two writes clear the field), so the
- * navigation a sender can name is by construction the one the machine adopted;
- * and both navigation-naming FAIL senders are already gated on
- * `deps.isTransitioning()` — the machine has to still be in the band — with
- * `asCancellation` restating a lost-liveness failure as `TRANSITION_CANCELLED`
- * — which `routeTransitionError` filters out before any send. Three adversarial
- * arcs (guard-redirect, a guard rejecting after a supersede landed, the
- * ROUTE_NOT_FOUND arc) were driven deliberately: all three end in `CANCELLED`
- * with no `TRANSITION_ERROR` at all. The `nav === undefined` half is dead for
- * a second reason — the one navigation-less sender (`Router.#unwindFailedStart`)
- * takes `STARTING --FAIL--> IDLE`, which carries no `when`.
+ * ⚠ **It refuses a stale FAIL that `routeTransitionError` sends while another
+ * navigation holds the band.** That sender sends `FAIL` whenever the machine is
+ * in the band (#2787). A navigation the machine has moved past usually reaches
+ * it restated by `asCancellation` as `TRANSITION_CANCELLED`, which goes to
+ * `CANCEL` instead; it arrives raw where the liveness read answers for the other
+ * navigation — a guard that redirects to a route an async guard holds and then
+ * refuses (#2788) — and where application code starts a navigation inside
+ * `completeTransition`'s own `FAIL`, through the caller's
+ * `signal.removeEventListener`. Both are pinned in
+ * `quiet-cancel-leaves-the-band-2787.test.ts`: with the predicate gone the stale
+ * `FAIL` takes the other navigation's band, and that navigation's commit is
+ * refused.
  *
- * ⚑ **What it DOES hold is measured too (#1672), and that is new.** Two-sided
- * mutation: removing `asCancellation` alone fails 5 tests, removing it AND this
- * predicate fails **6**. The sixth is `superseded-guard-rejection-1609.test.ts`
- * "outcome 2: the superseding navigation still emits TRANSITION_SUCCESS and
- * notifies subscribers" — exactly the silent-commit shape. So the division of
- * labour is known rather than assumed: `asCancellation` holds the half facing
- * the CALLER (which code `navigate()` rejects with), this predicate holds the
- * half facing SUBSCRIBERS. "Defence-in-depth" below names a second half, it is
- * not a hedge.
+ * ⚑ **The division of labour with `asCancellation` (#1672).** The restatement
+ * decides the half facing the CALLER — which code `navigate()` rejects with —
+ * and this predicate the half facing SUBSCRIBERS: whether a stale report moves
+ * the machine out from under the live navigation. The two controls above pin
+ * this half; `mayFail → true` reds both.
  *
- * The dead disjunct is dead by mutation as well as by argument: `mayFail →
- * true` kills nothing (#1648 §5.6), so the no-navigation branch is never TAKEN,
- * not merely never decisive.
- *
- * So it is a PROVEN EQUIVALENT in the mutation-testing sense, kept as
- * defence-in-depth for the day the liveness gates above it change: the table is
- * the last thing between a stale terminal report and the live navigation, and
- * two comparisons is what that costs. Do NOT read its survival as a coverage
- * gap to be closed with a test — no test can reach it without changing
- * production code first (core CLAUDE.md, "Mutation testing": prove equivalence,
- * then document rather than chase).
+ * The `nav === undefined` half is dead: the one navigation-less sender
+ * (`Router.#unwindFailedStart`) takes `STARTING --FAIL--> IDLE`, which carries
+ * no `when`.
  *
  * ⚠ **The first disjunct ADMITS rather than refuses, and it rests on an
  * INVENTORY, not on an argument: every navigation-less FAIL must reach the

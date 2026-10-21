@@ -26,8 +26,9 @@ const objectEntries = Object.entries;
  * Is this thrown value already the router's quiet-cancel outcome?
  *
  * Asked by {@link handleGuardError} (a guard signalling a quiet cancel by
- * throwing the RouterError directly, #933) and by {@link asCancellation}, which
- * must not re-wrap one.
+ * throwing the RouterError directly, #933), by {@link asCancellation}, which
+ * must not re-wrap one, and by {@link routeTransitionError}, which sends one
+ * through `CANCEL` (#2787).
  */
 function isTransitionCancelled(error: unknown): boolean {
   return (
@@ -42,7 +43,8 @@ function isTransitionCancelled(error: unknown): boolean {
  * Both failure arcs call it for a navigation that has LOST liveness, and every
  * way to lose it is a cancellation the navigation already announced. Carrying
  * the guard's verdict instead put a `FAIL` in the FSM under a navigation still
- * running, because {@link routeTransitionError} filters by error CODE. Liveness
+ * running, because {@link routeTransitionError} sends `FAIL` for anything that
+ * is not a cancellation. Liveness
  * itself is asked at the call sites, from different facts
  * (`finishAsyncNavigation` off the signal, `handleNavigateError` off the FSM).
  *
@@ -66,22 +68,32 @@ export function asCancellation(error: unknown): unknown {
       );
 }
 
+/**
+ * Hand a failed navigation to the machine: `CANCEL` for a cancellation, `FAIL`
+ * for anything else (#2787) — each only while the machine still carries it.
+ *
+ * ⚑ The `CANCEL` arm is how a cancel raised by APPLICATION code leaves the band —
+ * a guard's quiet cancel, a leave listener throwing or rejecting with it — so the
+ * navigation gets `TRANSITION_CANCEL`, as it does from a newer navigation,
+ * `stop()` or its own signal. `cancelIfInFlight` asks the identity itself.
+ *
+ * ⚠ The `FAIL` arm asks only for the band: the band's `FAIL` edges ask the
+ * identity (`mayFail`), and `STARTING`'s, which unwinds a failed `start()`, asks
+ * nothing. Outside the band the machine has already moved past the navigation,
+ * and a restart begun in between — from inside `completeTransition`'s own
+ * `FAIL(ROUTE_NOT_FOUND)`, for one — must not receive its `FAIL`.
+ */
 export function routeTransitionError(
   deps: NavigationDependencies,
   error: unknown,
   fromState: State | undefined,
   nav: object,
 ): void {
-  const routerError = error as RouterError;
-
-  if (
-    routerError.code === errorCodes.TRANSITION_CANCELLED ||
-    routerError.code === errorCodes.ROUTE_NOT_FOUND
-  ) {
-    return;
+  if (isTransitionCancelled(error)) {
+    deps.cancelIfInFlight(nav, error);
+  } else if (deps.isTransitioning()) {
+    deps.sendTransitionFail(fromState, error, nav);
   }
-
-  deps.sendTransitionFail(fromState, routerError, nav);
 }
 
 export function handleGuardError(
@@ -97,7 +109,7 @@ export function handleGuardError(
   // RouterError(TRANSITION_CANCELLED) directly — the same intent as a thrown
   // AbortError. Preserve it as-is instead of letting rethrowAsRouterError
   // overwrite the code with CANNOT_ACTIVATE / CANNOT_DEACTIVATE: that code
-  // drives the downstream suppression (routeTransitionError early-returns,
+  // routes it downstream (routeTransitionError sends CANCEL rather than FAIL,
   // fire-and-forget stays silent), so re-coding would surface the intended
   // quiet cancel as a reported transition error (#933).
   if (isTransitionCancelled(error)) {

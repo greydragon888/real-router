@@ -125,8 +125,8 @@ export function warnRemovalDuringNavigation(
   // promise carries `"CANCELLED"` there while `onTransitionError` carries
   // `"ROUTE_NOT_FOUND"` — one failure, two codes, depending on where the
   // caller is listening. `onTransitionCancel` never fires on this path at
-  // all (`CANCEL` is sent only by `stop()`/`dispose()` and the
-  // external-signal bridge), so the hook is the STABLE predicate of the two
+  // all (the failure leaves the band through `FAIL`, never `CANCEL`), so the
+  // hook is the STABLE predicate of the two
   // and the sentence says which is which. Naming the arc split and then
   // appending the hook reads as "the hook carries these codes" — true on the
   // async arc, false on the sync one.

@@ -365,6 +365,9 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     cancelNavigation: (reason) => {
       ns.eventBus.sendCancelIfPossible(ns.state.get(), reason);
     },
+    cancelIfInFlight: (nav, reason) => {
+      ns.eventBus.sendCancelIfInFlight(nav, ns.state.get(), reason);
+    },
     dispatchAbort: (controller, reason) => {
       ns.eventBus.dispatchAbort(controller, reason);
     },

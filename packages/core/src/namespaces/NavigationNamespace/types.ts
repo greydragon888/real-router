@@ -344,6 +344,12 @@ export interface NavigationDependencies {
   cancelNavigation: (reason?: unknown) => void;
 
   /**
+   * Cancel `nav` the same way while the machine still carries it, and do
+   * nothing once anything else has moved it (#2787).
+   */
+  cancelIfInFlight: (nav: object, reason: unknown) => void;
+
+  /**
    * Abort a failing navigation's controller as a counted dispatch, so a
    * navigation started from one of its `abort` listeners is refused
    * `REENTRANT_NAVIGATION` (#2778). No-op without a controller.
