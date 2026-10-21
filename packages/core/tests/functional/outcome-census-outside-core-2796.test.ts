@@ -1069,6 +1069,12 @@ const readsContext = (node: ts.Node): boolean =>
       return memberOf(declaration.initializer) === "context";
     }));
 
+/** `undefined`, `null` or `void …`: a presence check, not a reference. */
+const isNullish = (node: ts.Expression): boolean =>
+  (ts.isIdentifier(node) && node.text === "undefined") ||
+  node.kind === ts.SyntaxKind.NullKeyword ||
+  ts.isVoidExpression(node);
+
 function isObjectTyped(checker: ts.TypeChecker, node: ts.Expression): boolean {
   const type = checker.getTypeAtLocation(node);
   const parts = type.isUnion() ? type.types : [type];
@@ -1101,6 +1107,8 @@ const FORMS: Readonly<Record<string, Form>> = {
   "state-object": (node, checker) =>
     checker !== undefined &&
     isEquality(node) &&
+    !isNullish(node.left) &&
+    !isNullish(node.right) &&
     [node.left, node.right].some((side) => isObjectTyped(checker, side)),
   generation: (node) =>
     isEquality(node) &&
@@ -1292,6 +1300,8 @@ const CONTRACT_COMMIT =
   "contract:#2754 — a commit inside the plugin's not-found call takes that call's record";
 const CONTRACT_ACTIVATION =
   "contract:#531 — the first transition or commit the plugin hears takes the activation's record";
+const CONTRACT_INITIAL_LOAD =
+  "contract:the initial page load is the start() commit of a router that had committed nothing when the announcer was created";
 const UNSUPPORTED_Z12 =
   "unsupported:Z12 — a scroll-spy emit superseded by a commit that starts no transition";
 
@@ -1605,9 +1615,9 @@ const LEDGER: Readonly<Record<string, Readonly<Record<string, string>>>> = {
     "navigateWithHash › slot:navigatedSearch": NO,
   },
   "shared/dom-utils/route-announcer.ts": {
-    "createRouteAnnouncer › sign:subscribe": OBJECT,
+    "createRouteAnnouncer › sign:subscribe": CONTRACT_INITIAL_LOAD,
     "createRouteAnnouncer › slot:clearTimeoutId": NO,
-    "createRouteAnnouncer › slot:initialLoadPending": OBJECT,
+    "createRouteAnnouncer › slot:initialLoadPending": CONTRACT_INITIAL_LOAD,
     "createRouteAnnouncer › slot:isDestroyed": NO,
     "createRouteAnnouncer › slot:isReady": NO,
     "createRouteAnnouncer › slot:lastAnnouncedText": NO,
@@ -1758,6 +1768,7 @@ const HELD_BY = new Map<string, readonly string[]>([
   [CONTRACT_RESET, [CELL.errorReset]],
   [CONTRACT_COMMIT, [CELL.recordCommit]],
   [CONTRACT_ACTIVATION, [CELL.activation]],
+  [CONTRACT_INITIAL_LOAD, [CELL.announcer, CELL.announcerRestart]],
 ]);
 
 const HANDLER = "packages/navigation-plugin/src/navigate-handler.ts";
@@ -1906,6 +1917,8 @@ const BATCH = [
   `${HANDLER} › handler › sign:navigateToState`,
   `${HANDLER} › withRecovery › code:.code(TRANSITION_CANCELLED)`,
   `${POPSTATE} › recoverFromRouterError › code:.code(TRANSITION_CANCELLED)`,
+  "shared/dom-utils/route-announcer.ts › createRouteAnnouncer › sign:subscribe",
+  "shared/dom-utils/route-announcer.ts › createRouteAnnouncer › slot:initialLoadPending",
   `${TRACKER} › sign:subscribeLeave`,
   `${TRACKER} › slot:popstateFlag`,
   `${TRACKER} › slot:replay`,
@@ -2027,18 +2040,24 @@ const SLOT_SAMPLE = [
 /** The titles of the `it` / `test` calls of a test file, `.each` included. */
 function cellTitles(file: string): Set<string> {
   const absolute = path.join(ROOT, file);
+
+  return existsSync(absolute)
+    ? cellTitlesOf(readFileSync(absolute, "utf8"), file.endsWith("x"))
+    : new Set<string>();
+}
+
+/**
+ * The titles of the cells a test file RUNS: `it`, `test` and their `.each`.
+ * A `.skip`, `.todo` or `.only` cell holds nothing for the census.
+ */
+function cellTitlesOf(text: string, tsx: boolean): Set<string> {
   const titles = new Set<string>();
-
-  if (!existsSync(absolute)) {
-    return titles;
-  }
-
   const sf = ts.createSourceFile(
-    absolute,
-    readFileSync(absolute, "utf8"),
+    tsx ? "cells.tsx" : "cells.ts",
+    text,
     ts.ScriptTarget.Latest,
     true,
-    file.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+    tsx ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
 
   walk(sf, (node) => {
@@ -2052,11 +2071,14 @@ function cellTitles(file: string): Set<string> {
     const base = ts.isPropertyAccessExpression(callee)
       ? callee.expression
       : callee;
+    const runs =
+      !ts.isPropertyAccessExpression(callee) || callee.name.text === "each";
     const [title] = node.arguments;
 
     if (
       ts.isIdentifier(base) &&
       (base.text === "it" || base.text === "test") &&
+      runs &&
       title !== undefined &&
       ts.isStringLiteralLike(title)
     ) {
@@ -2465,12 +2487,19 @@ const FORM_SOURCE = `
         return;
       }
     });
+    router.subscribe(({ route }) => {
+      if (route === shown) {
+        return;
+      }
+    });
+    api.addEventListener("PLAIN", () => undefined);
+  }
+  export function presence(router: Router): void {
     router.subscribe(({ previousRoute }) => {
       if (previousRoute === undefined) {
         return;
       }
     });
-    api.addEventListener("PLAIN", () => undefined);
   }
   export function stage(router: Router): void {
     const outer = staged;
@@ -2610,6 +2639,13 @@ describe("the census reads every spelling (#2796)", () => {
         holds('listens › sign:addEventListener("PLAIN")', form),
       ),
     ).toStrictEqual([]);
+    // A presence check reads no reference: `previousRoute === undefined`
+    // holds no form of its own.
+    expect(
+      Object.keys(FORMS).filter((form) =>
+        holds("presence › sign:subscribe", form),
+      ),
+    ).toStrictEqual([]);
   });
 
   it("an arm decided by a call, and one decided by a value", () => {
@@ -2631,5 +2667,24 @@ describe("the census reads every spelling (#2796)", () => {
         ? "missing"
         : unguardedClears(place).map((node) => node.getText()),
     ).toStrictEqual(["mine = undefined"]);
+  });
+
+  it("a cell that runs holds a fact, and a skipped, pending or focused one does not", () => {
+    const cells = `
+      it("runs", () => {});
+      test("runs too", () => {});
+      it.each([1])("runs per row %s", () => {});
+      it.skip("skipped", () => {});
+      it.todo("pending");
+      test.only("focused", () => {});
+      it.skip.each([1])("skipped per row %s", () => {});
+      describe("a describe", () => {});
+    `;
+
+    expect([...cellTitlesOf(cells, false)]).toStrictEqual([
+      "runs",
+      "runs too",
+      "runs per row %s",
+    ]);
   });
 });
