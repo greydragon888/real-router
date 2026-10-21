@@ -2,14 +2,16 @@
 
 > Property-based invariants verified via [fast-check](https://fast-check.dev/). See `tests/property/` for implementations.
 
+`historyIndex` below is `state.context.memory.historyIndex` of the state the router shows, `-1` when it shows none — the entry `canGoBack()` and `canGoForward()` count from once no `back()`/`forward()`/`go()` is in flight.
+
 ## Index Bounds
 
-| #   | Invariant    | Description                                                                                                                               |
-| --- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Empty state  | When no navigations have occurred (after stop or before start), `#index === -1` and `#entries.length === 0`.                              |
-| 2   | Valid bounds | After any sequence of operations, `#index === -1` (empty) or `0 <= #index < #entries.length`.                                             |
-| 3   | canGoBack    | `canGoBack()` returns `true` **if and only if** `#index > 0` (strict bi-implication — verified for every action in an action sequence).   |
-| 4   | canGoForward | `canGoForward()` returns `true` **if and only if** `#index < #entries.length - 1` (strict bi-implication — indirectly via invariant #3).  |
+| #   | Invariant    | Description                                                                                                                                    |
+| --- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Empty state  | When no navigations have occurred (after stop or before start), `historyIndex === -1` and `#entries.length === 0`.                             |
+| 2   | Valid bounds | After any sequence of operations, `historyIndex === -1` (empty) or `0 <= historyIndex < #entries.length`.                                      |
+| 3   | canGoBack    | `canGoBack()` returns `true` **if and only if** `historyIndex > 0` (strict bi-implication — verified for every action in an action sequence).  |
+| 4   | canGoForward | `canGoForward()` returns `true` **if and only if** `historyIndex < #entries.length - 1` (strict bi-implication — indirectly via invariant #3). |
 
 ## History Size
 
@@ -23,15 +25,15 @@
 
 | #   | Invariant           | Description                                                                                            |
 | --- | ------------------- | ------------------------------------------------------------------------------------------------------ |
-| 8   | Back decrements     | After a successful `back()`, `#index` decreases by 1.                                                  |
-| 9   | Forward increments  | After a successful `forward()`, `#index` increases by 1.                                               |
+| 8   | Back decrements     | After a successful `back()`, `historyIndex` decreases by 1.                                            |
+| 9   | Forward increments  | After a successful `forward()`, `historyIndex` increases by 1.                                         |
 | 10  | Navigate-after-back | Navigating to a new route after `back()` truncates all entries after the current index before pushing. |
 
 ## Lifecycle
 
 | #   | Invariant   | Description                                                                                     |
 | --- | ----------- | ----------------------------------------------------------------------------------------------- |
-| 11  | Stop resets | After `router.stop()`, `#entries.length === 0` and `#index === -1`. Extensions remain callable. |
+| 11  | Stop resets | After `router.stop()`, `#entries.length === 0` and `historyIndex === -1`. Extensions remain callable. |
 
 ## State Context (`state.context.memory`)
 

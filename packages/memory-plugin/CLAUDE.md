@@ -88,5 +88,5 @@ When `router.navigate(name, params, undefined, { replace: true })` succeeds, the
 
 ### `onStop` clears history, `teardown` clears history AND removes extensions
 
-`router.stop()` → `onStop` → clears entries + resets index. Extensions remain callable and work correctly — `canGoBack()`/`canGoForward()` return `false`, `back()`/`forward()` are no-ops (target index out of bounds).
+`router.stop()` → `onStop` → clears entries and the position, the restore in flight with them. Extensions remain callable and work correctly — `canGoBack()`/`canGoForward()` return `false`, `back()`/`forward()` are no-ops (target index out of bounds).
 `unsubscribe()` → `teardown` → removes `back`/`forward`/`go`/`canGoBack`/`canGoForward` from router, then clears.

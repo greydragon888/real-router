@@ -793,9 +793,9 @@ describe("Memory plugin", () => {
     // already-cleared state, and leave #navigatingFromHistory stuck at true
     // so the next push after restart silently skipped recording an entry.
     //
-    // onStop and teardown bump the plugin's epoch (so settlers from before
-    // them skip), and #clear drops the restore in flight (so the next
-    // lifecycle starts clean).
+    // onStop and teardown drop the restore in flight (#clear): a settler from
+    // before them no longer finds its own restore in flight and writes
+    // nothing, and the next lifecycle starts clean.
 
     it("stop() mid-flight leaves history empty and next navigation records entry", async () => {
       router.usePlugin(memoryPluginFactory());

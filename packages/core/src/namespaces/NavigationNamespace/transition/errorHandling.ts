@@ -47,7 +47,8 @@ function isTransitionCancelled(error: unknown): boolean {
  * running, because {@link routeTransitionError} sends `FAIL` for anything that
  * is not a cancellation. Liveness
  * itself is asked at the call sites, from different facts
- * (`finishAsyncNavigation` off the signal, `handleNavigateError` off the FSM).
+ * (`finishAsyncNavigation` off the signal, `handleNavigateError` off the
+ * plan's `cancelReason`).
  *
  * A value already carrying the code is returned untouched — two pinned cells:
  * #1197's leave rejection keeps its `reason` (#943), and the resolve path's
@@ -57,9 +58,9 @@ function isTransitionCancelled(error: unknown): boolean {
  * failed `start()` unwinds — unconditional, so a stale `FAIL` there kills a
  * RESTART — and which error `navigate()` rejects with is a contract, not an
  * edge. Measured: neutralising this reds the torn-down cells of
- * `superseded-guard-rejection-1609.test.ts`, the removal cells of
- * `getRoutesApi/removeRoute.test.ts` and the `dispose()` cell of
- * `commit-gate-1169.test.ts`.
+ * `superseded-guard-rejection-1609.test.ts`, the redirect cells of
+ * `redirect-then-refuse-2788.test.ts` and the `dispose()` cell of
+ * `commit-gate-1169.test.ts`, among others.
  */
 export function asCancellation(error: unknown): unknown {
   return isTransitionCancelled(error)

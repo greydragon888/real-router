@@ -1000,7 +1000,7 @@ describe("invalidate: per-router isolation across cloneRouter() boundaries", () 
     async (idA, idB) => {
       // The stale registry is `WeakMap<Router, Set<string>>`, so per-router
       // isolation should come free from the WeakMap key identity. Verify
-      // that `invalidate(childA)` is consumed only by childA's leave
+      // that `invalidate(childA)` is answered only by childA's leave
       // handler — childB navigation stays cold even on the same base.
       const base = createRouter(ROUTES, { defaultRoute: "home" });
       const childA = cloneRouter(base);

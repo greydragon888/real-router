@@ -749,9 +749,9 @@ describe("RSC Loader Stress", () => {
 
   it("100 cycles abort-before-loader-await + invalidate (§7.G6)", async () => {
     // §7.G6: a navigation aborted BEFORE its leave-handler reaches
-    // `await loader(...)`. The stale flag is consumed only after a
-    // successful, non-cancelled write — an abort BEFORE the loader
-    // starts must leave the flag intact for the next navigation.
+    // `await loader(...)`. The stale flag is cleared only when a navigation
+    // that carries a refresh commits — an abort BEFORE the loader starts
+    // must leave the flag intact for the next navigation.
     const base = createRouter(routes, { defaultRoute: "home" });
     const router = cloneRouter(base);
     const loader = vi.fn().mockResolvedValue(node("Profile"));

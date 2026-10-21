@@ -116,7 +116,7 @@ ssrDataPluginFactory(loaders)                ← factory.ts (~20 LOC)
 **Why a closure instead of a class?**
 
 - Bindings are write-once at construction (`dataClaim`, `modeClaim`, `deferredClaim`, `deferredKeysClaim`, `compiledLoaders`, listener removers) — after `usePlugin()` returns, the only instance state that changes is the contents of `refreshes`, which carries each refresh from the leave listener to `onTransitionSuccess`.
-- No cross-method coordination across instances — each binding is used by exactly one site (interceptor writes, teardown removes).
+- No state shared across instances — every binding lives in one instance's closure, and `refreshes` is the one two methods share: the leave listener records a refresh, `onTransitionSuccess` clears the flag it answered.
 - Fewer files, fewer abstractions — proportional to the plugin's complexity.
 
 ## Data Flow
