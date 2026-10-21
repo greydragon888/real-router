@@ -1042,6 +1042,9 @@
       "d7294177f708",
       "cad1844f6313"
     ],
+    "packages/memory-plugin/src/plugin.ts": [
+      "5ce577772836"
+    ],
     "packages/navigation-plugin/src/plugin.ts": [],
     "packages/persistent-params-plugin/src/factory.ts": [
       "1a9864dfed80",
@@ -2107,6 +2110,9 @@
     "packages/hash-plugin/CLAUDE.md": [
       "097ec3f7ea70",
       "c142ac0ba337"
+    ],
+    "packages/memory-plugin/CLAUDE.md": [
+      "b890c2dad8b8"
     ],
     "packages/persistent-params-plugin/CLAUDE.md": [
       "476a0fbed6d4",

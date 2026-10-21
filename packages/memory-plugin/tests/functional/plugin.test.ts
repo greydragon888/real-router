@@ -595,11 +595,10 @@ describe("Memory plugin", () => {
       await router.navigate("settings");
 
       // History: [home, users, settings], index=2.
-      // back() commits synchronously (optimistic-sync) and only resets the
-      // #navigatingFromHistory flag in a later microtask. A navigate() fired
-      // in the SAME tick must still be recorded as a fresh push — it must not
-      // be swallowed by the stale history-restore flag.
-      router.back(); // → users (index 1), flag set true
+      // back() commits synchronously (optimistic-sync). A navigate() fired in
+      // the SAME tick must still be recorded as a fresh push — it must not be
+      // taken for the restore.
+      router.back(); // → users (index 1)
       await router.navigate("user", { id: "1" }); // same tick: must push, not restore
 
       // The push landed and truncated the forward leg: history is
@@ -794,9 +793,9 @@ describe("Memory plugin", () => {
     // already-cleared state, and leave #navigatingFromHistory stuck at true
     // so the next push after restart silently skipped recording an entry.
     //
-    // The fix bumps #goGeneration in onStop and teardown (so settlers skip
-    // via generation mismatch) and resets #navigatingFromHistory /
-    // #pendingDirection inside #clear (so the next lifecycle starts clean).
+    // onStop and teardown bump the plugin's epoch (so settlers from before
+    // them skip), and #clear drops the restore in flight (so the next
+    // lifecycle starts clean).
 
     it("stop() mid-flight leaves history empty and next navigation records entry", async () => {
       router.usePlugin(memoryPluginFactory());
@@ -832,10 +831,8 @@ describe("Memory plugin", () => {
 
       navigateSpy.mockRestore();
 
-      // Restart: the next navigation must actually record a new entry.
-      // Without the #navigatingFromHistory reset in #clear(), the flag
-      // would be stuck at true and onTransitionSuccess would skip the push,
-      // leaving history empty forever.
+      // Restart: the next navigation must actually record a new entry, not
+      // be taken for the restore that was in flight across the stop.
       await router.start("/");
       await router.navigate("users");
 
@@ -875,7 +872,7 @@ describe("Memory plugin", () => {
       navigateSpy.mockRestore();
     });
 
-    it("stop() → start() cycle leaves #navigatingFromHistory false even with no in-flight #go", async () => {
+    it("stop() → start() cycle records a fresh history even with no in-flight #go", async () => {
       // Sanity check: the #clear() reset must not introduce regressions for
       // the normal stop/start cycle with no race. Before the fix, #clear()
       // only touched #entries + #index; after the fix it also resets the

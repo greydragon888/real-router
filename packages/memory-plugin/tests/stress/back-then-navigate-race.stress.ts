@@ -35,7 +35,7 @@ describe("S11: back() in flight + immediate navigate() race", () => {
       await settle();
 
       // The profile push must have taken effect — otherwise the plugin got
-      // stuck with #navigatingFromHistory=true and skipped the push.
+      // took the navigate for a restore and skipped the push.
       expect(router.getState()?.name).toBe("profile");
       expect(router.canGoBack()).toBe(true);
 
@@ -69,7 +69,7 @@ describe("S11: back() in flight + immediate navigate() race", () => {
     }
   });
 
-  it("S11.2: 20 interleaved back() + navigate() cycles do not leak #navigatingFromHistory", async () => {
+  it("S11.2: 20 interleaved back() + navigate() cycles never take a navigate for a restore", async () => {
     const { router, unsubscribe } = createStressRouter();
     const ignoredCodes = new Set(["TRANSITION_CANCELLED", "SAME_STATES"]);
 
@@ -97,9 +97,8 @@ describe("S11: back() in flight + immediate navigate() race", () => {
 
       await settle();
 
-      // Router must remain responsive — if #navigatingFromHistory leaked to
-      // true, subsequent onTransitionSuccess calls would have silently skipped
-      // recording. Drive one more explicit push and verify it landed.
+      // Router must remain responsive — a navigate taken for a restore would
+      // have had its onTransitionSuccess silently skip recording. Drive one more explicit push and verify it landed.
       await router.navigate("users");
 
       expect(router.getState()?.name).toBe("users");
