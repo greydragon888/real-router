@@ -207,6 +207,15 @@ it is **preserved**, so `onTransitionError` does not fire. Any other thrown
 `RouterError` is re-coded to `CANNOT_ACTIVATE` / `CANNOT_DEACTIVATE` **on a
 copy**, because the thrown instance may be one of the cached singletons.
 
+⚠ **Another navigation's END is re-coded too, whatever its shape.** Core
+records what it aborts a navigation's signal with and what it rejects its
+promise with (`navigationEnds.ts`); a guard holding one was waiting on that
+navigation's work — a request deduplicated across navigations, or its promise
+— so the guard's own navigation fails rather than cancelling quietly. A guard
+holding its OWN navigation's end belongs to a navigation that is cancelled,
+and the failure arcs restate the failure as that cancellation.
+Pinned by `another-navigations-end-in-a-guard.test.ts`.
+
 **A quiet cancel leaves the band through `CANCEL`**, so the navigation gets its
 `TRANSITION_CANCEL` — and so does one whose `subscribeLeave` listener throws or
 rejects with that `RouterError`. `routeTransitionError` picks the edge by the

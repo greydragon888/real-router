@@ -470,6 +470,7 @@
       "c5c040b6dc58",
       "4b9bfc183c29",
       "d02cbed838fe",
+      "b350804497ea",
       "f3aa4e31aa4b",
       "11e4b81fc0af",
       "cfda5beec2c6",
@@ -733,6 +734,9 @@
       "822474843d6e",
       "69ba5c0e5842",
       "59045aff1bd7"
+    ],
+    "packages/core/src/navigationEnds.ts": [
+      "41bd5a7b2bca"
     ],
     "packages/core/src/pipeline/canonicalize.ts": [
       "1a9864dfed80",
@@ -2009,7 +2013,7 @@
       "251bc4409fe1",
       "7ff143533a1f",
       "cc4132553a04",
-      "1f9070dc2417",
+      "129361049cf0",
       "43077523baea",
       "f28154bd71c0",
       "5f841407aaf7",
@@ -2055,7 +2059,8 @@
       "d51138402e6c",
       "9ecad603960c",
       "861a0aeb9025",
-      "b479ef11988e"
+      "b479ef11988e",
+      "8aee6a8ce8c1"
     ],
     "packages/core/src/namespaces/RoutesNamespace/CLAUDE.md": [
       "56d7f818b3b6",

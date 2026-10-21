@@ -1,6 +1,7 @@
 // packages/core/src/namespaces/NavigationNamespace/transition/errorHandling.ts
 
 import { errorCodes, UNSAFE_KEY } from "../../../constants";
+import { isNavigationEnd } from "../../../navigationEnds";
 import { RouterError, freezeThrownError } from "../../../RouterError";
 import { putField } from "../../../utils/ingest";
 
@@ -101,6 +102,14 @@ export function handleGuardError(
   errorCode: string,
   segment: string,
 ): never {
+  // ⚑ A navigation's END is never this guard's quiet cancel. Another
+  // navigation's end means the guard was waiting on work that navigation
+  // started; its own navigation's end means that navigation is cancelled, and
+  // the failure arcs restate the failure as that cancellation.
+  if (isNavigationEnd(error)) {
+    rethrowAsRouterError(error, errorCode, segment);
+  }
+
   if (error instanceof DOMException && error.name === "AbortError") {
     throw freezeThrownError(new RouterError(errorCodes.TRANSITION_CANCELLED));
   }

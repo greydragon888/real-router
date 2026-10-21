@@ -447,7 +447,7 @@ describe("#1753/#1754: every commit door asks about the state it commits", () =>
     // this directory pin their own walks separately, and the three numbers
     // diverge exactly when their `.d.ts` policies do — this walk excludes,
     // they include.
-    expect(walkFiles(SRC_DIR)).toHaveLength(138);
+    expect(walkFiles(SRC_DIR)).toHaveLength(139);
   });
 
   it("every DOOR asks the question above the commit, or is exempt with a reason", () => {

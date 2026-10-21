@@ -158,7 +158,7 @@ describe("route-name rule authority (#2035)", () => {
     // ⚑ A RATCHET: core growing makes it red, and re-measuring is the point.
     // This glob INCLUDES `.d.ts` (a declaration calls nothing), so it diverges
     // from `commit-door-authority-1753`'s walk exactly when one exists.
-    expect(globSync(`${CORE_SRC}/**/*.ts`)).toHaveLength(138);
+    expect(globSync(`${CORE_SRC}/**/*.ts`)).toHaveLength(139);
     expect(ownedPredicates()).toHaveLength(Object.keys(TIERS).length);
   });
 

@@ -182,6 +182,34 @@ function abortSites(file: string, text: string): AbortSite[] {
   return sites;
 }
 
+/** The owners of every `recordNavigationEnd(<…>.signal.reason)` call. */
+function signalReasonRecords(file: string, text: string): string[] {
+  const source = ts.createSourceFile(
+    file,
+    text,
+    ts.ScriptTarget.Latest,
+    /* setParentNodes */ true,
+    ts.ScriptKind.TS,
+  );
+  const owners: string[] = [];
+
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      node.expression.getText(source) === "recordNavigationEnd" &&
+      (node.arguments[0]?.getText(source) ?? "").endsWith(".signal.reason")
+    ) {
+      owners.push(`${path.relative(SRC, file)} › ${ownerOf(node)}`);
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(source);
+
+  return owners;
+}
+
 describe("#2778 — an abort of a navigation's controller is a counted dispatch", () => {
   const sites = globSync(`${SRC}/**/*.ts`).flatMap((file) =>
     abortSites(file, readFileSync(file, "utf8")),
@@ -200,6 +228,18 @@ describe("#2778 — an abort of a navigation's controller is a counted dispatch"
     expect(
       sites.filter(({ site }) => !RAW_ABORT_OWNERS.has(site)),
     ).toStrictEqual([]);
+  });
+
+  it("every owner of a raw abort records what the signal then holds as the navigation's end", () => {
+    // A request bound to a navigation's signal rejects with `signal.reason`. A
+    // guard of ANOTHER navigation waiting on it tells that reason from its own
+    // quiet cancel only through `navigationEnds.ts`, so an abort that skips
+    // the record hands it a reason it reads as its own.
+    const recorded = globSync(`${SRC}/**/*.ts`).flatMap((file) =>
+      signalReasonRecords(file, readFileSync(file, "utf8")),
+    );
+
+    expect(new Set(recorded)).toStrictEqual(new Set(RAW_ABORT_OWNERS.keys()));
   });
 
   it("sees an alias, a literal key and a destructuring, not only a call", () => {

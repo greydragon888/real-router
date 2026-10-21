@@ -446,7 +446,7 @@ describe("§ #1751: every store-mutating API door carries the reentrancy ban", (
     // ⚑ A RATCHET: core growing makes it red, and re-measuring is the point.
     // This walk INCLUDES `.d.ts` (a declaration has no body to taint), so it
     // diverges from `commit-door-authority-1753`'s exactly when one exists.
-    expect(tsFiles(SRC_DIR)).toHaveLength(138);
+    expect(tsFiles(SRC_DIR)).toHaveLength(139);
   });
 
   it("the six public mutators are the ones derived", () => {

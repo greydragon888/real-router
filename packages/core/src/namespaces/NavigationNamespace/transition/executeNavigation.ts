@@ -3,6 +3,7 @@ import { asCancellation, routeTransitionError } from "./errorHandling";
 import { executeGuardPipeline } from "./guardPhase";
 import { errorCodes, constants } from "../../../constants";
 import { adoptNavigationOptions, ownFlag, ownSignal } from "../../../helpers";
+import { recordNavigationEnd } from "../../../navigationEnds";
 import { RouterError, freezeThrownError } from "../../../RouterError";
 import { getTransitionPath } from "../../../transitionPath";
 import {
@@ -156,6 +157,7 @@ function openController(plan: NavigationContext): AbortController {
   // where there is not (`stop()` / `dispose()` / supersede).
   if (plan.cancelReason !== undefined) {
     controller.abort(plan.cancelReason);
+    recordNavigationEnd(controller.signal.reason);
   }
 
   plan.controller = controller;
@@ -645,6 +647,8 @@ export function executeNavigation(
   } catch (error) {
     const outcome = handleNavigateError(deps, error, { nav, fromState });
 
+    recordNavigationEnd(outcome);
+
     // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from guards or transition pipeline
     return Promise.reject(outcome);
   }
@@ -744,6 +748,7 @@ async function finishAsyncNavigation(
     failureReason = outcome;
 
     routeTransitionError(deps, outcome, nav.fromState, nav);
+    recordNavigationEnd(outcome);
 
     throw outcome;
     // NB: emptying the `finally` is NOT equivalent (#1684). This IS the abort
@@ -766,6 +771,7 @@ async function finishAsyncNavigation(
     // already aborted keeps its first — also meaningful — reason.
     if (!succeeded) {
       controller.abort(failureReason);
+      recordNavigationEnd(controller.signal.reason);
     }
   }
 }
