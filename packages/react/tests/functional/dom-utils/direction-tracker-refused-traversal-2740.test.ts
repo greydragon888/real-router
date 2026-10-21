@@ -123,6 +123,30 @@ describe("createDirectionTracker beside a URL plugin that returns from a refused
     }
   });
 
+  it("a URL plugin whose buildUrl answers undefined: every popstate arms the flag, as without one", async () => {
+    const created = createRouter([
+      { name: "home", path: "/" },
+      { name: "about", path: "/about" },
+    ]);
+    const tracker = createDirectionTracker(created);
+    const unextend = getPluginApi(created).extendRouter({
+      buildUrl: () => undefined,
+    });
+
+    await created.start("/");
+    router = created;
+
+    try {
+      globalThis.dispatchEvent(new PopStateEvent("popstate"));
+      await created.navigate("about");
+
+      expect(document.documentElement.dataset.navDirection).toBe("back");
+    } finally {
+      tracker.destroy();
+      unextend();
+    }
+  });
+
   it("control: an allowed Back is labelled back", async () => {
     const { destroy } = await setup();
 
