@@ -52,9 +52,13 @@ export type RouteExitHandler = (
  *
  * If the handler returns a Promise, the router blocks on it. If the
  * Promise resolves, navigation proceeds. If it **rejects**, the router
- * rejects `navigate()` with the handler's **original error** and emits
- * `TRANSITION_ERROR` — it is NOT re-coded to `TRANSITION_CANCELLED` (that
- * arises only when the navigation's `signal` aborts).
+ * rejects `navigate()` with the handler's **original error** (a value that
+ * is not an `Error` arrives wrapped in one) and emits `TRANSITION_ERROR` —
+ * it is NOT re-coded to `TRANSITION_CANCELLED` (that arises when the
+ * navigation's `signal` aborts). A handler that rejects with a
+ * `RouterError(TRANSITION_CANCELLED)` itself cancels the navigation quietly:
+ * `navigate()` rejects with that error and the router emits
+ * `TRANSITION_CANCEL` instead (#2787).
  *
  * **Handler reactivity (Solid)**: Solid components run **once** at mount;
  * `handler` is captured in closure at the call site. If you need

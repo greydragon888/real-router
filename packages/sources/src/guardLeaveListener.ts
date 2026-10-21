@@ -45,11 +45,14 @@ type LeaveHandler = (context: RouteExitContext) => void | Promise<void>;
  *      core's `settleLeavePromises` and **blocks** the activation phase.
  *
  * **Error contract:** a rejected handler Promise rejects `navigate()` with the
- * handler's **original error** and emits `TRANSITION_ERROR` — it is NOT
- * re-coded to `TRANSITION_CANCELLED`. `TRANSITION_CANCELLED` arises only when
- * the payload `signal` aborts (supersede / `stop()` / `dispose()` / external
- * `opts.signal`). A fire-and-forget call here would silently un-block the
- * transition, so arm 3 must stay a passthrough.
+ * handler's **original error** (a value that is not an `Error` arrives
+ * wrapped in one) and emits `TRANSITION_ERROR` — it is NOT re-coded to
+ * `TRANSITION_CANCELLED`, which arises when the payload `signal` aborts
+ * (supersede / `stop()` / `dispose()` / external `opts.signal`). A handler
+ * that rejects with a `RouterError(TRANSITION_CANCELLED)` itself cancels the
+ * navigation quietly: `navigate()` rejects with that error and core emits
+ * `TRANSITION_CANCEL` instead (#2787). A fire-and-forget call here would
+ * silently un-block the transition, so arm 3 must stay a passthrough.
  */
 export function guardLeaveListener(
   handler: LeaveHandler,
