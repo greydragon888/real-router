@@ -8,6 +8,7 @@ import {
   events,
 } from "../../constants";
 import { adoptForeignBag, adoptForeignTransition } from "../../helpers";
+import { recordNavigationEnd } from "../../navigationEnds";
 import { raiser, RouterError, freezeThrownError } from "../../RouterError";
 import { routerEvents, routerStates } from "../../routerFSM";
 
@@ -347,6 +348,7 @@ export class EventBusNamespace {
     this.#dispatchDepth++;
     try {
       controller.abort(reason);
+      recordNavigationEnd(controller.signal.reason);
     } finally {
       this.#dispatchDepth--;
     }

@@ -53,9 +53,8 @@ describe("RouterProvider — announceNavigation", () => {
 
     vi.advanceTimersByTime(100);
 
-    // The first navigation after mount is treated as the initial transition
-    // (isInitialNavigation=true) and is intentionally NOT announced — so we
-    // perform a "warm-up" navigation, then assert on subsequent ones.
+    // The router starts before the provider mounts, so this first navigation
+    // after mount is announced too; the assertions read the next one.
     await router.navigate("about");
     flushSync();
 
@@ -109,8 +108,8 @@ describe("RouterProvider — announceNavigation", () => {
   // ── announceNavigation options (getAnnouncementText / prefix) ─────────────
   // Exercise the RouterProvider `announceNavigation` prop wiring through the
   // PUBLIC contract now that the Svelte adapter forwards RouteAnnouncerOptions.
-  // The first navigation after mount is the initial transition (skipped), so
-  // each case navigates twice and asserts on the second route ("home").
+  // Each case navigates twice and asserts on the second route ("home"), the
+  // one announced last.
 
   it("uses a custom getAnnouncementText", async () => {
     render(RouterProviderAnnounceTest, {

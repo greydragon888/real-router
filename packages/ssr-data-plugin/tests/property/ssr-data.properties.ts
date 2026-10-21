@@ -18,7 +18,7 @@ import {
   ssrDataPluginFactory,
 } from "../../src";
 import { LoaderTimeout, withTimeout } from "../../src/errors";
-import { clearStale, isStale, markStale } from "../../src/shared-ssr";
+import { clearStaleMark, markStale, staleMark } from "../../src/shared-ssr";
 import { DEFER_BRAND } from "../../src/shared-ssr/defer";
 import {
   escapeForScript,
@@ -763,20 +763,23 @@ describe("defer(): roundtrip + reserved-keys reject", () => {
 });
 
 // =============================================================================
-// markStale + isStale + clearStale: stale-registry algebra
+// markStale + staleMark + clearStaleMark: stale-registry algebra
 // =============================================================================
 //
-// The stale registry is a `WeakMap<Router, Set<string>>` keyed by router
-// instance. Three operations:
-//   - markStale(router, ns)  — add `ns` to the router's set (idempotent)
-//   - isStale(router, ns)    — peek (no mutation)
-//   - clearStale(router, ns) — remove `ns` from the set (idempotent)
+// The stale registry is a `WeakMap<Router, Map<string, number>>` keyed by
+// router instance. Three operations:
+//   - markStale(router, ns)            — record a fresh mark for `ns`
+//   - staleMark(router, ns)            — peek: the latest mark, or undefined
+//   - clearStaleMark(router, ns, mark) — clear `ns` if `mark` is the latest
 //
 // Algebraic invariants the implementation must hold:
-//   1. Idempotency: N marks ⟺ 1 mark; isStale stays true after N peeks.
-//   2. Mark-then-clear ⟹ isStale === false (round trip).
-//   3. Per-router isolation: marks on router A never visible on router B.
-//   4. Per-namespace isolation: mark "data" doesn't leak to mark "rsc".
+//   1. Idempotency: N marks keep `ns` stale, and one clear with the latest
+//      mark clears it.
+//   2. Mark-then-clear leaves `ns` not stale (round trip).
+//   3. N clears with one mark collapse to a single clear.
+//   4. A clear with an older mark leaves a newer mark in place.
+//   5. Per-router isolation: marks on router A never visible on router B.
+//   6. Per-namespace isolation: mark "data" doesn't leak to mark "rsc".
 
 // Widened from `[a-z]{1,8}` to cover real plugin namespaces — the actual
 // stale-registry keys in this codebase are camelCase (`ssrDataMode`,
@@ -795,61 +798,92 @@ describe("stale registry: idempotency + isolation invariants", () => {
       markStale(router, ns);
     }
 
-    expect(isStale(router, ns)).toBe(true);
+    const mark = staleMark(router, ns);
 
-    clearStale(router, ns);
+    expect(mark).toBeDefined();
 
-    expect(isStale(router, ns)).toBe(false);
+    clearStaleMark(router, ns, mark ?? Number.NaN);
+
+    expect(staleMark(router, ns)).toBeUndefined();
   });
 
   test.prop([arbNamespace], { numRuns: NUM_RUNS.standard })(
-    "round trip: markStale → isStale=true → clearStale → isStale=false",
+    "round trip: markStale → stale → clearStaleMark → not stale",
     (ns) => {
       const router = createRouter(ROUTES, { defaultRoute: "home" });
 
-      expect(isStale(router, ns)).toBe(false);
+      expect(staleMark(router, ns)).toBeUndefined();
 
       markStale(router, ns);
 
-      expect(isStale(router, ns)).toBe(true);
+      const mark = staleMark(router, ns);
 
-      clearStale(router, ns);
+      expect(mark).toBeDefined();
 
-      expect(isStale(router, ns)).toBe(false);
+      clearStaleMark(router, ns, mark ?? Number.NaN);
+
+      expect(staleMark(router, ns)).toBeUndefined();
     },
   );
 
   test.prop([arbNamespace, fc.integer({ min: 1, max: 5 })], {
     numRuns: NUM_RUNS.standard,
   })(
-    "clearStale is idempotent: N≥1 clears collapse to a single clear",
+    "clearStaleMark is idempotent: N≥1 clears with one mark collapse to a single clear",
     (ns, n) => {
       const router = createRouter(ROUTES, { defaultRoute: "home" });
 
       markStale(router, ns);
+
+      const mark = staleMark(router, ns) ?? Number.NaN;
+
       for (let i = 0; i < n; i++) {
-        clearStale(router, ns);
+        clearStaleMark(router, ns, mark);
       }
 
-      expect(isStale(router, ns)).toBe(false);
+      expect(staleMark(router, ns)).toBeUndefined();
     },
   );
 
+  test.prop([arbNamespace, fc.integer({ min: 1, max: 5 })], {
+    numRuns: NUM_RUNS.standard,
+  })("a clear with an older mark leaves a newer one in place", (ns, n) => {
+    const router = createRouter(ROUTES, { defaultRoute: "home" });
+
+    markStale(router, ns);
+
+    const older = staleMark(router, ns) ?? Number.NaN;
+
+    for (let i = 0; i < n; i++) {
+      markStale(router, ns);
+    }
+
+    const latest = staleMark(router, ns);
+
+    clearStaleMark(router, ns, older);
+
+    expect(staleMark(router, ns)).toBe(latest);
+
+    clearStaleMark(router, ns, latest ?? Number.NaN);
+
+    expect(staleMark(router, ns)).toBeUndefined();
+  });
+
   test.prop([arbNamespace], { numRuns: NUM_RUNS.standard })(
-    "per-router isolation: markStale(A, ns) never affects isStale(B, ns)",
+    "per-router isolation: markStale(A, ns) never affects staleMark(B, ns)",
     (ns) => {
       const routerA = createRouter(ROUTES, { defaultRoute: "home" });
       const routerB = createRouter(ROUTES, { defaultRoute: "home" });
 
       markStale(routerA, ns);
 
-      expect(isStale(routerA, ns)).toBe(true);
-      expect(isStale(routerB, ns)).toBe(false);
+      expect(staleMark(routerA, ns)).toBeDefined();
+      expect(staleMark(routerB, ns)).toBeUndefined();
     },
   );
 
   test.prop([arbNamespace, arbNamespace], { numRuns: NUM_RUNS.standard })(
-    "per-namespace isolation: markStale(r, A) never affects isStale(r, B)",
+    "per-namespace isolation: markStale(r, A) never affects staleMark(r, B)",
     (nsA, nsB) => {
       // Skip degenerate equal-namespace draws — same-ns is the trivial
       // "marking ns leaves ns marked" property already covered.
@@ -859,8 +893,8 @@ describe("stale registry: idempotency + isolation invariants", () => {
 
       markStale(router, nsA);
 
-      expect(isStale(router, nsA)).toBe(true);
-      expect(isStale(router, nsB)).toBe(false);
+      expect(staleMark(router, nsA)).toBeDefined();
+      expect(staleMark(router, nsB)).toBeUndefined();
     },
   );
 });
@@ -966,7 +1000,7 @@ describe("invalidate: per-router isolation across cloneRouter() boundaries", () 
     async (idA, idB) => {
       // The stale registry is `WeakMap<Router, Set<string>>`, so per-router
       // isolation should come free from the WeakMap key identity. Verify
-      // that `invalidate(childA)` is consumed only by childA's leave
+      // that `invalidate(childA)` is answered only by childA's leave
       // handler — childB navigation stays cold even on the same base.
       const base = createRouter(ROUTES, { defaultRoute: "home" });
       const childA = cloneRouter(base);

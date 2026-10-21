@@ -77,12 +77,12 @@ export type AnnouncedPlan = NavigationPlan & { readonly [ANNOUNCED]: true };
  * to disagree. The plan object is the only identity, and the machine compares it
  * by reference on the `COMPLETE` edge (`mayCommit`).
  *
- * The pipeline asks no IDENTITY question since #1734 (0 readers in `src`) — but
- * it did not collapse to ONE liveness question: the guard fence and
- * `finishAsyncNavigation` ask `!controller.signal.aborted`, while
- * `handleNavigateError` asks `deps.isTransitioning()`. That asymmetry is
- * deliberate and measured, and it is stated where it lives, above
- * `handleNavigateError`.
+ * Every liveness question the pipeline asks is about its OWN navigation: the
+ * guard fence and `finishAsyncNavigation` ask its controller
+ * (`!controller.signal.aborted`), and `handleNavigateError`, which may run
+ * where no controller exists, asks its `cancelReason` (below).
+ * ⚠ A phase read answers for whichever navigation the machine holds — stated
+ * where it bites, above `handleNavigateError`.
  */
 export interface NavigationContext {
   toState: State;
@@ -130,8 +130,9 @@ export interface NavigationContext {
    * flag rather than an eagerly-allocated controller precisely so cut A and
    * the born-dead arcs keep allocating nothing.
    *
-   * Written by the `CANCEL` action, read only by `openController`. Never
-   * cleared: a cancelled navigation does not come back.
+   * Written by the `CANCEL` action alone, so a reader asking "did the machine
+   * cancel THIS navigation?" needs no controller. Never cleared: a cancelled
+   * navigation does not come back.
    */
   cancelReason?: unknown;
   /**

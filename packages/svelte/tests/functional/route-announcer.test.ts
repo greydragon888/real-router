@@ -21,7 +21,7 @@ import { createRouteAnnouncer } from "../../src/dom-utils/route-announcer";
 import type { Router, State } from "@real-router/core";
 
 interface Subscriber {
-  cb: (payload: { route: State }) => void;
+  cb: (payload: { route: State; previousRoute: State | undefined }) => void;
 }
 
 interface FakeRouter {
@@ -34,8 +34,13 @@ const ANNOUNCER_SEL = "[data-real-router-announcer]";
 
 function makeFakeRouter(): FakeRouter {
   const subscribers: Subscriber[] = [];
+  // Like the router's own payload: every emit after the first carries the
+  // route before it, so the first emit is the start() commit. `getState()`
+  // answers the last one.
+  let previousRoute: State | undefined;
   const router = {
-    subscribe(cb: (payload: { route: State }) => void) {
+    getState: () => previousRoute,
+    subscribe(cb: Subscriber["cb"]) {
       const sub = { cb };
 
       subscribers.push(sub);
@@ -59,8 +64,11 @@ function makeFakeRouter(): FakeRouter {
         ...state,
       } as State;
 
+      const payload = { route: fullState, previousRoute };
+
+      previousRoute = fullState;
       subscribers.forEach((s) => {
-        s.cb({ route: fullState });
+        s.cb(payload);
       });
     },
     subscribers,
@@ -290,7 +298,7 @@ describe("createRouteAnnouncer — direct contract tests", () => {
       const { router, emit } = makeFakeRouter();
       const announcer = createRouteAnnouncer(router);
 
-      // Initial nav → suppressed by isInitialNavigation
+      // The first emit is the start() commit (no previous route) → not announced
       emit({ name: "home" });
       flushRaf();
 

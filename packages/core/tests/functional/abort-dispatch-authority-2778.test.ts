@@ -10,6 +10,10 @@
 // `navigation/reentrant-start-and-abort-2778.test.ts`; this file holds the SHAPE,
 // so a new raw abort reds on the day it is written.
 //
+// It holds the two halves `navigationEnds.ts` rests on (#2796) as well: every
+// raw abort records what the signal holds, and every quiet cancel core builds
+// is marked as built by `freezeThrownError`.
+//
 // Two raw aborts stay, each for a reason the scan names:
 // - `openController` aborts a controller it has just created, so nothing has
 //   had the chance to listen to it;
@@ -182,6 +186,117 @@ function abortSites(file: string, text: string): AbortSite[] {
   return sites;
 }
 
+/** The owners of every `recordNavigationEnd(<…>.signal.reason)` call. */
+function signalReasonRecords(file: string, text: string): string[] {
+  const source = ts.createSourceFile(
+    file,
+    text,
+    ts.ScriptTarget.Latest,
+    /* setParentNodes */ true,
+    ts.ScriptKind.TS,
+  );
+  const owners: string[] = [];
+
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      node.expression.getText(source) === "recordNavigationEnd" &&
+      (node.arguments[0]?.getText(source) ?? "").endsWith(".signal.reason")
+    ) {
+      owners.push(`${path.relative(SRC, file)} › ${ownerOf(node)}`);
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(source);
+
+  return owners;
+}
+
+/**
+ * Every `new RouterError(…TRANSITION_CANCELLED)` in `file`, and whether it is
+ * the argument of `freezeThrownError` — which marks it as one core built.
+ */
+function cancelConstructions(
+  file: string,
+  text: string,
+): { readonly site: string; readonly marked: boolean }[] {
+  const source = ts.createSourceFile(
+    file,
+    text,
+    ts.ScriptTarget.Latest,
+    /* setParentNodes */ true,
+    ts.ScriptKind.TS,
+  );
+  const found: { site: string; marked: boolean }[] = [];
+
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isNewExpression(node) &&
+      node.expression.getText(source) === "RouterError" &&
+      (node.arguments?.[0]?.getText(source) ?? "").endsWith(
+        "TRANSITION_CANCELLED",
+      )
+    ) {
+      const { parent } = node;
+
+      found.push({
+        site: `${path.relative(SRC, file)} › ${ownerOf(node)}`,
+        marked:
+          ts.isCallExpression(parent) &&
+          parent.expression.getText(source) === "freezeThrownError" &&
+          parent.arguments[0] === node,
+      });
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(source);
+
+  return found;
+}
+
+describe("#2796 — a quiet cancel core builds is marked as one core built", () => {
+  // `navigationEnds.ts` records an end only when core built it, and the mark
+  // is `freezeThrownError`'s. A `TRANSITION_CANCELLED` core builds without it
+  // is an end no guard can tell from its own quiet cancel.
+  it("every one in src is the argument of freezeThrownError", () => {
+    const found = globSync(`${SRC}/**/*.ts`).flatMap((file) =>
+      cancelConstructions(file, readFileSync(file, "utf8")),
+    );
+
+    expect(found.length).toBeGreaterThan(0);
+    expect(found.filter(({ marked }) => !marked)).toStrictEqual([]);
+  });
+
+  it("tells a marked construction from an unmarked one", () => {
+    const sample = `
+      function marked() {
+        throw freezeThrownError(new RouterError(errorCodes.TRANSITION_CANCELLED));
+      }
+      function unmarked() {
+        throw new RouterError(errorCodes.TRANSITION_CANCELLED, { reason: 1 });
+      }
+      function wrappedOtherwise() {
+        throw freeze(new RouterError(errorCodes.TRANSITION_CANCELLED));
+      }
+      function otherCode() {
+        throw new RouterError(errorCodes.CANNOT_ACTIVATE);
+      }
+    `;
+
+    expect(
+      cancelConstructions(path.join(SRC, "sample.ts"), sample),
+    ).toStrictEqual([
+      { site: "sample.ts › marked", marked: true },
+      { site: "sample.ts › unmarked", marked: false },
+      { site: "sample.ts › wrappedOtherwise", marked: false },
+    ]);
+  });
+});
+
 describe("#2778 — an abort of a navigation's controller is a counted dispatch", () => {
   const sites = globSync(`${SRC}/**/*.ts`).flatMap((file) =>
     abortSites(file, readFileSync(file, "utf8")),
@@ -200,6 +315,18 @@ describe("#2778 — an abort of a navigation's controller is a counted dispatch"
     expect(
       sites.filter(({ site }) => !RAW_ABORT_OWNERS.has(site)),
     ).toStrictEqual([]);
+  });
+
+  it("every owner of a raw abort records what the signal then holds as the navigation's end", () => {
+    // A request bound to a navigation's signal rejects with `signal.reason`. A
+    // guard of ANOTHER navigation waiting on it tells that reason from its own
+    // quiet cancel only through `navigationEnds.ts`, so an abort that skips
+    // the record hands it a reason it reads as its own.
+    const recorded = globSync(`${SRC}/**/*.ts`).flatMap((file) =>
+      signalReasonRecords(file, readFileSync(file, "utf8")),
+    );
+
+    expect(new Set(recorded)).toStrictEqual(new Set(RAW_ABORT_OWNERS.keys()));
   });
 
   it("sees an alias, a literal key and a destructuring, not only a call", () => {

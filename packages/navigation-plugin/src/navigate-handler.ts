@@ -1,7 +1,11 @@
 import { errorCodes, RouterError } from "@real-router/core";
 import { freezeThrownError } from "@real-router/core/utils";
 
-import { normalizeHashInput, urlToPathAndHash } from "./browser-env";
+import {
+  normalizeHashInput,
+  urlToPathAndHash,
+  watchNewerNavigations,
+} from "./browser-env";
 import { buildEntryUrl, isSameHref } from "./href-utils";
 import { PLUGIN_SYNC_INFO } from "./navigation-browser";
 
@@ -199,6 +203,13 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
         ...(state &&
           redirectBeforeCommit(event, matchedState.path, hash, base)),
         handler: async () => {
+          const newer = watchNewerNavigations(api);
+          // Another navigation owns the URL: a newer one the browser started
+          // (the handler took it), a download, or a router navigation that is
+          // neither refused nor cancelled (#2796).
+          const ownedElsewhere = (): boolean =>
+            taken !== record || newer.ownTheUrl();
+
           const arrived = await withRecovery(
             () =>
               stage(meta, () =>
@@ -225,10 +236,16 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
             browser,
             record,
             base,
-          );
+            ownedElsewhere,
+          ).finally(newer.stop);
 
           if (arrived) {
-            taken = undefined;
+            // Its own record only: a navigation the browser started after the
+            // commit, before this resumed, is the one in the slot now.
+            if (taken === record) {
+              taken = undefined;
+            }
+
             scrollIfAborted(event);
           }
         },
@@ -370,8 +387,9 @@ function scrollIfAborted(event: NavigateEvent): void {
  */
 /**
  * Runs the router's transition for a navigation the handler took, and
- * answers whether the router stands on its destination: `false` when a
- * newer navigation cancelled it. A refusal or a crash rejects.
+ * answers whether the router stands on its destination: `false` when the
+ * transition was cancelled and another navigation owns the URL. A refusal, a
+ * cancel nothing else owns the URL behind, or a crash rejects.
  */
 async function withRecovery(
   run: () => Promise<unknown>,
@@ -379,6 +397,7 @@ async function withRecovery(
   browser: NavigationBrowser,
   taken: Taken,
   base: string,
+  ownedElsewhere: () => boolean,
 ): Promise<boolean> {
   try {
     await run();
@@ -391,12 +410,13 @@ async function withRecovery(
       throw error;
     }
 
-    // TRANSITION_CANCELLED: a newer navigation aborted this one — the newer
-    // navigate event is (or will be) handled by this same plugin, and THAT
-    // event is responsible for syncing URL/state. Firing our own sync here
-    // races against it: browser.navigate(replace, same-url) would cancel the
+    // TRANSITION_CANCELLED with another navigation owning the URL — a newer
+    // navigate event this same plugin handles, or a router navigation — that
+    // one is responsible for syncing URL/state. Firing our own sync here races
+    // against it: browser.navigate(replace, same-url) would cancel the
     // in-flight newer transition, which is exactly the rapid-fire-events storm
-    // failure mode.
+    // failure mode. With none — a guard cancelled this navigation quietly
+    // (#2796) — the router stays put, and it returns as a refusal does.
     //
     // SAME_STATES: the router already shows the target state, but the entry
     // the browser committed can carry an alias of it — a `forwardTo` source,
@@ -405,7 +425,7 @@ async function withRecovery(
     // its fragment keeps it. A navigation a newer one has aborted writes
     // nothing and keeps the newer one's record, for the reason above: the
     // newer one owns the URL.
-    if (error.code === errorCodes.TRANSITION_CANCELLED) {
+    if (error.code === errorCodes.TRANSITION_CANCELLED && ownedElsewhere()) {
       return false;
     }
 
@@ -422,10 +442,10 @@ async function withRecovery(
     }
 
     // Other RouterError codes (CANNOT_DEACTIVATE, CANNOT_ACTIVATE,
-    // ROUTE_NOT_FOUND, …) — router rejected the transition, state is
-    // unchanged, but the Navigation API has already committed the navigation,
-    // and it does not roll an intercepted navigation back when the handler
-    // rejects.
+    // ROUTE_NOT_FOUND, …) and a cancel nothing else owns the URL behind — the
+    // router stayed, state is unchanged, but the Navigation API has already
+    // committed the navigation, and it does not roll an intercepted navigation
+    // back when the handler rejects.
     returnToOrigin(router, browser, taken, base);
 
     // The intercept rejects with the refusal: a navigation that finishes

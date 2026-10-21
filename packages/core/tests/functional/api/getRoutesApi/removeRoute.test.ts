@@ -1314,8 +1314,9 @@ describe("removing the route you are navigating TO (#1756)", () => {
    * · remove the route you are ON → refused. Allowing it would leave
    *   `getState().name` naming a route that no longer exists.
    * · remove the route you are navigating TO (or an ancestor of it) → applied,
-   *   and the navigation is cancelled by the commit door. The committed state
-   *   stays on a route that still exists, so nothing is corrupted.
+   *   and the commit door fails the navigation with `ROUTE_NOT_FOUND`. The
+   *   committed state stays on a route that still exists, so nothing is
+   *   corrupted.
    *
    * ⚠ Refusing the second case was proposed and MEASURED HARMFUL: with the
    * removal refused the guard returns `true`, the navigation completes into the
@@ -1336,7 +1337,7 @@ describe("removing the route you are navigating TO (#1756)", () => {
     },
   ];
 
-  it("applies the removal and cancels the navigation, leaving the committed state intact", async () => {
+  it("applies the removal and fails the navigation ROUTE_NOT_FOUND, leaving the committed state intact", async () => {
     const r = createRouter(routes, { allowNotFound: true });
 
     await r.start("/home");
@@ -1348,7 +1349,7 @@ describe("removing the route you are navigating TO (#1756)", () => {
     });
 
     await expect(r.navigate("admin.panel")).rejects.toMatchObject({
-      code: errorCodes.TRANSITION_CANCELLED,
+      code: errorCodes.ROUTE_NOT_FOUND,
     });
 
     expect(getRoutesApi(r).has("admin")).toBe(false);
@@ -1391,14 +1392,10 @@ describe("removing the route you are navigating TO (#1756)", () => {
     // The negative this test's own title promises — appending the new sentences
     // to the old text would otherwise pass a test named "not with …".
     expect(warned).not.toContain("may cause unexpected behavior");
-    // BOTH codes, and that is a correction rather than thoroughness: the first
-    // draft promised `TRANSITION_CANCELLED` alone, which is true only while the
-    // guard walk is synchronous. The async cell below is what caught it.
-    // The code VALUES, which is what a caller reads off `error.code` —
-    // `errorCodes.TRANSITION_CANCELLED` is the string "CANCELLED".
-    expect(warned).toContain(errorCodes.TRANSITION_CANCELLED);
+    // ONE code: the failure carries `ROUTE_NOT_FOUND` on every arc and in both
+    // channels, which the two cells below read.
     expect(warned).toContain(errorCodes.ROUTE_NOT_FOUND);
-    expect(warned).not.toContain("TRANSITION_CANCELLED");
+    expect(warned).not.toContain(errorCodes.TRANSITION_CANCELLED);
     // and the hook that actually fires
     expect(warned).toContain("onTransitionError");
     expect(warned).toContain("committed state is not affected");
@@ -1407,13 +1404,10 @@ describe("removing the route you are navigating TO (#1756)", () => {
     r.dispose();
   });
 
-  it("the failure code differs by arc — CANCELLED sync, ROUTE_NOT_FOUND async", async () => {
-    // ⚠ The cell that pins the message honest. `handleNavigateError` rewraps
-    // the door's `ROUTE_NOT_FOUND` into `TRANSITION_CANCELLED` only when it
-    // finds the machine already out of the band, which is the synchronous walk;
-    // once the walk has gone async the raw code reaches the caller. A message
-    // naming one of the two is wrong on the other, and the tier had no cell
-    // that would say so.
+  it("the failure code is ROUTE_NOT_FOUND on both arcs", async () => {
+    // ⚠ The cell that pins the message honest. The door's own `FAIL` is not a
+    // cancellation, so `handleNavigateError` hands the synchronous walk the same
+    // `ROUTE_NOT_FOUND` the asynchronous one carries (#2788).
     const run = async (asyncGuard: boolean): Promise<string | undefined> => {
       const r = createRouter(routes, { allowNotFound: true });
 
@@ -1443,19 +1437,13 @@ describe("removing the route you are navigating TO (#1756)", () => {
       return code;
     };
 
-    await expect(run(false)).resolves.toBe(errorCodes.TRANSITION_CANCELLED);
+    await expect(run(false)).resolves.toBe(errorCodes.ROUTE_NOT_FOUND);
     await expect(run(true)).resolves.toBe(errorCodes.ROUTE_NOT_FOUND);
   });
 
-  it("the two codes are a CHANNEL split, not only an arc split — the promise and the hook disagree on the sync arc", async () => {
-    // ⚠ The cell the message's own sentence rests on. Reading only the promise
-    // (the cell above) says "CANCELLED sync, ROUTE_NOT_FOUND async" and invites
-    // the message to append "…and reports it through onTransitionError", which
-    // reads as the hook carrying those codes. It does not: the hook carries
-    // `ROUTE_NOT_FOUND` on BOTH arcs, so on the synchronous one a single
-    // failure has two codes depending on where the caller listens. Nothing else
-    // in the tier reads both channels of one navigation, which is why the
-    // message shipped saying it wrong twice.
+  it("the promise and the hook carry the same code on both arcs", async () => {
+    // ⚠ The cell the message's own sentence rests on: it reads BOTH channels of
+    // one navigation, the promise and `onTransitionError`, on each arc.
     const run = async (
       asyncGuard: boolean,
     ): Promise<{ promise: string | undefined; hooks: string[] }> => {
@@ -1503,21 +1491,17 @@ describe("removing the route you are navigating TO (#1756)", () => {
       return { promise, hooks };
     };
 
-    // Synchronous walk: the two channels DISAGREE.
     await expect(run(false)).resolves.toStrictEqual({
-      promise: errorCodes.TRANSITION_CANCELLED,
+      promise: errorCodes.ROUTE_NOT_FOUND,
       hooks: [`error:${errorCodes.ROUTE_NOT_FOUND}`],
     });
-
-    // Once it has gone async they agree — which is exactly why an arc-only
-    // reading of this failure looks complete and is not.
     await expect(run(true)).resolves.toStrictEqual({
       promise: errorCodes.ROUTE_NOT_FOUND,
       hooks: [`error:${errorCodes.ROUTE_NOT_FOUND}`],
     });
   });
 
-  it("the warning splits the codes by channel and names the stable one", async () => {
+  it("the warning names one code for both channels", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const r = createRouter(routes, { allowNotFound: true });
 
@@ -1536,20 +1520,16 @@ describe("removing the route you are navigating TO (#1756)", () => {
       .filter((line) => line.includes("[router.removeRoute]"))
       .join("\n");
 
-    // The promise-side sentence carries BOTH codes; the hook-side sentence
-    // carries only the one the hook actually reports. Asserting the substrings
-    // rather than the whole message keeps the wording free to change while the
-    // two claims stay pinned to the cell above.
+    // Asserting the substrings rather than the whole message keeps the wording
+    // free to change while the claims stay pinned to the two cells above.
     expect(warned).toContain(
-      `rejected navigate() promise carries "${errorCodes.TRANSITION_CANCELLED}"`,
+      `fails that navigation with "${errorCodes.ROUTE_NOT_FOUND}"`,
     );
     expect(warned).toContain(
-      `"${errorCodes.ROUTE_NOT_FOUND}" once it has gone async`,
-    );
-    expect(warned).toContain(
-      `onTransitionError always reports "${errorCodes.ROUTE_NOT_FOUND}"`,
+      "the rejected navigate() promise and onTransitionError carry the same code",
     );
     expect(warned).toContain("onTransitionCancel never fires");
+    expect(warned).not.toContain(`"${errorCodes.TRANSITION_CANCELLED}"`);
 
     warnSpy.mockRestore();
     r.dispose();

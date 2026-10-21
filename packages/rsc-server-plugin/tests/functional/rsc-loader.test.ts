@@ -1404,8 +1404,9 @@ describe("@real-router/rsc-server-plugin", () => {
       expect(loader).toHaveBeenCalledTimes(1);
       expect(state.context.rsc).toBe(firstNode);
 
-      // Following navigation: the flag is consumed in LEAVE_APPROVE phase,
-      // loader runs a second time, fresh payload lands on nextRoute.
+      // Following navigation: its leave handler reads the flag in the
+      // LEAVE_APPROVE phase and runs the loader a second time; the fresh
+      // payload lands on nextRoute, and its commit clears the flag.
       await router.navigate("users.profile", { id: "42" }, undefined, {
         reload: true,
       });
@@ -1616,7 +1617,7 @@ describe("@real-router/rsc-server-plugin", () => {
     it("does not leak across cloneRouter() boundaries — invalidate(parent) doesn't trigger child loader", async () => {
       // The stale registry is `WeakMap<Router, Set<string>>`, so per-router
       // isolation should come free from the WeakMap key identity. Verify
-      // that `invalidate(childA)` is consumed only by childA's leave
+      // that `invalidate(childA)` is answered only by childA's leave
       // handler — childB navigation stays cold.
       const base = createRouter(routes, { defaultRoute: "home" });
       const childA = cloneRouter(base);

@@ -26,9 +26,9 @@ import {
 } from "../../src";
 import { ALLOWED_RSC_MODES } from "../../src/constants";
 import {
-  clearStale,
-  isStale,
+  clearStaleMark,
   markStale,
+  staleMark,
 } from "../../src/shared-ssr/staleRegistry";
 
 import type {
@@ -521,7 +521,7 @@ describe("composition: rsc-server-plugin + ssr-data-plugin coexist", () => {
 //
 // `invalidate(router, "rsc")` and `invalidate(router, "data")` are
 // namespace-scoped: each plugin's `subscribeLeave` listener gates on
-// `isStale(router, <own-namespace>)`. Marking one namespace must never
+// `staleMark(router, <own-namespace>)`. Marking one namespace must never
 // trigger the other plugin's loader.
 //
 // The randomised sequence below exercises arbitrary interleavings of
@@ -1132,20 +1132,19 @@ describe("rscActionPluginFactory: Promise/thenable detection (Inv 30)", () => {
 });
 
 // =============================================================================
-// staleRegistry — Set-based registry invariants (Inv 31-33)
+// staleRegistry — mark-based registry invariants (Inv 31-34)
 // =============================================================================
 //
-// §6.12-6.14: the registry is a WeakMap<Router, Set<string>>, so the
-// expected algebra is:
+// §6.12-6.14: the registry is a WeakMap<Router, Map<string, number>> — a
+// namespace is stale while it holds a mark, and a clear names the mark it
+// answers. The expected algebra is:
 //
 // - Inv 31 (idempotent mark): markStale(r, ns); markStale(r, ns) leaves
-//   the registry in the same state as a single mark — verified by
-//   `isStale === true` after either count, and a single `clearStale`
-//   restoring `isStale === false` (no residual marks from the
-//   duplicated call).
-// - Inv 32 (inverse): mark/clear restores isStale to false.
+//   the namespace stale, and a single clear with the latest mark clears it.
+// - Inv 32 (inverse): mark, then clear with that mark, leaves it not stale.
 // - Inv 33 (per-router isolation): marking one router does not affect
 //   another. Verifies the WeakMap key isolation contract.
+// - Inv 34 (latest wins): a clear with an older mark leaves a newer one.
 //
 // All tests use fresh router instances per fast-check trial — the
 // module-level WeakMap survives across trials, so cross-talk would
@@ -1154,38 +1153,41 @@ describe("rscActionPluginFactory: Promise/thenable detection (Inv 30)", () => {
 describe("staleRegistry: markStale is idempotent (Inv 31)", () => {
   test.prop([fc.string({ minLength: 1, maxLength: 16 })], {
     numRuns: NUM_RUNS.standard,
-  })("double markStale collapses to a single Set entry", (namespace) => {
+  })("double markStale leaves one mark to clear", (namespace) => {
     const router = createRouter(ROUTES, { defaultRoute: "home" });
 
     markStale(router, namespace);
     markStale(router, namespace);
 
-    // Both reads must observe the flag.
-    expect(isStale(router, namespace)).toBe(true);
+    const mark = staleMark(router, namespace);
 
-    // A single clearStale must restore the false state — if markStale
-    // were counting, two clears would be needed.
-    clearStale(router, namespace);
+    expect(mark).toBeDefined();
 
-    expect(isStale(router, namespace)).toBe(false);
+    // A single clear with the latest mark restores the not-stale state — if
+    // markStale were counting, two clears would be needed.
+    clearStaleMark(router, namespace, mark ?? Number.NaN);
+
+    expect(staleMark(router, namespace)).toBeUndefined();
   });
 });
 
-describe("staleRegistry: markStale / clearStale is an inverse pair (Inv 32)", () => {
+describe("staleRegistry: markStale / clearStaleMark is an inverse pair (Inv 32)", () => {
   test.prop([fc.string({ minLength: 1, maxLength: 16 })], {
     numRuns: NUM_RUNS.standard,
-  })("mark; clear; isStale === false", (namespace) => {
+  })("mark; clear with that mark; not stale", (namespace) => {
     const router = createRouter(ROUTES, { defaultRoute: "home" });
 
-    expect(isStale(router, namespace)).toBe(false);
+    expect(staleMark(router, namespace)).toBeUndefined();
 
     markStale(router, namespace);
 
-    expect(isStale(router, namespace)).toBe(true);
+    const mark = staleMark(router, namespace);
 
-    clearStale(router, namespace);
+    expect(mark).toBeDefined();
 
-    expect(isStale(router, namespace)).toBe(false);
+    clearStaleMark(router, namespace, mark ?? Number.NaN);
+
+    expect(staleMark(router, namespace)).toBeUndefined();
   });
 });
 
@@ -1200,14 +1202,34 @@ describe("staleRegistry: per-router isolation (Inv 33)", () => {
 
       markStale(r1, namespace);
 
-      expect(isStale(r1, namespace)).toBe(true);
-      expect(isStale(r2, namespace)).toBe(false);
+      expect(staleMark(r1, namespace)).toBeDefined();
+      expect(staleMark(r2, namespace)).toBeUndefined();
 
       // Symmetric: marking r2 doesn't retroactively affect r1's flag.
       markStale(r2, "another-namespace");
 
-      expect(isStale(r1, namespace)).toBe(true);
-      expect(isStale(r1, "another-namespace")).toBe(false);
+      expect(staleMark(r1, namespace)).toBeDefined();
+      expect(staleMark(r1, "another-namespace")).toBeUndefined();
     },
   );
+});
+
+describe("staleRegistry: a clear answers its own mark (Inv 34)", () => {
+  test.prop([fc.string({ minLength: 1, maxLength: 16 })], {
+    numRuns: NUM_RUNS.standard,
+  })("a clear with an older mark leaves a newer one", (namespace) => {
+    const router = createRouter(ROUTES, { defaultRoute: "home" });
+
+    markStale(router, namespace);
+
+    const older = staleMark(router, namespace) ?? Number.NaN;
+
+    markStale(router, namespace);
+
+    const latest = staleMark(router, namespace);
+
+    clearStaleMark(router, namespace, older);
+
+    expect(staleMark(router, namespace)).toBe(latest);
+  });
 });

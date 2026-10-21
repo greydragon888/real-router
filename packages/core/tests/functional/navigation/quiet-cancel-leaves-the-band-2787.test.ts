@@ -650,8 +650,9 @@ describe("#2787 — controls: a navigation the machine has moved past is not mov
     await router.start("/");
     log.length = 0;
 
-    // Which code the refused navigation rejects with is #2788's subject; what
-    // this pins is that its stale FAIL does not reach the redirect's band.
+    // The code the refused navigation rejects with is pinned by
+    // `redirect-then-refuse-2788.test.ts`; what this pins is that its stale
+    // FAIL does not reach the redirect's band.
     await router.navigate("redir").catch(() => undefined);
 
     held.release(true);

@@ -34,6 +34,19 @@ export interface EntryPositions {
   returnTo: (origin: EntryPosition) => void;
   /** The return the next traversal completes, consumed by reading it. */
   takeReturn: () => EntryPosition | undefined;
+  /**
+   * A traversal arrived at the entry holding `state`, and runs until
+   * `depart()`. While it runs, a write onto the entry the browser stands on
+   * belongs to it only if the browser still stands on that entry: a second
+   * traversal may have taken the browser elsewhere (`movedOn`).
+   */
+  arrive: (state: unknown) => void;
+  depart: () => void;
+  /**
+   * A traversal runs, and the entry holding `state` — the one the browser
+   * stands on — is measurably another than the one it reached.
+   */
+  movedOn: (state: unknown) => boolean;
 }
 
 // A random prefix keeps the runs of another document, or of another copy of
@@ -96,6 +109,7 @@ export function distanceBetween(
 export function createEntryPositions(): EntryPositions {
   let current: EntryPosition | undefined;
   let awaited: EntryPosition | undefined;
+  let arrived: EntryPosition | undefined;
 
   return {
     get current() {
@@ -134,6 +148,21 @@ export function createEntryPositions(): EntryPositions {
 
       return origin;
     },
+
+    arrive: (state) => {
+      arrived = readPosition(state);
+    },
+
+    depart: () => {
+      arrived = undefined;
+    },
+
+    movedOn: (state) => {
+      // Known only between two positions of one run.
+      const distance = distanceBetween(arrived, readPosition(state));
+
+      return distance !== undefined && distance !== 0;
+    },
   };
 }
 
@@ -147,7 +176,10 @@ export function createEntryPositions(): EntryPositions {
  * Each write first takes the position of the entry the browser stands on: a
  * replace keeps that entry's place and a push follows it. The browser may
  * stand elsewhere than the router's last entry — a traversal arrives while a
- * transition is still running.
+ * transition is still running. A replace while a traversal runs writes
+ * nothing when the browser measurably stands on another entry than the one
+ * that traversal reached: the History API writes only the current entry, and
+ * that one is a later traversal's.
  *
  * Every member calls `browser`'s own at call time, so a class instance keeps
  * its prototype and private fields, and a method replaced later is the one
@@ -169,7 +201,15 @@ export function withEntryPositions(
       browser.pushState(stamp(state, positions.push()), url);
     },
     replaceState: (state, url) => {
-      positions.adopt(browser.getState?.());
+      const live = browser.getState?.();
+
+      // The entry the browser stands on is another traversal's: the one in
+      // flight reached an entry the browser has left.
+      if (positions.movedOn(live)) {
+        return;
+      }
+
+      positions.adopt(live);
       browser.replaceState(stamp(state, positions.replace()), url);
     },
     ...(browser.getState && { getState: () => browser.getState?.() }),

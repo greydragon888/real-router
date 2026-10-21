@@ -463,9 +463,9 @@ describe("Back/forward round-trip invariant", () => {
 });
 
 // Bi-implication between `canGoBack() ⇔ state.context.memory.historyIndex > 0`.
-// Fix for #508: short-circuit branch of #go(delta) now writes
-// state.context.memory with the updated historyIndex, keeping the public
-// context view in sync with the private `#index`.
+// The short-circuit branch of #go(delta) writes state.context.memory with the
+// updated historyIndex (#508), keeping the public context view in sync with
+// the entry the stack shows.
 describe("canGoBack/canGoForward bi-implication with historyIndex", () => {
   // Covers INVARIANTS #3 and #4 as strict bi-implications.
   test.prop([arbMaxHistory, arbActionSequence], { numRuns: NUM_RUNS.async })(

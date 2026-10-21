@@ -82,13 +82,28 @@ describe("createRouteAnnouncer", () => {
     expect(document.querySelector(`[${ANNOUNCER_ATTR}]`)).toBeNull();
   });
 
-  it("skips initial navigation announcement", async () => {
+  it("announces the first navigation when created after start()", async () => {
     const announcer = createRouteAnnouncer(router);
     const element = document.querySelector(`[${ANNOUNCER_ATTR}]`)!;
 
     vi.advanceTimersByTime(150);
 
     await router.navigate("users");
+
+    expect(element.textContent).toContain("users");
+
+    announcer.destroy();
+  });
+
+  it("CONTROL — leaves out the start() commit when created before start()", async () => {
+    router.stop();
+
+    const announcer = createRouteAnnouncer(router);
+    const element = document.querySelector(`[${ANNOUNCER_ATTR}]`)!;
+
+    vi.advanceTimersByTime(150);
+
+    await router.start("/");
 
     expect(element.textContent).toBe("");
 
@@ -598,8 +613,8 @@ describe("createRouteAnnouncer", () => {
 
     vi.advanceTimersByTime(150);
 
-    await router.navigate("users"); // first nav after creation — initial-skip
-    await router.navigate("about"); // announces "Navigated to Same Title"
+    await router.navigate("users"); // announces "Navigated to Same Title"
+    await router.navigate("about"); // the same text: not announced again
 
     expect(element.textContent).toBe("Navigated to Same Title");
 
@@ -637,7 +652,7 @@ describe("createRouteAnnouncer", () => {
 
     vi.advanceTimersByTime(150);
 
-    await router.navigate("users"); // first nav after creation — initial-skip
+    await router.navigate("users"); // announced as well
 
     // navigateToNotFound emits an @@-prefixed UNKNOWN_ROUTE → the route name is
     // stripped to "" → resolveText falls through h1 → title → routeName to

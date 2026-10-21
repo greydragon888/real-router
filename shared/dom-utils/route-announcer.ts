@@ -73,7 +73,6 @@ export function createRouteAnnouncer(
   const prefix = options?.prefix ?? "Navigated to ";
   const getCustomText = options?.getAnnouncementText;
 
-  let isInitialNavigation = true;
   let isReady = false;
   let isDestroyed = false;
   let lastAnnouncedText = "";
@@ -112,9 +111,15 @@ export function createRouteAnnouncer(
     }
   }, SAFARI_READY_DELAY);
 
-  const unsubscribe = router.subscribe(({ route }) => {
-    if (isInitialNavigation) {
-      isInitialNavigation = false;
+  // The initial page load is the commit with no previous route — `start()`'s
+  // — of a router that shows no state when the announcer is created. The
+  // canonical mount order creates it after that commit; a `start()` after
+  // `stop()` changes the page with no load, and is announced.
+  let initialLoadPending = router.getState() === undefined;
+
+  const unsubscribe = router.subscribe(({ route, previousRoute }) => {
+    if (previousRoute === undefined && initialLoadPending) {
+      initialLoadPending = false;
 
       return;
     }

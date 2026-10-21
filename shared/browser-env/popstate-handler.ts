@@ -2,10 +2,12 @@ import { errorCodes, RouterError, UNKNOWN_ROUTE } from "@real-router/core";
 import { freezeThrownError } from "@real-router/core/utils";
 
 import { distanceBetween, readPosition } from "./history-position.js";
+import { watchNewerNavigations } from "./newer-navigations.js";
 import { getRouteFromEvent, updateBrowserState } from "./popstate-utils.js";
 import { encodeHashFragment, normalizeHashInput } from "./url-context.js";
 
 import type { EntryPosition, EntryPositions } from "./history-position.js";
+import type { NewerNavigations } from "./newer-navigations.js";
 import type { Browser, SharedFactoryState } from "./types.js";
 import type { Plugin, Router, State } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
@@ -268,9 +270,10 @@ export function createPopstateHandler(
 
   /**
    * navigate() already emitted $$error. A refusal returns to the entry the
-   * traversal started from; `SAME_STATES` (URL and state agree) and
-   * `TRANSITION_CANCELLED` (a newer navigation owns the URL) refuse nothing,
-   * and only resync the entry the browser stands on.
+   * traversal started from, and so does a cancellation no newer navigation
+   * owns the URL behind — a guard's quiet cancel (#2796). `SAME_STATES` (URL
+   * and state agree) and a cancellation by a newer navigation that owns the
+   * URL refuse nothing, and only resync the entry the browser stands on.
    *
    * Rollback errors are swallowed: teardown races may remove router.buildUrl
    * while a popstate event is still queued.
@@ -278,11 +281,12 @@ export function createPopstateHandler(
   function recoverFromRouterError(
     error: RouterError,
     start: TraversalStart,
+    newer: NewerNavigations,
   ): void {
     try {
       if (
         error.code === errorCodes.SAME_STATES ||
-        error.code === errorCodes.TRANSITION_CANCELLED
+        (error.code === errorCodes.TRANSITION_CANCELLED && newer.ownTheUrl())
       ) {
         rollbackUrlToCurrentState();
       } else {
@@ -337,11 +341,19 @@ export function createPopstateHandler(
       position: deps.positions?.current,
       state: deps.router.getState(),
     };
-    // The router now stands on the entry the browser does; a write skipped as
-    // a no-op (#1353) did not record it.
+    // The entry this traversal arrived at: the event's own state, since the
+    // browser may have moved on by the time the transition lands (#757). A
+    // `hashchange` carries none — its entry is the one the browser stands on.
+    const arrivedState =
+      "state" in evt ? (evt.state as unknown) : deps.browser.getState?.();
+    // The router now stands on the entry the traversal reached; a write skipped
+    // as a no-op (#1353) did not record it.
     const adoptLanded = (): void => {
-      deps.positions?.adopt(deps.browser.getState?.());
+      deps.positions?.adopt(arrivedState);
     };
+    const newer = watchNewerNavigations(deps.api);
+
+    deps.positions?.arrive(arrivedState);
 
     try {
       const restored = getRouteFromEvent(evt, deps.api, location);
@@ -406,11 +418,13 @@ export function createPopstateHandler(
       }
     } catch (error) {
       if (error instanceof RouterError) {
-        recoverFromRouterError(error, start);
+        recoverFromRouterError(error, start, newer);
       } else {
         recoverFromCriticalError(error, start);
       }
     } finally {
+      newer.stop();
+      deps.positions?.depart();
       isTransitioning = false;
       processDeferredEvent();
     }

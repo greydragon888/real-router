@@ -1,4 +1,3 @@
-import { errorCodes } from "@real-router/core";
 import { render } from "@solidjs/testing-library";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
@@ -132,26 +131,12 @@ describe("RouterProvider — announceNavigation", () => {
   // and would silently break only on a route-announcer refactor; locking
   // them here catches such regressions at PR-time.
 
-  // Helper: warms up the announcer past the `isInitialNavigation` skip
-  // by performing a no-op navigation. The route-announcer treats its
-  // FIRST router.subscribe callback as the initial state and silently
-  // skips the announcement; tests that need a "real" announcement to
-  // fire must navigate twice (or once after the warm-up).
-  async function warmUpAnnouncer(): Promise<void> {
+  // The router starts before the provider mounts, so the first navigation
+  // after mount is announced: the initial page load is the start() commit.
+  // Letting the Safari-ready window elapse makes the next announcement write
+  // at once.
+  function passSafariWindow(): void {
     vi.advanceTimersByTime(100);
-    // The router is already at "home" after beforeEach, so navigate("home")
-    // rejects with SAME_STATES — that's the EXPECTED rejection here, used to
-    // burn the initial-skip guard. Any other error code is a real bug and
-    // must propagate (a blanket `.catch(() => {})` would mask it).
-    await router.navigate("home").catch((error: unknown) => {
-      if (
-        typeof error !== "object" ||
-        error === null ||
-        (error as { code?: string }).code !== errorCodes.SAME_STATES
-      ) {
-        throw error;
-      }
-    });
   }
 
   it("§5.7 — second navigation to the same text is skipped (lastAnnouncedText guard)", async () => {
@@ -165,11 +150,8 @@ describe("RouterProvider — announceNavigation", () => {
 
     const announcer = document.querySelector(ANNOUNCER_SEL);
 
-    // Need TWO real navigations to reach lastAnnouncedText:
-    //   nav 1 — initial-skip (route-announcer's isInitialNavigation guard)
-    //   nav 2 — actually announces and SETS lastAnnouncedText
+    // The first navigation after mount announces and SETS lastAnnouncedText.
     vi.advanceTimersByTime(100);
-    await router.navigate("home");
     await router.navigate("about");
 
     expect(announcer?.textContent).toBe("Navigated to FixedTitle");
@@ -201,7 +183,7 @@ describe("RouterProvider — announceNavigation", () => {
 
     const announcer = document.querySelector(ANNOUNCER_SEL);
 
-    await warmUpAnnouncer();
+    passSafariWindow();
 
     await router.navigate("about");
 
@@ -228,7 +210,7 @@ describe("RouterProvider — announceNavigation", () => {
 
     const announcer = document.querySelector(ANNOUNCER_SEL);
 
-    await warmUpAnnouncer();
+    passSafariWindow();
 
     await router.navigate("about");
 
@@ -246,7 +228,7 @@ describe("RouterProvider — announceNavigation", () => {
 
     const announcer = document.querySelector(ANNOUNCER_SEL);
 
-    await warmUpAnnouncer();
+    passSafariWindow();
 
     await router.navigate("about");
 
@@ -271,7 +253,7 @@ describe("RouterProvider — announceNavigation", () => {
       </RouterProvider>
     ));
 
-    await warmUpAnnouncer();
+    passSafariWindow();
 
     await router.navigate("about");
 
@@ -306,17 +288,9 @@ describe("RouterProvider — announceNavigation", () => {
     expect(announcer).not.toBeNull();
 
     vi.advanceTimersByTime(100);
-    // Warm-up nav — still produces queued rAF callbacks; flush them so the
-    // initial-skip transition fires cleanly.
-    await router.navigate("home").catch(() => {});
-    for (const cb of queued.splice(0)) {
-      cb(0);
-    }
-    for (const cb of queued.splice(0)) {
-      cb(0);
-    }
 
-    // The real test nav — its rAF callbacks queue up but do NOT flush yet.
+    // The first navigation after mount — its rAF callbacks queue up but do
+    // NOT flush yet.
     await router.navigate("about");
 
     // Destroy BEFORE flushing — isDestroyed must prevent the inner-rAF write.
@@ -342,9 +316,8 @@ describe("RouterProvider — announceNavigation", () => {
   // ── announceNavigation options (getAnnouncementText / prefix) ─────────────
   // Exercise the RouterProvider `announceNavigation` prop wiring through the
   // PUBLIC contract (not a direct createRouteAnnouncer call) now that the Solid
-  // adapter forwards `RouteAnnouncerOptions`. The first navigation after mount
-  // is the initial transition and is skipped, so each case navigates twice and
-  // asserts on the second route ("home").
+  // adapter forwards `RouteAnnouncerOptions`. Each case navigates twice and
+  // asserts on the second route ("home"), the one announced last.
 
   it("uses a custom getAnnouncementText", async () => {
     render(() => (

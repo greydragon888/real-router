@@ -361,8 +361,9 @@ User clicks back/forward (popstate) OR changes the fragment externally (hashchan
         │                          (no silent navigateToDefault — see #483)
         │
         ├── catch (error):
-        │     SAME_STATES / TRANSITION_CANCELLED → rollbackUrlToCurrentState() (nothing refused)
-        │     other RouterError → returnOrRollback(start)
+        │     SAME_STATES, or TRANSITION_CANCELLED while a newer navigation owns the URL
+        │       → rollbackUrlToCurrentState() (nothing refused)
+        │     other RouterError, a quiet cancel included → returnOrRollback(start)
         │     otherwise: recoverFromCriticalError(error) → returnOrRollback(start)
         │
         └── finally:
@@ -459,7 +460,7 @@ See [`shared/browser-env/`](../../shared/browser-env/) for details on:
 
 - Route extraction from popstate events (history.state validation → URL matching fallback)
 - `historyState` as a subset of `State` (`name`, `params`, `search`, `path` and the entry's `position` stored in `history.state`)
-- Error categorization (a refusal and a crash return to the entry the traversal started from; `SAME_STATES` / `TRANSITION_CANCELLED` resync the live entry)
+- Error categorization (a refusal, a quiet cancel and a crash return to the entry the traversal started from; `SAME_STATES`, and `TRANSITION_CANCELLED` while a newer navigation owns the URL, resync the live entry)
 
 ## Option Defaults
 

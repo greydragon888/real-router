@@ -657,19 +657,11 @@ describe("RSC Loader Stress", () => {
   it("50 cycles in-flight invalidate + guard rejection (§7.G3)", async () => {
     // §7.G3: invalidate during nav that rejects on ACTIVATION GUARD.
     //
-    // Subtle invariant (different from loader-rejection AND abort):
-    // the leave handler runs in LEAVE_APPROVE phase — BEFORE activation
-    // guards. It awaits the loader, then `clearStale` runs ONLY IF
-    // `!signal.aborted`. Activation guards that reject do NOT abort
-    // the signal — they reject the navigation by returning false.
-    // So the leave handler completes its loader+clearStale path, even
-    // though the navigation as a whole rejects.
-    //
-    // CONSEQUENCE: guard-rejection IS "the navigation that consumes
-    // the flag" — different from loader-rejection (loader threw, no
-    // clearStale) and abort (signal.aborted=true, no clearStale).
-    // Pin this asymmetry so a future refactor that moved clearStale
-    // to TRANSITION_SUCCESS would surface here as deliberate breaking.
+    // The leave handler runs in LEAVE_APPROVE phase — BEFORE activation
+    // guards — so the loader runs and writes its node to the rejected
+    // navigation's context. That context never commits, and the flag is
+    // cleared only by the commit of a navigation that carries a refresh:
+    // the follow-up navigation runs the loader again.
     const base = createRouter(routes, { defaultRoute: "home" });
     const router = cloneRouter(base);
     const loader = vi.fn().mockResolvedValue(node("Profile"));
@@ -697,15 +689,15 @@ describe("RSC Loader Stress", () => {
         rejections++;
       });
 
-      // The leave handler ran (LEAVE_APPROVE is before activation guards),
-      // loader was invoked, clearStale ran (no abort). The activation
-      // guard then rejected the navigation, but the flag is already gone.
+      // The leave handler ran (LEAVE_APPROVE is before activation guards)
+      // and the loader was invoked. The activation guard then rejected
+      // the navigation, so the flag stays for the next one.
       if (loader.mock.calls.length > 0) {
         loaderRanDuringRejection++;
       }
 
-      // 2) Open the guard. The flag is GONE — follow-up nav must NOT
-      // see it (no fresh invalidate).
+      // 2) Open the guard. The flag is still set — the follow-up nav
+      // refreshes without a fresh invalidate.
       allowGuard = true;
       loader.mockClear();
       await router.navigate("users.profile", { id: `ok${i}` });
@@ -716,12 +708,11 @@ describe("RSC Loader Stress", () => {
     }
 
     expect(rejections).toBe(50);
-    // Guard-rejection invariant: leave handler consumed the flag every
-    // cycle — loader ran during the rejected navigation.
+    // The loader ran during every rejected navigation…
     expect(loaderRanDuringRejection).toBe(50);
-    // Follow-up navigation without fresh invalidate must NOT trigger
-    // the loader — flag was consumed by the rejected nav's leave handler.
-    expect(loaderRanOnFollowUp).toBe(0);
+    // …and again on every follow-up: the rejected navigation did not
+    // consume the flag.
+    expect(loaderRanOnFollowUp).toBe(50);
 
     router.stop();
   });
@@ -758,9 +749,9 @@ describe("RSC Loader Stress", () => {
 
   it("100 cycles abort-before-loader-await + invalidate (§7.G6)", async () => {
     // §7.G6: a navigation aborted BEFORE its leave-handler reaches
-    // `await loader(...)`. The stale flag is consumed only after a
-    // successful, non-cancelled write — an abort BEFORE the loader
-    // starts must leave the flag intact for the next navigation.
+    // `await loader(...)`. The stale flag is cleared only when a navigation
+    // that carries a refresh commits — an abort BEFORE the loader starts
+    // must leave the flag intact for the next navigation.
     const base = createRouter(routes, { defaultRoute: "home" });
     const router = cloneRouter(base);
     const loader = vi.fn().mockResolvedValue(node("Profile"));

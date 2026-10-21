@@ -253,17 +253,9 @@ describe("the boot window degrades rather than failing the start (#1750)", () =>
     // A guard OF the start navigation is the one boot arm where
     // `isTransitioning()` is `true`, so route-CRUD there is the logged no-op —
     // except `remove()` of a route that is not the ACTIVE one, which proceeds,
-    // and mid-boot nothing is active yet. The commit then fails, and what the
-    // caller's promise carries depends on whether the guard was synchronous:
-    // `handleNavigateError` restates the failure as `TRANSITION_CANCELLED` once
-    // the FSM has left the transition, which on the synchronous walk it already
-    // has (#1609 — that predicate is deliberate, and `handleNavigateError`'s
-    // own docstring owns the measurement of the alternative).
-    //
-    // The audit concluded the restatement must be fixed first. Measured, the
-    // cause SURVIVES the restatement — `asCancellation` attaches the original
-    // error whole as `reason` — so the classifier reads that instead and neither
-    // #1609's predicate nor the two-code contract #1756 documents is touched.
+    // and mid-boot nothing is active yet. The commit door then fails the start
+    // `ROUTE_NOT_FOUND` on either arc: its own `FAIL` is not a cancellation, so
+    // the synchronous walk does not restate it (#2788).
     const settleWith = async (guard: "sync" | "async"): Promise<Outcome> => {
       const router: Router = createRouter([{ name: "a", path: "/a" }], {
         allowNotFound: true,
@@ -317,8 +309,7 @@ describe("the boot window degrades rather than failing the start (#1750)", () =>
       path: "/a",
     });
 
-    // And the hook has always agreed with itself on both arms — it is only the
-    // promise that varies, which is why reading `reason` is enough.
+    // And the hook agrees with itself on both arms.
     expect(viaSync.events).toStrictEqual(viaAsync.events);
   });
 

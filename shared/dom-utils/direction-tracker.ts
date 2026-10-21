@@ -37,6 +37,9 @@ const NOOP_INSTANCE: DirectionTracker = Object.freeze({
  *     clicks on `<Link>` / programmatic `router.navigate(...)` do not.
  *   - On every `subscribeLeave`, write
  *     `popstateFlag ? "back" : "forward"` and reset the flag.
+ *   - A `popstate` that arrives while a transition is in flight arms the
+ *     flag of the transition after it, which is the one a URL plugin starts
+ *     for it.
  *
  * Returns `{ destroy }` to clean up the listener and clear the dataset
  * attribute.
@@ -52,7 +55,10 @@ export function createDirectionTracker(router: Router): DirectionTracker {
 
   // The `toState` the transition in flight was announced with.
   let inFlight: State | undefined;
-  let armedMidTransition = false;
+  // The address of a popstate that arrived while a transition was in flight.
+  // A URL plugin starts its traversal after that transition, so its flag is
+  // kept apart from the one the transition in flight may own.
+  let replay: string | undefined;
 
   // ⚑ The flag is SPENT by the transition it belongs to, whether or not that
   // transition reaches a leave phase (#1924). It is armed by any `popstate` on
@@ -68,16 +74,14 @@ export function createDirectionTracker(router: Router): DirectionTracker {
   // in-flight transition and replays it from that transition's `finally`. The
   // gap has no upper bound. Measured on the obvious choice: a task-boundary
   // expiry disarms a live navigation on ONE async `canDeactivate`.
-  // ⚑ A traversal onto the URL of the router's own state starts no
-  // transition: a URL plugin's return after a refused Back or Forward
-  // (#2740), or a Back onto an entry holding that state. The URL comes from
-  // the URL plugin's `buildUrl`; without one, every popstate arms the flag.
-  const landsOnRouterState = (): boolean => {
-    const state = router.getState();
+
+  // The address the URL plugin prints a state at, or `undefined` without
+  // one, or when its `buildUrl` throws or answers none.
+  const hrefOf = (state: State): string | undefined => {
     const buildUrl = router.buildUrl as BuildUrl | undefined;
 
-    if (state === undefined || buildUrl === undefined) {
-      return false;
+    if (buildUrl === undefined) {
+      return undefined;
     }
 
     try {
@@ -90,24 +94,41 @@ export function createDirectionTracker(router: Router): DirectionTracker {
         hash ? { hash } : undefined,
       );
 
-      return (
-        url !== undefined &&
-        new URL(url, globalThis.location.href).href === globalThis.location.href
-      );
+      return url === undefined
+        ? undefined
+        : new URL(url, globalThis.location.href).href;
     } catch {
-      return false;
+      return undefined;
     }
+  };
+
+  // ⚑ A traversal onto the URL of the router's own state starts no
+  // transition: a URL plugin's return after a refused Back or Forward
+  // (#2740), or a Back onto an entry holding that state. The URL comes from
+  // the URL plugin's `buildUrl`; without one, every popstate arms the flag.
+  const landsOnRouterState = (): boolean => {
+    const state = router.getState();
+
+    return state !== undefined && hrefOf(state) === globalThis.location.href;
   };
 
   const onPopstate = (): void => {
     if (landsOnRouterState()) {
+      // The URL plugin returns after a traversal it refused or one a guard
+      // cancelled quietly, and drops the popstate that waited behind it, so
+      // the flag that popstate's replay would have spent ends here.
+      if (inFlight === undefined) {
+        popstateFlag = false;
+      }
+
       return;
     }
 
-    popstateFlag = true;
-    // A deferred event belongs to the replay, not to the transition running
-    // now, so that transition's terminal event must not spend it.
-    armedMidTransition = inFlight !== undefined;
+    if (inFlight === undefined) {
+      popstateFlag = true;
+    } else {
+      replay = globalThis.location.href;
+    }
   };
 
   // IMPORTANT — listener-ordering: `popstate` fires on `window`, which
@@ -121,16 +142,12 @@ export function createDirectionTracker(router: Router): DirectionTracker {
 
   const api = getPluginApi(router);
 
+  // The flag of a popstate that arrived during the transition passes to the
+  // next one; the transition's own, unspent, ends with it.
   const onSettled = (): void => {
     inFlight = undefined;
-
-    if (armedMidTransition) {
-      armedMidTransition = false;
-
-      return;
-    }
-
-    popstateFlag = false;
+    popstateFlag = replay !== undefined;
+    replay = undefined;
   };
 
   // Core also reports a refusal that starts no transition on
@@ -142,12 +159,18 @@ export function createDirectionTracker(router: Router): DirectionTracker {
   const onError = (toState: State | undefined): void => {
     if (inFlight === undefined || toState?.context === inFlight.context) {
       onSettled();
-    } else {
-      // A popstate armed while the transition runs may be the one this
-      // refusal answers: a URL plugin handles a popstate that arrives during a
-      // programmatic transition on the spot. So that transition's terminal
-      // spends the flag instead of keeping it for a replay.
-      armedMidTransition = false;
+
+      return;
+    }
+
+    // A popstate that arrived while the transition runs may be the one this
+    // refusal answers: a URL plugin handles a popstate that arrives during a
+    // programmatic transition on the spot. It is, unless the refusal names
+    // another address.
+    const href = toState === undefined ? undefined : hrefOf(toState);
+
+    if (href === undefined || href === replay) {
+      replay = undefined;
     }
   };
 
@@ -163,7 +186,6 @@ export function createDirectionTracker(router: Router): DirectionTracker {
         ? "back"
         : "forward";
       popstateFlag = false;
-      armedMidTransition = false;
     }),
   ];
 

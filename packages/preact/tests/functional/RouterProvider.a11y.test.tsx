@@ -88,14 +88,9 @@ describe("RouterProvider — announceNavigation", () => {
 
   // ── announce behaviour ──────────────────────────────────────────────────
   //
-  // The announcer skips the FIRST navigation it observes (isInitialNavigation),
-  // so every announce test performs a throwaway warm-up navigation first.
-
-  async function warmup(): Promise<void> {
-    await act(async () => {
-      await router.navigate("home");
-    });
-  }
+  // The router is started before the provider mounts — the canonical order —
+  // so the first navigation each test makes is the first one announced: the
+  // initial page load is the start() commit, before the announcer exists.
 
   it("announces the route after the Safari-ready window (direct path)", async () => {
     render(
@@ -103,8 +98,6 @@ describe("RouterProvider — announceNavigation", () => {
         <div />
       </RouterProvider>,
     );
-
-    await warmup();
 
     // isReady = true (Safari window elapsed) BEFORE the announced navigation →
     // direct doAnnounce (no buffering).
@@ -129,8 +122,6 @@ describe("RouterProvider — announceNavigation", () => {
         <div />
       </RouterProvider>,
     );
-
-    await warmup();
 
     // No advance to isReady → the double rAF resolves the text but `isReady`
     // is still false, so it is deferred into `pendingText`.
@@ -159,8 +150,6 @@ describe("RouterProvider — announceNavigation", () => {
       </RouterProvider>,
     );
 
-    await warmup();
-
     void act(() => {
       vi.advanceTimersByTime(SAFARI_READY_DELAY + 1);
     });
@@ -188,8 +177,6 @@ describe("RouterProvider — announceNavigation", () => {
         <div />
       </RouterProvider>,
     );
-
-    await warmup();
 
     void act(() => {
       vi.advanceTimersByTime(SAFARI_READY_DELAY + 1);
@@ -220,8 +207,6 @@ describe("RouterProvider — announceNavigation", () => {
         <h1>Docs</h1>
       </RouterProvider>,
     );
-
-    await warmup();
 
     void act(() => {
       vi.advanceTimersByTime(SAFARI_READY_DELAY + 1);
@@ -294,8 +279,6 @@ describe("RouterProvider — announceNavigation", () => {
       </RouterProvider>,
     );
 
-    await warmup();
-
     void act(() => {
       vi.advanceTimersByTime(SAFARI_READY_DELAY + 1);
     });
@@ -320,8 +303,6 @@ describe("RouterProvider — announceNavigation", () => {
         <div />
       </RouterProvider>,
     );
-
-    await warmup();
 
     void act(() => {
       vi.advanceTimersByTime(SAFARI_READY_DELAY + 1);
@@ -357,8 +338,6 @@ describe("RouterProvider — announceNavigation", () => {
       </RouterProvider>,
     );
 
-    await warmup();
-
     void act(() => {
       vi.advanceTimersByTime(SAFARI_READY_DELAY + 1);
     });
@@ -382,8 +361,6 @@ describe("RouterProvider — announceNavigation", () => {
       </RouterProvider>,
     );
 
-    await warmup();
-
     void act(() => {
       vi.advanceTimersByTime(SAFARI_READY_DELAY + 1);
     });
@@ -405,8 +382,6 @@ describe("RouterProvider — announceNavigation", () => {
         <div />
       </RouterProvider>,
     );
-
-    await warmup();
 
     void act(() => {
       vi.advanceTimersByTime(SAFARI_READY_DELAY + 1);
@@ -433,8 +408,6 @@ describe("RouterProvider — announceNavigation", () => {
         <h1 tabIndex={0}>Home</h1>
       </RouterProvider>,
     );
-
-    await warmup();
 
     void act(() => {
       vi.advanceTimersByTime(SAFARI_READY_DELAY + 1);

@@ -3,6 +3,7 @@ import { asCancellation, routeTransitionError } from "./errorHandling";
 import { executeGuardPipeline } from "./guardPhase";
 import { errorCodes, constants } from "../../../constants";
 import { adoptNavigationOptions, ownFlag, ownSignal } from "../../../helpers";
+import { recordNavigationEnd } from "../../../navigationEnds";
 import { RouterError, freezeThrownError } from "../../../RouterError";
 import { getTransitionPath } from "../../../transitionPath";
 import {
@@ -156,6 +157,7 @@ function openController(plan: NavigationContext): AbortController {
   // where there is not (`stop()` / `dispose()` / supersede).
   if (plan.cancelReason !== undefined) {
     controller.abort(plan.cancelReason);
+    recordNavigationEnd(controller.signal.reason);
   }
 
   plan.controller = controller;
@@ -645,6 +647,8 @@ export function executeNavigation(
   } catch (error) {
     const outcome = handleNavigateError(deps, error, { nav, fromState });
 
+    recordNavigationEnd(outcome);
+
     // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from guards or transition pipeline
     return Promise.reject(outcome);
   }
@@ -744,6 +748,7 @@ async function finishAsyncNavigation(
     failureReason = outcome;
 
     routeTransitionError(deps, outcome, nav.fromState, nav);
+    recordNavigationEnd(outcome);
 
     throw outcome;
     // NB: emptying the `finally` is NOT equivalent (#1684). This IS the abort
@@ -766,6 +771,7 @@ async function finishAsyncNavigation(
     // already aborted keeps its first — also meaningful — reason.
     if (!succeeded) {
       controller.abort(failureReason);
+      recordNavigationEnd(controller.signal.reason);
     }
   }
 }
@@ -792,27 +798,20 @@ interface AttemptedNavigation {
 
 /**
  * Settle a failed navigation on the SYNCHRONOUS arc: abort its controller,
- * report it while the machine is still in the transition, and hand back the
- * outcome the caller's promise should carry.
+ * restate the failure as a cancellation when the machine cancelled this
+ * navigation, report it, and hand back the outcome the caller's promise should
+ * carry.
  *
  * `nav === undefined` means `TRANSITION_START` never fired, so there is no
  * announced navigation for a terminal event to pair with — the error goes back
  * untouched, and the report can NAME the navigation without an assertion
  * (#1648).
  *
- * **Has the FSM left my transition?** is the precondition for sending `FAIL`,
- * and `isActive()` is the looser approximation that gets a case wrong: a
- * guard running `stop()` and then a `start()` PARKED in an async interceptor
- * leaves the FSM in `STARTING`, where `isActive()` is true again — for a
- * different lifecycle, whose start the stale `FAIL` would kill
- * (`STARTING --FAIL--> IDLE`). Measured: swapping the predicate for
- * `isActive()` reds the restart cells of `superseded-guard-rejection-1609.test.ts`
- * and the removal cells of `getRoutesApi/removeRoute.test.ts`.
- *
- * ⚠ It asks whether the machine holds A transition, not this one. After a guard
- * redirects to a route an async guard holds and then refuses, it answers for
- * the redirect: the refused navigation rejects with its guard's code although
- * `TRANSITION_CANCEL` announced it cancelled.
+ * **Did the machine cancel THIS navigation?** is asked of the navigation's own
+ * record: `cancelReason` is written by the `CANCEL` action alone, onto the plan
+ * it cancels, and the plan is born without one. ⚠ A phase read answers for
+ * whichever transition the machine holds: after a guard redirects to a route an
+ * async guard holds and then refuses, that is the redirect's (#2788).
  *
  * The restatement below is `asCancellation` — see `./errorHandling` for what it
  * measures.
@@ -832,7 +831,8 @@ function handleNavigateError(
   deps.dispatchAbort(nav?.controller, error);
 
   if (nav !== undefined) {
-    const outcome = deps.isTransitioning() ? error : asCancellation(error);
+    const outcome =
+      nav.cancelReason === undefined ? error : asCancellation(error);
 
     routeTransitionError(deps, outcome, attempted.fromState, nav);
 

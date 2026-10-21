@@ -30,14 +30,15 @@ graph LR
     CORE -.->|provides| TYPES["State, NavigationOptions"]
 
     subgraph plugin [Plugin Instance]
+        OTSTART["onTransitionStart"] --> FILE["file the staged restore under toState.context; it is in flight"]
         OTS["onTransitionSuccess"] --> PUSH[push / replace entry]
-        OTS --> CONSUME["consume #navigatingFromHistory on commit (history replay)"]
+        OTS --> CONSUME["a commit carrying a restore record: no push (history replay)"]
         OS["onStop"] --> CLEAR[clear entries]
         TD["teardown"] --> RM[removeExtensions + clear]
-        GO["#go(delta)"] --> IDXSYNC["#index = targetIndex (optimistic)"]
-        IDXSYNC --> NAV["router.navigate()"]
+        GO["#go(delta)"] --> NAV["api.navigateToState()"]
+        NAV -->|start| OTSTART
         NAV -->|commit| OTS
-        NAV --> CATCH[".catch() → revert #index + reset flag if generation matches"]
+        NAV --> CATCH[".catch() → the restore stops moving the position"]
     end
 ```
 
@@ -55,19 +56,22 @@ Forward navigation: navigate("users", { id: "1" })
     │
     onTransitionSuccess(toState, fromState, opts)
     │
-    ├── #navigatingFromHistory === true?
-    │   └── YES → #navigatingFromHistory = false (consume on commit),
-    │             rewrite context, return (skip recording — back/forward replay)
+    ├── a restore record filed under toState.context?
+    │   └── YES → the restore lands: #shown = its target, rewrite context
+    │             with its direction, return (skip recording — replay)
     │
-    ├── opts.replace === true AND #index >= 0?
-    │   └── YES → #entries[#index] = entry  (overwrite current)
+    ├── base = position (the target of a restore still in flight, else #shown)
+    │   the restore in flight, if any, is cancelled by this commit
     │
-    └── NO → splice(#index + 1)             (discard forward history)
+    ├── opts.replace === true AND base >= 0?
+    │   └── YES → #entries[base] = entry  (overwrite)
+    │
+    └── NO → splice(base + 1)              (discard forward history)
              push(entry)
-             #index = #entries.length - 1
+             #shown = #entries.length - 1
              │
              └── maxHistory > 0 AND length > maxHistory?
-                 └── YES → splice(0, overflow), adjust #index
+                 └── YES → splice(0, overflow), adjust #shown
 ```
 
 ### Navigation Flow: `#go(delta)`
@@ -80,23 +84,23 @@ back() / forward() / go(delta)
         ├── delta === 0? → return (no-op)
         │
         ├── guard: delta === 0 || !Number.isFinite(delta) || !Number.isInteger(delta) → return
-        ├── targetIndex = #index + delta
+        ├── targetIndex = position + delta
         ├── targetIndex out of bounds? → return (no-op)
         │
-        ├── entry.path === currentState.path? → #index = targetIndex, return (short-circuit)
+        ├── entry.path === currentState.path AND no restore in flight?
+        │   → #shown = targetIndex, return (short-circuit)
         │
-        ├── previousIndex = #index
-        ├── generation = ++#goGeneration
-        ├── #navigatingFromHistory = true
-        ├── #index = targetIndex  (optimistic sync update)
+        ├── restore = { targetIndex, direction }, staged for the call
         │
-        └── router.navigate(entry.name, entry.params, undefined, { replace: true })
-            ├── SUCCESS → onTransitionSuccess consumes #navigatingFromHistory on commit
-            └── .catch()  → if (generation === #goGeneration)
-                               #index = previousIndex; #navigatingFromHistory = false
+        └── api.navigateToState(entry, { replace: true, source, force on the current path })
+            ├── START   → onTransitionStart files the restore under toState.context;
+            │             it is in flight: position = its target
+            ├── SUCCESS → onTransitionSuccess finds the record: the restore lands
+            └── .catch()  → if it is still the restore in flight, it no longer is:
+                               position = #shown
 ```
 
-The `navigatingFromHistory` flag prevents `onTransitionSuccess` from recording the replayed navigation as a new history entry. It is consumed the moment the restore commit is observed inside `onTransitionSuccess` — **not** in a later microtask — so a `navigate()` issued in the same tick as `back()`/`forward()`/`go()` is still recorded as a fresh push ([#807](https://github.com/greydragon888/real-router/issues/807)). A guard-blocked or rejected replay never reaches `onTransitionSuccess`, so the `.catch()` handler clears the flag and reverts the optimistic index instead; the `#goGeneration` guard ensures only the latest in-flight `#go` call can do so — older superseded calls no-op on settle.
+The restore record keeps `onTransitionSuccess` from recording the replayed navigation as a new history entry, and only the navigation that filed it carries it — a `navigate()` issued in the same tick as `back()`/`forward()`/`go()`, or committed while a guard holds the restore, is a fresh push. A guard-blocked or rejected replay never reaches `onTransitionSuccess`; its `.catch()` stops it moving the position, unless a newer restore has taken the position over or a navigation has committed over it.
 
 ## Data Flow
 
@@ -109,9 +113,9 @@ router.navigate("page", params)
     │
     onTransitionSuccess(toState, _, opts)
     │
-    ├── navigatingFromHistory? NO
+    ├── a restore record? NO
     ├── opts.replace? NO
-    └── splice(#index + 1) → push entry → #index++
+    └── splice(base + 1) → push entry → #shown = base + 1
 ```
 
 ### Back / Forward
@@ -121,15 +125,12 @@ router.back()
     │
     #go(-1)
     │
-    #navigatingFromHistory = true
-    #index = targetIndex           (optimistic sync update)
-    generation = ++#goGeneration
+    api.navigateToState(entry, { replace: true, source })
     │
-    router.navigate(entry.name, entry.params, undefined, { replace: true })
-    │
-    ├── SUCCESS → onTransitionSuccess → #navigatingFromHistory = false (consume on commit)
-    └── BLOCKED → .catch() → if (generation === #goGeneration)
-                                #index = previousIndex; #navigatingFromHistory = false
+    ├── START   → onTransitionStart files the restore: position = its target
+    ├── SUCCESS → onTransitionSuccess finds the record: #shown = its target, no push
+    └── BLOCKED → .catch() → the restore is no longer in flight:
+                                position = #shown
 ```
 
 ### Guard blocks back navigation
@@ -139,15 +140,14 @@ router.back()
     │
     #go(-1)
     │
-    #index = targetIndex    (optimistic)
-    router.navigate(...)
+    api.navigateToState(...)  → START: position = the target
     │
     CANNOT_ACTIVATE (guard returns false)
     │
-    .catch() → #index = previousIndex (revert), #navigatingFromHistory = false
-    (onTransitionSuccess never fired, so the flag is cleared here)
+    .catch() → the restore is no longer in flight: position = #shown
+    (onTransitionSuccess never fired, so the record was never consumed)
 
-canGoBack() reflects the reverted position
+canGoBack() reflects the entry the router shows
 ```
 
 ## Design Decisions
@@ -158,15 +158,11 @@ Plugin extensions registered via `extendRouter()` must be synchronous per the co
 
 ### Why `replace: true` in `#go()`
 
-Navigating back or forward replays an existing history entry. Using `replace: true` prevents `onTransitionSuccess` from pushing a duplicate entry (even with the `navigatingFromHistory` guard in place, this is the correct semantic: the history position changes, not the history length).
+Navigating back or forward replays an existing history entry. Using `replace: true` keeps the replayed navigation from pushing a duplicate entry (even with the restore record in place, this is the correct semantic: the history position changes, not the history length).
 
-### Why `#index` updates optimistically with revert-on-catch
+### Why the stack position is derived, not reverted
 
-`#go(delta)` updates `#index` **synchronously** before firing `router.navigate()` and reverts it in `.catch()` when the navigation fails. This is the **optimistic update pattern** — callers that inspect `canGoBack()`/`canGoForward()` immediately after `router.back()` see the expected post-navigation position instead of the stale pre-call state.
-
-A `#goGeneration` counter protects against superseded reverts: if a second `#go()` runs before the first settles, it bumps the generation, so the first `.catch()` finds a mismatch and skips the revert. The optimistic target from the second call wins, matching what `canGoBack()` should report.
-
-Historical note: earlier versions updated `#index` in `.then()`, which meant `canGoBack()` reported stale values during in-flight navigations. The switch to optimistic + revert happened in [#410](https://github.com/greydragon888/real-router/pull/410) to fix index desync on blocked guards (#294).
+The position `canGoBack()`/`canGoForward()` and the next `#go()` read is the target of the restore in flight, else the entry the router shows (`#shown`). Callers that inspect `canGoBack()`/`canGoForward()` while a `back()` is held see the post-navigation position, and a failed restore leaves nothing to undo: it stops being the restore in flight, and the position is the shown entry again. A refusal before the navigation is announced never made it the restore in flight, so it never moved the position at all.
 
 ### Why `go(0)` is a no-op
 
@@ -195,10 +191,10 @@ router.usePlugin(memoryPluginFactory(options))
                         └── returns removeExtensions()
                 │
                 return plugin.getPlugin()
-                    └── { onTransitionSuccess, onStop, teardown }
+                    └── { onTransitionStart, onTransitionSuccess, onStop, teardown }
 
 router.stop()
-    └── onStop → #clear() (entries + index reset, extensions remain)
+    └── onStop → #clear() (entries, shown index and the restore in flight reset, extensions remain)
 
 router.usePlugin() unsubscribe / teardown
     └── teardown → #removeExtensions() + #clear()

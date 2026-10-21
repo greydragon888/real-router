@@ -68,10 +68,7 @@ describe("AR1 — route-announcer double-rAF race (§7.3 #24)", () => {
     expect(announcer).not.toBeNull();
     expect(announcer?.textContent).toBe("");
 
-    // Cross Safari-ready window so isReady=true when rAF drains. The
-    // sacrificial first nav consumes the announcer's
-    // `isInitialNavigation` flag, so the burst nav sequence below all
-    // counts towards real announcements.
+    // Cross Safari-ready window so isReady=true when rAF drains.
     vi.advanceTimersByTime(100);
 
     const heapBefore = takeHeapSnapshot();

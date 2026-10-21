@@ -467,9 +467,10 @@
     "packages/core/src/namespaces/NavigationNamespace/transition/errorHandling.ts": [
       "1a9864dfed80",
       "d7294177f708",
-      "c5c040b6dc58",
+      "95584cf543f3",
       "4b9bfc183c29",
       "d02cbed838fe",
+      "b350804497ea",
       "f3aa4e31aa4b",
       "11e4b81fc0af",
       "cfda5beec2c6",
@@ -499,7 +500,7 @@
       "d539a32653dd",
       "0739314dfa90",
       "6e785c16aa63",
-      "8d50e805d207",
+      "9ed926b2fa98",
       "aa9f630c24c1"
     ],
     "packages/core/src/namespaces/NavigationNamespace/transition/guardPhase.ts": [
@@ -522,6 +523,7 @@
       "bd37678527d7",
       "3c752335b813",
       "a343e8ab8889",
+      "20adbd9dffa8",
       "2d9e35e43abe",
       "0315222f8f86",
       "9325ed655908",
@@ -598,9 +600,7 @@
       "eb26759451c4"
     ],
     "packages/core/src/namespaces/RouterLifecycleNamespace/RouterLifecycleNamespace.ts": [
-      "1a2a908859c7",
-      "0f906efca780",
-      "376f2c4eb7d5",
+      "97f1fc027783",
       "1b4f2b4c9d95",
       "7613b2caa503",
       "321d351964d2",
@@ -646,13 +646,11 @@
       "ea0e1ccd5379",
       "e7f0a1dd6358",
       "c13635e41a0e",
-      "3d7bbd619e39",
+      "c3d9483e99c1",
       "82b8e5c37977",
-      "1f07ada31c6d",
+      "f80700ab4186",
       "8ad3d9f87408",
-      "0e9f409590c7",
-      "36796f4f4028",
-      "0559c4249776",
+      "44e89725e837",
       "9566a67d2848",
       "06c8df20d0ab",
       "ad8a2c6e9150",
@@ -736,6 +734,10 @@
       "822474843d6e",
       "69ba5c0e5842",
       "59045aff1bd7"
+    ],
+    "packages/core/src/navigationEnds.ts": [
+      "a9726b75cfe0",
+      "ae40a744ea8b"
     ],
     "packages/core/src/pipeline/canonicalize.ts": [
       "1a9864dfed80",
@@ -831,13 +833,11 @@
       "e9a3f2a064a6"
     ],
     "packages/core/src/RouterError.ts": [
-      "cf0845010fb9",
-      "7b81b354abe9",
-      "45d4cea8e701",
       "c4904040b6e3",
       "b78881a1eeb4",
       "4d068979501f",
       "a837d3c0c7c7",
+      "576268a2a083",
       "a5d2004d474e",
       "85464716c733",
       "919662fab5c7",
@@ -847,7 +847,10 @@
       "919662fab5c7",
       "96ba553f2d81",
       "6640b5f1748d",
-      "9cda6166a10c"
+      "9cda6166a10c",
+      "cf0845010fb9",
+      "7b81b354abe9",
+      "45d4cea8e701"
     ],
     "packages/core/src/routerFSM.ts": [
       "138fa606bb95",
@@ -1040,6 +1043,9 @@
       "1a9864dfed80",
       "d7294177f708",
       "cad1844f6313"
+    ],
+    "packages/memory-plugin/src/plugin.ts": [
+      "5ce577772836"
     ],
     "packages/navigation-plugin/src/plugin.ts": [],
     "packages/persistent-params-plugin/src/factory.ts": [
@@ -1297,6 +1303,9 @@
     "packages/vue/src/composables/useRouteExit.ts": [
       "117882e62801"
     ],
+    "shared/browser-env/newer-navigations.ts": [
+      "e707a2d0fce7"
+    ],
     "shared/browser-env/plugin-utils.ts": [
       "bc9199ba1389",
       "966193703e68",
@@ -1423,7 +1432,7 @@
       "1c92ecbfe848",
       "2808234f7e3f",
       "d0d6938e1044",
-      "c0ea1371fc42"
+      "ab3434d637e4"
     ],
     "shared/ssr/defer.ts": [
       "4a570a8f94fd",
@@ -2012,7 +2021,7 @@
       "251bc4409fe1",
       "7ff143533a1f",
       "cc4132553a04",
-      "1f9070dc2417",
+      "129361049cf0",
       "43077523baea",
       "f28154bd71c0",
       "5f841407aaf7",
@@ -2058,7 +2067,8 @@
       "d51138402e6c",
       "9ecad603960c",
       "861a0aeb9025",
-      "72415b1aa221"
+      "b479ef11988e",
+      "babf0ed962a3"
     ],
     "packages/core/src/namespaces/RoutesNamespace/CLAUDE.md": [
       "56d7f818b3b6",
@@ -2105,6 +2115,9 @@
     "packages/hash-plugin/CLAUDE.md": [
       "097ec3f7ea70",
       "c142ac0ba337"
+    ],
+    "packages/memory-plugin/CLAUDE.md": [
+      "b890c2dad8b8"
     ],
     "packages/persistent-params-plugin/CLAUDE.md": [
       "476a0fbed6d4",

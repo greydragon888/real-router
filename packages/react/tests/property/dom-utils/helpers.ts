@@ -63,10 +63,16 @@ export function createMockRouter(): {
   router: Router;
   trigger: (routeName: string) => void;
 } {
-  type Callback = (data: { route: State }) => void;
+  type Callback = (data: { route: State; previousRoute?: State }) => void;
   const callbacks: Callback[] = [];
+  // As a router does, every commit after the first carries the one before it,
+  // and `getState()` answers the last one.
+  let committed: State | undefined;
 
   const mockRouter = {
+    getState(): State | undefined {
+      return committed;
+    },
     subscribe(cb: Callback): () => void {
       callbacks.push(cb);
 
@@ -92,8 +98,12 @@ export function createMockRouter(): {
         context: {},
       };
 
+      const previousRoute = committed;
+
+      committed = route;
+
       for (const cb of callbacks) {
-        cb({ route });
+        cb({ route, ...(previousRoute && { previousRoute }) });
       }
     },
   };

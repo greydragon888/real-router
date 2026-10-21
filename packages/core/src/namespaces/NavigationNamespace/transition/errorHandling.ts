@@ -1,6 +1,7 @@
 // packages/core/src/namespaces/NavigationNamespace/transition/errorHandling.ts
 
 import { errorCodes, UNSAFE_KEY } from "../../../constants";
+import { isNavigationEnd } from "../../../navigationEnds";
 import { RouterError, freezeThrownError } from "../../../RouterError";
 import { putField } from "../../../utils/ingest";
 
@@ -46,7 +47,8 @@ function isTransitionCancelled(error: unknown): boolean {
  * running, because {@link routeTransitionError} sends `FAIL` for anything that
  * is not a cancellation. Liveness
  * itself is asked at the call sites, from different facts
- * (`finishAsyncNavigation` off the signal, `handleNavigateError` off the FSM).
+ * (`finishAsyncNavigation` off the signal, `handleNavigateError` off the
+ * plan's `cancelReason`).
  *
  * A value already carrying the code is returned untouched — two pinned cells:
  * #1197's leave rejection keeps its `reason` (#943), and the resolve path's
@@ -56,9 +58,9 @@ function isTransitionCancelled(error: unknown): boolean {
  * failed `start()` unwinds — unconditional, so a stale `FAIL` there kills a
  * RESTART — and which error `navigate()` rejects with is a contract, not an
  * edge. Measured: neutralising this reds the torn-down cells of
- * `superseded-guard-rejection-1609.test.ts`, the removal cells of
- * `getRoutesApi/removeRoute.test.ts` and the `dispose()` cell of
- * `commit-gate-1169.test.ts`.
+ * `superseded-guard-rejection-1609.test.ts`, the redirect cells of
+ * `redirect-then-refuse-2788.test.ts` and the `dispose()` cell of
+ * `commit-gate-1169.test.ts`, among others.
  */
 export function asCancellation(error: unknown): unknown {
   return isTransitionCancelled(error)
@@ -101,6 +103,14 @@ export function handleGuardError(
   errorCode: string,
   segment: string,
 ): never {
+  // ⚑ A navigation's END is never this guard's quiet cancel. Another
+  // navigation's end means the guard was waiting on work that navigation
+  // started; its own navigation's end means that navigation is cancelled, and
+  // the failure arcs restate the failure as that cancellation.
+  if (isNavigationEnd(error)) {
+    rethrowAsRouterError(error, errorCode, segment);
+  }
+
   if (error instanceof DOMException && error.name === "AbortError") {
     throw freezeThrownError(new RouterError(errorCodes.TRANSITION_CANCELLED));
   }

@@ -188,12 +188,14 @@ discriminate.
 nothing.** A navigation that is no longer the one in flight is a cancellation,
 whatever its guard decided: no `TRANSITION_ERROR`, and `navigate()` rejects
 `TRANSITION_CANCELLED` carrying the original error as `reason`. ⚠ The two failure
-arcs read liveness from DIFFERENT facts, and the asymmetry is load-bearing:
-`finishAsyncNavigation` holds its own controller and asks `!signal.aborted`;
-the synchronous `handleNavigateError` asks `deps.isTransitioning()` — "does the
-FSM still hold MY transition", which is the actual precondition for sending
-`FAIL`. `isActive()` alone would be too loose there. Neither asks about
-IDENTITY — see `NavigationContext` in `types.ts`, which owns why.
+arcs read DIFFERENT facts about one question — did the machine cancel THIS
+navigation: `finishAsyncNavigation` holds its own controller and asks
+`!signal.aborted`; the synchronous `handleNavigateError`, which may run where no
+controller exists, asks the navigation's `cancelReason`, which only the `CANCEL`
+action writes. A phase read (`isTransitioning()`) answers for whichever
+navigation the machine holds: after a guard redirects to a route an async guard
+holds and then refuses, the redirect's. Pinned by
+`redirect-then-refuse-2788.test.ts`.
 
 **Non-cooperative guards are bounded.** `finishAsyncNavigation` races the guard
 completion against the controller's abort, so an async guard whose Promise never
@@ -204,6 +206,18 @@ guard may throw `RouterError(TRANSITION_CANCELLED)` directly for a quiet cancel 
 it is **preserved**, so `onTransitionError` does not fire. Any other thrown
 `RouterError` is re-coded to `CANNOT_ACTIVATE` / `CANNOT_DEACTIVATE` **on a
 copy**, because the thrown instance may be one of the cached singletons.
+
+⚠ **Another navigation's END is re-coded too, whatever its shape.** Core
+records what it aborts a navigation's signal with and what it rejects its
+promise with (`navigationEnds.ts`), of those the values it built; a guard
+holding one was waiting on that navigation's work — a request deduplicated
+across navigations, or its promise — so the guard's own navigation fails
+rather than cancelling quietly. A guard holding its OWN navigation's end
+belongs to a navigation that is cancelled, and the failure arcs restate the
+failure as that cancellation. A value the application handed in — the reason
+of a caller's `opts.signal`, a quiet cancel a guard threw — stays its own, and
+a guard raising it again cancels quietly.
+Pinned by `another-navigations-end-in-a-guard.test.ts`.
 
 **A quiet cancel leaves the band through `CANCEL`**, so the navigation gets its
 `TRANSITION_CANCEL` — and so does one whose `subscribeLeave` listener throws or

@@ -991,6 +991,8 @@ describe("Error Recovery", () => {
           params: {},
           path: "/users/list",
         }),
+        // The handler watches the navigations announced while its own runs.
+        addEventListener: () => () => {},
       } as unknown as Parameters<typeof createNavigateHandler>[0]["api"],
       browser: mockBrowser,
       stage: (_meta, start) => start(),

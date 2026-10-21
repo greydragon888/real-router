@@ -829,9 +829,9 @@ describe("NavigationAnnouncer — announcer options", () => {
   // patched, and `ngOnInit` is invoked directly — the same pattern the SSR
   // `<http-status-code>` test uses. This exercises the public
   // input → ngOnInit → createRouteAnnouncer forwarding path the AOT runtime hits
-  // when the template binding fires. The announcer skips its first navigation
-  // (initial transition), so each case navigates twice and asserts on the
-  // second route ("home").
+  // when the template binding fires. The router starts before the announcer is
+  // created, so both navigations of each case are announced; the case asserts
+  // on the second route ("home").
 
   it("forwards a custom getAnnouncementText to the announcer", async () => {
     TestBed.configureTestingModule({ providers: [provideRealRouter(router)] });

@@ -1,5 +1,5 @@
 import { fc, test } from "@fast-check/vitest";
-import { createRouter } from "@real-router/core";
+import { createRouter, errorCodes, RouterError } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 import { describe, expect } from "vitest";
 
@@ -12,9 +12,32 @@ import type { Router } from "@real-router/core";
 /**
  * #2740 class guard: a traversal the router refuses leaves every entry where
  * it was and the browser on the entry the traversal started from — whatever
- * the distance and direction, whichever guard refuses. It runs on jsdom's own
- * history, which keeps the object a write is given (#2741).
+ * the distance and direction, whichever guard refuses, and whether it refuses
+ * or cancels quietly with nothing newer behind it (#2796). It runs on jsdom's
+ * own history, which keeps the object a write is given (#2741).
  */
+
+const VERDICTS = [
+  "refuses",
+  "throws a quiet cancel",
+  "rejects with one",
+] as const;
+
+type Verdict = (typeof VERDICTS)[number];
+
+function answer(verdict: Verdict): boolean | Promise<boolean> {
+  if (verdict === "refuses") {
+    return false;
+  }
+
+  const cancel = new RouterError(errorCodes.TRANSITION_CANCELLED);
+
+  if (verdict === "throws a quiet cancel") {
+    throw cancel;
+  }
+
+  return Promise.reject(cancel);
+}
 
 const PATHS: Readonly<Record<string, string>> = {
   index: "/",
@@ -53,15 +76,16 @@ function routeOf(path: string): string {
 function refuse(
   router: Router,
   guard: "leave" | "enter",
+  verdict: Verdict,
   origin: string,
   target: string,
 ): void {
   const lifecycle = getLifecycleApi(router);
 
   if (guard === "leave") {
-    lifecycle.addDeactivateGuard(origin, () => () => false);
+    lifecycle.addDeactivateGuard(origin, () => () => answer(verdict));
   } else {
-    lifecycle.addActivateGuard(target, () => () => false);
+    lifecycle.addActivateGuard(target, () => () => answer(verdict));
   }
 }
 
@@ -101,11 +125,12 @@ describe("refused traversal — browser-plugin (#2740)", () => {
       fc.nat({ max: 4 }),
       fc.nat({ max: 4 }),
       fc.constantFrom("leave" as const, "enter" as const),
+      fc.constantFrom(...VERDICTS),
     ],
     { numRuns: NUM_RUNS.fast },
   )(
     "leaves the entries where they were and the browser on the entry it started from",
-    async (journey, back, to, guard) => {
+    async (journey, back, to, guard, verdict) => {
       const { router, paths, origin } = await start(journey, back);
 
       try {
@@ -114,7 +139,7 @@ describe("refused traversal — browser-plugin (#2740)", () => {
         const targetRoute = routeOf(paths[target]);
 
         fc.pre(targetRoute !== originRoute);
-        refuse(router, guard, originRoute, targetRoute);
+        refuse(router, guard, verdict, originRoute, targetRoute);
 
         globalThis.history.go(target - origin);
         await settle();

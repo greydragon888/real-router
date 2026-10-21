@@ -55,10 +55,7 @@ describe("A1 — announceNavigation rapid navigations (§7.2 #14)", () => {
     const ITERATIONS = 200;
 
     // Stay strictly inside the 100ms Safari-ready window — every nav
-    // overwrites `pendingText`. The first nav after announcer mount is
-    // additionally consumed by `isInitialNavigation`, so we warm with
-    // a sacrificial nav, then advance ~0ms (still pre-ready) and start
-    // the real burst.
+    // overwrites `pendingText`.
     vi.advanceTimersByTime(0);
 
     // Burst loop — 200 navigations, ALL completing pre-ready. Use a route

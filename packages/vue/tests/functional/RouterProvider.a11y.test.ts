@@ -81,9 +81,10 @@ describe("RouterProvider — announceNavigation", () => {
 
     vi.advanceTimersByTime(100);
 
-    // First navigation is skipped (initial navigation flag)
+    // The router starts before the provider mounts, so this navigation is
+    // announced too
     await router.navigate("about");
-    // Second navigation triggers the announcement
+    // The second navigation's announcement is the one asserted
     await router.navigate("home");
 
     const announcer = document.querySelector(ANNOUNCER_SEL);
@@ -111,9 +112,10 @@ describe("RouterProvider — announceNavigation", () => {
 
     vi.advanceTimersByTime(100);
 
-    // First navigation is skipped (initial navigation flag)
+    // The router starts before the provider mounts, so this navigation is
+    // announced too
     await router.navigate("about");
-    // Second navigation triggers the announcement — h1 is present
+    // The second navigation's announcement is the one asserted — h1 is present
     await router.navigate("home");
 
     const announcer = document.querySelector(ANNOUNCER_SEL);
@@ -192,8 +194,8 @@ describe("RouterProvider — announceNavigation", () => {
   });
 
   // ── announceNavigation options (getAnnouncementText / prefix) ─────────────
-  // First navigation after mount is skipped (initial-navigation flag), so each
-  // case navigates twice and asserts on the second route ("home").
+  // Each case navigates twice and asserts on the second route ("home"), the
+  // one announced last.
 
   it("uses a custom getAnnouncementText", async () => {
     mount(
@@ -376,7 +378,7 @@ describe("RouterProvider — announceNavigation edge cases", () => {
 
     vi.advanceTimersByTime(100);
 
-    // Primer: skipped by isInitialNavigation flag.
+    // A first navigation, announced as well; the assertion reads the next one.
     await internalRouter.navigate("other");
     // Target: a not-found navigation lands on `@@router/UNKNOWN_ROUTE` → the
     // internal-route guard blanks the route name → resolution falls through to
@@ -407,7 +409,7 @@ describe("RouterProvider — announceNavigation edge cases", () => {
 
     vi.advanceTimersByTime(100);
 
-    await baseRouter.navigate("about"); // primer (initial-skip)
+    await baseRouter.navigate("about"); // announced, then superseded
     await baseRouter.navigate("home");
 
     expect(document.querySelector(ANNOUNCER_SEL)?.textContent).toBe(
@@ -429,7 +431,7 @@ describe("RouterProvider — announceNavigation edge cases", () => {
 
     vi.advanceTimersByTime(100);
 
-    await baseRouter.navigate("about"); // primer
+    await baseRouter.navigate("about"); // announced as well
     await baseRouter.navigate("home");
 
     expect(h1.getAttribute("tabindex")).toBe("-1");
@@ -464,9 +466,9 @@ describe("RouterProvider — announceNavigation edge cases", () => {
     // Each navigation runs the subscribe callback synchronously through the
     // stubbed rAF, so both will land in pendingText before isReady flips.
     // Advance time by 50ms between them to assert we are still in-window.
-    await baseRouter.navigate("about"); // primer (skipped — initial)
+    await baseRouter.navigate("about"); // buffered in pendingText
     vi.advanceTimersByTime(50);
-    await baseRouter.navigate("home"); // first real → pendingText
+    await baseRouter.navigate("home"); // replaces it in pendingText
     vi.advanceTimersByTime(40); // still within 100ms window
     await baseRouter.navigate("items"); // second real → overwrites pendingText
 
@@ -496,7 +498,7 @@ describe("RouterProvider — announceNavigation edge cases", () => {
 
     vi.advanceTimersByTime(100);
 
-    await baseRouter.navigate("about"); // primer
+    await baseRouter.navigate("about"); // announced as well
     await baseRouter.navigate("home");
 
     const announcer = document.querySelector(ANNOUNCER_SEL);

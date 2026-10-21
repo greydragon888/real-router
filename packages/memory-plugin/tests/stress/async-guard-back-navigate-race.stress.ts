@@ -9,7 +9,7 @@ import { createStressRouter, noop, settle } from "./helpers";
 // concurrent `navigate()` cancels it and commits first. Timing-based flag
 // consumption then swallows that navigate as a phantom history-restore. This
 // stress interleaves the async race many times and asserts the stack never
-// wedges (`#navigatingFromHistory` stuck true → pushes silently skipped) nor
+// wedges (a navigate taken for a restore → pushes silently skipped) nor
 // desyncs (`#index` reverted out of bounds by the cancelled #go's `.catch`).
 describe("S12: async-guard back()/go() in flight + concurrent navigate() race (#1234 / #1235)", () => {
   beforeAll(() => {

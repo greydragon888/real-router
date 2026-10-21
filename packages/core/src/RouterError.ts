@@ -1,6 +1,7 @@
 // packages/core/src/RouterError.ts
 
 import { errorCodes, UNSAFE_KEY } from "./constants";
+import { recordConstruction } from "./navigationEnds";
 import { putField } from "./utils/ingest";
 
 /** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
@@ -51,8 +52,13 @@ const reservedMethods = new Set([
  *
  * ⚠ Only for errors core CONSTRUCTED. A re-thrown foreign error stays untouched:
  * freezing someone else's object on the way through is the hazard, not the fix.
+ *
+ * ⚑ It also records the error as one core built: `navigationEnds.ts` keeps a
+ * navigation's end only when core built it.
  */
 export function freezeThrownError<E extends RouterError>(error: E): E {
+  recordConstruction(error);
+
   return freeze(error);
 }
 
