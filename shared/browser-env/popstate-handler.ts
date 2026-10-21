@@ -1,4 +1,9 @@
-import { errorCodes, RouterError, UNKNOWN_ROUTE } from "@real-router/core";
+import {
+  errorCodes,
+  events,
+  RouterError,
+  UNKNOWN_ROUTE,
+} from "@real-router/core";
 import { freezeThrownError } from "@real-router/core/utils";
 
 import { distanceBetween, readPosition } from "./history-position.js";
@@ -117,6 +122,44 @@ export interface PopstateHandler {
 interface TraversalStart {
   readonly position: EntryPosition | undefined;
   readonly state: State | undefined;
+}
+
+/** Whether a navigation newer than a traversal's own owns the URL. */
+interface NewerNavigations {
+  readonly ownTheUrl: () => boolean;
+  readonly stop: () => void;
+}
+
+/**
+ * Watches the navigations the router announces while a traversal runs, until
+ * one is refused or cancelled. The traversal's own has ended by the time its
+ * promise rejects, so one left then is a newer navigation, and it owns the
+ * URL. With none left — a guard of the traversal cancels it quietly, or the
+ * router refuses the newer one — nothing does (#2796).
+ */
+function watchNewerNavigations(api: PluginApi): NewerNavigations {
+  const owners = new Set<object>();
+  const ended = (toState: State | undefined): void => {
+    if (toState !== undefined) {
+      owners.delete(toState.context);
+    }
+  };
+  const removers = [
+    api.addEventListener(events.TRANSITION_START, (toState) => {
+      owners.add(toState.context);
+    }),
+    api.addEventListener(events.TRANSITION_ERROR, ended),
+    api.addEventListener(events.TRANSITION_CANCEL, ended),
+  ];
+
+  return {
+    ownTheUrl: () => owners.size > 0,
+    stop: () => {
+      for (const remove of removers) {
+        remove();
+      }
+    },
+  };
 }
 
 export function createPopstateHandler(
@@ -268,9 +311,10 @@ export function createPopstateHandler(
 
   /**
    * navigate() already emitted $$error. A refusal returns to the entry the
-   * traversal started from; `SAME_STATES` (URL and state agree) and
-   * `TRANSITION_CANCELLED` (a newer navigation owns the URL) refuse nothing,
-   * and only resync the entry the browser stands on.
+   * traversal started from, and so does a cancellation no newer navigation
+   * owns the URL behind — a guard's quiet cancel (#2796). `SAME_STATES` (URL
+   * and state agree) and a cancellation by a newer navigation that owns the
+   * URL refuse nothing, and only resync the entry the browser stands on.
    *
    * Rollback errors are swallowed: teardown races may remove router.buildUrl
    * while a popstate event is still queued.
@@ -278,11 +322,12 @@ export function createPopstateHandler(
   function recoverFromRouterError(
     error: RouterError,
     start: TraversalStart,
+    newer: NewerNavigations,
   ): void {
     try {
       if (
         error.code === errorCodes.SAME_STATES ||
-        error.code === errorCodes.TRANSITION_CANCELLED
+        (error.code === errorCodes.TRANSITION_CANCELLED && newer.ownTheUrl())
       ) {
         rollbackUrlToCurrentState();
       } else {
@@ -342,6 +387,7 @@ export function createPopstateHandler(
     const adoptLanded = (): void => {
       deps.positions?.adopt(deps.browser.getState?.());
     };
+    const newer = watchNewerNavigations(deps.api);
 
     try {
       const restored = getRouteFromEvent(evt, deps.api, location);
@@ -406,11 +452,12 @@ export function createPopstateHandler(
       }
     } catch (error) {
       if (error instanceof RouterError) {
-        recoverFromRouterError(error, start);
+        recoverFromRouterError(error, start, newer);
       } else {
         recoverFromCriticalError(error, start);
       }
     } finally {
+      newer.stop();
       isTransitioning = false;
       processDeferredEvent();
     }
