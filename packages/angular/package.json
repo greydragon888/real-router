@@ -1,6 +1,6 @@
 {
   "name": "@real-router/angular",
-  "version": "0.24.5",
+  "version": "0.24.6",
   "type": "commonjs",
   "description": "Angular 22 integration for Real-Router",
   "exports": {
@@ -70,6 +70,6 @@
   "peerDependencies": {
     "@angular/common": ">=22.0.0",
     "@angular/core": ">=22.0.0",
-    "@real-router/core": "workspace:>=0.150.0"
+    "@real-router/core": "workspace:>=0.151.0"
   }
 }

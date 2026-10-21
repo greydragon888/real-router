@@ -1,5 +1,60 @@
 # @real-router/core
 
+## 0.151.0
+
+### Minor Changes
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - A guard waiting on another navigation's work fails its own navigation when that work is cancelled (same class as [#2788](https://github.com/greydragon888/real-router/issues/2788))
+
+  A guard can wait on work another navigation started: a request deduplicated across navigations and bound to that navigation's `signal`, which rejects with `signal.reason` as `fetch` does, or that navigation's `navigate()` promise. When that work ends with the cancellation the router created for that navigation — what it aborts the signal with when a newer navigation supersedes it, or what the navigation's promise rejects with — the guard now fails the navigation it belongs to: `TRANSITION_ERROR` is emitted, and `navigate()` rejects `CANNOT_ACTIVATE` — `CANNOT_DEACTIVATE` from a `canDeactivate` guard. Before, the guard took the other navigation's cancellation for its own quiet cancel: the navigation still running ended in `TRANSITION_CANCEL` and the user's navigation was dropped with nothing reported.
+
+  Unchanged — each of these is still a quiet cancel:
+
+  - a `RouterError(TRANSITION_CANCELLED)` or an `AbortError` the guard raises itself, one instance raised on every navigation included;
+  - an `AbortError` a request creates itself rather than taking it from the signal;
+  - the reason the application aborted a navigation's `opts.signal` with, whether the guard takes it from a request bound to that navigation's signal or from the application's own signal.
+
+  **Breaking Change:** a guard that rejects with the cancellation the router created for another navigation — the reason it aborted that navigation's `signal` with, or that navigation's rejection — no longer cancels its own navigation quietly.
+
+  **Migration:** to keep the quiet cancel, raise one of the guard's own.
+
+  ```diff
+   canActivate: () => async () => {
+  -  await sharedRequest;
+  +  try {
+  +    await sharedRequest;
+  +  } catch {
+  +    throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+  +  }
+
+     return true;
+   },
+  ```
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - A guard that redirects and then refuses rejects `TRANSITION_CANCELLED` whether the redirect's target commits at once or waits on an async guard ([#2788](https://github.com/greydragon888/real-router/issues/2788))
+
+  A guard that calls `router.navigate()` to another route and then returns `false` has handed the transition to that redirect, and the stream announces `TRANSITION_CANCEL` for its own navigation. When an asynchronous guard holds the redirect's target, that navigation's `navigate()` now rejects `TRANSITION_CANCELLED` too, as it already did for a target that commits at once. Before, it rejected with the guard's own code, `CANNOT_ACTIVATE` or `CANNOT_DEACTIVATE`, so a caller reading that code as "access denied" reported a redirect as a refusal. Core now asks whether the machine cancelled this navigation, not whether it holds some transition.
+
+  - A navigation whose target route, or an ancestor of it, is removed while it runs rejects `ROUTE_NOT_FOUND` on the synchronous guard walk as well — the code `onTransitionError` reports on both walks. The same holds for `start()` on a router created with `allowNotFound: false`; with `allowNotFound`, `start()` still degrades into the not-found state.
+  - The `[router.removeRoute]` warning names that one code.
+  - A redirect the router refuses on the spot — to the state it already shows (`SAME_STATES`) — supersedes nothing, and the guard's refusal stands: `CANNOT_ACTIVATE`, as before.
+  - Under a URL plugin, a Back whose guard redirects to a route an asynchronous guard holds, and then refuses, no longer takes the browser back to the entry the Back started from: the redirect owns the URL and records its entry after the one the Back reached, as it already did for a redirect target that commits at once.
+
+  **Breaking Change:** a navigation that fails because its target route was removed during a synchronous guard walk no longer rejects `TRANSITION_CANCELLED` with the `ROUTE_NOT_FOUND` on `reason`; it rejects `ROUTE_NOT_FOUND` itself.
+
+  **Migration:** classify the failure by its own code.
+
+  ```diff
+  -const reason = error.getField("reason");
+  -
+  -if (
+  -  error.code === "CANCELLED" &&
+  -  reason instanceof RouterError &&
+  -  reason.code === "ROUTE_NOT_FOUND"
+  -) {
+  +if (error.code === "ROUTE_NOT_FOUND") {
+  ```
+
 ## 0.150.0
 
 ### Minor Changes

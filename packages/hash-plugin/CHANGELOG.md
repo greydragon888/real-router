@@ -1,5 +1,20 @@
 # @real-router/hash-plugin
 
+## 0.16.2
+
+### Patch Changes
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - Two overlapping Backs keep every entry's page (same class as [#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  When a guard holds a Back and a second Back arrives behind it, the first one's transition no longer writes its route over the entry the second Back took the browser to. The browser and the router then agree on where the router stands, and every entry keeps its page whichever order the two settle in. Before, the first Back's success rewrote that entry with its own URL: the page the second Back was for vanished from history.
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - A Back or Forward a guard cancels quietly returns to the entry it started from ([#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  A guard can cancel a navigation quietly: throw or reject with `RouterError(TRANSITION_CANCELLED)`, or throw an `AbortError`. When it does so on a browser traversal, with no newer navigation behind the cancel, the router stays where it was, and the plugin now takes the browser back to the entry the traversal started from with `history.go()`, as it does for a refused one. Before, it rewrote the entry the traversal reached with the router's URL: the page the Back was for vanished from history, and the next allowed Back skipped past it.
+
+- Updated dependencies [[`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c)]:
+  - @real-router/core@0.151.0
+
 ## 0.16.1
 
 ### Patch Changes

@@ -7,6 +7,286 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-10-21]
 
+### @real-router/core@0.151.0
+
+### Minor Changes
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - A guard waiting on another navigation's work fails its own navigation when that work is cancelled (same class as [#2788](https://github.com/greydragon888/real-router/issues/2788))
+
+  A guard can wait on work another navigation started: a request deduplicated across navigations and bound to that navigation's `signal`, which rejects with `signal.reason` as `fetch` does, or that navigation's `navigate()` promise. When that work ends with the cancellation the router created for that navigation — what it aborts the signal with when a newer navigation supersedes it, or what the navigation's promise rejects with — the guard now fails the navigation it belongs to: `TRANSITION_ERROR` is emitted, and `navigate()` rejects `CANNOT_ACTIVATE` — `CANNOT_DEACTIVATE` from a `canDeactivate` guard. Before, the guard took the other navigation's cancellation for its own quiet cancel: the navigation still running ended in `TRANSITION_CANCEL` and the user's navigation was dropped with nothing reported.
+
+  Unchanged — each of these is still a quiet cancel:
+
+  - a `RouterError(TRANSITION_CANCELLED)` or an `AbortError` the guard raises itself, one instance raised on every navigation included;
+  - an `AbortError` a request creates itself rather than taking it from the signal;
+  - the reason the application aborted a navigation's `opts.signal` with, whether the guard takes it from a request bound to that navigation's signal or from the application's own signal.
+
+  **Breaking Change:** a guard that rejects with the cancellation the router created for another navigation — the reason it aborted that navigation's `signal` with, or that navigation's rejection — no longer cancels its own navigation quietly.
+
+  **Migration:** to keep the quiet cancel, raise one of the guard's own.
+
+  ```diff
+   canActivate: () => async () => {
+  -  await sharedRequest;
+  +  try {
+  +    await sharedRequest;
+  +  } catch {
+  +    throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+  +  }
+
+     return true;
+   },
+  ```
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - A guard that redirects and then refuses rejects `TRANSITION_CANCELLED` whether the redirect's target commits at once or waits on an async guard ([#2788](https://github.com/greydragon888/real-router/issues/2788))
+
+  A guard that calls `router.navigate()` to another route and then returns `false` has handed the transition to that redirect, and the stream announces `TRANSITION_CANCEL` for its own navigation. When an asynchronous guard holds the redirect's target, that navigation's `navigate()` now rejects `TRANSITION_CANCELLED` too, as it already did for a target that commits at once. Before, it rejected with the guard's own code, `CANNOT_ACTIVATE` or `CANNOT_DEACTIVATE`, so a caller reading that code as "access denied" reported a redirect as a refusal. Core now asks whether the machine cancelled this navigation, not whether it holds some transition.
+
+  - A navigation whose target route, or an ancestor of it, is removed while it runs rejects `ROUTE_NOT_FOUND` on the synchronous guard walk as well — the code `onTransitionError` reports on both walks. The same holds for `start()` on a router created with `allowNotFound: false`; with `allowNotFound`, `start()` still degrades into the not-found state.
+  - The `[router.removeRoute]` warning names that one code.
+  - A redirect the router refuses on the spot — to the state it already shows (`SAME_STATES`) — supersedes nothing, and the guard's refusal stands: `CANNOT_ACTIVATE`, as before.
+  - Under a URL plugin, a Back whose guard redirects to a route an asynchronous guard holds, and then refuses, no longer takes the browser back to the entry the Back started from: the redirect owns the URL and records its entry after the one the Back reached, as it already did for a redirect target that commits at once.
+
+  **Breaking Change:** a navigation that fails because its target route was removed during a synchronous guard walk no longer rejects `TRANSITION_CANCELLED` with the `ROUTE_NOT_FOUND` on `reason`; it rejects `ROUTE_NOT_FOUND` itself.
+
+  **Migration:** classify the failure by its own code.
+
+  ```diff
+  -const reason = error.getField("reason");
+  -
+  -if (
+  -  error.code === "CANCELLED" &&
+  -  reason instanceof RouterError &&
+  -  reason.code === "ROUTE_NOT_FOUND"
+  -) {
+  +if (error.code === "ROUTE_NOT_FOUND") {
+  ```
+
+### @real-router/memory-plugin@0.6.0
+
+### Minor Changes
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - Keep the history stack in step with the router when `back()`, `forward()` or `go()` overlaps another navigation ([#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  Each restore is recognised by its own navigation, and the stack position follows a restore only while that navigation runs: once a failed restore's rejection settles, the position is the entry the router shows. The same class of defect as [#2796](https://github.com/greydragon888/real-router/issues/2796).
+
+  - Two `back()` calls while an async guard holds the first, the second onto the path the router still shows: the router lands on the second's entry, through a navigation. It stayed on the first's target while `canGoBack()`, `canGoForward()` and `state.context.memory` pointed at the second's.
+  - `navigate(..., { replace: true })` while an async guard holds a `back()`: the replace overwrites the entry the `back()` targets, and the entry it left stays ahead. The stack stayed one entry ahead of the router, and `canGoForward()` reported `false`.
+  - A second `back()` from a `TRANSITION_START` listener of the first, which the router refuses synchronously (`REENTRANT_NAVIGATION`): the first restore commits with `direction: "back"`. It was published as `"navigate"`.
+  - Two `back()` calls while an async guard holds the first, the second refused by a guard: the stack stays on the entry the router shows. It stayed on the first's target, and the next push deleted the entry the user was on.
+  - A `back()` refused before its navigation starts — an entry whose route was removed — no longer moves `canGoBack()`/`canGoForward()` until its rejection settles, so a second `back()` before then targets the same entry, not the one before it.
+
+  **Breaking Change:** the position moves when the router announces a restore's navigation, not before the call to it, and a `back()`/`forward()` onto the path the router shows moves the stack synchronously only while no other restore is in flight — with one in flight it starts a navigation, which emits `TRANSITION_START` and `TRANSITION_SUCCESS` and reaches `router.subscribe`.
+
+  **Migration:** nothing to change for code that reads `canGoBack()`/`canGoForward()` after `back()` returns: a restore the router accepts has moved the position by then. A `router.subscribe` listener now also hears a same-path `back()`/`forward()` made while another restore is in flight.
+
+### Patch Changes
+
+- Updated dependencies [[`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c)]:
+  - @real-router/core@0.151.0
+
+### @real-router/navigation-plugin@0.15.0
+
+### Minor Changes
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - A browser navigation a guard cancels quietly returns to the entry it started from ([#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  A guard can cancel a navigation quietly: throw or reject with `RouterError(TRANSITION_CANCELLED)`, or throw an `AbortError`. When it does so on a navigation the browser started — a Back, for one — with no newer navigation behind the cancel, the router stays where it was, and the plugin now takes the browser back to the entry the navigation started from, as it does for a refused one. Before, the URL stayed on the entry the navigation reached while the router stayed on the page it was on.
+
+  - A newer navigation the browser starts, a download, or a router navigation that is neither refused nor cancelled owns the URL, and the plugin leaves it.
+  - A router navigation that cancels the browser's and is refused before the plugin recovers leaves nothing that owns the URL, and the browser's navigation returns as well.
+
+  **Breaking Change:** `TRANSITION_CANCELLED` no longer leaves the URL to a newer navigation unconditionally. With none behind the cancel, the plugin returns, and the intercepted navigation rejects with the router's `RouterError`: `finished` rejects and `navigateerror` fires. Before, `finished` resolved and no `navigateerror` fired.
+
+  **Migration:** a `navigateerror` listener, or code awaiting `finished`, that reports every rejection as a failure tells the quiet cancel apart by its code.
+
+  ```diff
+   navigation.addEventListener("navigateerror", (event) => {
+  +  if (event.error?.code === errorCodes.TRANSITION_CANCELLED) {
+  +    return;
+  +  }
+  +
+     reportFailure(event.error);
+   });
+  ```
+
+### Patch Changes
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - A navigation that arrives no longer drops the record of a newer one (same class as [#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  A navigation the browser starts right after another lands — from a `router.subscribe` listener through a microtask, before the plugin's handler for the first one resumes — keeps the record the plugin took for it. A navigation the router refuses after that now returns to the entry the router stands on. Before, the first navigation's arrival dropped the newer one's record, and the refusal took the browser to the newer navigation's entry, which the router never reached.
+
+- Updated dependencies [[`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c)]:
+  - @real-router/core@0.151.0
+
+### @real-router/rsc-server-plugin@0.5.0
+
+### Minor Changes
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - Clear the `invalidate(router, "rsc")` flag when the refreshing navigation commits, not when its loader resolves ([#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  The loader runs while the navigation leaves its route, before activation guards. A navigation an activation guard then refuses — or a newer navigation cancels while an async guard holds it — never shows the node its loader wrote, yet it consumed the flag, so the next navigation did not refresh. The flag now stays set until a navigation that carries the refresh commits, and an `invalidate()` made after that navigation's loader ran stays for the next one. The same class of defect as [#2796](https://github.com/greydragon888/real-router/issues/2796).
+
+  Nothing to change in application code: the navigation after a refused or cancelled one runs the loader again.
+
+### Patch Changes
+
+- Updated dependencies [[`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c)]:
+  - @real-router/core@0.151.0
+
+### @real-router/ssr-data-plugin@0.7.0
+
+### Minor Changes
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - Clear the `invalidate(router, "data")` flag when the refreshing navigation commits, not when its loader resolves ([#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  The loader runs while the navigation leaves its route, before activation guards. A navigation an activation guard then refuses — or a newer navigation cancels while an async guard holds it — never shows the data its loader wrote, yet it consumed the flag, so the next navigation did not refresh. The flag now stays set until a navigation that carries the refresh commits, and an `invalidate()` made after that navigation's loader ran stays for the next one. The same class of defect as [#2796](https://github.com/greydragon888/real-router/issues/2796).
+
+  Nothing to change in application code: the navigation after a refused or cancelled one runs the loader again.
+
+### Patch Changes
+
+- Updated dependencies [[`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c)]:
+  - @real-router/core@0.151.0
+
+### @real-router/angular@0.24.6
+
+### Patch Changes
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - Announce the first navigation after `<navigation-announcer>` is created ([#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  The announcer leaves out the initial page load — the commit of `router.start()` on a router that had committed nothing when the announcer was created. It skipped the first navigation it observed instead, so with the router started before bootstrap or in an app initializer, the first navigation after `NavigationAnnouncer` was created was never announced. A `start()` after `stop()` on a router that had committed by then changes the page without a load, and is still announced. The same class of defect as [#2796](https://github.com/greydragon888/real-router/issues/2796).
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` labels a Back pressed while another is held `back` ([#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  A `popstate` that arrives while a transition is in flight belongs to the traversal a URL plugin starts after that transition. When the held transition left after it, or a navigation to another address was refused in the meantime, that `popstate`'s flag was spent, and its traversal landed labelled `forward`. Each traversal keeps its own flag now: the transition in flight spends only its own, and a refusal spends the waiting one unless it names another address. The same class of defect as [#2796](https://github.com/greydragon888/real-router/issues/2796).
+
+  A Back that waits behind one a guard refuses or cancels quietly is dropped when the URL plugin returns to the entry the router shows, and its flag ends with that return: the next navigation is labelled `forward`. Before, a Back that waited behind a refused one left the next navigation labelled `back`.
+
+- Updated dependencies [[`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c)]:
+  - @real-router/core@0.151.0
+
+### @real-router/browser-plugin@0.26.3
+
+### Patch Changes
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - Two overlapping Backs keep every entry's page (same class as [#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  When a guard holds a Back and a second Back arrives behind it, the first one's transition no longer writes its route over the entry the second Back took the browser to. The browser and the router then agree on where the router stands, and every entry keeps its page whichever order the two settle in. Before, the first Back's success rewrote that entry with its own URL: the page the second Back was for vanished from history.
+
+  - Where the plugin cannot measure where the browser stands — an entry without the plugin's position, a custom `Browser` without `getState` — it writes as before.
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - A Back or Forward a guard cancels quietly returns to the entry it started from ([#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  A guard can cancel a navigation quietly: throw or reject with `RouterError(TRANSITION_CANCELLED)`, or throw an `AbortError`. When it does so on a browser traversal, with no newer navigation behind the cancel, the router stays where it was, and the plugin now takes the browser back to the entry the traversal started from with `history.go()`, as it does for a refused one. Before, it rewrote the entry the traversal reached with the router's URL: the page the Back was for vanished from history, and the next allowed Back skipped past it.
+
+  - A navigation that cancels the traversal and is neither refused nor cancelled itself owns the URL, and the plugin does not travel.
+  - A navigation that cancels the traversal and is refused before the plugin recovers leaves nothing that owns the URL, and the traversal returns as well.
+
+- Updated dependencies [[`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c)]:
+  - @real-router/core@0.151.0
+
+### @real-router/hash-plugin@0.16.2
+
+### Patch Changes
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - Two overlapping Backs keep every entry's page (same class as [#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  When a guard holds a Back and a second Back arrives behind it, the first one's transition no longer writes its route over the entry the second Back took the browser to. The browser and the router then agree on where the router stands, and every entry keeps its page whichever order the two settle in. Before, the first Back's success rewrote that entry with its own URL: the page the second Back was for vanished from history.
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - A Back or Forward a guard cancels quietly returns to the entry it started from ([#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  A guard can cancel a navigation quietly: throw or reject with `RouterError(TRANSITION_CANCELLED)`, or throw an `AbortError`. When it does so on a browser traversal, with no newer navigation behind the cancel, the router stays where it was, and the plugin now takes the browser back to the entry the traversal started from with `history.go()`, as it does for a refused one. Before, it rewrote the entry the traversal reached with the router's URL: the page the Back was for vanished from history, and the next allowed Back skipped past it.
+
+- Updated dependencies [[`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c)]:
+  - @real-router/core@0.151.0
+
+### @real-router/preact@0.24.4
+
+### Patch Changes
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - Announce the first navigation after `<RouterProvider announceNavigation>` mounts ([#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  The announcer leaves out the initial page load — the commit of `router.start()` on a router that had committed nothing when the announcer was created. It skipped the first navigation it observed instead, so in the canonical order, `await router.start()` and then render, the first navigation after mount was never announced. A `start()` after `stop()` on a router that had committed by then changes the page without a load, and is still announced. The same class of defect as [#2796](https://github.com/greydragon888/real-router/issues/2796).
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` labels a Back pressed while another is held `back` ([#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  A `popstate` that arrives while a transition is in flight belongs to the traversal a URL plugin starts after that transition. When the held transition left after it, or a navigation to another address was refused in the meantime, that `popstate`'s flag was spent, and its traversal landed labelled `forward`. Each traversal keeps its own flag now: the transition in flight spends only its own, and a refusal spends the waiting one unless it names another address. The same class of defect as [#2796](https://github.com/greydragon888/real-router/issues/2796).
+
+  A Back that waits behind one a guard refuses or cancels quietly is dropped when the URL plugin returns to the entry the router shows, and its flag ends with that return: the next navigation is labelled `forward`. Before, a Back that waited behind a refused one left the next navigation labelled `back`.
+
+- Updated dependencies [[`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c)]:
+  - @real-router/core@0.151.0
+
+### @real-router/react@0.37.4
+
+### Patch Changes
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - Announce the first navigation after `<RouterProvider announceNavigation>` mounts ([#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  The announcer leaves out the initial page load — the commit of `router.start()` on a router that had committed nothing when the announcer was created. It skipped the first navigation it observed instead, so in the canonical order, `await router.start()` and then render, the first navigation after mount was never announced. A `start()` after `stop()` on a router that had committed by then changes the page without a load, and is still announced. The same class of defect as [#2796](https://github.com/greydragon888/real-router/issues/2796).
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` labels a Back pressed while another is held `back` ([#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  A `popstate` that arrives while a transition is in flight belongs to the traversal a URL plugin starts after that transition. When the held transition left after it, or a navigation to another address was refused in the meantime, that `popstate`'s flag was spent, and its traversal landed labelled `forward`. Each traversal keeps its own flag now: the transition in flight spends only its own, and a refusal spends the waiting one unless it names another address. The same class of defect as [#2796](https://github.com/greydragon888/real-router/issues/2796).
+
+  A Back that waits behind one a guard refuses or cancels quietly is dropped when the URL plugin returns to the entry the router shows, and its flag ends with that return: the next navigation is labelled `forward`. Before, a Back that waited behind a refused one left the next navigation labelled `back`.
+
+- Updated dependencies [[`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c)]:
+  - @real-router/core@0.151.0
+
+### @real-router/solid@0.26.5
+
+### Patch Changes
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - Announce the first navigation after `<RouterProvider announceNavigation>` mounts ([#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  The announcer leaves out the initial page load — the commit of `router.start()` on a router that had committed nothing when the announcer was created. It skipped the first navigation it observed instead, so in the canonical order, `await router.start()` and then render, the first navigation after mount was never announced. A `start()` after `stop()` on a router that had committed by then changes the page without a load, and is still announced. The same class of defect as [#2796](https://github.com/greydragon888/real-router/issues/2796).
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` labels a Back pressed while another is held `back` ([#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  A `popstate` that arrives while a transition is in flight belongs to the traversal a URL plugin starts after that transition. When the held transition left after it, or a navigation to another address was refused in the meantime, that `popstate`'s flag was spent, and its traversal landed labelled `forward`. Each traversal keeps its own flag now: the transition in flight spends only its own, and a refusal spends the waiting one unless it names another address. The same class of defect as [#2796](https://github.com/greydragon888/real-router/issues/2796).
+
+  A Back that waits behind one a guard refuses or cancels quietly is dropped when the URL plugin returns to the entry the router shows, and its flag ends with that return: the next navigation is labelled `forward`. Before, a Back that waited behind a refused one left the next navigation labelled `back`.
+
+- Updated dependencies [[`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c)]:
+  - @real-router/core@0.151.0
+
+### @real-router/svelte@0.24.4
+
+### Patch Changes
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - Announce the first navigation after `<RouterProvider announceNavigation>` mounts ([#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  The announcer leaves out the initial page load — the commit of `router.start()` on a router that had committed nothing when the announcer was created. It skipped the first navigation it observed instead, so in the canonical order, `await router.start()` and then mount, the first navigation after mount was never announced. A `start()` after `stop()` on a router that had committed by then changes the page without a load, and is still announced. The same class of defect as [#2796](https://github.com/greydragon888/real-router/issues/2796).
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` labels a Back pressed while another is held `back` ([#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  A `popstate` that arrives while a transition is in flight belongs to the traversal a URL plugin starts after that transition. When the held transition left after it, or a navigation to another address was refused in the meantime, that `popstate`'s flag was spent, and its traversal landed labelled `forward`. Each traversal keeps its own flag now: the transition in flight spends only its own, and a refusal spends the waiting one unless it names another address. The same class of defect as [#2796](https://github.com/greydragon888/real-router/issues/2796).
+
+  A Back that waits behind one a guard refuses or cancels quietly is dropped when the URL plugin returns to the entry the router shows, and its flag ends with that return: the next navigation is labelled `forward`. Before, a Back that waited behind a refused one left the next navigation labelled `back`.
+
+- Updated dependencies [[`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c)]:
+  - @real-router/core@0.151.0
+
+### @real-router/vue@0.25.4
+
+### Patch Changes
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - Announce the first navigation after `RouterProvider` with `announceNavigation` mounts, or after the prop is switched on ([#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  The announcer leaves out the initial page load — the commit of `router.start()` on a router that had committed nothing when the announcer was created. It skipped the first navigation it observed instead, so in the canonical order, `await router.start()` and then mount, the first navigation after mount was never announced, and neither was the first one after `announceNavigation` turned on. A `start()` after `stop()` on a router that had committed by then changes the page without a load, and is still announced. The same class of defect as [#2796](https://github.com/greydragon888/real-router/issues/2796).
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` labels a Back pressed while another is held `back` ([#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  A `popstate` that arrives while a transition is in flight belongs to the traversal a URL plugin starts after that transition. When the held transition left after it, or a navigation to another address was refused in the meantime, that `popstate`'s flag was spent, and its traversal landed labelled `forward`. Each traversal keeps its own flag now: the transition in flight spends only its own, and a refusal spends the waiting one unless it names another address. The same class of defect as [#2796](https://github.com/greydragon888/real-router/issues/2796).
+
+  A Back that waits behind one a guard refuses or cancels quietly is dropped when the URL plugin returns to the entry the router shows, and its flag ends with that return: the next navigation is labelled `forward`. Before, a Back that waited behind a refused one left the next navigation labelled `back`.
+
+- Updated dependencies [[`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c)]:
+  - @real-router/core@0.151.0
+
+
 ### @real-router/core@0.150.0
 
 ### Minor Changes
