@@ -23,6 +23,7 @@ import { describe, expect, it } from "vitest";
 
 import { createRouter, errorCodes, RouterError } from "@real-router/core";
 import { getLifecycleApi, getRoutesApi } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 
 import { NUM_RUNS } from "./helpers";
 
@@ -506,6 +507,236 @@ describe("#1609 — a superseded navigation reports exactly one terminal event",
       // ...and the navigation that superseded it committed and announced it.
       expect(log).toContain("SUCCESS:second");
       expect(router.getState()?.name).toBe("second");
+    },
+  );
+});
+
+// --------------------------------------------------------------------------
+// #2787 — a navigation settles after its OWN terminal event
+// --------------------------------------------------------------------------
+//
+// The block above counts terminals once everything has settled, so the
+// supersede may supply the one it counts: a navigation its own failure left in
+// the band gets its `TRANSITION_CANCEL` from the navigation that supersedes it.
+// Here nothing supersedes. Each navigation ends on its own verdict, and the
+// terminal is read at the moment its promise settles.
+//
+// The KIND follows the verdict: a `RouterError(TRANSITION_CANCELLED)` from
+// either source, and a guard's `AbortError`, end in `TRANSITION_CANCEL`; an
+// allow in `TRANSITION_SUCCESS`; every other failure in `TRANSITION_ERROR` — a
+// leave listener's `AbortError` and `ROUTE_NOT_FOUND` among them, and an
+// application error that merely carries the cancellation code.
+
+type VerdictSource = "activate" | "deactivate" | "leave";
+
+type Verdict =
+  | "allow"
+  | "refuse"
+  | "throwError"
+  | "quietCancel"
+  | "abortError"
+  | "routeNotFound"
+  | "collidingCode";
+
+const raiseVerdict = (verdict: Verdict): unknown => {
+  switch (verdict) {
+    case "quietCancel": {
+      return new RouterError(errorCodes.TRANSITION_CANCELLED);
+    }
+    case "abortError": {
+      return new DOMException("aborted", "AbortError");
+    }
+    case "routeNotFound": {
+      return new RouterError(errorCodes.ROUTE_NOT_FOUND);
+    }
+    case "collidingCode": {
+      return Object.assign(new Error("application error"), {
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+    }
+    default: {
+      return new Error("verdict failed");
+    }
+  }
+};
+
+const terminalOf = (
+  source: VerdictSource,
+  verdict: Verdict,
+): "SUCCESS" | "CANCEL" | "ERROR" => {
+  if (verdict === "allow") {
+    return "SUCCESS";
+  }
+
+  if (
+    verdict === "quietCancel" ||
+    (verdict === "abortError" && source !== "leave")
+  ) {
+    return "CANCEL";
+  }
+
+  return "ERROR";
+};
+
+interface OwnVerdictCell {
+  source: VerdictSource;
+  verdict: Verdict;
+  async: boolean;
+  /** For a leave listener: reached through the guard walk, or the guard-free arc. */
+  guardedLeave: boolean;
+}
+
+const GUARD_VERDICTS: readonly Verdict[] = [
+  "allow",
+  "refuse",
+  "throwError",
+  "quietCancel",
+  "abortError",
+  "routeNotFound",
+  "collidingCode",
+];
+
+// A leave listener cannot refuse: it returns nothing.
+const LEAVE_VERDICTS = GUARD_VERDICTS.filter((verdict) => verdict !== "refuse");
+
+const BOTH = [false, true] as const;
+
+// The domain is finite, so every cell runs on every run — as `examples` — and
+// the random draws only repeat them.
+const OWN_VERDICT_CELLS: readonly OwnVerdictCell[] = [
+  ...(["activate", "deactivate"] as const).flatMap((source) =>
+    GUARD_VERDICTS.flatMap((verdict) =>
+      BOTH.map((async) => ({ source, verdict, async, guardedLeave: false })),
+    ),
+  ),
+  ...LEAVE_VERDICTS.flatMap((verdict) =>
+    BOTH.flatMap((async) =>
+      BOTH.map((guardedLeave) => ({
+        source: "leave" as const,
+        verdict,
+        async,
+        guardedLeave,
+      })),
+    ),
+  ),
+];
+
+const answer = (
+  value: boolean,
+  deferred: boolean,
+): boolean | Promise<boolean> => {
+  if (deferred) {
+    return Promise.resolve(value);
+  }
+
+  return value;
+};
+
+/** The verdict on its FIRST call, then `true` — the next navigation passes. */
+function verdictOnce(verdict: Verdict, deferred: boolean) {
+  let armed = true;
+
+  return (): boolean | Promise<boolean> => {
+    if (!armed || verdict === "allow") {
+      armed = false;
+
+      return answer(true, deferred);
+    }
+
+    armed = false;
+
+    if (verdict === "refuse") {
+      return answer(false, deferred);
+    }
+
+    if (deferred) {
+      return Promise.reject(raiseVerdict(verdict));
+    }
+
+    throw raiseVerdict(verdict);
+  };
+}
+
+describe("#2787 — a navigation settles after its own terminal event", () => {
+  it("the domain is the full product of source, verdict and timing, each cell once", () => {
+    expect(OWN_VERDICT_CELLS).toHaveLength(52);
+    expect(
+      new Set(
+        OWN_VERDICT_CELLS.map(
+          (c) => `${c.source}/${c.verdict}/${c.async}/${c.guardedLeave}`,
+        ),
+      ).size,
+    ).toBe(52);
+  });
+
+  // `examples` count towards `numRuns`, so the run is never shorter than the
+  // domain: every cell runs on every run, and the draws only repeat them.
+  test.prop([fc.constantFrom(...OWN_VERDICT_CELLS)], {
+    numRuns: Math.max(NUM_RUNS.fast, OWN_VERDICT_CELLS.length),
+    examples: OWN_VERDICT_CELLS.map((cell): [OwnVerdictCell] => [cell]),
+  })(
+    "the terminal is out and the band is left when the promise settles",
+    async ({ source, verdict, async, guardedLeave }) => {
+      const log: string[] = [];
+      const router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "t", path: "/t" },
+        { name: "b", path: "/b" },
+      ]);
+
+      router.usePlugin(() => ({
+        onTransitionStart: (to) => log.push(`START:${to.name}`),
+        onTransitionSuccess: (to) => log.push(`SUCCESS:${to.name}`),
+        onTransitionCancel: (to) => log.push(`CANCEL:${to.name}`),
+        onTransitionError: (to) => log.push(`ERROR:${to?.name}`),
+      }));
+
+      const lifecycle = getLifecycleApi(router);
+      const decide = verdictOnce(verdict, async);
+
+      if (source === "activate") {
+        lifecycle.addActivateGuard("t", () => decide);
+      } else if (source === "deactivate") {
+        lifecycle.addDeactivateGuard("home", () => decide);
+      } else {
+        if (guardedLeave) {
+          lifecycle.addActivateGuard("t", () => () => true);
+        }
+
+        // A synchronous verdict throws from the listener itself.
+        router.subscribeLeave(() => {
+          const outcome = decide();
+
+          return outcome instanceof Promise
+            ? outcome.then(() => undefined)
+            : undefined;
+        });
+      }
+
+      await router.start("/home");
+      log.length = 0;
+
+      // `isTransitioning()` covers `LEAVE_APPROVED` too — the band is both states.
+      let atSettle: { log: string[]; band: boolean } | undefined;
+      const read = () => {
+        atSettle = {
+          log: [...log],
+          band: getInternals(router).isTransitioning(),
+        };
+      };
+
+      await router.navigate("t").then(read, read);
+
+      expect(atSettle).toStrictEqual({
+        log: ["START:t", `${terminalOf(source, verdict)}:t`],
+        band: false,
+      });
+
+      // Nothing is left for the next navigation to supersede.
+      log.length = 0;
+      await router.navigate("b");
+
+      expect(log).toStrictEqual(["START:b", "SUCCESS:b"]);
     },
   );
 });

@@ -997,8 +997,9 @@ export class EventBusNamespace {
   }
 
   // Single entry point for routing a cancel into the FSM `CANCEL` action — every
-  // source comes through here: stop/dispose pass no reason, supersede and the
-  // external `opts.signal` pass the abort reason (#943).
+  // source comes through here: stop/dispose and a supersede pass no reason, the
+  // external `opts.signal` passes its abort reason (#943), and a cancel
+  // application code raised passes the value it raised (#2787).
   //
   // The `canCancel()` ask is not a safety net — a `send` with no edge is a
   // silent no-op, and removing the ask reds nothing at 100 % coverage. It states
@@ -1015,6 +1016,25 @@ export class EventBusNamespace {
     }
 
     this.sendCancel(fromState, reason);
+  }
+
+  /**
+   * `CANCEL` for ONE navigation: sent only while the machine still carries it
+   * (#2787). The pipeline asks with a failure it is settling, and by then the
+   * machine may have moved past that navigation — cancelled it, or adopted a
+   * newer one. Asked by reference, as `mayFail` asks for `FAIL`, because the
+   * edge itself stays unconditional (`UnconditionalBandCancel`).
+   */
+  sendCancelIfInFlight(
+    nav: object,
+    fromState: State | undefined,
+    reason: unknown,
+  ): void {
+    if (this.#fsm.getContext().inflight !== nav) {
+      return;
+    }
+
+    this.sendCancelIfPossible(fromState, reason);
   }
 
   /**

@@ -205,6 +205,16 @@ it is **preserved**, so `onTransitionError` does not fire. Any other thrown
 `RouterError` is re-coded to `CANNOT_ACTIVATE` / `CANNOT_DEACTIVATE` **on a
 copy**, because the thrown instance may be one of the cached singletons.
 
+**A quiet cancel leaves the band through `CANCEL`**, so the navigation gets its
+`TRANSITION_CANCEL` — and so does one whose `subscribeLeave` listener throws or
+rejects with that `RouterError`. `routeTransitionError` picks the edge by the
+outcome, and sends each only while the machine still carries the navigation:
+`sendCancelIfInFlight` compares `ctx.inflight` by reference, as `mayFail` does for
+`FAIL`, and `FAIL` is sent only inside the band, because `STARTING`'s `FAIL` edge
+asks nothing. A guard that redirects and then cancels quietly has handed the band
+to the redirect, which a band-only ask would cancel. Pinned by
+`quiet-cancel-leaves-the-band-2787.test.ts`.
+
 ---
 
 ## See Also

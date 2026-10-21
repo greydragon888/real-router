@@ -732,8 +732,8 @@ async function finishAsyncNavigation(
     // Liveness on the OTHER arm of the race (#1609). A guard that rejects one
     // or two microtasks before a superseding `navigate()` would otherwise
     // report FAIL for a navigation cancelled several microtasks earlier —
-    // `routeTransitionError` filters by error CODE, and `CANNOT_ACTIVATE` is
-    // not `TRANSITION_CANCELLED`. Into a `READY` FSM that is observability
+    // `routeTransitionError` sends `FAIL` for anything that is not a
+    // cancellation, and `CANNOT_ACTIVATE` is not one. Into a `READY` FSM that is observability
     // noise (a terminal event for a dead navigation); into the LIVE one it is
     // silent corruption, because `TRANSITION_STARTED --FAIL--> READY` is a real
     // edge, so the superseding navigation's later `COMPLETE` became a table

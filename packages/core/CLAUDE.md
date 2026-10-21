@@ -404,7 +404,7 @@ that reads it, a store admits only state its namespace owns, a validator method
 needs a door to guard.
 
 ⚠ **Size is not the signal, and neither is a member with one reader.** Both were
-tried and both failed: `NavigationDependencies` carries 27 members with over half
+tried and both failed: `NavigationDependencies` carries 28 members with over half
 of them read exactly once, which is the CORRECT shape for an injected dependency,
 and `RoutesStore` has no unread member at all. What separates an accreting entity
 from a large one is the absence of a refusal.

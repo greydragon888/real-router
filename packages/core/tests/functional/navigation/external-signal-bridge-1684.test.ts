@@ -17,7 +17,7 @@ import type { Router, State } from "@real-router/core";
  * inside `finishAsyncNavigation`, so it existed only for a navigation that
  * PARKED. Anything that aborted before that reached nobody: the abort was seen
  * only by `mayCommit`, a `when` predicate that REFUSES the `COMPLETE` edge
- * without moving the machine, and `routeTransitionError` filters the resulting
+ * without moving the machine, and `routeTransitionError` filtered the resulting
  * `TRANSITION_CANCELLED` before any send — so no `FAIL` followed either. The
  * navigation rejected correctly and the machine was never told: it stayed in
  * `LEAVE_APPROVED`, `isLeaveApproved()` lied, and `replace()` was a silent
