@@ -164,8 +164,9 @@ export class MemoryPlugin {
   /**
    * Where the stack stands: the entry the restore in flight moves to, else the
    * one the router shows. A restore moves it only once its navigation is
-   * announced, and stops moving it when that navigation fails — so a refusal
-   * leaves nothing to undo, whenever and however it comes (#1803).
+   * announced, and stops moving it once that navigation's promise rejects —
+   * so a refusal leaves nothing to undo, whenever and however it comes
+   * (#1803).
    */
   #position(): number {
     return this.#inFlight?.targetIndex ?? this.#shown;

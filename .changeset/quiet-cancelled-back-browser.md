@@ -6,5 +6,5 @@ A Back or Forward a guard cancels quietly returns to the entry it started from (
 
 A guard can cancel a navigation quietly: throw or reject with `RouterError(TRANSITION_CANCELLED)`, or throw an `AbortError`. When it does so on a browser traversal, with no newer navigation behind the cancel, the router stays where it was, and the plugin now takes the browser back to the entry the traversal started from with `history.go()`, as it does for a refused one. Before, it rewrote the entry the traversal reached with the router's URL: the page the Back was for vanished from history, and the next allowed Back skipped past it.
 
-- A navigation that cancels the traversal and is neither refused nor cancelled itself owns the URL, and the plugin does not travel — as before.
+- A navigation that cancels the traversal and is neither refused nor cancelled itself owns the URL, and the plugin does not travel.
 - A navigation that cancels the traversal and is refused before the plugin recovers leaves nothing that owns the URL, and the traversal returns as well.
