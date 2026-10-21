@@ -46,6 +46,8 @@ import path from "node:path";
 import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { cellTitlesOf } from "./helpers";
+
 const ROOT = path.resolve(__dirname, "../../../..");
 
 const SIGN_MEMBERS = new Set([
@@ -2045,49 +2047,6 @@ function cellTitles(file: string): Set<string> {
     : new Set<string>();
 }
 
-/**
- * The titles of the cells a test file RUNS: `it`, `test` and their `.each`.
- * A `.skip`, `.todo` or `.only` cell holds nothing for the census.
- */
-function cellTitlesOf(text: string, tsx: boolean): Set<string> {
-  const titles = new Set<string>();
-  const sf = ts.createSourceFile(
-    tsx ? "cells.tsx" : "cells.ts",
-    text,
-    ts.ScriptTarget.Latest,
-    true,
-    tsx ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-  );
-
-  walk(sf, (node) => {
-    if (!ts.isCallExpression(node)) {
-      return;
-    }
-
-    const callee = ts.isCallExpression(node.expression)
-      ? node.expression.expression
-      : node.expression;
-    const base = ts.isPropertyAccessExpression(callee)
-      ? callee.expression
-      : callee;
-    const runs =
-      !ts.isPropertyAccessExpression(callee) || callee.name.text === "each";
-    const [title] = node.arguments;
-
-    if (
-      ts.isIdentifier(base) &&
-      (base.text === "it" || base.text === "test") &&
-      runs &&
-      title !== undefined &&
-      ts.isStringLiteralLike(title)
-    ) {
-      titles.add(title.text);
-    }
-  });
-
-  return titles;
-}
-
 const cellExists = (cell: string): boolean => {
   const at = cell.indexOf(" › ");
 
@@ -2440,6 +2399,16 @@ const SPELLINGS = `
       throw error;
     });
   }
+  export function initialized(router: Router): void {
+    const pending = router.navigate("a");
+    pending.catch(() => {});
+  }
+  export function chained(router: Router): void {
+    void router.navigate("b").then(() => undefined).catch(() => {});
+  }
+  export function twoArguments(router: Router): void {
+    void router.navigate("c").then(() => undefined, () => {});
+  }
   export function writes(): void {
     history.pushState(null, "", "/");
   }
@@ -2496,6 +2465,17 @@ const FORM_SOURCE = `
   export function presence(router: Router): void {
     router.subscribe(({ previousRoute }) => {
       if (previousRoute === undefined) {
+        return;
+      }
+    });
+  }
+  export function versioned(router: Router): void {
+    let version = 0;
+
+    router.subscribe(() => {
+      const mine = ++version;
+
+      if (mine === version) {
         return;
       }
     });
@@ -2603,6 +2583,18 @@ describe("the census reads every spelling (#2796)", () => {
     expect(halves(at("spellings.ts", "forwarded › reject:go"))).toBe("typed/-");
   });
 
+  it("a rejection handler on a promise a declaration holds, at the end of a chain, and as then's second argument", () => {
+    expect(
+      halves(at("spellings.ts", "initialized › reject:navigate (swallowed)")),
+    ).toBe("typed/syntactic");
+    expect(
+      halves(at("spellings.ts", "chained › reject:navigate (swallowed)")),
+    ).toBe("typed/syntactic");
+    expect(halves(at("spellings.ts", "twoArguments › reject:navigate"))).toBe(
+      "typed/syntactic",
+    );
+  });
+
   it("code checks, a history write, a transition read and the slots", () => {
     const rests = [
       "rejects › code:instanceof RouterError",
@@ -2635,6 +2627,7 @@ describe("the census reads every spelling (#2796)", () => {
     );
     expect(holds("listens › sign:subscribeLeave", "signal")).toBe(true);
     expect(holds("listens › sign:subscribe", "state-object")).toBe(true);
+    expect(holds("versioned › sign:subscribe", "generation")).toBe(true);
     expect(holds("stage › sign:navigate", "call-extent")).toBe(true);
     expect(holds("lands › sign:navigate", "landed-position")).toBe(true);
     // Each negative is read off a place the census found.
@@ -2687,12 +2680,19 @@ describe("the census reads every spelling (#2796)", () => {
       test.only("focused", () => {});
       it.skip.each([1])("skipped per row %s", () => {});
       describe("a describe", () => {});
+      describe.todo("a pending suite", () => {
+        it("inside a pending suite", () => {});
+      });
+      describe.each([1])("a suite per row %s", () => {
+        it("inside a suite per row", () => {});
+      });
     `;
 
     expect([...cellTitlesOf(cells, false)]).toStrictEqual([
       "runs",
       "runs too",
       "runs per row %s",
+      "inside a suite per row",
     ]);
   });
 });

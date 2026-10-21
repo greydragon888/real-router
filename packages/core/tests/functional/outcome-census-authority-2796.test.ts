@@ -32,6 +32,8 @@ import path from "node:path";
 import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { cellTitlesOf } from "./helpers";
+
 const CORE = path.resolve(__dirname, "../..");
 const SRC = path.join(CORE, "src");
 
@@ -1036,31 +1038,9 @@ const HELD_BY = new Map<string, string>([
   ],
 ]);
 
-/** The titles of the `it` / `test` calls of a test file. */
+/** The titles of the cells a test file runs (`cellTitlesOf`). */
 function cellTitles(file: string): Set<string> {
-  const titles = new Set<string>();
-  const sourceFile = ts.createSourceFile(
-    file,
-    readFileSync(file, "utf8"),
-    ts.ScriptTarget.Latest,
-    true,
-  );
-
-  walk(sourceFile, (node) => {
-    const [title] = ts.isCallExpression(node) ? node.arguments : [];
-
-    if (
-      ts.isCallExpression(node) &&
-      ts.isIdentifier(node.expression) &&
-      (node.expression.text === "it" || node.expression.text === "test") &&
-      title !== undefined &&
-      ts.isStringLiteralLike(title)
-    ) {
-      titles.add(title.text);
-    }
-  });
-
-  return titles;
+  return cellTitlesOf(readFileSync(file, "utf8"), file.endsWith("x"));
 }
 
 /** The wiring a reference crosses to its callers: it decides nothing. */
@@ -1382,7 +1362,7 @@ describe("the census reads every spelling (#2796)", () => {
       if ((error as Error).name === "AbortError" || "AbortError" === (error as Error).name) { return; }
       if (nav.cancelReason !== undefined || signal.aborted) { return; }
     }
-    export function writes(nav: { cancelReason?: unknown }): void { nav.cancelReason = 1; }
+    export function writes(nav: { cancelReason?: unknown }, signal: AbortSignal): void { nav.cancelReason = 1; void signal.aborted; }
     const isGone = (error: unknown) => error instanceof RouterError;
     function notAPredicate(error: unknown): boolean { const seen = error; return seen instanceof RouterError; }
     export function asks(error: unknown): boolean { return isGone(error) && notAPredicate(error); }
@@ -1425,6 +1405,8 @@ describe("the census reads every spelling (#2796)", () => {
     expect(keys).toContain("callers.ts › decide › code:AbortError");
     expect(keys).toContain("callers.ts › decide › read:cancelReason");
     expect(keys).toContain("callers.ts › decide › read:aborted");
+    // The negative is read off a function the census reads.
+    expect(keys).toContain("callers.ts › writes › read:aborted");
     expect(keys).not.toContain("callers.ts › writes › read:cancelReason");
   });
 
