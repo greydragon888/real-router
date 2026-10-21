@@ -1151,8 +1151,7 @@ function armDecidedInside(place: Place): boolean {
 const isClear = (node: ts.Node): node is ts.BinaryExpression =>
   ts.isBinaryExpression(node) &&
   node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-  (node.right.kind === ts.SyntaxKind.UndefinedKeyword ||
-    node.right.kind === ts.SyntaxKind.NullKeyword ||
+  (node.right.kind === ts.SyntaxKind.NullKeyword ||
     (ts.isIdentifier(node.right) && node.right.text === "undefined"));
 
 const PROMISE_CALLBACKS = new Set(["then", "catch", "finally"]);
@@ -2524,7 +2523,7 @@ const FORM_SOURCE = `
     return error.code === errorCodes.TRANSITION_CANCELLED && flag;
   }
   export function continues(router: Router): void {
-    let mine: object | undefined;
+    let mine: object | null | undefined;
     const record = {};
 
     mine = record;
@@ -2537,6 +2536,10 @@ const FORM_SOURCE = `
     void router.navigate("d").then(() => {
       mine = undefined;
     });
+    void (async () => {
+      await router.navigate("e");
+      mine = null;
+    })();
   }
 `;
 
@@ -2634,6 +2637,10 @@ describe("the census reads every spelling (#2796)", () => {
     expect(holds("listens › sign:subscribe", "state-object")).toBe(true);
     expect(holds("stage › sign:navigate", "call-extent")).toBe(true);
     expect(holds("lands › sign:navigate", "landed-position")).toBe(true);
+    // Each negative is read off a place the census found.
+    expect(
+      at("forms.ts", 'listens › sign:addEventListener("PLAIN")'),
+    ).toBeDefined();
     expect(
       Object.keys(FORMS).filter((form) =>
         holds('listens › sign:addEventListener("PLAIN")', form),
@@ -2641,6 +2648,7 @@ describe("the census reads every spelling (#2796)", () => {
     ).toStrictEqual([]);
     // A presence check reads no reference: `previousRoute === undefined`
     // holds no form of its own.
+    expect(at("forms.ts", "presence › sign:subscribe")).toBeDefined();
     expect(
       Object.keys(FORMS).filter((form) =>
         holds("presence › sign:subscribe", form),
@@ -2666,7 +2674,7 @@ describe("the census reads every spelling (#2796)", () => {
       place === undefined
         ? "missing"
         : unguardedClears(place).map((node) => node.getText()),
-    ).toStrictEqual(["mine = undefined"]);
+    ).toStrictEqual(["mine = undefined", "mine = null"]);
   });
 
   it("a cell that runs holds a fact, and a skipped, pending or focused one does not", () => {
