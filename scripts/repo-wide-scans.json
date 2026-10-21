@@ -63,6 +63,10 @@
       "reads": "every tracked source and Markdown file in the repository"
     },
     {
+      "file": "packages/core/tests/functional/outcome-census-outside-core-2796.test.ts",
+      "reads": "every package's src except core's, plus shared/ — and the cells its verdicts name in their tests"
+    },
+    {
       "file": "packages/core/tests/functional/prototype-term-authority-2197.test.ts",
       "reads": "every package's src, plus shared/"
     },
