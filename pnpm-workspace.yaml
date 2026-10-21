@@ -76,9 +76,6 @@ overrides:
   # and api.osv.dev answers clean for each of those versions, queried one by one.
   brace-expansion@2: 2.1.7
   brace-expansion@5: 5.0.12
-  # shell-quote < 1.9.0 (GHSA-395f-4hp3-45gv, High) — dev-only (launch-editor → shell-quote), never
-  # in a published @real-router/* package. Drop when launch-editor pulls >=1.9.0 transitively.
-  shell-quote: '>=1.9.0'
   picomatch@2: 2.3.2
   # 4.0.7 is the highest minimum a parent declares (`^4.0.7`: @changesets/config,
   # knip, tsdown, vite) and the version @angular-devkit/core and @angular/build pin
