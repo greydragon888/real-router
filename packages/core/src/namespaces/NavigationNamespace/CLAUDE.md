@@ -188,12 +188,14 @@ discriminate.
 nothing.** A navigation that is no longer the one in flight is a cancellation,
 whatever its guard decided: no `TRANSITION_ERROR`, and `navigate()` rejects
 `TRANSITION_CANCELLED` carrying the original error as `reason`. ⚠ The two failure
-arcs read liveness from DIFFERENT facts, and the asymmetry is load-bearing:
-`finishAsyncNavigation` holds its own controller and asks `!signal.aborted`;
-the synchronous `handleNavigateError` asks `deps.isTransitioning()` — "does the
-FSM still hold MY transition", which is the actual precondition for sending
-`FAIL`. `isActive()` alone would be too loose there. Neither asks about
-IDENTITY — see `NavigationContext` in `types.ts`, which owns why.
+arcs read DIFFERENT facts about one question — did the machine cancel THIS
+navigation: `finishAsyncNavigation` holds its own controller and asks
+`!signal.aborted`; the synchronous `handleNavigateError`, which may run where no
+controller exists, asks the navigation's `cancelReason`, which only the `CANCEL`
+action writes. A phase read (`isTransitioning()`) answers for whichever
+navigation the machine holds: after a guard redirects to a route an async guard
+holds and then refuses, the redirect's. Pinned by
+`redirect-then-refuse-2788.test.ts`.
 
 **Non-cooperative guards are bounded.** `finishAsyncNavigation` races the guard
 completion against the controller's abort, so an async guard whose Promise never

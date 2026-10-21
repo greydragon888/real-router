@@ -499,7 +499,7 @@
       "d539a32653dd",
       "0739314dfa90",
       "6e785c16aa63",
-      "8d50e805d207",
+      "9ed926b2fa98",
       "aa9f630c24c1"
     ],
     "packages/core/src/namespaces/NavigationNamespace/transition/guardPhase.ts": [
@@ -522,6 +522,7 @@
       "bd37678527d7",
       "3c752335b813",
       "a343e8ab8889",
+      "20adbd9dffa8",
       "2d9e35e43abe",
       "0315222f8f86",
       "9325ed655908",
@@ -598,9 +599,7 @@
       "eb26759451c4"
     ],
     "packages/core/src/namespaces/RouterLifecycleNamespace/RouterLifecycleNamespace.ts": [
-      "1a2a908859c7",
-      "0f906efca780",
-      "376f2c4eb7d5",
+      "97f1fc027783",
       "1b4f2b4c9d95",
       "7613b2caa503",
       "321d351964d2",
@@ -646,13 +645,11 @@
       "ea0e1ccd5379",
       "e7f0a1dd6358",
       "c13635e41a0e",
-      "3d7bbd619e39",
+      "c3d9483e99c1",
       "82b8e5c37977",
-      "1f07ada31c6d",
+      "f80700ab4186",
       "8ad3d9f87408",
-      "0e9f409590c7",
-      "36796f4f4028",
-      "0559c4249776",
+      "44e89725e837",
       "9566a67d2848",
       "06c8df20d0ab",
       "ad8a2c6e9150",
@@ -2058,7 +2055,7 @@
       "d51138402e6c",
       "9ecad603960c",
       "861a0aeb9025",
-      "72415b1aa221"
+      "b479ef11988e"
     ],
     "packages/core/src/namespaces/RoutesNamespace/CLAUDE.md": [
       "56d7f818b3b6",

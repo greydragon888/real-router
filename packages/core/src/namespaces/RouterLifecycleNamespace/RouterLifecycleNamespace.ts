@@ -12,37 +12,18 @@ const atStart = raiser("router", "start");
 const REPLACE_OPTS: NavigationOptions = Object.freeze({ replace: true });
 
 /**
- * Was this failure, at its root, "the route is not there"?
+ * Was this failure "the route is not there"?
  *
- * ⚑ Asked one level deeper than the code, and that is the whole point. On the
- * synchronous guard walk `handleNavigateError` restates the failure as
- * `TRANSITION_CANCELLED` — the FSM has already left the transition by then, and
- * that predicate is deliberate (#1609 — `handleNavigateError`'s own docstring
- * owns the measurement of the alternative). `asCancellation` attaches the
- * original error WHOLE as `reason`, so the cause survives the restatement and a
- * classifier can read it without touching either #1609's predicate or the
- * two-code contract #1756 documents for `navigate()`.
+ * The commit door fails the start navigation `ROUTE_NOT_FOUND` on either arc:
+ * `handleNavigateError` restates a failure as `TRANSITION_CANCELLED` only for a
+ * navigation the machine cancelled, and the door's own `FAIL` is not a cancel.
  *
- * ⚠ Narrow on purpose: a `TRANSITION_CANCELLED` wrapping anything else — a real
- * supersede, a `stop()` — is not a missing route and is rethrown. Measured on
- * the boot arms, a window that stops or disposes the router fails `NOT_STARTED`
- * rather than a wrapped `ROUTE_NOT_FOUND`, so it never reaches here.
+ * ⚠ Narrow on purpose: a `TRANSITION_CANCELLED` — a real supersede, a `stop()`
+ * — is not a missing route and is rethrown.
  */
 function isMissingRoute(error: unknown): boolean {
-  // ⚠ Written over the two CANDIDATES rather than as an early-out on
-  // `instanceof`: that shape carries a `return false` for a non-`RouterError`
-  // the tier cannot reach — nothing in the commit path fails with a plain
-  // `Error` — and an unreachable statement under a 100 % gate is a branch to
-  // remove, not to `v8 ignore`. Here the same case falls out of the predicate.
-  const candidates: unknown[] = [
-    error,
-    (error as { reason?: unknown } | null | undefined)?.reason,
-  ];
-
-  return candidates.some(
-    (candidate) =>
-      candidate instanceof RouterError &&
-      candidate.code === errorCodes.ROUTE_NOT_FOUND,
+  return (
+    error instanceof RouterError && error.code === errorCodes.ROUTE_NOT_FOUND
   );
 }
 
