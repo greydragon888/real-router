@@ -1,5 +1,5 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
-import { createRouter } from "@real-router/core";
+import { createRouter, errorCodes, RouterError } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -12,7 +12,9 @@ import type { Route, Router } from "@real-router/core";
  * transition is in flight is replayed after it, so it is that replay's — the
  * leave of the transition in flight does not spend it, and a refusal that
  * names another address does not either. Each CONTROL lets the first Back land
- * before the second.
+ * before the second. A popstate the URL plugin drops when it returns from a
+ * refused or quietly cancelled Back is replayed by nobody, so its flag ends
+ * with the return.
  */
 
 // jsdom fires a traversal's `popstate` on a later task, and the transition it
@@ -167,5 +169,65 @@ describe("createDirectionTracker — overlapping traversals", () => {
       "back",
       "home:back",
     ]);
+  });
+
+  it.each(["refuses", "cancels quietly"] as const)(
+    "a Back behind one a guard %s is dropped with the plugin's return, and the next navigation is labelled forward",
+    async (verdict) => {
+      const created = await install();
+      let decide: ((allowed: boolean) => void) | undefined;
+      let cancel: ((error: unknown) => void) | undefined;
+
+      getLifecycleApi(created).addDeactivateGuard("contact", () => () => {
+        if (decide !== undefined) {
+          return true;
+        }
+
+        return new Promise<boolean>((resolve, reject) => {
+          decide = resolve;
+          cancel = reject;
+        });
+      });
+
+      globalThis.history.back(); // to /about, held before its leave
+      await settle();
+      globalThis.history.back(); // to /, waiting behind it
+      await settle();
+
+      if (verdict === "refuses") {
+        decide?.(false);
+      } else {
+        cancel?.(new RouterError(errorCodes.TRANSITION_CANCELLED));
+      }
+
+      await settle(); // the plugin returns to /contact and drops the second
+
+      expect(created.getState()?.name).toBe("contact");
+
+      await created.navigate("about");
+
+      expect(direction()).toBe("forward");
+    },
+  );
+
+  it("a Forward onto the router's entry while a Back is held before its leave keeps that Back's label", async () => {
+    const created = await install();
+    const held = holdFirst();
+    const labels: (string | undefined)[] = [];
+
+    getLifecycleApi(created).addDeactivateGuard("contact", held.guard);
+    // Registered after the tracker, so it reads what the tracker wrote.
+    created.subscribeLeave(() => {
+      labels.push(direction());
+    });
+
+    globalThis.history.back(); // to /about, held before its leave
+    await settle();
+    globalThis.history.forward(); // onto /contact, the entry the router shows
+    await settle();
+    held.release();
+    await settle();
+
+    expect(labels[0]).toBe("back");
   });
 });

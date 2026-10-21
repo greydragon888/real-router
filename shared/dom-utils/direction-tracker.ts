@@ -114,6 +114,13 @@ export function createDirectionTracker(router: Router): DirectionTracker {
 
   const onPopstate = (): void => {
     if (landsOnRouterState()) {
+      // The URL plugin returns after a traversal it refused or one a guard
+      // cancelled quietly, and drops the popstate that waited behind it, so
+      // the flag that popstate's replay would have spent ends here.
+      if (inFlight === undefined) {
+        popstateFlag = false;
+      }
+
       return;
     }
 
