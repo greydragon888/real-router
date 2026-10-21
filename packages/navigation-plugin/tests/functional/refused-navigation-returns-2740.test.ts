@@ -422,16 +422,37 @@ describe("a browser navigation the router refuses returns to the entry it starte
 
     it("after one a newer navigation cancelled, a refused one returns to the entry the router stands on", async () => {
       const { mock, router: r } = await setup();
+      let refuseTheNewer: ((allowed: boolean) => void) | undefined;
+      let views = 0;
 
       getLifecycleApi(r).addActivateGuard(
         "users.list",
         () => () => new Promise<boolean>(() => {}),
       );
-      refuse(r, "enter", "users.view");
+      // The router navigation is held, and refused only once the one it
+      // cancelled has settled — by then it owned the URL, and the cancelled
+      // one left its entry where the browser committed it. Every later
+      // navigation to users.view is refused at once.
+      getLifecycleApi(r).addActivateGuard("users.view", () => () => {
+        views++;
+
+        return (
+          views === 1 &&
+          new Promise<boolean>((resolve) => {
+            refuseTheNewer = resolve;
+          })
+        );
+      });
       mock.navigate("http://localhost/users/list");
       await settle();
-      // Cancels the navigation to users.list, and is refused itself.
-      await r.navigate("users.view", { id: "1" }).catch(() => undefined);
+
+      const newer = r
+        .navigate("users.view", { id: "1" })
+        .catch(() => undefined);
+
+      await settle();
+      refuseTheNewer?.(false);
+      await newer;
       await settle();
 
       mock.navigate("http://localhost/users/view/2");

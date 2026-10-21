@@ -35,6 +35,10 @@ export {
 
 export type { EntryPosition, EntryPositions } from "./history-position.js";
 
+export { watchNewerNavigations } from "./newer-navigations.js";
+
+export type { NewerNavigations } from "./newer-navigations.js";
+
 export {
   createOptionsValidator,
   safeBaseRule,

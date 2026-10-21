@@ -483,8 +483,11 @@ User clicks back/forward/link, submits a form, or navigation.navigate() fires
         │                                     → event.scroll() (scrollIfAborted, #2751)
         │                       SAME_STATES → also syncUrlToRouterState() for an entry
         │                                     at another path or query (#2744)
-        │                       TRANSITION_CANCELLED, or SAME_STATES of a navigation a
+        │                       TRANSITION_CANCELLED while another navigation owns
+        │                                     the URL, or SAME_STATES of a navigation a
         │                                     newer one aborted → nothing, the record stays
+        │                       TRANSITION_CANCELLED nothing else owns the URL behind
+        │                                     → returnToOrigin(), rethrow
         │                       other RouterError → returnToOrigin(), rethrow
         │                       non-RouterError → recoverFromNavigateError()
         │                                         → returnToOrigin(), rethrow

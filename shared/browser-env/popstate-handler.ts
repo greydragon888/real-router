@@ -1,16 +1,13 @@
-import {
-  errorCodes,
-  events,
-  RouterError,
-  UNKNOWN_ROUTE,
-} from "@real-router/core";
+import { errorCodes, RouterError, UNKNOWN_ROUTE } from "@real-router/core";
 import { freezeThrownError } from "@real-router/core/utils";
 
 import { distanceBetween, readPosition } from "./history-position.js";
+import { watchNewerNavigations } from "./newer-navigations.js";
 import { getRouteFromEvent, updateBrowserState } from "./popstate-utils.js";
 import { encodeHashFragment, normalizeHashInput } from "./url-context.js";
 
 import type { EntryPosition, EntryPositions } from "./history-position.js";
+import type { NewerNavigations } from "./newer-navigations.js";
 import type { Browser, SharedFactoryState } from "./types.js";
 import type { Plugin, Router, State } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
@@ -122,44 +119,6 @@ export interface PopstateHandler {
 interface TraversalStart {
   readonly position: EntryPosition | undefined;
   readonly state: State | undefined;
-}
-
-/** Whether a navigation newer than a traversal's own owns the URL. */
-interface NewerNavigations {
-  readonly ownTheUrl: () => boolean;
-  readonly stop: () => void;
-}
-
-/**
- * Watches the navigations the router announces while a traversal runs, until
- * one is refused or cancelled. The traversal's own has ended by the time its
- * promise rejects, so one left then is a newer navigation, and it owns the
- * URL. With none left — a guard of the traversal cancels it quietly, or the
- * router refuses the newer one — nothing does (#2796).
- */
-function watchNewerNavigations(api: PluginApi): NewerNavigations {
-  const owners = new Set<object>();
-  const ended = (toState: State | undefined): void => {
-    if (toState !== undefined) {
-      owners.delete(toState.context);
-    }
-  };
-  const removers = [
-    api.addEventListener(events.TRANSITION_START, (toState) => {
-      owners.add(toState.context);
-    }),
-    api.addEventListener(events.TRANSITION_ERROR, ended),
-    api.addEventListener(events.TRANSITION_CANCEL, ended),
-  ];
-
-  return {
-    ownTheUrl: () => owners.size > 0,
-    stop: () => {
-      for (const remove of removers) {
-        remove();
-      }
-    },
-  };
 }
 
 export function createPopstateHandler(

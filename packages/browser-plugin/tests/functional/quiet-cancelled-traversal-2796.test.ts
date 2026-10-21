@@ -140,6 +140,40 @@ describe("#2796 — a Back a guard cancels quietly returns to the entry it start
     },
   );
 
+  it("the watch over newer navigations ends with the traversal: a router capped at three listeners per event takes Back after Back", async () => {
+    globalThis.history.replaceState(null, "", "/sentinel");
+    globalThis.history.pushState(null, "", "/home");
+
+    const created = createRouter(routerConfig, {
+      defaultRoute: "home",
+      allowNotFound: true,
+      limits: { maxListeners: 3 },
+    });
+
+    created.usePlugin(
+      browserPluginFactory(
+        {},
+        createSafeBrowser(
+          () => globalThis.location.pathname + globalThis.location.search,
+          "browser-plugin",
+        ),
+      ),
+    );
+    await created.start();
+    router = created;
+
+    await created.navigate("users.list");
+
+    for (let round = 0; round < 3; round++) {
+      globalThis.history.back();
+      await settle();
+      globalThis.history.forward();
+      await settle();
+    }
+
+    expect(at()).toStrictEqual({ path: "/users/list", route: "users.list" });
+  });
+
   describe("a newer navigation behind the cancel", () => {
     /** Holds the Back's leave guard; every later leave is allowed. */
     function holdTheBack(r: Router): void {
