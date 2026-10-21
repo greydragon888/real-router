@@ -16,6 +16,9 @@ import type { Router } from "@real-router/core";
  * navigation behind it: the router stays where it was, and the plugin returns
  * to the entry the navigation started from, as it does for a refused one
  * (#2740). A newer navigation that owns the URL keeps it.
+ *
+ * And the handler's record of the navigation it took belongs to that
+ * navigation: one that arrives clears its own, never a newer one's.
  */
 
 type Verdict =
@@ -233,5 +236,47 @@ describe("the watch over newer navigations ends with the navigation", () => {
 
     expect(router.getState()?.path).toBe("/users/list");
     expect(mock.entries()).toHaveLength(destinations.length + 1);
+  });
+});
+
+describe("the handler's record belongs to the navigation it took", () => {
+  afterEach(() => {
+    router?.stop();
+    router = undefined;
+  });
+
+  it("a navigation that arrives after a newer one was taken leaves the newer one's record", async () => {
+    const { mock, router: r } = await setup();
+    const lifecycle = getLifecycleApi(r);
+
+    // The second navigation waits on its guard for good; the third is refused.
+    lifecycle.addActivateGuard(
+      "users.view",
+      () => () => new Promise<boolean>(() => {}),
+    );
+    lifecycle.addActivateGuard("index", () => () => false);
+
+    let armed = true;
+
+    r.subscribe(({ route }) => {
+      if (!armed || route.name !== "users.list") {
+        return;
+      }
+
+      armed = false;
+      // Taken before the first navigation's handler resumes after its commit.
+      queueMicrotask(() => {
+        mock.navigate("http://localhost/users/view/1");
+      });
+    });
+
+    mock.navigate("http://localhost/users/list"); // the first: no guard, commits
+    await settle();
+    mock.navigate("http://localhost/"); // the third: refused
+    await settle();
+
+    // The router stands on `users.list`, and so does the browser: the
+    // refusal returns to the entry the router stood on, not the second one's.
+    expect(where(mock)).toMatchObject({ index: 1, route: "users.list" });
   });
 });

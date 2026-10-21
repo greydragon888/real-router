@@ -478,7 +478,8 @@ User clicks back/forward/link, submits a form, or navigation.navigate() fires
         │         (+ force, hashChange when the fragment differs from the one the router
         │          publishes on the route it shows: event.hashChange, or an alias, #2744)
         │         withRecovery: resolved / SAME_STATES → the router stands on the
-        │                                     destination: the record is dropped; a write
+        │                                     destination: its own record is dropped,
+        │                                     a newer one taken since stays; a write
         │                                     after the transition aborted the navigation
         │                                     → event.scroll() (scrollIfAborted, #2751)
         │                       SAME_STATES → also syncUrlToRouterState() for an entry

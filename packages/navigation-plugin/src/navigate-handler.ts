@@ -240,7 +240,12 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
           ).finally(newer.stop);
 
           if (arrived) {
-            taken = undefined;
+            // Its own record only: a navigation the browser started after the
+            // commit, before this resumed, is the one in the slot now.
+            if (taken === record) {
+              taken = undefined;
+            }
+
             scrollIfAborted(event);
           }
         },
