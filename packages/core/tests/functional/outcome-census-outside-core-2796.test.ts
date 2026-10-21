@@ -2123,6 +2123,9 @@ const ledger = new Map(
 
 describe("the outcome-decision census outside core (#2796)", () => {
   const found = census(diskUnits(PACKAGE_CONFIG));
+  // The verdicts of the places found: a place the ledger names and the code
+  // lacks is the equality cell's to report, so the others read on.
+  const present = [...ledger].filter(([key]) => found.places.has(key));
   const place = (key: string): Place => {
     const value = found.places.get(key);
 
@@ -2146,7 +2149,7 @@ describe("the outcome-decision census outside core (#2796)", () => {
   });
 
   it("an identity verdict is held by the code of its place", () => {
-    const unheld = [...ledger]
+    const unheld = present
       .filter(([, verdict]) => verdict.startsWith("identity:"))
       .filter(
         ([key, verdict]) =>
@@ -2158,7 +2161,7 @@ describe("the outcome-decision census outside core (#2796)", () => {
   });
 
   it("an unsupported place still decides without an identity form", () => {
-    const stale = [...ledger]
+    const stale = present
       .filter(([, verdict]) => verdict.startsWith("unsupported:"))
       .filter(([key]) =>
         Object.keys(FORMS).some((form) => holdsForm(place(key), form)),
@@ -2169,7 +2172,7 @@ describe("the outcome-decision census outside core (#2796)", () => {
   });
 
   it("an arm a code picks is decided inside it by a call", () => {
-    const undecided = [...ledger]
+    const undecided = present
       .filter(([, verdict]) => verdict === EQ_ARM)
       .filter(([key]) => !armDecidedInside(place(key)))
       .map(([key]) => key);
@@ -2178,7 +2181,7 @@ describe("the outcome-decision census outside core (#2796)", () => {
   });
 
   it("a continuation clears an identity slot only when the slot is its own", () => {
-    const unguarded = [...ledger]
+    const unguarded = present
       .filter(
         ([key, verdict]) =>
           key.includes(" › slot:") && verdict.startsWith("identity:"),
