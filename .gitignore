@@ -62,9 +62,11 @@ packages/**/.eslintcache
 # AI / tooling
 # Ignore all .claude dirs (root + per-package), but track root .claude/commands,
 # root .claude/rules (path-scoped instructions — see CLAUDE.md) and the root
-# .claude/prompts that a tracked file cites — a new citation adds its line here
-**/.claude/
-!/.claude/
+# .claude/prompts that a tracked file cites — a new citation adds its line here.
+# ⚠ knip ignores rule order: a `!` line re-includes everything under the
+# directory it names. `*/**/.claude/` leaves the root dir unmatched, so it
+# needs no `!/.claude/`, which would re-include all of .claude/ for knip.
+*/**/.claude/
 /.claude/*
 !/.claude/commands/
 !/.claude/rules/
