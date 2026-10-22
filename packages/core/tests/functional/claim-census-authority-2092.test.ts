@@ -77,8 +77,22 @@ const CAVEAT_OPENING = " * ⚠ Capture narrows the window";
 /** Where that caveat ends. Its absence is a drift the cell below must SEE. */
 const CAVEAT_CLOSING = "(#1798";
 
-const read = (file: string): string =>
-  readFileSync(path.join(REPO_ROOT, file), "utf8");
+/** File texts by repo path, filled at collection by the suite below. */
+const TEXTS = new Map<string, string>();
+
+const read = (file: string): string => {
+  const cached = TEXTS.get(file);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const text = readFileSync(path.join(REPO_ROOT, file), "utf8");
+
+  TEXTS.set(file, text);
+
+  return text;
+};
 
 const claimLines = (file: string): string[] =>
   read(file)
@@ -274,6 +288,11 @@ describe("the #2092 claim census, as a ledger rather than a sweep", () => {
         (file) => !/node_modules|dist|CHANGELOG\.md|\/\.claude\//.test(file),
       )
       .toSorted((a, b) => a.localeCompare(b));
+
+  // Every text the cells read, read once here at collection.
+  for (const file of [...scanned(), ...scannedDocuments()]) {
+    read(file);
+  }
 
   it("every verified DOC still carries the claims that were read", () => {
     expect(orphaned(VERIFIED_DOCS)).toStrictEqual([]);

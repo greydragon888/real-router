@@ -981,10 +981,13 @@ describe("where core walks a chain it does not own", () => {
     return found;
   }
 
+  const SOURCES = sourceFiles();
+  const SITES = scan(SOURCES);
+
   it("every chain walk in src is classified", () => {
     const verdicts: Record<string, Site["shape"]> = {};
 
-    for (const site of scan()) {
+    for (const site of SITES) {
       // ⚠ Two sites with the same file AND the same first line are two sites.
       // `Object.fromEntries` collapsed them, so a second copy of an existing
       // walk was invisible — addressing by text is this file's rule, and the
@@ -1189,8 +1192,8 @@ describe("where core walks a chain it does not own", () => {
     // to `.mts`/`.tsx`, a directory moved out of `SRC`, a glob that matches
     // nothing.
     //
-    // ⚠ It calls `sourceFiles()` — the function `scan()` itself defaults to —
-    // rather than re-globbing. The first version pasted a SECOND copy of the
+    // ⚠ It reads `SOURCES`, the list `scan()` itself was handed, rather than
+    // re-globbing. The first version pasted a SECOND copy of the
     // glob here, so breaking the glob inside `scan()` left this control green;
     // measured, and the commit message claiming otherwise was wrong (the
     // mutation had edited both copies at once). A control that re-implements
@@ -1198,14 +1201,12 @@ describe("where core walks a chain it does not own", () => {
     //
     // A file count does NOT shrink as defects are fixed — the property the
     // count of unguarded walks lacked, and what makes a floor legitimate here.
-    const sources = sourceFiles();
-
-    expect(sources.length).toBeGreaterThan(50);
+    expect(SOURCES.length).toBeGreaterThan(50);
     // Matched is not read: a glob can hit while the file comes back empty.
-    expect(sources.every((source) => source.text.length > 0)).toBe(true);
+    expect(SOURCES.every((source) => source.text.length > 0)).toBe(true);
     // And a structurally permanent file is present, so a directory moved out of
     // `SRC` fails here rather than silently shrinking the census.
-    expect(sources.map((source) => path.relative(SRC, source.file))).toContain(
+    expect(SOURCES.map((source) => path.relative(SRC, source.file))).toContain(
       "guards.ts",
     );
   });

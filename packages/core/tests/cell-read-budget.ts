@@ -1,9 +1,8 @@
 import fs from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
-import path from "node:path";
 
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- test-only module; vitest is a root devDependency. The eslint vitest block (section 12) auto-exempts only *.test.ts / *.properties.ts / *.stress.ts / helpers.ts.
-import { afterAll, afterEach, beforeAll, beforeEach, expect } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach } from "vitest";
 
 /**
  * A cell reads a file or two; a TREE is read at collection (#2818).
@@ -28,59 +27,28 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect } from "vitest";
 
 /**
  * What a window may read. A scan of core's own `src` is over it, which
- * `cell-read-budget-authority-2818` holds; every cell the backlog does not name
- * is under it, which the tripwire itself holds on every run.
+ * `cell-read-budget-authority-2818` holds; every cell and hook is under it,
+ * which the tripwire itself holds on every run.
  */
 export const CELL_READ_BUDGET = 1024 * 1024;
-
-/**
- * The cells over the budget today, keyed by {@link cellKey}.
- *
- * ⚑ A BACKLOG, not an approval, and a ratchet in both directions: a cell over
- * the budget that it does not name reds, and so does a cell it names that reads
- * within the budget — move the scan to collection, then delete the row. It is
- * JSON so that the names it quotes stay out of the code
- * `test-name-authority-2125` builds its vocabulary from.
- */
-export const BACKLOG = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "cell-read-backlog.json"), "utf8"),
-) as readonly string[];
-
-/** A cell's key: its file under `tests/`, then its full name. */
-function cellKey(testPath: string, name: string): string {
-  return `${path.relative(__dirname, testPath)} :: ${name}`;
-}
 
 function mib(bytes: number): string {
   return `${bytes} bytes (${(bytes / CELL_READ_BUDGET).toFixed(1)} MiB)`;
 }
 
-/** Why the cell `key` fails after reading `bytes`, or `undefined` if it does not. */
-export function cellVerdict(
-  key: string,
-  bytes: number,
-  backlog: readonly string[],
-): string | undefined {
-  const over = bytes > CELL_READ_BUDGET;
-
-  if (over && !backlog.includes(key)) {
-    return (
-      `[cell-read-budget] this cell read ${mib(bytes)} through readFileSync, ` +
-      `over the ${mib(CELL_READ_BUDGET)} a cell may read. Read the tree ONCE at ` +
-      `collection, at module scope or in the describe body where no timeout ` +
-      `reaches, and let the cells read the result (#2818). The rule lives in ` +
-      `tests/cell-read-budget.ts.`
-    );
+/** Why a cell that read `bytes` fails, or `undefined` if it does not. */
+export function cellVerdict(bytes: number): string | undefined {
+  if (bytes <= CELL_READ_BUDGET) {
+    return undefined;
   }
 
-  if (!over && backlog.includes(key)) {
-    return (
-      `[cell-read-budget] "${key}" is in tests/cell-read-backlog.json and read ` +
-      `${mib(bytes)}, within the budget: delete its row, the backlog only shrinks.`
-    );
-  }
-
-  return undefined;
+  return (
+    `[cell-read-budget] this cell read ${mib(bytes)} through readFileSync, ` +
+    `over the ${mib(CELL_READ_BUDGET)} a cell may read. Read the tree ONCE at ` +
+    `collection, at module scope or in the describe body where no timeout ` +
+    `reaches, and let the cells read the result (#2818). The rule lives in ` +
+    `tests/cell-read-budget.ts.`
+  );
 }
 
 /** Why the hooks that read `bytes` outside the cells fail, or `undefined`. */
@@ -185,10 +153,7 @@ export function installCellReadBudget(): void {
   });
 
   afterEach(() => {
-    const { testPath, currentTestName } = expect.getState();
-    const key = cellKey(testPath ?? "", currentTestName ?? "");
-
-    close("hooks", (bytes) => cellVerdict(key, bytes, BACKLOG));
+    close("hooks", cellVerdict);
   });
 
   afterAll(() => {

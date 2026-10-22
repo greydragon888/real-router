@@ -2635,6 +2635,8 @@ describe("how many times core reads a caller-owned SCALAR slot (#2085)", () => {
     });
   });
 
+  const liveClass = liveClassSites();
+
   it("DERIVED — the live class across every package, each site classified", () => {
     // ⚑ The table above MEASURES four doors. This one ENUMERATES the class they
     // belong to, by walking every package's `src` and the bare `shared/`
@@ -2643,9 +2645,7 @@ describe("how many times core reads a caller-owned SCALAR slot (#2085)", () => {
     // ⚠ The assertion is the whole SET, not a count. A new site appears as a
     // new key with no classification beside it; a site that stops being inert
     // changes its number. Both red, and a legal rename of a local does neither.
-    const found = liveClassSites();
-
-    expect(found).toStrictEqual({
+    expect(liveClass).toStrictEqual({
       // ── core COPIES the caller's options at the entry (#1901) ────────────
       // A plugin hook does not receive the caller's object — measured on the
       // identity, with the caller's accessor counted at ONE read. So `hash` and

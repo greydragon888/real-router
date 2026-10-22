@@ -34,12 +34,10 @@
       "inputs": ["$TURBO_EXTENDS$", "tests/**/*.json"]
     },
     "test:properties": {
-      "dependsOn": ["$TURBO_EXTENDS$", "type-check:tests"],
-      "inputs": ["$TURBO_EXTENDS$", "tests/cell-read-backlog.json"]
+      "dependsOn": ["$TURBO_EXTENDS$", "type-check:tests"]
     },
     "test:stress": {
-      "dependsOn": ["$TURBO_EXTENDS$", "type-check:tests"],
-      "inputs": ["$TURBO_EXTENDS$", "tests/cell-read-backlog.json"]
+      "dependsOn": ["$TURBO_EXTENDS$", "type-check:tests"]
     }
   }
 }

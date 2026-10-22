@@ -686,9 +686,8 @@ A cell runs under `testTimeout`, and a scan inside one grows with its tree
 until it misses it on a loaded runner (#2818). So a test that reads a tree
 reads it at module scope or in the `describe` body, and its cells read the
 result. `tests/cell-read-budget.ts`, installed by `tests/setup.ts`, fails a cell
-or a hook that reads more than its budget through `readFileSync`. The cells over
-it today are rows of `tests/cell-read-backlog.json`, which only shrinks: a row
-whose cell reads within the budget fails until it is deleted.
+or a hook that reads more than its budget through `readFileSync`, and no cell is
+exempt from it.
 
 ### Mutation testing (Stryker)
 

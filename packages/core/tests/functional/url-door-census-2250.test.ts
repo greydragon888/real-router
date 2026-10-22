@@ -212,10 +212,12 @@ const census = (): Census => {
 };
 
 describe("which door a URL producer outside core asks (#2250)", () => {
+  const doors = census();
+
   it("the sweep reached the tree it claims to sweep", () => {
     // POSITIVE control for the table below: two empty lists are also what a
     // broken glob returns.
-    expect(census().filesRead).toBeGreaterThan(200);
+    expect(doors.filesRead).toBeGreaterThan(200);
   });
 
   it("every URL a user follows is built by the RESOLVING door", () => {
@@ -224,7 +226,7 @@ describe("which door a URL producer outside core asks (#2250)", () => {
     // exactly that reason: a check that asked the literal door would compare the
     // manifest against a URL no link renders, which is the defect it exists to
     // catch.
-    expect(census().fallback).toStrictEqual([
+    expect(doors.fallback).toStrictEqual([
       "packages/hash-plugin/src/plugin.ts::pluginBuildUrl",
       "packages/ssr-utils/src/getStaticPaths.ts::forwardedHref",
       "shared/browser-env/plugin-utils.ts::(anonymous)",
@@ -243,7 +245,7 @@ describe("which door a URL producer outside core asks (#2250)", () => {
     // above and fails the build when an enumerated leaf's link lands on a URL
     // these two do not produce, so the manifest stays literal and the two
     // answers cannot diverge unnoticed.
-    expect(census().standalone).toStrictEqual([
+    expect(doors.standalone).toStrictEqual([
       "packages/ssr-utils/src/getStaticPaths.ts::getStaticPaths",
       "packages/ssr-utils/src/getStaticPaths.ts::pathForEntry",
     ]);

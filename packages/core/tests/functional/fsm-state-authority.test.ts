@@ -80,6 +80,13 @@ function forceStateAccesses(file: string): number[] {
 }
 
 describe("FSM state-authority invariant — no forceState bypass (#1169)", () => {
+  const offenders = tsFiles(SRC_DIR)
+    .map((file) => ({
+      file: path.relative(SRC_DIR, file),
+      lines: forceStateAccesses(file),
+    }))
+    .filter((offender) => offender.lines.length > 0);
+
   it("the FSM engine exposes no forceState() method (the bypass primitive stays removed)", () => {
     // Prototype method, static, or instance field — none of the shapes a
     // re-introduced forceState could take should exist.
@@ -88,13 +95,6 @@ describe("FSM state-authority invariant — no forceState bypass (#1169)", () =>
   });
 
   it("core src never accesses .forceState — the transition table is the sole state authority", () => {
-    const offenders = tsFiles(SRC_DIR)
-      .map((file) => ({
-        file: path.relative(SRC_DIR, file),
-        lines: forceStateAccesses(file),
-      }))
-      .filter((offender) => offender.lines.length > 0);
-
     expect(offenders).toStrictEqual([]);
   });
 });

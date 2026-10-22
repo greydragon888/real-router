@@ -174,15 +174,15 @@ function cellWrites(file: string): number[] {
 }
 
 describe("Committed-state authority — no commit outside the machine", () => {
-  it("only the table writes the cells — nothing else in src does", () => {
-    const offenders = tsFiles(SRC_DIR)
-      .filter((file) => !ALLOWED_WRITERS.has(file))
-      .map((file) => ({
-        file: path.relative(SRC_DIR, file),
-        at: cellWrites(file),
-      }))
-      .filter((entry) => entry.at.length > 0);
+  const offenders = tsFiles(SRC_DIR)
+    .filter((file) => !ALLOWED_WRITERS.has(file))
+    .map((file) => ({
+      file: path.relative(SRC_DIR, file),
+      at: cellWrites(file),
+    }))
+    .filter((entry) => entry.at.length > 0);
 
+  it("only the table writes the cells — nothing else in src does", () => {
     expect(offenders).toStrictEqual([]);
   });
 

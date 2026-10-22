@@ -227,12 +227,14 @@ const transitiveFiles = (seeds: ReadonlySet<string>): string[] => {
 };
 
 describe("nothing registers on a buildPath interception point (#2090)", () => {
-  it("the TRIPWIRE — no site in packages/*, benchmarks/ or cross-router-bench/ names the seam", () => {
-    const { keys, seeds } = namingSites();
+  const { keys, seeds } = namingSites();
+  const transitive = transitiveFiles(seeds);
+  const reached = transitiveFiles(new Set(["persistent-params-plugin"]));
 
+  it("the TRIPWIRE — no site in packages/*, benchmarks/ or cross-router-bench/ names the seam", () => {
     expect(keys).toStrictEqual([]);
     expect([...seeds]).toStrictEqual([]);
-    expect(transitiveFiles(seeds)).toStrictEqual([]);
+    expect(transitive).toStrictEqual([]);
   });
 
   it("CONTROL — the predicate is structural, and it does find a site", () => {
@@ -278,8 +280,6 @@ describe("nothing registers on a buildPath interception point (#2090)", () => {
     // spellings the walk was built for are covered: `plugin.test.ts` imports by
     // RELATIVE path, the cross-router app hands the factory to `usePlugin` as a
     // NON-FIRST argument.
-    const reached = transitiveFiles(new Set(["persistent-params-plugin"]));
-
     expect(reached).toContain(
       "packages/persistent-params-plugin/tests/functional/plugin.test.ts",
     );

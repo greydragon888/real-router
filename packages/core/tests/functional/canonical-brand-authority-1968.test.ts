@@ -148,8 +148,10 @@ function census(): Record<string, number> {
 }
 
 describe("who may stamp the Canonical brand (#1968)", () => {
+  const casts = census();
+
   it("exactly two casts, both inside canonicalize", () => {
-    expect(census()).toStrictEqual(EXPECTED_BRAND_CASTS);
+    expect(casts).toStrictEqual(EXPECTED_BRAND_CASTS);
 
     // A closed-set count is only as complete as the walk under it, so the walk
     // is pinned too: everything the walk skips is documentation, and a source

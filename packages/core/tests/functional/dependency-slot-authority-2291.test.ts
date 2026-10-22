@@ -96,11 +96,11 @@ function slotWrites(file: string, text: string): string[] {
 }
 
 describe("the dependency store's slot has one writer (#2291)", () => {
-  it("only `clearDependencies` assigns `dependencies`", () => {
-    const sites = tsFiles(SRC_DIR).flatMap((file) =>
-      slotWrites(file, readFileSync(file, "utf8")),
-    );
+  const sites = tsFiles(SRC_DIR).flatMap((file) =>
+    slotWrites(file, readFileSync(file, "utf8")),
+  );
 
+  it("only `clearDependencies` assigns `dependencies`", () => {
     expect(sites).toStrictEqual(["dependenciesStore.ts · clearDependencies"]);
   });
 

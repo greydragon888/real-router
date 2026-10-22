@@ -125,11 +125,11 @@ const CLASSIFIED: Record<string, string> = {
 };
 
 describe("#1758 / #1759 — every route-table writer is behind the window's ban", () => {
+  const writes = tableWrites();
+
   it("the scan sees the writers at all", () => {
     // Non-vacuity: an empty scan satisfies the table below, and an empty scan is
     // what a broken root path or a renamed slot produces.
-    const writes = tableWrites();
-
     expect(writes.length).toBeGreaterThanOrEqual(3);
     expect(writes.some((w) => w.text.includes("matcher"))).toBe(true);
     expect(writes.some((w) => w.text.includes("tree"))).toBe(true);
@@ -164,7 +164,7 @@ describe("#1758 / #1759 — every route-table writer is behind the window's ban"
 
   it("every writer is classified, and the set is the one that was decided", () => {
     const seen = [
-      ...new Set(tableWrites().map((w) => `${w.file} · ${w.fn}`)),
+      ...new Set(writes.map((w) => `${w.file} · ${w.fn}`)),
     ].toSorted((left, right) => left.localeCompare(right));
 
     expect(

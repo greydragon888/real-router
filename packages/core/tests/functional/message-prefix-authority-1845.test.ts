@@ -466,9 +466,60 @@ const DEFERRED_OFFENDERS: readonly Offender[] = [
   { file: "internals.ts", prefix: "[real-router]" },
 ];
 
+/**
+ * What the walk over `src` reads: the arguments of a call or a construction
+ * that carry a bracketed head, and the raiser bindings.
+ */
+function messagesWalked(): { bracketed: number; bindings: number } {
+  let bracketed = 0;
+  let bindings = 0;
+
+  for (const file of globSync(`${SRC}/**/*.ts`)) {
+    const source = ts.createSourceFile(
+      file,
+      readFileSync(file, "utf8"),
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TS,
+    );
+
+    const walk = (node: ts.Node): void => {
+      if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
+        for (const argument of node.arguments ?? []) {
+          const text = textOf(argument);
+
+          if (text !== undefined && prefixOf(text) !== undefined) {
+            bracketed++;
+          }
+        }
+      }
+
+      // A raiser binding is where a converted head lives, so it is what the
+      // tier reads there instead of an argument.
+      if (
+        ts.isCallExpression(node) &&
+        node.expression.getText(source) === "raiser"
+      ) {
+        bindings++;
+      }
+
+      ts.forEachChild(node, walk);
+    };
+
+    walk(source);
+  }
+
+  return { bracketed, bindings };
+}
+
 describe("a message prefix names something the caller can look up (#1845)", () => {
+  const offending = offenders();
+  const doubled = doubleHeads();
+  const unreadable = unreadableRaiserUses();
+  const walked = messagesWalked();
+
   it("no message in core names an internal class or layer, beyond the deferred", () => {
-    expect(offenders()).toStrictEqual(DEFERRED_OFFENDERS);
+    expect(offending).toStrictEqual(DEFERRED_OFFENDERS);
   });
 
   it("CONTROL — the two discriminators the walk rests on, both polarities", () => {
@@ -585,7 +636,7 @@ describe("a message prefix names something the caller can look up (#1845)", () =
   });
 
   it("no raiser body renders a second head, and the residue stays open", () => {
-    expect(doubleHeads()).toStrictEqual([]);
+    expect(doubled).toStrictEqual([]);
   });
 
   it("CONTROL — О-3's two rejections fire, and the third shape does not", () => {
@@ -623,7 +674,7 @@ describe("a message prefix names something the caller can look up (#1845)", () =
   });
 
   it("every raiser use is the shape the head tier can read", () => {
-    expect(unreadableRaiserUses()).toStrictEqual([]);
+    expect(unreadable).toStrictEqual([]);
   });
 
   it("CONTROL — the four spellings the tier cannot read are refused", () => {
@@ -668,43 +719,7 @@ describe("a message prefix names something the caller can look up (#1845)", () =
   it("CONTROL — the walk reads messages at all, so an empty result means clean", () => {
     // Without this, a change to the AST shapes walked empties the result and the
     // assertion above passes over files it never inspected.
-    let bracketed = 0;
-    let bindings = 0;
-
-    for (const file of globSync(`${SRC}/**/*.ts`)) {
-      const source = ts.createSourceFile(
-        file,
-        readFileSync(file, "utf8"),
-        ts.ScriptTarget.Latest,
-        true,
-        ts.ScriptKind.TS,
-      );
-
-      const walk = (node: ts.Node): void => {
-        if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
-          for (const argument of node.arguments ?? []) {
-            const text = textOf(argument);
-
-            if (text !== undefined && prefixOf(text) !== undefined) {
-              bracketed++;
-            }
-          }
-        }
-
-        // A raiser binding is where a converted head lives, so it is what the
-        // tier reads there instead of an argument.
-        if (
-          ts.isCallExpression(node) &&
-          node.expression.getText(source) === "raiser"
-        ) {
-          bindings++;
-        }
-
-        ts.forEachChild(node, walk);
-      };
-
-      walk(source);
-    }
+    const { bracketed, bindings } = walked;
 
     // ⚠ Only the half that cannot reach zero is a live floor. Bindings rise as
     // families convert; literal heads fall toward zero BY DESIGN, so a floor on
@@ -1235,13 +1250,15 @@ function byteOrder(left: string, right: string): number {
 }
 
 describe("a refusal with no prefix at all is registered, not invisible (#2456)", () => {
+  const inCore = refusals();
+
   it("no literal refusal in core is left without a prefix", () => {
     // Was "the backlog is exactly this, and it only shrinks" while rows
     // remained (#2456). Adjudicated to empty in #2459, so the claim is now the
     // statement itself rather than a list — the same assertion, one register
     // later. It reds on a new bare refusal; the two controls named in the
     // docblock are what keep it from passing on a broken recogniser.
-    expect(refusals().bare).toStrictEqual([...BARE].toSorted(byteOrder));
+    expect(inCore.bare).toStrictEqual([...BARE].toSorted(byteOrder));
   });
 
   it("CONTROL — every throw in the tree lands in exactly one class", () => {
@@ -1250,18 +1267,16 @@ describe("a refusal with no prefix at all is registered, not invisible (#2456)",
     // those, which left 58 throws — every factory call and every re-throw —
     // counted by nothing, so a shape the rule cannot judge could arrive in
     // silence. The sum is what makes an unjudgeable shape still VISIBLE.
-    const seen = refusals();
-
     expect(
-      seen.literals +
-        seen.opaque +
-        seen.wrapped +
-        seen.rethrown +
-        seen.raised +
-        seen.otherShape,
-    ).toBe(seen.throwStatements);
+      inCore.literals +
+        inCore.opaque +
+        inCore.wrapped +
+        inCore.rethrown +
+        inCore.raised +
+        inCore.otherShape,
+    ).toBe(inCore.throwStatements);
     // No shape outside the five the partition names.
-    expect(seen.otherShape).toBe(0);
+    expect(inCore.otherShape).toBe(0);
   });
 
   it("CONTROL — the glob reaches the tree, and the rule recognises most of it", () => {
@@ -1269,17 +1284,15 @@ describe("a refusal with no prefix at all is registered, not invisible (#2456)",
     // a broken recogniser moves `literals`. The first draft conflated them in a
     // single `literals > 60` against a measured 90, so a glob narrowed to a handful
     // of files still passed. Both floors sit close under what is measured today.
-    const seen = refusals();
-
-    expect(seen.files).toBeGreaterThan(120);
-    expect(seen.throwStatements).toBeGreaterThan(130);
+    expect(inCore.files).toBeGreaterThan(120);
+    expect(inCore.throwStatements).toBeGreaterThan(130);
     // ⚠ The SUM, not the two halves. A conversion moves a site from `literals` to
     // `raised` and leaves the total alone — measured, 87 on both sides of step 3 —
     // so ONE floor holds from the first family to the last. Two would need re-basing
     // at every family, and a floor lowered by reflex is a floor that stopped
     // guarding: the recogniser it watches can break by exactly the amount the last
     // conversion moved.
-    expect(seen.literals + seen.raised).toBeGreaterThan(80);
+    expect(inCore.literals + inCore.raised).toBeGreaterThan(80);
     // The construction subject carries its own floors (#2493), because a broken
     // construction walk empties `bare` exactly the way a broken throw walk does,
     // and the floors above cannot see it: they count throws.
@@ -1287,11 +1300,11 @@ describe("a refusal with no prefix at all is registered, not invisible (#2456)",
     // Measured across steps 3 and 4: `constructions + raised` is 151 and
     // `judged + raised` is 115 on both sides of every conversion, because a
     // conversion MOVES a site between the two rather than removing one.
-    expect(seen.constructions + seen.raised).toBeGreaterThan(130);
-    expect(seen.judged + seen.raised).toBeGreaterThan(95);
+    expect(inCore.constructions + inCore.raised).toBeGreaterThan(130);
+    expect(inCore.judged + inCore.raised).toBeGreaterThan(95);
     // O-1's marker is recognised rather than registered, and a recogniser that
     // stopped matching would empty this without emptying anything above.
-    expect(seen.marked).toBeGreaterThan(0);
+    expect(inCore.marked).toBeGreaterThan(0);
   });
 
   it("the variable-fed head does not spread (О-6, ratified 2026-09-22)", () => {
@@ -1300,9 +1313,7 @@ describe("a refusal with no prefix at all is registered, not invisible (#2456)",
     // expression and finds an identifier. Teaching it would put a same-file
     // heuristic inside a gate, so the count is BOUNDED instead — a new site of
     // this shape reds here without any door being judged.
-    const seen = refusals();
-
-    expect(seen.variableFed).toBeLessThanOrEqual(3);
+    expect(inCore.variableFed).toBeLessThanOrEqual(3);
   });
 
   it("CONTROL — the variable-fed detector still finds one", () => {

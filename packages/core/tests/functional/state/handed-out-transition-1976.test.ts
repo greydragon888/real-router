@@ -470,6 +470,10 @@ describe("every door hands back a State carrying transition (#1976)", () => {
     router.dispose();
   });
 
+  const members = stateReturningMembers();
+  const declarationFiles = surfaceDeclarationFiles();
+  const owners = ownersOf(NOT_DOORS);
+
   it("the door list is DERIVED, not remembered", () => {
     // The closing check this file was missing, and the reason it was missing
     // three doors. `DOORS` is checked against every public member whose declared
@@ -481,20 +485,20 @@ describe("every door hands back a State carrying transition (#1976)", () => {
     // named one producer and there were three, found by a matrix rather than by
     // review. A hand-written list of surfaces is exactly what keeps being wrong,
     // so this one is not hand-written any more.
-    expect(
-      stateReturningMembers().filter((name) => !NOT_DOORS.has(name)),
-    ).toStrictEqual([...DOORS]);
+    expect(members.filter((name) => !NOT_DOORS.has(name))).toStrictEqual([
+      ...DOORS,
+    ]);
 
     // And the file list is checked, so it stops being the place a door can hide:
     // the scanned files are exactly the ones declaring the public surface.
     expect(
-      surfaceDeclarationFiles(),
+      declarationFiles,
       "the scanned files ARE the public surface",
     ).toStrictEqual(SURFACE_FILES.toSorted((a, b) => a.localeCompare(b)));
 
     // And the exclusion list, the one hand-written part left: each name it
     // drops must belong ONLY to a subscribe payload.
-    expect(ownersOf(NOT_DOORS)).toStrictEqual({
+    expect(owners).toStrictEqual({
       route: ["SubscribeState", "LeaveState"],
       previousRoute: ["SubscribeState"],
       nextRoute: ["LeaveState"],

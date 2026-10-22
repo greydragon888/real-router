@@ -198,6 +198,8 @@ describe("return-door census (#2303)", () => {
     return sites.toSorted(byName);
   }
 
+  const COALESCED = coalescedCalls();
+
   it("the derivation reaches the type barrel — anti-vacuum", () => {
     expect(TYPE_FILES.length).toBeGreaterThan(3);
     expect(Object.keys(ALIASES).length).toBeGreaterThan(8);
@@ -277,7 +279,7 @@ describe("return-door census (#2303)", () => {
     // through a stored wrapper, so a scan keyed on the name finds the matcher's
     // own same-named private method instead — a different function entirely.
     // What is derivable is the SHAPE: a call whose return core coalesces.
-    expect(coalescedCalls()).toStrictEqual([
+    expect(COALESCED).toStrictEqual([
       "engine/path-matcher/percentEncoding.ts :: value.codePointAt(i + 1) ?? 0",
       "engine/path-matcher/percentEncoding.ts :: value.codePointAt(i + 2) ?? 0",
       "namespaces/RouteLifecycleNamespace/RouteLifecycleNamespace.ts :: compiled.external.get(name) ?? compiled.definition.get(name)",
@@ -293,7 +295,7 @@ describe("return-door census (#2303)", () => {
     // functions, and `?? channels` is the only thing between a return that
     // violates its declared `ParamsSearch` and the matcher. The other four call
     // core's own code, where the fallback is an ordinary default.
-    const codecs = coalescedCalls().filter((s) => s.includes("?? channels"));
+    const codecs = COALESCED.filter((s) => s.includes("?? channels"));
 
     expect(codecs).toHaveLength(4);
   });

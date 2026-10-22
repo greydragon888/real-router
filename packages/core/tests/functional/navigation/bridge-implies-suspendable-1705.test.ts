@@ -342,6 +342,17 @@ function bridgeCallers(source: ts.SourceFile): string[] {
 
 describe("#1705 — the term that makes the implication true", () => {
   const source = parse(EXECUTE_FILE);
+  const files = tsFilesUnder(SRC_DIR);
+  const sites: Record<string, string[]> = {};
+
+  for (const file of files) {
+    const callers = bridgeCallers(parse(file));
+
+    if (callers.length > 0) {
+      sites[path.relative(SRC_DIR, file).replaceAll(path.sep, "/")] =
+        callers.toSorted((a, b) => a.localeCompare(b));
+    }
+  }
 
   it("`suspendable` is a disjunction and one of its terms IS the external signal", () => {
     const terms = suspendableDisjuncts(source);
@@ -367,18 +378,7 @@ describe("#1705 — the term that makes the implication true", () => {
     // module is a failure and not a re-sort: the early moment belongs to the
     // machine (the `NAVIGATE` action), the late one to the pipeline (it needs
     // `hasGuards`, which the edge cannot know).
-    const files = tsFilesUnder(SRC_DIR);
-    const sites: Record<string, string[]> = {};
-
-    for (const file of files) {
-      const callers = bridgeCallers(parse(file));
-
-      if (callers.length > 0) {
-        sites[path.relative(SRC_DIR, file).replaceAll(path.sep, "/")] =
-          callers.toSorted((a, b) => a.localeCompare(b));
-      }
-    }
-
+    //
     // POSITIVE CONTROL for the WALK, not for the match: an under-collecting
     // recursion would report an empty or shrunken map, which is indistinguishable
     // from "no third site" by reading the failure alone.

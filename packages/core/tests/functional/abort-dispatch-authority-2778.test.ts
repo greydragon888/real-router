@@ -262,11 +262,11 @@ describe("#2796 — a quiet cancel core builds is marked as one core built", () 
   // `navigationEnds.ts` records an end only when core built it, and the mark
   // is `freezeThrownError`'s. A `TRANSITION_CANCELLED` core builds without it
   // is an end no guard can tell from its own quiet cancel.
-  it("every one in src is the argument of freezeThrownError", () => {
-    const found = globSync(`${SRC}/**/*.ts`).flatMap((file) =>
-      cancelConstructions(file, readFileSync(file, "utf8")),
-    );
+  const found = globSync(`${SRC}/**/*.ts`).flatMap((file) =>
+    cancelConstructions(file, readFileSync(file, "utf8")),
+  );
 
+  it("every one in src is the argument of freezeThrownError", () => {
     expect(found.length).toBeGreaterThan(0);
     expect(found.filter(({ marked }) => !marked)).toStrictEqual([]);
   });
@@ -301,6 +301,9 @@ describe("#2778 — an abort of a navigation's controller is a counted dispatch"
   const sites = globSync(`${SRC}/**/*.ts`).flatMap((file) =>
     abortSites(file, readFileSync(file, "utf8")),
   );
+  const recorded = globSync(`${SRC}/**/*.ts`).flatMap((file) =>
+    signalReasonRecords(file, readFileSync(file, "utf8")),
+  );
 
   it("finds every abort in src — the scan is not vacuously green", () => {
     // One site per owner. Adding one is a decision about the reentrancy ban's
@@ -322,10 +325,6 @@ describe("#2778 — an abort of a navigation's controller is a counted dispatch"
     // guard of ANOTHER navigation waiting on it tells that reason from its own
     // quiet cancel only through `navigationEnds.ts`, so an abort that skips
     // the record hands it a reason it reads as its own.
-    const recorded = globSync(`${SRC}/**/*.ts`).flatMap((file) =>
-      signalReasonRecords(file, readFileSync(file, "utf8")),
-    );
-
     expect(new Set(recorded)).toStrictEqual(new Set(RAW_ABORT_OWNERS.keys()));
   });
 

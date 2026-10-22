@@ -246,8 +246,10 @@ function census(root: string = SRC): Census {
 }
 
 describe("a logger channel names something the caller can look up (#2461)", () => {
+  const channels = census();
+
   it("no channel in core names a class, a package, or anything else", () => {
-    expect(census().offenders).toStrictEqual([]);
+    expect(channels.offenders).toStrictEqual([]);
   });
 
   it("CONTROL — the level set is the class's, not a set written from memory", () => {
@@ -265,7 +267,7 @@ describe("a logger channel names something the caller can look up (#2461)", () =
     // ⚠ `computed` gets no floor here on purpose: a counter that only increments
     // cannot fail a `>= 0`, and such an assertion reads as coverage while being a
     // comment with `expect()` around it. The synthetic tree below pins its value.
-    expect(census().literals).toBeGreaterThan(12);
+    expect(channels.literals).toBeGreaterThan(12);
   });
 
   it("CONTROL — both polarities, on a tree written for the purpose", () => {

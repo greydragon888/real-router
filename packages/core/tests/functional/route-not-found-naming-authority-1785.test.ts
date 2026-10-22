@@ -126,16 +126,17 @@ function proseSites(root: string = SRC): Site[] {
 }
 
 describe("routeName names a route, or nothing (#1785)", () => {
+  const prose = proseSites();
+  const found = producers(SRC);
+
   it("no ROUTE_NOT_FOUND producer spells a sentence into routeName", () => {
-    expect(proseSites()).toStrictEqual([]);
+    expect(prose).toStrictEqual([]);
   });
 
   it("CONTROL — the walk finds producers in BOTH forms, so an empty result means clean", () => {
     // Without this, a rename of `RouterError` or of the `errorCodes` member
     // empties the walk and the assertion above passes on files it never read.
     // Both forms, because a walk that lost one of them still finds producers.
-    const found = producers(SRC);
-
     expect(found.length).toBeGreaterThan(3);
     expect(new Set(found.map(({ form }) => form))).toStrictEqual(
       new Set(["new", "tag"]),

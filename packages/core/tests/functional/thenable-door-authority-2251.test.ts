@@ -104,9 +104,11 @@ const sites = (): { entries: string[]; filesRead: number } => {
 };
 
 describe("identity tests for a promise are on core's OWN values (#2251)", () => {
+  const swept = sites();
+
   it("the sweep reached the tree it claims to sweep", () => {
     // POSITIVE control: an empty list is also what a broken glob returns.
-    expect(sites().filesRead).toBeGreaterThan(100);
+    expect(swept.filesRead).toBeGreaterThan(100);
   });
 
   it("every `instanceof Promise` in core sits on a value core produced", () => {
@@ -115,7 +117,7 @@ describe("identity tests for a promise are on core's OWN values (#2251)", () => 
     // exactly `start` and `forwardState`, so no application value reaches them.
     // A site on an APPLICATION's return belongs in the duck-typed set instead;
     // the guard walk is the one that was here and moved (#2251).
-    expect(sites().entries).toStrictEqual([
+    expect(swept.entries).toStrictEqual([
       "namespaces/NavigationNamespace/NavigationNamespace.ts::#settle",
       "Router.ts::#asPromise",
     ]);

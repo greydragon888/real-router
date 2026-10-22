@@ -202,14 +202,13 @@ const THIRD_SPELLING_BACKLOG: readonly { file: string; spelling: string }[] =
 
 describe("every prototype judgement uses one of the two decided terms (#2197)", () => {
   const files = scannedFiles();
+  const rows = census(files);
+  const third = unrecognised(files);
 
   it("CONTROL — the scan reads the tree and finds both terms", () => {
     // An empty scan satisfies the two cells below for the wrong reason: no
     // judgements found means no unrecognised ones and an empty census.
     expect(files.length).toBeGreaterThan(400);
-
-    const rows = census(files);
-
     expect(rows.reduce((sum, row) => sum + row.identity, 0)).toBeGreaterThan(0);
     expect(
       rows.reduce((sum, row) => sum + row.constructorTerm, 0),
@@ -217,11 +216,11 @@ describe("every prototype judgement uses one of the two decided terms (#2197)", 
   });
 
   it("no site spells the question a THIRD way, beyond the recorded backlog", () => {
-    expect(unrecognised(files)).toStrictEqual(THIRD_SPELLING_BACKLOG);
+    expect(third).toStrictEqual(THIRD_SPELLING_BACKLOG);
   });
 
   it("carries exactly the sites it was verified against, per term", () => {
-    expect(census(files)).toStrictEqual([
+    expect(rows).toStrictEqual([
       {
         file: "packages/core/src/engine/validation/route-batch.ts",
         identity: 1,

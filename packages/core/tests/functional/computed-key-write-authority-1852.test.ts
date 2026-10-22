@@ -475,10 +475,12 @@ function scanOutsideCore(
 }
 
 describe("a write under a computed key is guarded or classified (#1852)", () => {
+  const sites = scan();
+
   it("every remaining computed-key write in src is classified", () => {
     const verdicts: Record<string, string> = {};
 
-    for (const site of scan()) {
+    for (const site of sites) {
       // ⚠ Two sites with the same file AND the same text are two sites — the
       // ordinal is what keeps addressing-by-text from swallowing a duplicate,
       // the lesson `chain-walk-authority` learned from `Object.fromEntries`.
@@ -543,8 +545,8 @@ describe("a write under a computed key is guarded or classified (#1852)", () => 
     // That is the anti-pattern the scanner CONTROL above exists to avoid, and it
     // had been reintroduced two cells later. A non-emptiness check cannot have a
     // magic ceiling.
-    expect(scan().length).toBeGreaterThan(0);
-    expect(scan()).toHaveLength(Object.keys(REASONS).length);
+    expect(sites.length).toBeGreaterThan(0);
+    expect(sites).toHaveLength(Object.keys(REASONS).length);
 
     // ⚑ The reason TEXT is never verified by this file, and that is worth
     // stating rather than implying: `verdicts[key] = REASONS[key] ?? …` compared

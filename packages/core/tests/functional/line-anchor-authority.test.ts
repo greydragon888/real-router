@@ -172,8 +172,10 @@ function lineAnchors(files: readonly string[], root = REPO_ROOT): Anchor[] {
 const BASELINE: readonly Anchor[] = [];
 
 describe("nothing points at our code by line number", () => {
+  const anchors = lineAnchors(scannedFiles());
+
   it("carries exactly the known line anchors, no more and no fewer", () => {
-    expect(lineAnchors(scannedFiles())).toStrictEqual(BASELINE);
+    expect(anchors).toStrictEqual(BASELINE);
   });
 
   it("CONTROL — the scan REACHES each dot-directory it names", () => {
