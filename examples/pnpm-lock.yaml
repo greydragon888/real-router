@@ -115,7 +115,7 @@ importers:
         version: 0.5.0(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       ink:
         specifier: 7.1.1
         version: 7.1.1(@types/react@19.3.0)(react@19.3.1)
@@ -137,13 +137,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -192,10 +192,10 @@ importers:
         version: 0.148.0
       '@real-router/hash-plugin':
         specifier: '*'
-        version: 0.15.0(@real-router/core@0.148.0)
+        version: 0.16.1(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -244,10 +244,10 @@ importers:
         version: 0.148.0
       '@real-router/navigation-plugin':
         specifier: '*'
-        version: 0.12.0(@real-router/core@0.148.0)
+        version: 0.14.2(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -293,13 +293,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -336,10 +336,10 @@ importers:
         version: 0.148.0
       '@real-router/navigation-plugin':
         specifier: '*'
-        version: 0.12.0(@real-router/core@0.148.0)
+        version: 0.14.2(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -379,7 +379,7 @@ importers:
         version: 22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)
       '@real-router/angular':
         specifier: '*'
-        version: 0.24.2(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
+        version: 0.24.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
       rxjs:
         specifier: 7.8.2
         version: 7.8.2
@@ -400,10 +400,10 @@ importers:
         version: 22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))
       '@real-router/angular':
         specifier: '*'
-        version: 0.24.2(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
+        version: 0.24.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -455,10 +455,10 @@ importers:
         version: 22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))
       '@real-router/angular':
         specifier: '*'
-        version: 0.24.2(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
+        version: 0.24.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -510,10 +510,10 @@ importers:
         version: 22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))
       '@real-router/angular':
         specifier: '*'
-        version: 0.24.2(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
+        version: 0.24.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -565,10 +565,10 @@ importers:
         version: 22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))
       '@real-router/angular':
         specifier: '*'
-        version: 0.24.2(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
+        version: 0.24.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -620,10 +620,10 @@ importers:
         version: 22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))
       '@real-router/angular':
         specifier: '*'
-        version: 0.24.2(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
+        version: 0.24.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -669,10 +669,10 @@ importers:
         version: 22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))
       '@real-router/angular':
         specifier: '*'
-        version: 0.24.2(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
+        version: 0.24.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -757,10 +757,10 @@ importers:
         version: 22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))
       '@real-router/angular':
         specifier: '*'
-        version: 0.24.2(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
+        version: 0.24.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -827,13 +827,13 @@ importers:
         version: 22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))
       '@real-router/angular':
         specifier: '*'
-        version: 0.24.2(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
+        version: 0.24.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/hash-plugin':
         specifier: '*'
-        version: 0.15.0(@real-router/core@0.148.0)
+        version: 0.16.1(@real-router/core@0.148.0)
       rxjs:
         specifier: 7.8.2
         version: 7.8.2
@@ -876,10 +876,10 @@ importers:
         version: 22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))
       '@real-router/angular':
         specifier: '*'
-        version: 0.24.2(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
+        version: 0.24.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -922,10 +922,10 @@ importers:
         version: 22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))
       '@real-router/angular':
         specifier: '*'
-        version: 0.24.2(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
+        version: 0.24.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -992,10 +992,10 @@ importers:
         version: 22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))
       '@real-router/angular':
         specifier: '*'
-        version: 0.24.2(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
+        version: 0.24.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -1050,10 +1050,10 @@ importers:
         version: 22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@angular/platform-server@22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/compiler@22.2.3)(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@angular/platform-browser@22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)))(rxjs@7.8.2))(@angular/router@22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@angular/platform-browser@22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)))(rxjs@7.8.2))
       '@real-router/angular':
         specifier: '*'
-        version: 0.24.2(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
+        version: 0.24.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -1126,10 +1126,10 @@ importers:
         version: 22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@angular/platform-server@22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/compiler@22.2.3)(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@angular/platform-browser@22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)))(rxjs@7.8.2))(@angular/router@22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@angular/platform-browser@22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)))(rxjs@7.8.2))
       '@real-router/angular':
         specifier: '*'
-        version: 0.24.2(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
+        version: 0.24.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -1193,10 +1193,10 @@ importers:
         version: 22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@angular/platform-server@22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/compiler@22.2.3)(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@angular/platform-browser@22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)))(rxjs@7.8.2))(@angular/router@22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@angular/platform-browser@22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)))(rxjs@7.8.2))
       '@real-router/angular':
         specifier: '*'
-        version: 0.24.2(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
+        version: 0.24.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -1263,10 +1263,10 @@ importers:
         version: 22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@angular/platform-server@22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/compiler@22.2.3)(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@angular/platform-browser@22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)))(rxjs@7.8.2))(@angular/router@22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@angular/platform-browser@22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)))(rxjs@7.8.2))
       '@real-router/angular':
         specifier: '*'
-        version: 0.24.2(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
+        version: 0.24.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -1312,7 +1312,7 @@ importers:
     dependencies:
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
+        version: 0.24.1(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
         version: 10.29.8(preact-render-to-string@6.8.1)
@@ -1321,13 +1321,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
+        version: 0.24.1(@real-router/core@0.148.0)(preact@10.29.8)
       motion:
         specifier: 14.1.0
         version: 14.1.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -1352,13 +1352,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
+        version: 0.24.1(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
         version: 10.29.8(preact-render-to-string@6.8.1)
@@ -1380,13 +1380,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
+        version: 0.24.1(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
         version: 10.29.8(preact-render-to-string@6.8.1)
@@ -1408,13 +1408,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
+        version: 0.24.1(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
         version: 10.29.8(preact-render-to-string@6.8.1)
@@ -1436,13 +1436,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
+        version: 0.24.1(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
         version: 10.29.8(preact-render-to-string@6.8.1)
@@ -1479,13 +1479,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
+        version: 0.24.1(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
         version: 10.29.8(preact-render-to-string@6.8.1)
@@ -1522,13 +1522,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
+        version: 0.24.1(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
         version: 10.29.8(preact-render-to-string@6.8.1)
@@ -1547,7 +1547,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -1562,7 +1562,7 @@ importers:
         version: 0.7.0(@real-router/core@0.148.0)
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
+        version: 0.24.1(@real-router/core@0.148.0)(preact@10.29.8)
       '@real-router/preload-plugin':
         specifier: '*'
         version: 0.8.0(@real-router/core@0.148.0)
@@ -1608,7 +1608,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -1617,7 +1617,7 @@ importers:
         version: 0.8.0(@real-router/core@0.148.0)
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
+        version: 0.24.1(@real-router/core@0.148.0)(preact@10.29.8)
       '@real-router/preload-plugin':
         specifier: '*'
         version: 0.8.0(@real-router/core@0.148.0)
@@ -1642,13 +1642,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
+        version: 0.24.1(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
         version: 10.29.8(preact-render-to-string@6.8.1)
@@ -1685,13 +1685,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
+        version: 0.24.1(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
         version: 10.29.8(preact-render-to-string@6.8.1)
@@ -1731,10 +1731,10 @@ importers:
         version: 0.148.0
       '@real-router/hash-plugin':
         specifier: '*'
-        version: 0.15.0(@real-router/core@0.148.0)
+        version: 0.16.1(@real-router/core@0.148.0)
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
+        version: 0.24.1(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
         version: 10.29.8(preact-render-to-string@6.8.1)
@@ -1756,13 +1756,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
+        version: 0.24.1(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
         version: 10.29.8(preact-render-to-string@6.8.1)
@@ -1781,13 +1781,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
+        version: 0.24.1(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
         version: 10.29.8(preact-render-to-string@6.8.1)
@@ -1824,7 +1824,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -1833,7 +1833,7 @@ importers:
         version: 0.7.0(@real-router/core@0.148.0)
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
+        version: 0.24.1(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
         version: 10.29.8(preact-render-to-string@6.8.1)
@@ -1852,13 +1852,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
+        version: 0.24.1(@real-router/core@0.148.0)(preact@10.29.8)
       '@real-router/search-schema-plugin':
         specifier: '*'
         version: 0.7.0(@real-router/core@0.148.0)
@@ -1886,13 +1886,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
+        version: 0.24.1(@real-router/core@0.148.0)(preact@10.29.8)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.6.0(@real-router/core@0.148.0)
@@ -1929,13 +1929,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
+        version: 0.24.1(@real-router/core@0.148.0)(preact@10.29.8)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.6.0(@real-router/core@0.148.0)
@@ -1978,13 +1978,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
+        version: 0.24.1(@real-router/core@0.148.0)(preact@10.29.8)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.6.0(@real-router/core@0.148.0)
@@ -2030,7 +2030,7 @@ importers:
         version: 0.148.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
+        version: 0.24.1(@real-router/core@0.148.0)(preact@10.29.8)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.6.0(@real-router/core@0.148.0)
@@ -2073,7 +2073,7 @@ importers:
     dependencies:
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -2086,13 +2086,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       motion:
         specifier: 14.1.0
         version: 14.1.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -2126,13 +2126,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -2163,13 +2163,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -2200,13 +2200,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -2246,13 +2246,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -2298,13 +2298,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -2350,13 +2350,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -2384,7 +2384,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -2402,7 +2402,7 @@ importers:
         version: 0.8.0(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@real-router/search-schema-plugin':
         specifier: '*'
         version: 0.7.0(@real-router/core@0.148.0)
@@ -2454,7 +2454,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -2466,7 +2466,7 @@ importers:
         version: 0.8.0(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -2497,13 +2497,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -2549,13 +2549,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -2601,16 +2601,16 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/hash-plugin':
         specifier: '*'
-        version: 0.15.0(@real-router/core@0.148.0)
+        version: 0.16.1(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -2644,10 +2644,10 @@ importers:
         version: 0.148.0
       '@real-router/navigation-plugin':
         specifier: '*'
-        version: 0.12.0(@real-router/core@0.148.0)
+        version: 0.14.2(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -2678,16 +2678,16 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/navigation-plugin':
         specifier: '*'
-        version: 0.12.0(@real-router/core@0.148.0)
+        version: 0.14.2(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -2721,10 +2721,10 @@ importers:
         version: 0.148.0
       '@real-router/hash-plugin':
         specifier: '*'
-        version: 0.15.0(@real-router/core@0.148.0)
+        version: 0.16.1(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -2755,13 +2755,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -2789,13 +2789,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -2826,13 +2826,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -2860,13 +2860,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -2897,10 +2897,10 @@ importers:
         version: 0.148.0
       '@real-router/navigation-plugin':
         specifier: '*'
-        version: 0.12.0(@real-router/core@0.148.0)
+        version: 0.14.2(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -2931,13 +2931,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -2983,7 +2983,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -2992,7 +2992,7 @@ importers:
         version: 0.7.0(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -3020,13 +3020,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@real-router/search-schema-plugin':
         specifier: '*'
         version: 0.7.0(@real-router/core@0.148.0)
@@ -3063,13 +3063,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.6.0(@real-router/core@0.148.0)
@@ -3112,13 +3112,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.6.0(@real-router/core@0.148.0)
@@ -3167,13 +3167,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.6.0(@real-router/core@0.148.0)
@@ -3222,13 +3222,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@real-router/rsc-server-plugin':
         specifier: '*'
         version: 0.4.0(@real-router/core@0.148.0)(react@19.3.1)
@@ -3283,7 +3283,7 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.6.0(@real-router/core@0.148.0)
@@ -3332,7 +3332,7 @@ importers:
     dependencies:
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.17
@@ -3341,13 +3341,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.17
@@ -3372,13 +3372,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.17
@@ -3400,13 +3400,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.17
@@ -3428,13 +3428,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.17
@@ -3456,13 +3456,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.17
@@ -3499,13 +3499,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.17
@@ -3542,13 +3542,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.17
@@ -3567,7 +3567,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -3588,7 +3588,7 @@ importers:
         version: 0.7.0(@real-router/core@0.148.0)
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.17
@@ -3628,7 +3628,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -3640,7 +3640,7 @@ importers:
         version: 0.8.0(@real-router/core@0.148.0)
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.17
@@ -3662,13 +3662,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.17
@@ -3705,13 +3705,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.17
@@ -3751,10 +3751,10 @@ importers:
         version: 0.148.0
       '@real-router/hash-plugin':
         specifier: '*'
-        version: 0.15.0(@real-router/core@0.148.0)
+        version: 0.16.1(@real-router/core@0.148.0)
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.17
@@ -3776,13 +3776,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.17
@@ -3801,13 +3801,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.17
@@ -3844,7 +3844,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -3853,7 +3853,7 @@ importers:
         version: 0.7.0(@real-router/core@0.148.0)
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.17
@@ -3872,7 +3872,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -3881,7 +3881,7 @@ importers:
         version: 0.7.0(@real-router/core@0.148.0)
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.17
@@ -3906,13 +3906,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.6.0(@real-router/core@0.148.0)
@@ -3946,13 +3946,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.6.0(@real-router/core@0.148.0)
@@ -3995,13 +3995,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.6.0(@real-router/core@0.148.0)
@@ -4044,7 +4044,7 @@ importers:
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.6.0(@real-router/core@0.148.0)
@@ -4084,13 +4084,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.17
@@ -4109,13 +4109,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)
+        version: 0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)
       solid-js:
         specifier: ~1.9.14
         version: 1.9.17
@@ -4134,7 +4134,7 @@ importers:
     dependencies:
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       svelte:
         specifier: ~5.57.0
         version: 5.57.2(@typescript-eslint/types@8.70.1)
@@ -4143,13 +4143,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       svelte:
         specifier: ~5.57.0
         version: 5.57.2(@typescript-eslint/types@8.70.1)
@@ -4171,13 +4171,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       svelte:
         specifier: ~5.57.0
         version: 5.57.2(@typescript-eslint/types@8.70.1)
@@ -4199,13 +4199,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       svelte:
         specifier: ~5.57.0
         version: 5.57.2(@typescript-eslint/types@8.70.1)
@@ -4227,13 +4227,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       svelte:
         specifier: ~5.57.0
         version: 5.57.2(@typescript-eslint/types@8.70.1)
@@ -4255,13 +4255,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       svelte:
         specifier: ~5.57.0
         version: 5.57.2(@typescript-eslint/types@8.70.1)
@@ -4298,13 +4298,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       svelte:
         specifier: ~5.57.0
         version: 5.57.2(@typescript-eslint/types@8.70.1)
@@ -4341,13 +4341,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       svelte:
         specifier: ~5.57.0
         version: 5.57.2(@typescript-eslint/types@8.70.1)
@@ -4366,7 +4366,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -4387,7 +4387,7 @@ importers:
         version: 0.7.0(@real-router/core@0.148.0)
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       svelte:
         specifier: ~5.57.0
         version: 5.57.2(@typescript-eslint/types@8.70.1)
@@ -4427,7 +4427,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -4439,7 +4439,7 @@ importers:
         version: 0.8.0(@real-router/core@0.148.0)
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       svelte:
         specifier: ~5.57.0
         version: 5.57.2(@typescript-eslint/types@8.70.1)
@@ -4461,13 +4461,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       svelte:
         specifier: ~5.57.0
         version: 5.57.2(@typescript-eslint/types@8.70.1)
@@ -4504,13 +4504,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       svelte:
         specifier: ~5.57.0
         version: 5.57.2(@typescript-eslint/types@8.70.1)
@@ -4550,10 +4550,10 @@ importers:
         version: 0.148.0
       '@real-router/hash-plugin':
         specifier: '*'
-        version: 0.15.0(@real-router/core@0.148.0)
+        version: 0.16.1(@real-router/core@0.148.0)
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       svelte:
         specifier: ~5.57.0
         version: 5.57.2(@typescript-eslint/types@8.70.1)
@@ -4575,13 +4575,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       svelte:
         specifier: ~5.57.0
         version: 5.57.2(@typescript-eslint/types@8.70.1)
@@ -4600,13 +4600,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       svelte:
         specifier: ~5.57.0
         version: 5.57.2(@typescript-eslint/types@8.70.1)
@@ -4625,13 +4625,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       svelte:
         specifier: ~5.57.0
         version: 5.57.2(@typescript-eslint/types@8.70.1)
@@ -4650,13 +4650,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       svelte:
         specifier: ~5.57.0
         version: 5.57.2(@typescript-eslint/types@8.70.1)
@@ -4693,7 +4693,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -4702,7 +4702,7 @@ importers:
         version: 0.7.0(@real-router/core@0.148.0)
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       svelte:
         specifier: ~5.57.0
         version: 5.57.2(@typescript-eslint/types@8.70.1)
@@ -4721,7 +4721,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -4730,7 +4730,7 @@ importers:
         version: 0.7.0(@real-router/core@0.148.0)
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       svelte:
         specifier: ~5.57.0
         version: 5.57.2(@typescript-eslint/types@8.70.1)
@@ -4755,13 +4755,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       svelte:
         specifier: ~5.57.0
         version: 5.57.2(@typescript-eslint/types@8.70.1)
@@ -4780,7 +4780,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -4792,7 +4792,7 @@ importers:
         version: 0.3.0(@real-router/core@0.148.0)
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       svelte:
         specifier: ~5.57.0
         version: 5.57.2(@typescript-eslint/types@8.70.1)
@@ -4823,7 +4823,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -4835,7 +4835,7 @@ importers:
         version: 0.3.0(@real-router/core@0.148.0)
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       express:
         specifier: 5.3.0
         version: 5.3.0(supports-color@10.2.2)
@@ -4872,7 +4872,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -4884,7 +4884,7 @@ importers:
         version: 0.3.0(@real-router/core@0.148.0)
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       express:
         specifier: 5.3.0
         version: 5.3.0(supports-color@10.2.2)
@@ -4930,7 +4930,7 @@ importers:
         version: 0.3.0(@real-router/core@0.148.0)
       '@real-router/svelte':
         specifier: '*'
-        version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
+        version: 0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))
       express:
         specifier: 5.3.0
         version: 5.3.0(supports-color@10.2.2)
@@ -4967,7 +4967,7 @@ importers:
     dependencies:
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       vue:
         specifier: ~3.5.39
         version: 3.5.44(typescript@6.0.3)
@@ -4976,13 +4976,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       vue:
         specifier: ~3.5.39
         version: 3.5.44(typescript@6.0.3)
@@ -5007,13 +5007,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       vue:
         specifier: ~3.5.39
         version: 3.5.44(typescript@6.0.3)
@@ -5038,13 +5038,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       vue:
         specifier: ~3.5.39
         version: 3.5.44(typescript@6.0.3)
@@ -5069,13 +5069,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       vue:
         specifier: ~3.5.39
         version: 3.5.44(typescript@6.0.3)
@@ -5100,13 +5100,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       vue:
         specifier: ~3.5.39
         version: 3.5.44(typescript@6.0.3)
@@ -5146,13 +5146,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       vue:
         specifier: ~3.5.39
         version: 3.5.44(typescript@6.0.3)
@@ -5192,13 +5192,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       vue:
         specifier: ~3.5.39
         version: 3.5.44(typescript@6.0.3)
@@ -5220,7 +5220,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -5241,7 +5241,7 @@ importers:
         version: 0.7.0(@real-router/core@0.148.0)
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       vue:
         specifier: ~3.5.39
         version: 3.5.44(typescript@6.0.3)
@@ -5284,7 +5284,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -5296,7 +5296,7 @@ importers:
         version: 0.8.0(@real-router/core@0.148.0)
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       vue:
         specifier: ~3.5.39
         version: 3.5.44(typescript@6.0.3)
@@ -5321,13 +5321,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       vue:
         specifier: ~3.5.39
         version: 3.5.44(typescript@6.0.3)
@@ -5367,13 +5367,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       vue:
         specifier: ~3.5.39
         version: 3.5.44(typescript@6.0.3)
@@ -5416,10 +5416,10 @@ importers:
         version: 0.148.0
       '@real-router/hash-plugin':
         specifier: '*'
-        version: 0.15.0(@real-router/core@0.148.0)
+        version: 0.16.1(@real-router/core@0.148.0)
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       vue:
         specifier: ~3.5.39
         version: 3.5.44(typescript@6.0.3)
@@ -5444,13 +5444,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       vue:
         specifier: ~3.5.39
         version: 3.5.44(typescript@6.0.3)
@@ -5475,13 +5475,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       vue:
         specifier: ~3.5.39
         version: 3.5.44(typescript@6.0.3)
@@ -5503,13 +5503,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       vue:
         specifier: ~3.5.39
         version: 3.5.44(typescript@6.0.3)
@@ -5549,7 +5549,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -5558,7 +5558,7 @@ importers:
         version: 0.7.0(@real-router/core@0.148.0)
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       vue:
         specifier: ~3.5.39
         version: 3.5.44(typescript@6.0.3)
@@ -5580,13 +5580,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       vue:
         specifier: ~3.5.39
         version: 3.5.44(typescript@6.0.3)
@@ -5608,7 +5608,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -5617,7 +5617,7 @@ importers:
         version: 0.7.0(@real-router/core@0.148.0)
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       vue:
         specifier: ~3.5.39
         version: 3.5.44(typescript@6.0.3)
@@ -5645,7 +5645,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -5657,7 +5657,7 @@ importers:
         version: 0.3.0(@real-router/core@0.148.0)
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       vue:
         specifier: ~3.5.39
         version: 3.5.44(typescript@6.0.3)
@@ -5688,7 +5688,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -5700,7 +5700,7 @@ importers:
         version: 0.3.0(@real-router/core@0.148.0)
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       express:
         specifier: 5.3.0
         version: 5.3.0(supports-color@10.2.2)
@@ -5737,7 +5737,7 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
@@ -5749,7 +5749,7 @@ importers:
         version: 0.3.0(@real-router/core@0.148.0)
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       express:
         specifier: 5.3.0
         version: 5.3.0(supports-color@10.2.2)
@@ -5795,7 +5795,7 @@ importers:
         version: 0.3.0(@real-router/core@0.148.0)
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       express:
         specifier: 5.3.0
         version: 5.3.0(supports-color@10.2.2)
@@ -5832,13 +5832,13 @@ importers:
     dependencies:
       '@real-router/browser-plugin':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)
+        version: 0.26.1(@real-router/core@0.148.0)
       '@real-router/core':
         specifier: '*'
         version: 0.148.0
       '@real-router/vue':
         specifier: '*'
-        version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
+        version: 0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))
       vue:
         specifier: ~3.5.39
         version: 3.5.44(typescript@6.0.3)
@@ -7412,25 +7412,25 @@ packages:
       preact: ^10.4.0 || ^11.0.0-0
       vite: '>=2.0.0'
 
-  '@real-router/angular@0.24.2':
-    resolution: {integrity: sha512-q2nOswcSmNthX5RSL41oDYB1etBiech8bd7QbIKAAOvbIkoubvI1nV58Uy9y6xQgNfi5DP0s9J5gdDjECkCQhQ==}
+  '@real-router/angular@0.24.3':
+    resolution: {integrity: sha512-BUvCeGq+i7LLB2BK4Lij3sEUftiRY55nhiMo1vhwMOSzlhDph0K2K1VXV38RLMtR1y94M06YDOPt/ByZ2XLqIQ==}
     peerDependencies:
       '@angular/common': '>=22.0.0'
       '@angular/core': '>=22.0.0'
       '@real-router/core': '>=0.148.0'
 
-  '@real-router/browser-plugin@0.25.0':
-    resolution: {integrity: sha512-EcCt99OYtmw74RdvaenA4jg+UDh4G8XYkez59i6MQb4+2JrxrDN50GfvyoLEO2kDTwbsdY89tjVLqMo5xjLwnA==}
+  '@real-router/browser-plugin@0.26.1':
+    resolution: {integrity: sha512-BKPN5fFB6PpSNxWd4PEdB2Es8vhiOXDxEyOmD5e66IAum5UACdXARRq3mC8mhagIFib+mdhbpcq0T30qF+duCA==}
     peerDependencies:
-      '@real-router/core': '>=0.135.0'
+      '@real-router/core': '>=0.148.0'
 
   '@real-router/core@0.148.0':
     resolution: {integrity: sha512-08Y2yyaYpnnNu0jSaGMVwLxcW/Mjy2er2SxC5eFmAQtWQkgztdCjLiY8IHRnLVzmpRf+iwscYa/KgkPbfah7kA==}
 
-  '@real-router/hash-plugin@0.15.0':
-    resolution: {integrity: sha512-b0Ahjv5KjZgEd/VMkAr2bSe10JAUKxlabfObg9ptpTpOzYX6LCi+TlcVJaQaPmL/8XEl2vJSAl7LY0yMoQCZfg==}
+  '@real-router/hash-plugin@0.16.1':
+    resolution: {integrity: sha512-iH07zt/IsEvk1e7FAGuzf8mPaRFi8eUGamBEoCBcRC0/c/lv1iapJYLprc15FX4X42HtlvAg7lE3hNlrOpLZvQ==}
     peerDependencies:
-      '@real-router/core': '>=0.135.0'
+      '@real-router/core': '>=0.148.0'
 
   '@real-router/lifecycle-plugin@0.8.0':
     resolution: {integrity: sha512-wiF0GLBzwsdP8GmORvYpe249IzovrMYcoC74gQH5KC/fGaKipk5/+4vsqjJP502e0AaA5g0r4ZIjUusU3MJQlw==}
@@ -7447,18 +7447,18 @@ packages:
     peerDependencies:
       '@real-router/core': '>=0.135.0'
 
-  '@real-router/navigation-plugin@0.12.0':
-    resolution: {integrity: sha512-dRj1Op7fKnJvmlb4OEOHQt7plGCjTvbp0WgAJRML5uOL9zujfJ8baZa/Lt/q8dsHNFD/WU/8YrVtkuk7jeRiHQ==}
+  '@real-router/navigation-plugin@0.14.2':
+    resolution: {integrity: sha512-zU0TFJXRveS/DLoWaFQg8QjIhmNUj8M8WwjHEviDORzlyY4arZ6OFqFDpuWUfjIRSqJ/HB08MeentatVmJcpxQ==}
     peerDependencies:
-      '@real-router/core': '>=0.135.0'
+      '@real-router/core': '>=0.148.0'
 
   '@real-router/persistent-params-plugin@0.7.0':
     resolution: {integrity: sha512-oqG4CBUte8nIk5KSSQh6IviowS2CCIX6sUEVnG8HHfy0qAX+Jc7BwWNITtFVqwdaQulcqRM4BrzaMIrLinmxmQ==}
     peerDependencies:
       '@real-router/core': '>=0.135.0'
 
-  '@real-router/preact@0.24.0':
-    resolution: {integrity: sha512-REDYPay77xWKkg1rWMoindYm/ZrQItVCJC+PXaYpDRqYADekqvciYUQCNYEuP3MQZDSpUUDXUDNDQNEZIcLQNQ==}
+  '@real-router/preact@0.24.1':
+    resolution: {integrity: sha512-PJRuNUdYXlPs5BuMqLEwou4KpssuAkJOIkNs5azgNcnVTA7hIQivi+NGOIy1AhJsrePN9HJ1O6QJfsY70TsIXg==}
     peerDependencies:
       '@real-router/core': '>=0.148.0'
       preact: '>=10.28.0 || ^11.0.0-0'
@@ -7468,8 +7468,8 @@ packages:
     peerDependencies:
       '@real-router/core': '>=0.135.0'
 
-  '@real-router/react@0.37.0':
-    resolution: {integrity: sha512-Qc+kyJBHLqhzwGrJpFMlgHS6QUJXYssl+qbvJKlODJZJDUbn1wfTD8cVoKf9RynwQqQ2Iwiqy59qvYOIgr3Skg==}
+  '@real-router/react@0.37.1':
+    resolution: {integrity: sha512-gE9l2tTo5mYwqSPaYj9qi1TwN/DweyDho8fna7ARVK3rRzibag9RJfBBhQdeZzwYdLiBPELIqw5mDJ36DN2INA==}
     peerDependencies:
       '@real-router/core': '>=0.148.0'
       '@types/react': '>=18.0.0'
@@ -7497,8 +7497,8 @@ packages:
     peerDependencies:
       '@real-router/core': '>=0.135.0'
 
-  '@real-router/solid@0.26.1':
-    resolution: {integrity: sha512-brsMpbEqXRYc0UUt50UYOWA8VgmOrh5myqaRkIEUHq5G5G6fDfEd/GJhngIP/P9VwUGNr2y/12tMrJ9H4zT3Ew==}
+  '@real-router/solid@0.26.2':
+    resolution: {integrity: sha512-CgjUOogz+b1cF0NN+0bQWp0qdeMohsfCVIyp136BzWLTs66ANaz/ItCkrjOFhyBsbTagKDpjDnbNexfOSyaQlA==}
     peerDependencies:
       '@real-router/core': '>=0.148.0'
       solid-js: '>=1.7.0'
@@ -7518,14 +7518,14 @@ packages:
     peerDependencies:
       '@real-router/core': '>=0.141.0'
 
-  '@real-router/svelte@0.24.0':
-    resolution: {integrity: sha512-VgdS/Bb76d9UtPMOPcAt4pRsLAUJYgOT62GbsqkBSe+9/DtPzV4UBlkLpUjROQM11dJ4JrPLLr1GrG+hfYlSZQ==}
+  '@real-router/svelte@0.24.1':
+    resolution: {integrity: sha512-UDdO66L58J3qhYEMLdW9WuXY9R3GsuHhMP8EbG3mTQL9thcwmN0BEdoGdWMTld4xTlz4tPVwzRpZGlUEIuhDXg==}
     peerDependencies:
       '@real-router/core': '>=0.148.0'
       svelte: '>=5.7.0'
 
-  '@real-router/vue@0.25.0':
-    resolution: {integrity: sha512-kSX7TkGEK/CZJoCocSBTKs9HlRzkDF085GhINGJ7MYaDHZqyhiWqSwG/Tx5zBxelg15bUruGm4rKEdxDvpgBTA==}
+  '@real-router/vue@0.25.1':
+    resolution: {integrity: sha512-aoHxLKVNtI16JJ87KMPzwSSKNvijUYQiEMGz2zE91ruvEDSHcre8ppC8zsTETVIxhVMkRQ+CV+XMRbn9x36Bbg==}
     peerDependencies:
       '@real-router/core': '>=0.148.0'
       vue: '>=3.3.0'
@@ -13330,7 +13330,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@real-router/angular@0.24.2(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)':
+  '@real-router/angular@0.24.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@real-router/core@0.148.0)':
     dependencies:
       '@angular/common': 22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2)
       '@angular/core': 22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)
@@ -13339,13 +13339,13 @@ snapshots:
       '@real-router/sources': 0.15.0(@real-router/core@0.148.0)
       '@real-router/ssr-utils': 0.3.0(@real-router/core@0.148.0)
 
-  '@real-router/browser-plugin@0.25.0(@real-router/core@0.148.0)':
+  '@real-router/browser-plugin@0.26.1(@real-router/core@0.148.0)':
     dependencies:
       '@real-router/core': 0.148.0
 
   '@real-router/core@0.148.0': {}
 
-  '@real-router/hash-plugin@0.15.0(@real-router/core@0.148.0)':
+  '@real-router/hash-plugin@0.16.1(@real-router/core@0.148.0)':
     dependencies:
       '@real-router/core': 0.148.0
 
@@ -13361,7 +13361,7 @@ snapshots:
     dependencies:
       '@real-router/core': 0.148.0
 
-  '@real-router/navigation-plugin@0.12.0(@real-router/core@0.148.0)':
+  '@real-router/navigation-plugin@0.14.2(@real-router/core@0.148.0)':
     dependencies:
       '@real-router/core': 0.148.0
 
@@ -13369,7 +13369,7 @@ snapshots:
     dependencies:
       '@real-router/core': 0.148.0
 
-  '@real-router/preact@0.24.0(@real-router/core@0.148.0)(preact@10.29.8)':
+  '@real-router/preact@0.24.1(@real-router/core@0.148.0)(preact@10.29.8)':
     dependencies:
       '@real-router/core': 0.148.0
       '@real-router/route-utils': 0.4.0(@real-router/core@0.148.0)
@@ -13380,7 +13380,7 @@ snapshots:
     dependencies:
       '@real-router/core': 0.148.0
 
-  '@real-router/react@0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
+  '@real-router/react@0.37.1(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:
       '@real-router/core': 0.148.0
       '@real-router/route-utils': 0.4.0(@real-router/core@0.148.0)
@@ -13406,7 +13406,7 @@ snapshots:
     dependencies:
       '@real-router/core': 0.148.0
 
-  '@real-router/solid@0.26.1(@real-router/core@0.148.0)(solid-js@1.9.17)':
+  '@real-router/solid@0.26.2(@real-router/core@0.148.0)(solid-js@1.9.17)':
     dependencies:
       '@real-router/core': 0.148.0
       '@real-router/route-utils': 0.4.0(@real-router/core@0.148.0)
@@ -13427,14 +13427,14 @@ snapshots:
     dependencies:
       '@real-router/core': 0.148.0
 
-  '@real-router/svelte@0.24.0(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))':
+  '@real-router/svelte@0.24.1(@real-router/core@0.148.0)(svelte@5.57.2(@typescript-eslint/types@8.70.1))':
     dependencies:
       '@real-router/core': 0.148.0
       '@real-router/route-utils': 0.4.0(@real-router/core@0.148.0)
       '@real-router/sources': 0.15.0(@real-router/core@0.148.0)
       svelte: 5.57.2(@typescript-eslint/types@8.70.1)
 
-  '@real-router/vue@0.25.0(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))':
+  '@real-router/vue@0.25.1(@real-router/core@0.148.0)(vue@3.5.44(typescript@6.0.3))':
     dependencies:
       '@real-router/core': 0.148.0
       '@real-router/route-utils': 0.4.0(@real-router/core@0.148.0)
