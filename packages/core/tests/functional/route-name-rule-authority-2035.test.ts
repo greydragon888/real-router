@@ -76,18 +76,25 @@ function ownedPredicates(): string[] {
   return names.toSorted((left, right) => left.localeCompare(right));
 }
 
+/**
+ * Every file under `core/src` but the owner, parsed ONCE at collection.
+ * `callersOf` walks the tree once per rule, and a parse inside a cell runs
+ * under `testTimeout`, which a whole-tree parse can miss under coverage on a
+ * loaded CI runner (#2818).
+ *
+ * `.d.ts` is swept in and needs no exclusion: this counts CALLERS, and a
+ * declaration calls nothing (#2303). A sibling authority over the same
+ * directory excludes it; the divergence is inert on all three questions.
+ */
+const SOURCES = globSync(`${CORE_SRC}/**/*.ts`)
+  .filter((file) => file !== OWNER)
+  .map((file) => ({ file, source: sourceOf(file) }));
+
 /** Files under `core/src` that CALL `name`, excluding the file declaring it. */
 function callersOf(name: string): string[] {
   const files: string[] = [];
 
-  // `.d.ts` is swept in and needs no exclusion: this counts CALLERS, and a
-  // declaration calls nothing (#2303). A sibling authority over the same
-  // directory excludes it; the divergence is inert on all three questions.
-  for (const file of globSync(`${CORE_SRC}/**/*.ts`)) {
-    if (file === OWNER) {
-      continue;
-    }
-
+  for (const { file, source } of SOURCES) {
     let calls = false;
     const visit = (node: ts.Node): void => {
       if (
@@ -101,7 +108,7 @@ function callersOf(name: string): string[] {
       ts.forEachChild(node, visit);
     };
 
-    visit(sourceOf(file));
+    visit(source);
 
     if (calls) {
       files.push(file);

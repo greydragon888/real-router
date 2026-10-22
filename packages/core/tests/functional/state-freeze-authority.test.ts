@@ -240,8 +240,17 @@ function enclosingReturnType(node: ts.Node): ts.TypeNode | undefined {
   return undefined;
 }
 
+/** `src`'s files, parsed once at collection by the loop above the suite. */
+const primed = new Map<string, ts.SourceFile>();
+
 /** 1-based lines where an object LITERAL is created AS a `State`. */
 function parseForScan(file: string): ts.SourceFile {
+  const hit = primed.get(file);
+
+  if (hit) {
+    return hit;
+  }
+
   return ts.createSourceFile(
     file,
     readFileSync(file, "utf8"),
@@ -675,6 +684,17 @@ function shellFreezeCensus(): Record<string, number> {
   return found;
 }
 
+/**
+ * `src`, parsed and type-checked ONCE at collection, so no cell parses the
+ * tree or builds the program: a cell runs under `testTimeout`, which a
+ * whole-tree parse can miss under coverage on a loaded CI runner (#2818).
+ */
+for (const file of tsFiles(SRC_DIR)) {
+  primed.set(file, parseForScan(file));
+}
+
+const freezeCensus = shellFreezeCensus();
+
 describe("State-freeze authority — seven constructors, and each one accounted for", () => {
   it("the scan discriminates — a construction counts, a narrowing does not", () => {
     // Positive and negative control on the scan ITSELF, in one fixture, because
@@ -928,7 +948,7 @@ describe("State-freeze authority — seven constructors, and each one accounted 
     // (validated by planting one on `getRoutesApi`'s revalidation pair, #1826).
     // The subject is the OPERATION, so the scan resolves the argument's type.
     expect(
-      shellFreezeCensus(),
+      freezeCensus,
       "one each, and a sixth anywhere has to be argued for in EXPECTED_SHELL_FREEZERS",
     ).toStrictEqual(EXPECTED_SHELL_FREEZERS);
   });
@@ -953,11 +973,9 @@ describe("State-freeze authority — seven constructors, and each one accounted 
       }
     }
 
-    const freezers = shellFreezeCensus();
-
     expect(
       Object.keys(constructors)
-        .filter((file) => file in freezers)
+        .filter((file) => file in freezeCensus)
         .toSorted((a, b) => a.localeCompare(b)),
     ).toStrictEqual([
       // #2144 doubled this set: both handout producers now seal what they

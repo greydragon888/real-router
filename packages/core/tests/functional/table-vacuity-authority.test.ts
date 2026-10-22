@@ -106,8 +106,14 @@ describe("table-driven cell sets that can register zero cells", () => {
     return found.toSorted(byteOrder);
   }
 
+  // The tree is read and parsed ONCE, here at collection, and both cells
+  // below read that one scan. A parse inside a cell runs under
+  // `testTimeout`, which a whole-tree parse can miss under coverage on a
+  // loaded CI runner (#2335, #2818).
+  const backlog = scan();
+
   it("the backlog is exactly this, and it only shrinks", () => {
-    expect(scan()).toStrictEqual([
+    expect(backlog).toStrictEqual([
       "engine/property/gate-backstop-parity.properties.ts · SCANS",
       "engine/unit/path-matcher/SegmentMatcher.test.ts · <inline>",
       "engine/unit/path-matcher/buildParamMeta.test.ts · <inline>",
@@ -157,7 +163,7 @@ describe("table-driven cell sets that can register zero cells", () => {
 
     // This file's own tables are counted, and so is `hostile-bags-battery`'s —
     // proof the exclusion works rather than the regexes never matching.
-    expect(scan()).not.toContain(
+    expect(backlog).not.toContain(
       "functional/hostile-bags-battery.test.ts · CONTAINER_SHAPES",
     );
   });

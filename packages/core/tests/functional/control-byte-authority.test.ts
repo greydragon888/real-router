@@ -174,8 +174,13 @@ function scan(files: readonly string[], root = REPO_ROOT): Offender[] {
 }
 
 describe("no tracked text file carries a raw control byte", () => {
+  // The tracked text files are read ONCE, here at collection. A read inside
+  // a cell runs under `testTimeout`, which a whole-tree walk can miss under
+  // coverage on a loaded CI runner (#2818).
+  const offenders = scan(trackedFiles());
+
   it("every tracked text file is free of forbidden bytes", () => {
-    expect(scan(trackedFiles())).toStrictEqual([]);
+    expect(offenders).toStrictEqual([]);
   });
 
   it("CONTROL — the scan FINDS each forbidden byte, and admits TAB, LF and CRLF", () => {
