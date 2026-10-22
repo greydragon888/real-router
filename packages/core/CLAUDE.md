@@ -680,6 +680,16 @@ transpiler artifacts.
 without re-auditing".** Do NOT use it for defensive guards against
 TypeScript-enforced invariants, and always give the reason.
 
+### A scan reads its tree at collection
+
+A cell runs under `testTimeout`, and a scan inside one grows with its tree
+until it misses it on a loaded runner (#2818). So a test that reads a tree
+reads it at module scope or in the `describe` body, and its cells read the
+result. `tests/cell-read-budget.ts`, installed by `tests/setup.ts`, fails a cell
+or a hook that reads more than its budget through `readFileSync`. The cells over
+it today are rows of `tests/cell-read-backlog.json`, which only shrinks: a row
+whose cell reads within the budget fails until it is deleted.
+
 ### Mutation testing (Stryker)
 
 The score stops short of 100 %, and the remainder is structurally not worth

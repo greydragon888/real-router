@@ -30,13 +30,16 @@
       "cache": true
     },
     "test": {
-      "dependsOn": ["$TURBO_EXTENDS$", "type-check:tests"]
+      "dependsOn": ["$TURBO_EXTENDS$", "type-check:tests"],
+      "inputs": ["$TURBO_EXTENDS$", "tests/**/*.json"]
     },
     "test:properties": {
-      "dependsOn": ["$TURBO_EXTENDS$", "type-check:tests"]
+      "dependsOn": ["$TURBO_EXTENDS$", "type-check:tests"],
+      "inputs": ["$TURBO_EXTENDS$", "tests/cell-read-backlog.json"]
     },
     "test:stress": {
-      "dependsOn": ["$TURBO_EXTENDS$", "type-check:tests"]
+      "dependsOn": ["$TURBO_EXTENDS$", "type-check:tests"],
+      "inputs": ["$TURBO_EXTENDS$", "tests/cell-read-backlog.json"]
     }
   }
 }
