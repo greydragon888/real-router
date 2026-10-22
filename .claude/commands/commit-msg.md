@@ -36,7 +36,9 @@ Scopes — только из `SCOPES` в `commitlint.config.mjs`: `scope-enum` �
 printf '%s\n\n' "<заголовок>" "<абзац 1>" "<абзац 2>" | pnpm exec commitlint
 ```
 
-commitlint молчит — можно коммитить. Длину не меряй `awk` или `wc -c`: они считают байты, а `—` — три байта. Хук `commit-msg` git запускает только после всего pre-commit (от десятков секунд до минут), а `--no-verify` пропускает и его.
+Текст с `` ` `` или `$` двойные кавычки zsh раскрывают — такой проверяй и коммить файлом: `pnpm exec commitlint < <file>`, `git commit -F <file>`.
+
+commitlint молчит — можно коммитить. Длину не меряй `awk` или `wc -c`: они считают байты, а `—` — три байта. Хук `commit-msg` git запускает только после всего pre-commit, а `--no-verify` пропускает и его.
 
 Примеры:
 
