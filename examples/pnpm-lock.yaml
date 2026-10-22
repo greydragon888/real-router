@@ -1315,7 +1315,7 @@ importers:
         version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.7.0)
+        version: 10.29.8(preact-render-to-string@6.8.1)
 
   web/preact/animation-examples/motion-animations:
     dependencies:
@@ -1333,7 +1333,7 @@ importers:
         version: 14.1.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       preact:
         specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.7.0)
+        version: 10.29.8(preact-render-to-string@6.8.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -1361,7 +1361,7 @@ importers:
         version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.7.0)
+        version: 10.29.8(preact-render-to-string@6.8.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -1389,7 +1389,7 @@ importers:
         version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.7.0)
+        version: 10.29.8(preact-render-to-string@6.8.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -1417,7 +1417,7 @@ importers:
         version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.7.0)
+        version: 10.29.8(preact-render-to-string@6.8.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -1445,7 +1445,7 @@ importers:
         version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.7.0)
+        version: 10.29.8(preact-render-to-string@6.8.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -1488,7 +1488,7 @@ importers:
         version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.7.0)
+        version: 10.29.8(preact-render-to-string@6.8.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -1531,7 +1531,7 @@ importers:
         version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.7.0)
+        version: 10.29.8(preact-render-to-string@6.8.1)
     devDependencies:
       '@preact/preset-vite':
         specifier: 2.10.6
@@ -1571,7 +1571,7 @@ importers:
         version: 0.7.0(@real-router/core@0.148.0)
       preact:
         specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.7.0)
+        version: 10.29.8(preact-render-to-string@6.8.1)
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -1623,7 +1623,7 @@ importers:
         version: 0.8.0(@real-router/core@0.148.0)
       preact:
         specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.7.0)
+        version: 10.29.8(preact-render-to-string@6.8.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -1651,7 +1651,7 @@ importers:
         version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.7.0)
+        version: 10.29.8(preact-render-to-string@6.8.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -1694,7 +1694,7 @@ importers:
         version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.7.0)
+        version: 10.29.8(preact-render-to-string@6.8.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -1737,7 +1737,7 @@ importers:
         version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.7.0)
+        version: 10.29.8(preact-render-to-string@6.8.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -1765,7 +1765,7 @@ importers:
         version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.7.0)
+        version: 10.29.8(preact-render-to-string@6.8.1)
     devDependencies:
       '@preact/preset-vite':
         specifier: 2.10.6
@@ -1790,7 +1790,7 @@ importers:
         version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.7.0)
+        version: 10.29.8(preact-render-to-string@6.8.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -1836,7 +1836,7 @@ importers:
         version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
       preact:
         specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.7.0)
+        version: 10.29.8(preact-render-to-string@6.8.1)
     devDependencies:
       '@preact/preset-vite':
         specifier: 2.10.6
@@ -1864,7 +1864,7 @@ importers:
         version: 0.7.0(@real-router/core@0.148.0)
       preact:
         specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.7.0)
+        version: 10.29.8(preact-render-to-string@6.8.1)
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -1901,10 +1901,10 @@ importers:
         version: 0.3.0(@real-router/core@0.148.0)
       preact:
         specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.7.0)
+        version: 10.29.8(preact-render-to-string@6.8.1)
       preact-render-to-string:
-        specifier: ~6.7.0
-        version: 6.7.0(preact@10.29.8)
+        specifier: ~6.8.1
+        version: 6.8.1(preact@10.29.8)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -1947,10 +1947,10 @@ importers:
         version: 5.3.0(supports-color@10.2.2)
       preact:
         specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.7.0)
+        version: 10.29.8(preact-render-to-string@6.8.1)
       preact-render-to-string:
-        specifier: ~6.7.0
-        version: 6.7.0(preact@10.29.8)
+        specifier: ~6.8.1
+        version: 6.8.1(preact@10.29.8)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -1996,10 +1996,10 @@ importers:
         version: 5.3.0(supports-color@10.2.2)
       preact:
         specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.7.0)
+        version: 10.29.8(preact-render-to-string@6.8.1)
       preact-render-to-string:
-        specifier: ~6.7.0
-        version: 6.7.0(preact@10.29.8)
+        specifier: ~6.8.1
+        version: 6.8.1(preact@10.29.8)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -2042,10 +2042,10 @@ importers:
         version: 5.3.0(supports-color@10.2.2)
       preact:
         specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.7.0)
+        version: 10.29.8(preact-render-to-string@6.8.1)
       preact-render-to-string:
-        specifier: ~6.7.0
-        version: 6.7.0(preact@10.29.8)
+        specifier: ~6.8.1
+        version: 6.8.1(preact@10.29.8)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -10718,8 +10718,8 @@ packages:
     engines: {node: '>=14.0.0'}
     hasBin: true
 
-  preact-render-to-string@6.7.0:
-    resolution: {integrity: sha512-Z4WR8fmLMRpdYqJ9i7vrlXSsSrxVJydwrkEXHapexfARbWfGb7vGcnvNQnIzN0cXciMVOlz/XLoiMCi9gUsy9Q==}
+  preact-render-to-string@6.8.1:
+    resolution: {integrity: sha512-EIaLVlarET55f737gG/g1bK1UfjAgT3Z7Ch1Z7UX4/TwHh1O7EI5sCtwhVP+cs0n37SyV2HjZCSRtrpMm4Bujw==}
     peerDependencies:
       preact: '>=10 || >= 11.0.0-0'
 
@@ -13314,7 +13314,7 @@ snapshots:
 
   '@prefresh/core@1.5.9(preact@10.29.8)':
     dependencies:
-      preact: 10.29.8(preact-render-to-string@6.7.0)
+      preact: 10.29.8(preact-render-to-string@6.8.1)
 
   '@prefresh/utils@1.2.1': {}
 
@@ -13325,7 +13325,7 @@ snapshots:
       '@prefresh/core': 1.5.9(preact@10.29.8)
       '@prefresh/utils': 1.2.1
       '@rollup/pluginutils': 4.2.1
-      preact: 10.29.8(preact-render-to-string@6.7.0)
+      preact: 10.29.8(preact-render-to-string@6.8.1)
       vite: 8.3.3(@types/node@24.19.0)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
     transitivePeerDependencies:
       - supports-color
@@ -13374,7 +13374,7 @@ snapshots:
       '@real-router/core': 0.148.0
       '@real-router/route-utils': 0.4.0(@real-router/core@0.148.0)
       '@real-router/sources': 0.15.0(@real-router/core@0.148.0)
-      preact: 10.29.8(preact-render-to-string@6.7.0)
+      preact: 10.29.8(preact-render-to-string@6.8.1)
 
   '@real-router/preload-plugin@0.8.0(@real-router/core@0.148.0)':
     dependencies:
@@ -13811,7 +13811,7 @@ snapshots:
   '@testing-library/preact@3.2.4(preact@10.29.8)':
     dependencies:
       '@testing-library/dom': 8.20.1
-      preact: 10.29.8(preact-render-to-string@6.7.0)
+      preact: 10.29.8(preact-render-to-string@6.8.1)
 
   '@testing-library/react@16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:
@@ -16709,13 +16709,13 @@ snapshots:
       commander: 9.5.0
     optional: true
 
-  preact-render-to-string@6.7.0(preact@10.29.8):
+  preact-render-to-string@6.8.1(preact@10.29.8):
     dependencies:
-      preact: 10.29.8(preact-render-to-string@6.7.0)
+      preact: 10.29.8(preact-render-to-string@6.8.1)
 
-  preact@10.29.8(preact-render-to-string@6.7.0):
+  preact@10.29.8(preact-render-to-string@6.8.1):
     optionalDependencies:
-      preact-render-to-string: 6.7.0(preact@10.29.8)
+      preact-render-to-string: 6.8.1(preact@10.29.8)
 
   prelude-ls@1.2.1: {}
 
