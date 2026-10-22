@@ -115,13 +115,13 @@ importers:
         version: 0.5.0(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       ink:
         specifier: 7.1.1
-        version: 7.1.1(@types/react@19.3.0)(react@19.3.0)
+        version: 7.1.1(@types/react@19.3.0)(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
     devDependencies:
       '@types/react':
         specifier: 19.3.0
@@ -143,13 +143,13 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -195,13 +195,13 @@ importers:
         version: 0.15.0(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -247,13 +247,13 @@ importers:
         version: 0.12.0(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -299,13 +299,13 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -339,13 +339,13 @@ importers:
         version: 0.12.0(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -1330,7 +1330,7 @@ importers:
         version: 0.24.0(@real-router/core@0.148.0)(preact@10.29.8)
       motion:
         specifier: 14.1.0
-        version: 14.1.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 14.1.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       preact:
         specifier: ~10.29.7
         version: 10.29.8(preact-render-to-string@6.7.0)
@@ -2073,10 +2073,10 @@ importers:
     dependencies:
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
     devDependencies:
       '@types/react':
         specifier: 19.3.0
@@ -2092,16 +2092,16 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       motion:
         specifier: 14.1.0
-        version: 14.1.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 14.1.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -2132,13 +2132,13 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -2169,13 +2169,13 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -2206,13 +2206,13 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -2252,13 +2252,13 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -2268,7 +2268,7 @@ importers:
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@4.1.12(@types/node@24.19.0)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@24.19.0)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/react':
         specifier: ~16.3.2
-        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
@@ -2304,13 +2304,13 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -2320,7 +2320,7 @@ importers:
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@4.1.12(@types/node@24.19.0)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@24.19.0)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/react':
         specifier: ~16.3.2
-        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
@@ -2356,13 +2356,13 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@types/react':
         specifier: 19.3.0
@@ -2402,16 +2402,16 @@ importers:
         version: 0.8.0(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@real-router/search-schema-plugin':
         specifier: '*'
         version: 0.7.0(@real-router/core@0.148.0)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -2424,7 +2424,7 @@ importers:
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@4.1.12(@types/node@24.19.0)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@24.19.0)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/react':
         specifier: ~16.3.2
-        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
@@ -2466,13 +2466,13 @@ importers:
         version: 0.8.0(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -2503,13 +2503,13 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -2519,7 +2519,7 @@ importers:
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@4.1.12(@types/node@24.19.0)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@24.19.0)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/react':
         specifier: ~16.3.2
-        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
@@ -2555,13 +2555,13 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -2571,7 +2571,7 @@ importers:
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@4.1.12(@types/node@24.19.0)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@24.19.0)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/react':
         specifier: ~16.3.2
-        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
@@ -2610,13 +2610,13 @@ importers:
         version: 0.15.0(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -2647,13 +2647,13 @@ importers:
         version: 0.12.0(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -2687,13 +2687,13 @@ importers:
         version: 0.12.0(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -2724,13 +2724,13 @@ importers:
         version: 0.15.0(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -2761,13 +2761,13 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@types/react':
         specifier: 19.3.0
@@ -2795,13 +2795,13 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -2832,13 +2832,13 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@types/react':
         specifier: 19.3.0
@@ -2866,13 +2866,13 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@types/react':
         specifier: 19.3.0
@@ -2900,13 +2900,13 @@ importers:
         version: 0.12.0(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -2937,13 +2937,13 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -2953,7 +2953,7 @@ importers:
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@4.1.12(@types/node@24.19.0)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@24.19.0)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/react':
         specifier: ~16.3.2
-        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
@@ -2992,13 +2992,13 @@ importers:
         version: 0.7.0(@real-router/core@0.148.0)
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@types/react':
         specifier: 19.3.0
@@ -3026,16 +3026,16 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@real-router/search-schema-plugin':
         specifier: '*'
         version: 0.7.0(@real-router/core@0.148.0)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -3069,7 +3069,7 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.6.0(@real-router/core@0.148.0)
@@ -3078,10 +3078,10 @@ importers:
         version: 0.3.0(@real-router/core@0.148.0)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -3118,7 +3118,7 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.6.0(@real-router/core@0.148.0)
@@ -3130,10 +3130,10 @@ importers:
         version: 5.3.0(supports-color@10.2.2)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -3173,7 +3173,7 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.6.0(@real-router/core@0.148.0)
@@ -3185,10 +3185,10 @@ importers:
         version: 5.3.0(supports-color@10.2.2)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -3228,10 +3228,10 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@real-router/rsc-server-plugin':
         specifier: '*'
-        version: 0.4.0(@real-router/core@0.148.0)(react@19.3.0)
+        version: 0.4.0(@real-router/core@0.148.0)(react@19.3.1)
       '@real-router/ssr-utils':
         specifier: '*'
         version: 0.3.0(@real-router/core@0.148.0)
@@ -3240,10 +3240,10 @@ importers:
         version: 5.3.0(supports-color@10.2.2)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
       rsc-html-stream:
         specifier: 0.0.8
         version: 0.0.8
@@ -3265,7 +3265,7 @@ importers:
         version: 19.3.0(@types/react@19.3.0)
       '@vitejs/plugin-rsc':
         specifier: 0.5.35
-        version: 0.5.35(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vite@8.3.3(@types/node@24.19.0)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 0.5.35(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(vite@8.3.3(@types/node@24.19.0)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       tsx:
         specifier: 4.23.15
         version: 4.23.15
@@ -3283,7 +3283,7 @@ importers:
         version: 0.148.0
       '@real-router/react':
         specifier: '*'
-        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.6.0(@real-router/core@0.148.0)
@@ -3295,10 +3295,10 @@ importers:
         version: 5.3.0(supports-color@10.2.2)
       react:
         specifier: ~19.3.0
-        version: 19.3.0
+        version: 19.3.1
       react-dom:
         specifier: ~19.3.0
-        version: 19.3.0(react@19.3.0)
+        version: 19.3.1(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
@@ -10831,10 +10831,10 @@ packages:
     resolution: {integrity: sha512-K5zQjDllxWkf7Z5xJdV0/B0WTNqx6vxG70zJE4N0kBs4LovmEYWJzQGxC9bS9RAKu3bgM40lrd5zoLJ12MQ5BA==}
     engines: {node: '>= 0.10'}
 
-  react-dom@19.3.0:
-    resolution: {integrity: sha512-JDk8dgif51OjFoDE70+OT9ICyYr+69HlmihNwp1+Nsfbna3t5sIiCa9ZJktDmQ4/1b/rn26hIAR2uYXDMr5r0Q==}
+  react-dom@19.3.1:
+    resolution: {integrity: sha512-Y0bARz53lhEC1NMCASs0/j+faB/zqt3R8hpvg1e8+61ZVJ4UL0UdC4cBbXfZMcIuhrfgeILTLe+ZeBCavQPtKQ==}
     peerDependencies:
-      react: ^19.3.0
+      react: ^19.3.1
 
   react-is@17.0.2:
     resolution: {integrity: sha512-w2GsyukL62IJnlaff/nRegPQR94C/XXamvMWmSHRJ4y7Ts/4ocGRmTHvOs8PSE6pB3dWOrD/nueuU5sduBsQ4w==}
@@ -10845,8 +10845,8 @@ packages:
     peerDependencies:
       react: ^19.2.0
 
-  react@19.3.0:
-    resolution: {integrity: sha512-E8LUcbtBWt20bbl2YoHfx4ZDBdxVTfOKtCZn9cDSJ4l6/nuoApcpIBcj47t2wZoVX8g2ZHuMHbiShgCR1T5Sog==}
+  react@19.3.1:
+    resolution: {integrity: sha512-QNhWdt7nrgVWWQG58QuGsAR3jv3Hbe4mb4vz7w2csnHavciZJgda1CPNaldF6eVxv90ud3jUXpKlHL69gO38yw==}
     engines: {node: '>=0.10.0'}
 
   read-binary-file-arch@1.0.6:
@@ -13380,27 +13380,27 @@ snapshots:
     dependencies:
       '@real-router/core': 0.148.0
 
-  '@real-router/react@0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+  '@real-router/react@0.37.0(@real-router/core@0.148.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:
       '@real-router/core': 0.148.0
       '@real-router/route-utils': 0.4.0(@real-router/core@0.148.0)
       '@real-router/sources': 0.15.0(@real-router/core@0.148.0)
       '@types/react': 19.3.0
       '@types/react-dom': 19.3.0(@types/react@19.3.0)
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
     optionalDependencies:
-      ink: 7.1.1(@types/react@19.3.0)(react@19.3.0)
+      ink: 7.1.1(@types/react@19.3.0)(react@19.3.1)
 
   '@real-router/route-utils@0.4.0(@real-router/core@0.148.0)':
     dependencies:
       '@real-router/core': 0.148.0
 
-  '@real-router/rsc-server-plugin@0.4.0(@real-router/core@0.148.0)(react@19.3.0)':
+  '@real-router/rsc-server-plugin@0.4.0(@real-router/core@0.148.0)(react@19.3.1)':
     dependencies:
       '@real-router/core': 0.148.0
       '@real-router/ssr-utils': 0.3.0(@real-router/core@0.148.0)
-      react: 19.3.0
+      react: 19.3.1
 
   '@real-router/search-schema-plugin@0.7.0(@real-router/core@0.148.0)':
     dependencies:
@@ -13813,12 +13813,12 @@ snapshots:
       '@testing-library/dom': 8.20.1
       preact: 10.29.8(preact-render-to-string@6.7.0)
 
-  '@testing-library/react@16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+  '@testing-library/react@16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:
       '@babel/runtime': 7.29.7
       '@testing-library/dom': 10.4.1
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
     optionalDependencies:
       '@types/react': 19.3.0
       '@types/react-dom': 19.3.0(@types/react@19.3.0)
@@ -14146,15 +14146,15 @@ snapshots:
       '@rolldown/pluginutils': 1.0.1
       vite: 8.3.3(@types/node@24.19.0)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
 
-  '@vitejs/plugin-rsc@0.5.35(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vite@8.3.3(@types/node@24.19.0)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))':
+  '@vitejs/plugin-rsc@0.5.35(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(vite@8.3.3(@types/node@24.19.0)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))':
     dependencies:
       '@rolldown/pluginutils': 1.0.1
       es-module-lexer: 2.3.2
       estree-walker: 3.0.3
       magic-string: 1.4.1
       obug: 3.0.0
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
       srvx: 0.12.8
       strip-literal: 4.0.0
       turbo-stream: 3.2.1
@@ -15507,14 +15507,14 @@ snapshots:
 
   forwarded@0.2.0: {}
 
-  framer-motion@14.1.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+  framer-motion@14.1.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
     dependencies:
       motion-dom: 14.1.0
       motion-utils: 14.1.0
       tslib: 2.8.1
     optionalDependencies:
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
 
   fresh@2.0.0: {}
 
@@ -15803,7 +15803,7 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
-  ink@7.1.1(@types/react@19.3.0)(react@19.3.0):
+  ink@7.1.1(@types/react@19.3.0)(react@19.3.1):
     dependencies:
       '@alcalzone/ansi-tokenize': 0.3.0
       ansi-escapes: 7.3.0
@@ -15818,8 +15818,8 @@ snapshots:
       indent-string: 5.0.0
       is-in-ci: 2.0.0
       patch-console: 2.0.0
-      react: 19.3.0
-      react-reconciler: 0.33.0(react@19.3.0)
+      react: 19.3.1
+      react-reconciler: 0.33.0(react@19.3.1)
       scheduler: 0.27.0
       signal-exit: 3.0.7
       slice-ansi: 9.0.0
@@ -16313,13 +16313,13 @@ snapshots:
 
   motion-utils@14.1.0: {}
 
-  motion@14.1.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+  motion@14.1.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
     dependencies:
-      framer-motion: 14.1.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      framer-motion: 14.1.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       tslib: 2.8.1
     optionalDependencies:
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
 
   mri@1.2.0: {}
 
@@ -16799,19 +16799,19 @@ snapshots:
       iconv-lite: 0.7.3
       unpipe: 1.0.0
 
-  react-dom@19.3.0(react@19.3.0):
+  react-dom@19.3.1(react@19.3.1):
     dependencies:
-      react: 19.3.0
+      react: 19.3.1
       scheduler: 0.28.0
 
   react-is@17.0.2: {}
 
-  react-reconciler@0.33.0(react@19.3.0):
+  react-reconciler@0.33.0(react@19.3.1):
     dependencies:
-      react: 19.3.0
+      react: 19.3.1
       scheduler: 0.27.0
 
-  react@19.3.0: {}
+  react@19.3.1: {}
 
   read-binary-file-arch@1.0.6(supports-color@10.2.2):
     dependencies:
