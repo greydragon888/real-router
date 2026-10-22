@@ -1,5 +1,19 @@
 # router-benchmarks
 
+## 0.3.177
+
+### Patch Changes
+
+- Updated dependencies [[`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c)]:
+  - @real-router/angular@0.24.6
+  - @real-router/preact@0.24.4
+  - @real-router/react@0.37.4
+  - @real-router/solid@0.26.5
+  - @real-router/svelte@0.24.4
+  - @real-router/vue@0.25.4
+  - @real-router/core@0.151.0
+  - @real-router/memory-plugin@0.6.0
+
 ## 0.3.176
 
 ### Patch Changes

@@ -1,5 +1,22 @@
 # @real-router/vue
 
+## 0.25.4
+
+### Patch Changes
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - Announce the first navigation after `RouterProvider` with `announceNavigation` mounts, or after the prop is switched on ([#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  The announcer leaves out the initial page load — the commit of `router.start()` on a router that had committed nothing when the announcer was created. It skipped the first navigation it observed instead, so in the canonical order, `await router.start()` and then mount, the first navigation after mount was never announced, and neither was the first one after `announceNavigation` turned on. A `start()` after `stop()` on a router that had committed by then changes the page without a load, and is still announced. The same class of defect as [#2796](https://github.com/greydragon888/real-router/issues/2796).
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` labels a Back pressed while another is held `back` ([#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  A `popstate` that arrives while a transition is in flight belongs to the traversal a URL plugin starts after that transition. When the held transition left after it, or a navigation to another address was refused in the meantime, that `popstate`'s flag was spent, and its traversal landed labelled `forward`. Each traversal keeps its own flag now: the transition in flight spends only its own, and a refusal spends the waiting one unless it names another address. The same class of defect as [#2796](https://github.com/greydragon888/real-router/issues/2796).
+
+  A Back that waits behind one a guard refuses or cancels quietly is dropped when the URL plugin returns to the entry the router shows, and its flag ends with that return: the next navigation is labelled `forward`. Before, a Back that waited behind a refused one left the next navigation labelled `back`.
+
+- Updated dependencies [[`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c)]:
+  - @real-router/core@0.151.0
+
 ## 0.25.3
 
 ### Patch Changes

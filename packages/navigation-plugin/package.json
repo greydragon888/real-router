@@ -1,6 +1,6 @@
 {
   "name": "@real-router/navigation-plugin",
-  "version": "0.14.4",
+  "version": "0.15.0",
   "type": "commonjs",
   "description": "Navigation API integration plugin for browser URL synchronization",
   "main": "./dist/cjs/index.js",
@@ -56,6 +56,6 @@
     "jsdom": "30.1.2"
   },
   "peerDependencies": {
-    "@real-router/core": "workspace:>=0.150.0"
+    "@real-router/core": "workspace:>=0.151.0"
   }
 }

@@ -1,5 +1,39 @@
 # @real-router/navigation-plugin
 
+## 0.15.0
+
+### Minor Changes
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - A browser navigation a guard cancels quietly returns to the entry it started from ([#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  A guard can cancel a navigation quietly: throw or reject with `RouterError(TRANSITION_CANCELLED)`, or throw an `AbortError`. When it does so on a navigation the browser started — a Back, for one — with no newer navigation behind the cancel, the router stays where it was, and the plugin now takes the browser back to the entry the navigation started from, as it does for a refused one. Before, the URL stayed on the entry the navigation reached while the router stayed on the page it was on.
+
+  - A newer navigation the browser starts, a download, or a router navigation that is neither refused nor cancelled owns the URL, and the plugin leaves it.
+  - A router navigation that cancels the browser's and is refused before the plugin recovers leaves nothing that owns the URL, and the browser's navigation returns as well.
+
+  **Breaking Change:** `TRANSITION_CANCELLED` no longer leaves the URL to a newer navigation unconditionally. With none behind the cancel, the plugin returns, and the intercepted navigation rejects with the router's `RouterError`: `finished` rejects and `navigateerror` fires. Before, `finished` resolved and no `navigateerror` fired.
+
+  **Migration:** a `navigateerror` listener, or code awaiting `finished`, that reports every rejection as a failure tells the quiet cancel apart by its code.
+
+  ```diff
+   navigation.addEventListener("navigateerror", (event) => {
+  +  if (event.error?.code === errorCodes.TRANSITION_CANCELLED) {
+  +    return;
+  +  }
+  +
+     reportFailure(event.error);
+   });
+  ```
+
+### Patch Changes
+
+- [#2800](https://github.com/greydragon888/real-router/pull/2800) [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c) Thanks [@greydragon888](https://github.com/greydragon888)! - A navigation that arrives no longer drops the record of a newer one (same class as [#2796](https://github.com/greydragon888/real-router/issues/2796))
+
+  A navigation the browser starts right after another lands — from a `router.subscribe` listener through a microtask, before the plugin's handler for the first one resumes — keeps the record the plugin took for it. A navigation the router refuses after that now returns to the entry the router stands on. Before, the first navigation's arrival dropped the newer one's record, and the refusal took the browser to the newer navigation's entry, which the router never reached.
+
+- Updated dependencies [[`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c), [`b02d2e0`](https://github.com/greydragon888/real-router/commit/b02d2e0f3ac7145c7f561317e22032b32a5e472c)]:
+  - @real-router/core@0.151.0
+
 ## 0.14.4
 
 ### Patch Changes
