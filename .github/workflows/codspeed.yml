@@ -412,7 +412,7 @@ jobs:
       # working-directory: packages/core so `tsx` and @real-router/* resolve from
       # the package; --conditions maps @real-router/* to live `src/` (no build).
       #
-      # `mode` is a REQUIRED input on the v4 action (no default) — omitting it
+      # `mode` is a REQUIRED input of the action (no default) — omitting it
       # fails the run before any bench executes. `simulation` is the
       # deterministic instruction-count instrument (vs `walltime`, which needs
       # dedicated runners). ⚠ It measures USER-SPACE work only — "CodSpeed CPU
@@ -440,7 +440,7 @@ jobs:
       # values are a mixed-measurement report, and a differing auth method would
       # stop CodSpeed aggregating them at all.
       - name: Run core hot-path benchmarks under CodSpeed
-        uses: CodSpeedHQ/action@373d6868929f444bc08d901fd0eb0ad52a8875ea # v5.2.1
+        uses: CodSpeedHQ/action@821a40cd6c80e3cfe387caf55668287addd808da # v5.5.0
         with:
           mode: simulation
           runner-version: rev:v4.18.4
@@ -555,7 +555,7 @@ jobs:
       # `mode` and the (absent) `token:` in lockstep with `core` — see that
       # step's note on why aggregation depends on it.
       - name: Run adapter benchmarks under CodSpeed
-        uses: CodSpeedHQ/action@373d6868929f444bc08d901fd0eb0ad52a8875ea # v5.2.1
+        uses: CodSpeedHQ/action@821a40cd6c80e3cfe387caf55668287addd808da # v5.5.0
         with:
           mode: simulation
           runner-version: rev:v4.18.4

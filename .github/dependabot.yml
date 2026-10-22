@@ -35,9 +35,7 @@ updates:
       # @codspeed/* decides the V8 flags CodSpeed's simulation runs under, so a
       # bump moves every CodSpeed baseline at once. It arrives alone, not inside
       # `dev-dependencies`, where the step would be read as another package's.
-      # Pinned to a 6.0.0 prerelease, it is also offered the later 6.0.0
-      # prereleases. Listed before `dev-dependencies` for the reason the `react`
-      # group gives.
+      # Listed before `dev-dependencies` for the reason the `react` group gives.
       codspeed:
         patterns:
           - "@codspeed/*"
