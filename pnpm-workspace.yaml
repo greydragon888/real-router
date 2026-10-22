@@ -109,10 +109,10 @@ overrides:
   # vite, @angular/build, ng-packagr, @vue/compiler-sfc, beasties, postcss-scss /
   # -safe-parser / -load-config, eslint-plugin-svelte, svelte-eslint-parser. Not in any published
   # @real-router/* package. Single 8.x line, patch-level fix, so a floor is enough. It sits at
-  # 8.5.28, the highest minimum a parent declares (`^8.5.28`: vite and @vue/compiler-sfc): an
+  # 8.5.29, the highest minimum a parent declares (`^8.5.29`: @vue/compiler-sfc): an
   # override outranks semver, so a lower floor can keep a parent on an older release. Drop when
   # the toolchain pulls >=8.5.23 on its own.
-  postcss: '>=8.5.28'
+  postcss: '>=8.5.29'
   # fflate < 0.8.3: `unzipSync` can loop forever on a malformed ZIP64 archive
   # (GHSA-px8p-9vwx-vf98, 7.5). `@arethetypeswrong/core` (via its CLI and tsdown)
   # declares `^0.8.3`, but `@vitest/ui` declares `^0.8.2`, a range that admits
