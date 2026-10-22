@@ -45,11 +45,20 @@
 
 [#508]: https://github.com/greydragon888/real-router/issues/508
 
+## Superseded Restore
+
+| #   | Invariant                         | Description                                                                                                                                                                                                                                                                  |
+| --- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 15  | The newer navigation's end decides | A `back()`, `forward()` or `go()` a newer `navigate()` cancels while a guard holds it leaves the stack to that navigation's end, at once or after an async guard of its own: its push commits after the entry the restore moves to; a refusal or a quiet cancel leaves the stack on the entry the router shows, with `historyIndex` and the entries behind it unchanged ([#2802]). |
+
+[#2802]: https://github.com/greydragon888/real-router/issues/2802
+
 ## Test Files
 
 | File                                        | Invariants | Category                                         |
 | ------------------------------------------- | ---------- | ------------------------------------------------ |
 | `tests/property/memoryPlugin.properties.ts` | 1–14       | Index bounds, history size, navigation, context  |
+| `tests/property/superseded-restore.properties.ts` | 15   | Superseded restore                               |
 | `tests/property/helpers.ts`                 | —          | Shared arbitraries and router factory            |
 
 > **Concurrency note.** Invariants #2 (valid bounds) and #12 (push direction) also hold under a **concurrent async-guard race** — a `back()` / `go(-N)` whose target has an async `canActivate` guard, cancelled by a concurrent `navigate()` that commits first. The synchronous property arbitraries cannot generate this interleaving (it is the residual of #807 that shipped, [#1234] — the flag/`#index` were consumed/reverted by timing, not identity); it is stress-verified in `tests/stress/async-guard-back-navigate-race.stress.ts` ([#1235]).

@@ -484,11 +484,19 @@ User clicks back/forward/link, submits a form, or navigation.navigate() fires
         │                                     → event.scroll() (scrollIfAborted, #2751)
         │                       SAME_STATES → also syncUrlToRouterState() for an entry
         │                                     at another path or query (#2744)
-        │                       TRANSITION_CANCELLED while another navigation owns
-        │                                     the URL, or SAME_STATES of a navigation a
-        │                                     newer one aborted → nothing, the record stays
-        │                       TRANSITION_CANCELLED nothing else owns the URL behind
-        │                                     → returnToOrigin(), rethrow
+        │                       TRANSITION_CANCELLED → once a look — a microtask
+        │                                     after the last end, or the read
+        │                                     when no look is queued — finds
+        │                                     no router navigation announced
+        │                                     since running
+        │                                     (newer.whenSettled):
+        │                                     another navigation owns the URL → nothing,
+        │                                     the record stays; none → returnToOrigin(),
+        │                                     rethrow (the intercept is pending meanwhile);
+        │                                     a router that refused the watch → nothing,
+        │                                     the record stays
+        │                       SAME_STATES of a navigation a newer one aborted
+        │                                     → nothing, the record stays
         │                       other RouterError → returnToOrigin(), rethrow
         │                       non-RouterError → recoverFromNavigateError()
         │                                         → returnToOrigin(), rethrow

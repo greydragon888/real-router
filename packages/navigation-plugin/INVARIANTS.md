@@ -829,7 +829,8 @@ The guard is implemented by the pure helper `isSameHref(target, currentHref)` in
 - If error is not `RouterError`: `recoverFromNavigateError()` logs it and returns to the router's entry
 - If error is a `RouterError` that refuses (`CANNOT_DEACTIVATE`, `CANNOT_ACTIVATE`, `ROUTE_NOT_FOUND`, …): returns to the router's entry, nothing logged
 - `SAME_STATES`: an entry at another path or query than the router's gets the router's URL (A5); a URL that differs only in its fragment keeps it
-- `TRANSITION_CANCELLED`, and `SAME_STATES` of a navigation a newer one has aborted: nothing is done — the newer one owns the URL
+- `TRANSITION_CANCELLED`: once a look finds none of the router navigations announced since running, nothing is done while another navigation owns the URL — one the browser started since, or one the router committed; with none — a quiet cancel, or a newer router navigation refused or cancelled in turn — it returns to the router's entry; a router whose listener limit refused the watch waits for nothing and does nothing — the URL is left to the other navigations, a quiet cancel included
+- `SAME_STATES` of a navigation a newer one has aborted: nothing is done — the newer one owns the URL
 - After a return the intercept rejects with the error
 
 **Why it matters:** Distinguishes expected routing errors from unexpected exceptions.

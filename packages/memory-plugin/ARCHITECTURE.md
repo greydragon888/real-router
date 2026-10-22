@@ -38,14 +38,17 @@ graph LR
         GO["#go(delta)"] --> NAV["api.navigateToState()"]
         NAV -->|start| OTSTART
         NAV -->|commit| OTS
-        NAV --> CATCH[".catch() → the restore stops moving the position"]
+        NAV -->|refused / cancelled| OTEND["onTransitionError / onTransitionCancel: none runs"]
+        OTEND -->|the restore cancelled| WAIT["#waitFor: listens to the ends that follow"]
+        NAV -->|its promise rejects| LEFT["#left: refused, or cancelled with none running and no look queued → the restore stops moving the position"]
+        WAIT -->|a microtask after the last end, with none running| SAME["the same"]
     end
 ```
 
-| Import source             | What it uses                                                      | Purpose                          |
-| ------------------------- | ----------------------------------------------------------------- | -------------------------------- |
-| **@real-router/core**     | `PluginFactory`, `Plugin`, `Router`, `State`, `NavigationOptions` | Plugin types and router contract |
-| **@real-router/core/api** | `getPluginApi`, `PluginApi`                                       | `extendRouter()` to add methods  |
+| Import source             | What it uses                                                                | Purpose                                                                     |
+| ------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| **@real-router/core**     | `PluginFactory`, `Plugin`, `Router`, `State`, `NavigationOptions`, `events` | Plugin types and router contract                                            |
+| **@real-router/core/api** | `getPluginApi`, `PluginApi`                                                 | `extendRouter()` to add methods, `addEventListener()` while a restore waits |
 
 ## Core Algorithm
 
@@ -96,11 +99,16 @@ back() / forward() / go(delta)
             ├── START   → onTransitionStart files the restore under toState.context;
             │             it is in flight: position = its target
             ├── SUCCESS → onTransitionSuccess finds the record: the restore lands
-            └── .catch()  → if it is still the restore in flight, it no longer is:
-                               position = #shown
+            └── ERROR / CANCEL → the promise rejects (#left): refused, or cancelled
+                                 with no navigation running and no look queued →
+                                 the restore is no longer in flight: position =
+                                 #shown; cancelled while one runs or a look is
+                                 queued → the wait its cancel took (#waitFor): the
+                                 same, a microtask after the last end with none
+                                 running
 ```
 
-The restore record keeps `onTransitionSuccess` from recording the replayed navigation as a new history entry, and only the navigation that filed it carries it — a `navigate()` issued in the same tick as `back()`/`forward()`/`go()`, or committed while a guard holds the restore, is a fresh push. A guard-blocked or rejected replay never reaches `onTransitionSuccess`; its `.catch()` stops it moving the position, unless a newer restore has taken the position over or a navigation has committed over it.
+The restore record keeps `onTransitionSuccess` from recording the replayed navigation as a new history entry, and only the navigation that filed it carries it — a `navigate()` issued in the same tick as `back()`/`forward()`/`go()`, or committed while a guard holds the restore, is a fresh push. A guard-blocked or rejected replay never reaches `onTransitionSuccess`. A refused replay stops moving the position when its navigation's promise rejects (`#left`), after the microtasks the listeners of that end queued, whichever was registered first, whatever runs then. A cancelled one stops once the navigations that run from its cancel have ended (`#waitFor`), or at its rejection when none runs and no look of its wait is queued. A navigation that supersedes it starts within the call that cancels it — and commits there when nothing holds it — before that rejection, and its own end decides: its commit applies to the restore's target, and its refusal, or a cancel with nothing newer behind it, leaves the position on `#shown`. The wait takes a listener on success, error and cancel at the restore's cancel, after the ones an application registered before then, and the end of a navigation that ran looks a microtask later — a refusal before a navigation starts ends none — unless a later end comes first, so a redirect such a listener defers with a microtask runs by then and decides in its place, and the ended navigation's own promise handlers run after, whether it ends within the call that cancels the restore or later, unless another navigation ends later in the same task. A router whose listener limit leaves no room for the wait leaves the restore to its rejection. A newer restore takes the position over. A navigation a listener ends inside its announce, before the plugin's `onTransitionStart` runs, is remembered as ended and never moves the position.
 
 ## Data Flow
 
@@ -129,8 +137,8 @@ router.back()
     │
     ├── START   → onTransitionStart files the restore: position = its target
     ├── SUCCESS → onTransitionSuccess finds the record: #shown = its target, no push
-    └── BLOCKED → .catch() → the restore is no longer in flight:
-                                position = #shown
+    └── BLOCKED → the promise rejects (#left), whatever runs:
+                  the restore is no longer in flight, position = #shown
 ```
 
 ### Guard blocks back navigation
@@ -144,7 +152,8 @@ router.back()
     │
     CANNOT_ACTIVATE (guard returns false)
     │
-    .catch() → the restore is no longer in flight: position = #shown
+    the promise rejects (#left), whatever runs:
+    the restore is no longer in flight, position = #shown
     (onTransitionSuccess never fired, so the record was never consumed)
 
 canGoBack() reflects the entry the router shows
@@ -162,7 +171,7 @@ Navigating back or forward replays an existing history entry. Using `replace: tr
 
 ### Why the stack position is derived, not reverted
 
-The position `canGoBack()`/`canGoForward()` and the next `#go()` read is the target of the restore in flight, else the entry the router shows (`#shown`). Callers that inspect `canGoBack()`/`canGoForward()` while a `back()` is held see the post-navigation position, and a failed restore leaves nothing to undo: it stops being the restore in flight, and the position is the shown entry again. A refusal before the navigation is announced never made it the restore in flight, so it never moved the position at all.
+The position `canGoBack()`/`canGoForward()` and the next `#go()` read is the target of the restore in flight, else the entry the router shows (`#shown`). Callers that inspect `canGoBack()`/`canGoForward()` while a `back()` is held see the post-navigation position, and a failed restore leaves nothing to undo: it stops being the restore in flight when its navigation ends without landing, by the rules of [Navigation Flow](#navigation-flow-godelta), and the position is the shown entry again. A refusal before the navigation is announced never made it the restore in flight, so it never moved the position at all.
 
 ### Why `go(0)` is a no-op
 
@@ -191,7 +200,8 @@ router.usePlugin(memoryPluginFactory(options))
                         └── returns removeExtensions()
                 │
                 return plugin.getPlugin()
-                    └── { onTransitionStart, onTransitionSuccess, onStop, teardown }
+                    └── { onTransitionStart, onTransitionSuccess, onTransitionError,
+                          onTransitionCancel, onStop, teardown }
 
 router.stop()
     └── onStop → #clear() (entries, shown index and the restore in flight reset, extensions remain)

@@ -9,6 +9,7 @@ import {
 import { buildEntryUrl, isSameHref } from "./href-utils";
 import { PLUGIN_SYNC_INFO } from "./navigation-browser";
 
+import type { NewerNavigations } from "./browser-env";
 import type {
   NavigationBrowser,
   NavigationDirection,
@@ -90,6 +91,34 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
   // The last navigation this handler took, until the router reaches its
   // destination or the plugin next writes the router's own URL.
   let taken: Taken | undefined;
+
+  /**
+   * Whether another navigation than `record`'s owns the URL, once a look finds
+   * none the router announced since running: a newer one the browser started
+   * — the handler took it, or a download cleared the handler's record — or
+   * one the router committed, while the handler waited or after (#2796,
+   * #2802). A `stop()` that cancels them commits none, and a router that
+   * refused the watch leaves the URL to them.
+   */
+  const ownedElsewhere = async (
+    record: Taken,
+    newer: NewerNavigations,
+  ): Promise<boolean> => {
+    // `undefined` when the router refused the watch.
+    const committed = await new Promise<boolean | undefined>((resolve) => {
+      if (!newer.whenSettled(resolve)) {
+        resolve(undefined);
+      }
+    });
+
+    const state = router.getState();
+
+    return (
+      committed !== false ||
+      taken !== record ||
+      (state !== undefined && state !== record.state)
+    );
+  };
 
   return function handleNavigateEvent(event: NavigateEvent): void {
     if (!event.canIntercept || !router.isActive()) {
@@ -204,11 +233,6 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
           redirectBeforeCommit(event, matchedState.path, hash, base)),
         handler: async () => {
           const newer = watchNewerNavigations(api);
-          // Another navigation owns the URL: a newer one the browser started
-          // (the handler took it), a download, or a router navigation that is
-          // neither refused nor cancelled (#2796).
-          const ownedElsewhere = (): boolean =>
-            taken !== record || newer.ownTheUrl();
 
           const arrived = await withRecovery(
             () =>
@@ -236,7 +260,7 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
             browser,
             record,
             base,
-            ownedElsewhere,
+            () => ownedElsewhere(record, newer),
           ).finally(newer.stop);
 
           if (arrived) {
@@ -388,8 +412,9 @@ function scrollIfAborted(event: NavigateEvent): void {
 /**
  * Runs the router's transition for a navigation the handler took, and
  * answers whether the router stands on its destination: `false` when the
- * transition was cancelled and another navigation owns the URL. A refusal, a
- * cancel nothing else owns the URL behind, or a crash rejects.
+ * transition was cancelled and another navigation owns the URL once a look
+ * finds none the router announced since running. A refusal, a cancel nothing
+ * else owns the URL behind, or a crash rejects.
  */
 async function withRecovery(
   run: () => Promise<unknown>,
@@ -397,7 +422,7 @@ async function withRecovery(
   browser: NavigationBrowser,
   taken: Taken,
   base: string,
-  ownedElsewhere: () => boolean,
+  ownedElsewhere: () => Promise<boolean>,
 ): Promise<boolean> {
   try {
     await run();
@@ -411,12 +436,15 @@ async function withRecovery(
     }
 
     // TRANSITION_CANCELLED with another navigation owning the URL — a newer
-    // navigate event this same plugin handles, or a router navigation — that
-    // one is responsible for syncing URL/state. Firing our own sync here races
-    // against it: browser.navigate(replace, same-url) would cancel the
-    // in-flight newer transition, which is exactly the rapid-fire-events storm
-    // failure mode. With none — a guard cancelled this navigation quietly
-    // (#2796) — the router stays put, and it returns as a refusal does.
+    // navigate event this same plugin handles, or a router navigation that
+    // commits — that one is responsible for syncing URL/state. Firing our own
+    // sync here races against it: browser.navigate(replace, same-url) would
+    // cancel the in-flight newer transition, which is exactly the rapid-fire-
+    // events storm failure mode. A router navigation still running decides
+    // when it ends, and the intercept waits for it (#2802). With none — a
+    // guard cancelled this navigation quietly (#2796), or the newer one is
+    // refused or cancelled in turn — the router stays put, and it returns as a
+    // refusal does.
     //
     // SAME_STATES: the router already shows the target state, but the entry
     // the browser committed can carry an alias of it — a `forwardTo` source,
@@ -425,7 +453,10 @@ async function withRecovery(
     // its fragment keeps it. A navigation a newer one has aborted writes
     // nothing and keeps the newer one's record, for the reason above: the
     // newer one owns the URL.
-    if (error.code === errorCodes.TRANSITION_CANCELLED && ownedElsewhere()) {
+    if (
+      error.code === errorCodes.TRANSITION_CANCELLED &&
+      (await ownedElsewhere())
+    ) {
       return false;
     }
 

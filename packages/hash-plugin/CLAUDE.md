@@ -54,7 +54,7 @@ Transition completes → process deferred event
 
 Only the **last** deferred event is kept (intermediate states skipped). A transition the router refuses drops it when the plugin travels back to the entry the refused one started from: it describes a traversal from an entry the browser leaves (#2740).
 
-`createHashSyncLifecycle` empties the queue on `stop()` and `teardown()` via `PopstateHandler.discard` (#1922). Removing the two listeners is not enough — the in-flight transition's `finally` drains the queue unconditionally, so a queued event replayed after the plugin was gone. Shared via `browser-env`, so browser-plugin gets the same discard.
+`createHashSyncLifecycle` empties the queue on `stop()` and `teardown()` via `PopstateHandler.discard` (#1922), which also drops a cancelled traversal's wait for the navigation that cancelled it (#2802). Removing the two listeners is not enough — the in-flight transition's `finally` drains the queue unconditionally, so a queued event replayed after the plugin was gone. Shared via `browser-env`, so browser-plugin gets the same discard.
 
 ### Not-Found Popstate Same-State Short-Circuit (#1448)
 
@@ -174,7 +174,7 @@ On back/forward the browser has **already** restored the target entry's `{name, 
 
 ### A refused traversal returns to the entry it started from (#2740)
 
-The popstate handler is the one browser-plugin uses (`browser-env`), so a refused Back or Forward takes the browser back with `history.go(delta)` to the entry it started from, measured by the `position` each entry the plugin writes carries — browser-plugin's CLAUDE.md describes the mechanism. A popstate and the paired `hashchange` of the return are deduplicated as any traversal's are.
+The popstate handler is the one browser-plugin uses (`browser-env`), so a refused Back or Forward takes the browser back with `history.go(delta)` to the entry it started from, measured by the `position` each entry the plugin writes carries — browser-plugin's CLAUDE.md describes the mechanism, and how a traversal a newer navigation cancels waits for that navigation's end (#2802). A popstate and the paired `hashchange` of the return are deduplicated as any traversal's are. `tests/functional/superseded-traversal-2802.test.ts` holds the cancels here, a fragment navigation's included.
 
 ⚠ **An entry the browser makes for a fragment navigation measures no way back.** A native `<a href="#/x">`, an address-bar edit or `location.hash = …` creates the entry before any plugin code runs, and the plugin numbers it on its own when it writes into it. So refusing that navigation, or a Back or Forward between two such entries, rewrites the entry the browser stands on — in an app that navigates by plain anchors, no refusal returns. `tests/functional/refused-traversal-returns-2740.test.ts` pins both.
 

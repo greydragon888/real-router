@@ -188,10 +188,12 @@ describe("#2796 — a Back a guard cancels quietly returns to the entry it start
       globalThis.history.replaceState(null, "", "/sentinel");
       globalThis.history.pushState(null, "", "/home");
 
+      // Room for the watch's listener on each event, the plugin's own
+      // success hook included, until `taken` is filled.
       const created = createRouter(routerConfig, {
         defaultRoute: "home",
         allowNotFound: true,
-        limits: { maxListeners: 1 },
+        limits: { maxListeners: 2 },
       });
 
       created.usePlugin(
@@ -207,7 +209,10 @@ describe("#2796 — a Back a guard cancels quietly returns to the entry it start
       router = created;
 
       const api = getPluginApi(created);
-      const removeTaken = api.addEventListener(taken, () => {});
+      const removeTaken = [
+        api.addEventListener(taken, () => {}),
+        api.addEventListener(taken, () => {}),
+      ];
 
       await created.navigate("users.list");
       globalThis.history.back();
@@ -215,14 +220,22 @@ describe("#2796 — a Back a guard cancels quietly returns to the entry it start
 
       expect(at()).toStrictEqual({ path: "/home", route: "home" });
 
-      removeTaken();
+      for (const remove of removeTaken) {
+        remove();
+      }
 
-      for (const event of [
-        events.TRANSITION_START,
-        events.TRANSITION_ERROR,
-        events.TRANSITION_CANCEL,
-      ]) {
-        expect(() => api.addEventListener(event, () => {})).not.toThrow();
+      // Each event takes as many as the limit leaves beside the plugin's hook.
+      for (const [event, room] of [
+        [events.TRANSITION_START, 2],
+        [events.TRANSITION_SUCCESS, 1],
+        [events.TRANSITION_ERROR, 2],
+        [events.TRANSITION_CANCEL, 2],
+      ] as const) {
+        expect(() => {
+          for (let added = 0; added < room; added++) {
+            api.addEventListener(event, () => {});
+          }
+        }).not.toThrow();
       }
     },
   );

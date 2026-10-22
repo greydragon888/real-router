@@ -96,8 +96,22 @@ function resolveHashOptions(
 }
 
 /**
- * The popstate listener, plus the one piece of its state that outlives a single
- * event: the slot holding an event queued behind an in-flight transition.
+ * Rollback errors are swallowed: teardown races may remove router.buildUrl
+ * while a popstate event is still queued.
+ */
+function recoverQuietly(recover: () => void): void {
+  try {
+    recover();
+  } catch {
+    // noop — nothing safe to do here
+  }
+}
+
+/**
+ * The popstate listener, plus the two pieces of its state that outlive a
+ * single event: the slot holding an event queued behind an in-flight
+ * transition, and the wait of a traversal a newer navigation cancelled until
+ * that navigation ends (#2802).
  *
  * ⚠ Zero listeners is not an empty queue. The in-flight transition's `finally`
  * drains this slot unconditionally, so a queued event outlives teardown unless
@@ -108,9 +122,11 @@ export interface PopstateHandler {
 
   /**
    * Drops an event queued behind an in-flight transition, so the transition's
-   * `finally` has nothing to replay. Idempotent, and scoped to this handler —
-   * in a factory pool each plugin instance owns its own queue, so this never
-   * touches another router's (#758 / #1213).
+   * `finally` has nothing to replay, and a cancelled traversal's wait for the
+   * navigation that cancelled it, so that navigation's end moves nothing
+   * (#2802). Idempotent, and scoped to this handler — in a factory pool each
+   * plugin instance owns its own queue, so this never touches another
+   * router's (#758 / #1213).
    */
   discard: () => void;
 }
@@ -134,6 +150,11 @@ export function createPopstateHandler(
     location: string;
     hash: string | undefined;
   } | null = null;
+  // The watch the last cancelled traversal is left to: the end of the
+  // navigations it watches decides that traversal (#2802). Stopping a watch
+  // that has settled, or one the router refused, does nothing, so nothing
+  // clears the slot.
+  let waitedOn: NewerNavigations | undefined;
 
   function processDeferredEvent(): void {
     if (deferred) {
@@ -270,31 +291,49 @@ export function createPopstateHandler(
 
   /**
    * navigate() already emitted $$error. A refusal returns to the entry the
-   * traversal started from, and so does a cancellation no newer navigation
-   * owns the URL behind — a guard's quiet cancel (#2796). `SAME_STATES` (URL
-   * and state agree) and a cancellation by a newer navigation that owns the
-   * URL refuse nothing, and only resync the entry the browser stands on.
-   *
-   * Rollback errors are swallowed: teardown races may remove router.buildUrl
-   * while a popstate event is still queued.
+   * traversal started from. A cancellation waits for the navigations the
+   * router announced while the traversal ran to end: one that commits owns the
+   * URL, and with none — a guard's quiet cancel (#2796), or a newer one
+   * refused or cancelled in turn (#2802) — the traversal returns as a refused
+   * one does. `SAME_STATES` (URL and state agree) refuses nothing, and only
+   * resyncs the entry the browser stands on; so does a cancellation under a
+   * router that refused the watch.
    */
   function recoverFromRouterError(
     error: RouterError,
     start: TraversalStart,
     newer: NewerNavigations,
   ): void {
-    try {
-      if (
-        error.code === errorCodes.SAME_STATES ||
-        (error.code === errorCodes.TRANSITION_CANCELLED && newer.ownTheUrl())
-      ) {
-        rollbackUrlToCurrentState();
-      } else {
-        returnOrRollback(start);
-      }
-    } catch {
-      // noop — nothing safe to do here
+    const returnToStart = (): void => {
+      returnOrRollback(start);
+    };
+
+    if (
+      error.code === errorCodes.TRANSITION_CANCELLED &&
+      leaveToNewer(newer, returnToStart)
+    ) {
+      return;
     }
+
+    recoverQuietly(
+      error.code === errorCodes.SAME_STATES ||
+        error.code === errorCodes.TRANSITION_CANCELLED
+        ? rollbackUrlToCurrentState
+        : returnToStart,
+    );
+  }
+
+  /**
+   * Leaves a cancelled traversal to the navigations the router announced
+   * while it ran — `decide` runs once a look finds none of them running — and
+   * answers whether the router let the plugin watch them.
+   */
+  function leaveToNewer(newer: NewerNavigations, decide: () => void): boolean {
+    waitedOn = newer;
+
+    return newer.whenSettled(() => {
+      recoverQuietly(decide);
+    });
   }
 
   function recoverFromCriticalError(
@@ -335,6 +374,9 @@ export function createPopstateHandler(
     }
 
     isTransitioning = true;
+    // The browser has left the entry a cancelled traversal reached, and this
+    // traversal's own end decides.
+    waitedOn?.stop();
 
     // Where the traversal started: the router's entry, and its state there.
     const start: TraversalStart = {
@@ -423,7 +465,12 @@ export function createPopstateHandler(
         recoverFromCriticalError(error, start);
       }
     } finally {
-      newer.stop();
+      // A cancelled traversal's watch outlives it, until the newer
+      // navigation's end decides it.
+      if (waitedOn !== newer) {
+        newer.stop();
+      }
+
       deps.positions?.depart();
       isTransitioning = false;
       processDeferredEvent();
@@ -443,6 +490,7 @@ export function createPopstateHandler(
 
   handler.discard = () => {
     deferred = null;
+    waitedOn?.stop();
   };
 
   return handler;

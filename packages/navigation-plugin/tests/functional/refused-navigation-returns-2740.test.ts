@@ -422,26 +422,20 @@ describe("a browser navigation the router refuses returns to the entry it starte
 
     it("after one a newer navigation cancelled, a refused one returns to the entry the router stands on", async () => {
       const { mock, router: r } = await setup();
-      let refuseTheNewer: ((allowed: boolean) => void) | undefined;
       let views = 0;
 
       getLifecycleApi(r).addActivateGuard(
         "users.list",
         () => () => new Promise<boolean>(() => {}),
       );
-      // The router navigation is held, and refused only once the one it
-      // cancelled has settled — by then it owned the URL, and the cancelled
-      // one left its entry where the browser committed it. Every later
-      // navigation to users.view is refused at once.
+      // The router navigation is held, so the one it cancelled waits for its
+      // end with its entry where the browser committed it (#2802), and the
+      // next one the browser starts arrives first. Every later navigation to
+      // users.view is refused at once.
       getLifecycleApi(r).addActivateGuard("users.view", () => () => {
         views++;
 
-        return (
-          views === 1 &&
-          new Promise<boolean>((resolve) => {
-            refuseTheNewer = resolve;
-          })
-        );
+        return views === 1 && new Promise<boolean>(() => {});
       });
       mock.navigate("http://localhost/users/list");
       await settle();
@@ -451,12 +445,9 @@ describe("a browser navigation the router refuses returns to the entry it starte
         .catch(() => undefined);
 
       await settle();
-      refuseTheNewer?.(false);
-      await newer;
-      await settle();
-
       mock.navigate("http://localhost/users/view/2");
       await settle();
+      await newer;
 
       expect(r.getState()?.name).toBe("home");
       expect(history(mock)).toStrictEqual({
@@ -581,6 +572,37 @@ describe("a browser navigation the router refuses returns to the entry it starte
 
     expect(r.getState()?.name).toBe("users.list");
     expect(entries[index ?? -1]).toBe("/users/list");
+  });
+
+  it("a redirect a TRANSITION_ERROR listener starts, held by a guard of its own, writes its entry after the origin rather than after the refused one", async () => {
+    const { mock, router: r } = await setup();
+
+    refuse(r, "enter", "users.view");
+    getLifecycleApi(r).addActivateGuard(
+      "users.list",
+      () => () =>
+        new Promise<boolean>((resolve) => {
+          setTimeout(() => {
+            resolve(true);
+          }, 0);
+        }),
+    );
+    getPluginApi(r).addEventListener(events.TRANSITION_ERROR, () => {
+      queueMicrotask(() => {
+        void r.navigate("users.list").catch(() => undefined);
+      });
+    });
+
+    await mock
+      .navigate("http://localhost/users/view/42")
+      .finished.catch(() => undefined);
+    await settle();
+
+    expect({ route: r.getState()?.name, ...history(mock) }).toStrictEqual({
+      route: "users.list",
+      entries: ["/home", "/users/list"],
+      index: 1,
+    });
   });
 
   describe("controls", () => {
