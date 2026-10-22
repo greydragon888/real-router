@@ -121,13 +121,6 @@ overrides:
   # the toolchain pulls >=8.5.23 on its own.
   postcss: '>=8.5.28'
   tmp: '>=0.2.6'
-  # fflate < 0.8.3: `unzipSync` can loop forever on a malformed ZIP64 archive
-  # (GHSA-px8p-9vwx-vf98, 7.5). Its one parent here, `@vitest/ui`, declares
-  # `^0.8.2`, a range that admits the affected release; the floor is what excludes
-  # it. Test tooling, never in a published @real-router/* package. Bounded `<0.9`
-  # for the reason the @xmldom/xmldom entry states: on a 0.x line the minor IS the
-  # major. No 0.9 exists today, so the bound costs nothing.
-  fflate: '>=0.8.3 <0.9'
   # js-yaml 4.x — GHSA-5p4m-2wfm-xmqj (High, quadratic CPU in `!!omap`, fixed 4.3.1)
   # and GHSA-2883-xcg3-v3hh (High, 7.5, fixed 4.3.2). Every parent is part of
   # electron-builder (app-builder-lib, builder-util, dmg-builder) and parses OUR OWN
