@@ -1635,6 +1635,12 @@ export class Router<
       )`cannot start a navigation from inside a forwardState interceptor, a route's encodeParams or dynamic forwardTo callback, or a defaultRoute/defaultParams/defaultSearch option callback — they run while a navigation is being prepared, before it is announced. Defer it: queueMicrotask(() => router.navigate(...)).`;
     }
 
+    if (this.#navigation.isCommittingNotFound()) {
+      throw atRouter.code(
+        errorCodes.REENTRANT_NAVIGATION,
+      )`cannot start a navigation from inside a canDeactivate guard that navigateToNotFound() consults — the 404 commits from the state read before the guard was asked. A guard does not redirect: return false to stay, or defer the navigation: queueMicrotask(() => router.navigate(...)).`;
+    }
+
     // ⚠ The THIRD window, with its own sentence for the reason the two above
     // have theirs (#1665): no emit is on the stack and no navigation is being
     // prepared, so both of those texts read as spurious here. Without the

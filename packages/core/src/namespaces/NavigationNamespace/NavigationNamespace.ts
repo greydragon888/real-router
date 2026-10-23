@@ -48,6 +48,9 @@ export class NavigationNamespace {
   // becomes a machine state in the state-ownership plan (§10, phase 4).
   #preparingDepth = 0;
 
+  // Depth of the 404 door — see `isCommittingNotFound`.
+  #notFoundDepth = 0;
+
   // =========================================================================
   // Dependency injection
   // =========================================================================
@@ -110,7 +113,24 @@ export class NavigationNamespace {
   }
 
   navigateToNotFound(path: string): State {
-    return navigateToNotFound(this.#deps, path);
+    this.#notFoundDepth++;
+
+    try {
+      return navigateToNotFound(this.#deps, path);
+    } finally {
+      this.#notFoundDepth--;
+    }
+  }
+
+  /**
+   * Is the 404 door on the stack? It asks the departing route's `canDeactivate`
+   * between reading `fromState` and committing (#1643), with no emit on the
+   * stack, so `Router.#assertNotReentrant` reads this to refuse a navigation a
+   * consulted guard starts (#2786). The rest of the door's application code
+   * runs in the logger's window or in the dispatch, which the ban asks first.
+   */
+  isCommittingNotFound(): boolean {
+    return this.#notFoundDepth > 0;
   }
 
   revalidateToNotFound(path: string): State {

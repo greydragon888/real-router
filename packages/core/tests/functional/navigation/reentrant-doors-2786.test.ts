@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { createRouter, errorCodes } from "@real-router/core";
+import { constants, createRouter, errorCodes } from "@real-router/core";
 import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import { captureSyncThrow } from "../../helpers";
@@ -490,5 +490,166 @@ describe("#2786 — dispose() stops the router inside the dispatch", () => {
       "CANCEL slow",
       "$stop",
     ]);
+  });
+});
+
+describe("#2786 — navigateToNotFound() consults the departing route inside a window", () => {
+  // `navigateToNotFound()` consults the current route's `canDeactivate` (#1643)
+  // after it has read `fromState` and before it commits, with no emit on the
+  // stack. A navigation a consulted guard starts there either committed and
+  // was then overwritten by the 404, announced from a route the router had
+  // left, or parked and left the door unable to commit.
+
+  /** A router on `x`, whose `canDeactivate` runs `guard` when `navigateToNotFound()` consults it. */
+  async function onX(
+    guard: (router: Router, toState: State) => boolean,
+  ): Promise<Fixture> {
+    let current: Router | undefined;
+    const fixture = createFixture([
+      ...ROUTES,
+      {
+        name: "x",
+        path: "/x",
+        canDeactivate: () => (toState) => guard(current!, toState),
+      },
+    ]);
+
+    current = fixture.router;
+    await fixture.router.start("/x");
+    fixture.log.length = 0;
+
+    return fixture;
+  }
+
+  it("refuses a navigation a consulted guard starts; the guard's own verdict then decides", async () => {
+    let nested: string | undefined;
+    let fired = false;
+    const { router, log } = await onX((r) => {
+      if (!fired) {
+        fired = true;
+        nested = attempt(() => r.navigate("c"));
+      }
+
+      return true;
+    });
+
+    const state = router.navigateToNotFound("/nowhere");
+
+    await settle();
+
+    expect(nested).toBe(errorCodes.REENTRANT_NAVIGATION);
+    expect(state.name).toBe(constants.UNKNOWN_ROUTE);
+    expect(router.getState()?.name).toBe(constants.UNKNOWN_ROUTE);
+    expect(log).toStrictEqual([`SUCCESS ${constants.UNKNOWN_ROUTE}<-x`]);
+  });
+
+  it("a guard that redirects — navigate(), then return false — is refused at the redirect, and so is the 404", async () => {
+    let fired = false;
+    const { router, log } = await onX((r, toState) => {
+      // Leaving for the redirect is allowed; leaving for the 404 redirects.
+      if (toState.name !== constants.UNKNOWN_ROUTE) {
+        return true;
+      }
+
+      if (!fired) {
+        fired = true;
+        void r.navigate("c");
+      }
+
+      return false;
+    });
+
+    const outer = codeOf(
+      captureSyncThrow(() => router.navigateToNotFound("/nowhere")),
+    );
+
+    await settle();
+
+    expect(outer).toBe(errorCodes.CANNOT_DEACTIVATE);
+    expect(router.getState()?.name).toBe("x");
+    expect(log).toStrictEqual(["ERROR undefined<-x CANNOT_DEACTIVATE"]);
+  });
+
+  it("refuses a navigation onto a route an async guard holds — the 404 still commits", async () => {
+    let nested: string | undefined;
+    let fired = false;
+    const { router, log } = await onX((r) => {
+      if (!fired) {
+        fired = true;
+        nested = attempt(() => r.navigate("slow"));
+      }
+
+      return true;
+    });
+
+    const state = router.navigateToNotFound("/nowhere");
+
+    await settle();
+
+    expect(nested).toBe(errorCodes.REENTRANT_NAVIGATION);
+    expect(state.name).toBe(constants.UNKNOWN_ROUTE);
+    expect(log).toStrictEqual([`SUCCESS ${constants.UNKNOWN_ROUTE}<-x`]);
+  });
+
+  it("refuses the restart of a guard that stops the router — the 404 then has no router to commit to", async () => {
+    let nested: string | undefined;
+    let fired = false;
+    const { router, log } = await onX((r) => {
+      if (!fired) {
+        fired = true;
+        r.stop();
+        nested = attempt(() => r.start("/b"));
+      }
+
+      return true;
+    });
+
+    const outer = codeOf(
+      captureSyncThrow(() => router.navigateToNotFound("/nowhere")),
+    );
+
+    await settle();
+
+    expect(nested).toBe(errorCodes.REENTRANT_NAVIGATION);
+    expect(outer).toBe(errorCodes.ROUTER_NOT_STARTED);
+    expect(router.isActive()).toBe(false);
+    expect(log).toStrictEqual(["$stop"]);
+  });
+
+  it("control: a guard that refuses keeps the router where it is", async () => {
+    const { router, log } = await onX(() => false);
+
+    const outer = codeOf(
+      captureSyncThrow(() => router.navigateToNotFound("/nowhere")),
+    );
+
+    expect(outer).toBe(errorCodes.CANNOT_DEACTIVATE);
+    expect(router.getState()?.name).toBe("x");
+    expect(log).toStrictEqual(["ERROR undefined<-x CANNOT_DEACTIVATE"]);
+
+    // The window closes on the refusal's way out as well.
+    const next = await router.navigate("a", {}, {}, { forceDeactivate: true });
+
+    expect(next.name).toBe("a");
+  });
+
+  it("control: a guard canNavigateTo() consults may still navigate — the predicate has no commit to overwrite it with", async () => {
+    let nested: string | undefined;
+    let fired = false;
+    const { router } = await onX((r) => {
+      if (!fired) {
+        fired = true;
+        nested = attempt(() => r.navigate("c"));
+      }
+
+      return true;
+    });
+
+    expect(router.canNavigateTo("a")).toBe(true);
+
+    await settle();
+
+    expect(nested).toBe("accepted");
+    expect(router.getState()?.name).toBe("c");
   });
 });
