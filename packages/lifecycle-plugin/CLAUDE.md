@@ -30,7 +30,7 @@ Hook lookup: `api.getRouteConfig(routeName)?.[hookName]` — reads hook factory 
 
 Every signal also aborts on `stop()`, `dispose()` and plugin teardown; a navigation that does not commit aborts none.
 
-Hooks fire only for the **leaf route** (the route matching `toState.name` / `fromState.name`), not for parent segments.
+Hooks fire only for the **navigation target** and the **route being left** (`toState.name` / `fromState.name`), not for their parent segments (#2693). A route with children gets hooks when it is one of the two: a navigation to `users` runs the hooks of `users`, and one from `users` to `users.view` runs `onLeave` of `users`.
 
 ### onNavigate orthogonality
 

@@ -120,7 +120,7 @@ A controller is opened by the first hook handed its signal, so a route without h
 
 `controller.abort()` without an argument gives every abort its own `DOMException` named `AbortError`, the name abort-aware code filters on — `fetch` rejects with it. A `RouterError` carries a different `name`. A shared reason has its `stack` rewritten by Node's `fetch` on every abort, and a frozen one — a frozen `State` included — makes Node's `fetch` reject with a `TypeError` instead of the reason. The price is the stack each `DOMException` captures, paid once per abort.
 
-### Why leaf route only
+### Why no hooks for parent segments
 
 Hooks fire only for `toState.name` / `fromState.name`, not for all segments in `transition.segments.activated` / `deactivated`. Reasons:
 
@@ -146,7 +146,7 @@ The only failure mode of orthogonal dispatch is the user declaring the same func
 
 ### Why no configuration
 
-The plugin is stateless and has no options. The hooks themselves (defined on routes) are the configuration. Adding options like "fire for parent segments" would complicate both API and implementation for marginal benefit.
+The plugin has no options. The hooks themselves (defined on routes) are the configuration. Adding options like "fire for parent segments" would complicate both API and implementation for marginal benefit.
 
 ### Why per-hook try/catch (isolation)
 
