@@ -58,7 +58,7 @@ src/
 ├── createSignalFromSource.ts   # Signal bridge — converts RouterSource to Solid Accessor
 ├── createStoreFromSource.ts    # Store bridge — converts RouterSource to Solid store (reconcile)
 ├── directives/
-│   └── link.tsx                # use:link directive + JSX.Directives augmentation (shipped to consumers, #976)
+│   └── link.tsx                # use:link directive + JSX.Directives augmentation (shipped to consumers)
 ├── hooks/
 │   ├── useRouter.tsx           # Router + Navigator from context (never reactive)
 │   ├── useNavigator.tsx        # Navigator from context (never reactive)

@@ -39,7 +39,7 @@ src/
 ├── ssr.ts                      # /ssr — SSR-feature subpath (8 exports)
 ├── RouterProvider.ts           # Context provider — wires router to Vue tree
 ├── context.ts                  # Triple Injection Key Pattern (public: RouterKey/NavigatorKey/RouteKey) + @internal HTTP_STATUS_KEY for /ssr
-├── types.ts                    # RouteState, RouteContext, LinkProps (with hash for #532)
+├── types.ts                    # RouteContext, LinkProps (with the `hash` prop)
 ├── constants.ts                # EMPTY_PARAMS, EMPTY_OPTIONS (frozen singletons)
 ├── createRouterPlugin.ts       # Vue Plugin factory (for app.use())
 ├── useRefFromSource.ts         # Ref bridge — converts RouterSource to ShallowRef

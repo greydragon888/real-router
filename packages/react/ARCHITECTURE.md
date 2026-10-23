@@ -46,7 +46,7 @@ dist/
 │   ├── ink.d.mts
 │   └── chunk-*.mjs            # Shared code (auto-extracted)
 └── cjs/                       # Mirror of esm/ for CJS consumers — except `./ink`,
-                               # which is ESM-only in the export map (#1628): its CJS
+                               # which is ESM-only in the export map: its CJS
                                # build would require() ESM-only ink@7 (top-level await),
                                # which Node cannot load. cjs/ink.* is still emitted —
                                # the node10 `typesVersions` fallback points at
@@ -65,7 +65,7 @@ src/
 ├── ink.ts                         # Ink entry: terminal UI runtime
 ├── index.react-server.ts          # RSC type-only entry (root, react-server condition)
 ├── ssr.react-server.ts            # RSC type-only entry (/ssr, react-server condition)
-├── RouterProviderCore.tsx         # DOM-free core: Router/Route/Navigator contexts + useSyncExternalStore wiring (#800)
+├── RouterProviderCore.tsx         # DOM-free core: Router/Route/Navigator contexts + useSyncExternalStore wiring
 ├── RouterProvider.tsx             # DOM-aware wrapper over the core — announcer / scroll / VT effects
 ├── context.ts                     # createContext<T | null>(null) for Router/Route/Navigator
 ├── types.ts                       # RouteContext, LinkProps (DOM)
@@ -75,7 +75,7 @@ src/
 │   ├── link-utils.ts              # shouldNavigate, targetsAnotherContext, anchorTargetsAnotherContext, buildHref, navigateWithHash, buildActiveClassName, applyLinkA11y, shallowEqual
 │   ├── route-announcer.ts         # createRouteAnnouncer (WCAG aria-live, double-rAF state machine)
 │   ├── scroll-restore.ts          # createScrollRestoration (opt-in scroll capture + restore)
-│   ├── scroll-spy.ts              # createScrollSpy (IntersectionObserver → URL hash, #575)
+│   ├── scroll-spy.ts              # createScrollSpy (IntersectionObserver → URL hash)
 │   ├── view-transitions.ts        # createViewTransitions (subscribeLeave-based VT integration)
 │   ├── direction-tracker.ts       # createDirectionTracker (back/forward annotation)
 │   └── index.ts
@@ -84,7 +84,7 @@ src/
 │   ├── useRoute.tsx               # Full route state — RouteHookResult<P> with non-nullable route (throws if undefined)
 │   ├── useNavigator.tsx           # Navigator from context (never re-renders)
 │   ├── useRouteNode.tsx           # Node-scoped subscription (cached createRouteNodeSource)
-│   ├── useIsActiveRoute.tsx       # Active state subscription — delegates to shared createActiveSource (#1427); useMemo-wrapped
+│   ├── useIsActiveRoute.tsx       # Active state subscription — delegates to shared createActiveSource; useMemo-wrapped
 │   ├── useRouteUtils.tsx          # RouteUtils from route tree (never re-renders)
 │   ├── useRouterTransition.tsx    # Transition lifecycle (cached getTransitionSource)
 │   ├── useRouteExit.tsx           # Wrap subscribeLeave with reentrant abort + same-route skip + latest-handler ref + StrictMode dedupe
@@ -93,7 +93,7 @@ src/
 ├── components/
 │   ├── Link.tsx                   # memo'd link with custom areLinkPropsEqual + active state; inline onClick (no useCallback)
 │   ├── InkLink.tsx                # /ink — focusable text link via useFocus + useInput
-│   ├── InkRouterProvider.tsx      # /ink — composes RouterProviderCore only (keeps dom-utils out of the ink chunk, #800)
+│   ├── InkRouterProvider.tsx      # /ink — composes RouterProviderCore only (keeps dom-utils out of the ink chunk)
 │   ├── RouterErrorBoundary.tsx    # Declarative navigation error handling (useLayoutEffect for onErrorRef, useMemo'd source)
 │   ├── ClientOnly.tsx             # /ssr — server fallback → client children swap after mount
 │   ├── ServerOnly.tsx             # /ssr — symmetric inverse of ClientOnly
@@ -119,12 +119,12 @@ The `dom-utils/` directory is a symlink to `shared/dom-utils/` — identical hel
 - **`shouldNavigate(evt)`** — click filtering (button 0, no modifier keys)
 - **`targetsAnotherContext(target)`** — the anchor's `target` names a browsing context other than this one; unset, empty and `_self` are the router's, everything else is the browser's
 - **`anchorTargetsAnotherContext(element)`** — the same question about an element, narrowed to HTML anchors by `tagName` so an anchor from another realm still answers
-- **`buildHref(router, routeName, routeParams, routeSearch?, hash?)`** — URL generation with buildUrl/buildPath fallback; query channel at position 4, hash fragment at position 5 (RFC-4 M2 / #1548)
+- **`buildHref(router, routeName, routeParams, routeSearch?, hash?)`** — URL generation with buildUrl/buildPath fallback; query channel at position 4, hash fragment at position 5
 - **`buildActiveClassName(isActive, activeClassName, baseClassName)`** — class string composition
 - **`applyLinkA11y(element)`** — adds `role="link"` + `tabindex="0"` to non-interactive elements. Not used by React's `<Link>` (always renders `<a>`), but used by Svelte/Solid/Vue/Angular directive-based navigation. Exported for consumers building custom navigation components on non-anchor elements.
 - **`createRouteAnnouncer(router, options?)`** — WCAG screen reader announcements via `aria-live` region
 - **`createScrollRestoration(router, options?)`** — opt-in scroll capture on transition, restore on back/pagehide. DOM-concern isolated from router-core. Lifecycle: `useEffect` on `RouterProvider` creates the utility when `scrollRestoration` prop is set; cleanup destroys it. Primitive-field deps (`mode`, `anchorScrolling`) guard against inline-object thrash; `scrollContainer` is read lazily, excluded from deps.
-- **`createScrollSpy(router, options)`** — opt-in `IntersectionObserver`-driven URL hash spy (#575). Picks the topmost visible anchor inside `options.scrollContainer` (or window) and emits `router.navigate(name, params, undefined, { hash, replace: true, force: true, hashChange: true })` (query channel unused — opts at position 4, RFC-4 M2 / #1548) so the URL bar tracks scroll. Anti-flicker via `getTransitionSource(router).isTransitioning` gate + `coolingDown` gate set on user-driven `<Link hash>` clicks (cleared on `scrollend` or 500 ms fallback) + `selfEmitting` guard around the spy's own emit so the cooldown setup doesn't self-rate-limit. Lifecycle: `useEffect` on `RouterProvider` creates the utility when `scrollSpy` prop has a non-empty `selector`; cleanup destroys it. Primitive-field deps (`selector`, `rootMargin`); `scrollContainer` lazy. Requires a URL plugin (browser-plugin / navigation-plugin) for `state.context.url` claim — degrades to NOOP otherwise.
+- **`createScrollSpy(router, options)`** — opt-in `IntersectionObserver`-driven URL hash spy. Picks the topmost visible anchor inside `options.scrollContainer` (or window) and emits `router.navigate(state.name, state.params, state.search, { hash, replace: true, force: true, hashChange: true })` so the URL bar tracks scroll. It passes both channels of the current state, which keeps the query through the hash move. Anti-flicker via `getTransitionSource(router).isTransitioning` gate + `coolingDown` gate set on user-driven `<Link hash>` clicks (cleared on `scrollend` or 500 ms fallback) + `selfEmitting` guard around the spy's own emit so the cooldown setup doesn't self-rate-limit. Lifecycle: `useEffect` on `RouterProvider` creates the utility when `scrollSpy` prop has a non-empty `selector`; cleanup destroys it. Primitive-field deps (`selector`, `rootMargin`); `scrollContainer` lazy. Requires a URL plugin (browser-plugin / navigation-plugin) for `state.context.url` claim — degrades to NOOP otherwise.
 - **`createViewTransitions(router)`** — opt-in View Transitions API integration. Wires `subscribeLeave` (open VT snapshot of old DOM, returns immediately so router isn't blocked) + `subscribe` (resolve deferred → `requestAnimationFrame` → VT snapshots new DOM → animates). No-op when `document.startViewTransition` is unavailable (SSR, Firefox as of 2026-04). Lifecycle: `useEffect` on `RouterProvider` creates the utility when `viewTransitions` prop is truthy; cleanup calls `destroy()` which skips any in-flight VT via `skipTransition()`.
 
 ## Context Architecture
@@ -191,7 +191,7 @@ RouterErrorBoundary
 └── Renders: children + fallback(error, resetError) via Fragment
 ```
 
-**Custom comparator (`areLinkPropsEqual`):** Explicitly compares all Link-specific props — `shallowEqual` (`Object.is` per key, order-insensitive) for `routeParams`, `routeSearch` (query channel, RFC-4 M2 / #1548), and `routeOptions`, strict equality (`===`) for primitives (`routeName`, `className`, `activeClassName`, `activeStrict`, `ignoreQueryParams`, `onClick`, `target`, `style`, `children`). Prevents re-renders from inline object literals `<Link routeParams={{ id: 123 }} />`. Nested objects in params aren't deep-compared — consumers stabilize with `useMemo` if needed.
+**Custom comparator (`areLinkPropsEqual`):** Explicitly compares all Link-specific props — `shallowEqual` (`Object.is` per key, order-insensitive) for `routeParams`, `routeSearch` (query channel), and `routeOptions`, strict equality (`===`) for primitives (`routeName`, `className`, `activeClassName`, `activeStrict`, `ignoreQueryParams`, `onClick`, `target`, `style`, `children`). Prevents re-renders from inline object literals `<Link routeParams={{ id: 123 }} />`. Nested objects in params aren't deep-compared — consumers stabilize with `useMemo` if needed.
 
 **RouteView.Match with `fallback`:** When `fallback` prop is provided, `Match` wraps its children in a `<Suspense>` boundary with that fallback. Use this with `React.lazy()` to code-split route components. Works seamlessly with `keepAlive` — the `<Activity>` wrapper preserves the entire `<Suspense>` boundary including the fallback state.
 
@@ -292,5 +292,4 @@ tests/
 ## See Also
 
 - [CLAUDE.md](CLAUDE.md) — Quick reference for AI agents (hooks table, gotchas, performance)
-- [RFC-react-18-19-split.md](.claude/RFC-react-18-19-split.md) — Design document for dual entry points
 - [Root ARCHITECTURE.md](../../ARCHITECTURE.md) — Monorepo-level architecture

@@ -38,9 +38,9 @@ dist/
     └── package.json            # ng-packagr secondary entry manifest
 ```
 
-ng-packagr produces FESM2022 bundles (ESM-only, no CJS). `src/dom-utils/` is a symlink to `shared/dom-utils/`, as in the other framework adapters; ng-packagr compiles the shared sources through it (#2552).
+ng-packagr produces FESM2022 bundles (ESM-only, no CJS). `src/dom-utils/` is a symlink to `shared/dom-utils/`, as in the other framework adapters; ng-packagr compiles the shared sources through it.
 
-The `/ssr` subpath is built as a ng-packagr secondary entry point: ng-packagr names it after the directory of `ssr/ng-package.json`, whose `entryFile` is `src/ssr/public_api.ts`, so every source file lives under `src/` (#2627). Importing from `@real-router/angular/ssr` does not pull SSR-only dependencies into client bundles.
+The `/ssr` subpath is built as a ng-packagr secondary entry point: ng-packagr names it after the directory of `ssr/ng-package.json`, whose `entryFile` is `src/ssr/public_api.ts`, so every source file lives under `src/`. Importing from `@real-router/angular/ssr` does not pull SSR-only dependencies into client bundles.
 
 ## Source Structure
 
@@ -78,7 +78,7 @@ src/                            # Main entry — client API
 │   ├── RouterErrorBoundary.ts  # Navigation error handling
 │   ├── NavigationAnnouncer.ts  # WCAG aria-live announcer
 │   └── index.ts
-├── dom-utils/                  # Symlink → shared/dom-utils/ (#2552)
+├── dom-utils/                  # Symlink → shared/dom-utils/
 │   ├── link-utils.ts           # buildHref, buildActiveClassName, applyLinkA11y, shouldNavigate, targetsAnotherContext, anchorTargetsAnotherContext, navigateWithHash, shallowEqual
 │   ├── route-announcer.ts      # createRouteAnnouncer
 │   ├── scroll-restore.ts       # createScrollRestoration (opt-in scroll capture + restore)
@@ -179,7 +179,7 @@ provideRealRouter (ROUTE)   — createRouteSource(router)                     �
 
 ### RouteView
 
-`RouteView` uses Angular's `contentChildren` query to collect `RouteMatch`, `RouteSelf`, and `RouteNotFound` directive instances. Each directive holds a `TemplateRef` injected from its host `ng-template`. The component creates a `createRouteNodeSource` inside an `effect(...)` scheduled from the **constructor** (#630 — signal inputs are readable inside `effect()` at first run), stores snapshots in a local `signal<RouteSnapshot>`, and derives `activeTemplate` via two split computeds:
+`RouteView` uses Angular's `contentChildren` query to collect `RouteMatch`, `RouteSelf`, and `RouteNotFound` directive instances. Each directive holds a `TemplateRef` injected from its host `ng-template`. The component creates a `createRouteNodeSource` inside an `effect(...)` scheduled from the **constructor** (signal inputs are readable inside `effect()` at first run), stores snapshots in a local `signal<RouteSnapshot>`, and derives `activeTemplate` via two split computeds:
 
 ```
 RouteView (@Component, selector: route-view)
@@ -194,7 +194,7 @@ RouteView (@Component, selector: route-view)
 └── activeTemplate = computed(() => matchedTemplate() ?? fallbackTemplate())
 ```
 
-**Template priority:** `Match` (segment prefix) → `Self` (exact-match for `nodeName`) → `NotFound` (UNKNOWN_ROUTE only). First-wins for all three — matches, selfs, and notFounds (#1439) — mirroring the React/Preact/Solid/Vue adapters.
+**Template priority:** `Match` (segment prefix) → `Self` (exact-match for `nodeName`) → `NotFound` (UNKNOWN_ROUTE only). First-wins for all three — matches, selfs, and notFounds — mirroring the React/Preact/Solid/Vue adapters.
 
 Template renders `<ng-container [ngTemplateOutlet]="activeTemplate()">` — only the matched template is instantiated.
 
@@ -241,20 +241,20 @@ Opt-in via `provideRealRouter(router, { viewTransitions: true })`. Same wiring p
 RealLink (@Directive, selector: a[realLink])
 ├── routeName, routeParams, routeSearch, routeOptions, activeClassName, activeStrict, ignoreQueryParams, hash = input()
 ├── isActive = signal(false)                               # local active state
-├── stableParams = createStableParams(routeParams)         # shallowEqual content-stabilization (#988)
+├── stableParams = createStableParams(routeParams)         # shallowEqual content-stabilization
 ├── href = computed(() => buildHref(..., stableParams()))  # primitive-string output; Object.is dedup
-├── prevActive, prevHref, prevActiveClass                  # skip-same-value caches (audit §8b)
+├── prevActive, prevHref, prevActiveClass                  # skip-same-value caches
 ├── effect((onCleanup) => createActiveRouteSource(..., stableParams()) + subscribeSourceToSignal + skip-same-value branch)
 ├── updateHref() → el.setAttribute("href", ...) iff href !== prevHref
 ├── updateActiveClass() → classList.toggle(activeClass, isActive()) iff active flipped
 └── onClick(event) → shouldNavigate(event) ∧ ¬targetsAnotherContext(anchor.target) → navigateWithHash(...).catch(NOOP_CATCH)
 ```
 
-Subscription setup runs inside `effect(...)` scheduled from the **constructor** (#630) — signal inputs are readable inside the effect's first execution, so reading `routeName()`/`stableParams()`/`hash()` makes the source creation reactive. The previous `ngOnInit` pattern captured inputs once at mount and silently drifted under AOT signal-input bindings. `routeParams` is routed through `createStableParams` (`computed` + `shallowEqual`) so an inline `[routeParams]="{ id: 1 }"` literal re-allocated on every change detection does not re-create the source or re-run `buildHref` until the param content actually changes (#988 — mirrors the Vue `<Link>` fix; behavior unchanged, stabilized params are always content-equal).
+Subscription setup runs inside `effect(...)` scheduled from the **constructor** — signal inputs are readable inside the effect's first execution, so reading `routeName()`/`stableParams()`/`hash()` makes the source creation reactive. Setup in `ngOnInit` would capture the inputs once at mount and drift under AOT signal-input bindings. `routeParams` is routed through `createStableParams` (`computed` + `shallowEqual`) so an inline `[routeParams]="{ id: 1 }"` literal re-allocated on every change detection does not re-create the source or re-run `buildHref` until the param content actually changes — the Vue `<Link>` stabilizes its params the same way, and the stabilized params are always content-equal to the input.
 
 ### RealLinkActive
 
-Same subscription pattern as `RealLink` (constructor `effect()` + `subscribeSourceToSignal` helper + skip-same-value `prevActive` + `createStableParams` content-stabilization of `routeParams`, #988). Applies a CSS class to any element (not just `<a>`) via `classList.toggle`. Calls `applyLinkA11y` in the constructor to set `role="link"` and `tabindex="0"` on non-interactive elements (skip-list: `<a>`, `<button>` — see [audit §5.2 Bug 4](.claude/review-2026-05-16.md) for the known a11y limitation on `<details>` / `<summary>` / native interactive elements).
+Same subscription pattern as `RealLink` (constructor `effect()` + `subscribeSourceToSignal` helper + skip-same-value `prevActive` + `createStableParams` content-stabilization of `routeParams`). Applies a CSS class to any element (not just `<a>`) via `classList.toggle`. Calls `applyLinkA11y` in the constructor to set `role="link"` and `tabindex="0"` on non-interactive elements. Its skip-list is `<a>` and `<button>` only: any other host, a natively interactive `<summary>` included, gets both attributes unless it already carries them.
 
 ## Build Notes
 
@@ -264,7 +264,7 @@ Same subscription pattern as `RealLink` (constructor `effect()` + `subscribeSour
 - Partial compilation artifacts — linked at application build time by the consumer's Angular compiler
 - No Zone.js dependency — signal-first, compatible with `provideExperimentalZonelessChangeDetection()`
 
-**dom-utils symlink:** `src/dom-utils/` is a symlink to `shared/dom-utils/`, and ng-packagr compiles through it. The artifact is the one a copy of the same sources produces (#2552).
+**dom-utils symlink:** `src/dom-utils/` is a symlink to `shared/dom-utils/`, and ng-packagr compiles through it. The artifact is the one a copy of the same sources produces.
 
 **JIT mode limitation:** Angular 22 JIT mode (used in TestBed without a compiler transform) does not support signal-based `input()` in template bindings, and `contentChildren()` queries never populate. Paths that need real template compilation are unit-tested in the dedicated **aot** vitest project (`tests/aot/**`, compiled by `@analogjs/vite-plugin-angular`) — see Testing Strategy below.
 
@@ -296,20 +296,20 @@ router emits TRANSITION_SUCCESS
 ```
 tests/
 ├── functional/           # Unit tests per function/component/directive (vitest "jit" project)
-├── aot/                  # AOT-compiled fixtures (vitest "aot" project, #1512)
+├── aot/                  # AOT-compiled fixtures (vitest "aot" project)
 │   ├── setup.ts          # TestBed setup WITHOUT @angular/compiler (no JIT fallback masking)
-│   ├── routeview-fallback.aot.test.ts  # RouteView Self/NotFound + #1439 first-wins matrix
+│   ├── routeview-fallback.aot.test.ts  # RouteView Self/NotFound + first-wins matrix
 │   └── directives.aot.test.ts          # RealLink / RealLinkActive signal-input paths
 ├── property/             # Property-based tests (separate config, test:properties)
 ├── stress/               # Stress tests (separate config, test:stress)
 └── setup.ts              # Angular TestBed + JSDOM environment setup (jit project)
 ```
 
-**Two vitest projects, one run (#1512):** `vitest.config.mts` declares `test.projects` — `jit` (the whole suite, esbuild-transpiled; `contentChildren` queries stay empty there) and `aot` (only `tests/aot/**`, compiled by `@analogjs/vite-plugin-angular` with full Ivy, where the queries populate for real). Coverage is a root-only option, so both projects merge into a single report and AOT-only hits count toward the thresholds — this is what allows `RouteView`'s fallback resolution to be covered without a `v8 ignore`.
+**Two vitest projects, one run:** `vitest.config.mts` declares `test.projects` — `jit` (the whole suite, esbuild-transpiled; `contentChildren` queries stay empty there) and `aot` (only `tests/aot/**`, compiled by `@analogjs/vite-plugin-angular` with full Ivy, where the queries populate for real). Coverage is a root-only option, so both projects merge into a single report and AOT-only hits count toward the thresholds — this is what allows `RouteView`'s fallback resolution to be covered without a `v8 ignore`.
 
 **Coverage thresholds:** measured floors, enforced in `vitest.config.mts` — see the config comment for the merge-duplicate caveat.
 
-**Why not 100%:** every semantic path is executed and asserted in the two-project run (#1512 layers 1-2 closed the ordinary gaps in the jit suite and the signal-input paths in the aot project). The residual percentage is a measurement artifact: files tested in BOTH projects reach the merged report twice — the jit copy keeps the paths only AOT runs untaken, and the aot copy's coverage map is too coarse to record them — plus a few AOT-emit phantom branches (angular#64583 class). See CLAUDE.md "Coverage Ceiling" for the full analysis and why evicting tests into the aot project wholesale is deliberately not pursued.
+**Why not 100%:** every semantic path is executed and asserted in the two-project run — the ordinary paths in the jit suite, the signal-input paths in the aot project. The residual percentage is a measurement artifact: files tested in BOTH projects reach the merged report twice — the jit copy keeps the paths only AOT runs untaken, and the aot copy's coverage map is too coarse to record them — plus a few phantom branches the AOT emit records on lines whose every semantic path executes. See CLAUDE.md "Coverage Ceiling" for the full analysis and why evicting tests into the aot project wholesale is deliberately not pursued.
 
 ## See Also
 
