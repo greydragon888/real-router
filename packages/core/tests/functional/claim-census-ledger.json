@@ -1304,7 +1304,7 @@
       "117882e62801"
     ],
     "shared/browser-env/newer-navigations.ts": [
-      "e707a2d0fce7"
+      "e27f64955b0d"
     ],
     "shared/browser-env/plugin-utils.ts": [
       "bc9199ba1389",
@@ -2116,9 +2116,7 @@
       "097ec3f7ea70",
       "c142ac0ba337"
     ],
-    "packages/memory-plugin/CLAUDE.md": [
-      "b890c2dad8b8"
-    ],
+    "packages/memory-plugin/CLAUDE.md": [],
     "packages/persistent-params-plugin/CLAUDE.md": [
       "476a0fbed6d4",
       "31329257942d"

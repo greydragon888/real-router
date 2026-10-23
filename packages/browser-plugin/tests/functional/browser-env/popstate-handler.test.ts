@@ -485,28 +485,43 @@ describe("popstate handler", () => {
       );
     });
 
-    it("RouterError rollback failures are swallowed (teardown race)", async () => {
-      const deps = makeDeps({
-        pathToUrl: vi.fn(() => {
-          throw new Error("the plugin's base prefixer was torn down");
-        }),
-      });
+    // A cancel recovers after the wait for newer navigations, a refusal and
+    // SAME_STATES at once: each recovery swallows its own failure.
+    it.each([
+      errorCodes.TRANSITION_CANCELLED,
+      errorCodes.CANNOT_DEACTIVATE,
+      errorCodes.SAME_STATES,
+    ])(
+      "RouterError rollback failures are swallowed (teardown race): %s",
+      async (code) => {
+        const unhandled = vi.fn();
+        const deps = makeDeps({
+          pathToUrl: vi.fn(() => {
+            throw new Error("the plugin's base prefixer was torn down");
+          }),
+        });
 
-      deps.api.navigateToState.mockRejectedValue(
-        new RouterError(errorCodes.TRANSITION_CANCELLED),
-      );
-      const handler = createPopstateHandler(deps);
+        deps.api.navigateToState.mockRejectedValue(new RouterError(code));
+        const handler = createPopstateHandler(deps);
 
-      expect(() => {
-        handler(
-          makePopStateEvent({ name: "users", params: {}, path: "/users" }),
-        );
-      }).not.toThrow();
+        process.on("unhandledRejection", unhandled);
 
-      await flushAsync();
+        try {
+          expect(() => {
+            handler(
+              makePopStateEvent({ name: "users", params: {}, path: "/users" }),
+            );
+          }).not.toThrow();
 
-      expect(deps.browser.replaceState).not.toHaveBeenCalled();
-    });
+          await flushAsync();
+        } finally {
+          process.off("unhandledRejection", unhandled);
+        }
+
+        expect(unhandled).not.toHaveBeenCalled();
+        expect(deps.browser.replaceState).not.toHaveBeenCalled();
+      },
+    );
 
     it("recovers from a critical (non-Router) error with a logged rollback", async () => {
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});

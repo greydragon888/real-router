@@ -1279,6 +1279,7 @@ const CONTEXT = "identity:context";
 const SIGNAL = "identity:signal";
 const OBJECT = "identity:state-object";
 const EXTENT = "identity:call-extent";
+const GENERATION = "identity:generation";
 const LANDED = "identity:landed-position";
 const EQ_END =
   "equivalent:Ф1–Ф3 — an end event ends the transition whose start the listener heard last";
@@ -1293,6 +1294,8 @@ const EQ_ARM =
   "equivalent:the code picks the arm, and identity decides inside it";
 const EQ_REPLAY =
   "equivalent:a popstate that arrives mid-transition is replayed as the next transition";
+const EQ_COMMITTED =
+  "equivalent:Ф2–Ф3 — a commit a watch hears before it is read follows the cancel of the navigation it watches for";
 const CONTRACT_2751 =
   "contract:#2751 — a navigation whose signal aborts as it lands gets the scroll";
 const CONTRACT_RESET =
@@ -1359,15 +1362,25 @@ const LEDGER: Readonly<Record<string, Readonly<Record<string, string>>>> = {
     "onTransitionSuccess › hook:onTransitionSuccess": EQ_END,
   },
   "packages/memory-plugin/src/plugin.ts": {
-    "#go › reject:navigateToState": OBJECT,
+    "#go › reject:navigateToState": EXTENT,
     "#go › sign:navigateToState": EXTENT,
     "#go › slot:promise": NO,
+    "#waitFor › sign:addEventListener(TRANSITION_CANCEL)": NO,
+    "#waitFor › sign:addEventListener(TRANSITION_ERROR)": NO,
+    "#waitFor › sign:addEventListener(TRANSITION_SUCCESS)": NO,
+    "#waitFor › slot:looks": GENERATION,
     "MemoryPlugin › slot:#disposed": NO,
-    "MemoryPlugin › slot:#inFlight": OBJECT,
+    "MemoryPlugin › slot:#ends": CONTEXT,
+    "MemoryPlugin › slot:#inFlight": CONTEXT,
+    "MemoryPlugin › slot:#ranLast": CONTEXT,
     "MemoryPlugin › slot:#restores": CONTEXT,
+    "MemoryPlugin › slot:#running": CONTEXT,
     "MemoryPlugin › slot:#shown": NO,
     "MemoryPlugin › slot:#staged": EXTENT,
+    "MemoryPlugin › slot:#waiting": GENERATION,
     "onStop › hook:onStop": NO,
+    "onTransitionCancel › hook:onTransitionCancel": CONTEXT,
+    "onTransitionError › hook:onTransitionError": CONTEXT,
     "onTransitionStart › hook:onTransitionStart": CONTEXT,
     "onTransitionSuccess › hook:onTransitionSuccess": CONTEXT,
   },
@@ -1558,7 +1571,14 @@ const LEDGER: Readonly<Record<string, Readonly<Record<string, string>>>> = {
     "watchNewerNavigations › sign:addEventListener(TRANSITION_CANCEL)": CONTEXT,
     "watchNewerNavigations › sign:addEventListener(TRANSITION_ERROR)": CONTEXT,
     "watchNewerNavigations › sign:addEventListener(TRANSITION_START)": CONTEXT,
-    "watchNewerNavigations › slot:owners": CONTEXT,
+    "watchNewerNavigations › sign:addEventListener(TRANSITION_SUCCESS)":
+      CONTEXT,
+    "watchNewerNavigations › slot:committed": EQ_COMMITTED,
+    "watchNewerNavigations › slot:ends": CONTEXT,
+    "watchNewerNavigations › slot:looking": GENERATION,
+    "watchNewerNavigations › slot:looks": GENERATION,
+    "watchNewerNavigations › slot:running": CONTEXT,
+    "watchNewerNavigations › slot:settled": NO,
   },
   "shared/browser-env/plugin-utils.ts": {
     "createReplaceHistoryState › slot:hashSegment": NO,
@@ -1572,6 +1592,7 @@ const LEDGER: Readonly<Record<string, Readonly<Record<string, string>>>> = {
     "createHashSyncLifecycle › slot:sawPopstate": NO,
     "createPopstateHandler › slot:deferred": NO,
     "createPopstateHandler › slot:isTransitioning": EXTENT,
+    "createPopstateHandler › slot:waitedOn": OBJECT,
     "createPopstateLifecycle › slot:myRemover": NO,
     "onPopState › code:errorCodes.ROUTE_NOT_FOUND": NO,
     "onPopState › code:instanceof RouterError": NO,
@@ -1698,6 +1719,9 @@ const MEMORY =
   "packages/memory-plugin/tests/functional/restore-belongs-to-its-go.test.ts";
 const RECORD = `${NAV_PLUGIN}/transition-record-2753-2754.test.ts`;
 const CORE_NAV = "packages/core/tests/functional/navigation";
+const SUPERSEDED_TRAVERSAL = `${BROWSER_PLUGIN}/superseded-traversal-2802.test.ts`;
+const SUPERSEDED_RESTORE =
+  "packages/memory-plugin/tests/functional/superseded-restore-2802.test.ts";
 
 /** Cells, each a test file and the title of an `it` in it. */
 const CELL = {
@@ -1710,10 +1734,20 @@ const CELL = {
   memoryListener: `${MEMORY} › a second back() from a listener that runs before the plugin's own leaves the first one's restore`,
   memoryCancelled: `${MEMORY} › a first back() cancelled by a second leaves the stack to the second while it is held`,
   memoryCommit: `${MEMORY} › a navigation that commits over a restore in flight shows its own position to its commit's listeners`,
+  memoryNewer: `${SUPERSEDED_RESTORE} › while the newer navigation runs, the stack stands on the entry the restore moves to`,
+  memoryEndings: `${SUPERSEDED_RESTORE} › the newer navigation %s`,
+  memoryEarlyRefusal: `${SUPERSEDED_RESTORE} › a navigation refused before it starts while the newer one runs decides nothing, and the plugin's hooks throw nothing`,
+  memoryEndedInAnnounce: `${SUPERSEDED_RESTORE} › a restore a listener ends inside its announce moves no position`,
+  memoryOwnRejection: `${SUPERSEDED_RESTORE} › a back() a TRANSITION_ERROR listener registered %s the plugin defers after a refused back() keeps its own target while its guard holds it`,
+  memoryBatch: `${SUPERSEDED_RESTORE} › a navigation refused at once that cancels the one the restore waits for ends the wait as that one's refusal does: a redirect a listener defers that %s, registered %s the plugin, lands where it does after one refusal`,
+  memoryLateEnd: `${SUPERSEDED_RESTORE} › the newer navigation ends when %s %i microtasks after it cancels the restore: a redirect a listener registered before the plugin defers lands past the restore's target`,
+  memoryNeverRan: `${SUPERSEDED_RESTORE} › after a guard cancels the restore quietly at once, a navigation to %s the caller starts then %s: a redirect a listener of that refusal defers lands where the end of a navigation that ran decides`,
   taken: `${NAV_PLUGIN}/quiet-cancelled-navigation-2796.test.ts › a navigation that arrives after a newer one was taken leaves the newer one's record`,
   origin: `${NAV_PLUGIN}/refused-navigation-returns-2740.test.ts › after one a newer navigation cancelled, a refused one returns to the entry the router stands on`,
   sameStates: `${NAV_PLUGIN}/browser-push-rewritten-url-2744.test.ts › a newer navigation owns the URL: the alias an older one committed is not written`,
   navCancel: `${NAV_PLUGIN}/quiet-cancelled-navigation-2796.test.ts › refused before the Back settles: nothing owns the URL, and the Back returns`,
+  navNewerEnds: `${NAV_PLUGIN}/superseded-navigation-2802.test.ts › Back: the newer navigation %s after the Back settled`,
+  navStoppedAfterCommit: `${NAV_PLUGIN}/superseded-navigation-2802.test.ts › stop() after the newer navigation commits the URL the Back reached, before the wait is read, leaves the Back's navigation finished: that one committed`,
   scroll: `${NAV_PLUGIN}/rewritten-url-scroll-2751.test.ts › control: a navigation a newer one cancels gets no scroll, the newer one does`,
   scrollNotFound: `${NAV_PLUGIN}/rewritten-url-scroll-2751.test.ts › control: a navigation to a URL no route matches that a newer one overtakes gets no scroll, the newer one does`,
   record: `${RECORD} › a browser navigation that supersedes a held browser navigation publishes its own metadata`,
@@ -1734,6 +1768,12 @@ const CELL = {
   newerOwns: `${BROWSER_PLUGIN}/quiet-cancelled-traversal-2796.test.ts › still running when the Back settles: it owns the URL, and the plugin does not travel`,
   newerNone: `${BROWSER_PLUGIN}/quiet-cancelled-traversal-2796.test.ts › refused before the Back settles: nothing owns the URL, and the Back returns`,
   quietCancel: `${BROWSER_PLUGIN}/quiet-cancelled-traversal-2796.test.ts › a canDeactivate guard that %s: the page the Back was for is still one Back away`,
+  newerEnds: `${SUPERSEDED_TRAVERSAL} › the newer navigation %s after the Back settled`,
+  newerWatchEnds: `${SUPERSEDED_TRAVERSAL} › the watch ends with the newer navigation, which %s %s: it keeps no listener, nor does a later Back's`,
+  newerEarlyRefusal: `${SUPERSEDED_TRAVERSAL} › a navigation refused before it starts while the newer one runs decides nothing`,
+  newerEndedInAnnounce: `${SUPERSEDED_TRAVERSAL} › a traversal a listener ends inside its announce settles at once: its watch keeps no listener`,
+  newerBatch: `${SUPERSEDED_TRAVERSAL} › a navigation refused at once that cancels the newer one ends the watch as that one's refusal does: a redirect a TRANSITION_ERROR listener defers by a microtask that %s owns the URL`,
+  newerLateEnd: `${SUPERSEDED_TRAVERSAL} › the newer navigation ends when %s %i microtasks after it starts: a redirect a listener of that end defers by a microtask owns the URL`,
   deferred: `${BROWSER_PLUGIN}/refused-traversal-returns-2740.test.ts › a second Back while the guard decides is dropped with the first, and the guard is asked once`,
   rollback: `${BROWSER_PLUGIN}/refused-traversal-returns-2740.test.ts › a redirect a TRANSITION_ERROR listener defers is not undone by the return`,
   trackerError: `${REACT_DOM}/direction-tracker-early-refusal-2779.test.ts › a SAME_STATES refusal equal to a held reload in all but its context leaves a Back that cancels the reload labelled back`,
@@ -1763,8 +1803,9 @@ const HELD_BY = new Map<string, readonly string[]>([
   [EQ_VT, [CELL.f2, CELL.f3]],
   [EQ_RESTART, [CELL.restart]],
   [EQ_ABORTED, [CELL.aborted]],
-  [EQ_ARM, [CELL.newerNone, CELL.navCancel]],
+  [EQ_ARM, [CELL.newerNone, CELL.navCancel, CELL.newerEnds, CELL.navNewerEnds]],
   [EQ_REPLAY, [CELL.trackerHeld]],
+  [EQ_COMMITTED, [CELL.f2, CELL.f3, CELL.navStoppedAfterCommit]],
   [CONTRACT_2751, [CELL.scroll]],
   [CONTRACT_RESET, [CELL.errorReset]],
   [CONTRACT_COMMIT, [CELL.recordCommit]],
@@ -1822,11 +1863,21 @@ const CELLS = new Map<string, string>([
     "packages/logger-plugin/src/plugin.ts › LoggerPlugin › slot:#announced",
     CELL.logger,
   ],
-  [`${MEMORY_PLUGIN} › #go › reject:navigateToState`, CELL.memoryRefused],
   [`${MEMORY_PLUGIN} › #go › sign:navigateToState`, CELL.memoryListener],
+  [`${MEMORY_PLUGIN} › MemoryPlugin › slot:#ends`, CELL.memoryEndedInAnnounce],
   [`${MEMORY_PLUGIN} › MemoryPlugin › slot:#inFlight`, CELL.memoryCancelled],
+  [`${MEMORY_PLUGIN} › MemoryPlugin › slot:#ranLast`, CELL.memoryNeverRan],
   [`${MEMORY_PLUGIN} › MemoryPlugin › slot:#restores`, CELL.memoryCommit],
+  [`${MEMORY_PLUGIN} › MemoryPlugin › slot:#running`, CELL.memoryEarlyRefusal],
   [`${MEMORY_PLUGIN} › MemoryPlugin › slot:#staged`, CELL.memoryStaged],
+  [
+    `${MEMORY_PLUGIN} › onTransitionCancel › hook:onTransitionCancel`,
+    CELL.memoryEndings,
+  ],
+  [
+    `${MEMORY_PLUGIN} › onTransitionError › hook:onTransitionError`,
+    CELL.memoryRefused,
+  ],
   [
     `${MEMORY_PLUGIN} › onTransitionStart › hook:onTransitionStart`,
     CELL.memoryCommit,
@@ -1835,6 +1886,9 @@ const CELLS = new Map<string, string>([
     `${MEMORY_PLUGIN} › onTransitionSuccess › hook:onTransitionSuccess`,
     CELL.memoryCommit,
   ],
+  [`${MEMORY_PLUGIN} › #go › reject:navigateToState`, CELL.memoryOwnRejection],
+  [`${MEMORY_PLUGIN} › #waitFor › slot:looks`, CELL.memoryBatch],
+  [`${MEMORY_PLUGIN} › MemoryPlugin › slot:#waiting`, CELL.memoryLateEnd],
   [`${HANDLER} › createNavigateHandler › slot:taken`, CELL.taken],
   [`${HANDLER} › handler › sign:navigateToNotFound`, CELL.scrollNotFound],
   [`${HANDLER} › handler › sign:navigateToState`, CELL.scroll],
@@ -1881,10 +1935,18 @@ const CELLS = new Map<string, string>([
   ],
   [
     `${NEWER} › watchNewerNavigations › sign:addEventListener(TRANSITION_CANCEL)`,
-    CELL.newerNone,
+    CELL.newerEnds,
   ],
-  [`${NEWER} › watchNewerNavigations › slot:owners`, CELL.newerOwns],
+  [
+    `${NEWER} › watchNewerNavigations › sign:addEventListener(TRANSITION_SUCCESS)`,
+    CELL.newerWatchEnds,
+  ],
+  [`${NEWER} › watchNewerNavigations › slot:ends`, CELL.newerEndedInAnnounce],
+  [`${NEWER} › watchNewerNavigations › slot:looking`, CELL.newerLateEnd],
+  [`${NEWER} › watchNewerNavigations › slot:looks`, CELL.newerBatch],
+  [`${NEWER} › watchNewerNavigations › slot:running`, CELL.newerEarlyRefusal],
   [`${POPSTATE} › createPopstateHandler › slot:isTransitioning`, CELL.deferred],
+  [`${POPSTATE} › createPopstateHandler › slot:waitedOn`, CELL.newerEnds],
   [`${POPSTATE} › onPopState › reject:navigateToState (try)`, CELL.deferred],
   [`${POPSTATE} › onPopState › sign:navigateToState`, CELL.overlapping],
   [
@@ -2047,10 +2109,25 @@ function cellTitles(file: string): Set<string> {
     : new Set<string>();
 }
 
+/** The file a cell named here lives in: its text before the first ` › `. */
+const fileOf = (cell: string): string => cell.slice(0, cell.indexOf(" › "));
+
+// Every file a cell named here lives in, read once at collection, where no
+// cell's read budget reaches (#2818).
+const TITLES = new Map(
+  [
+    ...new Set(
+      [...CELLS.values(), ...[...HELD_BY.values()].flat()].map((cell) =>
+        fileOf(cell),
+      ),
+    ),
+  ].map((file) => [file, cellTitles(file)]),
+);
+
 const cellExists = (cell: string): boolean => {
   const at = cell.indexOf(" › ");
 
-  return at > 0 && cellTitles(cell.slice(0, at)).has(cell.slice(at + 3));
+  return at > 0 && (TITLES.get(fileOf(cell))?.has(cell.slice(at + 3)) ?? false);
 };
 
 const byText = (a: string, b: string): number => a.localeCompare(b);

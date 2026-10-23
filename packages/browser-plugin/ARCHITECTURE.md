@@ -349,11 +349,20 @@ User clicks back or forward
         │                          (no silent navigateToDefault — see #483)
         │
         ├── catch (error):
-        │     SAME_STATES / TRANSITION_CANCELLED → rollbackUrlToCurrentState() (nothing refused)
+        │     SAME_STATES → rollbackUrlToCurrentState() (nothing refused)
+        │     TRANSITION_CANCELLED → newer.whenSettled(): once a look — a
+        │       microtask after the last end, or the read when no look is
+        │       queued — finds none of the navigations announced during the
+        │       traversal running →
+        │       returnOrRollback(start), which writes nothing when one of them
+        │       committed; a traversal the browser makes meanwhile, stop() and
+        │       teardown drop the wait
+        │       (a router that refused the watch → rollbackUrlToCurrentState())
         │     other RouterError → returnOrRollback(start)
         │     otherwise: recoverFromCriticalError(error) → returnOrRollback(start)
         │
         └── finally:
+              newer.stop() unless the traversal waits on it
               isTransitioning = false
               processDeferredEvent()
 ```
@@ -439,7 +448,7 @@ Popstate event handling, critical error recovery, and deferred event processing 
 - `shared/browser-env/popstate-utils.ts` — `getRouteFromEvent` (validates `history.state` via `isStateStrict`, falls back to `api.matchPath(browser.getLocation())` when invalid), `updateBrowserState` (the four-channel projection `{ name, params, search, path }` — hash-plugin's writer, and since #1837 the URL rollback's too, so a rollback entry carries the same members every other write site does), `createUpdateBrowserState` (mutable-buffer factory used by browser-plugin on the hot path)
 - `shared/browser-env/popstate-handler.ts` — `createPopstateHandler` (deferred-queue, last-write-wins, `RouterError` vs critical-error split), `createPopstateLifecycle` (popstate listener add/remove + `cleanup` callback)
 - `historyState` is a subset of `State`: only `{ name, params, search, path }` and the entry's `position` are stored in `history.state` — `transition`, `context`, etc. are not persisted across reloads
-- Error categorization in `popstate-handler.ts`: a refusal — a `RouterError` other than `SAME_STATES` / `TRANSITION_CANCELLED` — a `TRANSITION_CANCELLED` no newer navigation owns the URL behind, and anything else, after `recoverFromCriticalError()` logs it, go through `returnOrRollback()`; `SAME_STATES`, and a `TRANSITION_CANCELLED` behind which a navigation announced during the traversal is neither refused nor cancelled, refuse nothing and resync the live entry with `rollbackUrlToCurrentState()`
+- Error categorization in `popstate-handler.ts`: a refusal — a `RouterError` other than `SAME_STATES` / `TRANSITION_CANCELLED` — and anything else, after `recoverFromCriticalError()` logs it, go through `returnOrRollback()`; a `TRANSITION_CANCELLED` goes through it once a look finds none of the navigations announced during the traversal running, and `returnOrRollback()` writes nothing when one of them committed; `SAME_STATES`, and a `TRANSITION_CANCELLED` under a router that refused the watch, refuse nothing and resync the live entry with `rollbackUrlToCurrentState()`
 
 ## Option Defaults
 

@@ -361,12 +361,20 @@ User clicks back/forward (popstate) OR changes the fragment externally (hashchan
         │                          (no silent navigateToDefault — see #483)
         │
         ├── catch (error):
-        │     SAME_STATES, or TRANSITION_CANCELLED while a newer navigation owns the URL
-        │       → rollbackUrlToCurrentState() (nothing refused)
-        │     other RouterError, a quiet cancel included → returnOrRollback(start)
+        │     SAME_STATES → rollbackUrlToCurrentState() (nothing refused)
+        │     TRANSITION_CANCELLED → newer.whenSettled(): once a look — a
+        │       microtask after the last end, or the read when no look is
+        │       queued — finds none of the navigations announced during the
+        │       traversal running →
+        │       returnOrRollback(start), which writes nothing when one of them
+        │       committed; a traversal the browser makes meanwhile, stop() and
+        │       teardown drop the wait
+        │       (a router that refused the watch → rollbackUrlToCurrentState())
+        │     other RouterError → returnOrRollback(start)
         │     otherwise: recoverFromCriticalError(error) → returnOrRollback(start)
         │
         └── finally:
+              newer.stop() unless the traversal waits on it
               isTransitioning = false
               processDeferredEvent()
 ```
@@ -460,7 +468,7 @@ See [`shared/browser-env/`](../../shared/browser-env/) for details on:
 
 - Route extraction from popstate events (history.state validation → URL matching fallback)
 - `historyState` as a subset of `State` (`name`, `params`, `search`, `path` and the entry's `position` stored in `history.state`)
-- Error categorization (a refusal, a quiet cancel and a crash return to the entry the traversal started from; `SAME_STATES`, and `TRANSITION_CANCELLED` while a newer navigation owns the URL, resync the live entry)
+- Error categorization (a refusal and a crash return to the entry the traversal started from; a `TRANSITION_CANCELLED` waits until a look finds none of the navigations announced during the traversal running, and returns unless one of them committed; `SAME_STATES`, and `TRANSITION_CANCELLED` under a router that refused the watch, resync the live entry)
 
 ## Option Defaults
 
