@@ -10,7 +10,7 @@
 npm install @real-router/angular @real-router/core @real-router/browser-plugin
 ```
 
-**Peer dependencies:** `@angular/core` >= 22.0.0, `@angular/common` >= 22.0.0
+**Peer dependencies:** `@real-router/core`, `@angular/core` >= 22.0.0, `@angular/common` >= 22.0.0
 
 ## Quick Start
 
@@ -789,7 +789,7 @@ The shared (cross-framework) wiki pages use the `use*` naming convention — the
 
 | Package                                                                                  | Description                             |
 | ---------------------------------------------------------------------------------------- | --------------------------------------- |
-| [@real-router/core](https://www.npmjs.com/package/@real-router/core)                     | Core router (required dependency)       |
+| [@real-router/core](https://www.npmjs.com/package/@real-router/core)                     | Core router (required peer dependency)  |
 | [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) | Browser History API integration         |
 | [@real-router/sources](https://www.npmjs.com/package/@real-router/sources)               | Subscription layer (used internally)    |
 | [@real-router/route-utils](https://www.npmjs.com/package/@real-router/route-utils)       | Route tree queries (`injectRouteUtils`) |

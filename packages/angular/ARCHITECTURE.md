@@ -6,9 +6,10 @@
 
 ```
 @real-router/angular
-├── @real-router/core         # Router instance, Navigator, State types
+├── @real-router/core         # peer — Router instance, Navigator, State types
 ├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource, getTransitionSource, createDismissableError)
-└── @real-router/route-utils  # Route tree queries (startsWithSegment)
+├── @real-router/route-utils  # Route tree queries (startsWithSegment)
+└── @real-router/ssr-utils    # serializeRouterState, hydrateRouter (the TransferState bridge of provideRealRouterFactory)
 ```
 
 ## Entry Points

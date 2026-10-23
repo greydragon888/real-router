@@ -23,7 +23,7 @@ lifecycle-plugin/
 
 ```mermaid
 graph LR
-    LP["@real-router/lifecycle-plugin"] -->|dep| CORE["@real-router/core"]
+    LP["@real-router/lifecycle-plugin"] -.->|peer| CORE["@real-router/core"]
 
     CORE -.->|provides| PF[PluginFactory]
     CORE -.->|provides| PA[PluginApi]

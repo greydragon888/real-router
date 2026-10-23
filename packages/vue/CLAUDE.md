@@ -23,7 +23,7 @@ import {
 } from "@real-router/vue/ssr";
 ```
 
-**Peer dependency:** `vue` >= 3.3.0
+**Peer dependencies:** `@real-router/core`, `vue` >= 3.3.0
 
 **Architecture:** Flat structure. All code lives in `src/`. Two entry points — main (`.`) and `/ssr`; no legacy/modern split. RouteView included with native `keepAlive` support via Vue's `<KeepAlive>`.
 

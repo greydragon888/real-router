@@ -13,7 +13,7 @@
 npm install @real-router/react @real-router/core @real-router/browser-plugin
 ```
 
-**Peer dependency:** main entry requires `react` >= 19.2.0 (uses `<Activity>`); `@real-router/react/legacy` works with `react` >= 18.0.0; `@real-router/react/ink` requires `react` >= 19.2 **and** `ink` >= 7.0.0 (Ink v7 itself pins React 19.2+).
+**Peer dependencies:** `@real-router/core`; the main entry requires `react` >= 19.2.0 (uses `<Activity>`); `@real-router/react/legacy` works with `react` >= 18.0.0; `@real-router/react/ink` requires `react` >= 19.2 **and** `ink` >= 7.0.0 (Ink v7 itself pins React 19.2+).
 
 ## Entry Points
 
@@ -554,12 +554,12 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 ## Related Packages
 
-| Package                                                                                  | Description                          |
-| ---------------------------------------------------------------------------------------- | ------------------------------------ |
-| [@real-router/core](https://www.npmjs.com/package/@real-router/core)                     | Core router (required dependency)    |
-| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) | Browser History API integration      |
-| [@real-router/sources](https://www.npmjs.com/package/@real-router/sources)               | Subscription layer (used internally) |
-| [@real-router/route-utils](https://www.npmjs.com/package/@real-router/route-utils)       | Route tree queries (`useRouteUtils`) |
+| Package                                                                                  | Description                            |
+| ---------------------------------------------------------------------------------------- | -------------------------------------- |
+| [@real-router/core](https://www.npmjs.com/package/@real-router/core)                     | Core router (required peer dependency) |
+| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) | Browser History API integration        |
+| [@real-router/sources](https://www.npmjs.com/package/@real-router/sources)               | Subscription layer (used internally)   |
+| [@real-router/route-utils](https://www.npmjs.com/package/@real-router/route-utils)       | Route tree queries (`useRouteUtils`)   |
 
 ## Contributing
 

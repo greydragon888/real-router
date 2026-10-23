@@ -86,7 +86,7 @@ graph TD
 | **src/types**               | Shared type definitions (the `/types` subpath)                                                                         | All modules                              |
 | **src/utils/ingest**        | Ingestion primitives — one discipline for writing into a record under a key core did not choose (the `/utils` subpath) | Every layer, and the plugins             |
 
-(The only workspace reference in `package.json` is a **dev**Dependency on `@real-router/ssr-utils` for SSR-helper tests — there are no runtime `dependencies`.)
+(`package.json` names no other `@real-router/*` package in any dependency field, and there are no runtime `dependencies`.)
 
 ## Facade + Namespaces Pattern
 

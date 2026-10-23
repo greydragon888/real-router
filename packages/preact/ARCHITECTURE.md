@@ -6,7 +6,7 @@
 
 ```
 @real-router/preact
-├── @real-router/core         # Router instance, Navigator, State types
+├── @real-router/core         # peer — Router instance, Navigator, State types
 ├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource, getTransitionSource, createDismissableError)
 └── @real-router/route-utils  # Route tree queries (getRouteUtils, getChain, getSiblings)
 ```

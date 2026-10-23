@@ -24,7 +24,7 @@ import {
 } from "@real-router/solid/ssr";
 ```
 
-**Peer dependency:** `solid-js` >= 1.7.0
+**Peer dependencies:** `@real-router/core`, `solid-js` >= 1.7.0
 
 **Architecture:** Flat structure. All code lives in `src/`. Two entry points — main (`.`) and `/ssr` (full SSR-feature surface mirrored from `@real-router/react/ssr`); no legacy/modern split inside either entry. RouteView included but without `keepAlive` (Solid has no Activity API).
 

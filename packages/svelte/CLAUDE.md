@@ -23,7 +23,7 @@ import {
 } from "@real-router/svelte/ssr";
 ```
 
-**Peer dependency:** `svelte` >= 5.7.0
+**Peer dependencies:** `@real-router/core`, `svelte` >= 5.7.0
 
 **Architecture:** Primarily flat structure (one `utils/` subdir for `createHttpStatusSink`). All code lives in `src/`. **Two entry points** — main + `/ssr` subpath (mirrors `@real-router/react/ssr`). RouteView included but without `keepAlive` (Svelte has no equivalent).
 

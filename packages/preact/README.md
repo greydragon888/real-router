@@ -17,7 +17,7 @@ Add `@real-router/browser-plugin` (or `hash-plugin` / `navigation-plugin` /
 `memory-plugin`) when you need History API integration — the Quick Start below
 uses it.
 
-**Peer dependency:** `preact` >= 10.28.0 (Preact 10) or ^11.0.0-0 (Preact 11 beta and later). The adapter imports DOM types (`HTMLAttributes`, `TargetedMouseEvent`) from the top-level `preact` namespace introduced in 10.28; Preact 11's JSX-namespace restructure preserves the same imports.
+**Peer dependencies:** `@real-router/core`, and `preact` >= 10.28.0 (Preact 10) or ^11.0.0-0 (Preact 11 beta and later). The adapter imports DOM types (`HTMLAttributes`, `TargetedMouseEvent`) from the top-level `preact` namespace introduced in 10.28; Preact 11's JSX-namespace restructure preserves the same imports.
 
 ## Quick Start
 
@@ -479,12 +479,12 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 ## Related Packages
 
-| Package                                                                                  | Description                          |
-| ---------------------------------------------------------------------------------------- | ------------------------------------ |
-| [@real-router/core](https://www.npmjs.com/package/@real-router/core)                     | Core router (required dependency)    |
-| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) | Browser History API integration      |
-| [@real-router/sources](https://www.npmjs.com/package/@real-router/sources)               | Subscription layer (used internally) |
-| [@real-router/route-utils](https://www.npmjs.com/package/@real-router/route-utils)       | Route tree queries (`useRouteUtils`) |
+| Package                                                                                  | Description                            |
+| ---------------------------------------------------------------------------------------- | -------------------------------------- |
+| [@real-router/core](https://www.npmjs.com/package/@real-router/core)                     | Core router (required peer dependency) |
+| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) | Browser History API integration        |
+| [@real-router/sources](https://www.npmjs.com/package/@real-router/sources)               | Subscription layer (used internally)   |
+| [@real-router/route-utils](https://www.npmjs.com/package/@real-router/route-utils)       | Route tree queries (`useRouteUtils`)   |
 
 ## Contributing
 

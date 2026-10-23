@@ -23,7 +23,7 @@ import {
 } from "@real-router/angular/ssr";
 ```
 
-**Peer dependency:** `@angular/core` >= 22.0.0, `@angular/common` >= 22.0.0
+**Peer dependencies:** `@real-router/core`, `@angular/core` >= 22.0.0, `@angular/common` >= 22.0.0
 
 **Architecture:** Flat structure with two entry points (main + `/ssr` ng-packagr secondary entry). All code lives in `src/`, the `/ssr` entry's in `src/ssr/`; `ssr/` holds only the entry's `ng-package.json` (#2627). Built with ng-packagr (partial compilation mode). Signal-first, zoneless-compatible.
 

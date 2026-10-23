@@ -33,7 +33,7 @@ rx/
 
 ```mermaid
 graph LR
-    RX["@real-router/rx"] -->|dep| CORE["@real-router/core"]
+    RX["@real-router/rx"] -.->|peer| CORE["@real-router/core"]
 
     CORE -.->|provides| PAPI[getPluginApi]
     CORE -.->|provides| EVENTS[events constants]

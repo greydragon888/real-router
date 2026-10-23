@@ -33,7 +33,7 @@ logger-plugin/
 
 ```mermaid
 graph LR
-    LP["@real-router/logger-plugin"] -->|dep| CORE["@real-router/core"]
+    LP["@real-router/logger-plugin"] -.->|peer| CORE["@real-router/core"]
 
     CORE -.->|provides| PF[PluginFactory]
     CORE -.->|provides| TYPES["State, Params, RouterError"]

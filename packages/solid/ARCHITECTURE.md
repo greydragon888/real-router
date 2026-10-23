@@ -6,7 +6,7 @@
 
 ```
 @real-router/solid
-├── @real-router/core         # Router instance, Navigator, State types
+├── @real-router/core         # peer — Router instance, Navigator, State types
 ├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource, getTransitionSource, createDismissableError)
 └── @real-router/route-utils  # Route tree queries: `getRouteUtils(router)` returns a `RouteUtils` instance whose methods (`getChain`, `getSiblings`, …) walk the route tree
 ```

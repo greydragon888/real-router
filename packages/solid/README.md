@@ -10,7 +10,7 @@
 npm install @real-router/solid @real-router/core @real-router/browser-plugin
 ```
 
-**Peer dependency:** `solid-js` >= 1.7.0
+**Peer dependencies:** `@real-router/core`, `solid-js` >= 1.7.0
 
 ## Quick Start
 
@@ -635,12 +635,12 @@ Server-side rendering: [ssr](../../examples/web/solid/ssr-examples/ssr) · [ssr-
 
 ## Related Packages
 
-| Package                                                                                  | Description                          |
-| ---------------------------------------------------------------------------------------- | ------------------------------------ |
-| [@real-router/core](https://www.npmjs.com/package/@real-router/core)                     | Core router (required dependency)    |
-| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) | Browser History API integration      |
-| [@real-router/sources](https://www.npmjs.com/package/@real-router/sources)               | Subscription layer (used internally) |
-| [@real-router/route-utils](https://www.npmjs.com/package/@real-router/route-utils)       | Route tree queries (`useRouteUtils`) |
+| Package                                                                                  | Description                            |
+| ---------------------------------------------------------------------------------------- | -------------------------------------- |
+| [@real-router/core](https://www.npmjs.com/package/@real-router/core)                     | Core router (required peer dependency) |
+| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) | Browser History API integration        |
+| [@real-router/sources](https://www.npmjs.com/package/@real-router/sources)               | Subscription layer (used internally)   |
+| [@real-router/route-utils](https://www.npmjs.com/package/@real-router/route-utils)       | Route tree queries (`useRouteUtils`)   |
 
 ## Contributing
 

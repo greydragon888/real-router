@@ -10,7 +10,7 @@
 npm install @real-router/svelte @real-router/core @real-router/browser-plugin
 ```
 
-**Peer dependency:** `svelte` >= 5.7.0
+**Peer dependencies:** `@real-router/core`, `svelte` >= 5.7.0
 
 ## Quick Start
 
@@ -553,12 +553,12 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 ## Related Packages
 
-| Package                                                                                  | Description                          |
-| ---------------------------------------------------------------------------------------- | ------------------------------------ |
-| [@real-router/core](https://www.npmjs.com/package/@real-router/core)                     | Core router (required dependency)    |
-| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) | Browser History API integration      |
-| [@real-router/sources](https://www.npmjs.com/package/@real-router/sources)               | Subscription layer (used internally) |
-| [@real-router/route-utils](https://www.npmjs.com/package/@real-router/route-utils)       | Route tree queries (`useRouteUtils`) |
+| Package                                                                                  | Description                            |
+| ---------------------------------------------------------------------------------------- | -------------------------------------- |
+| [@real-router/core](https://www.npmjs.com/package/@real-router/core)                     | Core router (required peer dependency) |
+| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) | Browser History API integration        |
+| [@real-router/sources](https://www.npmjs.com/package/@real-router/sources)               | Subscription layer (used internally)   |
+| [@real-router/route-utils](https://www.npmjs.com/package/@real-router/route-utils)       | Route tree queries (`useRouteUtils`)   |
 
 ## Contributing
 

@@ -94,90 +94,94 @@ graph TD
     DOMUTILS["shared/dom-utils<br/>(shared sources)"]
     SSRSHARED["shared/ssr<br/>(shared sources)"]
 
-    BP -->|dep| CORE
+    ROUTEUTILS -.->|peer| CORE
+    SSRUTILS -.->|peer| CORE
+
+    BP -.->|peer| CORE
     BP -.->|symlink| BROWSERENV
 
-    HP -->|dep| CORE
+    HP -.->|peer| CORE
     HP -.->|symlink| BROWSERENV
 
-    NP -->|dep| CORE
+    NP -.->|peer| CORE
     NP -.->|symlink| BROWSERENV
 
-    LP -->|dep| CORE
+    LP -.->|peer| CORE
 
     SOURCES -->|dep| ROUTEUTILS
-    SOURCES -->|dep| CORE
+    SOURCES -.->|peer| CORE
 
-    REACT["react<br/>(main + /legacy)"]
-    REACT -->|dep| CORE
+    REACT -.->|peer| CORE
     REACT -->|dep| SOURCES
     REACT -->|dep| ROUTEUTILS
     REACT -.->|symlink| DOMUTILS
 
     PREACT["preact"]
-    PREACT -->|dep| CORE
+    PREACT -.->|peer| CORE
     PREACT -->|dep| SOURCES
     PREACT -->|dep| ROUTEUTILS
     PREACT -.->|symlink| DOMUTILS
 
     SOLID["solid"]
-    SOLID -->|dep| CORE
+    SOLID -.->|peer| CORE
     SOLID -->|dep| SOURCES
     SOLID -->|dep| ROUTEUTILS
     SOLID -.->|symlink| DOMUTILS
 
     VUE["vue"]
-    VUE -->|dep| CORE
+    VUE -.->|peer| CORE
     VUE -->|dep| SOURCES
     VUE -->|dep| ROUTEUTILS
     VUE -.->|symlink| DOMUTILS
 
     SVELTE["svelte"]
-    SVELTE -->|dep| CORE
+    SVELTE -.->|peer| CORE
     SVELTE -->|dep| SOURCES
     SVELTE -->|dep| ROUTEUTILS
     SVELTE -.->|symlink| DOMUTILS
 
     ANGULAR["angular"]
-    ANGULAR -->|dep| CORE
+    ANGULAR -.->|peer| CORE
     ANGULAR -->|dep| SOURCES
     ANGULAR -->|dep| ROUTEUTILS
     ANGULAR -->|dep| SSRUTILS
-    ANGULAR -.->|copy| DOMUTILS
+    ANGULAR -.->|symlink| DOMUTILS
 
-    RX -->|dep| CORE
+    RX -.->|peer| CORE
 
-    PPP -->|dep| CORE
+    PPP -.->|peer| CORE
 
     SDP["ssr-data-plugin"]
-    SDP -->|dep| CORE
+    SDP -.->|peer| CORE
+    SDP -->|dep| SSRUTILS
     SDP -.->|symlink| SSRSHARED
 
     RSP["rsc-server-plugin"]
-    RSP -->|dep| CORE
+    RSP -.->|peer| CORE
+    RSP -->|dep| SSRUTILS
     RSP -.->|symlink| SSRSHARED
 
     LCP["lifecycle-plugin"]
-    LCP -->|dep| CORE
+    LCP -.->|peer| CORE
 
     PLP["preload-plugin"]
-    PLP -->|dep| CORE
+    PLP -.->|peer| CORE
 
     MP["memory-plugin"]
-    MP -->|dep| CORE
+    MP -.->|peer| CORE
 
     VP["validation-plugin"]
-    VP -->|dep| CORE
+    VP -.->|peer| CORE
 
     SSP["search-schema-plugin"]
-    SSP -->|dep| CORE
+    SSP -.->|peer| CORE
 
     ROUTEUTILS -.->|peer| CORE
 
     SSRUTILS -.->|peer| CORE
 ```
 
-Solid arrows = runtime `dependencies`. Dashed arrows = bundled at build time (consumer's bundle includes the internal package).
+Solid arrows = runtime `dependencies`. Dashed `peer` arrows = `peerDependencies`. Dashed `symlink` arrows = shared sources compiled into the consumer's own bundle through a `src/` symlink.
 
 ## Core Architecture
 
@@ -638,7 +642,7 @@ All navigation errors are `RouterError` instances with typed `code` from `errorC
 
 ### Build System
 
-pnpm monorepo with Turborepo for task orchestration. Dual ESM/CJS output via tsdown (Rolldown-based bundler). Shared sources (`shared/`) are bundled into the packages that link them — not separate npm artifacts. `workspace:^` protocol for inter-package dependencies. The reporting turbo tasks use `outputLogs: "errors-only"` — silent on success, full output on failure; `turbo.json` names them. `build:verbose`/`test:verbose` scripts override to full output for debugging. The examples sit outside turbo, in a pnpm workspace of their own: `pnpm -r` builds and tests them against the npm releases their lockfile records, or against tarballs of this checkout's packages (`scripts/checkout-tarballs.mjs`).
+pnpm monorepo with Turborepo for task orchestration. Dual ESM/CJS output via tsdown (Rolldown-based bundler). Shared sources (`shared/`) are bundled into the packages that link them — not separate npm artifacts. `workspace:^` protocol for the `dependencies` and `devDependencies` between packages; the core peer is `workspace:>=`, because a `^0.x` range admits no new core minor. The reporting turbo tasks use `outputLogs: "errors-only"` — silent on success, full output on failure; `turbo.json` names them. `build:verbose`/`test:verbose` scripts override to full output for debugging. The examples sit outside turbo, in a pnpm workspace of their own: `pnpm -r` builds and tests them against the npm releases their lockfile records, or against tarballs of this checkout's packages (`scripts/checkout-tarballs.mjs`).
 
 ### Performance Hot Path
 

@@ -23,7 +23,7 @@ memory-plugin/
 
 ```mermaid
 graph LR
-    MP["@real-router/memory-plugin"] -->|dep| CORE["@real-router/core"]
+    MP["@real-router/memory-plugin"] -.->|peer| CORE["@real-router/core"]
 
     CORE -.->|provides| PF[PluginFactory]
     CORE -.->|provides| PA[PluginApi]

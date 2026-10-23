@@ -32,7 +32,7 @@ import {
 } from "@real-router/preact/ssr";
 ```
 
-**Peer dependency:** `preact` ">=10.28.0 || ^11.0.0-0" — compatible with Preact 10.28+ and Preact 11 (beta and stable). Floor sits at 10.28 because the adapter pulls `HTMLAttributes` / `TargetedMouseEvent` from the top-level `preact` namespace (introduced in 10.28; `dom.d.ts`), which is the only import shape that survives Preact 11's JSX-namespace restructure.
+**Peer dependencies:** `@real-router/core`, and `preact` ">=10.28.0 || ^11.0.0-0" — compatible with Preact 10.28+ and Preact 11 (beta and stable). Floor sits at 10.28 because the adapter pulls `HTMLAttributes` / `TargetedMouseEvent` from the top-level `preact` namespace (introduced in 10.28; `dom.d.ts`), which is the only import shape that survives Preact 11's JSX-namespace restructure.
 
 **Architecture:** Flat structure. All code lives in `src/`. Two entry points (main + `/ssr`) — no legacy/modern split. `RouteView` included but without `keepAlive` (Preact has no Activity API).
 

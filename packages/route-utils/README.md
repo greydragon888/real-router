@@ -13,6 +13,8 @@
 npm install @real-router/route-utils
 ```
 
+**Peer dependency:** `@real-router/core`
+
 ## Quick Start
 
 ```typescript

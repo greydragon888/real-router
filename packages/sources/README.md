@@ -204,11 +204,11 @@ This is by design (#1215): the source is a live event stream, symmetric with `cr
 
 ## Related Packages
 
-| Package                                                                | Description                                 |
-| ---------------------------------------------------------------------- | ------------------------------------------- |
-| [@real-router/core](https://www.npmjs.com/package/@real-router/core)   | Core router (required dependency)           |
+| Package                                                                | Description                                           |
+| ---------------------------------------------------------------------- | ----------------------------------------------------- |
+| [@real-router/core](https://www.npmjs.com/package/@real-router/core)   | Core router (required peer dependency)                |
 | [@real-router/react](https://www.npmjs.com/package/@real-router/react) | React adapter — built on sources, like the other five |
-| [@real-router/rx](https://www.npmjs.com/package/@real-router/rx)       | Observable API (`state$`, `events$`)        |
+| [@real-router/rx](https://www.npmjs.com/package/@real-router/rx)       | Observable API (`state$`, `events$`)                  |
 
 ## Contributing
 
