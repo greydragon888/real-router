@@ -35,6 +35,8 @@ import {
   validateLifecycleCountThresholds,
   warnOverwrite as warnLifecycleOverwrite,
   warnAsyncGuardSync,
+  warnNonBooleanGuard,
+  warnNonBooleanGuardSync,
 } from "./validators/lifecycle";
 import {
   validateNavigateArgs,
@@ -330,6 +332,12 @@ function buildValidatorObject(
       },
       warnAsyncGuardSync(name, methodName) {
         warnAsyncGuardSync(name, methodName, api.logger);
+      },
+      warnNonBooleanGuardSync(name, answer, methodName) {
+        warnNonBooleanGuardSync(name, answer, methodName, api.logger);
+      },
+      warnNonBooleanGuard(name, answer) {
+        warnNonBooleanGuard(name, answer, api.logger);
       },
     },
     navigation: {

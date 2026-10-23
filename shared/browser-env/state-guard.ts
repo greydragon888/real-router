@@ -39,10 +39,10 @@ const hasOwn = Object.hasOwn;
  * constants — is DUPLICATED here from
  * `packages/validation-plugin/src/type-guards/` because the two homes share no
  * common dependency (browser-env is a symlinked shared source consumed by the
- * URL plugins; it must not depend on validation-plugin). This mirrors the
- * `getTypeDescription` twin between `type-guards` and `engine` (#903/#1052): one
- * behavioural contract, two byte-identical copies. **Any change to the guard
- * semantics here MUST be mirrored in validation-plugin's copy and vice versa.**
+ * URL plugins; it must not depend on validation-plugin). One behavioural
+ * contract, two copies whose code `scripts/tests/twin-lockstep.test.mjs` holds
+ * identical. **Any change to the guard semantics here MUST be mirrored in
+ * validation-plugin's copy and vice versa.**
  * Only `isStateStrict` is exported — the helpers are module-private.
  * ─────────────────────────────────────────────────────────────────────────────
  */

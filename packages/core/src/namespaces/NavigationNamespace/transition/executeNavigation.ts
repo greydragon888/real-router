@@ -617,6 +617,7 @@ export function executeNavigation(
         signal,
         isLive,
         emitLeaveApproveCallback,
+        deps.warnNonBooleanGuard,
       );
 
       if (guardCompletion !== undefined) {

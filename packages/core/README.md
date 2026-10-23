@@ -435,7 +435,8 @@ destructure, cached per router: `navigate`, `getState`, `isActiveRoute`,
 shared with the current route are not re-checked. An async guard cannot be
 evaluated synchronously, so it resolves to `false` (silent in core, warned by the
 plugin); a guard that **throws** also resolves to `false`, logged via
-`logger.warn`.
+`logger.warn`. A guard answering any other non-boolean resolves to `false` too —
+the verdict `navigate` reaches for it (silent in core, named by the plugin).
 
 Parity covers every way `navigate` refuses the SAME arguments, not just the guard
 verdict: a missing required path param and a declared query key handed in the
@@ -489,6 +490,7 @@ shapes:
 standalone and via `constants.UNKNOWN_ROUTE`.
 
 **`GuardFn`**: `(toState, fromState, signal?) => boolean | Promise<boolean>`.
+Only `true` allows: any other answer, returned or settled by a promise, refuses.
 
 ---
 

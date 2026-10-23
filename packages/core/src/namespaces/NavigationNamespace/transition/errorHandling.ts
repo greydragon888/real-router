@@ -292,8 +292,9 @@ export function wrapSyncError(
 }
 
 /**
- * Settle a guard's Promise into the pipeline's terms: `false` and a rejection
- * both become the phase's `RouterError`, nothing else escapes.
+ * Settle a guard's Promise into the pipeline's terms: anything but `true` and a
+ * rejection both become the phase's `RouterError`. The rule is the synchronous
+ * step's (#2823), and so is the report of a non-boolean value to the validator.
  *
  * Lives here rather than with the interpreter because that IS this module's
  * concern — turning a guard's refusal into the right error (#1607). The
@@ -303,18 +304,25 @@ export async function resolveAsyncGuard(
   promise: Promise<boolean>,
   errorCode: string,
   segment: string,
+  warnNonBooleanGuard: (name: string, answer: unknown) => void,
 ): Promise<void> {
-  let result: boolean;
+  let answer: unknown;
 
   try {
-    result = await promise;
+    answer = await promise;
   } catch (error: unknown) {
     handleGuardError(error, errorCode, segment);
 
     return; // unreachable — handleGuardError returns never
   }
 
-  if (!result) {
-    throw freezeThrownError(new RouterError(errorCode, { segment }));
+  if (answer === true) {
+    return;
   }
+
+  if (answer !== false) {
+    warnNonBooleanGuard(segment, answer);
+  }
+
+  throw freezeThrownError(new RouterError(errorCode, { segment }));
 }

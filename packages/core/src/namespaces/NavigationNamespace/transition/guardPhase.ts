@@ -16,9 +16,9 @@ import type { GuardFn, State } from "../../../types";
  * `finishAsyncNavigation` already asks there, so a check in either spot reds
  * nothing.
  *
- * ⚑ Every function here takes its parameters FLAT rather than in a bag, and
- * carries a `NOSONAR` for it: the walk runs per guard step on the #307 path,
- * and an options object would be an allocation per call.
+ * ⚑ Every function here that walks the program takes its parameters FLAT
+ * rather than in a bag, and carries a `NOSONAR` for it: the walk runs per guard
+ * step on the #307 path, and an options object would be an allocation per call.
  */
 
 const PHASE_DEACTIVATE = 0;
@@ -43,8 +43,8 @@ interface Suspension {
  * ONE step of the program: the cancellation check, then the step's own work.
  *
  * Returns a {@link Suspension} when the step handed back a Promise, `undefined`
- * when it finished synchronously, and throws when it refused — a guard returning
- * `false`, a guard throwing, or the navigation having been cancelled.
+ * when it finished synchronously, and throws when it refused — a guard answering
+ * anything but `true`, a guard throwing, or the navigation having been cancelled.
  */
 function runStep( // NOSONAR -- see the note on flat parameters at the top of this file
   phase: number,
@@ -57,6 +57,7 @@ function runStep( // NOSONAR -- see the note on flat parameters at the top of th
   signal: AbortSignal | undefined,
   isLive: () => boolean,
   emitLeaveApprove: () => Promise<void> | undefined,
+  warnNonBooleanGuard: (name: string, answer: unknown) => void,
 ): Suspension | undefined {
   // THE cancellation check — the only one in this file, and the head of the step
   // is where it has to stay: the leave phase returns before any guard lookup, so
@@ -95,72 +96,91 @@ function runStep( // NOSONAR -- see the note on flat parameters at the top of th
     return undefined;
   }
 
-  // Stryker disable next-line BooleanLiteral: equivalent — guardResult is unconditionally reassigned by guardFn() on the next line, or the catch calls handleGuardError() (returns never), so the init value is never read.
-  let guardResult: boolean | Promise<boolean> = false;
+  let answer: unknown;
 
   try {
-    guardResult = guardFn(toState, fromState, signal);
+    answer = guardFn(toState, fromState, signal);
   } catch (error: unknown) {
     handleGuardError(error, errorCode, segment);
   }
 
-  // ⚑ A THENABLE, not `Promise.prototype` (#2251). `instanceof` compares against
-  // the CURRENT realm, so a promise minted in a `vm` context, an iframe, a worker
-  // bridge or a federated module is not a match — an identity test sends it to
-  // the synchronous branch below, where a pending object is truthy and the guard
-  // is never awaited at all. `GuardFn` declares `Promise<boolean>`, and a
-  // cross-realm promise satisfies that declaration.
-  //
-  // ⚠ **One path, not a fast path beside it.** A native promise is a thenable,
-  // so an `instanceof` short-circuit ahead of this would be a second branch no
-  // test can tell from the first — an equivalent mutant, and an exception the
-  // `thenable-door-authority-2251` table would have to carry.
-  //
-  // ⚠ **`then` is read ONCE and the captured function is what gets called.**
-  // Deciding on read #1 and letting `await` take read #2 is the defect #2136
-  // measured on the emitter: a slot answering a non-function the second time is
-  // adopted as a plain value, and its rejection reaches nobody.
-  //
-  // ⚠ **The read sits in the guard's OWN error channel.** `then` may be an
-  // accessor or a `Proxy` trap, so reading it runs application code — and this
-  // is the FIRST read, which makes any throw ORIGINATE here. Routed through
-  // `handleGuardError`, a hostile slot fails the navigation the way a throwing
-  // guard does instead of escaping the pipeline as a bare `TypeError`.
-  //
-  // ⚠ No optional chain: a JS caller's `null` / `undefined` throws on the read
-  // and the channel above converts it into the SAME `RouterError(errorCode)` the
-  // falsy branch below would have raised — measured identical, so guarding the
-  // read would be a term no test can tell from its absence.
+  // ⚑ Only `true` allows (#2823). `GuardFn` declares `boolean |
+  // Promise<boolean>`, but untyped guard code answers anything, and read by
+  // truthiness `return "login"` or a filtered array would let the user in — a
+  // guard failing OPEN. Every other answer refuses; a thenable is awaited
+  // first, and `resolveAsyncGuard` holds what it settles on to the same rule.
+  if (answer === true) {
+    return undefined;
+  }
+
+  if (answer !== false) {
+    const pending = adoptThenable(answer, errorCode, segment);
+
+    if (pending !== undefined) {
+      return { phase, index: index + 1, pending };
+    }
+
+    warnNonBooleanGuard(segment, answer);
+  }
+
+  throw freezeThrownError(new RouterError(errorCode, { segment }));
+}
+
+/**
+ * The promise a guard's thenable answer settles, or `undefined` when the answer
+ * is not a thenable.
+ *
+ * ⚑ A THENABLE, not `Promise.prototype` (#2251). `instanceof` compares against
+ * the CURRENT realm, so a promise minted in a `vm` context, an iframe, a worker
+ * bridge or a federated module is not a match — an identity test would read it
+ * as a non-boolean answer and refuse without awaiting it. `GuardFn` declares
+ * `Promise<boolean>`, and a cross-realm promise satisfies that declaration.
+ *
+ * ⚠ **One path, not a fast path beside it.** A native promise is a thenable,
+ * so an `instanceof` short-circuit ahead of this would be a second branch no
+ * test can tell from the first — an equivalent mutant, and an exception the
+ * `thenable-door-authority-2251` table would have to carry.
+ *
+ * ⚠ **`then` is read ONCE and the captured function is what gets called.**
+ * Deciding on read #1 and letting `await` take read #2 is the defect #2136
+ * measured on the emitter: a slot answering a non-function the second time is
+ * adopted as a plain value, and its rejection reaches nobody.
+ *
+ * ⚠ **The read sits in the guard's OWN error channel.** `then` may be an
+ * accessor or a `Proxy` trap, so reading it runs application code — and this
+ * is the FIRST read, which makes any throw ORIGINATE here. Routed through
+ * `handleGuardError`, a hostile slot fails the navigation the way a throwing
+ * guard does instead of escaping the pipeline as a bare `TypeError`.
+ *
+ * ⚠ The optional chain is what keeps `null` / `undefined` out of that channel:
+ * neither can carry a `then`, and read without it each throws a `TypeError`
+ * whose message the refusal would carry instead of the one `false` raises.
+ */
+function adoptThenable(
+  answer: unknown,
+  errorCode: string,
+  segment: string,
+): Promise<boolean> | undefined {
   let then: unknown;
 
   try {
-    then = (guardResult as { then?: unknown }).then;
+    then = (answer as { then?: unknown } | null | undefined)?.then;
   } catch (error: unknown) {
     handleGuardError(error, errorCode, segment);
   }
 
-  if (typeof then === "function") {
-    const thenable = guardResult;
-
-    return {
-      phase,
-      index: index + 1,
-      // A sync throw from `then` becomes a rejection here, which is the same
-      // channel a rejecting guard promise already travels.
-      pending: new Promise<boolean>((resolve, reject) => {
-        Reflect.apply(then as (...args: unknown[]) => unknown, thenable, [
-          resolve,
-          reject,
-        ]);
-      }),
-    };
+  if (typeof then !== "function") {
+    return undefined;
   }
 
-  if (!guardResult) {
-    throw freezeThrownError(new RouterError(errorCode, { segment }));
-  }
-
-  return undefined;
+  // A sync throw from `then` becomes a rejection here, which is the same
+  // channel a rejecting guard promise already travels.
+  return new Promise<boolean>((resolve, reject) => {
+    Reflect.apply(then as (...args: unknown[]) => unknown, answer, [
+      resolve,
+      reject,
+    ]);
+  });
 }
 
 /**
@@ -185,6 +205,7 @@ function runPhase( // NOSONAR -- see the note on flat parameters at the top of t
   signal: AbortSignal | undefined,
   isLive: () => boolean,
   emitLeaveApprove: () => Promise<void> | undefined,
+  warnNonBooleanGuard: (name: string, answer: unknown) => void,
 ): Suspension | undefined {
   const isLeave = phase === PHASE_LEAVE;
   const isDeactivate = phase === PHASE_DEACTIVATE;
@@ -220,6 +241,7 @@ function runPhase( // NOSONAR -- see the note on flat parameters at the top of t
       signal,
       isLive,
       emitLeaveApprove,
+      warnNonBooleanGuard,
     );
 
     if (suspension !== undefined) {
@@ -250,6 +272,7 @@ function runFrom( // NOSONAR -- see the note on flat parameters at the top of th
   signal: AbortSignal | undefined,
   isLive: () => boolean,
   emitLeaveApprove: () => Promise<void> | undefined,
+  warnNonBooleanGuard: (name: string, answer: unknown) => void,
   startPhase: number,
   startIndex: number,
 ): Suspension | undefined {
@@ -268,6 +291,7 @@ function runFrom( // NOSONAR -- see the note on flat parameters at the top of th
       signal,
       isLive,
       emitLeaveApprove,
+      warnNonBooleanGuard,
     );
 
     if (suspension !== undefined) {
@@ -299,6 +323,7 @@ async function resumeFrom( // NOSONAR -- see the note on flat parameters at the 
   signal: AbortSignal | undefined,
   isLive: () => boolean,
   emitLeaveApprove: () => Promise<void> | undefined,
+  warnNonBooleanGuard: (name: string, answer: unknown) => void,
 ): Promise<void> {
   let at: Suspension | undefined = suspension;
 
@@ -314,6 +339,7 @@ async function resumeFrom( // NOSONAR -- see the note on flat parameters at the 
           ? errorCodes.CANNOT_DEACTIVATE
           : errorCodes.CANNOT_ACTIVATE,
         (isDeactivate ? toDeactivate : toActivate)[at.index - 1],
+        warnNonBooleanGuard,
       );
     }
 
@@ -329,6 +355,7 @@ async function resumeFrom( // NOSONAR -- see the note on flat parameters at the 
       signal,
       isLive,
       emitLeaveApprove,
+      warnNonBooleanGuard,
       at.phase,
       at.index,
     );
@@ -352,6 +379,7 @@ export function executeGuardPipeline( // NOSONAR -- see the note on flat paramet
   signal: AbortSignal,
   isLive: () => boolean,
   emitLeaveApprove: () => Promise<void> | undefined,
+  warnNonBooleanGuard: (name: string, answer: unknown) => void,
 ): Promise<void> | undefined {
   const suspension = runFrom(
     deactivateGuards,
@@ -365,6 +393,7 @@ export function executeGuardPipeline( // NOSONAR -- see the note on flat paramet
     signal,
     isLive,
     emitLeaveApprove,
+    warnNonBooleanGuard,
     PHASE_DEACTIVATE,
     0,
   );
@@ -384,5 +413,6 @@ export function executeGuardPipeline( // NOSONAR -- see the note on flat paramet
         signal,
         isLive,
         emitLeaveApprove,
+        warnNonBooleanGuard,
       );
 }

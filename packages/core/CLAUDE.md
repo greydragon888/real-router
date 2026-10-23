@@ -404,7 +404,7 @@ that reads it, a store admits only state its namespace owns, a validator method
 needs a door to guard.
 
 ⚠ **Size is not the signal, and neither is a member with one reader.** Both were
-tried and both failed: `NavigationDependencies` carries 28 members with over half
+tried and both failed: `NavigationDependencies` carries 29 members with over half
 of them read exactly once, which is the CORRECT shape for an injected dependency,
 and `RoutesStore` has no unread member at all. What separates an accreting entity
 from a large one is the absence of a refusal.
@@ -423,14 +423,19 @@ All guards are `GuardFn` (`boolean | Promise<boolean>`) — no State return. Bot
 route config and `addActivateGuard` / `addDeactivateGuard` accept a
 `GuardFnFactory`, whose signature is `(router, getDependency) => GuardFn`.
 
+Only `true` allows. A `State`, a route name or any other non-boolean — returned,
+or settled by a thenable — refuses on every reader of the answer, and a
+transition rejects with `CANNOT_ACTIVATE` / `CANNOT_DEACTIVATE`; `INVARIANTS.md`
+guard row 8 owns the rule.
+
 ⚠ **The async half is a THENABLE, not `Promise.prototype` (#2251).** A promise
 from another realm — a `vm` context, an iframe, a worker bridge, a federated
 module — is awaited exactly as a native one is, and a `then` that throws on read
-fails the navigation the way a throwing guard does rather than reading as
-"allowed". `INVARIANTS.md` guard row 5 owns the rule.
+fails the navigation the way a throwing guard does rather than reaching the
+caller as a bare `TypeError`. `INVARIANTS.md` guard row 5 owns the rule.
 
 ```typescript
-// WRONG — GuardFn returns boolean only
+// WRONG — a State is not `true`: the navigation is refused, not redirected
 lifecycle.addActivateGuard(
   "admin",
   (router) => () => getPluginApi(router).makeState("login"),

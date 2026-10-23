@@ -165,6 +165,53 @@ describe("validateRoute", () => {
       }).toThrow(`[router.${methodName}] Route name must be a string`);
     });
 
+    it("should describe a name whose constructor's `name` is not a string as 'object' (#2823)", () => {
+      // A null-prototype object cannot be printed, so describing it made the
+      // refusal a TypeError of its own; a Symbol or a number printed as a type.
+      for (const hostile of [Object.create(null), Symbol("name"), 42]) {
+        const constructor = (): void => {};
+
+        Object.defineProperty(constructor, "name", { value: hostile });
+
+        expect(() => {
+          validateRoute({ name: { constructor }, path: "/test" }, methodName);
+        }).toThrow(
+          `[router.${methodName}] Route name must be a string, got object`,
+        );
+      }
+    });
+
+    it("should describe a name whose constructor is not a function as 'object', whatever its `name` (#2823)", () => {
+      expect(() => {
+        validateRoute(
+          { name: { constructor: { name: "Widget" } }, path: "/test" },
+          methodName,
+        );
+      }).toThrow(
+        `[router.${methodName}] Route name must be a string, got object`,
+      );
+    });
+
+    it("should read the constructor's `name` once, so a drifting `name` cannot pass a non-string (#2823)", () => {
+      let reads = 0;
+      const constructor = (): void => {};
+
+      Object.defineProperty(constructor, "name", {
+        get(): unknown {
+          reads += 1;
+
+          return reads === 1 ? "Widget" : Object.create(null);
+        },
+      });
+
+      expect(() => {
+        validateRoute({ name: { constructor }, path: "/test" }, methodName);
+      }).toThrow(
+        `[router.${methodName}] Route name must be a string, got Widget`,
+      );
+      expect(reads).toBe(1);
+    });
+
     it("should describe an anonymous-class name as 'object', not '' (#903)", () => {
       // An anonymous class has an empty constructor name; the message falls back
       // to "object" rather than an empty "got ".

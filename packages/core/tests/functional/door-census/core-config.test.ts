@@ -264,7 +264,7 @@ describe("config-door census (#2303)", () => {
         "maxPlugins",
         "warnListeners",
       ],
-      logger: ["callback", "level"],
+      logger: ["callback", "callbackIgnoresLevel", "level"],
     });
   });
 

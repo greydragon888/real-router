@@ -22,7 +22,8 @@ src/
     │                           full object structure, getter rejection
     ├── plugins.ts            — PluginsNamespace: count vs maxPlugins limit,
     ├── lifecycle.ts          — LifecycleNamespace: handler type, not-registering guard,
-    │                           count vs maxLifecycleHandlers
+    │                           count vs maxLifecycleHandlers, guard answers that are
+    │                           neither true nor false, a thenable on the synchronous ask
     ├── navigation.ts         — NavigationNamespace: navigate args, navigateToDefault args,
     │                           NavigationOptions shape, params validation (navigate/buildPath/canNavigateTo),
     │                           start path validation
@@ -173,6 +174,8 @@ All errors thrown by this plugin follow a consistent format:
 ```
 [router.METHOD] descriptive message, got ${typeDescription}
 ```
+
+`typeDescription` is a string for every value and never throws: an object whose reads throw, or whose constructor's `name` is not a string, is described as `object`.
 
 Examples:
 

@@ -399,6 +399,12 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     canNavigate: () => ns.eventBus.canBeginTransition(),
     isStarting: () => ns.eventBus.isStarting(),
     getLifecycleFunctions: () => ns.routeLifecycle.getFunctions(),
+    warnNonBooleanGuard: (name, answer) => {
+      getInternals(ns.router).validator?.lifecycle.warnNonBooleanGuard(
+        name,
+        answer,
+      );
+    },
     // Deactivation half only — the 404 has no route to activate (#1643). Only
     // `navigateToNotFound` asks, so its guard's log names it (#2821).
     canDeactivateCurrent: (deactivated, toState, fromState) =>

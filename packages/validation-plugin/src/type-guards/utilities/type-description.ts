@@ -4,6 +4,9 @@
  * Gets a human-readable description of a value's type.
  * Used for error messages to provide helpful debugging information.
  *
+ * It answers a string for every value and never throws: the description lands
+ * in a message, and the message must not become the thing that fails.
+ *
  * @param value - Value to describe
  * @returns String description of the value's type
  *
@@ -20,34 +23,37 @@ export function getTypeDescription(value: unknown): string {
     return "null";
   }
 
-  // Array with length info
-  if (Array.isArray(value)) {
-    return `array[${value.length}]`;
+  // Primitive types and functions: `typeof` reads nothing off the value.
+  if (typeof value !== "object") {
+    return typeof value;
   }
 
-  if (typeof value === "object") {
-    // Read `constructor`/`.name` defensively: an adversarial own `constructor`
-    // (null, a string, a number, …) is not a real constructor and must not crash
-    // here nor yield a non-string (#787); a THROWING accessor — a `constructor`
-    // getter, a function constructor with a throwing `.name` getter, or a Proxy
-    // that throws on [[Get]] — must not crash either (#1052). Both fall back to
-    // "object", the same as the non-function-value branch.
-    try {
-      const ctor: unknown = (value as { constructor?: unknown }).constructor;
-
-      // Return constructor name for class instances
-      if (typeof ctor === "function" && ctor.name !== "Object") {
-        return ctor.name || "object"; // empty name (anonymous class) → "object"
-      }
-    } catch {
-      // Throwing constructor/.name getter or Proxy [[Get]] → fall through (#1052).
+  // Describing an object reads it, and every read can run application code:
+  // `Array.isArray` throws on a revoked proxy, `length` and `constructor` are
+  // accessors or traps, and an adversarial own `constructor` (null, a string, a
+  // number, …) is not a real constructor (#787). A read that throws (#1052), or
+  // a `name` that is not a string, falls back to "object".
+  try {
+    // Array with length info
+    if (Array.isArray(value)) {
+      return `array[${value.length}]`;
     }
 
-    // Plain object, null-prototype object, or adversarial / throwing constructor
-    return "object";
+    const ctor: unknown = (value as { constructor?: unknown }).constructor;
+
+    if (typeof ctor === "function") {
+      const name: unknown = ctor.name;
+
+      // Return constructor name for class instances; an anonymous class has
+      // an empty one.
+      if (typeof name === "string" && name !== "" && name !== "Object") {
+        return name;
+      }
+    }
+  } catch {
+    // A throwing read describes nothing; "object" stands.
   }
 
-  // Primitive types (string, number, boolean, undefined, etc.)
-  // Note: typeof undefined === "undefined", so we don't need explicit check
-  return typeof value;
+  // Plain object, null-prototype object, or adversarial / throwing constructor
+  return "object";
 }

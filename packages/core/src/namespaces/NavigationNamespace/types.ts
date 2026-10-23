@@ -421,6 +421,12 @@ export interface NavigationDependencies {
   /** Get lifecycle functions (canDeactivate, canActivate maps) */
   getLifecycleFunctions: () => [Map<string, GuardFn>, Map<string, GuardFn>];
 
+  /**
+   * Hand a guard's non-boolean answer to the validator, when one is installed
+   * (#2823). The walk refuses that answer either way.
+   */
+  warnNonBooleanGuard: (name: string, answer: unknown) => void;
+
   /** Check if a transition is currently in progress */
   isTransitioning: () => boolean;
 

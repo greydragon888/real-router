@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { createRouter, errorCodes } from "@real-router/core";
 
-import type { Route, Router } from "@real-router/core";
+import type { Route, Router, RouterError } from "@real-router/core";
 
 /**
  * A guard's answer counts whatever realm its promise came from (#2251).
@@ -191,49 +191,62 @@ describe("a guard's promise is honoured from any realm (#2251)", () => {
   it("a hostile `then` fails the navigation through the guard's own channel", async () => {
     // Reading `then` runs application code — an accessor or a `Proxy` trap — and
     // this is the FIRST read, so a throw originates here. It must reach the same
-    // error channel a throwing guard does, not escape as a bare `TypeError`.
-    for (const hostile of [
-      (): unknown => ({
-        // eslint-disable-next-line unicorn/no-thenable -- a hostile `then` accessor IS the subject
-        get then(): never {
-          throw new TypeError("hostile accessor");
-        },
-      }),
-      (): unknown =>
-        new Proxy(
-          {},
-          {
-            get(): never {
-              throw new TypeError("hostile trap");
-            },
+    // error channel a throwing guard does, not escape as a bare `TypeError`. The
+    // refusal carries the throw's message, which a refusal of the answer as a
+    // non-boolean would not: its message is the code. It names the guarded
+    // segment, as a throwing guard's refusal does.
+    for (const [message, hostile] of [
+      [
+        "hostile accessor",
+        (): unknown => ({
+          // eslint-disable-next-line unicorn/no-thenable -- a hostile `then` accessor IS the subject
+          get then(): never {
+            throw new TypeError("hostile accessor");
           },
-        ),
-    ]) {
+        }),
+      ],
+      [
+        "hostile trap",
+        (): unknown =>
+          new Proxy(
+            {},
+            {
+              get(): never {
+                throw new TypeError("hostile trap");
+              },
+            },
+          ),
+      ],
+    ] as const) {
       const router = await started({
         canActivate: () => hostile as never,
       });
 
-      await expect(outcome(router, "gated")).resolves.toBe(
-        `BLOCKED ${errorCodes.CANNOT_ACTIVATE}`,
+      await expect(router.navigate("gated")).rejects.toSatisfy(
+        (error: RouterError) =>
+          error.code === errorCodes.CANNOT_ACTIVATE &&
+          error.message === message &&
+          error.segment === "gated",
       );
 
       router.stop();
     }
   });
 
-  it("CONTROL — null and undefined reach the same refusal the falsy branch raises", async () => {
+  it("CONTROL — null and undefined are refused, not awaited", async () => {
     // `GuardFn` declares `boolean | Promise<boolean>`, but a JS caller is not
-    // bound by that. They throw on the property read and the guard's own error
-    // channel converts that into the SAME `RouterError(errorCode)` the falsy
-    // branch below would have raised — identical outcome, different path, which
-    // is why an optional chain here would be a term no test could discriminate.
+    // bound by that. Neither can carry a `then`, so the walk neither reads nor
+    // awaits one: the refusal carries the code as its message, where a read or
+    // an await would carry a `TypeError`'s.
     for (const value of [null, undefined]) {
       const router = await started({
         canActivate: () => (): never => value as never,
       });
 
-      await expect(outcome(router, "gated")).resolves.toBe(
-        `BLOCKED ${errorCodes.CANNOT_ACTIVATE}`,
+      await expect(router.navigate("gated")).rejects.toSatisfy(
+        (error: RouterError) =>
+          error.code === errorCodes.CANNOT_ACTIVATE &&
+          error.message === errorCodes.CANNOT_ACTIVATE,
       );
 
       router.stop();
@@ -241,13 +254,19 @@ describe("a guard's promise is honoured from any realm (#2251)", () => {
   });
 
   it("CONTROL — an object whose `then` is NOT callable stays on the synchronous branch", async () => {
-    // The boundary of the widening: `{ then: 1 }` is truthy and not a thenable,
-    // so it must read as "allowed" rather than be awaited forever.
+    // The boundary of the widening: `{ then: 1 }` is not a thenable, so it is
+    // not awaited — it is a non-boolean answer, refused on the spot with the
+    // error `false` raises (#2823). Awaited, the call of `then` would throw,
+    // and the refusal would carry that `TypeError` instead.
     // eslint-disable-next-line unicorn/no-thenable -- a non-callable `then` IS the boundary under test
     const notThenable = { then: 1 } as unknown as boolean;
     const router = await started({ canActivate: () => () => notThenable });
 
-    await expect(outcome(router, "gated")).resolves.toBe("NAVIGATED");
+    await expect(router.navigate("gated")).rejects.toSatisfy(
+      (error: RouterError) =>
+        error.code === errorCodes.CANNOT_ACTIVATE &&
+        error.message === errorCodes.CANNOT_ACTIVATE,
+    );
 
     router.stop();
   });

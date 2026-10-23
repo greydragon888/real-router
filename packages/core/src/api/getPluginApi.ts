@@ -280,7 +280,7 @@ export function getPluginApi<
     // lands and every consumer sees it.
     //
     // ⚑ It DELEGATES rather than copies, so a spy installed on the internals
-    // logger afterwards is still seen. `validator-boundary-authority-2322`'s two
+    // logger afterwards is still seen. `validator-boundary-authority-2322`'s
     // `spyOn(…, "warn")` cells are the check.
     logger: freeze<RouterLogger>({
       log: (context, message, ...args) => {
