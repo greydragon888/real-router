@@ -90,21 +90,21 @@ src/
 
 ## Key Differences from React and Preact Adapters
 
-| Aspect                      | React                              | Preact                                     | Solid                                                   |
-| --------------------------- | ---------------------------------- | ------------------------------------------ | ------------------------------------------------------- |
-| Reactivity model            | Re-renders (virtual DOM diffing)   | Re-renders (virtual DOM diffing)           | Fine-grained signals (no re-renders)                    |
-| External store subscription | `useSyncExternalStore` (native)    | Custom polyfill (`useState` + `useEffect`) | `createSignalFromSource` (`createSignal` + `onCleanup`) |
-| Hook return types           | Values (`RouteState`)              | Values (`RouteState`)                      | Accessors (`Accessor<RouteState>`)                      |
-| Props access                | Destructure freely                 | Destructure freely                         | Never destructure — use getters                         |
-| `memo()`                    | Required for optimization          | Required for optimization                  | Not needed — components run once                        |
-| `useCallback`               | Required for stable refs           | Required for stable refs                   | Not needed — no re-renders                              |
-| Params stabilization        | `canonicalJson` in sources         | `canonicalJson` in sources                 | `canonicalJson` in sources                              |
-| Active class on Link        | `className` string concat          | `className` string concat                  | `classList` object                                      |
-| `keepAlive` / Activity      | React 19.2+                        | Not available                              | Not available                                           |
-| Entry points                | Main + Legacy + /ssr (+ /ink, RSC) | Single                                     | Main + /ssr                                             |
-| Build tool                  | tsdown                             | tsdown                                     | rollup + babel-preset-solid                             |
-| Peer dependency             | `react` >= 19.0.0                  | `preact` >= 10.0.0                         | `solid-js` >= 1.7.0                                     |
-| RouteView child detection   | React element type checking        | `toChildArray` + element type checking     | Symbol-based marker objects (`$$type`)                  |
+| Aspect                      | React                                           | Preact                                     | Solid                                                   |
+| --------------------------- | ----------------------------------------------- | ------------------------------------------ | ------------------------------------------------------- |
+| Reactivity model            | Re-renders (virtual DOM diffing)                | Re-renders (virtual DOM diffing)           | Fine-grained signals (no re-renders)                    |
+| External store subscription | `useSyncExternalStore` (native)                 | Custom polyfill (`useState` + `useEffect`) | `createSignalFromSource` (`createSignal` + `onCleanup`) |
+| Hook return types           | Values (`RouteState`)                           | Values (`RouteState`)                      | Accessors (`Accessor<RouteState>`)                      |
+| Props access                | Destructure freely                              | Destructure freely                         | Never destructure — use getters                         |
+| `memo()`                    | Required for optimization                       | Required for optimization                  | Not needed — components run once                        |
+| `useCallback`               | Required for stable refs                        | Required for stable refs                   | Not needed — no re-renders                              |
+| Params stabilization        | `canonicalJson` in sources                      | `canonicalJson` in sources                 | `canonicalJson` in sources                              |
+| Active class on Link        | `className` string concat                       | `className` string concat                  | `classList` object                                      |
+| `keepAlive` / Activity      | React 19.2+                                     | Not available                              | Not available                                           |
+| Entry points                | Main + Legacy + /ssr + /legacy/ssr + /ink + RSC | Main + /ssr                                | Main + /ssr                                             |
+| Build tool                  | tsdown                                          | tsdown                                     | rollup + babel-preset-solid                             |
+| Peer dependency             | `react` >= 18.0.0 (19.2+ for the main entry)    | `preact` >= 10.28.0 or ^11.0.0-0           | `solid-js` >= 1.7.0                                     |
+| RouteView child detection   | React element type checking                     | `toChildArray` + element type checking     | Symbol-based marker objects (`$$type`)                  |
 
 ### createSignalFromSource
 

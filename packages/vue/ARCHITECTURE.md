@@ -11,24 +11,31 @@
 └── @real-router/route-utils  # Route tree queries (getRouteUtils, getChain, getSiblings)
 ```
 
-## Single Entry Point
+## Entry Points
 
-One entry point. Vue has native `<KeepAlive>`, so no modern/legacy split is needed.
+Two entry points via `package.json` subpath exports. Vue has native `<KeepAlive>`, so no modern/legacy split is needed.
 
 ```
-@real-router/vue  →  src/index.ts  →  Full API (Vue 3.3+)
+@real-router/vue      →  src/index.ts  →  Client API (Vue 3.3+)
+@real-router/vue/ssr  →  src/ssr.ts    →  SSR-feature components and composables
 ```
 
-**Build output** (tsdown single entry):
+**Build output** (tsdown, one entry per subpath; code both entries import goes to a shared chunk):
 
 ```
 dist/
 ├── esm/
 │   ├── index.mjs
-│   └── index.d.mts
+│   ├── index.d.mts
+│   ├── ssr.mjs
+│   ├── ssr.d.mts
+│   └── <module>-<hash>.mjs
 └── cjs/
     ├── index.js
-    └── index.d.ts
+    ├── index.d.ts
+    ├── ssr.js
+    ├── ssr.d.ts
+    └── <module>-<hash>.js
 ```
 
 ## Source Structure
@@ -83,22 +90,22 @@ src/
 
 ## Key Differences from React, Preact, and Solid Adapters
 
-| Aspect                      | React                            | Preact                                     | Solid                                                   | Vue                                                  |
-| --------------------------- | -------------------------------- | ------------------------------------------ | ------------------------------------------------------- | ---------------------------------------------------- |
-| Reactivity model            | Re-renders (virtual DOM diffing) | Re-renders (virtual DOM diffing)           | Fine-grained signals (no re-renders)                    | Proxy-based refs (targeted DOM updates)              |
-| External store subscription | `useSyncExternalStore` (native)  | Custom polyfill (`useState` + `useEffect`) | `createSignalFromSource` (`createSignal` + `onCleanup`) | `useRefFromSource` (`shallowRef` + `onScopeDispose`) |
-| Hook/composable return      | Values (`RouteState`)            | Values (`RouteState`)                      | Accessors (`Accessor<RouteState>`)                      | `{ navigator, route: Ref, previousRoute: Ref }`      |
-| `memo()`                    | Required for optimization        | Required for optimization                  | Not needed — components run once                        | Not needed — Vue tracks ref dependencies             |
-| Params stabilization        | `canonicalJson` in sources       | `canonicalJson` in sources                 | `canonicalJson` in sources                              | `canonicalJson` in sources                           |
-| Active class on Link        | `className` string concat        | `className` string concat                  | `classList` object                                      | `class` string concat                                |
-| `keepAlive` / Activity      | React 19.2+                      | Not available                              | Not available                                           | Vue native `<KeepAlive>` (all versions)              |
-| Context mechanism           | `createContext` + Provider       | `createContext` + Provider                 | `createContext` + Provider                              | `provide` / `inject` + `InjectionKey`                |
-| Context count               | 2 (React), 3 (Preact)            | 3                                          | 2                                                       | 3                                                    |
-| Components                  | JSX (.tsx)                       | JSX (.tsx)                                 | JSX (.tsx)                                              | `defineComponent` + `h()` (.ts)                      |
-| Build tool                  | tsdown                           | tsdown                                     | rollup + babel-preset-solid                             | tsdown                                               |
-| Peer dependency             | `react` >= 19.0.0                | `preact` >= 10.0.0                         | `solid-js` >= 1.7.0                                     | `vue` >= 3.3.0                                       |
-| Children access             | `{children}` / slots             | `{children}` / slots                       | slots                                                   | `slots.default?.()`                                  |
-| File extensions             | .tsx                             | .tsx                                       | .tsx                                                    | .ts                                                  |
+| Aspect                      | React                                        | Preact                                     | Solid                                                   | Vue                                                  |
+| --------------------------- | -------------------------------------------- | ------------------------------------------ | ------------------------------------------------------- | ---------------------------------------------------- |
+| Reactivity model            | Re-renders (virtual DOM diffing)             | Re-renders (virtual DOM diffing)           | Fine-grained signals (no re-renders)                    | Proxy-based refs (targeted DOM updates)              |
+| External store subscription | `useSyncExternalStore` (native)              | Custom polyfill (`useState` + `useEffect`) | `createSignalFromSource` (`createSignal` + `onCleanup`) | `useRefFromSource` (`shallowRef` + `onScopeDispose`) |
+| Hook/composable return      | Values (`RouteState`)                        | Values (`RouteState`)                      | Accessors (`Accessor<RouteState>`)                      | `{ navigator, route: Ref, previousRoute: Ref }`      |
+| `memo()`                    | Required for optimization                    | Required for optimization                  | Not needed — components run once                        | Not needed — Vue tracks ref dependencies             |
+| Params stabilization        | `canonicalJson` in sources                   | `canonicalJson` in sources                 | `canonicalJson` in sources                              | `canonicalJson` in sources                           |
+| Active class on Link        | `className` string concat                    | `className` string concat                  | `classList` object                                      | `class` string concat                                |
+| `keepAlive` / Activity      | React 19.2+                                  | Not available                              | Not available                                           | Vue native `<KeepAlive>` (all versions)              |
+| Context mechanism           | `createContext` + Provider                   | `createContext` + Provider                 | `createContext` + Provider                              | `provide` / `inject` + `InjectionKey`                |
+| Context count               | 2 (React), 3 (Preact)                        | 3                                          | 2                                                       | 3                                                    |
+| Components                  | JSX (.tsx)                                   | JSX (.tsx)                                 | JSX (.tsx)                                              | `defineComponent` + `h()` (.ts)                      |
+| Build tool                  | tsdown                                       | tsdown                                     | rollup + babel-preset-solid                             | tsdown                                               |
+| Peer dependency             | `react` >= 18.0.0 (19.2+ for the main entry) | `preact` >= 10.28.0 or ^11.0.0-0           | `solid-js` >= 1.7.0                                     | `vue` >= 3.3.0                                       |
+| Children access             | `{children}` / slots                         | `{children}` / slots                       | slots                                                   | `slots.default?.()`                                  |
+| File extensions             | .tsx                                         | .tsx                                       | .tsx                                                    | .ts                                                  |
 
 ### useRefFromSource
 

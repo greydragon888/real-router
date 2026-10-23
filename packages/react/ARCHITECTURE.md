@@ -34,24 +34,28 @@ All client entries are thin re-export files — no duplicated logic. The `/legac
 ```
 dist/
 ├── esm/
-│   ├── index.mjs              # Main entry (React 19.2+)
+│   ├── index.mjs                # Main entry (React 19.2+)
 │   ├── index.d.mts
-│   ├── ssr.mjs                # SSR-feature subpath
+│   ├── index.react-server.mjs   # Root under `react-server`: types only, an empty module
+│   ├── index.react-server.d.mts
+│   ├── ssr.mjs                  # SSR-feature subpath
 │   ├── ssr.d.mts
-│   ├── legacy.mjs             # Legacy entry (React 18+)
+│   ├── ssr.react-server.mjs     # /ssr under `react-server`: types only, an empty module
+│   ├── ssr.react-server.d.mts
+│   ├── legacy.mjs               # Legacy entry (React 18+)
 │   ├── legacy.d.mts
-│   ├── legacy.ssr.mjs         # Legacy SSR subset
+│   ├── legacy.ssr.mjs           # Legacy SSR subset
 │   ├── legacy.ssr.d.mts
-│   ├── ink.mjs                # Ink entry (Ink 7+)
+│   ├── ink.mjs                  # Ink entry (Ink 7+)
 │   ├── ink.d.mts
-│   └── chunk-*.mjs            # Shared code (auto-extracted)
-└── cjs/                       # Mirror of esm/ for CJS consumers — except `./ink`,
-                               # which is ESM-only in the export map: its CJS
-                               # build would require() ESM-only ink@7 (top-level await),
-                               # which Node cannot load. cjs/ink.* is still emitted —
-                               # the node10 `typesVersions` fallback points at
-                               # cjs/ink.d.ts — but no export condition references
-                               # cjs/ink.js, so it is unreachable at runtime.
+│   └── <module>-<hash>.mjs      # Shared code (auto-extracted), with .d.mts chunks for shared types
+└── cjs/                         # Mirror of esm/ for CJS consumers — except `./ink`,
+                                 # which is ESM-only in the export map: its CJS
+                                 # build would require() ESM-only ink@7 (top-level await),
+                                 # which Node cannot load. cjs/ink.* is still emitted —
+                                 # the node10 `typesVersions` fallback points at
+                                 # cjs/ink.d.ts — but no export condition references
+                                 # cjs/ink.js, so it is unreachable at runtime.
 ```
 
 ## Source Structure

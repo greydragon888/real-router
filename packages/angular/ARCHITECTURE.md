@@ -104,21 +104,21 @@ ssr/
 
 ## Key Differences from React, Preact, Solid, and Vue Adapters
 
-| Aspect                | React                            | Solid                            | Vue                                   | Angular                                                     |
-| --------------------- | -------------------------------- | -------------------------------- | ------------------------------------- | ----------------------------------------------------------- |
-| Reactivity model      | Re-renders (virtual DOM)         | Fine-grained signals             | Proxy-based refs                      | Angular signals (zoneless-compatible)                       |
-| External store bridge | `useSyncExternalStore`           | `createSignalFromSource`         | `useRefFromSource` (shallowRef)       | `sourceToSignal` (signal + DestroyRef)                      |
-| Hook/function return  | Values (`RouteState`)            | Accessors (`Accessor<T>`)        | `{ navigator, route: Ref }`           | `{ navigator, routeState: Signal<RouteSnapshot> }`          |
-| Context mechanism     | `createContext` + Provider       | `createContext` + Provider       | `provide` / `inject` + `InjectionKey` | `InjectionToken` + `provideRealRouter`                      |
-| Context count         | 3                                | 2                                | 3                                     | 3                                                           |
-| Components            | JSX (.tsx)                       | JSX (.tsx)                       | `defineComponent` + `h()` (.ts)       | `@Component` decorators (.ts)                               |
-| Directives            | N/A                              | N/A                              | `v-link` (custom directive)           | `realLink`, `realLinkActive`, `routeMatch`, `routeNotFound` |
-| Route matching        | `RouteView.Match` (JSX children) | `RouteView.Match` (JSX children) | `RouteView.Match` (VNode type check)  | `ng-template[routeMatch]` (content children)                |
-| Build tool            | tsdown                           | rollup + babel-preset-solid      | tsdown                                | ng-packagr (partial compilation)                            |
-| Output format         | ESM + CJS                        | ESM + CJS                        | ESM + CJS                             | FESM2022 (ESM-only)                                         |
-| Peer dependency       | `react` >= 19.0.0                | `solid-js` >= 1.7.0              | `vue` >= 3.3.0                        | `@angular/core` >= 22.0.0                                   |
-| `keepAlive`           | React 19.2+ Activity             | Not available                    | Vue native `<KeepAlive>`              | Not available                                               |
-| RxJS                  | No                               | No                               | No                                    | No (signal-first)                                           |
+| Aspect                | React                                        | Solid                            | Vue                                   | Angular                                                     |
+| --------------------- | -------------------------------------------- | -------------------------------- | ------------------------------------- | ----------------------------------------------------------- |
+| Reactivity model      | Re-renders (virtual DOM)                     | Fine-grained signals             | Proxy-based refs                      | Angular signals (zoneless-compatible)                       |
+| External store bridge | `useSyncExternalStore`                       | `createSignalFromSource`         | `useRefFromSource` (shallowRef)       | `sourceToSignal` (signal + DestroyRef)                      |
+| Hook/function return  | Values (`RouteState`)                        | Accessors (`Accessor<T>`)        | `{ navigator, route: Ref }`           | `{ navigator, routeState: Signal<RouteSnapshot> }`          |
+| Context mechanism     | `createContext` + Provider                   | `createContext` + Provider       | `provide` / `inject` + `InjectionKey` | `InjectionToken` + `provideRealRouter`                      |
+| Context count         | 3                                            | 2                                | 3                                     | 3                                                           |
+| Components            | JSX (.tsx)                                   | JSX (.tsx)                       | `defineComponent` + `h()` (.ts)       | `@Component` decorators (.ts)                               |
+| Directives            | N/A                                          | N/A                              | `v-link` (custom directive)           | `realLink`, `realLinkActive`, `routeMatch`, `routeNotFound` |
+| Route matching        | `RouteView.Match` (JSX children)             | `RouteView.Match` (JSX children) | `RouteView.Match` (VNode type check)  | `ng-template[routeMatch]` (content children)                |
+| Build tool            | tsdown                                       | rollup + babel-preset-solid      | tsdown                                | ng-packagr (partial compilation)                            |
+| Output format         | ESM + CJS                                    | ESM + CJS                        | ESM + CJS                             | FESM2022 (ESM-only)                                         |
+| Peer dependency       | `react` >= 18.0.0 (19.2+ for the main entry) | `solid-js` >= 1.7.0              | `vue` >= 3.3.0                        | `@angular/core`, `@angular/common` >= 22.0.0                |
+| `keepAlive`           | React 19.2+ Activity                         | Not available                    | Vue native `<KeepAlive>`              | Not available                                               |
+| RxJS                  | No                                           | No                               | No                                    | No (signal-first)                                           |
 
 ### sourceToSignal
 
