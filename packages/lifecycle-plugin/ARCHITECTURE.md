@@ -35,10 +35,11 @@ graph LR
     end
 ```
 
-| Import source              | What it uses                    | Purpose                    |
-| -------------------------- | ------------------------------- | -------------------------- |
-| **@real-router/core**      | `PluginFactory`, `State` types  | Plugin factory return type |
-| **@real-router/core/api**  | `getPluginApi`, `PluginApi`     | Access route custom fields |
+| Import source               | What it uses                                                                                                              | Purpose                                                                                             |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| **@real-router/core**       | `PluginFactory`, `State`, `TreeChangedEvent`, `DefaultDependencies` types; the `Route` / `RouteConfigUpdate` augmentation | The plugin factory's return type, the hook signature, route-tree events, the hook fields of a route |
+| **@real-router/core/api**   | `getPluginApi`, `getRoutesApi`                                                                                            | `getRouteConfig()` reads a route's hooks; `subscribeChanges()` drops removed routes from the cache  |
+| **@real-router/core/types** | `Router` type                                                                                                             | The `router` a hook factory receives                                                                |
 
 ## Core Algorithm
 
