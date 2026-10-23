@@ -211,7 +211,7 @@ on(from, event, action) {
 - **Declared-pair guard:** `on()` reads the table for `from`, then for `event` — an undeclared `from`, or a `from` with no edge for `event`, throws instead of dead-registering an action that could never fire
 - **Nested Map:** `#actions` is `Map<from, Map<event, action>>` — one inner map per source state
 - **One action per (from, event) pair** — second `on()` overwrites the first (last-write-wins)
-- **Identity-guarded unsubscribe:** the returned unsubscribe deletes the entry **only if it is still the action this call registered** (`stateMap?.get(event) === capturedAction`) — a no-op once the pair was overwritten by a later `on()`, matching INVARIANTS "Action #5"
+- **Identity-guarded unsubscribe:** the returned unsubscribe deletes the entry **only if it is still the action this call registered** (`stateMap?.get(event) === capturedAction`) — a no-op once the pair was overwritten by a later `on()`, matching INVARIANTS "Stale unsub no-op"
 - **Lazy Map:** `#actions` is `null` until first `on()` call — zero allocation for consumers that don't use actions
 
 ### onTransition() — Listener Registration (Null-Slot Pattern)

@@ -284,53 +284,53 @@ tests/
 
 ## Stress Test Coverage
 
-34 stress-test files in `tests/stress/` (excluding `helpers.tsx`) validate behavior under extreme conditions. The 13 categories below describe the original coverage; subsequent audit rounds (2026-05-16 + 2026-05-17 P0→Sprint A) added the following single-purpose files — refer to `ls packages/solid/tests/stress/` for the live set, or to the descriptions below:
+The stress tests in `tests/stress/` (`helpers.tsx` aside) validate behavior under extreme conditions; `ls packages/solid/tests/stress/` lists them. The list names files and the scenarios they run, and the table groups the cases by category:
 
 - `link-hash-rapid` — 200 hash-only clicks + 150 setSignal-driven flips + 100 `<Show keyed>` flips
 - `link-modifier-keys` — 100 links × 6 modifier types × 100 clicks
 - `link-slow-path` — 150 navs with reactive parent routeName on slow path + 200 links × 1000 navs
 - `link-force-clicks` — 300 same-route force clicks + 200 cross-route force clicks
-- `lazy-switching` — N switches between lazy() components; **8.3** (Sprint A.4 add) 50 rapid switches with pending chunks
-- `lazy-source-reconnect` — 150 mount→unmount→remount on cached lazy source (G1)
+- `lazy-switching` — N switches between lazy() components; **8.3** 50 rapid switches with pending chunks
+- `lazy-source-reconnect` — 150 mount→unmount→remount on cached lazy source
 - `route-enter-exit` — 150 cross-route enter/exit + 100 same-route skip + 100 mount/unmount
-- `view-transitions-stop` — 100 mount + nav + stop cycles with stubbed VT; **V1.2** (Sprint A) 100 rapid VT burst (subscribeLeave count stable)
+- `view-transitions-stop` — 100 mount + nav + stop cycles with stubbed VT; **V1.2** 100 rapid VT burst (subscribeLeave count stable)
 - `should-update-cache` — 200 unique useRouteNode + 100 same nodeName + 2 routers isolation
-- `remove-route-mid-session` — 200 traverse-style navs to removed route (#4)
-- `replace-history-during-transition` — 11.1/11.2 + **11.3** (Sprint A) 100 replaceHistoryState burst during pending transition
+- `remove-route-mid-session` — 200 traverse-style navs to removed route
+- `replace-history-during-transition` — 11.1/11.2 + **11.3** 100 replaceHistoryState burst during pending transition
 - `error-boundary-auto-reset` — 100 error→success cycles + 50 zombie-effect protection
 - `create-root-ownership` — 1000 createRoot/dispose cycles with signal+store bridge
 - `announcer-double-raf` — 1000 navs + 500 sync-rAF navs (a11y under rAF backlog)
 - `announcer-rapid` — 200 navs inside Safari-ready 100ms window (queue overwrite)
-- `async-guards-race` — fast vs slow guard + 20 concurrent; **10.3** (Sprint A) real wall-clock timers (1ms/100ms/500ms)
-- `multiple-providers` — 2 sibling providers on 1 router (G18)
+- `async-guards-race` — fast vs slow guard + 20 concurrent; **10.3** real wall-clock timers (1ms/100ms/500ms)
+- `multiple-providers` — 2 sibling providers on 1 router
 - `use-route-throws` — 100 cycles render-after-stop
 - `use-deferred-race` — navigate ↔ Await resolve race (50 cycles + stale resolves)
 - `memory-mount-unmount` — useRouterTransition × 1000 + useRouteNode × 100 × 10 × 50 navs
-- `mount-unmount-lifecycle` — R10 (50 start/stop cycles) + **R10b** (Sprint A.4) 200 start/stop cycles with per-half drift baseline
+- `mount-unmount-lifecycle` — R10 (50 start/stop cycles) + **R10b** 200 start/stop cycles with per-half drift baseline
 - `subscription-fanout` — 30/50 useRouteNode + 100 navs
 - `transition-hook-stress` — 50 navs with async guard + 50 concurrent
-- `scroll-restoration-rapid` — 200 rapid navs + S2 documented leak; **S3** (Sprint A.4) 50 rapid alternating popstate-like navs
-- `navigate-during-teardown` — T1 + **T1.2** (Sprint A) 100 mount + nav + unmount cycles
+- `scroll-restoration-rapid` — 200 rapid navs + S2 documented leak; **S3** 50 rapid alternating popstate-like navs
+- `navigate-during-teardown` — T1 + **T1.2** 100 mount + nav + unmount cycles
 - `navigate-long-lived-subscription` — 10000 navs on stable subscribers (L1)
 - `navigate-memory-leak` — 10000 Link mount/unmount cycles (M1, slow path)
 - `factory-reuse` — 100 router instances + 1000 cache-only cycles (F1)
-- `hmr-router-swap` (P1 add) — 200 router prop swaps via `<Show keyed>` + 50 swaps with active navigation
+- `hmr-router-swap` — 200 router prop swaps via `<Show keyed>` + 50 swaps with active navigation
 
-| Category                 | Tests (file count) | Test count | What they verify                                                                                                                                                                                                                                                                        |
-| ------------------------ | ------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mount/unmount lifecycle  | 1 file             | 8 tests    | useRouteNode/useRoute/Link/useRouterTransition × 200 mount/unmount cycles — bounded heap; 50 components remount + re-subscribe; conditional toggle × 100 with onCleanup tracking; router stop/restart; **R10 — 50 start/stop cycles without navigations — subscriptions released (S1)** |
-| Subscription fanout      | 1 file             | 5 tests    | 30 useRouteNode on different nodes — signals track correctly; 20 useRoute + 30 useRouteNode('') — all update; 50 useRouteNode('users') — granular scoping; concurrent mount/unmount; cleanup on unmount (50 onCleanup calls)                                                            |
-| Link mass rendering      | 1 file             | 5 tests    | 200 Links mount — no render loops; active class toggle; 50 round-robin navigations; deep routeParams; 50 rapid clicks; dynamic routeName × 100                                                                                                                                          |
-| Link directive           | 1 file             | 3 tests    | 100 use:link elements — a11y attributes (role, tabindex); mount/unmount × 50 cycles — bounded heap + onCleanup fires; activeClassName toggle; click navigation; 50 rapid clicks; `<a>` href + no a11y override                                                                          |
-| Store granularity        | 1 file             | 5 tests    | useRouteStore — route.name effect fires only on name changes; route.params.id — only on id changes; useRouteNodeStore — scoped + granular; 20 consumers tracking different properties; 10 nodes × 50 navs — isolated                                                                    |
-| Deep tree context        | 1 file             | 4 tests    | 30-deep useRouteNode — only relevant nodes re-render; useRouter — 0 re-renders; wide tree 25 leaves — all re-render; nested RouterProviders — isolated                                                                                                                                  |
-| Transition hook          | 1 file             | 4 tests    | 50 async guard cycles — isTransitioning true→false; 50 concurrent — last wins; 20 consumers — consistent; navigate + cancel × 50 — never stuck                                                                                                                                          |
-| Combined SPA             | 1 file             | 4 tests    | Full app with RouteView + Links + useRouteNode + 200 navs; transition progress; remount after unmount; RouteView match correctness × 100                                                                                                                                                |
-| Cache growth             | 1 file             | 4 tests    | 200 unique `useRouteNode(name)` — all fire effects, no crash; same nodeName × 100 components — cache hit, consistent signal state; router stop + GC → new router works; 2 routers × 50 nodeNames — isolated caches, no cross-talk                                                       |
-| Navigate during teardown | 1 file             | 1 test     | **T1 (S2)** — navigate fires during component unmount — no zombie setState warnings                                                                                                                                                                                                     |
-| Navigate memory leak     | 1 file             | 1 test     | **M1 (S3)** — 10000 mount/unmount Link cycles (slow path) — bounded heap (< 100 MB growth)                                                                                                                                                                                              |
-| Factory reuse            | 1 file             | 1 test     | **F1 (S4)** — 100 router instances × mount → unmount → stop — heap stable (< 50 MB growth, WeakMap cache entries GC-collected)                                                                                                                                                          |
-| Long-lived subscription  | 1 file             | 1 test     | **L1** — 10000 `router.navigate()` on a single mounted `useRoute`/`useRouteNode` pair — every root effect fires, `users` node stays silent, bounded heap (< 50 MB) — probes that router-internal listener arrays don't grow per-navigation                                              |
+| Category                 | Tests (file count) | Test count | What they verify                                                                                                                                                                                                                                                                   |
+| ------------------------ | ------------------ | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mount/unmount lifecycle  | 1 file             | 8 tests    | useRouteNode/useRoute/Link/useRouterTransition × 200 mount/unmount cycles — bounded heap; 50 components remount + re-subscribe; conditional toggle × 100 with onCleanup tracking; router stop/restart; **R10 — 50 start/stop cycles without navigations — subscriptions released** |
+| Subscription fanout      | 1 file             | 5 tests    | 30 useRouteNode on different nodes — signals track correctly; 20 useRoute + 30 useRouteNode('') — all update; 50 useRouteNode('users') — granular scoping; concurrent mount/unmount; cleanup on unmount (50 onCleanup calls)                                                       |
+| Link mass rendering      | 1 file             | 5 tests    | 200 Links mount — no render loops; active class toggle; 50 round-robin navigations; deep routeParams; 50 rapid clicks; dynamic routeName × 100                                                                                                                                     |
+| Link directive           | 1 file             | 3 tests    | 100 use:link elements — a11y attributes (role, tabindex); mount/unmount × 50 cycles — bounded heap + onCleanup fires; activeClassName toggle; click navigation; 50 rapid clicks; `<a>` href + no a11y override                                                                     |
+| Store granularity        | 1 file             | 5 tests    | useRouteStore — route.name effect fires only on name changes; route.params.id — only on id changes; useRouteNodeStore — scoped + granular; 20 consumers tracking different properties; 10 nodes × 50 navs — isolated                                                               |
+| Deep tree context        | 1 file             | 4 tests    | 30-deep useRouteNode — only relevant nodes re-render; useRouter — 0 re-renders; wide tree 25 leaves — all re-render; nested RouterProviders — isolated                                                                                                                             |
+| Transition hook          | 1 file             | 4 tests    | 50 async guard cycles — isTransitioning true→false; 50 concurrent — last wins; 20 consumers — consistent; navigate + cancel × 50 — never stuck                                                                                                                                     |
+| Combined SPA             | 1 file             | 4 tests    | Full app with RouteView + Links + useRouteNode + 200 navs; transition progress; remount after unmount; RouteView match correctness × 100                                                                                                                                           |
+| Cache growth             | 1 file             | 4 tests    | 200 unique `useRouteNode(name)` — all fire effects, no crash; same nodeName × 100 components — cache hit, consistent signal state; router stop + GC → new router works; 2 routers × 50 nodeNames — isolated caches, no cross-talk                                                  |
+| Navigate during teardown | 1 file             | 1 test     | **T1** — navigate fires during component unmount — no zombie setState warnings                                                                                                                                                                                                     |
+| Navigate memory leak     | 1 file             | 1 test     | **M1** — 10000 mount/unmount Link cycles (slow path) — bounded heap (< 100 MB growth)                                                                                                                                                                                              |
+| Factory reuse            | 1 file             | 1 test     | **F1** — 100 router instances × mount → unmount → stop — heap stable (< 50 MB growth, WeakMap cache entries GC-collected)                                                                                                                                                          |
+| Long-lived subscription  | 1 file             | 1 test     | **L1** — 10000 `router.navigate()` on a single mounted `useRoute`/`useRouteNode` pair — every root effect fires, `users` node stays silent, bounded heap (< 50 MB) — probes that router-internal listener arrays don't grow per-navigation                                         |
 
 ## See Also
 
