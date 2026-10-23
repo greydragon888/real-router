@@ -5,7 +5,12 @@ import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import { captureSyncThrow } from "../../helpers";
 
-import type { Route, Router, State } from "@real-router/core";
+import type {
+  NavigationOptions,
+  Route,
+  Router,
+  State,
+} from "@real-router/core";
 
 /**
  * #2786 — application code core calls in the middle of its own work, outside
@@ -19,8 +24,8 @@ import type { Route, Router, State } from "@real-router/core";
  * before: a `TRANSITION_SUCCESS` from a route the router had already left, a
  * boot committing over the restart, a disposed router left booting.
  *
- * Each describe is one window, with the call that opens it and a control that
- * stays accepted.
+ * Each describe is one place, the call that reaches it, and a control whose
+ * outcome the fix leaves alone.
  */
 
 const codeOf = (error: unknown): string | undefined =>
@@ -651,5 +656,105 @@ describe("#2786 — navigateToNotFound() consults the departing route inside a w
 
     expect(nested).toBe("accepted");
     expect(router.getState()?.name).toBe("c");
+  });
+});
+
+describe("#2786 — the entry reads the caller's `opts` before `fromState`", () => {
+  // `opts` is accessor- or Proxy-backed by contract, so reading it is a call
+  // into application code, and no window counts it. A getter that navigated
+  // ran after the entry had read `fromState`, so this navigation was announced
+  // from the route the nested one had already left. Not a window: the nested
+  // navigation stays legal, and the anchor is read after it.
+
+  /** `opts` whose `slot` getter starts `navigate(target)` on its first read. */
+  function navigatingOpts(
+    router: Router,
+    slot: "replace" | "signal",
+    target: string,
+  ): NavigationOptions {
+    const signal = new AbortController().signal;
+    const opts = {};
+    let fired = false;
+
+    Object.defineProperty(opts, slot, {
+      enumerable: true,
+      get() {
+        if (!fired) {
+          fired = true;
+          void router.navigate(target).catch(() => {});
+        }
+
+        return slot === "signal" && signal;
+      },
+    });
+
+    return opts;
+  }
+
+  it.each(["replace", "signal"] as const)(
+    "a navigation an `opts.%s` getter starts commits first, and this one is announced from it",
+    async (slot) => {
+      const { router, log } = createFixture();
+
+      await router.start("/");
+      log.length = 0;
+
+      const state = await router.navigate(
+        "a",
+        {},
+        {},
+        navigatingOpts(router, slot, "c"),
+      );
+
+      expect(state.name).toBe("a");
+      expect(log).toStrictEqual([
+        "START c<-home",
+        "SUCCESS c<-home",
+        "START a<-c",
+        "SUCCESS a<-c",
+      ]);
+    },
+  );
+
+  it("a getter that navigates to the same target leaves this one nothing to do", async () => {
+    const { router, log } = createFixture();
+
+    await router.start("/");
+    log.length = 0;
+
+    const outcome = await router
+      .navigate("a", {}, {}, navigatingOpts(router, "replace", "a"))
+      .then(
+        (state) => state.name,
+        (error: unknown) => codeOf(error),
+      );
+
+    expect(outcome).toBe(errorCodes.SAME_STATES);
+    expect(router.getState()?.name).toBe("a");
+    expect(log).toStrictEqual([
+      "START a<-home",
+      "SUCCESS a<-home",
+      `ERROR a<-a ${errorCodes.SAME_STATES}`,
+    ]);
+  });
+
+  it("control: a getter that throws fails the call before anything is announced", async () => {
+    const { router, log } = createFixture();
+    const boom = new Error("boom");
+    const opts = {};
+
+    Object.defineProperty(opts, "replace", {
+      enumerable: true,
+      get() {
+        throw boom;
+      },
+    });
+
+    await router.start("/");
+    log.length = 0;
+
+    await expect(router.navigate("a", {}, {}, opts)).rejects.toBe(boom);
+    expect(router.getState()?.name).toBe("home");
+    expect(log).toStrictEqual([]);
   });
 });
