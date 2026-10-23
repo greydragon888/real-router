@@ -21,14 +21,15 @@
 ```
 persistent-params-plugin/
 ├── src/
-│   ├── index.ts           — Public API (exports factory + PersistentParamsConfig type)
-│   │                        Module augmentation: StateContext.persistentParams on @real-router/core/types
-│   ├── factory.ts         — persistentParamsPluginFactory (validation, initialParams, paramNamesSet, closure)
-│   ├── plugin.ts          — PersistentParamsPlugin class (interceptors, state updates, teardown)
-│   ├── param-utils.ts     — Pure param utilities (extractOwnParams, mergeParams)
-│   ├── validation.ts      — Config + runtime value validation (validateConfig, validateParamValue)
-│   ├── types.ts           — PersistentParamsConfig type
-│   └── constants.ts       — ERROR_PREFIX, LOGGER_CONTEXT
+│   ├── index.ts              — Public API (exports factory + PersistentParamsConfig type)
+│   │                           Module augmentation: StateContext.persistentParams on @real-router/core/types
+│   ├── factory.ts            — persistentParamsPluginFactory (validation, initialParams, paramNamesSet, closure)
+│   ├── plugin.ts             — PersistentParamsPlugin class (interceptors, state updates, teardown)
+│   ├── param-utils.ts        — Pure param utilities (extractOwnParams, mergeParams)
+│   ├── validation.ts         — Config + runtime value validation (validateConfig, validateParamValue)
+│   ├── is-primitive-value.ts — isPrimitiveValue type guard (finite number, string, boolean) for validation.ts
+│   ├── types.ts              — PersistentParamsConfig type
+│   └── constants.ts          — ERROR_PREFIX, LOGGER_CONTEXT
 ```
 
 ## Module Dependency Graph
@@ -39,11 +40,12 @@ index.ts
             ├── plugin.ts
             │       ├── param-utils.ts
             │       ├── validation.ts
-            │       │       └── constants.ts
+            │       │       ├── constants.ts
+            │       │       └── is-primitive-value.ts
             │       └── constants.ts
             └── validation.ts
 
-types.ts  ← imported by factory.ts, validation.ts
+types.ts  ← imported by index.ts (type re-export), factory.ts, validation.ts
 
 index.ts also declares module augmentation on @real-router/core/types (StateContext)
 ```
