@@ -277,6 +277,15 @@ be a function or null, got number`.
   change; the field path each message carries is untouched, which is what a reader
   follows.
 
+  This pull request also returns the `clear` door's name to the call a caller
+  makes ([#2479](https://github.com/greydragon888/real-router/issues/2479)):
+  `clearRoutes` lives only in `RoutesNamespace`, and the caller types
+  `getRoutesApi(router).clear()`. The refusal `clear()` raises while a state is
+  committed reads `[router.clear]` again, undoing `0.146.1`'s
+  `[router.clearRoutes]`, and the error that `clear()` and `replace()` log while a
+  navigation is in flight moves from the `router.clearRoutes` channel to
+  `router.clear`. Observable message and channel change, no behaviour change.
+
 ## 0.147.1
 
 ### Patch Changes

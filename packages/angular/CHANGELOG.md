@@ -390,7 +390,8 @@
 
   ⚠ `download` is unchanged and still not consulted; `<a realLink download>`
   performs a route transition. That is a policy question rather than a parity gap
-  (neither router checks it either) and is tracked separately.
+  (neither router checks it either) and is tracked separately
+  ([#2190](https://github.com/greydragon888/real-router/issues/2190)).
 
 ## 0.17.52
 
