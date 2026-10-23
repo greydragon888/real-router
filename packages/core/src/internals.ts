@@ -170,17 +170,24 @@ export interface RouterInternals<
   /**
    * Commits the not-found (`UNKNOWN_ROUTE`) state for `path` and emits
    * `TRANSITION_SUCCESS` — the `NavigationNamespace.navigateToNotFound`
-   * primitive.
+   * primitive, behind the facade's ban: it refuses from every window
+   * `router.navigateToNotFound()` refuses from (#2786).
    */
   readonly navigateToNotFound: (path: string) => State;
 
   /**
    * The `replace()` revalidation's twin of the above: commits `UNKNOWN_ROUTE`
    * WITHOUT consulting the departing route's `canDeactivate` (#1652, #1981).
-   * A tree swap is not a departure the user chose.
+   * A tree swap is not a departure the user chose. `replace()` calls it when a
+   * structural replace drops the active route, so subscribers are notified
+   * instead of the state silently clearing (#950).
+   *
+   * Outside that revalidation it refuses from every window of the reentrancy
+   * ban, as `navigate()` does; inside it asks nothing (#2786).
    */
   readonly revalidateToNotFound: (path: string) => State;
 
+  /** The facade's `start()`: its checks, then the `start` interceptor chain (#2786). */
   readonly start: (path: string) => Promise<State>;
 
   /**
@@ -300,6 +307,10 @@ export interface RouterInternals<
    * never started, still STARTING, or mid-transition — because `SYSTEM_COMMIT`
    * is declared on `READY` alone and therefore also refuses routers that are
    * very much alive. The phase rides the message rather than the code.
+   *
+   * Outside `replace()`'s revalidation it refuses from every window of the
+   * reentrancy ban, as `navigate()` does; inside it asks nothing, because that
+   * revalidation calls it (#2786).
    */
   readonly systemCommit: (
     toState: State,

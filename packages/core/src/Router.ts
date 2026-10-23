@@ -182,6 +182,15 @@ export class Router<
   readonly #onSuppressedStartError: (error: unknown) => void;
 
   /**
+   * The `start` seam's interceptor chain, which `#runStart` runs after the
+   * facade's checks. `getInternals(this).start` is the facade itself, so the
+   * published member takes those checks too (#2786). `unknown`, because an
+   * interceptor that skips `next()` returns whatever it returns, and
+   * `#runStart` asks for a thenable.
+   */
+  readonly #startChain: (path: string) => unknown;
+
+  /**
    * The href door's own run of the `forwardState` chain, above the route-default
    * merge (#2087).
    */
@@ -570,6 +579,14 @@ export class Router<
       );
     };
 
+    this.#startChain = createInterceptable(
+      SEAM.start,
+      (path: string) => {
+        return this.#lifecycle.start(path);
+      },
+      interceptorsMap,
+    );
+
     // ⚑ Named rather than passed as a literal, so an adapter below can reach
     // `internals.validator` at CALL time without a WeakMap hop per call. The
     // guards live here rather than on the facade (#2259): `getInternals` ships
@@ -680,6 +697,10 @@ export class Router<
         );
       },
       navigateToNotFound: (path) => {
+        // The facade's ban, in the facade's order: no window reaches the
+        // commit through this door either (#2786).
+        this.#assertNotReentrant();
+
         // ⚠ The public facade's own check, copied EXACTLY (#2259) — including
         // the `!== undefined` arm. The internals signature declares `path`
         // required, so a stricter test reads as defensible and is not: it would
@@ -692,15 +713,14 @@ export class Router<
 
         return this.#navigation.navigateToNotFound(path);
       },
-      revalidateToNotFound: (path) =>
-        this.#navigation.revalidateToNotFound(path),
-      start: createInterceptable(
-        SEAM.start,
-        (path: string) => {
-          return this.#lifecycle.start(path);
-        },
-        interceptorsMap,
-      ),
+      revalidateToNotFound: (path) => {
+        this.#assertNotReentrantOutsideRevalidation();
+
+        return this.#navigation.revalidateToNotFound(path);
+      },
+      // The facade, not the chain: `canStart()` and the ban run first, as they
+      // do for `router.start()` (#2786). `#runStart` runs `#startChain`.
+      start: (path) => this.start(path),
       navigateToState: (state, navOpts) => {
         // Plugin-only navigation primitive (#525). Fire-and-forget safe like the
         // public facade methods — popstate handlers call it without awaiting —
@@ -760,6 +780,8 @@ export class Router<
       getStateName: () => this.#state.get()?.name,
       isTransitioning: () => this.#eventBus.isTransitioning(),
       systemCommit: (toState, fromState, opts) => {
+        this.#assertNotReentrantOutsideRevalidation();
+
         // ⚑ ONE read of the caller's name (#2085), taken above both consumers.
         // The State may be a plugin's, so each read is a call into application
         // code, and asking twice lets the door commit a name it never checked.
@@ -1545,7 +1567,7 @@ export class Router<
     let internalStart: Promise<State>;
 
     try {
-      const chainResult: unknown = getInternals(this).start(startPath);
+      const chainResult: unknown = this.#startChain(startPath);
 
       // A `start` interceptor that returns without calling next() yields a
       // non-thenable (typically undefined); the `.catch` below would then throw
@@ -1650,6 +1672,19 @@ export class Router<
       throw atRouter.code(
         errorCodes.REENTRANT_NAVIGATION,
       )`cannot start a navigation from inside replace()'s revalidation — the revalidation would then defer to a commit that may never happen. Defer it: queueMicrotask(() => router.navigate(...)).`;
+    }
+  }
+
+  /**
+   * The ban for the two `getInternals` commit doors `replace()`'s revalidation
+   * calls, `revalidateToNotFound` and `systemCommit` (#2786). Inside that
+   * window the caller is core, and the revalidation may itself run inside
+   * another window — a `replace()` from a listener — so nothing is asked there.
+   * Outside it they refuse as `navigate()` does.
+   */
+  #assertNotReentrantOutsideRevalidation(): void {
+    if (!this.#routes.isRevalidating()) {
+      this.#assertNotReentrant();
     }
   }
 

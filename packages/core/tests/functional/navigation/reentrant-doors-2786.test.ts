@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 
-import { constants, createRouter, errorCodes } from "@real-router/core";
+import { constants, createRouter, errorCodes, events } from "@real-router/core";
 import { getPluginApi, getRoutesApi } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 
 import { captureSyncThrow } from "../../helpers";
 
@@ -691,7 +692,14 @@ describe("#2786 — the entry reads the caller's `opts` before `fromState`", () 
     return opts;
   }
 
-  it.each(["replace", "signal"] as const)(
+  /** Named and counted (`table-vacuity-authority`). */
+  const GETTER_SLOTS = ["replace", "signal"] as const;
+
+  it("covers both slots the entry reads off the caller", () => {
+    expect(GETTER_SLOTS).toHaveLength(2);
+  });
+
+  it.each(GETTER_SLOTS)(
     "a navigation an `opts.%s` getter starts commits first, and this one is announced from it",
     async (slot) => {
       const { router, log } = createFixture();
@@ -757,4 +765,188 @@ describe("#2786 — the entry reads the caller's `opts` before `fromState`", () 
     expect(router.getState()?.name).toBe("home");
     expect(log).toStrictEqual([]);
   });
+});
+
+describe("#2786 — the getInternals doors that start or commit refuse as the facade does", () => {
+  // `getInternals` is published, and its members that start a navigation or
+  // commit a state reached the machine past the facade's checks. From a
+  // `TRANSITION_SUCCESS` listener each committed over the transition being
+  // announced, and `start` ran a second boot on a started router.
+  // `revalidateToNotFound` and `systemCommit` are the commit doors `replace()`'s
+  // own revalidation calls, so inside that window they ask nothing.
+
+  /** Runs `call` now; the returned function says what it did once settled. */
+  function capture(call: () => unknown): () => Promise<string> {
+    let thrown: unknown;
+    let returned: unknown;
+
+    try {
+      returned = call();
+    } catch (error) {
+      thrown = error;
+    }
+
+    if (returned instanceof Promise) {
+      returned.catch(() => {});
+    }
+
+    return async () => {
+      if (thrown !== undefined) {
+        return `threw ${codeOf(thrown)}`;
+      }
+
+      if (returned instanceof Promise) {
+        return (returned as Promise<State>).then(
+          (state) => `resolved ${state.name}`,
+          (error: unknown) => `rejected ${codeOf(error)}`,
+        );
+      }
+
+      return `returned ${nameOf(returned as State | undefined)}`;
+    };
+  }
+
+  /** Calls `door` from the first `TRANSITION_SUCCESS` of `navigate("a")`. */
+  async function fromListener(
+    door: (router: Router) => unknown,
+  ): Promise<{ outcome: string | undefined; fixture: Fixture }> {
+    const fixture = createFixture();
+    const { router, log } = fixture;
+    let outcome: (() => Promise<string>) | undefined;
+
+    await router.start("/");
+    log.length = 0;
+
+    getPluginApi(router).addEventListener(events.TRANSITION_SUCCESS, () => {
+      outcome ??= capture(() => door(router));
+    });
+
+    await router.navigate("a");
+    await settle();
+
+    return { outcome: await outcome?.(), fixture };
+  }
+
+  /** Named and counted (`table-vacuity-authority`). */
+  const COMMIT_DOORS: readonly [string, (router: Router) => unknown][] = [
+    [
+      "navigateToNotFound",
+      (router) => getInternals(router).navigateToNotFound("/nowhere"),
+    ],
+    [
+      "revalidateToNotFound",
+      (router) => getInternals(router).revalidateToNotFound("/nowhere"),
+    ],
+    [
+      "systemCommit",
+      (router) =>
+        getInternals(router).systemCommit(
+          getPluginApi(router).makeState("b", {}, {}, "/b"),
+          router.getState(),
+          {},
+        ),
+    ],
+  ];
+
+  /** Named and counted (`table-vacuity-authority`). */
+  const REPLACE_ARMS: readonly [
+    string,
+    (routes: Route[]) => Route[],
+    string,
+  ][] = [
+    [
+      "the active route dropped — revalidateToNotFound",
+      (routes) => routes.filter((route) => route.name !== "a"),
+      constants.UNKNOWN_ROUTE,
+    ],
+    ["the active route kept — systemCommit", (routes) => routes, "a"],
+  ];
+
+  it("covers the three commit doors and both revalidation arms", () => {
+    expect(COMMIT_DOORS).toHaveLength(3);
+    expect(REPLACE_ARMS).toHaveLength(2);
+  });
+
+  it.each(COMMIT_DOORS)(
+    "refuses getInternals(router).%s from a listener",
+    async (_name, door) => {
+      const { outcome, fixture } = await fromListener(door);
+
+      expect(outcome).toBe(`threw ${errorCodes.REENTRANT_NAVIGATION}`);
+      expect(fixture.router.getState()?.name).toBe("a");
+      expect(fixture.log).toStrictEqual(["START a<-home", "SUCCESS a<-home"]);
+    },
+  );
+
+  it("getInternals(router).start from a listener rejects as start() does — the router is started", async () => {
+    const { outcome, fixture } = await fromListener((router) =>
+      getInternals(router).start("/b"),
+    );
+
+    expect(outcome).toBe(`rejected ${errorCodes.ROUTER_ALREADY_STARTED}`);
+    expect(fixture.router.getState()?.name).toBe("a");
+    expect(fixture.log).toStrictEqual(["START a<-home", "SUCCESS a<-home"]);
+  });
+
+  it("getInternals(router).start on a started router rejects as start() does", async () => {
+    const { router, log } = createFixture();
+
+    await router.start("/");
+    log.length = 0;
+
+    const outcome = await capture(() => getInternals(router).start("/b"))();
+
+    expect(outcome).toBe(`rejected ${errorCodes.ROUTER_ALREADY_STARTED}`);
+    expect(router.getState()?.name).toBe("home");
+    expect(log).toStrictEqual([]);
+  });
+
+  it("refuses getInternals(router).start from the $stop listener dispose() runs", async () => {
+    const { router, hooks, log } = createFixture();
+    let outcome: (() => Promise<string>) | undefined;
+
+    await router.start("/");
+    log.length = 0;
+
+    hooks.onStop = () => {
+      outcome ??= capture(() => getInternals(router).start("/b"));
+    };
+
+    router.dispose();
+    await settle();
+
+    await expect(outcome?.()).resolves.toBe(
+      `threw ${errorCodes.REENTRANT_NAVIGATION}`,
+    );
+    expect(log).toStrictEqual(["$stop"]);
+  });
+
+  it("getInternals(router).start boots a stopped router, as start() does", async () => {
+    const { router, log } = createFixture();
+
+    await router.start("/");
+    router.stop();
+    log.length = 0;
+
+    const outcome = await capture(() => getInternals(router).start("/b"))();
+
+    expect(outcome).toBe("resolved b");
+    expect(log).toStrictEqual([
+      "$start",
+      "START b<-undefined",
+      "SUCCESS b<-undefined",
+    ]);
+  });
+
+  it.each(REPLACE_ARMS)(
+    "control: replace() from a listener still revalidates through its commit door: %s",
+    async (_arm, nextRoutes, expected) => {
+      const { outcome, fixture } = await fromListener((router) => {
+        getRoutesApi(router).replace(nextRoutes(ROUTES));
+      });
+
+      expect(outcome).toBe("returned undefined");
+      expect(fixture.router.getState()?.name).toBe(expected);
+    },
+  );
 });
