@@ -320,8 +320,6 @@ const payload: RscPayload = {
 };
 ```
 
-See [`rfc-rsc-server-plugin-payload-action.md`](../../.claude/rfc-rsc-server-plugin-payload-action.md) for design rationale and tradeoffs.
-
 ### `buildRscPayload(state, rootOverride?)` — wire-format helper
 
 Removes the repeated `{ root: state.context.rsc, returnValue: ..., formState: ... }` boilerplate. Reads `state.context.rsc` and `state.context.rscAction` and returns a `RscPayload<TReturn, TFormState>`. Pass `rootOverride` to wrap the per-route Server Component tree (e.g. with cross-cutting layout chrome) without rebuilding the payload by hand.

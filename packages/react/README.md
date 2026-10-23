@@ -550,7 +550,7 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 14 runnable examples — each is a standalone Vite app. Run: `cd examples/web/react/basic && pnpm dev`
 
-[basic](../../examples/web/react/basic) · [nested-routes](../../examples/web/react/nested-routes) · [auth-guards](../../examples/web/react/auth-guards) · [data-loading](../../examples/web/react/data-loading) · [lazy-loading](../../examples/web/react/lazy-loading) · [async-guards](../../examples/web/react/async-guards) · [hash-routing](../../examples/web/react/hash-routing) · [persistent-params](../../examples/web/react/persistent-params) · [error-handling](../../examples/web/react/error-handling) · [dynamic-routes](../../examples/web/react/dynamic-routes) · [keep-alive](../../examples/web/react/keep-alive) · [legacy-entry](../../examples/web/react/legacy-entry) · [hmr](../../examples/web/react/hmr) · [combined](../../examples/web/react/combined)
+[basic](../../examples/web/react/basic) · [nested-routes](../../examples/web/react/nested-routes) · [auth-guards](../../examples/web/react/auth-guards) · [data-loading](../../examples/web/react/data-loading) · [lazy-loading](../../examples/web/react/lazy-loading) · [async-guards](../../examples/web/react/async-guards) · [hash-routing](../../examples/web/react/hash-routing) · [persistent-params](../../examples/web/react/persistent-params) · [error-handling](../../examples/web/react/error-handling) · [dynamic-routes](../../examples/web/react/dynamic-routes) · [keepAlive](../../examples/web/react/keepAlive) · [legacy-entry](../../examples/web/react/legacy-entry) · [hmr](../../examples/web/react/hmr) · [combined](../../examples/web/react/combined)
 
 ## Related Packages
 

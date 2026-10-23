@@ -70,4 +70,4 @@ None (zero dependencies).
 
 ## License
 
-[MIT](../../LICENSE)
+[MIT](../../../LICENSE)

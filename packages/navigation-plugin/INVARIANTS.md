@@ -970,7 +970,7 @@ URIs, and custom schemes like `app://`, `tauri://`, `file://`).
 **Why it matters:** A total parser composes cleanly without null-case branches.
 Desktop runtimes (Electron `app://`, Tauri `tauri://`, `file://`) need scheme-
 agnostic parsing; validation is the matcher's job, not the parser's. See
-[IMPLEMENTATION_NOTES#safeParseUrl](../../../IMPLEMENTATION_NOTES.md#safeparseurl--scheme-agnostic-parser-496).
+[IMPLEMENTATION_NOTES#safeParseUrl](../../IMPLEMENTATION_NOTES.md#safeparseurl--scheme-agnostic-parser-496).
 
 ---
 

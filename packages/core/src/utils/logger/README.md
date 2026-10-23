@@ -136,8 +136,8 @@ import type {
 
 ## Contributing
 
-See [contributing guidelines](../../CONTRIBUTING.md) for development setup and PR process.
+See [contributing guidelines](../../../../../CONTRIBUTING.md) for development setup and PR process.
 
 ## License
 
-[MIT](../../LICENSE) © [Oleg Ivanov](https://github.com/greydragon888)
+[MIT](../../../LICENSE) © [Oleg Ivanov](https://github.com/greydragon888)

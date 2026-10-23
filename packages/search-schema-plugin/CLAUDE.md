@@ -132,6 +132,6 @@ Known gap (#802 side-finding): swapping `searchSchema` via `getRoutesApi(router)
 
 ## See Also
 
-- [RFC](../core/.claude/rfc/rfc-search-schema-validation.md) — Full design document
+- RFC: `packages/core/.claude/rfc/rfc-search-schema-validation.md` — full design document, a local file git does not track
 - [packages/core/CLAUDE.md](../core/CLAUDE.md) — Core package (PluginApi, forwardState interceptor)
 - [packages/persistent-params-plugin/CLAUDE.md](../persistent-params-plugin/CLAUDE.md) — Similar interceptor pattern
