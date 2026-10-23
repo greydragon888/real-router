@@ -8,7 +8,7 @@ $ARGUMENTS
 - **Явный список** `[test]`-issue одной группы (`#1178 #1181 #1179`) — обычно одна тема (reentrancy / start / stress-hygiene) одного пакета.
 - **Без аргументов (или `all`) → discovery-режим:** сам находит все открытые test-gap issue (Шаг 0.0), группирует по пакету, подтверждает скоуп ПЕРЕД правкой. Сузить: `all <фильтр>` — напр. `all core`, `all priority:medium`.
 
-Этот скилл — **ОРКЕСТРАТОР**. Изоляцию ГРУППЫ (worktree вне репозитория, `EnterWorktree`, `pnpm install` без dist, возобновление, worktree-жизненный-цикл) и точечную валидацию он **НЕ дублирует — берёт как `/bugfix-batch` Шаги 1 и 3**; доставка другая: дифф из одних тестов идёт прямо в `master`, без ветки задачи, PR и changeset. Здесь — только тест-геп-специфика: классификация гепа + **дисциплина дискриминации** + маршрут «тест vs всплывший баг». Механику property берёт из `/audit-pbt` / `/pbt-scenarios`, stress — из `/stress-scenarios` / `/audit-stress`, метод мутации — из `/mutation-score`, всплывший баг — в `/bugfix`.
+Этот скилл — **ОРКЕСТРАТОР**. Изоляцию ГРУППЫ (worktree в `.claude/worktrees/`, `EnterWorktree`, `pnpm install` без dist, возобновление, worktree-жизненный-цикл) и точечную валидацию он **НЕ дублирует — берёт как `/bugfix-batch` Шаги 1 и 3**; доставка другая: дифф из одних тестов идёт прямо в `master`, без ветки задачи, PR и changeset. Здесь — только тест-геп-специфика: классификация гепа + **дисциплина дискриминации** + маршрут «тест vs всплывший баг». Механику property берёт из `/audit-pbt` / `/pbt-scenarios`, stress — из `/stress-scenarios` / `/audit-stress`, метод мутации — из `/mutation-score`, всплывший баг — в `/bugfix`.
 
 ## Шаг 0 — Discovery (если нет списка) + fetch + классификация КАЖДОГО гепа
 
@@ -24,7 +24,7 @@ $ARGUMENTS
 
 ## Шаг 1 — Один worktree на группу — изоляция **как `/bugfix-batch` Шаг 1**, без ветки задачи
 
-Worktree вне репозитория, отделённый от `master` (`git worktree add --detach <каталог вне репо> master`) → `EnterWorktree path:` → **`pnpm install --frozen-lockfile` в worktree ПЕРЕД любой пробой/прогоном** (свежий worktree не делит `node_modules`; dist НЕ собирай). Worktree нужен для проб: мутация правит `src`, а в общем основном чекауте это задело бы чужую работу. Коммиты копятся на detached HEAD; в `master` их переносит владелец (`git merge --ff-only <sha>` в основном чекауте — рецепт в корневом CLAUDE.md, правило про worktree) или `git push origin HEAD:master` по явной просьбе. Возобновление: `pwd` + `git log --oneline master..HEAD` перед пере-созданием. Команды и resume-ловушки — в `/bugfix-batch` Шаг 1, не дублирую.
+Worktree в `.claude/worktrees/`, отделённый от `master` (`git worktree add --detach .claude/worktrees/<имя> master`) → `EnterWorktree path:` → **`pnpm install --frozen-lockfile` в worktree ПЕРЕД любой пробой/прогоном** (без своих `node_modules` Node берёт пакеты основного чекаута; dist НЕ собирай). Worktree нужен для проб: мутация правит `src`, а в общем основном чекауте это задело бы чужую работу. Коммиты копятся на detached HEAD; в `master` их переносит владелец (`git merge --ff-only <sha>` в основном чекауте — рецепт в корневом CLAUDE.md, правило про worktree) или `git push origin HEAD:master` по явной просьбе. Возобновление: `pwd` + `git log --oneline master..HEAD` перед пере-созданием. Команды и resume-ловушки — в `/bugfix-batch` Шаг 1, не дублирую.
 
 ## Шаг 2 — Per-gap цикл (ЯДРО этого скила)
 
@@ -55,7 +55,7 @@ Worktree вне репозитория, отделённый от `master` (`git
 
 ## Итоговый отчёт
 
-- Worktree: каталог вне репозитория; sha последнего коммита для `git merge --ff-only`.
+- Worktree: каталог в `.claude/worktrees/`; sha последнего коммита для `git merge --ff-only`.
 - Таблица по гепам: `#<N>` → **класс** (missing / integrity / property / stress) → тест(ы) + **доказательство мутации** (что сломал → покраснело, что вернул → зелёно) → коммит → статус (**закрыт** / **not-reproduced** триаж / **BUG → эскалирован в `/bugfix` #NN**).
 - Точечная валидация объединённого набора (полный граф — на pre-push; отметь поведенчески-затронутых потребителей, если баг всплыл в широком пакете).
 - Коммиты: sha и `Closes #<N>` каждого гепа. Всплывшие баги — отдельные ветки/PR + changeset.
