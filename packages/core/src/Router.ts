@@ -159,6 +159,13 @@ export class Router<
   readonly #eventBus: EventBusNamespace;
 
   /**
+   * The logger core built and calls the callback through, held for the
+   * reentrancy ban — not the `getInternals(this).logger` slot, which a plugin
+   * may replace (#2303).
+   */
+  readonly #logger: RouterLogger;
+
+  /**
    * Per-instance suppressor for fire-and-forget `start()`. It logs through THIS
    * router's logger (built in the constructor), so it cannot be static (#724).
    *
@@ -216,6 +223,8 @@ export class Router<
     // deps at wiring; a plugin reads the frozen three-method view PluginApi
     // carries (#2339 slice 2), not this instance.
     const logger = new RouterLogger(normalizedLogger);
+
+    this.#logger = logger;
 
     // Per-instance fire-and-forget suppressor (see the field declaration): it
     // logs through THIS router's logger, so it is built here, not static.
@@ -1571,8 +1580,9 @@ export class Router<
    * allowed. Always-on core invariant guard (not validator-gated).
    *
    * TWO windows around the announce, because application code runs in two
-   * places core does not control, on opposite sides of it (the third,
-   * `replace()`'s revalidation, is commented at its check below):
+   * places core does not control, on opposite sides of it (the logger's
+   * callback and `replace()`'s revalidation are commented at their checks
+   * below):
    *
    * - **Dispatch** (`isProcessing`) — a transition-event listener, mid-emit
    *   (RFC navigation-cancellation-unification §4) — and, since #1647, a
@@ -1603,6 +1613,16 @@ export class Router<
    * this order.
    */
   #assertNotReentrant(): void {
+    // Core logs from the middle of its own operations, and the callback is the
+    // application's — one call site, so this holds every logging site (#2786).
+    // Asked FIRST: the callback may run inside a dispatch (a listener's error),
+    // where only this text names the code that navigated.
+    if (this.#logger.isInCallback()) {
+      throw atRouter.code(
+        errorCodes.REENTRANT_NAVIGATION,
+      )`cannot start a navigation from inside the logger's callback — core logs from the middle of its own operations, and a navigation started there would run inside the one being logged. Defer it: queueMicrotask(() => router.navigate(...)).`;
+    }
+
     if (this.#eventBus.isProcessing()) {
       throw atRouter.code(
         errorCodes.REENTRANT_NAVIGATION,

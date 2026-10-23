@@ -129,10 +129,10 @@ export class NavigationNamespace {
    * three default options may be a dependency-resolved callback). Other
    * application code runs before the announce too: `abortPreviousNavigation`'s
    * `CANCEL` action, whose abort and emit the dispatch depth counts (#2778),
-   * and — counted by no window — accessor reads of the caller's `params`,
-   * `opts` and `signal`, and the logger's callback. The dispatch depth is why
-   * the reentrancy ban missed this window: it keys off the emitter, and there
-   * has been no emit yet.
+   * the logger's callback, a window of its own (#2786), and — counted by no
+   * window — accessor reads of the caller's `params`, `opts` and `signal`. The
+   * dispatch depth is why the reentrancy ban missed this window: it keys off
+   * the emitter, and there has been no emit yet.
    *
    * A DEPTH raised inline, not a boolean set by a wrapper: the wrapper allocated
    * a closure per navigation on the #307 hot path. Each site lowers it in a
@@ -140,8 +140,8 @@ export class NavigationNamespace {
    *
    * Read by `Router.#assertNotReentrant` beside `EventBus.isProcessing()`;
    * between them they span the windows where application code runs inside a
-   * navigation core has not finished setting up, except the reads and the
-   * callback above. A guard is in neither, for the reason the same row gives.
+   * navigation core has not finished setting up, except the reads above. A
+   * guard is in neither, for the reason the same row gives.
    *
    * Interim form — pre-start becoming a STATE of the machine absorbs it, and a
    * nested navigation is then an ordinary supersede needing no marker.

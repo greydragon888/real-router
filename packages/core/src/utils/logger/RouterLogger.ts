@@ -75,10 +75,11 @@ export class RouterLogger {
   #currentThreshold = 0;
 
   /**
-   * Re-entrancy guard: true while a user callback is executing. Prevents a
-   * callback that itself calls `logger.*` from recursing back through
-   * `#invokeCallback` (which would otherwise spin ~5.9k deep until a swallowed
-   * RangeError, see #791). Console output is unaffected.
+   * True while the user callback is executing — one fact, two readers. The
+   * nested-message skip in `#invokeCallback` keeps a callback that calls
+   * `logger.*` from recursing (#791; console output is unaffected), and
+   * `Router.#assertNotReentrant` refuses a synchronous navigation started from
+   * the callback (#2786), through {@link isInCallback}.
    */
   #inCallback = false;
 
@@ -95,6 +96,11 @@ export class RouterLogger {
     if (config) {
       this.configure(config);
     }
+  }
+
+  /** Whether the user callback is on the stack. */
+  isInCallback(): boolean {
+    return this.#inCallback;
   }
 
   /**
