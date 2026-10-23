@@ -14824,6 +14824,9 @@ Three rounds of review of the fix found the same order of the text in two more p
 > **Updated (2026-10-13).** The override values and comments this entry left to
 > #2646 are corrected. See "Overrides are judged against the ranges their parents declare".
 
+> **Updated (2026-10-23).** The supported-versions table of `SECURITY.md` this entry
+> left to #2723 is corrected. See "`SECURITY.md` supports the latest minor of each package".
+
 **Problem.** A comment or a doc that restates the configuration drifts on its own schedule, and nothing re-derives it. A sweep of the infrastructure prose — the workflows and the setup action, `scripts/` and its tests, the root configs and docs, the skills and prompts under `.claude/`, and what package docs say about the machinery — found more than a hundred such places. Among them:
 
 - `ci.yml` named a `duplication` job that no longer exists and called "CI Result" the single required check, while `protect-master` requires five contexts;
@@ -15295,3 +15298,15 @@ Two kinds of ignored paths under `.claude/` stay visible to knip, none of them c
 - **`RFC-3986` stays.** The URI standard is a citation of another kind, and the boundary after one or two digits keeps it out. Every `RFC-4 M2` the sweep removed sat beside an issue number, so `#\d+` alone would have caught those lines; the second token holds the form without one.
 
 **Measured (mutations).** A probe carrying `(#1234)` in prose, a bare `#42`, `RFC-4 M2`, `(#77)` in a table cell and `#8` in a heading drew 5 errors as `vale-probe/ARCHITECTURE.md`, as `ARCHITECTURE.md` from its own directory and by absolute path, and none as a `README.md` or a `CLAUDE.md` beside it. `RFC-3986`, `` `#999` ``, a fenced `"#555"` and the link `[…](#1234)` drew none. A `(#1234)` planted in the root ARCHITECTURE.md and in `packages/core/src/utils/fsm/ARCHITECTURE.md` drew 2 errors in the corpus run; with both restored, the corpus has 0 errors.
+
+## `SECURITY.md` supports the latest minor of each package (#2723, 2026-10-23)
+
+**Problem.** The supported-versions table of `SECURITY.md` named `1.x.x` as supported and everything below `1.0.0` as not, while every `@real-router/*` release is `0.x`: the policy covered no version a consumer could install. Two more places in the file stood on the same premise — a `package.json` example on `^1.0.0`, a range no release satisfies, and `pnpm update` as the way to stay current, which never leaves the range a project declares.
+
+**Solution.** Security fixes are released for the latest minor of each package, and earlier minors receive no backports. The table says so, the example is a sentence that points at the table, and the update command is `pnpm update --latest`, beside a warning that a new minor before 1.0 can carry incompatible changes.
+
+**Why.**
+
+- **The latest minor is the only one a fix can reach.** `changesets.yml` publishes from `master`, and the repository keeps no maintenance branch to release an earlier minor from. Every published package carries the `latest` dist-tag alone (read on 2026-10-23).
+- **Per package.** `.changeset/config.json` has no `fixed` or `linked` group, so each package moves its own minor, and no single version number describes them all.
+- **A caret range holds one minor before 1.0.** `^0.12.3` is `>=0.12.3 <0.13.0`. A fix that keeps the public API takes `patch` by the table in `.changeset/README.md`, so a project on the latest minor receives it with a plain `pnpm update`; a project on an earlier minor needs `--latest`, which takes the `latest` tag whatever the declared range.

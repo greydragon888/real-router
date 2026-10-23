@@ -2,12 +2,14 @@
 
 ## Supported Versions
 
-We release patches for security vulnerabilities. Currently supported versions:
+Every `@real-router/*` package is `0.x`, and each one is versioned on its own. Security fixes are released for the latest minor of each package; earlier minors receive no backports.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.x.x   | :white_check_mark: |
-| < 1.0.0 | :x:                |
+| Version                                | Supported          |
+| -------------------------------------- | ------------------ |
+| The latest `0.x` minor of each package | :white_check_mark: |
+| Earlier `0.x` minors                   | :x:                |
+
+A fix that keeps the public API ships as a patch of the latest minor, which a caret range on that minor accepts; a fix that has to change the API ships as the next minor. Before 1.0 a caret range holds a single minor — `^0.12.3` stops below `0.13.0` — so a project on an earlier minor has to upgrade to receive a fix.
 
 ## Reporting a Vulnerability
 
@@ -56,23 +58,14 @@ Please include the following information to help us triage and prioritize the is
 
 ### Production Usage
 
-Real-router is designed for production use. However, always follow these best practices:
-
-```json
-{
-  "dependencies": {
-    "@real-router/core": "^1.0.0",
-    "@real-router/react": "^1.0.0"
-  }
-}
-```
+Real-router is designed for production use. Keep each `@real-router/*` package on its latest minor, the one that receives security fixes (see [Supported Versions](#supported-versions)), and follow the best practices below.
 
 ### Best Practices
 
-1. **Keep the library updated**: We regularly update dependencies to address security vulnerabilities
+1. **Keep the library updated**: We regularly update dependencies to address security vulnerabilities. `pnpm update` stays inside the range in `package.json`; `--latest` moves each package to its latest version, the one [Supported Versions](#supported-versions) covers. Before 1.0 a new minor can carry incompatible changes: read the package's changelog first
 
    ```bash
-   pnpm update @real-router/core @real-router/react
+   pnpm update --latest @real-router/core @real-router/react
    ```
 
 2. **Audit dependencies regularly**:
@@ -142,5 +135,5 @@ _No reports yet - you could be the first!_
 
 ---
 
-**Last Updated**: February 2026
-**Next Review**: May 2026
+**Last Updated**: October 2026
+**Next Review**: January 2027
