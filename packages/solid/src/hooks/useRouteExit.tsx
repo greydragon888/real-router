@@ -58,7 +58,9 @@ export type RouteExitHandler = (
  * navigation's `signal` aborts). A handler that rejects with a
  * `RouterError(TRANSITION_CANCELLED)` itself cancels the navigation quietly:
  * `navigate()` rejects with that error and the router emits
- * `TRANSITION_CANCEL` instead (#2787).
+ * `TRANSITION_CANCEL` instead (#2787). A handler that rejects with the
+ * error the router ended ANOTHER navigation with — it awaited that
+ * navigation's work — fails this one with `CANNOT_DEACTIVATE` (#2786).
  *
  * **Handler reactivity (Solid)**: Solid components run **once** at mount;
  * `handler` is captured in closure at the call site. If you need

@@ -51,8 +51,11 @@ type LeaveHandler = (context: RouteExitContext) => void | Promise<void>;
  * (supersede / `stop()` / `dispose()` / external `opts.signal`). A handler
  * that rejects with a `RouterError(TRANSITION_CANCELLED)` itself cancels the
  * navigation quietly: `navigate()` rejects with that error and core emits
- * `TRANSITION_CANCEL` instead (#2787). A fire-and-forget call here would
- * silently un-block the transition, so arm 3 must stay a passthrough.
+ * `TRANSITION_CANCEL` instead (#2787). A handler that rejects with the error
+ * the router ended ANOTHER navigation with — it awaited that navigation's
+ * work — fails this one with `CANNOT_DEACTIVATE` (#2786). A fire-and-forget
+ * call here would silently un-block the transition, so arm 3 must stay a
+ * passthrough.
  */
 export function guardLeaveListener(
   handler: LeaveHandler,

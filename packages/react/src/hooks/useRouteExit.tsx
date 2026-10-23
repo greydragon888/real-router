@@ -62,7 +62,9 @@ export type RouteExitHandler = (
  * `dispose()`, or an external `opts.signal`). A handler that rejects with a
  * `RouterError(TRANSITION_CANCELLED)` itself cancels the navigation quietly:
  * `navigate()` rejects with that error and the router emits
- * `TRANSITION_CANCEL` instead (#2787).
+ * `TRANSITION_CANCEL` instead (#2787). A handler that rejects with the
+ * error the router ended ANOTHER navigation with — it awaited that
+ * navigation's work — fails this one with `CANNOT_DEACTIVATE` (#2786).
  *
  * **Reentrancy — no synchronous `navigate()` from the handler.** The handler
  * runs inside the transition's leave-dispatch window, so calling
