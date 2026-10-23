@@ -78,6 +78,8 @@ export function asCancellation(error: unknown): unknown {
  * a guard's quiet cancel, a leave listener throwing or rejecting with it — so the
  * navigation gets `TRANSITION_CANCEL`, as it does from a newer navigation,
  * `stop()` or its own signal. `cancelIfInFlight` asks the identity itself.
+ * Another navigation's end is not such a cancel: {@link handleGuardError} and
+ * {@link leaveFailure} re-code it before it reaches here.
  *
  * ⚠ The `FAIL` arm asks only for the band: the band's `FAIL` edges ask the
  * identity (`mayFail`), and `STARTING`'s, which unwinds a failed `start()`, asks

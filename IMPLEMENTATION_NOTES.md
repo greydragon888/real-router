@@ -15125,6 +15125,8 @@ Five mutants, against a green baseline: the stamp back on the writer's object, a
 
 ## Whose outcome it is: a place asks its own navigation, and two censuses hold the class (#2796, 2026-10-21)
 
+> **Updated (2026-10-23).** The `cheap-wave` verdict is gone. #2786 gave its places their final verdicts: the system-commit edge and its sender are `unsupported` under N5 (#2798), and the 404 door's commit is a `ban-equivalent` held by the consultation's window — "Where core runs the application's code" below.
+
 **Problem.**
 
 - The follow-up chain #2740 → #2798 kept producing one shape of defect: a place that decides whose outcome an event is — the end of this navigation or another's, the success this code started or a later one — asks something any navigation could answer. A phase of the machine, an error's code, the slot the last writer filled, the first success seen, the entry the browser stands on.
@@ -15216,3 +15218,48 @@ Two kinds of ignored paths under `.claude/` stay visible to knip, none of them c
 **Why the backlog is a turbo input.** The inputs of a test task name `tests/**/*.{ts,tsx}`, so an edit of the backlog alone would replay a cached result: a deleted row whose cell still reads over the budget would stay green until the next edit of a `.ts` file, and red on that commit. `packages/core/turbo.json` adds the backlog to the inputs of `test`, `test:properties` and `test:stress`, all three of which load `tests/setup.ts`. For `test` the glob is `tests/**/*.json`, which takes in the claim census's `tests/functional/claim-census-ledger.json` too.
 
 **Limits.** Only `readFileSync` counts: a directory walk, a `stat`, an async read and a child process (`git grep`) do not. Attribution is by window, so two concurrent cells would share one; core runs none. The tripwire is core's setup alone, so the scans in the tests of other packages are not held by it.
+
+## Where core runs the application's code: the cheap wave closes its windows, and a census of the calls holds them (#2786, #2797, 2026-10-23)
+
+**Problem.**
+
+- Core calls the application's code from the middle of its own operations, and a navigation or a `stop()` + `start()` started there ran to completion while the operation went on with what it had read before. #2786 measured six places on `master` @ `1e359490f`: an own getter of the caller's `opts`, an own `aborted` getter of `opts.signal`, the logger's `callback`, a `start` interceptor and the boot's `decodeParams`, a `$stop` listener of `dispose()`, and `getInternals(router).start`. The class census (B1, B2 of `.claude/class-chain-2778-2026-10-21/`) found more of the kind: the guards `navigateToNotFound()` consults, the `getInternals` doors that commit, a second read of the name `systemCommit` checked, the caller's signal during the bridge's registration, the guard factories `replace()` compiles before its revalidation window, and a `subscribeLeave` listener that fails with another navigation's end.
+- #2797: a promise of the application's code that core never consumed was an unhandled rejection, fatal to a Node process under the default `--unhandled-rejections=throw` — the leave listeners' promises after an earlier listener cancelled, and an async guard a synchronous check reads as "blocked" (`canNavigateTo()`, the 404 consultation).
+- The ban's windows were added one issue at a time: a window existed where an issue had found a place, and nothing found the place no issue had.
+
+**Solution.**
+
+- One measure per kind, each a few lines of `src`:
+  - the ban asks first whether this router's logger callback is on the stack, with a sentence of its own. One call site invokes the callback, `RouterLogger.#invokeCallback`, so every logging site is held at once, `PluginApi.logger` included;
+  - `dispose()` sends its `STOP` inside the dispatch depth (`sendStopForDispose`), so a `$stop` listener of the teardown cannot restart the router;
+  - `navigateToNotFound()` consults the departing route's `canDeactivate` inside a depth of its own (`isCommittingNotFound`): a navigation the guard starts is refused, and the guard's own verdict decides;
+  - the entry reads `fromState` after the caller's `opts`, so a getter's navigation is where the outer one starts from;
+  - the `getInternals` members that start a navigation or commit a state refuse as their facade twins do. `revalidateToNotFound` and `systemCommit` ask a named predicate that lets `replace()`'s own revalidation through, and `start` is `router.start()`;
+  - `systemCommit` hands the name it checked to the commit;
+  - a leave listener's failure that is another navigation's end is re-coded `CANNOT_DEACTIVATE` by `leaveFailure`, as a guard's is (#2796);
+  - the bridge asks the plan's `cancelReason` after the caller's `addEventListener` returns, and closes at once when the machine cancelled the plan meanwhile;
+  - `replace()` reads the state where its revalidation window opens;
+  - for #2797, the early exit of `settleLeavePromises` and `#checkGuardSync` consume the promises they drop.
+- `packages/core/tests/functional/app-code-call-census-2786.test.ts` derives three sets and pins each by equality: the kinds of the application's code, read from the published types; every call of one in `src`, keyed by its declaration; and the `try`/`finally` windows whose counters the ban reads. A `counted` place stands inside its window or is reached only through it; `inherits`, `by-design`, `harmless` and `unsupported` say why a place may run outside every window, and name the cell or the decision that holds it. CONTROL finds the leaf of every B1 place by its declaration; `abort-dispatch-authority-2778.test.ts` holds the aborts.
+- The outcome census of #2796 retires its `cheap-wave` verdict: the system-commit edge and its sender are `unsupported` under N5 (#2798), and the 404 door's commit is a `ban-equivalent` held by the consultation's window.
+- navigation-plugin: four cells of `transition-record-2753-2754.test.ts` built a restart from the logger's callback, or a navigation or a commit from a `canDeactivate` guard the plugin's not-found call consults, and failed on the branch; they pin the refusal now. The same-document event of `navigateInCall()` reports a handler's throw as the navigation's failure, as the browser does.
+
+**Why.**
+
+- **A window per kind, not a check per place.** The logger's callback has one call site, so one predicate covers every message core logs; a check at each logging site leaves the next one open.
+- **A census of the calls, not of the windows.** The windows were complete for the places issues had found. The census enumerates the calls, so a new call of the application's code fails until it has a verdict, and the code holds a `counted` verdict, not a comment. Measured: a mutant of every rule reds its own cell, with CONTROL green under all but the mutants of CONTROL itself; every historical form returned into today's code — #2778's `$start` and `dispatchAbort` outside the count (`63bf684b5^`), and each form this batch fixed — reds a cell, the census's own or that of its measure's guard or window. Run on `d30f5a495`, it printed outside every window exactly the leaves of the 17 B1 places and the places a verdict already covered.
+- **The census sees leaves, not stacks.** A new path to an existing leaf outside its window is invisible to it; the behavioural cells of the window hold that.
+- **The `$stop` of a top-level `stop()` stays open.** The machine is `IDLE` there, the table refuses the navigate family, and a restart has nothing of the old lifecycle left to run.
+- **A consulted guard's escaped refusal refuses the 404.** `#checkGuardSync` reads a guard's throw as a refusal, so a guard that tries to redirect and lets the ban's refusal escape keeps the router where it is, and the caller gets `CANNOT_DEACTIVATE`, as from any guard that throws there.
+- **navigation-plugin keeps `onStart`'s drop of a staged record.** It was written for a restart from the logger's callback, which core refuses now, and no cell exercises it — removing it leaves the suite green. The plugin does not own core's ban.
+
+**Left unsupported, by name** (exotic, no issue filed — the owner's rule of 2026-10-21):
+
+- A signal with replaced members: row 2 of #2786 (an own `aborted` getter of `opts.signal`), its seventh place (the `addEventListener` and `removeEventListener` core calls on the caller's signal), and B2 rows 19 and 20 (the bridge's listener reading `.reason`; a getter that slips past the #1687 fence). Intrinsics would close the kind, and they break foreign signals and eleven test files.
+- A restart from a boot stage — the `start` interceptors, the thenable one returns, the boot's `matchPath` (#2786 row 4, N1, N5): it needs a boot-liveness predicate core does not have (#2798).
+- A third-party `RouterValidator` that navigates (B1, B7, R3).
+- A member replaced on `getInternals(router).logger`, a slot that is bare by decision (#2303).
+- Z12: a scroll-spy emit superseded by a commit that starts no transition, a verdict `outcome-census-outside-core-2796.test.ts` holds.
+- A second read of an object the application returned, outside `systemCommit` — B2 rows 25, 28, 29 and 41: the `then` of a leave listener's result, of a start interceptor's result and of the logger callback's result, and a plugin's hook slots at registration and teardown.
+- `revalidateToNotFound` or `systemCommit` called through `getInternals` from inside `replace()`'s revalidation window — the named exception `internals-window-parity-2786.test.ts` holds.
+- In navigation-plugin, a browser navigation that a `canDeactivate` guard starts during the plugin's not-found call, to a URL no route matches: core refuses its commit, and the plugin's recovery from that refusal takes the browser back to the router's entry before the outer 404 commits. Measured on `MockNavigation`: the router on the 404, the browser on the entry it left, the 404's entry one step ahead.

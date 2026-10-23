@@ -630,11 +630,13 @@ dispatch throw `REENTRANT_NAVIGATION` synchronously. Defer instead.
 
 - ⚠ **`decodeParams` is NOT in that list** — it serves the URL→state direction and
   runs from `matchPath`, which prepares no navigation.
-- Not affected: a **guard** (it runs after the announce, so the classic
-  guard-redirect stays an ordinary supersede) and `matchPath()`.
+- Not affected: a **guard** the pipeline runs (it runs after the announce, so
+  the classic guard-redirect stays an ordinary supersede) and `matchPath()`. A
+  guard `navigateToNotFound()` consults is in a window of its own (`INVARIANTS.md`
+  "Reentrancy & dispatch").
 - ⚑ The two halves throw the same code with DIFFERENT messages, because "you are
   inside a listener" is false in the pre-start window. Locked by an AST scan over
-  `src` (`reentrancy-ban-messages.test.ts`), so a third ban cannot ship bare.
+  `src` (`reentrancy-ban-messages.test.ts`), so no further window can ship bare.
 
 A **`start` interceptor is async** and must return a `Promise<State>`. One that
 returns neither `next(...)`'s result nor a thenable is a misuse: `Router.start()`
@@ -695,7 +697,10 @@ emits `TRANSITION_ERROR`; it is not converted to `TRANSITION_CANCELLED`, and the
 first sync throw wins. The exception is a listener throwing or rejecting with a
 `RouterError(TRANSITION_CANCELLED)`: that cancels the navigation — `navigate()`
 rejects with the same error, and `TRANSITION_CANCEL` is emitted instead of
-`TRANSITION_ERROR`.
+`TRANSITION_ERROR`. Neither holds for the error the router ended ANOTHER
+navigation with: a listener throwing or rejecting with it was waiting on that
+navigation's work, and the navigation fails with `CANNOT_DEACTIVATE`, as a
+`canDeactivate` guard holding one does.
 
 The `signal` aborts when the navigation is **cancelled or fails**, and **never** on
 success — a listener that captured it still observes `aborted === false` after the

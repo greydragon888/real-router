@@ -158,10 +158,11 @@ export class NavigationNamespace {
    * a closure per navigation on the #307 hot path. Each site lowers it in a
    * `finally`; `INVARIANTS.md` "Reentrancy & dispatch" row 4 says why.
    *
-   * Read by `Router.#assertNotReentrant` beside `EventBus.isProcessing()`;
-   * between them they span the windows where application code runs inside a
-   * navigation core has not finished setting up, except the reads above. A
-   * guard is in neither, for the reason the same row gives.
+   * Read by `Router.#assertNotReentrant` beside `EventBus.isProcessing()` and
+   * the logger's window; between them they span the windows where application
+   * code runs inside a navigation core has not finished setting up, except the
+   * accessor reads above. A guard the pipeline runs is in none of them, for
+   * the reason the same row gives.
    *
    * Interim form — pre-start becoming a STATE of the machine absorbs it, and a
    * nested navigation is then an ordinary supersede needing no marker.

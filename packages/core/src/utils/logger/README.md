@@ -68,7 +68,7 @@ logger.configure({
 | `callback` | `LogCallback` | — | Custom handler for log messages |
 | `callbackIgnoresLevel` | `boolean` | `false` | When `true`, callback receives all messages regardless of level |
 
-> **Note:** The `callback` may safely call `logger.*`. A re-entrancy guard turns the nested call into a no-op (the message is still written to the console once), so it never recurses.
+> **Note:** The `callback` may safely call `logger.*`. A re-entrancy guard turns the nested call into a no-op (the message is still written to the console once), so it never recurses. It may not navigate the router that logs: a navigation started from the callback throws `REENTRANT_NAVIGATION` — defer it with `queueMicrotask`.
 
 ### `callbackIgnoresLevel`
 

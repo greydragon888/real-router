@@ -1595,7 +1595,7 @@ export class Router<
 
   /**
    * Rejects a synchronous reentrant navigation — which calls, and from which
-   * windows, is `INVARIANTS.md` "Reentrancy & dispatch" rows 1 and 4. Throws
+   * windows, is `INVARIANTS.md` "Reentrancy & dispatch" rows 1 and 4–7. Throws
    * synchronously: inside an emitter listener the emit's `onListenerError`
    * isolation surfaces it (visible, non-fatal); inside an `abort` listener the
    * platform reports it as an uncaught exception, which ends a Node process. A
@@ -1605,7 +1605,7 @@ export class Router<
    * TWO windows around the announce, because application code runs in two
    * places core does not control, on opposite sides of it (the logger's
    * callback and `replace()`'s revalidation are commented at their checks
-   * below):
+   * below, the 404 consultation at `isCommittingNotFound`):
    *
    * - **Dispatch** (`isProcessing`) — a transition-event listener, mid-emit
    *   (RFC navigation-cancellation-unification §4) — and, since #1647, a
@@ -1664,11 +1664,12 @@ export class Router<
       )`cannot start a navigation from inside a canDeactivate guard that navigateToNotFound() consults — the 404 commits from the state read before the guard was asked. A guard does not redirect: return false to stay, or defer the navigation: queueMicrotask(() => router.navigate(...)).`;
     }
 
-    // ⚠ The THIRD window, with its own sentence for the reason the two above
-    // have theirs (#1665): no emit is on the stack and no navigation is being
-    // prepared, so both of those texts read as spurious here. Without the
-    // refusal the revalidation defers to a navigation that may never commit, and
-    // a state on a dropped route then has nothing left to revalidate it (#1759).
+    // ⚠ A window with its own sentence for the reason the ones above have
+    // theirs (#1665): no logger callback, emit or 404 commit is on the stack
+    // and no navigation is being prepared, so each of those texts reads as
+    // spurious here. Without the refusal the revalidation defers to a
+    // navigation that may never commit, and a state on a dropped route then has
+    // nothing left to revalidate it (#1759).
     if (this.#routes.isRevalidating()) {
       throw atRouter.code(
         errorCodes.REENTRANT_NAVIGATION,
