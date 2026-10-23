@@ -210,27 +210,3 @@ export function validateSetRootPath(
 
   return true;
 }
-
-/**
- * Validates clearRoutes operation.
- * Returns false if operation should be blocked (navigation in progress).
- *
- * @param isNavigating - Whether navigation is in progress
- * @param logger - Per-router logger instance (from `getInternals(router).logger`)
- * @returns true if clearRoutes can proceed, false if blocked
- */
-export function validateClearRoutes(
-  isNavigating: boolean,
-  logger: RouterLogger,
-): boolean {
-  if (isNavigating) {
-    logger.error(
-      "router.clear",
-      "Cannot clear routes while navigation is in progress. Wait for navigation to complete.",
-    );
-
-    return false;
-  }
-
-  return true;
-}

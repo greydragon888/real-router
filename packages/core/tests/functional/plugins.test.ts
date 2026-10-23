@@ -1020,7 +1020,7 @@ describe("core/plugins", () => {
         // Should log the error
         // Logger format: logger.error(context, message, error)
         expect(errorSpy).toHaveBeenCalledWith(
-          "[router.usePlugin] Error during cleanup:",
+          "[router] Error during cleanup:",
           teardownError,
         );
 
@@ -1056,7 +1056,7 @@ describe("core/plugins", () => {
 
         // The logged message must survive (blanked StringLiteral mutant).
         expect(errorSpy).toHaveBeenCalledWith(
-          "[router.usePlugin] Error during cleanup:",
+          "[router] Error during cleanup:",
           teardownError,
         );
 

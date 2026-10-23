@@ -1,7 +1,11 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { events } from "@real-router/core";
-import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
+import {
+  getLifecycleApi,
+  getPluginApi,
+  getRoutesApi,
+} from "@real-router/core/api";
 
 import { createTestRouter } from "../helpers";
 import { consultationsOn, installSpyValidator } from "../helpers/spyValidator";
@@ -199,8 +203,7 @@ describe("core/validator call-site contract (facade + namespaces)", () => {
 
   // ===========================================================================
   // RouteLifecycleNamespace warns (warnOverwrite / validateCountThresholds /
-  // warnAsyncGuardSync) + the "canActivate"/"canDeactivate"/"canNavigateTo"
-  // methodName strings
+  // warnAsyncGuardSync) + the methodName string each door hands them
   // ===========================================================================
   describe("RouteLifecycleNamespace", () => {
     let lifecycle: ReturnType<typeof getLifecycleApi>;
@@ -266,13 +269,41 @@ describe("core/validator call-site contract (facade + namespaces)", () => {
         "canNavigateTo",
       );
     });
+
+    it("navigateToNotFound: an async canDeactivate guard warns sync-check ('navigateToNotFound')", async () => {
+      await router.start("/home");
+
+      lifecycle.addDeactivateGuard("home", () => async () => true);
+
+      expect(() => router.navigateToNotFound("/nowhere")).toThrow();
+      expect(validator.lifecycle.warnAsyncGuardSync).toHaveBeenCalledWith(
+        "home",
+        "navigateToNotFound",
+      );
+    });
+
+    it("replace: an async canActivate on the path's new owner warns sync-check ('replace')", async () => {
+      await router.start("/home");
+
+      getRoutesApi(router).replace([
+        { name: "landing", path: "/home", canActivate: () => async () => true },
+        { name: "home", path: "/old-home" },
+      ]);
+
+      expect(validator.lifecycle.warnAsyncGuardSync).toHaveBeenCalledWith(
+        "landing",
+        "replace",
+      );
+    });
   });
 
   // ===========================================================================
-  // EventBusNamespace — proactive listener-count threshold (#1188). subscribe()
-  // and getPluginApi().addEventListener() both feed the emitter's per-event
-  // cap; core reads the pre-add count and calls the validator so the plugin can
-  // warn/error before the bare-Error hard cap ever throws.
+  // EventBusNamespace — proactive listener-count threshold (#1188). Core asks
+  // the validator for three doors and hands it the door's name: subscribe(),
+  // getPluginApi().addEventListener(), and usePlugin() for a plugin's hooks
+  // (#2821). It counts before the add and hands the validator the count the
+  // add will make, so the plugin can warn/error before the bare-Error hard cap
+  // ever throws.
   // ===========================================================================
   describe("EventBusNamespace", () => {
     it("subscribe: checks listener-count thresholds ('$$success','subscribe')", () => {
@@ -292,6 +323,16 @@ describe("core/validator call-site contract (facade + namespaces)", () => {
         expect.any(Number),
         events.ROUTER_START,
         "addEventListener",
+      );
+    });
+
+    it("usePlugin: checks listener-count thresholds for a plugin's hooks (eventName,'usePlugin')", () => {
+      router.usePlugin(() => ({ onTransitionSuccess: () => {} }));
+
+      expect(validator.eventBus.validateCountThresholds).toHaveBeenCalledWith(
+        expect.any(Number),
+        events.TRANSITION_SUCCESS,
+        "usePlugin",
       );
     });
   });

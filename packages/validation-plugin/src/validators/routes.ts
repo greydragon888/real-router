@@ -2,8 +2,6 @@
 
 /**
  * DX-only validator functions for RoutesNamespace.
- * Copied from packages/core/src/namespaces/RoutesNamespace/validators.ts
- * (excludes validateRemoveRoute/validateClearRoutes — those are in routeGuards.ts)
  */
 
 import { resolveForwardChain } from "@real-router/core";

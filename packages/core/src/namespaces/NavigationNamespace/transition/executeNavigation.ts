@@ -913,8 +913,10 @@ export function abortPreviousNavigation(
   abortedAtEntry: AbortSignal | undefined,
 ): void {
   if (deps.isTransitioning()) {
+    // Bare `router`: several calls reach this, and the warning is about the
+    // instance, not the call (#2821).
     deps.logger.warn(
-      "router.navigate",
+      "router",
       "Concurrent navigation detected on shared router instance. " +
         "For SSR, use cloneRouter() to create isolated instance per request.",
     );

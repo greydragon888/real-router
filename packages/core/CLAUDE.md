@@ -624,6 +624,8 @@ observable surface rather than an internal label.
 names anything but `router` or `router.<door>`, and judges three forms: a literal,
 a `` `router.${method}` `` template, and a `…CONTEXT` / `…CTX` constant at its
 declaration, because the call site of an imported one holds only the name.
+Neither authority asks which calls REACH a site;
+`log-site-channel-2821.test.ts` pins the sites #2821 found, call by call.
 
 ### Modifying Existing Methods
 

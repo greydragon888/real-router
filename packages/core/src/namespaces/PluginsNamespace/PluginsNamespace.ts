@@ -92,11 +92,9 @@ export class PluginsNamespace<
         try {
           cleanup();
         } catch (error) {
-          this.#deps.logger.error(
-            LOGGER_CONTEXT,
-            "Error during cleanup:",
-            error,
-          );
+          // Bare `router`: the returned unsubscribe and `dispose()` both run
+          // this teardown (#2821).
+          this.#deps.logger.error("router", "Error during cleanup:", error);
         }
       };
 
@@ -162,11 +160,9 @@ export class PluginsNamespace<
         try {
           cleanup();
         } catch (error) {
-          this.#deps.logger.error(
-            LOGGER_CONTEXT,
-            "Error during cleanup:",
-            error,
-          );
+          // Bare `router`: the returned unsubscribe and `dispose()` both run
+          // this teardown (#2821).
+          this.#deps.logger.error("router", "Error during cleanup:", error);
         }
       }
     };

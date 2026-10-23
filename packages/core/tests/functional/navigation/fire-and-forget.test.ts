@@ -13,8 +13,8 @@ import type { Router } from "@real-router/core";
  * code) so no process-level `unhandledRejection` leaks
  * and no spurious "Unexpected navigation error" is logged for them. (A genuinely
  * unexpected navigate rejection — e.g. a subscribeLeave listener that throws —
- * is NOT suppressed and DOES log under "router.navigate"; start failures log
- * under "router.start", #931.)
+ * is NOT suppressed and DOES log, under the bare "router" channel; start
+ * failures log under "router.start", #931.)
  *
  * Suppression lives in `NavigationNamespace` (Step 0 of the two-pipelines RFC),
  * not in the facade: the layer that CREATES a promise is the only one that can

@@ -296,9 +296,11 @@ export class Router<
       onListenerError: (eventName, error) => {
         logger.error("router", `Error in listener for ${eventName}:`, error);
       },
+      // Bare `router` as well: every door that registers on this emitter
+      // reaches this one check, which cannot tell them apart (#2821).
       onListenerWarn: (eventName, count) => {
         logger.warn(
-          "router.addEventListener",
+          "router",
           `Event "${eventName}" has ${count} listeners — possible memory leak`,
         );
       },
@@ -642,7 +644,11 @@ export class Router<
         assertListenerIsFunction(cb);
         internals.validator?.eventBus.validateListenerArgs(eventName, cb);
 
-        return this.#eventBus.addEventListener(eventName, cb);
+        return this.#eventBus.addEventListener(
+          eventName,
+          cb,
+          "addEventListener",
+        );
       },
       subscribeDiagnostic: (key, handler) =>
         this.#eventBus.subscribeDiagnostic(key, handler),
@@ -1264,6 +1270,7 @@ export class Router<
       toActivate,
       toState,
       fromState,
+      "canNavigateTo",
     );
   }
 
