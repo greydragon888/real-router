@@ -1,5 +1,12 @@
 # router-benchmarks
 
+## 0.3.178
+
+### Patch Changes
+
+- Updated dependencies [[`4e1da1c`](https://github.com/greydragon888/real-router/commit/4e1da1c3c4354d42d31a7ed786391b9554f9dd2a)]:
+  - @real-router/memory-plugin@0.7.0
+
 ## 0.3.177
 
 ### Patch Changes
