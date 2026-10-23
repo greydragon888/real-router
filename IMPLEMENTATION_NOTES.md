@@ -607,6 +607,8 @@ The lever this blocks is concrete. Measured on core, 11-core M3 Pro, two rounds:
 
 **The repository cells need history, so `repo-lints` checks out all of it.** Three cells read real commits — every release commit is accepted, every commit touching a source file is refused, a dependency bump is accepted — and `actions/checkout` defaults to `fetch-depth: 1`, where the only commit has no parent to diff against. They skip visibly in such a clone rather than pass on no data, and the job now takes the full history so they run: measured, its checkout goes from 3 s to 6 s.
 
+> **Updated (2026-10-23).** The cell that refuses every source-bearing commit samples the last 50 of them, however far back they reach, rather than the source-bearing ones among the last 200 commits. Its floor of 50 guards vacuity, and commits that change no code land on master directly: after a run of twelve documentation commits the last 200 held 49, so the cell went red with the predicate unchanged — measured 57 on `origin/master` and 55 on the local `master` below them. The walk stops at the 50th and reads at most 1000 commits.
+
 **Why the Dependabot author arm stays beside it.** The two overlap on npm bumps and diverge on one reachable case: `.github/dependabot.yml` lists `/.github/actions/setup` explicitly (see _"Dependabot PRs skip every metric"_ and the config's own comment), and `ci.yml` deliberately treats a change under `.github/actions/` as code — so a bump of that composite action's pins is `should_run=true` and is not manifest-only. The author arm covers it; the diff predicate does not, and is not meant to.
 
 ## The gate's critical path was a serial chain, and the property tier left it (#2429, 2026-09-19)

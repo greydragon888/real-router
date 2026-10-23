@@ -218,13 +218,20 @@ test("every release commit on master is accepted", (t) => {
 test("every commit that touches source is refused", (t) => {
   if (!hasHistory()) return t.skip(NO_HISTORY);
 
-  const recent = git("log", "--format=%H %s", "-n", "200")
+  // The sample counts commits that touch source, however far back they reach.
+  // Commits that change no code land on master directly, and in a window of
+  // the last N commits each run of them shrinks the sample.
+  const SAMPLE = 50;
+  const WINDOW = 1000;
+  const recent = git("log", "--format=%H %s", "-n", String(WINDOW))
     .split("\n")
     .filter(Boolean);
 
   let checked = 0;
 
   for (const line of recent) {
+    if (checked === SAMPLE) break;
+
     const [sha] = line.split(" ");
     const changed = changedIn(sha);
 
@@ -235,9 +242,10 @@ test("every commit that touches source is refused", (t) => {
   }
 
   // Vacuity: `git log` failing would leave the loop with nothing to check.
-  assert.ok(
-    checked >= 50,
-    `expected source-bearing commits in the last 200, found ${String(checked)}`,
+  assert.equal(
+    checked,
+    SAMPLE,
+    `expected ${String(SAMPLE)} source-bearing commits in the last ${String(WINDOW)}, found ${String(checked)}`,
   );
 });
 
