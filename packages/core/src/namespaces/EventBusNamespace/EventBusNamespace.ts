@@ -89,6 +89,9 @@ function settleLeavePromises(
     };
 
     if (signal.aborted) {
+      // Every listener still ran, so their promises are consumed here: one
+      // that rejects later is otherwise an unhandled rejection (#2797).
+      void Promise.allSettled(promises);
       onAbort();
 
       return;
