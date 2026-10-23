@@ -1,5 +1,142 @@
 # @real-router/core
 
+## 0.153.0
+
+### Minor Changes
+
+- [#2830](https://github.com/greydragon888/real-router/pull/2830) [`e2f25d9`](https://github.com/greydragon888/real-router/commit/e2f25d9dde85bdc4709e571ab26a36d6ea04e8fd) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse a restart from a `$stop` listener that `dispose()` runs ([#2786](https://github.com/greydragon888/real-router/issues/2786))
+
+  `dispose()` stops the router before it tears it down, and the `onStop` hooks and `$stop` listeners it runs now sit inside the reentrancy ban: a `start()` after `stop()`, or a navigation, called synchronously from one of them throws `RouterError(REENTRANT_NAVIGATION)`. Before, such a `start()` booted the router the teardown then disposed: a boot with nothing to wait for resolved on a router whose `isActive()` was already `false`, and one an async guard held never settled.
+
+  A `$stop` listener of a top-level `stop()` still restarts the router.
+
+  **Breaking Change:** `start()` called synchronously from an `onStop` hook or a `$stop` listener during `dispose()` throws.
+
+  **Migration:** a router being disposed is not restarted; create a new one instead.
+
+- [#2830](https://github.com/greydragon888/real-router/pull/2830) [`e2f25d9`](https://github.com/greydragon888/real-router/commit/e2f25d9dde85bdc4709e571ab26a36d6ea04e8fd) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse the `getInternals` members that start or commit from the windows `router.navigate()` refuses from ([#2786](https://github.com/greydragon888/real-router/issues/2786))
+
+  `getInternals(router)` (`@real-router/core/validation`) hands out members that start a navigation or commit a state past the facade's checks. They now refuse as the facade does:
+
+  - `navigateToNotFound(path)` throws `RouterError(REENTRANT_NAVIGATION)` from every window in which `router.navigateToNotFound()` throws it — a router event listener, the logger's callback, a navigation being prepared and the others. Before, it committed the 404 over the transition being announced.
+  - `revalidateToNotFound(path)` and `systemCommit(toState, fromState, opts)` throw it from every window in which `router.navigate()` throws it, except inside `replace()`'s revalidation, which calls them itself — a `replace()` from a listener still revalidates. Before, they committed over the transition being announced.
+  - `start(path)` is now `router.start()`: it rejects `ROUTER_ALREADY_STARTED` on a started router, throws `REENTRANT_NAVIGATION` from a window, and boots a stopped router. Before, it ran the `start` interceptor chain alone — on a started router it booted a second time, and on a stopped router it rejected `TRANSITION_CANCELLED`.
+
+  **Breaking Change:** these members no longer commit or boot from inside a window, and `start` no longer boots a router that is already started.
+
+  **Migration:** defer a call made from a listener or a callback, as for `router.navigate()`, and stop the router before starting it again.
+
+  ```diff
+   api.addEventListener(events.TRANSITION_SUCCESS, () => {
+  -  getInternals(router).navigateToNotFound("/gone");
+  +  queueMicrotask(() => getInternals(router).navigateToNotFound("/gone"));
+   });
+  ```
+
+- [#2830](https://github.com/greydragon888/real-router/pull/2830) [`e2f25d9`](https://github.com/greydragon888/real-router/commit/e2f25d9dde85bdc4709e571ab26a36d6ea04e8fd) Thanks [@greydragon888](https://github.com/greydragon888)! - A leave listener that throws or rejects with another navigation's cancellation or failure fails its own navigation with `CANNOT_DEACTIVATE` ([#2786](https://github.com/greydragon888/real-router/issues/2786))
+
+  A `subscribeLeave` listener can wait on work another navigation started: that navigation's `navigate()` promise, or a request bound to its `signal` that rejects with `signal.reason`. When that work ends with the value the router ended that navigation with — the cancellation it created for it, or the error the navigation failed with — the listener now fails the navigation it belongs to, as a guard holding the same value does: `TRANSITION_ERROR` is emitted, and `navigate()` rejects `CANNOT_DEACTIVATE`. Before, a cancellation was taken for the listener's own quiet cancel — the navigation still running ended in `TRANSITION_CANCEL` and the user's navigation was dropped with nothing reported — and a failure failed the navigation with the other navigation's error, such as its `CANNOT_ACTIVATE`.
+
+  Unchanged:
+
+  - a `RouterError(TRANSITION_CANCELLED)` the listener raises itself is a quiet cancel;
+  - any other error fails the navigation with that error;
+  - the cancellation of the listener's own navigation is still that navigation's cancellation.
+
+  **Breaking Change:** a leave listener that throws or rejects with the value the router ended another navigation with no longer cancels its own navigation quietly, nor fails it with that navigation's error: the navigation fails with `CANNOT_DEACTIVATE`.
+
+  **Migration:** raise a value of the listener's own — a `RouterError(TRANSITION_CANCELLED)` keeps the quiet cancel, any other error fails the navigation with that error.
+
+  ```diff
+   router.subscribeLeave(async () => {
+  -  await sharedRequest;
+  +  try {
+  +    await sharedRequest;
+  +  } catch {
+  +    throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+  +  }
+   });
+  ```
+
+- [#2830](https://github.com/greydragon888/real-router/pull/2830) [`e2f25d9`](https://github.com/greydragon888/real-router/commit/e2f25d9dde85bdc4709e571ab26a36d6ea04e8fd) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse a navigation started from inside the logger's callback ([#2786](https://github.com/greydragon888/real-router/issues/2786))
+
+  Core calls `options.logger.callback` from the middle of its own operations — the "Concurrent navigation detected" warning a superseding `navigate()` logs, for one, or a warning `replace()` logs about a route in its batch. `navigate()`, `navigateToDefault()`, `navigateToNotFound()`, `navigateToState()` or a `start()` after `stop()`, called synchronously from the callback, now throws `RouterError(REENTRANT_NAVIGATION)` with a message naming the callback. Before, the call ran to completion and the operation it interrupted then carried on with what it had read before: the superseding navigation emitted `TRANSITION_SUCCESS` from the route the router had already left, and `replace()` revalidated the state it held before the call, over the navigation.
+
+  The refusal holds wherever the callback runs, including where no navigation is in flight. Uncaught, the throw reaches the logger, which reports it with `console.error` like any error of the callback. Navigating another router from the callback is unaffected.
+
+  **Breaking Change:** a navigation started synchronously from the logger's callback throws.
+
+  **Migration:** defer it.
+
+  ```diff
+   logger: {
+     callback: (level, context, message) => {
+  -    router.navigate("error");
+  +    queueMicrotask(() => void router.navigate("error"));
+     },
+   },
+  ```
+
+- [#2830](https://github.com/greydragon888/real-router/pull/2830) [`e2f25d9`](https://github.com/greydragon888/real-router/commit/e2f25d9dde85bdc4709e571ab26a36d6ea04e8fd) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse a navigation started from a `canDeactivate` guard that `navigateToNotFound()` consults ([#2786](https://github.com/greydragon888/real-router/issues/2786))
+
+  `navigateToNotFound()` asks the current route's `canDeactivate` before it commits the 404. A `navigate()`, `navigateToDefault()`, `navigateToNotFound()`, `navigateToState()` or a `start()` after `stop()` called synchronously from that guard now throws `RouterError(REENTRANT_NAVIGATION)` with a message naming the window. Before, the nested navigation ran first and the 404 was then decided from the state read before the guard was asked:
+
+  - a guard that navigated and allowed the leave: the nested navigation committed, and the 404 then committed over it, announced from the route the router had already left;
+  - a guard that redirected — `navigate()`, then `return false` — committed the redirect, and `navigateToNotFound()` threw `CANNOT_DEACTIVATE` with the router on the redirect's route;
+  - a navigation onto a route an async guard holds made `navigateToNotFound()` throw `ROUTER_NOT_STARTED`, and the 404 was not committed.
+
+  A guard that lets the throw escape refuses the 404 like any throwing guard: `CANNOT_DEACTIVATE`, and the router stays where it is. A guard that catches it decides with its own return value. `canNavigateTo()` consulting the same guard is unaffected.
+
+  **Breaking Change:** a `canDeactivate` guard no longer redirects when `navigateToNotFound()` consults it.
+
+  **Migration:** refuse from the guard, or defer the navigation.
+
+  ```diff
+   canDeactivate: (router) => (toState) => {
+     if (toState.name === "confirm-leave") return true;
+  -  router.navigate("confirm-leave");
+  +  queueMicrotask(() => void router.navigate("confirm-leave"));
+     return false;
+   },
+  ```
+
+### Patch Changes
+
+- [#2830](https://github.com/greydragon888/real-router/pull/2830) [`e2f25d9`](https://github.com/greydragon888/real-router/commit/e2f25d9dde85bdc4709e571ab26a36d6ea04e8fd) Thanks [@greydragon888](https://github.com/greydragon888)! - Announce a navigation from the state the router is on when a getter of its `opts` navigates ([#2786](https://github.com/greydragon888/real-router/issues/2786))
+
+  `navigate()` now reads the caller's `opts` — accessors included, `signal` among them — before it reads the state it navigates from. A navigation such a getter starts synchronously has then committed, or is in flight and is superseded as usual, and the outer navigation is announced and committed from where the router is: `START a<-c`, `SUCCESS a<-c` after a getter navigated to `c`. Before, it reported the state read before the getter ran — `START a<-home`, `SUCCESS a<-home` with the router on `c`.
+
+  A getter that navigates to the outer call's own target now makes that call reject `SAME_STATES`, as navigating to the current state does. A getter that throws still rejects the call with its error and announces nothing.
+
+- [#2830](https://github.com/greydragon888/real-router/pull/2830) [`e2f25d9`](https://github.com/greydragon888/real-router/commit/e2f25d9dde85bdc4709e571ab26a36d6ea04e8fd) Thanks [@greydragon888](https://github.com/greydragon888)! - Consume a leave listener's promise when an earlier listener cancelled the navigation ([#2797](https://github.com/greydragon888/real-router/issues/2797))
+
+  Every `subscribeLeave` listener runs, and the later ones run with `signal.aborted === true` once an earlier one has cancelled the navigation — by aborting the caller's `opts.signal` or by calling `router.stop()`. A later listener whose promise rejected afterwards surfaced as an unhandled rejection, which ends a Node process under the default `--unhandled-rejections=throw`.
+
+  - The listeners' promises are consumed on that arc too, so the late rejection no longer escapes.
+  - `navigate()` settles as before: `TRANSITION_CANCELLED` after the cancel, and the listener's own error when nothing cancelled the navigation.
+
+- [#2830](https://github.com/greydragon888/real-router/pull/2830) [`e2f25d9`](https://github.com/greydragon888/real-router/commit/e2f25d9dde85bdc4709e571ab26a36d6ea04e8fd) Thanks [@greydragon888](https://github.com/greydragon888)! - `replace()` revalidates the state the router is on when its revalidation starts ([#2786](https://github.com/greydragon888/real-router/issues/2786))
+
+  `replace()` read the router's state on entry and revalidated that snapshot against the new routes. The new batch's guard factories run in between, so a navigation one of them started did not survive: the revalidation committed its outcome for the snapshot over that navigation — the route the router had just left, with a `TRANSITION_SUCCESS` for it, when the batch keeps that route. The state is now read when the revalidation starts, so the state that navigation committed is the one revalidated, by the same rules as any revalidation.
+
+- [#2830](https://github.com/greydragon888/real-router/pull/2830) [`e2f25d9`](https://github.com/greydragon888/real-router/commit/e2f25d9dde85bdc4709e571ab26a36d6ea04e8fd) Thanks [@greydragon888](https://github.com/greydragon888)! - A signal listener whose registration cancels its navigation is removed ([#2786](https://github.com/greydragon888/real-router/issues/2786))
+
+  The router registers an `abort` listener on a navigation's `opts.signal` through `signal.addEventListener`. When that method started another navigation or called `router.stop()`, the navigation was cancelled before the router could remove the listener: it stayed on the signal, and a later `abort()` of that signal cancelled whichever navigation the router was running by then. The router now removes it as soon as the registration returns.
+
+- [#2830](https://github.com/greydragon888/real-router/pull/2830) [`e2f25d9`](https://github.com/greydragon888/real-router/commit/e2f25d9dde85bdc4709e571ab26a36d6ea04e8fd) Thanks [@greydragon888](https://github.com/greydragon888)! - Consume the promise of an async guard that a synchronous check asks ([#2797](https://github.com/greydragon888/real-router/issues/2797))
+
+  `router.canNavigateTo()`, and `navigateToNotFound()` when it asks the departing route's `canDeactivate`, cannot wait for an async guard: its promise reads as "blocked". A guard whose promise then rejected — an async guard whose request failed — surfaced as an unhandled rejection, which ends a Node process under the default `--unhandled-rejections=throw`.
+
+  - The promise is consumed, so its rejection no longer escapes.
+  - Both checks answer as before: `canNavigateTo()` returns `false`, and `navigateToNotFound()` throws `CANNOT_DEACTIVATE`.
+
+- [#2830](https://github.com/greydragon888/real-router/pull/2830) [`e2f25d9`](https://github.com/greydragon888/real-router/commit/e2f25d9dde85bdc4709e571ab26a36d6ea04e8fd) Thanks [@greydragon888](https://github.com/greydragon888)! - Commit the route name `getInternals(router).systemCommit` checked, not a second read of it ([#2786](https://github.com/greydragon888/real-router/issues/2786))
+
+  `systemCommit(toState, fromState, opts)` read `toState.name` once to check it against the route table and again to build the committed state. A `State` whose `name` answers differently on the second read — an accessor- or Proxy-backed object built outside core — committed a name the check never saw: a route the table does not hold, or another route's name over this state's path.
+
+  - The door reads `name` once, and the committed state carries the name the check accepted.
+  - A name the table does not hold on that read is still refused with `ROUTE_NOT_FOUND`, and a plain `State` commits as before.
+
 ## 0.152.0
 
 ### Minor Changes
