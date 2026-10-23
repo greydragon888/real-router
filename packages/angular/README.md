@@ -591,7 +591,7 @@ The URL hash tracks the topmost visible anchor as the user scrolls, syncing `sta
 
 Options: `{ selector: string, rootMargin?: string, scrollContainer?: () => HTMLElement | null }`. Default `rootMargin`: `"-20% 0px -60% 0px"`. Empty `selector` / `undefined` = off. SSR / browsers without `IntersectionObserver` = NOOP. Requires `browser-plugin` or `navigation-plugin` (hash-plugin / memory-plugin → warn-once + NOOP). The utility is installed via `provideEnvironmentInitializer` (`installScrollSpy`) and torn down on `DestroyRef`; options are a snapshot at bootstrap, not reactive.
 
-Available on both `provideRealRouter(router, { scrollSpy })` (SPA) and `provideRealRouterFactory({ baseRouter, scrollSpy })` (SSR). On the SSR path the utility is correctly NOOP'd on the server pass (`document` is undefined). Behaviour is identical to the React adapter — see the [React Scroll Spy demo](../../examples/web/react/hash-examples/scroll-spy/) (12 sections, TOC sidebar, 10 e2e scenarios) and the [Scroll Spy guide](https://github.com/greydragon888/real-router/wiki/Scroll-Spy).
+Available on both `provideRealRouter(router, { scrollSpy })` (SPA) and `provideRealRouterFactory({ baseRouter, scrollSpy })` (SSR). On the SSR path the utility is correctly NOOP'd on the server pass (`document` is undefined). Behaviour is identical to the React adapter — see the [React Scroll Spy demo](../../examples/web/react/hash-examples/scroll-spy/) (12 sections, TOC sidebar, Playwright-tested) and the [Scroll Spy guide](https://github.com/greydragon888/real-router/wiki/Scroll-Spy).
 
 ## Server-Side Rendering
 

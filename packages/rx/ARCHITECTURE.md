@@ -328,16 +328,16 @@ Rationale: `state$`/`events$` are **infinite** streams driven by the router's li
 
 ## Stress Test Coverage
 
-54 stress tests across 9 files in `tests/stress/` validate behavior under extreme conditions:
+The stress tests in `tests/stress/` validate behavior under extreme conditions; `pnpm -F @real-router/rx test:stress` runs them and reports how many there are:
 
-| Category       | Tests (file count) | Test count | What they verify                                               |
-| -------------- | ------------------ | ---------- | -------------------------------------------------------------- |
-| Subscription   | 2 files            | 12 tests   | Rapid subscribe/unsubscribe churn, parallel pipeline isolation, re-entrant abort inside subscribeFn |
-| Operators      | 3 files            | 19 tests   | Deep pipe chains, timer cleanup (incl. error-interleave), takeUntil race conditions |
-| Error handling | 1 file             | 6 tests    | Error propagation through operator chains under load           |
-| Backpressure   | 1 file             | 7 tests    | Async iterator under slow consumer / fast producer, synchronous terminal batch under concurrency |
-| Fan-out        | 1 file             | 6 tests    | Many subscribers on single events$ stream                      |
-| Resource leaks | 1 file             | 4 tests    | Abort-listener / notifier-subscription / teardown-once accumulation under repetition (count-based, no heap noise) |
+| Category       | What they verify                                                                                                  |
+| -------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Subscription   | Rapid subscribe/unsubscribe churn, parallel pipeline isolation, re-entrant abort inside subscribeFn               |
+| Operators      | Deep pipe chains, timer cleanup (incl. error-interleave), takeUntil race conditions                               |
+| Error handling | Error propagation through operator chains under load                                                              |
+| Backpressure   | Async iterator under slow consumer / fast producer, synchronous terminal batch under concurrency                  |
+| Fan-out        | Many subscribers on single events$ stream                                                                         |
+| Resource leaks | Abort-listener / notifier-subscription / teardown-once accumulation under repetition (count-based, no heap noise) |
 
 ## See Also
 

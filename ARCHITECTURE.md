@@ -50,12 +50,12 @@ real-router/
 ├── examples/                       # A pnpm workspace of its own; @real-router/* declared as *
 │   ├── shared/                            # Shared store, API, abilities, styles
 │   ├── web/
-│   │   ├── react/      (28 vite apps)     # React 19.2+ (incl. animation-examples × 4 + ssr-examples × 5 [ssr, ssr-streaming, ssr-mixed, ssg, ssr-rsc]); 59 e2e specs
-│   │   ├── preact/     (20 vite apps)     # Preact 10 (incl. animation-examples × 4 + ssr-examples × 4); 54 e2e specs
-│   │   ├── solid/      (22 vite apps)     # Solid.js (incl. animation-examples × 4 + ssr-examples × 4); 54 e2e specs
-│   │   ├── vue/        (23 vite apps)     # Vue 3 SFC (incl. animation-examples × 4 + ssr-examples × 4); 55 e2e specs
-│   │   ├── svelte/     (23 vite apps)     # Svelte 5 (incl. animation-examples × 4 + ssr-examples × 4); 54 e2e specs
-│   │   └── angular/    (15 vite apps)     # Angular 22+ (incl. animation-examples × 4 + ssr-examples × 4 using provideRealRouterFactory); 49 e2e specs
+│   │   ├── react/      (28 vite apps)     # React 19.2+ (incl. animation-examples × 4 + ssr-examples × 5 [ssr, ssr-streaming, ssr-mixed, ssg, ssr-rsc])
+│   │   ├── preact/     (20 vite apps)     # Preact 10 (incl. animation-examples × 4 + ssr-examples × 4)
+│   │   ├── solid/      (22 vite apps)     # Solid.js (incl. animation-examples × 4 + ssr-examples × 4)
+│   │   ├── vue/        (23 vite apps)     # Vue 3 SFC (incl. animation-examples × 4 + ssr-examples × 4)
+│   │   ├── svelte/     (23 vite apps)     # Svelte 5 (incl. animation-examples × 4 + ssr-examples × 4)
+│   │   └── angular/    (15 vite apps)     # Angular 22+ (incl. animation-examples × 4 + ssr-examples × 4 using provideRealRouterFactory)
 │   ├── console/
 │   │   └── react-ink/  (1 app)            # CLI demo via @real-router/react/ink + memory-plugin
 │   └── desktop/
@@ -634,9 +634,9 @@ All navigation errors are `RouterError` instances with typed `code` from `errorC
 ### Testing Strategy
 
 - **100% code coverage** enforced in CI; the Angular and Svelte adapters hold measured floors below it, each with its reason in the adapter's `vitest.config.mts`
-- **Property-based testing** — 1900+ property test cases via fast-check: URL encoding, parameter serialization, route tree operations, reactive subscription ordering, canonical params, link helpers
-- **Stress testing** — 1100+ stress test cases in `.stress.ts` / `.stress.tsx` files (core, plugins, all 6 framework adapters): concurrent navigations, guard removal mid-execution, route CRUD under load, heap snapshots confirming zero memory leaks, mount/unmount lifecycle, subscription fanout granularity, full SPA simulations
-- **Playwright e2e testing** — 1800+ test cases across 330+ spec files (100+ playwright projects) covering all 6 framework adapters (React, Preact, Solid, Vue, Svelte, Angular). Tests verify real browser behavior: navigation, guards, data loading, error handling, hash routing, nested routes, dynamic routes, async guards, SSR/streaming/SSG/RSC pipelines, animations.
+- **Property-based testing** — fast-check suites in `.properties.ts` files, run by `pnpm test:properties`: URL encoding, parameter serialization, route tree operations, reactive subscription ordering, canonical params, link helpers
+- **Stress testing** — stress suites in `.stress.ts` / `.stress.tsx` files (core, plugins, all 6 framework adapters), run by `pnpm test:stress`: concurrent navigations, guard removal mid-execution, route CRUD under load, heap snapshots confirming zero memory leaks, mount/unmount lifecycle, subscription fanout granularity, full SPA simulations
+- **Playwright e2e testing** — the `.spec.ts` files of the example apps (`git ls-files 'examples/*.spec.ts'` lists them), covering all 6 framework adapters (React, Preact, Solid, Vue, Svelte, Angular). Tests verify real browser behavior: navigation, guards, data loading, error handling, hash routing, nested routes, dynamic routes, async guards, SSR/streaming/SSG/RSC pipelines, animations.
 - **Mutation testing** (Stryker) validates test suite quality beyond line coverage
 - **`lint:e2e`** pre-commit check — verifies every example with `playwright.config.ts` has at least one spec file
 

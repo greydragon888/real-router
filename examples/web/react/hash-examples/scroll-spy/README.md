@@ -86,7 +86,9 @@ No direct `createScrollSpy` import needed — `RouterProvider`'s `scrollSpy` pro
 </Link>
 ```
 
-## Scenarios (10 e2e tests)
+## Scenarios
+
+The tests of [`e2e/scroll-spy.spec.ts`](e2e/scroll-spy.spec.ts):
 
 | # | Scenario | RFC |
 | --- | --- | --- |
@@ -100,6 +102,8 @@ No direct `createScrollSpy` import needed — `RouterProvider`'s `scrollSpy` pro
 | Bonus 6 | Invalid selector handling (silenced state) | RFC §7 |
 | Bonus 9 | `?spy=per-route` — per-route selector excludes `.no-spy` h2 on `/guide` | RFC §11 |
 | Bonus 10 | Route without `[id]` (`/about`) — no emits, hash preserved | RFC §7 |
+| Bonus 11 | Slow incremental scroll under `navigation-plugin` — `scrollY` only grows, no viewport jump on spy emits | — |
+| Bonus 12 | Every full scroll through a section produces exactly one transition — no stuck URL between sections | — |
 
 ## Plugin dependencies
 

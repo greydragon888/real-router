@@ -502,7 +502,7 @@ Emits a forced same-route transition with `{ hash, replace: true, force: true, h
 
 Options: `{ selector: string, rootMargin?: string, scrollContainer?: () => HTMLElement | null }`. Default `rootMargin`: `"-20% 0px -60% 0px"` (anchor active when crossing the top 20% of the viewport). Empty `selector` / `undefined` = off. SSR / browsers without `IntersectionObserver` = NOOP. Requires `browser-plugin` or `navigation-plugin` (hash-plugin and memory-plugin → warn-once + NOOP — they don't claim `state.context.url`).
 
-Live demo: [`examples/web/react/hash-examples/scroll-spy/`](../../examples/web/react/hash-examples/scroll-spy/) (12 sections, TOC sidebar, plugin & spy-mode switchers, 10 e2e scenarios). See [Scroll Spy guide](https://github.com/greydragon888/real-router/wiki/Scroll-Spy) for the full API surface and recipes.
+Live demo: [`examples/web/react/hash-examples/scroll-spy/`](../../examples/web/react/hash-examples/scroll-spy/) (12 sections, TOC sidebar, plugin & spy-mode switchers, Playwright-tested). See [Scroll Spy guide](https://github.com/greydragon888/real-router/wiki/Scroll-Spy) for the full API surface and recipes.
 
 ## View Transitions
 

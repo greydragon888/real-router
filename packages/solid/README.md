@@ -580,7 +580,7 @@ Emits a forced same-route transition with `{ hash, replace: true, force: true, h
 
 Options: `{ selector: string, rootMargin?: string, scrollContainer?: () => HTMLElement | null }`. Empty `selector` / `undefined` = off. Read once on mount (Solid `onMount` is non-reactive). SSR / browsers without `IntersectionObserver` = NOOP. Requires `browser-plugin` or `navigation-plugin` (hash-plugin / memory-plugin → warn-once + NOOP).
 
-Behaviour is identical to the React adapter — see the [React Scroll Spy demo](../../examples/web/react/hash-examples/scroll-spy/) (12 sections, TOC sidebar, 10 e2e scenarios) and the [Scroll Spy guide](https://github.com/greydragon888/real-router/wiki/Scroll-Spy).
+Behaviour is identical to the React adapter — see the [React Scroll Spy demo](../../examples/web/react/hash-examples/scroll-spy/) (12 sections, TOC sidebar, Playwright-tested) and the [Scroll Spy guide](https://github.com/greydragon888/real-router/wiki/Scroll-Spy).
 
 ## View Transitions
 

@@ -226,10 +226,11 @@ tests/
 
 ## Stress Test Coverage
 
-20 stress files in `tests/stress/` validate behavior under extreme conditions across
+The stress files in `tests/stress/` validate behavior under extreme conditions across
 core hook fan-out, Link mass-rendering, deep trees, scope/cache isolation, transition
 lifecycle, SSR streaming, route deletion mid-session, view-transitions interruption,
 hash navigation, lazy-loaded RouteView, polyfill race conditions, and the announcer.
+`pnpm -F @real-router/preact test:stress` runs them and reports how many there are.
 
 | Category                      | File(s)                                                                  | What they verify                                                                                                                                                                                        |
 | ----------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
