@@ -14,7 +14,7 @@ $ARGUMENTS
 
 ```
 /implement-rfc .claude/pnpm-11-migration-analysis.md
-/implement-rfc .claude/rfc-isomorphic-fetch-cache.md --dry-run
+/implement-rfc .claude/rfc-modular-application-kernel.md --dry-run
 /implement-rfc .claude/ci-cd-architecture-2026-09-29/rfc/rfc-3-derived-config.md — шаг 14 по плану ~/.claude/plans/<план>.md
 ```
 
