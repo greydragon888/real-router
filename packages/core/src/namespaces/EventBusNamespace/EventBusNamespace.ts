@@ -1114,16 +1114,27 @@ export class EventBusNamespace {
       this.sendCancelIfPossible(this.#fsm.getContext().current, signal.reason);
     };
 
-    // ⚑ ONE expression, and that is what holds "register, THEN record": the
-    // closer is the registration's RETURN VALUE, so no moment exists at which a
-    // closer stands and the listener does not (`bridgeSignal` above has what
-    // the two-statement form cost). The `onClosed` argument is the self-clearing
-    // half, written here because this caller owns the field. Pinned by
+    // ⚑ The closer is the registration's RETURN VALUE, and that is what holds
+    // "register, THEN record": no moment exists at which a closer stands and
+    // the listener does not (`bridgeSignal` above has what the two-statement
+    // form cost). The `onClosed` argument is the self-clearing half, written
+    // here because this caller owns the field. Pinned by
     // `bridge-registration-order-1724.test.ts`, which COUNTS
     // `removeEventListener` — the balance discriminates, the outcome does not.
-    payload.detachExternalBridge = bridgeSignal(signal, onExternalAbort, () => {
+    const detach = bridgeSignal(signal, onExternalAbort, () => {
       payload.detachExternalBridge = undefined;
     });
+
+    // ⚑ Registering runs the caller's code, and a navigation or a `stop()`
+    // started there cancels this navigation while it has no closer to run
+    // (#2786). `cancelReason` is the term the late moment asks BEFORE it
+    // registers; asked after, it closes what that cancel could not. Pinned by
+    // `bridge-registration-reentry-2786.test.ts`.
+    if (payload.cancelReason === undefined) {
+      payload.detachExternalBridge = detach;
+    } else {
+      detach();
+    }
 
     return SCOPE_DECIDED_TOKEN;
   }

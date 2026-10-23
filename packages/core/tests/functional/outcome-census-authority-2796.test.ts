@@ -838,6 +838,7 @@ const LEDGER = new Map<string, string>([
     "identity:own-controller",
   ], // row 29
   [`${EBN} › settleLeavePromises › read:aborted`, "identity:own-controller"], // row 29
+  [`${EBN} › bridgeExternalSignal › read:cancelReason`, "identity:plan-record"], // bridge-registration-reentry-2786.test.ts
   [`${EBN} › canBeginTransition › phase:canSend`, NOT],
   [`${EBN} › canCancel › phase:canSend`, SLOT],
   [`${EBN} › canCommitTransition › phase:canSend`, "identity:plan"], // row 18
