@@ -808,7 +808,7 @@ const LEDGER = new Map<string, string>([
   ["Router.ts › dispose › phase:isTransitioning", SLOT], // row 9
   ["Router.ts › dispose › send:sendCancelIfPossible", SLOT], // row 9
   ["Router.ts › dispose › send:sendDispose", SLOT], // row 9
-  ["Router.ts › dispose › send:sendStop", SLOT], // row 9
+  ["Router.ts › dispose › send:sendStopForDispose", SLOT], // row 9
   ["Router.ts › isActive › phase:isActive", NOT],
   ["Router.ts › isTransitioning › phase:isTransitioning", NOT],
   ["Router.ts › navigateToNotFound › phase:isActive", NOT],

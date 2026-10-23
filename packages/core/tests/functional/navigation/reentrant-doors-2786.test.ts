@@ -408,3 +408,87 @@ describe("#2786 — the logger's callback is a window of its own", () => {
     other.dispose();
   });
 });
+
+describe("#2786 — dispose() stops the router inside the dispatch", () => {
+  // `dispose()` sends STOP on its way to DISPOSE, so its `$stop` listeners run
+  // with the teardown still to come. A top-level `stop()` keeps its `$stop`
+  // open: a restart from there is supported, and stays the control.
+
+  it("refuses a restart from a $stop listener of dispose()", async () => {
+    const { router, hooks, log } = createFixture();
+    let nested: string | undefined;
+
+    await router.start("/");
+    hooks.onStop = () => {
+      nested = attempt(() => router.start("/b"));
+    };
+    log.length = 0;
+
+    router.dispose();
+    await settle();
+
+    expect(nested).toBe(errorCodes.REENTRANT_NAVIGATION);
+    expect(router.isActive()).toBe(false);
+    expect(log).toStrictEqual(["$stop"]);
+  });
+
+  it("refuses a restart onto a route an async guard holds — no start() is left pending on a disposed router", async () => {
+    const { router, hooks, log } = createFixture();
+    let nested: string | undefined;
+
+    await router.start("/");
+    hooks.onStop = () => {
+      nested = attempt(() => router.start("/slow"));
+    };
+    log.length = 0;
+
+    router.dispose();
+    await settle();
+
+    expect(nested).toBe(errorCodes.REENTRANT_NAVIGATION);
+    expect(log).toStrictEqual(["$stop"]);
+  });
+
+  it("control: a $stop listener of a top-level stop() still restarts the router", async () => {
+    const { router, hooks, log } = createFixture();
+    let nested: string | undefined;
+
+    await router.start("/");
+    hooks.onStop = () => {
+      nested ??= attempt(() => router.start("/b"));
+    };
+    log.length = 0;
+
+    router.stop();
+    await settle();
+
+    expect(nested).toBe("accepted");
+    expect(router.getState()?.name).toBe("b");
+    expect(log).toStrictEqual([
+      "$stop",
+      "$start",
+      "START b<-undefined",
+      "SUCCESS b<-undefined",
+    ]);
+  });
+
+  it("control: dispose() from top-level code still cancels a start() an async guard holds", async () => {
+    const { router, log } = createFixture();
+
+    const pending = router.start("/slow").then(
+      (state) => state.name,
+      (error: unknown) => codeOf(error),
+    );
+
+    await settle();
+    router.dispose();
+
+    await expect(pending).resolves.toBe(errorCodes.TRANSITION_CANCELLED);
+    expect(log).toStrictEqual([
+      "$start",
+      "START slow<-undefined",
+      "CANCEL slow",
+      "$stop",
+    ]);
+  });
+});

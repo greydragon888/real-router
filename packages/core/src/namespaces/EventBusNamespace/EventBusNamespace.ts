@@ -357,19 +357,18 @@ export class EventBusNamespace {
   /**
    * True while a router event is being dispatched synchronously — while an
    * `emitTransition*` call, the `$start` emit (#1647), a `subscribeLeave`
-   * listener batch, or a `dispatchAbort` is on the stack. The navigation facade
-   * reads this to reject a
-   * synchronous reentrant navigate() from inside such a listener (RFC §4).
+   * listener batch, a `dispatchAbort` or `dispose()`'s `STOP` is on the
+   * stack. The navigation facade reads this to reject a synchronous reentrant
+   * navigate() from inside such a listener (RFC §4).
    *
-   * `$stop` is deliberately NOT in that set: its action runs after the swap, so
-   * the machine is already IDLE and the doors refuse `ROUTER_NOT_STARTED` from
-   * the table anyway — a second mechanism there would buy nothing (#1647 §5.6a).
-   * The one door the table admits there is `start()`, and a `$stop` listener
-   * of a top-level `stop()` restarts a router with nothing of its old
+   * The `$stop` of a top-level `stop()` is deliberately NOT in that set: its
+   * action runs after the swap, so the machine is already IDLE and the doors
+   * refuse `ROUTER_NOT_STARTED` from the table anyway — a second mechanism
+   * there would buy nothing (#1647 §5.6a). The one door the table admits there
+   * is `start()`, and that listener restarts a router with nothing of its old
    * lifecycle left to run; a `stop()` called inside another dispatch emits
-   * `$stop` inside that dispatch's depth. ⚠ `dispose()` emits `$stop` too and
-   * then disposes, so a restart from that listener boots a router about to be
-   * disposed — an open door the reentrancy ban does not cover.
+   * `$stop` inside that dispatch's depth. `dispose()` has a teardown left to
+   * run, so its `STOP` is counted ({@link sendStopForDispose}, #2786).
    */
   isProcessing(): boolean {
     return this.#dispatchDepth > 0;
@@ -472,6 +471,21 @@ export class EventBusNamespace {
 
   sendStop(): void {
     this.#fsm.send(routerEvents.STOP);
+  }
+
+  /**
+   * `STOP` on `dispose()`'s way to `DISPOSE`, its `$stop` emit counted like a
+   * transition event's (#2786): a restart from that listener would boot a
+   * router the teardown then disposes. A top-level `stop()` sends
+   * {@link sendStop}, and its `$stop` stays open.
+   */
+  sendStopForDispose(): void {
+    this.#dispatchDepth++;
+    try {
+      this.#fsm.send(routerEvents.STOP);
+    } finally {
+      this.#dispatchDepth--;
+    }
   }
 
   sendDispose(): void {

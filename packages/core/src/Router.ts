@@ -1079,7 +1079,7 @@ export class Router<
     this.#eventBus.sendCancelIfPossible(this.#state.get());
 
     if (this.#eventBus.isReady() || this.#eventBus.isTransitioning()) {
-      this.#eventBus.sendStop();
+      this.#eventBus.sendStopForDispose();
     }
 
     this.#eventBus.sendDispose();

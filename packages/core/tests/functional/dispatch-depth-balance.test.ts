@@ -192,8 +192,8 @@ describe(`#1034 — every ${FIELD} increment is restored in a finally`, () => {
     // #2778), so it should be made on purpose and land here — and give the new
     // window a cell in `navigation/reentrant-start-and-abort-2778.test.ts`.
     // Five `emitTransition*` + the sync `subscribeLeave` batch + `$start` +
-    // `dispatchAbort`.
-    expect(raises).toHaveLength(8);
+    // `dispatchAbort` + `dispose()`'s `STOP` (#2786).
+    expect(raises).toHaveLength(9);
   });
 
   it("balances every raise with a restore", () => {
