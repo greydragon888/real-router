@@ -1,5 +1,12 @@
 # router-benchmarks
 
+## 0.3.180
+
+### Patch Changes
+
+- Updated dependencies [[`e2f25d9`](https://github.com/greydragon888/real-router/commit/e2f25d9dde85bdc4709e571ab26a36d6ea04e8fd), [`e2f25d9`](https://github.com/greydragon888/real-router/commit/e2f25d9dde85bdc4709e571ab26a36d6ea04e8fd), [`e2f25d9`](https://github.com/greydragon888/real-router/commit/e2f25d9dde85bdc4709e571ab26a36d6ea04e8fd), [`e2f25d9`](https://github.com/greydragon888/real-router/commit/e2f25d9dde85bdc4709e571ab26a36d6ea04e8fd), [`e2f25d9`](https://github.com/greydragon888/real-router/commit/e2f25d9dde85bdc4709e571ab26a36d6ea04e8fd), [`e2f25d9`](https://github.com/greydragon888/real-router/commit/e2f25d9dde85bdc4709e571ab26a36d6ea04e8fd), [`e2f25d9`](https://github.com/greydragon888/real-router/commit/e2f25d9dde85bdc4709e571ab26a36d6ea04e8fd), [`e2f25d9`](https://github.com/greydragon888/real-router/commit/e2f25d9dde85bdc4709e571ab26a36d6ea04e8fd), [`e2f25d9`](https://github.com/greydragon888/real-router/commit/e2f25d9dde85bdc4709e571ab26a36d6ea04e8fd), [`e2f25d9`](https://github.com/greydragon888/real-router/commit/e2f25d9dde85bdc4709e571ab26a36d6ea04e8fd), [`e2f25d9`](https://github.com/greydragon888/real-router/commit/e2f25d9dde85bdc4709e571ab26a36d6ea04e8fd)]:
+  - @real-router/core@0.153.0
+
 ## 0.3.179
 
 ### Patch Changes
