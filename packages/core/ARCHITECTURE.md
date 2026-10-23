@@ -179,7 +179,7 @@ carries one validator: a registration that finds the slot occupied throws
 `VALIDATION_PLUGIN_ALREADY_INSTALLED` instead of overwriting it.
 
 **`@real-router/core/validation` is the plugin's ONLY door to the engine.** It
-re-exports `validateRoute`, the path reader `buildParamMeta` (#2569) and the
+re-exports `validateRoute`, the path reader `buildParamMeta` and the
 `Matcher` / `RouteTree` types, so the plugin never imports `src/engine`
 directly. A guard test in the plugin blocks a `route-tree` import.
 
@@ -500,7 +500,7 @@ Errors during navigation are routed through two different paths depending on FSM
 | **Via FSM**     | `sendFail()` → FSM FAIL | A transition failed: FSM is in `STARTING`, `TRANSITION_STARTED` or `LEAVE_APPROVED`                                                                  | FSM transitions → action emits `$$error` |
 | **Direct emit** | `emitTransitionError()` | A REPORT to observers, not a transition failure: early refusals (ROUTE_NOT_FOUND, SAME_STATES, the P3 channel guard) and the plugin-facing primitive | Emits directly, FSM state unchanged      |
 
-A listener tells a transition's failure from a direct emit by the `context` of the `toState` (#2779). The FAIL action on `TRANSITION_STARTED` / `LEAVE_APPROVED` emits `ctx.inflight.toState`: the object `TRANSITION_START` carried, or the committed copy once `completeTransition` has written it back — and both carry that transition's `context`. A direct emit carries `undefined` or a state with a `context` of its own, and may arrive while a transition is in flight. `tests/property/transitionAttribution.properties.ts` holds the rule against `isTransitioning()`.
+A listener tells a transition's failure from a direct emit by the `context` of the `toState`. The FAIL action on `TRANSITION_STARTED` / `LEAVE_APPROVED` emits `ctx.inflight.toState`: the object `TRANSITION_START` carried, or the committed copy once `completeTransition` has written it back — and both carry that transition's `context`. A direct emit carries `undefined` or a state with a `context` of its own, and may arrive while a transition is in flight. `tests/property/transitionAttribution.properties.ts` holds the rule against `isTransitioning()`.
 
 **The row is never chosen at runtime, and that is the design.** Each has a fixed set of senders: a sender that reports to observers without a transition to fail always emits directly, and it neither knows nor should decide whether one is in flight. There is no `READY --FAIL--> READY` edge for it to take, so a stale `FAIL` in `READY` is a table no-op structurally — and since the emit rides the edge's action, it emits nothing at all rather than being filtered.
 
@@ -972,7 +972,7 @@ docblock, and are deliberately not restated.
   them stage ③ and the mode gate are provably identity. ⚠ The two defaults are read
   ABOVE the gate deliberately: they are its route half AND the slow path's first
   input.
-- **Options are frozen at construction — one level, the level core owns** (#1832),
+- **Options are frozen at construction — one level, the level core owns**,
   so `getOptions()` is safe to return directly, and `buildPath` options are cached
   per router instance. ⚠ The nested bags are the CALLER's objects and core writes
   to none of them, so a write there is accepted and read live; the census in

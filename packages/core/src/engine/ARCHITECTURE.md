@@ -2,40 +2,39 @@
 
 > Detailed architecture for AI agents and contributors
 >
-> **Folded into core (engine-merge iteration 2).** This document was
-> `packages/engine/ARCHITECTURE.md`; the engine now lives at
-> `packages/core/src/engine/`. Package-level references below (build config,
-> `packages/engine/*` paths, workspace-dep wiring) are **historical** — read
-> them as the design record of the #1510 three-layer merge (route-tree +
-> path-matcher + search-params). The layer architecture itself is unchanged.
+> The engine is a subsystem of `@real-router/core` at `packages/core/src/engine/`,
+> not a package. `route-tree` names its facade, the directory root;
+> `path-matcher` and `search-params` are the two layers under it.
 
 ## Overview
 
-`route-tree` is an **internal package** that provides the route tree data structure, URL matching, path building, and route validation for `@real-router/core`. It acts as an **integration layer** between two zero-dependency packages (`path-matcher` and `search-params`), combining them into a cohesive routing engine.
+`route-tree` is the **facade layer** that provides the route tree data structure, URL matching, path building, and route validation for `@real-router/core`. It acts as an **integration layer** between the two layers under it (`path-matcher` and `search-params`), combining them into a cohesive routing engine.
 
 **Key role:** Core never touches `path-matcher` or `search-params` directly — all access goes through `route-tree`.
 
-## Package Structure
+## Directory Structure
 
 ```
-route-tree/
-├── src/
-│   ├── builder/
-│   │   ├── buildTree.ts           — Single-pass mutable tree construction
-│   │   ├── computeCaches.ts       — Cache computation + freeze
-│   │   ├── createRouteTree.ts     — Public API (function)
-│   │   ├── types.ts               — RouteTree, RouteDefinition
-│   │   └── index.ts
-│   ├── operations/
-│   │   ├── query.ts               — getSegmentsByName() — O(1) route lookup
-│   │   ├── routeTreeToDefinitions.ts — Tree → RouteDefinition[] (for cloneRouter)
-│   │   └── types.ts               — MatchResult, RouteTreeState, RouteTreeStateMeta, ParamSource
-│   ├── validation/
-│   │   ├── route-batch.ts         — Full route validation with duplicate detection
-│   │   └── routes.ts              — Path format validation
-│   ├── createMatcher.ts           — Matcher factory (SegmentMatcher + search-params DI)
-│   ├── types.ts                   — Central re-export hub
-│   └── index.ts                   — Public API exports
+engine/
+├── builder/
+│   ├── buildTree.ts           — Single-pass mutable tree construction
+│   ├── computeCaches.ts       — Cache computation + freeze
+│   ├── createRouteTree.ts     — Public API (function)
+│   ├── types.ts               — RouteTree, RouteDefinition
+│   └── index.ts
+├── operations/
+│   ├── query.ts               — getSegmentsByName() — O(1) route lookup
+│   ├── routeTreeToDefinitions.ts — Tree → RouteDefinition[] (for cloneRouter)
+│   └── types.ts               — MatchResult, RouteTreeState, RouteTreeStateMeta, ParamSource
+├── validation/
+│   ├── route-batch.ts         — Full route validation with duplicate detection
+│   ├── route-name.ts          — The route-name rules, one predicate each
+│   └── routes.ts              — Path format validation
+├── path-matcher/              — The path-matcher layer: segment-trie URL matching
+├── search-params/             — The search-params layer: query-string parse and build
+├── createMatcher.ts           — Matcher factory (SegmentMatcher + search-params DI)
+├── types.ts                   — Central re-export hub
+└── index.ts                   — Public API exports
 ```
 
 ## Dependencies
@@ -172,7 +171,7 @@ interface MutableRouteNode {
 ```
 
 - Absolute paths: detected by `path.startsWith("~")`, tilde stripped from stored `path`
-- Leading-slash normalization (#1407): after the `~`-strip, a non-empty path that starts with neither `/` nor `?` (query-only) gets a `/` prepended — `foo`/`~foo` → `/foo`, `:id` → `/:id`. So the trie only ever sees leading-`/` paths (no cross-node fusion, no slash-less dead route); a leading-`/`, `~/`, `?query`, or empty root path is untouched
+- Leading-slash normalization: after the `~`-strip, a non-empty path that starts with neither `/` nor `?` (query-only) gets a `/` prepended — `foo`/`~foo` → `/foo`, `:id` → `/:id`. So the trie only ever sees leading-`/` paths (no cross-node fusion, no slash-less dead route); a leading-`/`, `~/`, `?query`, or empty root path is untouched
 - Children: recursively created via `createNode()`
 - Parent references: set during construction
 
@@ -268,31 +267,31 @@ validateRoutePath(path, routeName, methodName, parentNode?)
 | Absolute            | `"/users"`, `"/api/v2"`   | Standard paths                                                     |
 | Absolute with tilde | `"~/dashboard"`           | Override parent path                                               |
 | Query-only          | `"?page"`, `"?q&limit"`   | Query parameter routes                                             |
-| Relative segment    | `"profile"`, `"settings"` | Normalized to a `/`-child (`/profile`), appended to parent (#1407) |
+| Relative segment    | `"profile"`, `"settings"` | Normalized to a `/`-child (`/profile`), appended to parent         |
 | Parameterized       | `"/:id"`                  | Dynamic URL params                                                 |
-| Splat               | `"/*path"`                | Catch-all params — binds only as the LAST segment of the assembled path; an earlier one matches empty and `buildPath` omits it (#1568) |
+| Splat               | `"/*path"`                | Catch-all params — binds only as the LAST segment of the assembled path; an earlier one matches empty and `buildPath` omits it |
 
 **Rejected:**
 
-| Rule                                | Example                         | Reason                                                                 |
-| ----------------------------------- | ------------------------------- | ---------------------------------------------------------------------- |
-| Non-string                          | `null`, `123`                   | Type safety                                                            |
-| Whitespace (`\s`)                   | `"/users /list"`                | Any whitespace rejected                                                |
-| Invalid path format                 | `"#fragment"`                   | Must match `/^([/?~]\|[^/]+$)/`                                        |
-| Double slashes                      | `"//users"`                     | Malformed URLs                                                         |
-| Tilde under parameterized parent    | `"~/admin"` under `"/:id"`      | Ambiguous matching                                                     |
-| Optional modifier (removed, M1)     | `"/:id?"`, `"/*rest?"`          | Optionality is expressed with sibling routes (`optional-removed`)      |
-| Regex constraint (removed, M1)      | `"/:id<\d+>"`, `"/a>b"`         | `<`/`>` reserved; validate the value in a guard (`constraint-removed`) |
-| Fused mid-segment marker (#1050)    | `"/a:b"`, `"/x:id"`             | build extracts a param, the trie compiles a literal — they disagree    |
-| Duplicate param name (#1151)        | `"/:id/:id"`, `"/:x/*x"`        | the second binding silently overwrites the first at match              |
-| Non-ASCII static segment (#1154)    | `"/café"`, `"/меню"`            | match compares statics raw and rejects non-ASCII input — never matches |
-| Malformed query declaration (#1242) | `"/a?fil<ter"`, `"/a/:tab?tab"` | a query name carrying `<`/`>`, or colliding with a path-param name     |
+| Rule                             | Example                         | Reason                                                                 |
+| -------------------------------- | ------------------------------- | ---------------------------------------------------------------------- |
+| Non-string                       | `null`, `123`                   | Type safety                                                            |
+| Whitespace (`\s`)                | `"/users /list"`                | Any whitespace rejected                                                |
+| Invalid path format              | `"#fragment"`                   | Must match `/^([/?~]\|[^/]+$)/`                                        |
+| Double slashes                   | `"//users"`                     | Malformed URLs                                                         |
+| Tilde under parameterized parent | `"~/admin"` under `"/:id"`      | Ambiguous matching                                                     |
+| Optional modifier                | `"/:id?"`, `"/*rest?"`          | Optionality is expressed with sibling routes (`optional-removed`)      |
+| Regex constraint                 | `"/:id<\d+>"`, `"/a>b"`         | `<`/`>` reserved; validate the value in a guard (`constraint-removed`) |
+| Fused mid-segment marker         | `"/a:b"`, `"/x:id"`             | build extracts a param, the trie compiles a literal — they disagree    |
+| Duplicate param name             | `"/:id/:id"`, `"/:x/*x"`        | the second binding silently overwrites the first at match              |
+| Non-ASCII static segment         | `"/café"`, `"/меню"`            | match compares statics raw and rejects non-ASCII input — never matches |
+| Malformed query declaration      | `"/a?fil<ter"`, `"/a/:tab?tab"` | a query name carrying `<`/`>`, or colliding with a path-param name     |
 
 ### Validation Errors
 
 Validation failures surface as `TypeError` — both the ten that go through
 `createRouterError` in `validation/routes.ts` and the ones `validation/route-batch.ts`
-throws directly; each head is built by the raiser (#2487). There is no
+throws directly; each head is built by the raiser. There is no
 package-specific error-subclass hierarchy.
 
 ## Query Operations
@@ -331,7 +330,7 @@ graph TD
     subgraph core ["@real-router/core"]
         RN[RoutesNamespace]
         RS[routesStore]
-        VAL["validation.ts (plugin door, #1301)"]
+        VAL["validation.ts (plugin door)"]
         GR[getRoutesApi]
         CR[cloneRouter]
     end
@@ -399,7 +398,7 @@ Tree is read synchronously — no concurrency concerns in single-threaded JS.
 | -------------------- | --------------------------------------------------------------------------------- |
 | `routesStore.ts`     | `createMatcher`, `createRouteTree`, `routeTreeToDefinitions`, types               |
 | `RoutesNamespace.ts` | Types only (`CreateMatcherOptions`, `RouteParams`, `RouteTree`, `RouteTreeState`) |
-| `validation.ts`      | `validateRoute`, `buildParamMeta`, `Matcher`, `RouteTree` types (re-exported for the plugin, #1301, #2569) |
+| `validation.ts`      | `validateRoute`, `buildParamMeta`, `Matcher`, `RouteTree` types (re-exported for the plugin) |
 | `cloneRouter.ts`     | `routeTreeToDefinitions`                                                          |
 | `getRoutesApi.ts`    | `nodeToDefinition`, `RouteDefinition`, `RouteTree` types                          |
 | `Router.ts`          | `CreateMatcherOptions` type                                                       |

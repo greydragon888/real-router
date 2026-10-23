@@ -4,7 +4,7 @@
 
 ## Overview
 
-This engine is a synchronous finite state machine, `src/utils/fsm` in core since wave-3 — the standalone `@real-router/fsm` package is published at `0.6.1` and is no longer built from this source. Its one import is `internalDefect`, which marks a refusal no caller input can reach (#2487).
+This engine is a synchronous finite state machine at `src/utils/fsm` in core. The `@real-router/fsm` package on npm (`0.6.1`) is not built from this source. Its one import is `internalDefect`, which marks a refusal no caller input can reach.
 It drives the entire router lifecycle — all states (IDLE, STARTING, READY, TRANSITION_STARTED, LEAVE_APPROVED, DISPOSED) and transitions are managed by a single FSM instance.
 
 **Key role:** No boolean flags, no ad-hoc state management. Every router state change is an FSM transition.
@@ -14,21 +14,20 @@ Events flow through FSM actions into the event emitter.
 
 ```
 fsm/
-├── src/
-│   ├── fsm.ts       — FSM class (all logic)
-│   ├── types.ts     — FSMConfig, TransitionInfo, TransitionListener
-│   └── index.ts     — Public API exports
+├── fsm.ts       — FSM class (all logic)
+├── types.ts     — FSMConfig, TransitionInfo, TransitionListener
+└── index.ts     — Public API exports
 ```
 
 ## Dependencies
 
-**Zero runtime dependencies.** Pure TypeScript, uses only `Map` and arrays.
+**No runtime dependencies** beyond core's `internalDefect`. Pure TypeScript, uses only `Map` and arrays.
 
 **Consumed by:**
 
 ```mermaid
 graph LR
-    CORE["@real-router/core"] -->|dep| FSM["@real-router/fsm"]
+    CORE["@real-router/core"] -->|imports| FSM["src/utils/fsm"]
 
     FSM -.->|provides| CLASS[FSM class]
 
@@ -91,7 +90,7 @@ type TransitionDeclaration<TStates, …> =
       readonly update?: ((ctx, payload) => void) | undefined;
     };
 
-// Distributive union over the event (#886): narrowing `info.event` narrows
+// Distributive union over the event: narrowing `info.event` narrows
 // `info.payload` to that event's payload — symmetric with `on`'s action.
 type TransitionInfo<TStates, TEvents, TPayloadMap> =
   TEvents extends infer E extends TEvents
@@ -186,7 +185,9 @@ send(event, ...args) {
 
 ```typescript
 on(from, event, action) {
-  if (this.#transitions[from] === undefined) throw …; // #885 — reject undeclared `from`
+  const edges = this.#transitions[from];
+  if (edges === undefined) throw …;                // reject undeclared `from`
+  if (!hasOwn(edges, event)) throw …;              // reject a `from` with no edge for `event`
   this.#actions ??= new Map();                     // lazy init (outer: state → inner map)
 
   let stateActions = this.#actions.get(from);      // inner map: event → action
@@ -198,7 +199,7 @@ on(from, event, action) {
   const capturedAction = action;
   stateActions.set(event, capturedAction);         // overwrites existing (last-write-wins)
 
-  return () => {                                    // identity-guarded unsub (#427)
+  return () => {                                    // identity-guarded unsub
     const stateMap = this.#actions?.get(from);
     if (stateMap?.get(event) === capturedAction) { // only delete if still ours
       stateMap.delete(event);
@@ -207,10 +208,10 @@ on(from, event, action) {
 }
 ```
 
-- **Declared-`from` guard (#885):** `on()` starts by reading the table for `from` — an undeclared `from` throws instead of dead-registering an action that could never fire
-- **Nested Map:** `#actions` is `Map<from, Map<event, action>>` — one inner map per source state (replaced the pre-#316 `${from}\0${event}` string key)
+- **Declared-pair guard:** `on()` reads the table for `from`, then for `event` — an undeclared `from`, or a `from` with no edge for `event`, throws instead of dead-registering an action that could never fire
+- **Nested Map:** `#actions` is `Map<from, Map<event, action>>` — one inner map per source state
 - **One action per (from, event) pair** — second `on()` overwrites the first (last-write-wins)
-- **Identity-guarded unsubscribe (#427):** the returned unsubscribe deletes the entry **only if it is still the action this call registered** (`stateMap?.get(event) === capturedAction`) — a no-op once the pair was overwritten by a later `on()`, matching INVARIANTS "Action #5"
+- **Identity-guarded unsubscribe:** the returned unsubscribe deletes the entry **only if it is still the action this call registered** (`stateMap?.get(event) === capturedAction`) — a no-op once the pair was overwritten by a later `on()`, matching INVARIANTS "Action #5"
 - **Lazy Map:** `#actions` is `null` until first `on()` call — zero allocation for consumers that don't use actions
 
 ### onTransition() — Listener Registration (Null-Slot Pattern)
@@ -258,7 +259,7 @@ onTransition(listener) {
 // fired order = ["A", "D", "B"]   (C skipped; D called this same send)
 ```
 
-This **intentionally differs** from the sibling `@real-router/event-emitter`, which snapshots the listener set (`[...set]`) before iterating, so mutations there only affect the _next_ emit. Do not assume the two repo primitives share mutation-during-dispatch semantics. (See [#755](https://github.com/greydragon888/real-router/issues/755).)
+This **intentionally differs** from the sibling `event-emitter` primitive (`../event-emitter`), which snapshots the listener set (`[...set]`) before iterating, so mutations there only affect the _next_ emit. Do not assume the two repo primitives share mutation-during-dispatch semantics.
 
 **Actions, by contrast, are single-captured.** The matching `on()` action is read into a local **before** it fires (`const action = …; action(payload)`), so a reentrant `on()` that overwrites the `(from, event)` action **during its own dispatch** does _not_ re-fire it in the current `send()` (it applies to the next `send`). Live iteration is a **listener-only** property — actions and listeners intentionally differ on mutation-during-dispatch.
 
@@ -274,7 +275,7 @@ This **intentionally differs** from the sibling `@real-router/event-emitter`, wh
 
 ## Declared-state guard
 
-The constructor (`initial`), `on` (`from`), and every transition **target** in the table (validated for closure at construction, [#1159](https://github.com/greydragon888/real-router/issues/1159)) each check the table directly — three separate sites raising one message, not a shared helper (#2529): an undeclared state throws **before** any mutation instead of silently leaving `#currentTransitions` undefined and bricking the next `canSend`/`send` ([#754](https://github.com/greydragon888/real-router/issues/754) originally the `forceState` guard; [#885](https://github.com/greydragon888/real-router/issues/885) constructor + `on`; [#1159](https://github.com/greydragon888/real-router/issues/1159) table targets). The closure check runs once at construction (cold path) and skips explicit `undefined` targets (the "no transition" no-op); post-construction mutation of the shared table stays a documented GIGO boundary.
+The constructor (`initial`), `on` (`from`), and every transition **target** in the table (validated for closure at construction) each check the table directly — three separate sites raising one message, not a shared helper: an undeclared state throws **before** any mutation instead of silently leaving `#currentTransitions` undefined and bricking the next `canSend`/`send`. The closure check runs once at construction (cold path) and skips explicit `undefined` targets (the "no transition" no-op); post-construction mutation of the shared table stays a documented GIGO boundary.
 
 ```typescript
 // each entry point reads the table itself — three sites, one message
@@ -285,7 +286,7 @@ if (edges === undefined) {
 }
 ```
 
-> **Historical:** `forceState(state)` — a direct `#state`/`#currentTransitions` write that bypassed actions/listeners — was the engine's hot-path escape hatch, added for core's navigate path (NAVIGATE/COMPLETE, ~30ns saved per call). Core dropped it in the #1169 commit-gate refactor (the FSM table is now the sole authority over state, no bypass), leaving zero consumers, so the method was removed. See CHANGELOG.
+> **No state bypass.** Only the constructor (`initial`) and `send()` write `#state`, so every state change after construction is a declared edge of the table, which actions and listeners observe.
 
 ## Reentrancy
 
@@ -362,7 +363,7 @@ fsm.send("START", {}); // TS error
 
 Default `TPayloadMap = Record<never, never>` — all events are payload-free.
 
-> **Enforced ([#753](https://github.com/greydragon888/real-router/issues/753)):** the contract above is enforced by a distributive `send<E extends TEvents>(event, ...payload: E extends keyof TPayloadMap ? [TPayloadMap[E]] : [undefined?])` signature — symmetric with `on`, the payload correlates to the **specific** event. Previously `send(event: TEvents, payload?: TPayloadMap[TEvents])` indexed by the **full** `TEvents` union (which collapses to `unknown`), so `send("NAVIGATE")` and a wrong-event payload both compiled. Runtime is unchanged; the fix is type-level only. Dormant for core (`RouterPayloads` is empty).
+> **Enforced:** the contract above is enforced by a distributive `send<E extends TEvents>(event: E, ...args: E extends keyof TPayloadMap ? [TPayloadMap[E]] : [undefined?])` overload — symmetric with `on`, the payload correlates to the **specific** event, so `send("NAVIGATE")` without its payload and a payload of another event are both type errors. The correlation is type-level only; nothing checks it at runtime.
 
 ## Self-Transitions
 
@@ -409,13 +410,10 @@ stateDiagram-v2
 ```
 
 ⚠ This is the ROUTER's table, not an engine example, so it is checked against
-`routerFSM.ts` edge-for-edge by `scripts/fsm-diagram-parity.test.mjs` — edit the
-table and this block fails until it is redrawn. It had drifted four ways before
-that guard existed (a `READY --FAIL--> READY` that no longer exists, both
-`SYSTEM_COMMIT` self-loop, `STARTING --STOP--> IDLE`, and every `DISPOSE`
-safety-net edge but one). A second `SYSTEM_COMMIT` edge on `STARTING` existed
-briefly and was removed once measured — both arcs said to need it commit from
-`READY` instead.
+`routerFSM.ts` edge-for-edge by `scripts/tests/fsm-diagram-parity.test.mjs` — edit
+the table and this block fails until it is redrawn. The edges the table
+deliberately lacks, `SYSTEM_COMMIT` on `STARTING` among them, are typed `never`
+by `DeclaredAbsences` in `routerFSM.ts`, so declaring one is a type error.
 
 ### EventBusNamespace Integration
 

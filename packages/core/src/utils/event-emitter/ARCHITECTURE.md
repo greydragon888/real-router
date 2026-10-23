@@ -127,10 +127,10 @@ class EventEmitter<TEventMap> {
 - `emit()` early-returns if the name is already present (**coalesce**), adds it before
   running listeners, and deletes it in a `finally`.
 - So an event can never re-enter its own dispatch — recursion is structurally
-  impossible (**depth ≤ 1**), with no depth bound and no stack-overflow path (#1033).
+  impossible (**depth ≤ 1**), with no depth bound and no stack-overflow path.
   The public `isDispatching(name)` reads this Set.
 
-**Record lifecycle (no leak for dynamic names, #750 / #1033)**
+**Record lifecycle (no leak for dynamic names)**
 
 All three per-event records (`#callbacks`, `#warnedEvents`, `#dispatching`) are released
 the moment a name goes idle — `off()` deletes the listener `Set` (and warn latch) when
@@ -145,8 +145,7 @@ S2 `#dispatching`, S3 `#warnedEvents`).
 ### on() — Listener Registration (atomic: validate before mutate)
 
 `on()` never mutates until every rejection check has passed, so a rejected registration
-(duplicate, limit, or a throwing warn hook) leaves **no orphan record and no burnt latch**
-(#1167 / #1168):
+(duplicate, limit, or a throwing warn hook) leaves **no orphan record and no burnt latch**:
 
 ```typescript
 on(eventName, cb) {
@@ -179,7 +178,7 @@ off(eventName, cb) {
   set.delete(cb);                          // idempotent: no-op if cb not registered
   if (set.size === 0) {
     // Release the record once the last listener is gone, so consumers with
-    // dynamic event names don't accumulate empty Sets unbounded (#750).
+    // dynamic event names don't accumulate empty Sets unbounded.
     this.#callbacks.delete(eventName);
     this.#warnedEvents?.delete(eventName); // warn latch released with the Set
   }
@@ -218,7 +217,7 @@ emit(eventName, a?, b?, c?, d?)
 **Why coalesce?** Emitting an event that is already being dispatched (a listener that
 synchronously re-emits the **same** event) is skipped — a no-op. So an event can never
 re-enter its own dispatch, and recursion is structurally impossible (**depth ≤ 1**): no
-depth bound, no `RecursionDepthError`, no stack-overflow path (#1033). The name is added
+depth bound, no `RecursionDepthError`, no stack-overflow path. The name is added
 to `#dispatching` before listeners run and removed in the `finally`, so it self-releases
 on **both** normal and abnormal exit.
 
@@ -262,7 +261,7 @@ Per-listener isolation with one carve-out for a throwing error hook:
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Per-listener `try/catch`       | Each listener call is isolated — one throwing doesn't stop the others; the error is forwarded to `onListenerError`. There is **no re-thrown sentinel** |
 | `onListenerError` callback     | Called once per listener throw with `(eventName, error)`; if absent, the error is silently swallowed                                                    |
-| `onListenerError` itself throws (#1165) | The throw **propagates and aborts the rest of the snapshot** (subsequent listeners do not run); `emit()`'s `finally` still releases the `#dispatching` guard on this abnormal exit |
+| `onListenerError` itself throws | The throw **propagates and aborts the rest of the snapshot** (subsequent listeners do not run); `emit()`'s `finally` still releases the `#dispatching` guard on this abnormal exit |
 
 ## Limits System
 
@@ -273,7 +272,7 @@ Per-listener isolation with one carve-out for a throwing error hook:
 
 - **0 = disabled** for both limits
 - `maxListeners` checks `set.size >= limit` and throws **before** the warn check — a registration that hits the limit never warns
-- `warnListeners` fires when `set.size === threshold`, latched to **exactly once per emitter+event** (off/on churn does not re-fire; `clearAll()` resets the latch). The advisory hook runs **before** the latch is set, so a hook that throws aborts `on()` without burning the latch (#1168)
+- `warnListeners` fires when `set.size === threshold`, latched to **exactly once per emitter+event** (off/on churn does not re-fire; `clearAll()` resets the latch). The advisory hook runs **before** the latch is set, so a hook that throws aborts `on()` without burning the latch
 
 Re-entrancy is **not** a limit — coalescing is the dispatch model (always on), not an opt-in bound. See the **emit() — Single-Path Dispatch** section above.
 
