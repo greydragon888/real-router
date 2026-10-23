@@ -894,6 +894,10 @@ const LEDGER = new Map<string, string>([
     NOT,
   ],
   [
+    `${TRANSITION}/errorHandling.ts › leaveFailure › call:isNavigationEnd`,
+    "identity:end-record",
+  ], // row 28, the leave-listener arm: another-navigations-end-in-a-leave-listener.test.ts
+  [
     `${TRANSITION}/errorHandling.ts › rethrowAsRouterError › code:instanceof RouterError`,
     NOT,
   ],

@@ -11,6 +11,7 @@ import { adoptForeignBag, adoptForeignTransition } from "../../helpers";
 import { recordNavigationEnd } from "../../navigationEnds";
 import { raiser, RouterError, freezeThrownError } from "../../RouterError";
 import { routerEvents, routerStates } from "../../routerFSM";
+import { leaveFailure } from "../NavigationNamespace/transition/errorHandling";
 
 import type { EventBusOptions, ScopeDecision } from "./types";
 import type {
@@ -111,7 +112,7 @@ function settleLeavePromises(
       }
 
       if (firstSyncError !== undefined) {
-        reject(ensureError(firstSyncError));
+        reject(ensureError(leaveFailure(firstSyncError)));
 
         return;
       }
@@ -122,7 +123,7 @@ function settleLeavePromises(
       );
 
       if (rejected !== undefined) {
-        reject(ensureError(rejected.reason));
+        reject(ensureError(leaveFailure(rejected.reason)));
 
         return;
       }
@@ -995,7 +996,7 @@ export class EventBusNamespace {
 
     if (promises === undefined) {
       if (firstSyncError !== undefined) {
-        throw ensureError(firstSyncError);
+        throw ensureError(leaveFailure(firstSyncError));
       }
 
       return undefined;

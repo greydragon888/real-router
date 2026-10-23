@@ -130,6 +130,24 @@ export function handleGuardError(
 }
 
 /**
+ * A `subscribeLeave` listener's failure, as its navigation receives it.
+ *
+ * ⚑ A navigation's END is never this listener's quiet cancel, and it is
+ * re-coded `CANNOT_DEACTIVATE` on a copy, as {@link handleGuardError} re-codes
+ * it for a guard (#2786). Another navigation's end means the listener was
+ * waiting on work that navigation started; its own navigation's end means that
+ * navigation is cancelled, and the failure arcs restate the failure as that
+ * cancellation. Every other value passes unchanged, a quiet cancel the listener
+ * raised included (#2787).
+ */
+export function leaveFailure(error: unknown): unknown {
+  // An END is a `RouterError`: only `freezeThrownError` records one.
+  return isNavigationEnd(error)
+    ? recodedCopy(error as RouterError, errorCodes.CANNOT_DEACTIVATE)
+    : error;
+}
+
+/**
  * Error metadata structure for transition errors.
  * Contains information extracted from caught exceptions.
  */
@@ -163,22 +181,27 @@ export function rethrowAsRouterError(
   segment: string,
 ): never {
   if (error instanceof RouterError) {
-    const { code, message, ...meta } = error.toJSON();
-
-    const copy = new RouterError(code as string, {
-      ...meta,
-      message: message as string,
-    });
-
-    copy.setCode(errorCode);
-    copy.stack = error.stack ?? "";
-
-    throw freezeThrownError(copy);
+    throw recodedCopy(error, errorCode);
   }
 
   throw freezeThrownError(
     new RouterError(errorCode, wrapSyncError(error, segment)),
   );
+}
+
+/** The frozen copy of `error` carrying `errorCode` — never `error` itself. */
+function recodedCopy(error: RouterError, errorCode: string): RouterError {
+  const { code, message, ...meta } = error.toJSON();
+
+  const copy = new RouterError(code as string, {
+    ...meta,
+    message: message as string,
+  });
+
+  copy.setCode(errorCode);
+  copy.stack = error.stack ?? "";
+
+  return freezeThrownError(copy);
 }
 
 // Own-enumerable keys that must never be copied from a thrown object onto the
