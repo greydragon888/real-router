@@ -14,8 +14,8 @@ src/
 ├── createErrorSource.ts         — Error lifecycle + cached getErrorSource wrapper
 ├── createDismissableError.ts    — Derived source: getErrorSource wrapped with dismissedVersion state
 ├── createActiveNameSelector.ts  — Shared O(1) active-name selector (Solid-style routeSelector port)
-├── createRouteEnterGate.ts      — Route-enter guard gate: stateful decision closure (#1435, not a source)
-├── guardLeaveListener.ts        — Route-exit guard HOF: subscribeLeave-listener wrapper (#1435, not a source)
+├── createRouteEnterGate.ts      — Route-enter guard gate: stateful decision closure (not a source)
+├── guardLeaveListener.ts        — Route-exit guard HOF: subscribeLeave-listener wrapper (not a source)
 ├── canonicalJson.ts             — Key-order-stable JSON serialization (cache keys for active-route)
 ├── normalizeActiveOptions.ts    — DEFAULT_ACTIVE_OPTIONS + normalizeActiveOptions helper
 ├── computeSnapshot.ts           — Same-reference snapshot optimization for route nodes
@@ -39,9 +39,9 @@ Most factories return a cached instance keyed by router and, where applicable, b
 | `createActiveNameSelector` | `WeakMap<Router, selector>` | until router GC |
 | `createTransitionSource` / `createErrorSource` | none (advanced-use) | owner-driven; `destroy()` tears down |
 
-**Composite key for `createActiveRouteSource`:** `` `${routeName}|${canonicalJson(params)}|${canonicalJson(search)}|${strict}|${ignoreQueryParams}|${hashKey}` `` — 6-component since RFC-4 M2 (#1548) added the `search` channel (was 5-component since #532), where `hashKey` is `hash === undefined ? "" : `#${hash}``, isolating hash-aware tab-link variants (`createActiveRouteSource.ts`). Key-order-insensitive via `canonicalJson` — `{a:1, b:2}` and `{b:2, a:1}` hit the same entry (checked per field: `params` and `search` each normalize independently).
+**Composite key for `createActiveRouteSource`:** `` `${routeName}|${canonicalJson(params)}|${canonicalJson(search)}|${strict}|${ignoreQueryParams}|${hashKey}` `` — six components, where `hashKey` is `hash === undefined ? "" : `#${hash}``, isolating hash-aware tab-link variants (`createActiveRouteSource.ts`). Key-order-insensitive via `canonicalJson` — `{a:1, b:2}` and `{b:2, a:1}` hit the same entry (checked per field: `params` and `search` each normalize independently).
 
-**Non-cached paths:** `createActiveRouteSource` bypasses the cache and returns a fresh source for that call in two cases — a NON-STRING route name, because the cache key coerces it and a non-string would share a slot with a well-typed name (#1881); and `canonicalJson` throwing on either the params or the search bag. Throw-triggers include `BigInt` (native `JSON.stringify`), `Map`, `Set`, `WeakMap`, `WeakSet`, `RegExp` (eager `TypeError` — these would otherwise collapse to `"{}"` and cause cache-key collisions), and circular references (path-based detector in `canonicalize()`). `Symbol`-valued fields are silently dropped (standard JSON semantics) — they do not bypass the cache.
+**Non-cached paths:** `createActiveRouteSource` bypasses the cache and returns a fresh source for that call in two cases — a NON-STRING route name, because the cache key coerces it and a non-string would share a slot with a well-typed name; and `canonicalJson` throwing on either the params or the search bag. Throw-triggers include `BigInt` (native `JSON.stringify`), `Map`, `Set`, `WeakMap`, `WeakSet`, `RegExp` (eager `TypeError` — these would otherwise collapse to `"{}"` and cause cache-key collisions), and circular references (path-based detector in `canonicalize()`). `Symbol`-valued fields are silently dropped (standard JSON semantics) — they do not bypass the cache.
 
 **`destroy()` on cached wrappers is a no-op** — the shared source lives until the router is garbage-collected, releasing the WeakMap entry automatically. Required so that adapter code like Angular `sourceToSignal` can call `destroy()` in `DestroyRef.onDestroy` without tearing down a shared instance.
 
@@ -53,7 +53,7 @@ The `BaseSource` invokes `onFirstSubscribe` when the first listener attaches and
 
 Because the subscription is driven by listener count, a mount/unmount/remount cycle doesn't leave a dangling subscription. Compatible with React's `useSyncExternalStore` and Strict Mode.
 
-All three lazy sources (`createRouteSource`, `createRouteNodeSource`, `createActiveRouteSource`) reconcile their snapshot with the current router state on each reconnection (#765/#766) — this handles Activity hide/show cycles where the source was disconnected and missed navigation events. The eager `createDismissableError` wrapper likewise catches up on first subscribe (#765.2), so an error that fired before the wrapper's first subscriber is still surfaced.
+All three lazy sources (`createRouteSource`, `createRouteNodeSource`, `createActiveRouteSource`) reconcile their snapshot with the current router state on each reconnection — this handles Activity hide/show cycles where the source was disconnected and missed navigation events. The eager `createDismissableError` wrapper likewise catches up on first subscribe, so an error that fired before the wrapper's first subscriber is still surfaced.
 
 ### 2. Eager-Connection (`createTransitionSource` / `getTransitionSource`, `createErrorSource` / `getErrorSource`)
 
@@ -97,7 +97,7 @@ The predicate is created once per source instance — safe, because `createRoute
 
 ```
 Router event
-  → pre-filter: areRoutesRelated (new/prev route) OR hashFlip (#532)
+  → pre-filter: areRoutesRelated (new/prev route) OR hashFlip
   → isActiveRoute check (+ state.context.url.hash equality when opts.hash is set)
   → Object.is dedup guard
   → listener notification
@@ -117,11 +117,11 @@ Determines whether a node is active for a given route and builds the `{ route, p
 
 ### `stabilizeState`
 
-State reference stabilization keyed on `path` **+** `state.context.url.hash` (#532) **+** `state.transition.reload` (#605). When all three match, returns `prev`; otherwise returns `next`. Reload navigations always bypass dedup (`next.transition.reload === true` returns `next` even on path-equal navs). Hash differences also surface as a fresh render so tab-style UIs (`/settings#profile` → `/settings#billing`) re-render. O(1) comparisons. Used by `computeSnapshot`, `createRouteSource`, and `createTransitionSource`.
+State reference stabilization keyed on `path` **+** `state.context.url.hash` **+** `state.transition.reload`. When all three match, returns `prev`; otherwise returns `next`. Reload navigations always bypass dedup (`next.transition.reload === true` returns `next` even on path-equal navs). Hash differences also surface as a fresh render so tab-style UIs (`/settings#profile` → `/settings#billing`) re-render. O(1) comparisons. Used by `computeSnapshot`, `createRouteSource`, and `createTransitionSource`.
 
 ### `canonicalJson`
 
-Explicit `canonicalize()` clone that sorts object keys via byte-order comparison (`<` / `>`, locale-independent) before `JSON.stringify`. Used by `createActiveRouteSource` to build a stable cache key from the `params` and `search` arguments (each normalized independently, RFC-4 M2 / #1548). Throws `TypeError` on `BigInt` (standard `JSON.stringify` behaviour), `Map` / `Set` / `WeakMap` / `WeakSet` / `RegExp` (would otherwise collapse to `"{}"` and collide on cache keys), and circular references (path-based detector via `Set<object>` with `try/finally` cleanup — DAGs with shared refs serialise normally). `__proto__` is preserved as an own property (null-prototype sorted record). The caller falls back to a non-cached source on any throw.
+Explicit `canonicalize()` clone that sorts object keys via byte-order comparison (`<` / `>`, locale-independent) before `JSON.stringify`. Used by `createActiveRouteSource` to build a stable cache key from the `params` and `search` arguments (each normalized independently). Throws `TypeError` on `BigInt` (standard `JSON.stringify` behaviour), `Map` / `Set` / `WeakMap` / `WeakSet` / `RegExp` (would otherwise collapse to `"{}"` and collide on cache keys), and circular references (path-based detector via `Set<object>` with `try/finally` cleanup — DAGs with shared refs serialise normally). `__proto__` is preserved as an own property (null-prototype sorted record). The caller falls back to a non-cached source on any throw.
 
 ### `normalizeActiveOptions`
 
@@ -146,7 +146,7 @@ Shared selector providing O(1) active-name checks with ONE `router.subscribe` fo
 
 On each router transition, iterates over subscribed names; for each uses `areRoutesRelated` pre-filter, then diffs `prevActive` vs recomputed `nextActive`, notifies only names whose status actually flipped. Lazy-connected: no router subscription until first listener; disconnects on last.
 
-Framework-agnostic port of the `routeSelector` pattern from `@real-router/solid`'s `RouterProvider`. Currently internal to adapters that choose the fast-path; wider integration in Link components deferred to opt-in migration.
+Framework-agnostic port of the `routeSelector` pattern from `@real-router/solid`'s `RouterProvider`. `createActiveSource` resolves a default-options link through it, and every adapter except Solid routes its active state through `createActiveSource`; Solid's `Link` uses the `createSelector` its `RouterProvider` builds.
 
 ## Dependencies
 
@@ -187,4 +187,3 @@ Stress tests in `tests/stress/` validate behavior under extreme conditions:
 
 - [CLAUDE.md](CLAUDE.md) — Quick exports reference
 - [INVARIANTS.md](INVARIANTS.md) — Property-based test invariants
-- [.claude/memory-baseline-2026-04-18.md](../../.claude/memory-baseline-2026-04-18.md) — Cross-adapter heap measurements

@@ -128,7 +128,7 @@ this.#removeForwardStateInterceptor = this.#pluginApi.addInterceptor(
   "forwardState",
   (next, routeName, routeParams, routeSearch) =>
     // core resolves state first, then the schema validates the QUERY CHANNEL of
-    // the result — one rule for both directions (#1564)
+    // the result — one rule for both directions
     this.#validateState(next(routeName, routeParams, routeSearch)),
 );
 
@@ -157,7 +157,7 @@ navigate(name, params, search) / matchPath(url)
         │
         ├── result = next(routeName, routeParams, routeSearch)
         │     └── core builds/resolves State { name, params, search }
-        │         (merges route defaultParams for undefined keys, channel-aware since #1549)
+        │         (merges route defaultParams for undefined keys, channel-aware)
         │
         └── #validateState(result)
               │
@@ -172,11 +172,11 @@ navigate(name, params, search) / matchPath(url)
               │      identity, an ABSOLUTE node restarts the accumulation)
               │
               ├── channel = { ...omitKeys(result.params, pathParams), ...result.search }
-              │     ← the QUERY CHANNEL, wherever it lives (#1564): `search` is the
+              │     ← the QUERY CHANNEL, wherever it lives: `search` is the
               │       canonical half (and where an inner interceptor injects), the
-              │       params bag still carries a v1 single-bag caller's query. Path
+              │       params bag still carries a single-bag caller's query. Path
               │       slots are excluded — the schema never sees or rewrites them.
-              │       A twin goes to `search`, mirroring core's precedence (#843)
+              │       A twin goes to `search`, mirroring core's precedence
               │
               ├── schema["~standard"].validate(channel)
               │
@@ -207,9 +207,9 @@ navigate(name, params, search) / matchPath(url)
                     │
                     ├── defaults = { ...omitKeys(route.defaultParams, pathParams),
                     │                 ...route.defaultSearch }
-                    │     ← the route's query-channel defaults (`defaultSearch` is the
-                    │       M2 home, #1549; a `defaultParams` entry still reaches the
-                    │       query channel for a declared query key — minus path slots)
+                    │     ← the route's query-channel defaults (`defaultSearch` is their
+                    │       home; a `defaultParams` entry reaches the query channel
+                    │       too, for a declared query key — minus path slots)
                     │
                     └── return writeBack({ ...defaults, ...stripped })
                                   ← defaults fill stripped keys; valid keys kept as-is
@@ -282,7 +282,7 @@ Schema sees deserialized objects, not raw query strings. `z.number().positive()`
 
 ### buildPath is governed by schema validation
 
-`router.buildPath()` runs the `forwardState` chain on the caller's intent (core #2087) — the one this plugin registers. It registers no `buildPath` hook and needs none:
+`router.buildPath()` runs the `forwardState` chain on the caller's intent — the one this plugin registers. It registers no `buildPath` hook and needs none:
 
 ```
 router.navigate("search", { page: "bad" })
@@ -295,7 +295,7 @@ router.buildPath("search", {}, { page: "bad" })
   → URL built with the schema's answer
 ```
 
-`router.buildPath` runs the `forwardState` seam on the caller's intent (core #2087), so the schema governs the href exactly as it governs `navigate`. One intent produces one URL.
+`router.buildPath` runs the `forwardState` seam on the caller's intent, so the schema governs the href exactly as it governs `navigate`. One intent produces one URL.
 
 ⚠ **The coverage is core's, not this plugin's**: no line of this package registers a `buildPath` hook, and none needs to. *"`buildPath` is a pure URL builder; validation is a navigation-time concern"* holds only while the builder prints what navigation prints — with a route `defaultSearch` it does not, and a builder that prints a different URL is not one anyone can use. That divergence is `INVARIANTS.md` row 7.
 
@@ -393,8 +393,8 @@ Recovery applies only when `onError` is not set. The sequence is:
             → Set<string> of invalid top-level keys
 
 2. omitKeys(channel, invalidKeys)
-      └── shallow copy of the validated channel (state.search or state.params —
-          RFC-4 M2 / #1548) without invalid keys
+      └── shallow copy of the validated channel (state.search or state.params)
+          without invalid keys
           → "stripped" params
 
 3. { ...defaults, ...stripped }

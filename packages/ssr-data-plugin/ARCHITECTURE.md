@@ -43,13 +43,13 @@ index.ts
     │       ├── shared-ssr/createSsrLoaderPlugin.ts
     │       │       ├── shared-ssr/staleRegistry.ts (staleMark + clearStaleMark)
     │       │       ├── shared-ssr/defer.ts (isDeferred — slow-path branch in writeLoaderResult)
-    │       │       └── shared-ssr/deferRegistryClient.ts (ensureRegistryPromise — client-side hydration path; #761)
+    │       │       └── shared-ssr/deferRegistryClient.ts (ensureRegistryPromise — client-side hydration path)
     │       └── types.ts
     ├── invalidate.ts → shared-ssr/staleRegistry.ts (markStale)
     ├── getSsrDataMode.ts → shared-ssr (ALL_SSR_MODES, SsrMode)
     └── (re-exports defer, isDeferred, DeferredPayload from shared-ssr)
 
-server.ts → shared-ssr/deferWireFormat.ts (formatSettleScript, getDeferBootstrapScript, escapeForScript) — server-only, kept out of the client `.` chunk (#761)
+server.ts → shared-ssr/deferWireFormat.ts (formatSettleScript, getDeferBootstrapScript, escapeForScript) — server-only, kept out of the client `.` chunk
 errors.ts → shared-ssr/errors.ts (LoaderRedirect, LoaderNotFound, LoaderTimeout, withTimeout)
 ```
 

@@ -1,6 +1,6 @@
 # @real-router/ssr-utils
 
-> Router-level SSR/SSG/hydration helpers — extracted from `@real-router/core/utils` (#1543)
+> Router-level SSR/SSG/hydration helpers, kept outside `@real-router/core`
 
 ## Source Structure
 
@@ -23,26 +23,17 @@ tests/
 
 ## Why This Package Exists
 
-Core's SSR primitives lived at `@real-router/core/utils` from #563/#596/#603
-onward, but by 2026-07 that subpath was the *only* SSR-specific surface left
-inside core — everything else SSR-related (`shared/ssr`'s
-`createSsrLoaderPlugin`) already lived outside it. The subpath persisted by
-inertia: every one of its runtime dependencies (`cloneRouter`, `getPluginApi`
-→ `@real-router/core/api`; `getInternals` → `@real-router/core/validation`)
-was already public, so nothing structurally required it to stay inside core.
+A package of their own keeps the SSR helpers out of core, so core stays a pure
+router: no SSR-specific code ships in the core bundle. Nothing ties them to
+core's internals — their runtime dependencies, `cloneRouter` and
+`getPluginApi`, come from the public `@real-router/core/api`.
 
-Extracting it:
-
-- Makes core a "pure router" — no SSR-specific code ships in the core bundle.
-- Resolved the `core/utils` vs `@real-router/route-utils` naming collision
-  (unrelated packages that only looked related by name — see issue #1543's
-  design discussion). ⚠ Past tense: `@real-router/core/utils` exists again since
-  #1852, publishing core's ingestion primitives (`putField` / `copyFields`). It
-  is a different subpath under a reused name — nothing SSR-related lives there,
-  and this package does not import it.
-- Puts the whole SSR surface outside core under two speaking names:
+- The whole SSR surface sits outside core under two speaking names:
   `ssr-utils` (router-level, published) + `shared/ssr` (plugin-level,
   inlined) — see "Sibling, not merged, with `shared/ssr`" in CLAUDE.md.
+- ⚠ `@real-router/core/utils` is not the SSR home. That subpath publishes
+  core's discipline primitives for plugins, `putField` / `copyFields` among
+  them; nothing SSR-related lives there, and this package does not import it.
 
 ## Dependency Direction
 

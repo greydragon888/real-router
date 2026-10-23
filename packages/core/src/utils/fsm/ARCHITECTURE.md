@@ -467,5 +467,5 @@ fsm.send("COMPLETE", { state, fromState, opts });
 
 - [INVARIANTS.md](INVARIANTS.md) — Property-based test invariants
 - [event-emitter ARCHITECTURE.md](../event-emitter/ARCHITECTURE.md) — Event emitter (receives FSM events)
-- [core CLAUDE.md](../core/CLAUDE.md) — Core package architecture
-- [ARCHITECTURE.md](../../ARCHITECTURE.md) — System-level architecture
+- [core CLAUDE.md](../../../CLAUDE.md) — Core package architecture
+- [ARCHITECTURE.md](../../../../../ARCHITECTURE.md) — System-level architecture

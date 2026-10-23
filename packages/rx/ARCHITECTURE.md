@@ -92,7 +92,7 @@ subscribe(observerOrNext, options?)
            ▼
 ┌──────────────────────┐
 │  if (closed)         │  sync complete() inside subscribeFn ran finalize()
-│    finalize()        │  before teardown existed — run it now (#772)
+│    finalize()        │  before teardown existed — run it now
 └──────────┬───────────┘
            │
            ▼
@@ -107,7 +107,7 @@ subscribe(observerOrNext, options?)
 - Error in teardown → caught silently
 - No `error` callback → `console.error("Unhandled error in RxObservable:", err)`
 
-**Terminal teardown (#772):** teardown and abort-listener removal run via a shared `finalize()` on **every** terminal path — `unsubscribe()` AND `complete()` — so a self-completing source still releases its resource (`unsubscribe()` after `complete()` is a no-op). `finalize()` runs teardown at most once; a synchronous `complete()` inside the subscribe function defers it to the post-subscribe `if (closed) finalize()`. `error` is intentionally **non-terminal** (does not set `closed`, does not finalize) — resources release on the consumer's `unsubscribe()`.
+**Terminal teardown:** teardown and abort-listener removal run via a shared `finalize()` on **every** terminal path — `unsubscribe()` AND `complete()` — so a self-completing source still releases its resource (`unsubscribe()` after `complete()` is a no-op). `finalize()` runs teardown at most once; a synchronous `complete()` inside the subscribe function defers it to the post-subscribe `if (closed) finalize()`. `error` is intentionally **non-terminal** (does not set `closed`, does not finalize) — resources release on the consumer's `unsubscribe()`.
 
 ### pipe() — Operator Composition
 
@@ -152,7 +152,7 @@ for await (const value of observable) {
 
 **Latest-value:** If multiple values arrive while the iterator is suspended in `yield`, only the most recent value is yielded next. Intermediate values are skipped.
 
-**Terminal batch (#774):** the buffered value is checked **before** `completed`, so a value emitted immediately before a synchronous `complete()` is still yielded, and a synchronous `error()` is thrown rather than swallowed. The terminal is honored only once the value buffer is drained.
+**Terminal batch:** the buffered value is checked **before** `completed`, so a value emitted immediately before a synchronous `complete()` is still yielded, and a synchronous `error()` is thrown rather than swallowed. The terminal is honored only once the value buffer is drained.
 
 ## Stream Factories
 
@@ -183,7 +183,7 @@ state$(router, options?)
 
 - **Cold observable:** No work until `.subscribe()` is called
 - **Replay via microtask:** Initial state emitted asynchronously to ensure subscriber's `next` is wired
-- **Replay yields to live events (#771):** a synchronous navigation can fire `TRANSITION_SUCCESS` inside the subscribe→microtask window (core's optimistic-sync commit). The `sawEvent` guard suppresses the deferred replay in that case — the live event already delivered a fresher snapshot, so emitting the captured (now stale) state afterwards would deliver values out of chronological order
+- **Replay yields to live events:** a synchronous navigation can fire `TRANSITION_SUCCESS` inside the subscribe→microtask window (core's optimistic-sync commit). The `sawEvent` guard suppresses the deferred replay in that case — the live event already delivered a fresher snapshot, so emitting the captured (now stale) state afterwards would deliver values out of chronological order
 - **Default `replay: true`** — emits current state on subscribe (unless a live event superseded it first, see above)
 
 ### events$() — Event Stream
@@ -252,9 +252,9 @@ createStatefulOperator(subscribeFn) — Stateful operators (distinctUntilChanged
 | Source completes | Complete + unsubscribe both  |
 | Unsubscribe      | Unsubscribe both             |
 
-**Subscription order:** Notifier subscribes first (handles synchronous emission), then source. Early return if notifier completes/errors synchronously before source subscription — the now-assigned notifier subscription is unsubscribed on that early return so it never dangles (#773). Symmetrically, a source that completes/errors **synchronously** is released by a post-subscribe `if (completed)` check, since its handler ran before `sourceSubscription` was assigned (#877).
+**Subscription order:** Notifier subscribes first (handles synchronous emission), then source. Early return if notifier completes/errors synchronously before source subscription — the now-assigned notifier subscription is unsubscribed on that early return so it never dangles. Symmetrically, a source that completes/errors **synchronously** is released by a post-subscribe `if (completed)` check, since its handler ran before `sourceSubscription` was assigned.
 
-**Terminal cleanup symmetry (#877):** every branch that sets `completed` releases **both** subscriptions. Because `error` is non-terminal at the `RxObservable` layer, a source `error()` does not close the source on its own — but `takeUntil` is permanently inert after it (`completed = true` drops all later values), so it unsubscribes the source rather than holding a subscription it will never use again.
+**Terminal cleanup symmetry:** every branch that sets `completed` releases **both** subscriptions. Because `error` is non-terminal at the `RxObservable` layer, a source `error()` does not close the source on its own — but `takeUntil` is permanently inert after it (`completed = true` drops all later values), so it unsubscribes the source rather than holding a subscription it will never use again.
 
 ## Error Isolation
 

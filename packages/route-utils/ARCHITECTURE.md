@@ -123,7 +123,7 @@ The curried form is useful for creating reusable predicates (e.g., in `filter()`
 
 ### Validation Pipeline
 
-The two entry forms (direct vs. curried) run the same checks in **different order** — the route-name check (`invalidName`) is deferred so the single-arg form always returns a tester function per its overload contract (#769):
+The two entry forms (direct vs. curried) run the same checks in **different order** — the route-name check (`invalidName`) is deferred so the single-arg form always returns a tester function per its overload contract:
 
 ```
 Direct form   f(route, segment):
@@ -138,7 +138,7 @@ Curried form  f(route)(segment):
     → buildRegex: length (≤ 10,000) → character (SAFE_SEGMENT_PATTERN) → compile + cache
 ```
 
-Validation is split: name/segment type-empty-null checks happen in the returned function, length/character checks happen in `buildRegex`. The route-name check is computed once as `invalidName` but is **deferred** — it never short-circuits before the currying branch, so the single-arg form always returns a tester function (#769). The two forms check `invalidName` at **different points**: the **direct** form checks it *before* the segment-type guard (so `f("", 42)` returns `false`, never a `TypeError`), while the **curried** form checks it *after* (so `f("")(42)` throws `TypeError`). Deliberate consequence: with an invalid route name, **both** forms skip the length/character validation of a string segment, so direct/curried equivalence for **string** segments holds exactly (INVARIANTS Inv 5).
+Validation is split: name/segment type-empty-null checks happen in the returned function, length/character checks happen in `buildRegex`. The route-name check is computed once as `invalidName` but is **deferred** — it never short-circuits before the currying branch, so the single-arg form always returns a tester function. The two forms check `invalidName` at **different points**: the **direct** form checks it *before* the segment-type guard (so `f("", 42)` returns `false`, never a `TypeError`), while the **curried** form checks it *after* (so `f("")(42)` throws `TypeError`). Deliberate consequence: with an invalid route name, **both** forms skip the length/character validation of a string segment, so direct/curried equivalence for **string** segments holds exactly (INVARIANTS Inv 5).
 
 ---
 

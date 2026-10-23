@@ -155,7 +155,7 @@ onTransitionCancel(toState, fromState?)
     └── resetTransitionState()
 
 onTransitionError(toState?, fromState?, err)
-    ├── ends = toState?.context === #announced?.context   (not for a refusal that starts no transition, #2779)
+    ├── ends = toState?.context === #announced?.context   (not for a refusal that starts no transition)
     ├── if ends → perf.mark("router:transition-error:{label}")
     ├── if ends → perf.measure("router:transition-failed:{label}", start, error)
     ├── if logError → console.error("[ctx] Transition error: {code} (Xms when ends)", { error, stack, to, from })
@@ -223,8 +223,8 @@ getParamsDiff(fromParams, toParams)
 ```
 
 Channel-agnostic — called once for `state.params` (path) and once for `state.search`
-(query), each diffed and logged independently under a `params`/`search`-labelled line
-(RFC-4 M2 / #1548). Only triggered for **same-route navigation** (`toState.name === fromState.name`).
+(query), each diffed and logged independently under a `params`/`search`-labelled line.
+Only triggered for **same-route navigation** (`toState.name === fromState.name`).
 
 ### console-groups.ts — Group Manager
 

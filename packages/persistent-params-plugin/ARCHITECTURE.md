@@ -4,7 +4,7 @@
 
 ## Overview
 
-`@real-router/persistent-params-plugin` automatically injects a fixed set of query parameters into every navigation transition. Once a parameter value is observed in a committed state, it's stored internally and merged into the query channel of every subsequent `forwardState` call — the seam both `router.navigate` and `router.buildPath` run (#2087).
+`@real-router/persistent-params-plugin` automatically injects a fixed set of query parameters into every navigation transition. Once a parameter value is observed in a committed state, it's stored internally and merged into the query channel of every subsequent `forwardState` call — the seam both `router.navigate` and `router.buildPath` run.
 
 **Core role:** A stateful interceptor layer that sits between the caller's navigation params and the core's path/state builders. Contains no URL parsing or browser logic — only param merging, storage, and validation.
 
@@ -158,8 +158,8 @@ This guarantees the router is never left in a partially-initialized state.
 ### forwardState interceptor — one seam, both doors
 
 ```
-router.navigate(name, params, search?)      ← RFC-4 M2 / #1548: search is arg 3
-router.buildPath(name, params, search?)     ← the same seam, on the caller's intent (#2087)
+router.navigate(name, params, search?)      ← search is arg 3
+router.buildPath(name, params, search?)     ← the same seam, on the caller's intent
         │
         ▼
   forwardState interceptor (registered in constructor)
@@ -168,12 +168,12 @@ router.buildPath(name, params, search?)     ← the same seam, on the caller's i
         │     └── core builds the State object; both channels flow through untouched
         │
         ├── #forwardStateSearch(result.search, result.params)  ← injects into the QUERY
-        │     │                                                   channel (#1563) and leaves
+        │     │                                                   channel and leaves
         │     │                                                   result.params alone
         │     ├── extractOwnParams on both bags
         │     │     └── copies OWN keys only; every own key is kept as data
         │     ├── for each key in safeParams (the path bag — every key validated, as
-        │     │     the plugin has always policed the single-bag argument):
+        │     │     the plugin polices the single-bag argument):
         │     │     validateParamValue(key, value)   ← `undefined` is an accepted
         │     │                                         value: it IS the removal request
         │     ├── mergeParams(#persistentParams, safeSearch)
@@ -188,30 +188,29 @@ router.buildPath(name, params, search?)     ← the same seam, on the caller's i
         └── return { ...result, search: mergedSearch }   ← result.params passed through as-is
 ```
 
-One seam, one channel. Persistent params are QUERY params by the plugin's own root declaration (`setRootPath("?a&b")`), so they are injected into `search` — the channel the built URL takes its query from (#1563). The seam runs on the navigate path and on `router.buildPath` alike, so the query it returns is both what `state.search` carries and what the URL prints; there is no second injection point below the validation seam a route schema registers.
+One seam, one channel. Persistent params are QUERY params by the plugin's own root declaration (`setRootPath("?a&b")`), so they are injected into `search` — the channel the built URL takes its query from. The seam runs on the navigate path and on `router.buildPath` alike, so the query it returns is both what `state.search` carries and what the URL prints; there is no second injection point below the validation seam a route schema registers.
 
-`#forwardStateSearch` does **not** mutate `paramNamesSet` / `#persistentParams` — that would drop the param before the deactivation/activation guards run, so a rejected or cancelled transition would lose it (#803). A removal marker (`{ key: undefined }`) is honored in **either** channel: `mergeParams` applies it in the query bag, the tracked-key loop in the path bag. The permanent removal is committed in `onTransitionSuccess`, against the state that actually committed.
+`#forwardStateSearch` does **not** mutate `paramNamesSet` / `#persistentParams` — that would drop the param before the deactivation/activation guards run, so a rejected or cancelled transition would lose it. A removal marker (`{ key: undefined }`) is honored in **either** channel: `mergeParams` applies it in the query bag, the tracked-key loop in the path bag. The permanent removal is committed in `onTransitionSuccess`, against the state that actually committed.
 
 ### onTransitionSuccess: updating stored params and publishing to state context
 
 ```
 Transition committed → onTransitionSuccess(toState)
         │
-        ├── toState.name === UNKNOWN_ROUTE?                    ← #1676
+        ├── toState.name === UNKNOWN_ROUTE?
         │     YES: publish the snapshot unchanged and RETURN.
         │          A 404 is hand-built with BOTH channels empty (it matched no
         │          route, so no route declares where its keys belong), so the
         │          absence below would read as a removal that nobody requested.
         │
         ├── for each key in paramNamesSet:
-        │     inSearch = hasOwn(toState.search, key)          ← RFC-4 M2 / #1548:
-        │     present  = inSearch || hasOwn(toState.params, key)  search is canonical,
-        │     value    = inSearch ? toState.search[key]           params is the
-        │                          : toState.params[key]           hand-built-state
-        │                                                          (navigateToState) fallback
+        │     inSearch = hasOwn(toState.search, key)          ← search is canonical,
+        │     present  = inSearch || hasOwn(toState.params, key)  params is the
+        │     value    = inSearch ? toState.search[key]           hand-built-state
+        │                          : toState.params[key]           (navigateToState) fallback
         │
         │     !present || value === undefined?
-        │       YES: PRIMARY removal (#803) — if stored value was defined,
+        │       YES: PRIMARY removal — if stored value was defined,
         │            delete it from #persistentParams AND paramNamesSet.
         │            Covers explicit navigate({key: undefined}) removals and
         │            navigateToState bypassing forwardState with one branch.
@@ -242,7 +241,7 @@ router.navigate("route2", { id: "2" })
               → State { params: { id: "2" }, search: { mode: "dev" } }
         │        (injected into the QUERY channel — the channel the plugin itself
         │         declared "mode" in via setRootPath("?mode"); the path bag is handed
-        │         on untouched, so core has nothing to re-route, #1563)
+        │         on untouched, so core has nothing to re-route)
         ▼
   core prints the URL from that query channel → "/route2/2?mode=dev"
         │
@@ -315,7 +314,7 @@ Throws `TypeError` with a descriptive message on any violation. The factory neve
 
 ## Parameter Removal Semantics
 
-Setting a persistent param to `undefined` is a permanent deletion, not a temporary omission — **but the deletion is committed only when the navigation succeeds** (#803):
+Setting a persistent param to `undefined` is a permanent deletion, not a temporary omission — **but the deletion is committed only when the navigation succeeds**:
 
 ```
 navigate("route", { mode: undefined })
@@ -377,7 +376,7 @@ result = { mode: "dev", id: "2" }
 
 The plugin calls `api.setRootPath(originalRootPath + "?" + paramNames.join("&"))` in the constructor. This tells the core's path builder that the root path includes query param placeholders for all persistent params.
 
-Without this, `router.buildPath("home")` would return `"/"` even when persistent params are active. With it, the core knows to include the param slots, and the `forwardState` interceptor fills them in — on that door as on the navigate one (#2087).
+Without this, `router.buildPath("home")` would return `"/"` even when persistent params are active. With it, the core knows to include the param slots, and the `forwardState` interceptor fills them in — on that door as on the navigate one.
 
 On teardown, `api.setRootPath(originalRootPath)` restores the original value.
 

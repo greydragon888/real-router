@@ -211,31 +211,14 @@ Vue's proxy-based reactivity eliminates most of the optimization work needed in 
 
 The main performance primitive is `useRefFromSource`: it creates a `shallowRef` that only updates when the underlying source emits, and Vue's scheduler batches DOM updates automatically.
 
-### Vue Runtime Floor (vs-tanstack Benchmark)
+### Vue Runtime Floor
 
-The `vs-tanstack` benchmark (`benchmarks/vs-tanstack/client-nav/real-router/vue`) exercises a 10-step navigation loop with ~44 route-state subscribers (`useRoute`/`useRouteNode`/nanostores, each rendering `null`) **plus a 20-`<Link>` panel that re-renders on every navigation**. Real-Router's Vue adapter was historically ~6× slower in absolute terms than React/Solid despite sharing the same `@real-router/sources` router layer.
+On a Link-heavy page, navigation time is dominated by Vue's component re-renders, not by the router:
 
-**Where the cost actually is — measured by router-free control apps (2026-06-27, CPU-profiled):**
+- **`<Link>` stabilizes `routeParams` by content** with `shallowEqual`, the same contract as the React adapter's `Link` `memo`. A parent that hands each Link a fresh `{ id }` literal on every render does not make a same-shape navigation re-run `canonicalJson` or `buildHref`. Nested-object param values are compared by reference, so they still benefit from a stable `ref`/`computed` (see CLAUDE.md "Object Params and Memoization").
+- **What stays Vue-bound** is the volume and per-update cost of router-driven component re-renders — each `<Link>`'s render effect and `<a>` patch, `RouteView` re-evaluation — plus Vue's reference-based prop diffing, which, unlike `React.memo`, cannot bail a child out when its parent re-renders with a fresh literal. These are runtime costs, not adapter work.
 
-- **Bare Vue is _not_ the problem.** 47 components reading one `shallowRef`, no router, runs at ~0.034 ms/nav — the same as the equivalent React app (~0.032). Vue's component-update machinery is not intrinsically slow.
-- **Subscribers are nearly free.** 20 null-returning `useRoute` subscribers cost ~0.006 ms/nav.
-- **`<Link>` is the bottleneck.** 20 real `<Link>`s cost ~0.146 ms/nav. The parent panel hands each Link a fresh `{ id }` literal every render; the Link then re-ran `canonicalJson(routeParams)` + `buildHref` on every navigation because both keyed off the raw, reference-changing prop.
-
-**The fixable lever (shipped).** Content-stabilize `routeParams` with `shallowEqual` (the same contract as the React adapter's `Link` `memo`) so same-shape navigations skip `canonicalJson` and `buildHref` entirely. Formal `vitest bench`, same-session A/B: **168.95 → 201.49 hz (+19.3 %, RME ±0.9 %)** — an order of magnitude above the noise floor.
-
-**Three _other_ rewrites that were genuinely noise** (2026-04-18, see `benchmarks/.bench-results/vs-tanstack/2026-04-18-report.md`). They targeted the subscriber/scheduler path or the wrong `Link` mechanism — **not** the param-recompute lever above:
-
-| Hypothesis                                                             | Predicted gain | Measured Δ | Verdict                   |
-| ---------------------------------------------------------------------- | -------------: | ---------: | ------------------------- |
-| Replace `computed()` in `useRouteNode` with direct `shallowRef` writes |        10–15 % |     +0.6 % | Within noise (RME ±0.9 %) |
-| Replace `watch([...])` dep-array getter with `watchEffect` in `Link`   |         3– 5 % |    +0.35 % | Within noise              |
-| Eliminate `Object.keys(attrs)` rest-spread in `Link.render`            |         3– 5 % |    +0.36 % | Within noise              |
-
-> **Correction.** These three measurements were real, but the conclusion once drawn from them — _"root cause is Vue runtime, the adapter can't help"_ — was an over-generalization. It pinned the cost on 44 null-returning subscribers (which the control apps show are nearly free) and missed the `Link` param-stabilization lever (which the control apps show is the actual bottleneck, and which yields +19 %). Do **not** read the 2026-04-18 report as "the Vue adapter is at its floor."
-
-**What remains Vue-bound after the fix.** Even optimized, the Vue app is still ~5× slower than React/Solid in absolute terms (~0.50 vs ~0.10 ms/nav). Since bare Vue ≈ bare React, this residual is _not_ raw Vue speed — it is the **volume and per-update cost of router-driven Vue component re-renders** (each `<Link>`'s render effect + `<a>` patch, RouteView re-evaluation, the nanostores loader-data cascade) plus Vue's reference-based prop diffing, which — unlike `React.memo` — cannot fully bail a child component out when its parent re-renders with a fresh literal. These are runtime/integration costs, not further adapter inefficiencies. TanStack-Vue sits in the same Vue-runtime budget (it is only ~2.2× faster than TanStack-React absolute), so against TanStack-Vue Real-Router's win is compressed (~2.3×) versus React/Solid (~14×/11.5×) — the router is simply a smaller slice of a Vue-render-dominated total.
-
-**Takeaway for consumers:** the adapter now memoizes `routeParams` by content, so inline `:routeParams="{ id }"` literals are cheap; nested-object param values still benefit from a stable `ref`/`computed` (see CLAUDE.md "Object Params and Memoization"). Beyond that, absolute navigation time on Link-heavy pages is dominated by Vue's per-component reactive-render volume, not by the router — Real-Router's architectural wins (node-scoped subscriptions, fewer allocations) show up as memory reduction. See [`benchmarks/vs-tanstack/ADAPTER_PERFORMANCE.md`](../../benchmarks/vs-tanstack/ADAPTER_PERFORMANCE.md) for the full cross-framework methodology and decomposition.
+The numbers are recorded in [IMPLEMENTATION_NOTES.md](../../IMPLEMENTATION_NOTES.md), "Vue `<Link>` measurements on the vs-tanstack suite".
 
 ## Data Flow
 

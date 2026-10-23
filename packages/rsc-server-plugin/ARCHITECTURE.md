@@ -84,27 +84,16 @@ The shared module exports:
 
 Sibling plugin `@real-router/ssr-data-plugin` consumes the same helpers with `namespace = "data"` and `T = unknown`. Because the shared logic is symlinked source (not a published package), bug fixes apply to both plugins automatically.
 
-## Variant B Decision Record
+## Variant B — `ReactNode`, not Flight bytes
 
-The RSC integration RFC explicitly chose to publish `ReactNode` (Variant B) over a pre-rendered Flight `Uint8Array` (Variant A). Evidence:
+The plugin publishes a `ReactNode` (Variant B), not a pre-rendered Flight payload — `Uint8Array` / `ReadableStream` (Variant A):
 
 1. **Streaming.** `renderToReadableStream` returns `ReadableStream<Uint8Array>` that can be piped in parallel with HTML SSR — Variant A would block the loader on Flight render
 2. **Bundler-agnosticism.** `react-server-dom-{webpack,turbopack,parcel,esm}` have incompatible signatures; pushing the choice up to the caller eliminates an n-way DI matrix in the plugin
 3. **Industry alignment.** RR7 `unstable_RSCStaticRouter` and TanStack Start `renderServerComponent` both store `ReactNode` and render Flight separately
 4. **Transport.** `state.context.rsc` is intentionally non-JSON-serializable; transport via `serializeRouterState({ excludeContext: ["rsc"] })`
 
-See `.claude/rfc-rsc-server-plugin.md` "Ключевое решение: Variant B" for the full evidence trail.
-
-### Note for readers of `research-rsc-integration-ru.md`
-
-The original R&D document (`.claude/research-rsc-integration-ru.md`, "Уровень 1") presented **two architectural options** without picking a winner:
-
-| Option | What it stored in `state.context.rsc`                | Status |
-| ------ | ---------------------------------------------------- | ------ |
-| **A**  | Pre-rendered Flight bytes (`Uint8Array`/`ReadableStream`) | ❌ **Rejected** in this implementation |
-| **B**  | `ReactNode` (Server Component element)               | ✅ **Adopted**                          |
-
-**If you're migrating notes/code that referenced "Variant A":** the published API stores a `ReactNode`. The Flight render step is **the caller's responsibility** — it happens *outside* the plugin via the bundler-specific `renderToReadableStream`. The cost: `state.context.rsc` is non-JSON-serializable (functions/symbols inside React elements), which is why `serializeRouterState` gained the `excludeContext` option in `@real-router/core`. The benefit: streaming TTFB, bundler agnosticism, and zero `react-server-dom-*` peer dep.
+The Flight render step is **the caller's**: it happens _outside_ the plugin via the bundler-specific `renderToReadableStream`. The cost: `state.context.rsc` is non-JSON-serializable (functions/symbols inside React elements), which is what the `excludeContext` option of `serializeRouterState` (`@real-router/ssr-utils`) is for. The benefit: streaming TTFB, bundler agnosticism, and zero `react-server-dom-*` peer dep.
 
 ## Factory Pattern
 
@@ -113,7 +102,7 @@ Same closure-based factory as `ssr-data-plugin` — no class; after `usePlugin()
 ```
 rscServerPluginFactory(loaders)              ← factory.ts (~25 LOC incl. JSDoc)
         │
-        │  1. validateLoaders(loaders)         ← inlined binding of createLoadersValidator(ERROR_PREFIX, ALLOWED_RSC_MODES) (the previous standalone validation.ts was deleted; single 7-line consumer, no other importer)
+        │  1. validateLoaders(loaders)         ← inlined binding of createLoadersValidator(ERROR_PREFIX, ALLOWED_RSC_MODES) (one consumer, no other importer)
         │  2. createSsrLoaderPlugin<ReactNode, Dependencies>(loaders, { namespace: "rsc", modeNamespace: "ssrRscMode", errorPrefix, allowedModes })
         │
         └── createSsrLoaderPlugin returns PluginFactory (closure)
@@ -379,7 +368,7 @@ If any factory throws or returns a non-function:
 - No interceptor is registered (it runs after the loop)
 - No leave listener is registered (it runs after the loop)
 
-This prevents permanently blocking ANY of the plugin's namespaces when a factory has a bug. The change from "single-claim rollback" to "acquired-array rollback" was driven by adding the `ssrRscMode` claim — a single `claim.release()` would have leaked the partner namespace on factory failure.
+This prevents permanently blocking ANY of the plugin's namespaces when a factory has a bug. A single `claim.release()` would leak the partner namespace on factory failure: the plugin holds two, `"rsc"` and `"ssrRscMode"`.
 
 For `rsc-server-plugin` specifically, `acquired.length` is always 2 (no `deferredNamespace` configured). The `ssr-data-plugin` path can grow it to 4 — see the `if (deferredConfig !== null)` branch inside that same `try` in `shared-ssr/createSsrLoaderPlugin.ts` (the `value`/`keys` claims acquired when `deferredConfig !== null`).
 
@@ -422,4 +411,3 @@ Additional stress suites cover error handling (failing/throwing loaders), slow l
 - [ARCHITECTURE.md](../../ARCHITECTURE.md) — System architecture of the monorepo
 - [core/CLAUDE.md](../core/CLAUDE.md) — Core architecture (Plugin API, addInterceptor)
 - [ssr-data-plugin/ARCHITECTURE.md](../ssr-data-plugin/ARCHITECTURE.md) — Sibling plugin (plain JSON data)
-- [.claude/rfc-rsc-server-plugin.md](../../.claude/rfc-rsc-server-plugin.md) — Full design RFC including Variant A vs B evidence

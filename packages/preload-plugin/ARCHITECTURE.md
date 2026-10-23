@@ -70,7 +70,7 @@ Implementation: two scalar fields `#lastTouchTarget` and `#lastTouchTimeStamp` (
 
 `#compiledPreloads` stores `{ fn, factory }` pairs keyed by `state.name`. On every resolve, `getRouteConfig(name)?.preload` is read and its reference compared against the cached `factory`. If the reference changed (e.g., after `getRoutesApi(router).replace(newRoutes)`), the old compiled function is discarded and the new factory is compiled. This ensures HMR and dynamic route replacement work without plugin reinstallation.
 
-Cost: one `getRouteConfig()` call per hover event (simple property lookup). The previous approach called `getRouteConfig()` only on cache miss but did not detect stale factories after `replaceRoutes()`.
+Cost: one `getRouteConfig()` call per hover event (simple property lookup). Reading the config on a cache miss only would keep serving a factory that `getRoutesApi(router).replace()` swapped out.
 
 ## Delay Coercion
 

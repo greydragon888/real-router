@@ -15263,3 +15263,17 @@ Two kinds of ignored paths under `.claude/` stay visible to knip, none of them c
 - A second read of an object the application returned, outside `systemCommit` — B2 rows 25, 28, 29 and 41: the `then` of a leave listener's result, of a start interceptor's result and of the logger callback's result, and a plugin's hook slots at registration and teardown.
 - `revalidateToNotFound` or `systemCommit` called through `getInternals` from inside `replace()`'s revalidation window — the named exception `internals-window-parity-2786.test.ts` holds.
 - In navigation-plugin, a browser navigation that a `canDeactivate` guard starts during the plugin's not-found call, to a URL no route matches: core refuses its commit, and the plugin's recovery from that refusal takes the browser back to the router's entry before the outer 404 commits. Measured on `MockNavigation`: the router on the 404, the browser on the entry it left, the 404's entry one step ahead.
+
+## Vue `<Link>` measurements on the vs-tanstack suite (2026-10-23)
+
+**Problem.** The "Vue Runtime Floor" section of `packages/vue/ARCHITECTURE.md` recorded an investigation run on the `vs-tanstack` jsdom suite: dated measurements, three rejected rewrites and the correction of an earlier conclusion. The suite is retired (see "Retire the router5/6 mitata + vs-tanstack jsdom benchmark suites"), so the section pointed at three paths that no longer exist, and its history broke the present-tense rule `.claude/rules/docs.md` holds every ARCHITECTURE.md to.
+
+**Solution.** The section keeps what holds: `<Link>` stabilizes `routeParams` by content, and what stays Vue-bound. The record moves here. The loop was 10 navigation steps over ~44 route-state subscribers (`useRoute` / `useRouteNode` / nanostores, each rendering `null`) plus a 20-`<Link>` panel that re-rendered on every navigation.
+
+- Before the fix the Vue app measured ~6× slower than React/Solid in absolute terms, on the same `@real-router/sources` layer.
+- Router-free control apps (2026-06-27, CPU-profiled): 47 components reading one `shallowRef` ran at ~0.034 ms/nav, the equivalent React app at ~0.032; 20 null-returning `useRoute` subscribers cost ~0.006 ms/nav; 20 real `<Link>`s cost ~0.146 ms/nav, because each re-ran `canonicalJson(routeParams)` and `buildHref` on the fresh `{ id }` literal its parent handed it.
+- Content-stabilizing `routeParams` with `shallowEqual`: 168.95 → 201.49 hz (+19.3 %, RME ±0.9 %), formal `vitest bench`, same-session A/B. It shipped in vue 0.15.8.
+- Three rewrites measured as noise (2026-04-18): direct `shallowRef` writes in place of `computed()` in `useRouteNode` (+0.6 %), `watchEffect` in place of the `watch([...])` getter in `Link` (+0.35 %), and no `Object.keys(attrs)` rest-spread in `Link.render` (+0.36 %). The conclusion drawn from them then — the Vue runtime is the root cause and the adapter cannot help — was an over-generalization: it blamed the subscribers, which the control apps show are nearly free, and missed the `Link` param lever.
+- After the fix the Vue app stayed ~5× slower than React/Solid in absolute terms (~0.50 vs ~0.10 ms/nav). TanStack-Vue sat in the same Vue-runtime budget, so against it Real-Router's lead was ~2.3×, against ~14× / ~11.5× on React / Solid.
+
+**Why here.** A measurement on a retired harness cannot be re-run, so it is history, and history lives in this file. The three rejected rewrites are the part worth finding again: each looks like an obvious lever in `Link` or `useRouteNode`, and each measured as noise.

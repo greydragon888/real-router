@@ -137,7 +137,7 @@ the moment a name goes idle — `off()` deletes the listener `Set` (and warn lat
 its last listener is removed, and `emit()` releases the `#dispatching` entry in its
 `finally` when the dispatch returns (no re-entrancy, so the entry's lifetime is exactly
 one dispatch). `listenerCount()` reports 0 either way, so the release is only observable
-via heap — covered by `tests/stress/event-emitter.stress.ts` (S1 `#callbacks`,
+via heap — covered by `tests/stress/utils/event-emitter/event-emitter.stress.ts` (S1 `#callbacks`,
 S2 `#dispatching`, S3 `#warnedEvents`).
 
 ## Core Algorithms
@@ -342,5 +342,5 @@ createRouter(routes, {
 
 - [INVARIANTS.md](INVARIANTS.md) — Property-based test invariants
 - [fsm ARCHITECTURE.md](../fsm/ARCHITECTURE.md) — FSM engine (drives event emission)
-- [core CLAUDE.md](../core/CLAUDE.md) — Core package architecture
-- [ARCHITECTURE.md](../../ARCHITECTURE.md) — System-level architecture
+- [core CLAUDE.md](../../../CLAUDE.md) — Core package architecture
+- [ARCHITECTURE.md](../../../../../ARCHITECTURE.md) — System-level architecture

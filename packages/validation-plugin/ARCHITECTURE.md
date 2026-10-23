@@ -189,7 +189,7 @@ Examples:
 | `ReferenceError` | Resource not found (route, dependency)                                                                               |
 | `RangeError`     | Numeric limit exceeded (`maxPlugins`, `maxLifecycleHandlers`), cross-field limit violation (`warnListeners > maxListeners`) |
 
-Retrospective validation errors use `[validation-plugin]` prefix instead of `[router.METHOD]`, because no specific public method was called — the plugin is checking accumulated state at registration time. (The forward-chain checks are a third case: they call core's `resolveForwardChain`, so the refusal is core's and says `[router]` — #2456.)
+Retrospective validation errors use `[validation-plugin]` prefix instead of `[router.METHOD]`, because no specific public method was called — the plugin is checking accumulated state at registration time. (The forward-chain checks are a third case: they call core's `resolveForwardChain`, so the refusal is core's and says `[router]`.)
 
 ```
 [validation-plugin] validateExistingRoutes: duplicate route name "home"
