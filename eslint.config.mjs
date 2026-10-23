@@ -322,7 +322,7 @@ const blocks = tsEslint.config(
           selector:
             "CallExpression[callee.name='runHook'][arguments.0.type='CallExpression']",
           message:
-            "isolate(produce()) anti-pattern: pass a recipe (the hook NAME), not a produced value, to runHook — `runHook(compileHook(...))` evaluates the factory outside runHook's try/catch and leaks a compile-throw that swallows sibling hooks. Use `runHook(hookName, routeName, toState, fromState)`.",
+            "isolate(produce()) anti-pattern: pass a recipe (the hook NAME), not a produced value, to runHook — `runHook(compileHook(...))` evaluates the factory outside runHook's try/catch and leaks a compile-throw that swallows sibling hooks. Use `runHook(hookName, routeName, toState, fromState, signal)`.",
         },
       ],
 
