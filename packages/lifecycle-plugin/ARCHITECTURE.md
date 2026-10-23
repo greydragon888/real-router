@@ -87,11 +87,11 @@ compileHook(hookName: "onEnter" | "onStay" | "onLeave" | "onNavigate", routeName
 
 The `compiledHooks` Map stores `{ hook, factory }` pairs. On every `compileHook()` call, the current factory reference from `getRouteConfig()` is compared against the cached `factory` via `===`. If the reference changed (e.g., after `getRoutesApi(router).replace(newRoutes)`), the old compiled hook is discarded and the new factory is compiled. This ensures HMR and dynamic route replacement work without plugin reinstallation.
 
-Cost: one `getRouteConfig()` call per hook invocation (simple property lookup on `routeCustomFields`). The previous approach called `getRouteConfig()` only on cache miss but could not detect stale factories after `replaceRoutes()`.
+Cost: one `getRouteConfig()` call per hook a commit consults — a `hasRoute` check and a property lookup on `routeCustomFields`. Reading the config on a cache miss only would keep serving a factory that `getRoutesApi(router).replace()` swapped out.
 
 ### Route Custom Fields
 
-Custom fields are extracted automatically by core's `registerSingleRouteHandlers` in `routesStore.ts`. Standard fields — the members `Route` declares: `name`, `path`, `children`, `canActivate`, `canDeactivate`, `forwardTo`, `encodeParams`, `decodeParams`, `defaultParams`, `defaultSearch` — are excluded. Everything else, including `onEnter`, `onStay`, `onLeave`, `onNavigate`, lands in `routeCustomFields[routeName]`. (`defaultSearch` joined that list in #1738; until then a core config field was handed to plugins through `getRouteConfig`, which is how the gap was found — from this very page's wiki twin.)
+Custom fields are extracted automatically by core's `registerSingleRouteHandlers` in `routesStore.ts`. Standard fields — the members `Route` declares: `name`, `path`, `children`, `canActivate`, `canDeactivate`, `forwardTo`, `encodeParams`, `decodeParams`, `defaultParams`, `defaultSearch` — are excluded. Everything else, including `onEnter`, `onStay`, `onLeave`, `onNavigate`, lands in `routeCustomFields[routeName]`.
 
 ## Design Decisions
 
@@ -130,14 +130,14 @@ Hooks fire only for `toState.name` / `fromState.name`, not for all segments in `
 
 ### Why `onNavigate` is orthogonal, not a fallback
 
-`onNavigate` covers the most common pattern: run the same side-effect whenever the route is the navigation target (data loading, analytics, UI reset). Two design options were considered:
+`onNavigate` covers the most common pattern: run the same side-effect whenever the route is the navigation target (data loading, analytics, UI reset). Two dispatch designs are possible:
 
 1. **Orthogonal** — fire `onNavigate` on every success, independently of `onEnter` / `onStay`.
 2. **Fallback** — fire `onNavigate` only when the case-specific hook (`onEnter` or `onStay`) is absent for the current case.
 
 The orthogonal design wins:
 
-- **Matches the real-world hybrid example.** Chat route: `onEnter` connects the WebSocket, `onNavigate` loads messages. Under fallback semantics, `onNavigate` would not fire on entry (since `onEnter` is defined), forcing the user to duplicate `loadMessages` inside `onEnter` — exactly the duplication `onNavigate` was introduced to eliminate.
+- **Matches the real-world hybrid example.** Chat route: `onEnter` connects the WebSocket, `onNavigate` loads messages. Under fallback semantics, `onNavigate` would not fire on entry (since `onEnter` is defined), forcing the user to duplicate `loadMessages` inside `onEnter` — exactly the duplication `onNavigate` exists to remove.
 - **Mirrors global plugin hooks.** `onTransitionStart` and `onTransitionSuccess` coexist — neither silences the other. Route-level hooks follow the same model.
 - **Simpler mental model.** Each hook fires based on its own condition. No priority rules, no fallback chains, no hidden interactions.
 - **Composable.** Declaring `onEnter` alongside `onNavigate` cannot silently break the latter during refactors.
@@ -150,13 +150,13 @@ The plugin has no options. The hooks themselves (defined on routes) are the conf
 
 ### Why per-hook try/catch (isolation)
 
-Each hook's compile (factory) **and** invocation is wrapped in a per-hook `try/catch` that re-throws asynchronously via `queueMicrotask` (#798, #1222). This exists for one reason: a throwing `onLeave`, `onEnter` or `onStay` — whether the **factory** throws at compile (a failing DI init) or the hook **body** throws at invocation — must not abort the `onTransitionSuccess` handler before the hooks after it run; otherwise the throw silently swallows them, `onNavigate` among them, breaking the orthogonality invariant. The `compileHook` call lives **inside** the `try` (#1222): passing a pre-compiled hook as the argument would evaluate the factory *before* the `try` is entered — the `isolate(produce())` anti-pattern — leaking a compile-throw. Re-throwing on a microtask (rather than swallowing with `console.warn`) keeps the developer signal visible to global error handlers while every other hook of the transition still fires; the router continues operating regardless. This mirrors the per-listener isolation in `BaseSource` / `createActiveNameSelector` (`@real-router/sources`).
+Each hook's compile (factory) **and** invocation is wrapped in a per-hook `try/catch` that re-throws asynchronously via `queueMicrotask`. This exists for one reason: a throwing `onLeave`, `onEnter` or `onStay` — whether the **factory** throws at compile (a failing DI init) or the hook **body** throws at invocation — must not abort the `onTransitionSuccess` handler before the hooks after it run; otherwise the throw silently swallows them, `onNavigate` among them, breaking the orthogonality invariant. The `compileHook` call lives **inside** the `try`: passing a pre-compiled hook as the argument would evaluate the factory _before_ the `try` is entered — the `isolate(produce())` anti-pattern — leaking a compile-throw. Re-throwing on a microtask (rather than swallowing with `console.warn`) keeps the developer signal visible to global error handlers while every other hook of the transition still fires; the router continues operating regardless. This mirrors the per-listener isolation in `BaseSource` / `createActiveNameSelector` (`@real-router/sources`).
 
-The trade-off vs. the earlier "let it propagate to the EventEmitter" design: a throwing hook now surfaces **asynchronously** (uncaught, via the microtask) instead of synchronously through the EventEmitter's "Error in listener" sink. The isolation is applied uniformly to all four hooks via a single local `runHook` helper — a per-site fix, not a shared cross-package `invokeSafely` primitive (deliberately rejected in #1039: a shared helper can't enforce adoption and per-context policies differ; the structural preventer of the forgotten-isolation class is a lint rule, not a primitive).
+The trade-off: a throwing hook surfaces **asynchronously** (uncaught, via the microtask), not synchronously through the EventEmitter's "Error in listener" sink. The isolation is one local `runHook` helper applied to all four hooks, not a shared cross-package `invokeSafely` primitive: a shared helper cannot enforce its own adoption, and the error policy differs per context. A `no-restricted-syntax` rule in the root `eslint.config.mjs` refuses a call as `runHook`'s first argument — the `isolate(produce())` shape; it does not see a hook invoked outside `runHook`.
 
 ## See Also
 
 - [core CLAUDE.md](../core/CLAUDE.md) — Core package architecture (PluginFactory, getRouteConfig)
-- [core routesStore.ts](../core/src/namespaces/RoutesNamespace/routesStore.ts) — Custom fields extraction (line 205-222)
+- [core routesStore.ts](../core/src/namespaces/RoutesNamespace/routesStore.ts) — Custom fields extraction (`registerSingleRouteHandlers`)
 - [preload-plugin ARCHITECTURE.md](../preload-plugin/ARCHITECTURE.md) — Same getRouteConfig + factory reference cache pattern
 - [ARCHITECTURE.md](../../ARCHITECTURE.md) — System-level architecture
