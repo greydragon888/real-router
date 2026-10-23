@@ -9,15 +9,26 @@ export { lifecyclePluginFactory } from "./factory";
  */
 declare module "@real-router/core" {
   interface Route<Dependencies extends DefaultDependencies> {
-    /** Factory that returns a hook called when this route segment is newly activated (entered). */
+    // The hooks run for the routes of the navigation target and the previous
+    // state only — a parent of either gets none (#2693).
+    /**
+     * Factory that returns a hook called when a committed navigation lands on
+     * this route from another route, or the router starts on it.
+     */
     onEnter?: LifecycleHookFactory<Dependencies>;
-    /** Factory that returns a hook called when this route segment stays active but params changed. */
+    /**
+     * Factory that returns a hook called when a committed navigation lands on
+     * this route from itself, whether or not params or search changed.
+     */
     onStay?: LifecycleHookFactory<Dependencies>;
-    /** Factory that returns a hook called when this route segment is deactivated (left). */
+    /**
+     * Factory that returns a hook called when a committed navigation leaves
+     * this route for another one.
+     */
     onLeave?: LifecycleHookFactory<Dependencies>;
     /**
      * Factory that returns a hook called on every successful navigation to this
-     * route (both entry and param-change). Fires independently of `onEnter` /
+     * route (both entry and stay). Fires independently of `onEnter` /
      * `onStay` (orthogonal dispatch) — declaring one never silences another.
      */
     onNavigate?: LifecycleHookFactory<Dependencies>;
