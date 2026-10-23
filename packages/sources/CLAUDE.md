@@ -18,7 +18,7 @@
 | `primeErrorSource(router)` | **Side-effect only** (returns `void`) — eagerly create+subscribe `getErrorSource` IF the router is registered, else no-op. Adapters' `RouterProvider` call it at mount so a boundary mounting after an error still sees it (#778), without crashing on a router-like with no internals (test stub / `Object.create` clone). `getErrorSource` stays strict (throws); this is the don't-crash-the-Provider wrapper. |
 | `createDismissableError(router)` | Dismissable error wrapper over `getErrorSource` — **per-router cached**, snapshot includes `resetError` |
 | `createActiveNameSelector(router)` | O(1) active-name checker — **per-router cached** shared selector (Link fast-path) |
-| `createActiveSource(router, routeName, params, search, strict, ignoreQueryParams, hash)` | `<Link>` active-state `RouterSource<boolean>`: with default options (non-empty name, no `params` / `search`, non-strict, query-ignoring, no `hash`) it reuses `createActiveNameSelector`, otherwise it returns a `createActiveRouteSource`; Svelte, Preact and Angular call it, Solid keeps its own fast/slow decision |
+| `createActiveSource(router, routeName, params, search, strict, ignoreQueryParams, hash)` | `<Link>` active-state `RouterSource<boolean>`: with default options (non-empty name, no `params` / `search`, non-strict, query-ignoring, no `hash`) it reuses `createActiveNameSelector`, otherwise it returns a `createActiveRouteSource`; React, Preact, Vue, Svelte and Angular call it, Solid keeps its own fast/slow decision |
 
 ### Options & utilities
 
