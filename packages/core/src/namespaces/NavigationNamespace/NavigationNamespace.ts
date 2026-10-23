@@ -62,11 +62,9 @@ export class NavigationNamespace {
         return;
       }
 
-      deps.logger.error(
-        "router.navigate",
-        "Unexpected navigation error",
-        error,
-      );
+      // Bare `router`: `#settle` hands this one closure the promise of every
+      // entry point that returns one, so it cannot name the call (#2821).
+      deps.logger.error("router", "Unexpected navigation error", error);
     };
   }
 

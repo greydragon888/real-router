@@ -43,11 +43,12 @@ export function validateListenerArgs<E extends EventName>(
 /**
  * Proactive warn@20% / error@50% threshold for the per-event listener counter
  * (#1188) — the fourth resource counter, mirroring plugins / lifecycle /
- * dependencies. Fired by core from `subscribe` / `addEventListener` with the
- * POST-add count. Core keeps the emitter's bare-`Error` hard cap; this only
- * surfaces an actionable, `[router.<method>]`-prefixed signal well before it, so
- * a listener leak (e.g. a missing unsubscribe — #766) is caught early instead of
- * OOM-ing at the 10 000-listener wall. `maxListeners === 0` means unlimited.
+ * dependencies. Fired by core from `subscribe` / `addEventListener`, and from
+ * `usePlugin` for a plugin's hooks, with the POST-add count. Core keeps the
+ * emitter's bare-`Error` hard cap; this only surfaces an actionable,
+ * `[router.<method>]`-prefixed signal well before it, so a listener leak (e.g. a
+ * missing unsubscribe — #766) is caught early instead of OOM-ing at the
+ * 10 000-listener wall. `maxListeners === 0` means unlimited.
  */
 export function validateListenerCountThresholds(
   count: number,

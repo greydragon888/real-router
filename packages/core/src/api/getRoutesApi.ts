@@ -14,7 +14,6 @@ import {
   spliceSubtree,
 } from "../namespaces/RoutesNamespace/helpers";
 import {
-  validateClearRoutes,
   validateRemoveRoute,
   warnRemovalDuringNavigation,
 } from "../namespaces/RoutesNamespace/routeGuards";
@@ -738,6 +737,7 @@ function replaceRoutes<
               toActivate,
               revalidated,
               currentState,
+              "replace",
             );
 
           if (allowed) {
@@ -1074,21 +1074,23 @@ export function getRoutesApi<
       // guards. Design note `fsm-as-state-owner-2026-07-31.md` §11.A1, option
       // (c), owner decision 2026-08-01.
       //
-      // A THROW rather than the `logger.error` + no-op that `validateClearRoutes`
-      // uses below, because the two preconditions are different classes: "a
-      // navigation is in flight" clears by itself (wait and retry works), while
-      // this one never does — the caller has to change the code. That is the
-      // same line `REENTRANT_TREE_MUTATION` sits on (#1032).
+      // A THROW rather than the `logger.error` + no-op below, because the two
+      // preconditions are different classes: "a navigation is in flight"
+      // clears by itself (wait and retry works), while this one never does —
+      // the caller has to change the code. That is the same line
+      // `REENTRANT_TREE_MUTATION` sits on (#1032).
       if (ctx.getStateName() !== undefined) {
         throw atClear.code(
           errorCodes.ROUTER_NOT_STOPPED,
         )`Cannot clear routes while a state is committed. Use replace(routes) to swap the tree on a running router, or stop() first.`;
       }
 
-      const canClear = validateClearRoutes(ctx.isTransitioning(), ctx.logger);
+      if (ctx.isTransitioning()) {
+        ctx.logger.error(
+          "router.clear",
+          "Cannot clear routes while navigation is in progress. Wait for navigation to complete.",
+        );
 
-      /* v8 ignore next 3 -- @preserve: the no-op arm of `validateClearRoutes`, twin of its call at `replace()` below; reaching it needs a transition in flight with no committed state, and no test builds that pair */
-      if (!canClear) {
         return;
       }
 
@@ -1129,9 +1131,12 @@ export function getRoutesApi<
 
       const routeArray = Array.isArray(routes) ? routes : [routes];
 
-      const canReplace = validateClearRoutes(ctx.isTransitioning(), ctx.logger);
+      if (ctx.isTransitioning()) {
+        ctx.logger.error(
+          "router.replace",
+          "Cannot replace routes while navigation is in progress. Wait for navigation to complete.",
+        );
 
-      if (!canReplace) {
         return;
       }
 

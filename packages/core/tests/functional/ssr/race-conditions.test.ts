@@ -182,7 +182,7 @@ describe("SSR race conditions", () => {
       const concurrentWarning = calls.find(
         (call) =>
           call[0] === "warn" &&
-          call[1] === "router.navigate" &&
+          call[1] === "router" &&
           call[2].includes("Concurrent navigation"),
       );
 
@@ -202,7 +202,7 @@ describe("SSR race conditions", () => {
       const concurrentWarnings = allCalls.filter(
         (call) =>
           call[0] === "warn" &&
-          call[1] === "router.navigate" &&
+          call[1] === "router" &&
           call[2].includes("Concurrent navigation"),
       );
 

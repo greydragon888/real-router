@@ -21,12 +21,12 @@ import { describe, expect, it } from "vitest";
  * the door the caller typed, or the bare facade where several doors reach one
  * raiser.
  *
- * ⚠ **The vocabulary is the DOOR, not the method.** Core names the routes-API
- * doors `addRoute` / `updateRoute` / `removeRoute` / `clearRoutes` while the
- * methods are `add` / `update` / `remove` / `clear` — measured, `[router.addRoute]`
- * appears twenty times and `[router.updateRoute]` ten. A channel that used the
- * method name instead would be the odd one out, so this authority polices the
- * SHAPE (`router` or `router.<name>`) and leaves the vocabulary to #1845's walk.
+ * ⚠ **This authority polices the SHAPE (`router` or `router.<name>`), not the
+ * name.** Which names a channel may carry — a door a caller can call, or one of
+ * the route-CRUD names core keeps to match the plugin's wording — is
+ * `door-reachability-authority-2479`'s question. Which calls reach a site is
+ * neither's: `log-site-channel-2821.test.ts` pins the sites #2821 found, call by
+ * call.
  */
 const SRC = path.resolve(__dirname, "../../src");
 

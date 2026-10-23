@@ -517,11 +517,16 @@ export class RouteLifecycleNamespace<
     return this.#functionsTuple;
   }
 
+  /**
+   * `methodName` is the door the caller typed; it names a throwing guard's log
+   * and the validator's async-guard warning (#2821).
+   */
   canNavigateTo(
     toDeactivate: string[],
     toActivate: string[],
     toState: State,
     fromState: State | undefined,
+    methodName: string,
   ): boolean {
     for (const segment of toDeactivate) {
       if (
@@ -530,7 +535,7 @@ export class RouteLifecycleNamespace<
           segment,
           toState,
           fromState,
-          "canNavigateTo",
+          methodName,
         )
       ) {
         return false;
@@ -544,7 +549,7 @@ export class RouteLifecycleNamespace<
           segment,
           toState,
           fromState,
-          "canNavigateTo",
+          methodName,
         )
       ) {
         return false;
@@ -845,8 +850,8 @@ export class RouteLifecycleNamespace<
       return false;
     } catch (error) {
       // #959: a throwing sync guard must not vanish silently. `navigate()`
-      // surfaces the same throw via `handleGuardError` → TRANSITION_ERROR; the
-      // sync predicate (`canNavigateTo`) has no error channel, so core logs it
+      // surfaces the same throw via `handleGuardError` → TRANSITION_ERROR; a
+      // synchronous ask hands the guard's error to no caller, so core logs it
       // directly. This is an OPERATIONAL signal (the guard crashed — distinct
       // from the opt-in validator DX warnings above for which the validator is
       // the right home): the navigation is still treated as blocked (`false`).

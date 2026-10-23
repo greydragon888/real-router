@@ -61,7 +61,7 @@ describe("S25: replace() atomicity under concurrent navigation", () => {
     await Promise.resolve();
 
     // replace() during an active transition is a logged no-op
-    // (validateClearRoutes → logger.error, early `return`). Its return value is
+    // (logger.error, early `return`). Its return value is
     // void whether it swaps or no-ops, so the no-op is proven STRUCTURALLY below
     // (route9 still resolves), not via the return value.
     routesApi.replace(newRoutes);

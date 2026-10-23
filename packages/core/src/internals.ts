@@ -170,9 +170,7 @@ export interface RouterInternals<
   /**
    * Commits the not-found (`UNKNOWN_ROUTE`) state for `path` and emits
    * `TRANSITION_SUCCESS` — the `NavigationNamespace.navigateToNotFound`
-   * primitive. `replace()` uses it when a structural replace drops the active
-   * route, so subscribers are notified instead of the state silently clearing
-   * (#950).
+   * primitive.
    */
   readonly navigateToNotFound: (path: string) => State;
 

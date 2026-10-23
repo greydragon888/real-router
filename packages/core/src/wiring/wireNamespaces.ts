@@ -174,8 +174,9 @@ function wirePlugins<Dependencies extends DefaultDependencies>(
 ): void {
   const deps: PluginsDependencies<Dependencies> = {
     logger: getInternals(ns.router).logger,
+    // A plugin's hooks register here, so the door is `usePlugin` (#2821).
     addEventListener: (eventName, cb) =>
-      ns.eventBus.addEventListener(eventName, cb),
+      ns.eventBus.addEventListener(eventName, cb, "usePlugin"),
     canNavigate: () => ns.eventBus.canBeginTransition(),
     compileFactory,
     getValidator,
@@ -398,9 +399,16 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     canNavigate: () => ns.eventBus.canBeginTransition(),
     isStarting: () => ns.eventBus.isStarting(),
     getLifecycleFunctions: () => ns.routeLifecycle.getFunctions(),
-    // Deactivation half only — the 404 has no route to activate (#1643).
+    // Deactivation half only — the 404 has no route to activate (#1643). Only
+    // `navigateToNotFound` asks, so its guard's log names it (#2821).
     canDeactivateCurrent: (deactivated, toState, fromState) =>
-      ns.routeLifecycle.canNavigateTo(deactivated, [], toState, fromState),
+      ns.routeLifecycle.canNavigateTo(
+        deactivated,
+        [],
+        toState,
+        fromState,
+        "navigateToNotFound",
+      ),
     isTransitioning: () => ns.eventBus.isTransitioning(),
     // Post-leave auto-cleanup unregisters only the EXTERNAL (component-managed)
     // guard; a route-config (definition) guard survives for re-entry (#1171).

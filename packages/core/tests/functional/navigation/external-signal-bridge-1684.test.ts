@@ -147,7 +147,7 @@ describe.each(ENTRY_POINTS)(
       expect(router.isActive()).toBe(true);
 
       // …which is what makes a whole-tree swap land instead of being the logged
-      // no-op `validateClearRoutes` returns while a transition is in flight.
+      // no-op `replace()` answers while a transition is in flight.
       const routes = getRoutesApi(router);
 
       routes.replace([{ name: "fresh", path: "/fresh" }]);

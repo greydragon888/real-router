@@ -762,12 +762,16 @@ export class EventBusNamespace {
    * each callback once. The contract differs from {@link subscribe} /
    * {@link subscribeLeave}, which are end-user surfaces and silently accept
    * duplicates.
+   *
+   * `methodName` is the door the caller typed — `addEventListener`, or
+   * `usePlugin` for a plugin's hooks — and names the validator's count warning.
    */
   addEventListener<E extends EventName>(
     eventName: E,
     cb: Plugin[EventMethodMap[E]],
+    methodName: string,
   ): Unsubscribe {
-    this.#checkListenerThreshold(eventName, "addEventListener");
+    this.#checkListenerThreshold(eventName, methodName);
 
     return this.#emitter.on(
       eventName,

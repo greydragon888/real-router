@@ -690,7 +690,7 @@ describe("core/routes/replaceRoutes", () => {
     });
 
     // #1204: replace() during the STARTING window — inside an async start
-    // interceptor, before next(). validateClearRoutes gates only on
+    // interceptor, before next(). replace()'s in-flight check gates only on
     // isTransitioning(), which covers TRANSITION_STARTED/LEAVE_APPROVED but NOT
     // STARTING, so replace() PROCEEDS here (unlike mid-navigation, where it is a
     // logged no-op — see "blocking during navigation"). No committed state exists
@@ -707,7 +707,7 @@ describe("core/routes/replaceRoutes", () => {
         lazyApi.replace([
           { name: "home", path: "/" },
           { name: "lazy", path: "/lazy" },
-        ]); // FSM is STARTING → validateClearRoutes does not block
+        ]); // FSM is STARTING → the in-flight check does not block
 
         return next(path);
       });
