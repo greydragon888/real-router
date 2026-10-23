@@ -562,8 +562,12 @@ export class EventBusNamespace {
    * it. Asking first turns that into the `ROUTER_DISPOSED` these callers were
    * already promised (#1186) — the guard did not disappear when it became
    * structural, it moved to where it cannot be forgotten.
+   *
+   * `name` is `payload.toState.name` as the caller read it. The door that
+   * checks a foreign name hands in the answer it checked, and the shell commits
+   * that answer rather than asking the State again (#2786).
    */
-  systemCommit(payload: RouterPayloads["SYSTEM_COMMIT"]): State {
+  systemCommit(payload: RouterPayloads["SYSTEM_COMMIT"], name: string): State {
     // ⚑ The commit door that COPIES, because nothing below it does (#1792).
     // `getInternals` is a published export, and four first-party packages reach
     // it: `ssr-utils` and `validation-plugin` directly, `ssr-data-plugin` and
@@ -611,7 +615,7 @@ export class EventBusNamespace {
       // the pipeline). Not cosmetic: `Object.keys(getState())` is observable,
       // and a differently-ordered literal gives the committed state a second
       // hidden class — the shape #1684's regression took.
-      name: toState.name,
+      name,
       params: adoptForeignBag(toState.params, EMPTY_PARAMS) as Params,
       search: adoptForeignBag(toState.search, EMPTY_SEARCH) as SearchParams,
       path: toState.path,

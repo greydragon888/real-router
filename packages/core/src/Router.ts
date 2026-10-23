@@ -782,8 +782,9 @@ export class Router<
       systemCommit: (toState, fromState, opts) => {
         this.#assertNotReentrantOutsideRevalidation();
 
-        // ⚑ ONE read of the caller's name (#2085), taken above both consumers.
-        // The State may be a plugin's, so each read is a call into application
+        // ⚑ ONE read of the caller's name (#2085), taken above every consumer:
+        // the check below and the commit, which takes this answer (#2786). The
+        // State may be a plugin's, so each read is a call into application
         // code, and asking twice lets the door commit a name it never checked.
         const name = toState.name;
 
@@ -805,7 +806,7 @@ export class Router<
           );
         }
 
-        return this.#eventBus.systemCommit({ toState, fromState, opts });
+        return this.#eventBus.systemCommit({ toState, fromState, opts }, name);
       },
       routerExtensions: [],
       contextClaimRecords: new Map(),

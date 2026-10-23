@@ -140,6 +140,16 @@ describe("how many times core reads a caller-owned key", () => {
     defaultSearch: { tab: "d" },
   };
   const MEASURED_FIELDS = Object.keys(FIELD_VALUE);
+  const STATE_SLOTS = stateSlots();
+
+  /** `<door> · state.<slot>` for every slot the `State` type declares (#2786). */
+  const stateSlotRows = (
+    door: string,
+    reads: Readonly<Record<string, number>>,
+  ): Record<string, number> =>
+    Object.fromEntries(
+      STATE_SLOTS.map((slot) => [`${door} · state.${slot}`, reads[slot] ?? 0]),
+    );
 
   /**
    * A route carrying ONE measured field, not one carrying all ten.
@@ -528,22 +538,21 @@ describe("how many times core reads a caller-owned key", () => {
         reason: "success",
         segments: segments.bag,
       });
+      // The State's OWN slots, counted on the shell the caller hands in (#2786).
+      const shell = countingBag({
+        ...base,
+        params: params.bag,
+        search: search.bag,
+        transition: transition.bag as unknown as State["transition"],
+      });
 
-      getInternals(router).systemCommit(
-        {
-          ...base,
-          params: params.bag,
-          search: search.bag,
-          transition: transition.bag as unknown as State["transition"],
-        },
-        router.getState(),
-        {},
-      );
+      getInternals(router).systemCommit(shell.bag, router.getState(), {});
 
       table["systemCommit · params"] = peak(params.reads);
       table["systemCommit · search"] = peak(search.reads);
       table["systemCommit · transition"] = peak(transition.reads);
       table["systemCommit · transition.segments"] = peak(segments.reads);
+      Object.assign(table, stateSlotRows("systemCommit", shell.reads));
       router.dispose();
     }
     {
@@ -1212,6 +1221,17 @@ describe("how many times core reads a caller-owned key", () => {
       // counts the container's own keys, and moves only if that walk runs twice.
       "systemCommit · transition": 1,
       "systemCommit · transition.segments": 1,
+
+      // ⚑ One row per slot the `State` type declares (#2786), so a slot the
+      // type gains is a row this literal lacks. The door checks `name` against
+      // the table, and the shell it commits takes that same answer: a second
+      // read is a name nothing checked.
+      "systemCommit · state.context": 1,
+      "systemCommit · state.name": 1,
+      "systemCommit · state.params": 1,
+      "systemCommit · state.path": 1,
+      "systemCommit · state.search": 1,
+      "systemCommit · state.transition": 1,
 
       // §4.1 of the RFC — `executeNavigation` hoists `const reload = opts.reload`
       // (#1719) and then `isSameNavigation` reads `opts.reload` again to decide
@@ -2316,6 +2336,30 @@ describe("the forwardTo fold's no-default arm (#1952)", () => {
  * are `read-once-doors-2085.test.ts`; this file owns the numbers.
  */
 const REPO = path.resolve(__dirname, "../../../..");
+
+/**
+ * The slots `interface State` declares, read off `src/types/base.ts` rather
+ * than listed — the rows `systemCommit` owes the first table (#2786).
+ */
+function stateSlots(): string[] {
+  const file = path.resolve(__dirname, "../../src/types/base.ts");
+  const sf = ts.createSourceFile(
+    file,
+    readFileSync(file, "utf8"),
+    ts.ScriptTarget.ESNext,
+    /* setParentNodes */ true,
+  );
+  const state = sf.statements.find(
+    (node): node is ts.InterfaceDeclaration =>
+      ts.isInterfaceDeclaration(node) && node.name.text === "State",
+  );
+
+  const members: readonly ts.TypeElement[] = state?.members ?? [];
+
+  return members
+    .filter((member) => ts.isPropertySignature(member))
+    .map((member) => member.name.getText(sf));
+}
 
 /** Every node that opens its own parameter scope. */
 function isFunctionLike(n: ts.Node): boolean {

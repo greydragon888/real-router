@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { createRouter } from "@real-router/core";
+import { createRouter, errorCodes } from "@real-router/core";
 import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 import { getInternals } from "@real-router/core/validation";
 
 import type { Router, State } from "@real-router/core/types";
 
 /**
- * Four doors read a caller-owned slot ONCE (#2085).
+ * Doors that read a caller-owned slot ONCE (#2085; `systemCommit`, #2786).
  *
  * Each of them asked a slot to decide something and asked again to use it, and
  * the second answer is the one that shipped.
@@ -22,7 +22,7 @@ import type { Router, State } from "@real-router/core/types";
  * once or four times, which is why the counts need an owner rather than a
  * paragraph.
  */
-describe("four doors read a caller-owned slot once (#2085)", () => {
+describe("doors read a caller-owned slot once (#2085, #2786)", () => {
   /** A State whose `name` answers `base.name` for `n` reads, then `second`. */
   const driftingName = (
     base: State,
@@ -106,6 +106,60 @@ describe("four doors read a caller-owned slot once (#2085)", () => {
         "drift after 2 reads": "name=users path=/u/7",
         "drift to a route that does NOT exist": "name=users path=/u/7",
         "CONTROL — a stable accessor": "name=users path=/u/7",
+      });
+    });
+  });
+
+  describe("systemCommit — the name that COMMITS is the name that was checked (#2786)", () => {
+    /** `what the router committed`, or the code the door refused with. */
+    const observe = async (n: number, second: string): Promise<string> => {
+      const router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "users", path: "/u/:id" },
+        { name: "admin", path: "/a/:section" },
+      ]);
+
+      await router.start("/home");
+
+      const target = getPluginApi(router).makeState("users", { id: "7" });
+      const d = driftingName(target, n, second);
+      let answer: string;
+
+      try {
+        getInternals(router).systemCommit(d.state, router.getState(), {});
+
+        const committed = router.getState();
+
+        answer = `name=${committed?.name} path=${committed?.path}`;
+      } catch (error) {
+        answer = `REFUSED ${(error as { code?: string }).code}`;
+      }
+
+      router.dispose();
+
+      return answer;
+    };
+
+    it("commits what the FIRST read named, whatever the later ones say", async () => {
+      // ⚑ The door reads the name to check it against the table (#2252), and
+      // the shell it commits takes that answer. A second read is a name the
+      // check never saw — a route that does not exist, or another route's
+      // name over this one's path.
+      const table = {
+        "drift after 1 read": await observe(1, "admin"),
+        "drift to a route that does NOT exist": await observe(1, "nope"),
+        "CONTROL — a stable accessor": await observe(999, "admin"),
+        "CONTROL — an unknown FIRST answer is refused": await observe(
+          0,
+          "nope",
+        ),
+      };
+
+      expect(table).toStrictEqual({
+        "drift after 1 read": "name=users path=/u/7",
+        "drift to a route that does NOT exist": "name=users path=/u/7",
+        "CONTROL — a stable accessor": "name=users path=/u/7",
+        "CONTROL — an unknown FIRST answer is refused": `REFUSED ${errorCodes.ROUTE_NOT_FOUND}`,
       });
     });
   });
