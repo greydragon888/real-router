@@ -90,7 +90,7 @@ browserPluginFactory(opts?, browser?)         ← public
 
 **Why no class?**
 
-`createBrowserPlugin` was previously a `BrowserPlugin` class with private fields — but it was `@internal` and never exported. Inlining as a function eliminates one source file and one `export class` from the package surface. The state that lived in private fields (`#claim`, `#updateState`, `#browser`, `#base`) is now closure-captured by `onTransitionSuccess`.
+`createBrowserPlugin` is an internal function, not a class: the state the plugin keeps (`claim`, `urlClaim`, `updateState`, the `browser` it is handed) is captured by the closures of the plugin it returns, so the package has no source file and no `export class` for it.
 
 ### Creation Flow
 
@@ -134,7 +134,7 @@ The `Browser` interface, `createSafeBrowser()`, `createHistoryFallbackBrowser()`
 - `shared/browser-env/safe-browser.ts` — `createSafeBrowser` (real History API binding)
 - `shared/browser-env/ssr-fallback.ts` — `createHistoryFallbackBrowser` (no-op fallback for SSR/Node)
 - `shared/browser-env/detect.ts` — `isBrowserEnvironment()`
-- `shared/browser-env/history-api.ts` — `pushState`, `replaceState`, `addPopstateListener`, `getHash`, `getState` (`getState` reads `history.state` so `onTransitionSuccess` can skip a no-op popstate `replaceState`, #1353)
+- `shared/browser-env/history-api.ts` — `pushState`, `replaceState`, `addPopstateListener`, `getHash`, `getState` (`getState` reads `history.state` so `onTransitionSuccess` can skip a no-op popstate `replaceState`)
 
 **Key points for browser-plugin:**
 
@@ -210,7 +210,7 @@ const removeExtensions = api.extendRouter({
 });
 ```
 
-`createReplaceHistoryState` from `browser-env` creates the `replaceHistoryState` method — it resolves the target **and both channels** via `api.buildNavigationState` (the caller's `search` goes in, the resolved `params`/`search` come out), then writes that state as the record and builds the URL from it, both via `browser.replaceState`. Taking the query from the resolved state rather than the raw argument is what keeps a `forwardTo` chain's query-channel `defaultParams` in `history.state` (#1574) — and the URL is built from the same resolved triple, so the two halves of one `replaceState` call cannot describe different states (#1585). Before that they could: the URL went through `buildUrl` with the caller's RAW arguments, which reached the public `buildPath` of the day — no `forwardTo` resolution, no `forwardState` seam — so a `persistent-params` injection landed in the record and not in the URL beside it. The record is the resolved state VERBATIM; there is no `api.makeState` re-make, which was a leftover from `buildState` (that primitive built no path, so one had to be supplied) and rebuilt a byte-identical state per record.
+`createReplaceHistoryState` from `browser-env` creates the `replaceHistoryState` method — it resolves the target **and both channels** via `api.buildNavigationState` (the caller's `search` goes in, the resolved `params`/`search` come out), then writes that state as the record and builds the URL from it, both via `browser.replaceState`. Taking the query from the resolved state rather than the raw argument is what keeps a `forwardTo` chain's query-channel `defaultParams` in `history.state` — and the URL is built from the same resolved triple, so the two halves of one `replaceState` call cannot describe different states. The record is the resolved state VERBATIM; there is no `api.makeState` re-make, because the resolved state already carries its path.
 
 `extendRouter()` validates that no property with the same name already exists on the router (throws `PLUGIN_CONFLICT` if it does), adds the properties, and returns an unsubscribe function that removes them.
 
@@ -228,12 +228,12 @@ const lifecycle = createPopstateLifecycle({
     removeStartInterceptor();
     removeExtensions(); // ← removes buildUrl, matchUrl, replaceHistoryState
     claim.release();
-    urlClaim.release(); // ← releases the shared "url" hash namespace (#532)
+    urlClaim.release(); // ← releases the shared "url" hash namespace
   },
 });
 ```
 
-`teardown` removes the popstate listener (and the `hashchange` listener it owns, #759), then calls the `cleanup` callback which unregisters the start interceptor, router extensions, and both context-namespace claims.
+`teardown` removes the popstate listener (and the `hashchange` listener it owns), then calls the `cleanup` callback which unregisters the start interceptor, router extensions, and both context-namespace claims.
 
 As a safety net, `router.dispose()` also cleans up any extensions that plugins failed to remove in their `teardown`.
 
@@ -280,7 +280,7 @@ Each new plugin instance registers its own popstate listener in `onStart`. Witho
 
 `shared` is intentionally mutable. It's the only shared state between instances of the same factory.
 
-**Factory pool — last-wins (concurrent-live caveat, #758).** Because the single `removePopStateListener` slot is shared, each `onStart` removes the previous instance's listener before installing its own. The pattern is built for a pool where routers are created/destroyed **sequentially** (one live router at a time). If two routers from the same factory are live **at the same time** on one window, only the **last-started** one tracks `popstate` — the earlier one silently desyncs from the URL. There is a single `popstate` stream and a single URL, so this mutual exclusivity is inherent (who owns the URL with two live routers?). For genuinely concurrent routers, give each its own factory instance. Locked by `tests/stress/factory-instance-cleanup.stress.ts` (B7.5).
+**Factory pool — last-wins (concurrent-live caveat).** Because the single `removePopStateListener` slot is shared, each `onStart` removes the previous instance's listener before installing its own. The pattern is built for a pool where routers are created/destroyed **sequentially** (one live router at a time). If two routers from the same factory are live **at the same time** on one window, only the **last-started** one tracks `popstate` — the earlier one silently desyncs from the URL. There is a single `popstate` stream and a single URL, so this mutual exclusivity is inherent (who owns the URL with two live routers?). For genuinely concurrent routers, give each its own factory instance. Locked by `tests/stress/factory-instance-cleanup.stress.ts` (B7.5).
 
 ## Data Flow: Navigation
 
@@ -299,10 +299,10 @@ router.navigate(name, params, opts)
         ├── url = buildUrl(toState.path, options.base)
         │         (toState.path is already final — no re-buildPath in onTransitionSuccess)
         │
-        ├── Resolve hash (tri-state, #532): opts.hash===undefined → cached `currentHash`;
+        ├── Resolve hash (tri-state): opts.hash===undefined → cached `currentHash`;
         │     ""→clear; "value"→set. finalUrl = hash ? `${url}#${encodeHashFragment(hash)}` : url
         │
-        ├── urlClaim.write(toState, { hash, hashChanged })   ← shared "url" namespace (#532)
+        ├── urlClaim.write(toState, { hash, hashChanged })   ← shared "url" namespace
         │
         └── updateState(toState, finalUrl, shouldReplace, browser)   ← createUpdateBrowserState() closure
                   │
@@ -320,7 +320,7 @@ User clicks back or forward
         ▼
   browser.addPopstateListener → handler(evt)  (from createPopstateHandler)
         │
-        ├── location = browser.getLocation()   (snapshot at fire time, #757)
+        ├── location = browser.getLocation()   (snapshot at fire time)
         │
         ├── the return returnOrRollback started, landing on its origin?
         │     (positions.takeReturn() consumes it either way)
@@ -346,7 +346,7 @@ User clicks back or forward
         │     YES: await router.navigate(route.name, route.params, transitionOptions)
         │     NO + allowNotFound: router.navigateToNotFound(location)
         │     NO + !allowNotFound: api.emitTransitionError(ROUTE_NOT_FOUND) + returnOrRollback(start)
-        │                          (no silent navigateToDefault — see #483)
+        │                          (no silent navigateToDefault)
         │
         ├── catch (error):
         │     SAME_STATES → rollbackUrlToCurrentState() (nothing refused)
@@ -393,7 +393,7 @@ Rapid back/forward clicks generate multiple popstate events in quick succession.
 
 The `isTransitioning` flag blocks concurrent processing.
 New events are written to the single-slot `deferred = { evt, location }` queue — each one overwrites the previous (last-write-wins).
-The `location` is snapshotted when the event fires, not when it is replayed: the in-flight navigation's `onTransitionSuccess → replaceState` overwrites the live location before `processDeferredEvent()` runs, so re-reading it then would resolve the wrong target (#757).
+The `location` is snapshotted when the event fires, not when it is replayed: the in-flight navigation's `onTransitionSuccess → replaceState` overwrites the live location before `processDeferredEvent()` runs, so re-reading it then would resolve the wrong target.
 After the current transition completes, `processDeferredEvent()` processes the last deferred event against its snapshotted location — unless the router refused the transition and the plugin travelled back, which drops it.
 
 ```
@@ -445,7 +445,7 @@ Concatenation: `base + path`. With an empty base, a path that would read as a ho
 
 Popstate event handling, critical error recovery, and deferred event processing live in `shared/browser-env/`:
 
-- `shared/browser-env/popstate-utils.ts` — `getRouteFromEvent` (validates `history.state` via `isStateStrict`, falls back to `api.matchPath(browser.getLocation())` when invalid), `updateBrowserState` (the four-channel projection `{ name, params, search, path }` — hash-plugin's writer, and since #1837 the URL rollback's too, so a rollback entry carries the same members every other write site does), `createUpdateBrowserState` (mutable-buffer factory used by browser-plugin on the hot path)
+- `shared/browser-env/popstate-utils.ts` — `getRouteFromEvent` (validates `history.state` via `isStateStrict`, falls back to `api.matchPath(browser.getLocation())` when invalid), `updateBrowserState` (the four-channel projection `{ name, params, search, path }` — hash-plugin's writer and the URL rollback's, so a rollback entry carries the same members every other write site does), `createUpdateBrowserState` (mutable-buffer factory used by browser-plugin on the hot path)
 - `shared/browser-env/popstate-handler.ts` — `createPopstateHandler` (deferred-queue, last-write-wins, `RouterError` vs critical-error split), `createPopstateLifecycle` (popstate listener add/remove + `cleanup` callback)
 - `historyState` is a subset of `State`: only `{ name, params, search, path }` and the entry's `position` are stored in `history.state` — `transition`, `context`, etc. are not persisted across reloads
 - Error categorization in `popstate-handler.ts`: a refusal — a `RouterError` other than `SAME_STATES` / `TRANSITION_CANCELLED` — and anything else, after `recoverFromCriticalError()` logs it, go through `returnOrRollback()`; a `TRANSITION_CANCELLED` goes through it once a look finds none of the navigations announced during the traversal running, and `returnOrRollback()` writes nothing when one of them committed; `SAME_STATES`, and a `TRANSITION_CANCELLED` under a router that refused the watch, refuse nothing and resync the live entry with `rollbackUrlToCurrentState()`
@@ -491,10 +491,10 @@ router.navigate() → success
         ▼
   Plugin.onTransitionSuccess()
         ├── shouldReplaceHistory(navOptions, toState, fromState)
-        ├── hash = navOptions.hash === undefined ? cached `currentHash` : normalizeHashInput(navOptions.hash)  (#532)
+        ├── hash = navOptions.hash === undefined ? cached `currentHash` : normalizeHashInput(navOptions.hash)
         ├── urlClaim.write(toState, { hash, hashChanged: navOptions.hashChange ?? hash !== publishedPrevHash })
         ├── url = buildUrl(toState.path, base); finalUrl = hash ? `${url}#${encodeHashFragment(hash)}` : url
-        ├── updateState(toState, finalUrl, replaceHistory, browser)  ← reuses buffer (skipped when canSkipPopstateHistoryWrite, #1353)
+        ├── updateState(toState, finalUrl, replaceHistory, browser)  ← reuses buffer (skipped when canSkipPopstateHistoryWrite)
         └── claim.write(toState, FROZEN_POPSTATE | FROZEN_NAVIGATE)
 
 router.stop()
@@ -502,13 +502,13 @@ router.stop()
         ▼
   Plugin.onStop()
         ├── Removes popstate listener (lifecycle.onStop)
-        └── Removes the hashchange listener if still owned (#758 / #759)
+        └── Removes the hashchange listener if still owned
 
 unsubscribe() or router.dispose()
         │
         ▼
   Plugin.teardown()
-        ├── Removes the hashchange listener if still owned (#758 / #759)
+        ├── Removes the hashchange listener if still owned
         ├── Removes popstate listener (lifecycle.teardown)
         └── cleanup() — removeStartInterceptor(), removeExtensions(), claim.release(), urlClaim.release()
 ```
@@ -530,14 +530,14 @@ extractPath("/app/users/123", { base: "/app" })
 
 Requires a server-side fallback (all paths → `index.html`).
 
-### Hash Fragment Support (#532)
+### Hash Fragment Support
 
 URL fragments are first-class state via the `state.context.url` namespace, written by the plugin in `onTransitionSuccess` with tri-state semantics:
 
 ```typescript
 // factory.ts — onTransitionSuccess
 // "preserve" reads the cached `currentHash` (kept fresh by a hashchange listener
-// + the plugin's own nav-writes), NOT a per-nav location.hash read (#1019).
+// + the plugin's own nav-writes), NOT a per-nav location.hash read.
 const browserHash = currentHash;
 const publishedPrevHash =
   (fromState?.context as { url?: { hash?: string } } | undefined)?.url?.hash ??

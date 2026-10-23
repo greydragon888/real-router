@@ -227,15 +227,15 @@ this.#removeExtensions = api.extendRouter({
 });
 ```
 
-`createReplaceHistoryState` from `browser-env` creates the `replaceHistoryState` method — it resolves the target **and both channels** via `api.buildNavigationState` (the caller's `search` goes in, the resolved `params`/`search` come out), then writes that state as the record and builds the URL from it, both via `browser.replaceState`. Taking the query from the resolved state rather than the raw argument is what keeps a `forwardTo` chain's query-channel `defaultParams` in `history.state` (#1574) — and the URL is built from the same resolved triple, so the two halves of one `replaceState` call cannot describe different states (#1585). Before that they could: the URL went through `buildUrl` with the caller's RAW arguments, which reached the public `buildPath` of the day — no `forwardTo` resolution, no `forwardState` seam — so a `persistent-params` injection landed in the record and not in the URL beside it. The record is the resolved state VERBATIM; there is no `api.makeState` re-make, which was a leftover from `buildState` (that primitive built no path, so one had to be supplied) and rebuilt a byte-identical state per record.
+`createReplaceHistoryState` from `browser-env` creates the `replaceHistoryState` method — it resolves the target **and both channels** via `api.buildNavigationState` (the caller's `search` goes in, the resolved `params`/`search` come out), then writes that state as the record and builds the URL from it, both via `browser.replaceState`. Taking the query from the resolved state rather than the raw argument is what keeps a `forwardTo` chain's query-channel `defaultParams` in `history.state` — and the URL is built from the same resolved triple, so the two halves of one `replaceState` call cannot describe different states. The record is the resolved state VERBATIM; there is no `api.makeState` re-make, because the resolved state already carries its path.
 
 ### Cleanup on teardown
 
-Lifecycle hooks (`onStart`, `onStop`, `teardown`) are created by `createPopstateLifecycle` from `browser-env`:
+Lifecycle hooks (`onStart`, `onStop`, `teardown`) are created by `createHashSyncLifecycle` from `browser-env`:
 
 ```typescript
 // plugin.ts, constructor
-this.#lifecycle = createPopstateLifecycle({
+this.#lifecycle = createHashSyncLifecycle({
   browser,
   shared,
   handler,
@@ -246,7 +246,7 @@ this.#lifecycle = createPopstateLifecycle({
 });
 ```
 
-`teardown` removes the popstate **and** hashchange listeners (both stored under the single `removePopStateListener` slot as a combined remover, #759), then calls the `cleanup` callback which unregisters the start interceptor and router extensions.
+`teardown` removes the popstate **and** hashchange listeners (both stored under the single `removePopStateListener` slot as a combined remover), then calls the `cleanup` callback which unregisters the start interceptor and router extensions.
 
 As a safety net, `router.dispose()` also cleans up any extensions that plugins failed to remove in their `teardown`.
 
@@ -282,7 +282,7 @@ interface SharedFactoryState {
 }
 ```
 
-The `shared` object is created once in `hashPluginFactory()` and passed to `createHashSyncLifecycle` from `browser-env` (hash-plugin's variant of `createPopstateLifecycle` that also wires `hashchange`, #759).
+The `shared` object is created once in `hashPluginFactory()` and passed to `createHashSyncLifecycle` from `browser-env` (hash-plugin's variant of `createPopstateLifecycle` that also wires `hashchange`).
 
 **Why is it needed?**
 
@@ -291,7 +291,7 @@ Each new plugin instance registers its own popstate + hashchange listeners in `o
 
 `shared` is intentionally mutable. It's the only shared state between instances of the same factory.
 
-**Factory pool — last-wins (concurrent-live caveat, #758).** Because the single `removePopStateListener` slot is shared, each `onStart` removes the previous instance's listeners before installing its own. (For hash-plugin the slot holds a combined remover for **both** the popstate and hashchange listeners, #759.) The pattern is built for a pool where routers are created/destroyed **sequentially** (one live router at a time). If two routers from the same factory are live **at the same time** on one window, only the **last-started** one tracks `popstate`/`hashchange` — the earlier one silently desyncs from the URL. There is a single event stream and a single URL, so this mutual exclusivity is inherent. For genuinely concurrent routers, give each its own factory instance. Locked by `tests/stress/plugin-lifecycle-churn.stress.ts`.
+**Factory pool — last-wins (concurrent-live caveat).** Because the single `removePopStateListener` slot is shared, each `onStart` removes the previous instance's listeners before installing its own. (For hash-plugin the slot holds a combined remover for **both** the popstate and hashchange listeners.) The pattern is built for a pool where routers are created/destroyed **sequentially** (one live router at a time). If two routers from the same factory are live **at the same time** on one window, only the **last-started** one tracks `popstate`/`hashchange` — the earlier one silently desyncs from the URL. There is a single event stream and a single URL, so this mutual exclusivity is inherent. For genuinely concurrent routers, give each its own factory instance. Locked by `tests/stress/plugin-lifecycle-churn.stress.ts`.
 
 ## Data Flow: Navigation
 
@@ -308,7 +308,7 @@ router.navigate(name, params, search, opts)
         │     (from browser-env: replace ?? !fromState || reload && path match)
         │
         ├── skip? popstate + shouldReplace + canSkipPopstateHistoryWrite
-        │     (browser already restored the identical entry — #1353)
+        │     (browser already restored the identical entry)
         │     └── yes → no write (avoids a redundant Blink history event)
         │
         ├── url = router.buildUrl(toState.name, toState.params)   [only when writing]
@@ -324,7 +324,7 @@ router.navigate(name, params, search, opts)
 
 ## Data Flow: popstate (back/forward buttons) + hashchange (external fragment changes)
 
-Event handling is delegated to `browser-env` via `createPopstateHandler`. browser-plugin wires it with `createPopstateLifecycle` (popstate only); hash-plugin wires it with `createHashSyncLifecycle` (popstate **and** hashchange, #759). Both events reach the **same** handler; the flow below is shared:
+Event handling is delegated to `browser-env` via `createPopstateHandler`. browser-plugin wires it with `createPopstateLifecycle` (popstate only); hash-plugin wires it with `createHashSyncLifecycle` (popstate **and** hashchange). Both events reach the **same** handler; the flow below is shared:
 
 ```
 User clicks back/forward (popstate) OR changes the fragment externally (hashchange)
@@ -332,7 +332,7 @@ User clicks back/forward (popstate) OR changes the fragment externally (hashchan
         ▼
   addPopstateListener / addHashChangeListener → handler(evt)  (from createPopstateHandler)
         │
-        ├── location = browser.getLocation()   (snapshot at fire time, #757)
+        ├── location = browser.getLocation()   (snapshot at fire time)
         │
         ├── the return returnOrRollback started, landing on its origin?
         │     (positions.takeReturn() consumes it either way)
@@ -358,7 +358,7 @@ User clicks back/forward (popstate) OR changes the fragment externally (hashchan
         │     YES: await router.navigate(route.name, route.params, route.search, transitionOptions)
         │     NO + allowNotFound: router.navigateToNotFound(location)
         │     NO + !allowNotFound: api.emitTransitionError(ROUTE_NOT_FOUND) + returnOrRollback(start)
-        │                          (no silent navigateToDefault — see #483)
+        │                          (no silent navigateToDefault)
         │
         ├── catch (error):
         │     SAME_STATES → rollbackUrlToCurrentState() (nothing refused)
@@ -405,17 +405,17 @@ Rapid back/forward clicks generate multiple popstate events in quick succession.
 
 The `isTransitioning` flag blocks concurrent processing.
 New events are written to the single-slot `deferred = { evt, location }` queue — each one overwrites the previous (last-write-wins).
-The `location` is snapshotted when the event fires, not when it is replayed: the in-flight navigation's `onTransitionSuccess → replaceState` overwrites the live hash location before `processDeferredEvent()` runs, so re-reading it then would resolve the wrong target (#757).
+The `location` is snapshotted when the event fires, not when it is replayed: the in-flight navigation's `onTransitionSuccess → replaceState` overwrites the live hash location before `processDeferredEvent()` runs, so re-reading it then would resolve the wrong target.
 After the current transition completes, `processDeferredEvent()` processes the last deferred event against its snapshotted location — unless the router refused the transition and the plugin travelled back, which drops it.
 
-### popstate/hashchange dedup (#759)
+### popstate/hashchange dedup
 
-`createHashSyncLifecycle` registers both listeners but must not act on both when a **hash-changing back/forward** fires the pair synchronously (one browser task) — that would double-navigate. Two type-scoped flags (`sawPopstate` / `sawHashchange`), reset on a microtask, drop whichever of the pair arrives **second**. The dedup is **order-independent** (works whether the browser fires popstate or hashchange first) and does not coalesce:
+`createHashSyncLifecycle` registers both listeners but must not act on both when a **hash-changing back/forward** fires the pair synchronously (one browser task) — that would double-navigate. Two type-scoped flags (`sawPopstate` / `sawHashchange`), reset on a macrotask (`setTimeout(0)`), drop whichever of the pair arrives **second**. A microtask reset would not hold: a microtask checkpoint runs between the pair's two listeners. The dedup is **order-independent** (works whether the browser fires popstate or hashchange first) and does not coalesce:
 
-- **Separate gestures** land in separate tasks → the microtask reset clears the flags between them, so each is handled.
+- **Separate gestures** land in separate tasks → the macrotask reset clears the flags between them, so each is handled.
 - **Same-type bursts** (two rapid `popstate`s → the deferred path above) are unaffected: a `popstate` only blocks a following `hashchange`, never another `popstate`.
 
-An **external** fragment change fires `hashchange` alone (no popstate), so it is never dropped — that is the gap #759 closed.
+An **external** fragment change fires `hashchange` alone (no popstate), so it is never dropped; without the `hashchange` listener it would not reach the router at all.
 
 See [`shared/browser-env/popstate-handler.ts`](../../shared/browser-env/popstate-handler.ts) (`createHashSyncLifecycle`) for implementation details.
 
@@ -503,7 +503,7 @@ router.start()
         ▼
   Plugin.onStart()
         ├── Removes previous popstate + hashchange listeners (if any)
-        └── Registers new popstate + hashchange listeners (combined remover, #759)
+        └── Registers new popstate + hashchange listeners (combined remover)
 
 router.navigate() → success
         │
@@ -576,7 +576,7 @@ buildUrl("users.profile", { id: "123" })
 | URL format         | `/app/users/123`                           | `#!/users/123`                                  |
 | Path extraction    | `String.startsWith` + `slice`              | Pre-computed RegExp via `createHashPrefixRegex` |
 | Hash preservation  | Preserves hash when paths match            | N/A — hash IS the route                         |
-| Event sources      | `popstate` only (`createPopstateLifecycle`) | `popstate` + `hashchange`, deduped (`createHashSyncLifecycle`, #759) |
+| Event sources      | `popstate` only (`createPopstateLifecycle`) | `popstate` + `hashchange`, deduped (`createHashSyncLifecycle`) |
 | Regex              | Not needed                                 | Pre-computed once at factory time               |
 | Server config      | Requires fallback (all paths → index.html) | No server config needed                         |
 | `buildUrl` formula | `base + path`                              | `urlPrefix + path` (pre-computed prefix)        |
