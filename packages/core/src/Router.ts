@@ -159,6 +159,13 @@ export class Router<
   readonly #eventBus: EventBusNamespace;
 
   /**
+   * The logger core built and calls the callback through, held for the
+   * reentrancy ban — not the `getInternals(this).logger` slot, which a plugin
+   * may replace (#2303).
+   */
+  readonly #logger: RouterLogger;
+
+  /**
    * Per-instance suppressor for fire-and-forget `start()`. It logs through THIS
    * router's logger (built in the constructor), so it cannot be static (#724).
    *
@@ -173,6 +180,15 @@ export class Router<
    * classify through ONE shared policy, `isExpectedRejection`.
    */
   readonly #onSuppressedStartError: (error: unknown) => void;
+
+  /**
+   * The `start` seam's interceptor chain, which `#runStart` runs after the
+   * facade's checks. `getInternals(this).start` is the facade itself, so the
+   * published member takes those checks too (#2786). `unknown`, because an
+   * interceptor that skips `next()` returns whatever it returns, and
+   * `#runStart` asks for a thenable.
+   */
+  readonly #startChain: (path: string) => unknown;
 
   /**
    * The href door's own run of the `forwardState` chain, above the route-default
@@ -216,6 +232,8 @@ export class Router<
     // deps at wiring; a plugin reads the frozen three-method view PluginApi
     // carries (#2339 slice 2), not this instance.
     const logger = new RouterLogger(normalizedLogger);
+
+    this.#logger = logger;
 
     // Per-instance fire-and-forget suppressor (see the field declaration): it
     // logs through THIS router's logger, so it is built here, not static.
@@ -561,6 +579,14 @@ export class Router<
       );
     };
 
+    this.#startChain = createInterceptable(
+      SEAM.start,
+      (path: string) => {
+        return this.#lifecycle.start(path);
+      },
+      interceptorsMap,
+    );
+
     // ⚑ Named rather than passed as a literal, so an adapter below can reach
     // `internals.validator` at CALL time without a WeakMap hop per call. The
     // guards live here rather than on the facade (#2259): `getInternals` ships
@@ -671,6 +697,10 @@ export class Router<
         );
       },
       navigateToNotFound: (path) => {
+        // The facade's ban, in the facade's order: no window reaches the
+        // commit through this door either (#2786).
+        this.#assertNotReentrant();
+
         // ⚠ The public facade's own check, copied EXACTLY (#2259) — including
         // the `!== undefined` arm. The internals signature declares `path`
         // required, so a stricter test reads as defensible and is not: it would
@@ -683,15 +713,14 @@ export class Router<
 
         return this.#navigation.navigateToNotFound(path);
       },
-      revalidateToNotFound: (path) =>
-        this.#navigation.revalidateToNotFound(path),
-      start: createInterceptable(
-        SEAM.start,
-        (path: string) => {
-          return this.#lifecycle.start(path);
-        },
-        interceptorsMap,
-      ),
+      revalidateToNotFound: (path) => {
+        this.#assertNotReentrantOutsideRevalidation();
+
+        return this.#navigation.revalidateToNotFound(path);
+      },
+      // The facade, not the chain: `canStart()` and the ban run first, as they
+      // do for `router.start()` (#2786). `#runStart` runs `#startChain`.
+      start: (path) => this.start(path),
       navigateToState: (state, navOpts) => {
         // Plugin-only navigation primitive (#525). Fire-and-forget safe like the
         // public facade methods — popstate handlers call it without awaiting —
@@ -751,8 +780,11 @@ export class Router<
       getStateName: () => this.#state.get()?.name,
       isTransitioning: () => this.#eventBus.isTransitioning(),
       systemCommit: (toState, fromState, opts) => {
-        // ⚑ ONE read of the caller's name (#2085), taken above both consumers.
-        // The State may be a plugin's, so each read is a call into application
+        this.#assertNotReentrantOutsideRevalidation();
+
+        // ⚑ ONE read of the caller's name (#2085), taken above every consumer:
+        // the check below and the commit, which takes this answer (#2786). The
+        // State may be a plugin's, so each read is a call into application
         // code, and asking twice lets the door commit a name it never checked.
         const name = toState.name;
 
@@ -774,7 +806,7 @@ export class Router<
           );
         }
 
-        return this.#eventBus.systemCommit({ toState, fromState, opts });
+        return this.#eventBus.systemCommit({ toState, fromState, opts }, name);
       },
       routerExtensions: [],
       contextClaimRecords: new Map(),
@@ -1070,7 +1102,7 @@ export class Router<
     this.#eventBus.sendCancelIfPossible(this.#state.get());
 
     if (this.#eventBus.isReady() || this.#eventBus.isTransitioning()) {
-      this.#eventBus.sendStop();
+      this.#eventBus.sendStopForDispose();
     }
 
     this.#eventBus.sendDispose();
@@ -1536,7 +1568,7 @@ export class Router<
     let internalStart: Promise<State>;
 
     try {
-      const chainResult: unknown = getInternals(this).start(startPath);
+      const chainResult: unknown = this.#startChain(startPath);
 
       // A `start` interceptor that returns without calling next() yields a
       // non-thenable (typically undefined); the `.catch` below would then throw
@@ -1563,7 +1595,7 @@ export class Router<
 
   /**
    * Rejects a synchronous reentrant navigation — which calls, and from which
-   * windows, is `INVARIANTS.md` "Reentrancy & dispatch" rows 1 and 4. Throws
+   * windows, is `INVARIANTS.md` "Reentrancy & dispatch" rows 1 and 4–7. Throws
    * synchronously: inside an emitter listener the emit's `onListenerError`
    * isolation surfaces it (visible, non-fatal); inside an `abort` listener the
    * platform reports it as an uncaught exception, which ends a Node process. A
@@ -1571,8 +1603,9 @@ export class Router<
    * allowed. Always-on core invariant guard (not validator-gated).
    *
    * TWO windows around the announce, because application code runs in two
-   * places core does not control, on opposite sides of it (the third,
-   * `replace()`'s revalidation, is commented at its check below):
+   * places core does not control, on opposite sides of it (the logger's
+   * callback and `replace()`'s revalidation are commented at their checks
+   * below, the 404 consultation at `isCommittingNotFound`):
    *
    * - **Dispatch** (`isProcessing`) — a transition-event listener, mid-emit
    *   (RFC navigation-cancellation-unification §4) — and, since #1647, a
@@ -1603,6 +1636,16 @@ export class Router<
    * this order.
    */
   #assertNotReentrant(): void {
+    // Core logs from the middle of its own operations, and the callback is the
+    // application's — one call site, so this holds every logging site (#2786).
+    // Asked FIRST: the callback may run inside a dispatch (a listener's error),
+    // where only this text names the code that navigated.
+    if (this.#logger.isInCallback()) {
+      throw atRouter.code(
+        errorCodes.REENTRANT_NAVIGATION,
+      )`cannot start a navigation from inside the logger's callback — core logs from the middle of its own operations, and a navigation started there would run inside the one being logged. Defer it: queueMicrotask(() => router.navigate(...)).`;
+    }
+
     if (this.#eventBus.isProcessing()) {
       throw atRouter.code(
         errorCodes.REENTRANT_NAVIGATION,
@@ -1615,15 +1658,35 @@ export class Router<
       )`cannot start a navigation from inside a forwardState interceptor, a route's encodeParams or dynamic forwardTo callback, or a defaultRoute/defaultParams/defaultSearch option callback — they run while a navigation is being prepared, before it is announced. Defer it: queueMicrotask(() => router.navigate(...)).`;
     }
 
-    // ⚠ The THIRD window, with its own sentence for the reason the two above
-    // have theirs (#1665): no emit is on the stack and no navigation is being
-    // prepared, so both of those texts read as spurious here. Without the
-    // refusal the revalidation defers to a navigation that may never commit, and
-    // a state on a dropped route then has nothing left to revalidate it (#1759).
+    if (this.#navigation.isCommittingNotFound()) {
+      throw atRouter.code(
+        errorCodes.REENTRANT_NAVIGATION,
+      )`cannot start a navigation from inside a canDeactivate guard that navigateToNotFound() consults — the 404 commits from the state read before the guard was asked. A guard does not redirect: return false to stay, or defer the navigation: queueMicrotask(() => router.navigate(...)).`;
+    }
+
+    // ⚠ A window with its own sentence for the reason the ones above have
+    // theirs (#1665): no logger callback, emit or 404 commit is on the stack
+    // and no navigation is being prepared, so each of those texts reads as
+    // spurious here. Without the refusal the revalidation defers to a
+    // navigation that may never commit, and a state on a dropped route then has
+    // nothing left to revalidate it (#1759).
     if (this.#routes.isRevalidating()) {
       throw atRouter.code(
         errorCodes.REENTRANT_NAVIGATION,
       )`cannot start a navigation from inside replace()'s revalidation — the revalidation would then defer to a commit that may never happen. Defer it: queueMicrotask(() => router.navigate(...)).`;
+    }
+  }
+
+  /**
+   * The ban for the two `getInternals` commit doors `replace()`'s revalidation
+   * calls, `revalidateToNotFound` and `systemCommit` (#2786). Inside that
+   * window the caller is core, and the revalidation may itself run inside
+   * another window — a `replace()` from a listener — so nothing is asked there.
+   * Outside it they refuse as `navigate()` does.
+   */
+  #assertNotReentrantOutsideRevalidation(): void {
+    if (!this.#routes.isRevalidating()) {
+      this.#assertNotReentrant();
     }
   }
 

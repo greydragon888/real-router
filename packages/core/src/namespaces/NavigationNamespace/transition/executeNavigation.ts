@@ -390,8 +390,6 @@ export function executeNavigation(
   let nav: NavigationPlan | undefined;
 
   try {
-    fromState = deps.getState();
-
     // Read FIRST and once: everything that happens to the signal after this
     // point happened INSIDE the navigation, and must reach it through the
     // machine rather than through a throw.
@@ -419,6 +417,13 @@ export function executeNavigation(
     // now come off core's own data, so the caller's accessors are entered
     // exactly once per key — including keys core never names.
     opts = adoptNavigationOptions(opts);
+
+    // ⚑ The ANCHOR, read after the last call into the caller's object (#2786).
+    // No window counts an `opts` getter, so a navigation one starts has
+    // committed by this line or is in flight, superseded below; read above the
+    // getters, `fromState` would name a route the router had left.
+    // `entry-reads-opts-once.test.ts` holds the order.
+    fromState = deps.getState();
 
     // ⚑ EVERY flag is hoisted here, above both readers (#1719 / #1817), on the
     // stated ground that `opts` is accessor- or Proxy-backed BY CONTRACT, so

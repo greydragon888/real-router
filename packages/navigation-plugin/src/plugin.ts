@@ -298,8 +298,9 @@ export class NavigationPlugin {
       onStart: () => {
         // A router that starts during a staging call was restarted from code
         // that call ran before its own transition started. Core refuses a
-        // restart from a router notification there (#2778), not from the
-        // logger's callback. Its start transition is not the call's.
+        // restart from a router notification and from the logger's callback
+        // there (#2778, #2786); the drop does not rely on it. Its start
+        // transition is not the call's.
         this.#staged = undefined;
         lifecycle.onStart();
       },
@@ -469,9 +470,9 @@ export class NavigationPlugin {
 
   /**
    * `#stage` for the commit `commit` makes without a transition —
-   * `navigateToNotFound()`. `onTransitionStart` never reads it, so a
-   * transition a `canDeactivate` guard of the current route starts inside that
-   * call takes none of it; a commit an app makes from that guard reads it too.
+   * `navigateToNotFound()`. `onTransitionStart` never reads it, and core
+   * refuses a navigation a `canDeactivate` guard of the current route starts
+   * inside that call (#2786), so the call's own commit is the one to read it.
    */
   #stageCommit<T>(record: NavigationRecord, commit: () => T): T {
     const outer = this.#stagedCommit;

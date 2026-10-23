@@ -36,13 +36,12 @@ import { describe, expect, it } from "vitest";
  * the inventory and stop noticing a second `opts.signal` read. The set below is
  * keyed by FUNCTION, so the files merge without ambiguity.
  */
-const FILES = [
-  path.resolve(
-    __dirname,
-    "../../../src/namespaces/NavigationNamespace/transition/executeNavigation.ts",
-  ),
-  path.resolve(__dirname, "../../../src/helpers.ts"),
-];
+const ENTRY = path.resolve(
+  __dirname,
+  "../../../src/namespaces/NavigationNamespace/transition/executeNavigation.ts",
+);
+
+const FILES = [ENTRY, path.resolve(__dirname, "../../../src/helpers.ts")];
 
 function parse(file: string): ts.SourceFile {
   return ts.createSourceFile(
@@ -121,12 +120,82 @@ function optsReadsByFunction(source: ts.SourceFile): Record<string, string[]> {
   return reads;
 }
 
+/**
+ * The entry's `deps.getState()` calls, and its reads of the CALLER's `opts`:
+ * every reference to `opts` up to the assignment that swaps it for core's copy.
+ */
+function anchorAndCallerReads(source: ts.SourceFile): {
+  readonly anchors: readonly number[];
+  readonly callerReads: readonly {
+    readonly end: number;
+    readonly via: string;
+  }[];
+} {
+  const entry = source.statements.find(
+    (node): node is ts.FunctionDeclaration =>
+      ts.isFunctionDeclaration(node) && node.name?.text === "executeNavigation",
+  );
+  const anchors: number[] = [];
+  const optsRefs: ts.Identifier[] = [];
+  let swap: ts.BinaryExpression | undefined;
+
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      ts.isIdentifier(node.left) &&
+      node.left.text === "opts" &&
+      ts.isCallExpression(node.right) &&
+      ts.isIdentifier(node.right.expression) &&
+      node.right.expression.text === "adoptNavigationOptions"
+    ) {
+      swap ??= node;
+    }
+
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      ts.isIdentifier(node.expression.expression) &&
+      node.expression.expression.text === "deps" &&
+      node.expression.name.text === "getState"
+    ) {
+      anchors.push(node.getStart());
+    }
+
+    if (ts.isIdentifier(node) && node.text === "opts") {
+      optsRefs.push(node);
+    }
+
+    node.forEachChild(visit);
+  };
+
+  entry?.body?.forEachChild(visit);
+
+  const callerReads = optsRefs
+    .filter(
+      (ref) =>
+        swap !== undefined && ref.getStart() < swap.end && ref !== swap.left,
+    )
+    .map((ref) => ({
+      end: ref.end,
+      via:
+        ts.isCallExpression(ref.parent) &&
+        ts.isIdentifier(ref.parent.expression)
+          ? ref.parent.expression.text
+          : ts.SyntaxKind[ref.parent.kind],
+    }));
+
+  return { anchors, callerReads };
+}
+
 describe("the caller's `opts` is read at the entry, once", () => {
   const reads: Record<string, string[]> = {};
 
   for (const file of FILES) {
     Object.assign(reads, optsReadsByFunction(parse(file)));
   }
+
+  const { anchors, callerReads } = anchorAndCallerReads(parse(ENTRY));
 
   it("`beginTransition` reads no `opts` field at all", () => {
     // POSITIVE CONTROL for the scan: it finds reads SOMEWHERE, so an empty
@@ -173,5 +242,23 @@ describe("the caller's `opts` is read at the entry, once", () => {
       // why the entry above now names all six rather than five.
       ownSignal: ["signal"],
     });
+  });
+
+  it("reads `fromState` after the last read of the caller's object (#2786)", () => {
+    // A getter on `opts` runs application code that no window counts, and a
+    // navigation it starts commits inside it unless a guard holds it. Read
+    // above it, `fromState` would name a route the router had already left.
+    //
+    // POSITIVE CONTROL: the caller's reads up to the swap for core's copy are
+    // found by name, and the entry reads the committed state once.
+    expect(callerReads.map((read) => read.via)).toStrictEqual([
+      "ownSignal",
+      "adoptNavigationOptions",
+    ]);
+    expect(anchors).toHaveLength(1);
+
+    expect(anchors[0]).toBeGreaterThan(
+      Math.max(...callerReads.map((read) => read.end)),
+    );
   });
 });

@@ -27,6 +27,7 @@ instance.
 | `log(context, message, ...args)` | Log at "log" level |
 | `warn(context, message, ...args)` | Log at "warn" level |
 | `error(context, message, ...args)` | Log at "error" level |
+| `isInCallback()` | Whether the user callback is on the stack — read by the router's reentrancy ban |
 
 ## Module Structure
 
@@ -42,6 +43,7 @@ core/src/utils/logger/
 - **Per-router instance (no singleton)** -- each router builds its own `RouterLogger` from `options.logger` in the constructor and stores it on `RouterInternals.logger`; `configure()` affects only that instance, so config never leaks across routers (#724). Reached via `getInternals(router).logger`
 - **Callback errors are swallowed — synchronous throws AND async rejections** -- a synchronous `throw` is caught and reported as `[router] Error in callback:`; an async callback (a `(...) => Promise<void>` is assignable to the `void`-typed `LogCallback`) whose returned Promise rejects is isolated too (`[router] Error in async callback:`), so it is **not** leaked as a Node `unhandledRejection` — process-fatal under `--unhandled-rejections=strict`, Node 22+ default (#1161). Both report via `console.error` directly (avoids recursive logger calls), mirroring core's `subscribe` isolation (#944)
 - **Re-entrant callbacks are a safe no-op** -- if `callback` calls `logger.*`, an `#inCallback` re-entrancy guard skips the nested callback invocation (the nested message still reaches the console once). Without it the call would recurse ~5.9k deep to a swallowed `RangeError` (#791)
+- **The callback cannot navigate the router that logs** -- `Router.#assertNotReentrant` asks `isInCallback()` first and throws `REENTRANT_NAVIGATION` for a navigation or a restart started from the callback; a deferred one runs (#2786). Core `INVARIANTS.md` "Reentrancy & dispatch" row 5
 - **`callbackIgnoresLevel`** -- when true, callback receives ALL messages even if console output is filtered; when false (default), callback follows the same threshold as console
 - **Level `"none"` early exit** -- when level is `"none"` and `callbackIgnoresLevel` is false, `#writeLog` returns immediately without any processing
 - **Console safety** -- `#writeToConsole` checks `typeof console !== "undefined"` and `typeof console[level] === "function"` before calling

@@ -735,11 +735,11 @@ function census(
  * The vocabulary. `identity:<form>` names the form the place's code must hold;
  * the rest name why a place without one is not a defect, or which decision
  * left it as it is. An `equivalent`, `ban-equivalent` or `contract` verdict
- * names the test cell that holds its fact (`HELD_BY`); an `unsupported` or
- * `cheap-wave` one lapses when its place gains an identity form.
+ * names the test cell that holds its fact (`HELD_BY`); an `unsupported` one
+ * lapses when its place gains an identity form.
  */
 const VERDICT =
-  /^(?:identity:(?:plan|own-controller|plan-record|end-record)|slot-intent|equivalent:.+|ban-equivalent:.+|unsupported:.+|cheap-wave|contract:.+|not-outcome)$/u;
+  /^(?:identity:(?:plan|own-controller|plan-record|end-record)|slot-intent|equivalent:.+|ban-equivalent:.+|unsupported:.+|contract:.+|not-outcome)$/u;
 
 const EBN = "namespaces/EventBusNamespace/EventBusNamespace.ts";
 const NAV = "namespaces/NavigationNamespace";
@@ -754,6 +754,7 @@ const BAN_ANNOUNCE = "ban-equivalent:the announce is a counted dispatch";
 const BAN_BRIDGE = "ban-equivalent:the bridge closes with its navigation";
 const BAN_REVALIDATION =
   "ban-equivalent:the revalidation window refuses navigation";
+const BAN_NOT_FOUND = "ban-equivalent:the 404 consultation refuses navigation";
 const EQ_UNWIND =
   "equivalent:a start in READY without a state is the one unwinding";
 const EQ_EDGE =
@@ -775,7 +776,7 @@ const LEDGER = new Map<string, string>([
   [`${EDGE}:STARTING.STOP(-)`, SLOT],
   [`${EDGE}:STARTING.DISPOSE(-)`, SLOT],
   [`${EDGE}:READY.NAVIGATE(-)`, NOT],
-  [`${EDGE}:READY.SYSTEM_COMMIT(-)`, "cheap-wave"], // row 7
+  [`${EDGE}:READY.SYSTEM_COMMIT(-)`, N5], // row 7
   [`${EDGE}:READY.STOP(-)`, SLOT],
   [`${EDGE}:READY.DISPOSE(-)`, SLOT],
   [`${EDGE}:TRANSITION_STARTED.NAVIGATE(-)`, NOT],
@@ -808,7 +809,7 @@ const LEDGER = new Map<string, string>([
   ["Router.ts › dispose › phase:isTransitioning", SLOT], // row 9
   ["Router.ts › dispose › send:sendCancelIfPossible", SLOT], // row 9
   ["Router.ts › dispose › send:sendDispose", SLOT], // row 9
-  ["Router.ts › dispose › send:sendStop", SLOT], // row 9
+  ["Router.ts › dispose › send:sendStopForDispose", SLOT], // row 9
   ["Router.ts › isActive › phase:isActive", NOT],
   ["Router.ts › isTransitioning › phase:isTransitioning", NOT],
   ["Router.ts › navigateToNotFound › phase:isActive", NOT],
@@ -838,6 +839,7 @@ const LEDGER = new Map<string, string>([
     "identity:own-controller",
   ], // row 29
   [`${EBN} › settleLeavePromises › read:aborted`, "identity:own-controller"], // row 29
+  [`${EBN} › bridgeExternalSignal › read:cancelReason`, "identity:plan-record"], // bridge-registration-reentry-2786.test.ts
   [`${EBN} › canBeginTransition › phase:canSend`, NOT],
   [`${EBN} › canCancel › phase:canSend`, SLOT],
   [`${EBN} › canCommitTransition › phase:canSend`, "identity:plan"], // row 18
@@ -851,7 +853,7 @@ const LEDGER = new Map<string, string>([
   [`${EBN} › sendCancelIfInFlight › bus:sendCancelIfPossible`, "identity:plan"], // row 13
   [`${EBN} › sendCancelIfPossible › bus:sendCancel`, SLOT], // row 3
   [`${EBN} › sendCancelIfPossible › phase:canCancel`, SLOT], // row 3
-  [`${EBN} › systemCommit › phase:canSend`, "cheap-wave"], // row 7
+  [`${EBN} › systemCommit › phase:canSend`, N5], // row 7
 
   // Navigation.
   [`${NAV}/NavigationNamespace.ts › #navigate › phase:isStarting`, NOT],
@@ -893,6 +895,10 @@ const LEDGER = new Map<string, string>([
     `${TRANSITION}/errorHandling.ts › isTransitionCancelled › code:instanceof RouterError`,
     NOT,
   ],
+  [
+    `${TRANSITION}/errorHandling.ts › leaveFailure › call:isNavigationEnd`,
+    "identity:end-record",
+  ], // row 28, the leave-listener arm: another-navigations-end-in-a-leave-listener.test.ts
   [
     `${TRANSITION}/errorHandling.ts › rethrowAsRouterError › code:instanceof RouterError`,
     NOT,
@@ -979,7 +985,7 @@ const LEDGER = new Map<string, string>([
   ], // row 26
   [
     `${TRANSITION}/navigateToNotFound.ts › commitNotFound › send:systemCommit`,
-    "cheap-wave",
+    BAN_NOT_FOUND,
   ], // row 15
   [
     "navigationEnds.ts › isNavigationEnd › read:registry",
@@ -1019,6 +1025,10 @@ const HELD_BY = new Map<string, string>([
   [
     BAN_REVALIDATION,
     "functional/revalidation-window-doors-1758.test.ts › every named door consults the window",
+  ],
+  [
+    BAN_NOT_FOUND,
+    "functional/navigation/reentrant-doors-2786.test.ts › refuses a navigation a consulted guard starts; the guard's own verdict then decides",
   ],
   [
     EQ_UNWIND,
@@ -1252,12 +1262,9 @@ describe("the outcome-decision census of core (#2796)", () => {
     expect(unheld).toStrictEqual([]);
   });
 
-  it("an unsupported or cheap-wave place still decides without an identity form", () => {
+  it("an unsupported place still decides without an identity form", () => {
     const stale = [...LEDGER]
-      .filter(
-        ([, verdict]) =>
-          verdict.startsWith("unsupported:") || verdict === "cheap-wave",
-      )
+      .filter(([, verdict]) => verdict.startsWith("unsupported:"))
       .filter(([key]) =>
         formHolders(found, key, functions).some((holder) =>
           Object.values(FORMS).some((form) => contains(holder, form)),

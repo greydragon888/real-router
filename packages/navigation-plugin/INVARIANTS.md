@@ -443,7 +443,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 - During the transition (in guards): `toState.context.navigation` holds the record's metadata, not yet frozen
 - After the transition's `onTransitionSuccess`: `state.context.navigation` holds the frozen metadata, and no other success reads the record; a commit's record stays staged until its call returns
 
-**Boundary:** a commit an app makes during the plugin's not-found call — `navigateToNotFound()` from a `canDeactivate` guard — reads that call's record too: the slot cannot tell it from the plugin's own commit.
+**Refused by core (#2786):** a commit an app makes during the plugin's not-found call — `navigateToNotFound()` from a `canDeactivate` guard that call consults. The slot cannot tell it from the plugin's own commit.
 
 **Why it matters:** Prevents meta from leaking between transitions.
 
@@ -461,8 +461,8 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 **Postcondition:**
 - The superseded call rejects with `TRANSITION_CANCELLED`
 - The superseding navigation ends as it ends with nothing in flight: the same router URL and browser entry, the same `state.context.navigation`, the same metadata in its guards, and no `traverseTo()` but its own
-- A navigation a guard starts synchronously within a staging call — a `canActivate` of `traverseToLast()`'s target, or the current route's `canDeactivate` inside `navigateToNotFound()` — takes none of its record
-- A navigation nested in another's call — a refused one in `traverseToLast()`'s, one to a URL no route matches in the router's check of another such URL — leaves the outer record in place
+- A navigation a `canActivate` guard of `traverseToLast()`'s target starts synchronously within the call takes none of its record; core refuses one the current route's `canDeactivate` starts inside `navigateToNotFound()` (#2786)
+- A navigation nested in another's call — a refused one in `traverseToLast()`'s, one to a URL no route matches in the router's check of another such URL, which core refuses (#2786) — leaves the outer record in place
 - A browser navigation that supersedes a held browser navigation publishes its own metadata too
 
 **Test:** `tests/functional/transition-record-2753-2754.test.ts`
@@ -481,7 +481,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 - A `traverseToLast()` or a browser navigation refused by a guard — or a `traverseToLast()` whose `browser.traverseTo()` threw, or a navigation to a URL no route matches refused by `canDeactivate` — then a commit that starts no transition; or
 - A transition an earlier `TRANSITION_START` listener ended before the plugin heard it start — by `router.stop()`, with or without a restart core refuses there, or by aborting a browser navigation — then a commit that starts no transition; or
 - A restart core refuses inside a `TRANSITION_ERROR` listener during `traverseToLast()`'s call, then a start; or
-- A router restarted from a guard of `traverseToLast()`'s transition, its start held by a guard, or from the logger's callback inside its call; or
+- A router restarted from a guard of `traverseToLast()`'s transition, its start held by a guard; or a restart core refuses from the logger's callback inside its call; or
 - A transition whose success an earlier `TRANSITION_SUCCESS` listener interrupts with `router.stop()` and a restart core refuses
 
 **Postcondition:**
@@ -489,7 +489,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 - The commit or transition after the refused, ended or restarted one publishes its own metadata and traverses nowhere; the restarted router's guards read none of the record
 - A transition whose success such a listener interrupts publishes its own record
 
-**Refused by core (#2778):** a navigation an app starts from inside a router notification — a listener, the abort handler of the navigation a call supersedes — and a restart there: `start()` throws `REENTRANT_NAVIGATION`, as the navigate family does. The cells that try a restart from a listener pin the refusal.
+**Refused by core (#2778, #2786):** a navigation an app starts from inside a router notification — a listener, the abort handler of the navigation a call supersedes — or from the logger's callback, and a restart there: `start()` throws `REENTRANT_NAVIGATION`, as the navigate family does. The cells that try a restart from a listener or the logger's callback pin the refusal.
 
 **Test:** `tests/functional/transition-record-2753-2754.test.ts`
 

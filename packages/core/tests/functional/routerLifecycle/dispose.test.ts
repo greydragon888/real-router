@@ -1,6 +1,6 @@
 import { describe, beforeEach, it, expect, vi } from "vitest";
 
-import { errorCodes, events } from "@real-router/core";
+import { errorCodes, events, RouterError } from "@real-router/core";
 import {
   cloneRouter,
   getDependenciesApi,
@@ -474,6 +474,30 @@ describe("dispose", () => {
       }).not.toThrow();
 
       expect(goodTeardown).toHaveBeenCalledTimes(1);
+    });
+
+    // The teardown runs outside every counted window, and the router is
+    // already DISPOSED there: the machine refuses both (#2786).
+    it("a teardown dispose() runs can neither navigate nor restart the router", async () => {
+      const attempts: Promise<unknown>[] = [];
+
+      router.usePlugin(() => ({
+        teardown: () => {
+          attempts.push(router.navigate("users"), router.start("/home"));
+        },
+      }));
+
+      await router.start("/home");
+
+      router.dispose();
+
+      const [navigated, restarted] = attempts;
+
+      await expect(navigated).rejects.toBeInstanceOf(RouterError);
+      await expect(restarted).rejects.toBeInstanceOf(RouterError);
+
+      expect(router.isActive()).toBe(false);
+      expect(router.getState()).toBeUndefined();
     });
   });
 

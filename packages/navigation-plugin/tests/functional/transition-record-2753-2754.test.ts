@@ -24,12 +24,12 @@ import type { LoggerConfig } from "@real-router/core/types";
  *   inside the staging call, not a commit after a failed transition or after
  *   one an earlier listener ended before the plugin heard it start, not a
  *   transition of a router a guard of that call restarted, not one whose call
- *   is nested in another's. The boundary: a commit an app makes during the
- *   plugin's not-found call takes that call's record.
+ *   is nested in another's.
  * - Core refuses a navigation an app starts from inside a router notification
  *   — a listener, an abort handler of the navigation a call supersedes — and
- *   a restart from there (#2778). The cells that try one pin the refusal and
- *   that each call keeps its record.
+ *   a restart from there (#2778), and from the logger's callback and a
+ *   `canDeactivate` guard `navigateToNotFound()` consults (#2786). The cells
+ *   that try one pin the refusal and that each call keeps its record.
  * - The activation's record goes to the router's first transition or commit,
  *   on a router whose `getState()` and `getPreviousState()` are `undefined`.
  *
@@ -115,7 +115,12 @@ function sameDocumentReplace(url: string): NavigateEvent {
       getState: () => undefined,
     },
     intercept: (options: NavigationInterceptOptions) => {
-      Promise.resolve(options.handler?.()).catch(noop);
+      // The browser reports a handler's throw as the navigation's failure, not
+      // to the code that started the navigation.
+      // eslint-disable-next-line sonarjs/prefer-promise-shorthand -- the executor is what turns the handler's synchronous throw into a rejection
+      new Promise((resolve) => {
+        resolve(options.handler?.());
+      }).catch(noop);
     },
     scroll: noop,
   } as unknown as NavigateEvent;
@@ -301,9 +306,13 @@ function codeOf(promise: Promise<unknown>): Promise<string | undefined> {
 function restartInside(router: Router, path: string): string | undefined {
   router.stop();
 
-  // eslint-disable-next-line sonarjs/no-try-promise -- the try captures the SYNC reentrancy throw; the rejection half is handled by .catch()
+  return attempt(() => router.start(path));
+}
+
+/** A navigation started where core may refuse one: the refusal's code, or `"accepted"`. */
+function attempt(navigate: () => unknown): string | undefined {
   try {
-    router.start(path).catch(noop);
+    Promise.resolve(navigate()).catch(noop);
   } catch (error) {
     return (error as { code?: string }).code;
   }
@@ -656,9 +665,10 @@ describe("a navigation takes no record staged for another", () => {
     env.router.stop();
   });
 
-  it("one a canDeactivate guard starts within navigateToNotFound()'s call reads and publishes none of it", async () => {
-    const control = await alone(ROUTER_NAVIGATE);
+  it("one a canDeactivate guard starts within navigateToNotFound()'s call is refused, and so is the 404", async () => {
     const env = await createEnv();
+    const before = env.router.getState();
+    let refused: string | undefined;
 
     getLifecycleApi(env.router).addDeactivateGuard(
       "users.list",
@@ -667,7 +677,7 @@ describe("a navigation takes no record staged for another", () => {
           return true;
         }
 
-        env.router.navigate("other").catch(noop);
+        refused = attempt(() => env.router.navigate("other"));
 
         return false;
       },
@@ -676,11 +686,10 @@ describe("a navigation takes no record staged for another", () => {
     await PUSH_UNMATCHED.run(env);
     await settle();
 
-    const result = outcome(env, ROUTER_NAVIGATE.destination);
-
-    expect(result.router).toBe("/other");
-    expect(result.read).toBe("none");
-    expect(result.meta).toStrictEqual(control.meta);
+    expect(refused).toBe(errorCodes.REENTRANT_NAVIGATION);
+    expect(env.router.getState()).toBe(before);
+    expect(env.reads.has("other")).toBe(false);
+    expect(pathOf(env.mock.currentUrl)).toBe("/users/list");
 
     env.router.stop();
   });
@@ -1032,12 +1041,12 @@ describe("a navigation takes no record staged for another", () => {
     env.router.stop();
   });
 
-  // The logger's callback is code core runs inside a staging call, before
-  // the call's transition starts, that core does not refuse a restart from.
-  // `onStart` keeps the restart's start transition from taking the record.
-  it("a restart from the logger's callback inside traverseToLast()'s call takes none of its record", async () => {
+  // The logger's callback runs inside a staging call, before the call's
+  // transition starts. Core refuses the restart (#2786); the callback's stop()
+  // still stops the router.
+  it("a restart from the logger's callback inside traverseToLast()'s call is refused, and the call takes no record", async () => {
     let restartOnWarn = false;
-    let restarted = false;
+    let refused: string | undefined;
     let router: Router | undefined;
     const env = createUnstartedEnv(`${ORIGIN}/home`, {
       allowNotFound: true,
@@ -1050,9 +1059,7 @@ describe("a navigation takes no record staged for another", () => {
           }
 
           restartOnWarn = false;
-          restarted = true;
-          router.stop();
-          router.start("/other").catch(noop);
+          refused = restartInside(router, "/other");
         },
       },
     });
@@ -1073,17 +1080,19 @@ describe("a navigation takes no record staged for another", () => {
     // traverseToLast() supersedes `slow`: core warns of the concurrent
     // navigation before it cancels `slow`.
     restartOnWarn = true;
-    await codeOf(env.router.traverseToLast("about"));
-    await superseded;
-    await settle();
 
-    expect(restarted).toBe(true);
-    expect(env.reads.get("other")).toBe("none");
+    await expect(codeOf(env.router.traverseToLast("about"))).resolves.toBe(
+      errorCodes.TRANSITION_CANCELLED,
+    );
+    await expect(superseded).resolves.toBe(errorCodes.TRANSITION_CANCELLED);
+
+    expect(refused).toBe(errorCodes.REENTRANT_NAVIGATION);
+    expect(env.router.getState()).toBeUndefined();
+    expect(env.reads.has("about")).toBe(false);
     expect(env.traversals).toStrictEqual([]);
 
     env.release();
     await settle();
-    env.router.stop();
   });
 
   // Subscribed before the plugin, the listener runs ahead of the plugin's
@@ -1168,9 +1177,12 @@ describe("a navigation takes no record staged for another", () => {
     await settle();
   });
 
+  // Core refuses the nested call's commit (#2786); its stage still puts the
+  // outer record back.
   it("a navigation to a URL no route matches, nested in another's call, leaves the outer one its record", async () => {
     const control = await alone(PUSH_UNMATCHED);
     const env = await createEnv();
+    const notFound = vi.spyOn(env.router, "navigateToNotFound");
     let nest = true;
 
     getLifecycleApi(env.router).addDeactivateGuard(
@@ -1188,6 +1200,10 @@ describe("a navigation takes no record staged for another", () => {
     await PUSH_UNMATCHED.run(env);
     await settle();
 
+    expect(notFound.mock.results.map(({ type }) => type)).toStrictEqual([
+      "return",
+      "throw",
+    ]);
     expect(env.router.getState()?.path).toBe("/nope");
     expect(env.router.getState()?.context.navigation).toStrictEqual(
       control.meta,
@@ -1222,13 +1238,13 @@ describe("a navigation takes no record staged for another", () => {
     env.router.stop();
   });
 
-  // The boundary: the slot cannot tell an app's commit made during the
-  // plugin's not-found call from the plugin's own.
-  it("a commit an app makes during the plugin's not-found call takes that call's record", async () => {
+  // The slot cannot tell an app's commit made during the plugin's not-found
+  // call from the plugin's own; core refuses the app's (#2786).
+  it("a commit an app makes during the plugin's not-found call is refused, and the call's own takes its record", async () => {
     const control = await alone(PUSH_UNMATCHED);
     const env = await createEnv();
     const published: unknown[] = [];
-    let nest = true;
+    let refused: string | undefined;
 
     env.router.subscribe(({ route }) => {
       published.push([route.path, route.context.navigation]);
@@ -1236,9 +1252,8 @@ describe("a navigation takes no record staged for another", () => {
     getLifecycleApi(env.router).addDeactivateGuard(
       "users.list",
       () => (toState) => {
-        if (nest && toState.path === "/nope") {
-          nest = false;
-          env.router.navigateToNotFound("/elsewhere");
+        if (refused === undefined && toState.path === "/nope") {
+          refused = attempt(() => env.router.navigateToNotFound("/elsewhere"));
         }
 
         return true;
@@ -1248,11 +1263,9 @@ describe("a navigation takes no record staged for another", () => {
     await PUSH_UNMATCHED.run(env);
     await settle();
 
+    expect(refused).toBe(errorCodes.REENTRANT_NAVIGATION);
     expect(control.meta).toMatchObject({ navigationType: "push" });
-    expect(published).toStrictEqual([
-      ["/elsewhere", control.meta],
-      ["/nope", control.meta],
-    ]);
+    expect(published).toStrictEqual([["/nope", control.meta]]);
 
     env.router.stop();
   });

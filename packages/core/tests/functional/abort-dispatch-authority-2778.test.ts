@@ -22,9 +22,9 @@
 //   one (pinned in the behavioural file).
 //
 // ⚠ The scan reads NAMES. An abort reached through a key held in a variable
-// (`controller[key]()`) or through `Reflect.get` is out of its reach, and so is
-// the position of an abort inside its owner: the behavioural file pins where
-// `finishAsyncNavigation`'s release sits.
+// (`controller[key]()`) or through `Reflect.get` is out of its reach. Of the
+// positions inside an owner it holds one, the counted primitive's; the
+// behavioural file pins where `finishAsyncNavigation`'s release sits.
 
 import { globSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -186,6 +186,96 @@ function abortSites(file: string, text: string): AbortSite[] {
   return sites;
 }
 
+const isFunctionLike = (node: ts.Node): boolean =>
+  ts.isFunctionDeclaration(node) ||
+  ts.isMethodDeclaration(node) ||
+  ts.isGetAccessorDeclaration(node) ||
+  ts.isSetAccessorDeclaration(node) ||
+  ts.isConstructorDeclaration(node) ||
+  ts.isFunctionExpression(node) ||
+  ts.isArrowFunction(node);
+
+/** The steps `node` itself makes on `counter` with `operator`. */
+function steps(
+  node: ts.Node,
+  counter: string,
+  operator: ts.SyntaxKind,
+): ts.Node[] {
+  const found: ts.Node[] = [];
+
+  const visit = (child: ts.Node): void => {
+    if (
+      (ts.isPostfixUnaryExpression(child) ||
+        ts.isPrefixUnaryExpression(child)) &&
+      child.operator === operator &&
+      ts.isPropertyAccessExpression(child.operand) &&
+      child.operand.name.text === counter
+    ) {
+      found.push(child);
+    }
+
+    if (!isFunctionLike(child)) {
+      ts.forEachChild(child, visit);
+    }
+  };
+
+  ts.forEachChild(node, visit);
+
+  return found;
+}
+
+/**
+ * For each abort `owner` reads: does it stand in a `try` of its own function
+ * whose `finally` lowers `counter`, raised before that `try`?
+ */
+function abortsInCountedTry(
+  file: string,
+  text: string,
+  owner: string,
+  counter: string,
+): boolean[] {
+  const source = ts.createSourceFile(
+    file,
+    text,
+    ts.ScriptTarget.Latest,
+    /* setParentNodes */ true,
+    ts.ScriptKind.TS,
+  );
+  const answers: boolean[] = [];
+
+  const visit = (node: ts.Node): void => {
+    if (readsAbort(node) && ownerOf(node) === owner) {
+      const fn = ts.findAncestor(node.parent, isFunctionLike);
+      const region = ts.findAncestor(
+        node,
+        (ancestor) =>
+          ts.isTryStatement(ancestor) &&
+          ancestor.tryBlock.pos <= node.pos &&
+          node.end <= ancestor.tryBlock.end,
+      );
+
+      answers.push(
+        fn !== undefined &&
+          region !== undefined &&
+          ts.isTryStatement(region) &&
+          ts.findAncestor(region.parent, isFunctionLike) === fn &&
+          region.finallyBlock !== undefined &&
+          steps(region.finallyBlock, counter, ts.SyntaxKind.MinusMinusToken)
+            .length > 0 &&
+          steps(fn, counter, ts.SyntaxKind.PlusPlusToken).some(
+            (step) => step.end <= region.getStart(source),
+          ),
+      );
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(source);
+
+  return answers;
+}
+
 /** The owners of every `recordNavigationEnd(<…>.signal.reason)` call. */
 function signalReasonRecords(file: string, text: string): string[] {
   const source = ts.createSourceFile(
@@ -304,6 +394,11 @@ describe("#2778 — an abort of a navigation's controller is a counted dispatch"
   const recorded = globSync(`${SRC}/**/*.ts`).flatMap((file) =>
     signalReasonRecords(file, readFileSync(file, "utf8")),
   );
+  const bus = path.join(
+    SRC,
+    "namespaces/EventBusNamespace/EventBusNamespace.ts",
+  );
+  const busText = readFileSync(bus, "utf8");
 
   it("finds every abort in src — the scan is not vacuously green", () => {
     // One site per owner. Adding one is a decision about the reentrancy ban's
@@ -326,6 +421,38 @@ describe("#2778 — an abort of a navigation's controller is a counted dispatch"
     // quiet cancel only through `navigationEnds.ts`, so an abort that skips
     // the record hands it a reason it reads as its own.
     expect(new Set(recorded)).toStrictEqual(new Set(RAW_ABORT_OWNERS.keys()));
+  });
+
+  it("the counted primitive aborts inside the try whose finally lowers the dispatch depth", () => {
+    // The depth is what the reentrancy ban reads; an abort above the raise or
+    // below the `finally` is the raw dispatch this file exists to refuse.
+    expect(
+      abortsInCountedTry(bus, busText, "dispatchAbort", "#dispatchDepth"),
+    ).toStrictEqual([true]);
+  });
+
+  it("tells an abort in the counted try from one before it, unlowered, or in a nested function", () => {
+    const sample = `
+      class Bus {
+        #depth = 0;
+        inside(c: AbortController) { this.#depth++; try { c.abort(); } finally { this.#depth--; } }
+        before(c: AbortController) { c.abort(); this.#depth++; try { void 0; } finally { this.#depth--; } }
+        unlowered(c: AbortController) { this.#depth++; try { c.abort(); } finally { void 0; } }
+        unraised(c: AbortController) { try { c.abort(); } finally { this.#depth--; } this.#depth++; }
+        nested(c: AbortController) { this.#depth++; try { [c].forEach((x) => { x.abort(); }); } finally { this.#depth--; } }
+      }
+    `;
+
+    expect(
+      ["inside", "before", "unlowered", "unraised", "nested"].map((owner) =>
+        abortsInCountedTry(
+          path.join(SRC, "sample.ts"),
+          sample,
+          owner,
+          "#depth",
+        ),
+      ),
+    ).toStrictEqual([[true], [false], [false], [false], [false]]);
   });
 
   it("sees an alias, a literal key and a destructuring, not only a call", () => {

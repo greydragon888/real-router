@@ -816,7 +816,8 @@ export class RouteLifecycleNamespace<
 
   /**
    * Shared implementation for synchronous guard checks.
-   * Warns if a guard returns a Promise (async guards are not supported in sync mode).
+   * Warns if a guard returns a Promise (async guards are not supported in sync
+   * mode), and consumes that promise.
    * Catches exceptions and treats them as navigation-blocking (`false`).
    *
    * @param functions - Map of compiled guard functions to look up
@@ -844,6 +845,11 @@ export class RouteLifecycleNamespace<
       if (typeof result === "boolean") {
         return result;
       }
+
+      // An async guard's promise is application code's, and this check cannot
+      // wait for it. Consumed here, so one that rejects is not an unhandled
+      // rejection (#2797); a thenable from another realm is adopted (#2251).
+      void Promise.resolve(result).catch(() => undefined);
 
       this.#deps.getValidator()?.lifecycle.warnAsyncGuardSync(name, methodName);
 

@@ -1754,7 +1754,7 @@ const CELL = {
   recordTraverse: `${RECORD} › one that supersedes a traverseToLast() onto an entry with a fragment publishes its own`,
   recordNested: `${RECORD} › a navigation to a URL no route matches, nested in another's call, leaves the outer one its record`,
   recordGuard: `${RECORD} › one a guard starts within traverseToLast()'s call ends as router.navigate() alone`,
-  recordCommit: `${RECORD} › a commit an app makes during the plugin's not-found call takes that call's record`,
+  recordCommit: `${RECORD} › a commit an app makes during the plugin's not-found call is refused, and the call's own takes its record`,
   activation: `${NAV_PLUGIN}/navigation-meta-activation.test.ts › activation "reload" → first transition has navigationType "reload"`,
   gateInitial:
     "packages/sources/tests/unit/createRouteEnterGate.test.ts › skips the initial commit — transition.from undefined (arm 2, skip-initial)",

@@ -11,6 +11,7 @@ import { adoptForeignBag, adoptForeignTransition } from "../../helpers";
 import { recordNavigationEnd } from "../../navigationEnds";
 import { raiser, RouterError, freezeThrownError } from "../../RouterError";
 import { routerEvents, routerStates } from "../../routerFSM";
+import { leaveFailure } from "../NavigationNamespace/transition/errorHandling";
 
 import type { EventBusOptions, ScopeDecision } from "./types";
 import type {
@@ -89,6 +90,9 @@ function settleLeavePromises(
     };
 
     if (signal.aborted) {
+      // Every listener still ran, so their promises are consumed here: one
+      // that rejects later is otherwise an unhandled rejection (#2797).
+      void Promise.allSettled(promises);
       onAbort();
 
       return;
@@ -108,7 +112,7 @@ function settleLeavePromises(
       }
 
       if (firstSyncError !== undefined) {
-        reject(ensureError(firstSyncError));
+        reject(ensureError(leaveFailure(firstSyncError)));
 
         return;
       }
@@ -119,7 +123,7 @@ function settleLeavePromises(
       );
 
       if (rejected !== undefined) {
-        reject(ensureError(rejected.reason));
+        reject(ensureError(leaveFailure(rejected.reason)));
 
         return;
       }
@@ -357,19 +361,18 @@ export class EventBusNamespace {
   /**
    * True while a router event is being dispatched synchronously — while an
    * `emitTransition*` call, the `$start` emit (#1647), a `subscribeLeave`
-   * listener batch, or a `dispatchAbort` is on the stack. The navigation facade
-   * reads this to reject a
-   * synchronous reentrant navigate() from inside such a listener (RFC §4).
+   * listener batch, a `dispatchAbort` or `dispose()`'s `STOP` is on the
+   * stack. The navigation facade reads this to reject a synchronous reentrant
+   * navigate() from inside such a listener (RFC §4).
    *
-   * `$stop` is deliberately NOT in that set: its action runs after the swap, so
-   * the machine is already IDLE and the doors refuse `ROUTER_NOT_STARTED` from
-   * the table anyway — a second mechanism there would buy nothing (#1647 §5.6a).
-   * The one door the table admits there is `start()`, and a `$stop` listener
-   * of a top-level `stop()` restarts a router with nothing of its old
+   * The `$stop` of a top-level `stop()` is deliberately NOT in that set: its
+   * action runs after the swap, so the machine is already IDLE and the doors
+   * refuse `ROUTER_NOT_STARTED` from the table anyway — a second mechanism
+   * there would buy nothing (#1647 §5.6a). The one door the table admits there
+   * is `start()`, and that listener restarts a router with nothing of its old
    * lifecycle left to run; a `stop()` called inside another dispatch emits
-   * `$stop` inside that dispatch's depth. ⚠ `dispose()` emits `$stop` too and
-   * then disposes, so a restart from that listener boots a router about to be
-   * disposed — an open door the reentrancy ban does not cover.
+   * `$stop` inside that dispatch's depth. `dispose()` has a teardown left to
+   * run, so its `STOP` is counted ({@link sendStopForDispose}, #2786).
    */
   isProcessing(): boolean {
     return this.#dispatchDepth > 0;
@@ -474,6 +477,21 @@ export class EventBusNamespace {
     this.#fsm.send(routerEvents.STOP);
   }
 
+  /**
+   * `STOP` on `dispose()`'s way to `DISPOSE`, its `$stop` emit counted like a
+   * transition event's (#2786): a restart from that listener would boot a
+   * router the teardown then disposes. A top-level `stop()` sends
+   * {@link sendStop}, and its `$stop` stays open.
+   */
+  sendStopForDispose(): void {
+    this.#dispatchDepth++;
+    try {
+      this.#fsm.send(routerEvents.STOP);
+    } finally {
+      this.#dispatchDepth--;
+    }
+  }
+
   sendDispose(): void {
     this.#fsm.send(routerEvents.DISPOSE);
   }
@@ -548,8 +566,12 @@ export class EventBusNamespace {
    * it. Asking first turns that into the `ROUTER_DISPOSED` these callers were
    * already promised (#1186) — the guard did not disappear when it became
    * structural, it moved to where it cannot be forgotten.
+   *
+   * `name` is `payload.toState.name` as the caller read it. The door that
+   * checks a foreign name hands in the answer it checked, and the shell commits
+   * that answer rather than asking the State again (#2786).
    */
-  systemCommit(payload: RouterPayloads["SYSTEM_COMMIT"]): State {
+  systemCommit(payload: RouterPayloads["SYSTEM_COMMIT"], name: string): State {
     // ⚑ The commit door that COPIES, because nothing below it does (#1792).
     // `getInternals` is a published export, and four first-party packages reach
     // it: `ssr-utils` and `validation-plugin` directly, `ssr-data-plugin` and
@@ -597,7 +619,7 @@ export class EventBusNamespace {
       // the pipeline). Not cosmetic: `Object.keys(getState())` is observable,
       // and a differently-ordered literal gives the committed state a second
       // hidden class — the shape #1684's regression took.
-      name: toState.name,
+      name,
       params: adoptForeignBag(toState.params, EMPTY_PARAMS) as Params,
       search: adoptForeignBag(toState.search, EMPTY_SEARCH) as SearchParams,
       path: toState.path,
@@ -974,7 +996,7 @@ export class EventBusNamespace {
 
     if (promises === undefined) {
       if (firstSyncError !== undefined) {
-        throw ensureError(firstSyncError);
+        throw ensureError(leaveFailure(firstSyncError));
       }
 
       return undefined;
@@ -1092,16 +1114,27 @@ export class EventBusNamespace {
       this.sendCancelIfPossible(this.#fsm.getContext().current, signal.reason);
     };
 
-    // ⚑ ONE expression, and that is what holds "register, THEN record": the
-    // closer is the registration's RETURN VALUE, so no moment exists at which a
-    // closer stands and the listener does not (`bridgeSignal` above has what
-    // the two-statement form cost). The `onClosed` argument is the self-clearing
-    // half, written here because this caller owns the field. Pinned by
+    // ⚑ The closer is the registration's RETURN VALUE, and that is what holds
+    // "register, THEN record": no moment exists at which a closer stands and
+    // the listener does not (`bridgeSignal` above has what the two-statement
+    // form cost). The `onClosed` argument is the self-clearing half, written
+    // here because this caller owns the field. Pinned by
     // `bridge-registration-order-1724.test.ts`, which COUNTS
     // `removeEventListener` — the balance discriminates, the outcome does not.
-    payload.detachExternalBridge = bridgeSignal(signal, onExternalAbort, () => {
+    const detach = bridgeSignal(signal, onExternalAbort, () => {
       payload.detachExternalBridge = undefined;
     });
+
+    // ⚑ Registering runs the caller's code, and a navigation or a `stop()`
+    // started there cancels this navigation while it has no closer to run
+    // (#2786). `cancelReason` is the term the late moment asks BEFORE it
+    // registers; asked after, it closes what that cancel could not. Pinned by
+    // `bridge-registration-reentry-2786.test.ts`.
+    if (payload.cancelReason === undefined) {
+      payload.detachExternalBridge = detach;
+    } else {
+      detach();
+    }
 
     return SCOPE_DECIDED_TOKEN;
   }

@@ -127,7 +127,9 @@ every reader correct by construction.
    carrying the prior `context` and route-meta, guards NOT re-run since the user
    was already legitimately here; **route-identity change** → consult the new
    route's activation guards synchronously, commit on pass, not-found on a block
-   or an async guard.
+   or an async guard. The current state is read where the window below opens,
+   so a navigation that application code of the steps above started — a guard
+   factory the step-3 compile runs — is revalidated, not overwritten (#2786).
 
 ⚑ **The window between the swap and the commit refuses route-CRUD and
 navigation.** Both arms run application code there — the survivor arm through the

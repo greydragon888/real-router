@@ -45,7 +45,12 @@ guards.** It emits only `TRANSITION_SUCCESS`, takes a `SYSTEM_COMMIT` edge, and
 **asks the current route's `canDeactivate`** — leaving is still leaving, and this
 is the primitive URL plugins call on an unmatched Back. A refusal throws
 `CANNOT_DEACTIVATE`; an async guard cannot be answered synchronously and resolves
-to **refuse**, the fail-safe direction for a guard whose job is preventing loss.
+to **refuse**, the fail-safe direction for a guard whose job is preventing loss,
+and its promise is consumed (`async-guard-in-a-sync-check-2797.test.ts`). The
+door commits from the state it read before asking, so it asks inside a window
+of the reentrancy ban (`isCommittingNotFound`): a navigation the guard starts
+is refused, and the guard's own verdict decides. Pinned by
+`reentrant-doors-2786.test.ts`.
 
 ⚑ **`replace()`'s revalidation opts out of `canDeactivate` on every arm, and that
 is a RULE rather than two exceptions.** A tree swap is an operation the
@@ -217,7 +222,10 @@ belongs to a navigation that is cancelled, and the failure arcs restate the
 failure as that cancellation. A value the application handed in — the reason
 of a caller's `opts.signal`, a quiet cancel a guard threw — stays its own, and
 a guard raising it again cancels quietly.
-Pinned by `another-navigations-end-in-a-guard.test.ts`.
+Pinned by `another-navigations-end-in-a-guard.test.ts`. A `subscribeLeave`
+listener that throws or rejects with an end fails its navigation the same way,
+`CANNOT_DEACTIVATE` through `leaveFailure`; pinned by
+`another-navigations-end-in-a-leave-listener.test.ts`.
 
 **A quiet cancel leaves the band through `CANCEL`**, so the navigation gets its
 `TRANSITION_CANCEL` — and so does one whose `subscribeLeave` listener throws or
