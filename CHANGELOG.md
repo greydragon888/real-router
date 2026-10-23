@@ -5,6 +5,79 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-10-23]
+
+### @real-router/memory-plugin@0.7.0
+
+### Minor Changes
+
+- [#2819](https://github.com/greydragon888/real-router/pull/2819) [`4e1da1c`](https://github.com/greydragon888/real-router/commit/4e1da1c3c4354d42d31a7ed786391b9554f9dd2a) Thanks [@greydragon888](https://github.com/greydragon888)! - A `back()`, `forward()` or `go()` that a newer `navigate()` cancels leaves the stack to that navigation's end ([#2802](https://github.com/greydragon888/real-router/issues/2802))
+
+  The stack stopped following a restore once the restore's navigation rejected. A `navigate()` that cancelled a held restore therefore pushed after the restore's target when it committed at once, and after the entry the router shows when it committed after an async guard of its own.
+
+  - The position now stays on the restore's target until the newer navigation ends. Its commit applies to that entry whenever it commits — a push truncates after it, a replace overwrites it; its refusal, or a cancel with nothing newer behind it, leaves the stack on the entry the router shows.
+  - A redirect a `TRANSITION_ERROR` or `TRANSITION_CANCEL` listener starts in a microtask after that refusal or cancel — or after the refusal of a `navigate()` that cancels the newer one and that a guard refuses at once — is newer still: its commit lands past the restore's target as well, where it landed past the entry the router shows once it started after the restore's rejection was handled. A redirect from a listener registered after the restore's cancel lands past the entry the router shows.
+  - So does a navigation started after a guard cancels the restore quietly — a redirect a `TRANSITION_CANCEL` listener starts in a microtask, or a `navigate()` the caller of `back()` makes right after a guard cancels it at once — when it commits after an async guard of its own; when a guard refuses it at once, so does a redirect a listener of that refusal starts in a microtask. One started a task later lands as before.
+  - The newer navigation's own `.catch()` or `await` finds the stack on the entry the router shows also when that navigation is refused, or cancelled with nothing newer behind it, within the call that cancels the restore, where it found the restore's target: a redirect it starts that commits at once lands past that entry, and `canGoForward()` and `back()` there read it. A redirect a listener of that end started that its own guard still holds, another navigation that ends later in the same task, or a listener registered before the plugin that ends that navigation inside its announce, leaves that handler the restore's target.
+  - From its cancel until the navigations that run after it end — or, with none, until its rejection — the restore holds one more listener of `TRANSITION_SUCCESS`, `TRANSITION_ERROR` and `TRANSITION_CANCEL`. A router whose `limits.maxListeners` leaves no room for them drops the restore at its rejection, as before.
+
+  **Breaking Change:**
+
+  - While that navigation runs, `canGoBack()`, `canGoForward()` and the next `back()`, `forward()` or `go()` read the restore's target, not the entry the router shows, which they read once the restore's rejection settled.
+  - The plugin registers `onTransitionError` and `onTransitionCancel` hooks, so `usePlugin()` throws on a router whose `limits.maxListeners` is reached for `TRANSITION_ERROR` or `TRANSITION_CANCEL`.
+
+  **Migration:** read `canGoBack()`/`canGoForward()` after the newer navigation settles where they must describe the entry the router shows. Under `limits.maxListeners`, leave room for one listener of `TRANSITION_ERROR` and one of `TRANSITION_CANCEL`, and for the three a waiting restore takes.
+
+### @real-router/navigation-plugin@0.16.0
+
+### Minor Changes
+
+- [#2819](https://github.com/greydragon888/real-router/pull/2819) [`4e1da1c`](https://github.com/greydragon888/real-router/commit/4e1da1c3c4354d42d31a7ed786391b9554f9dd2a) Thanks [@greydragon888](https://github.com/greydragon888)! - A browser navigation that a newer router navigation cancels waits for that navigation's end ([#2802](https://github.com/greydragon888/real-router/issues/2802))
+
+  While a guard held a Back, a Forward or a link the browser started, a router navigation that superseded it was taken to own the URL at the cancel. When that navigation was refused afterwards, the browser stayed on the entry the cancelled navigation reached while the router stayed where it was.
+
+  - The intercept now stays pending until the router navigations announced meanwhile have ended. One that commits owns the URL. One that is refused, or cancelled with nothing newer behind it, sends the browser back to the entry the router stands on, as a refusal does ([#2740](https://github.com/greydragon888/real-router/issues/2740), [#2796](https://github.com/greydragon888/real-router/issues/2796)). A `navigate()` that a `TRANSITION_CANCEL` listener registered before the browser's navigation began starts in a microtask after a guard cancels that navigation quietly is waited for the same way: when a guard refuses it at once, a redirect a listener of that refusal starts in a microtask owns the URL, where the browser was sent back first.
+  - The plugin's watch over newer navigations takes a `TRANSITION_SUCCESS` listener for each browser navigation it takes as well. A router whose `limits.maxListeners` (10,000 by default) leaves no room on start, success, error or cancel refuses the watch, and the URL is then left to the other navigations at the cancel, a guard's quiet cancel included — as when the limit refused the watch before.
+
+  **Breaking Change:** `finished` of the cancelled navigation follows that end, where it resolved at the cancel. The plugin's write of a commit to another URL aborts it: `navigateerror` fires with `AbortError`, `finished` rejects, and the browser skips the scroll it applies when a navigation finishes — the page a link or `navigation.navigate()` was superseded on keeps the offset it had, where it was scrolled to the top. A commit to the URL it reached only updates that entry's state, and `finished` resolves. A return rejects it with the router's `RouterError` (`TRANSITION_CANCELLED`). Measured on Chromium 153, Firefox 155 and WebKit 26.6.
+
+  **Migration:** a `navigateerror` listener, or code awaiting `finished`, that reports every rejection as a failure skips the two a newer navigation causes.
+
+  ```diff
+   navigation.addEventListener("navigateerror", (event) => {
+  +  if (
+  +    event.error?.name === "AbortError" ||
+  +    event.error?.code === errorCodes.TRANSITION_CANCELLED
+  +  ) {
+  +    return;
+  +  }
+  +
+     reportFailure(event.error);
+   });
+  ```
+
+### @real-router/browser-plugin@0.26.4
+
+### Patch Changes
+
+- [#2819](https://github.com/greydragon888/real-router/pull/2819) [`4e1da1c`](https://github.com/greydragon888/real-router/commit/4e1da1c3c4354d42d31a7ed786391b9554f9dd2a) Thanks [@greydragon888](https://github.com/greydragon888)! - A Back or Forward that a newer router navigation cancels waits for that navigation's end ([#2802](https://github.com/greydragon888/real-router/issues/2802))
+
+  - While a guard held the traversal, a router navigation that superseded it — a link followed meanwhile — was taken to own the URL at the cancel, and the entry the browser had reached was rewritten with the router's URL then. A newer navigation refused afterwards left the page the Back was for gone from history; one that committed pushed after the rewritten entry.
+  - Now that navigation's end decides. One that commits writes its entry after the entry the traversal reached: a push keeps that entry's page, a replace overwrites it. One that is refused, or cancelled with nothing newer behind it, takes the browser back to the entry the traversal started from, as a refused traversal does ([#2740](https://github.com/greydragon888/real-router/issues/2740), [#2796](https://github.com/greydragon888/real-router/issues/2796)). A `navigate()` that a `TRANSITION_CANCEL` listener registered before the traversal began starts in a microtask after a guard cancels the traversal quietly is waited for the same way: when a guard refuses it at once, a redirect a listener of that refusal starts in a microtask owns the URL, where the traversal returned first.
+  - Nothing is written while it runs. A Back or Forward meanwhile is decided in its place, and `stop()` or removing the plugin drops the wait.
+  - The plugin's watch over newer navigations takes a `TRANSITION_SUCCESS` listener for each traversal as well. A router whose `limits.maxListeners` (10,000 by default) leaves no room on start, success, error or cancel refuses the watch, and a cancelled traversal then rewrites the entry the browser stands on, a guard's quiet cancel included — as when the limit refused the watch before.
+
+### @real-router/hash-plugin@0.16.3
+
+### Patch Changes
+
+- [#2819](https://github.com/greydragon888/real-router/pull/2819) [`4e1da1c`](https://github.com/greydragon888/real-router/commit/4e1da1c3c4354d42d31a7ed786391b9554f9dd2a) Thanks [@greydragon888](https://github.com/greydragon888)! - A Back, a Forward or an external fragment change that a newer router navigation cancels waits for that navigation's end ([#2802](https://github.com/greydragon888/real-router/issues/2802))
+
+  - While a guard held the traversal, a router navigation that superseded it was taken to own the URL at the cancel, and the entry the browser had reached was rewritten with the router's URL then. A newer navigation refused afterwards left the page the traversal was for gone from history; one that committed pushed after the rewritten entry.
+  - Now that navigation's end decides. One that commits writes its entry after the entry the traversal reached: a push keeps that entry's page, a replace overwrites it. One that is refused, or cancelled with nothing newer behind it, takes the browser back to the entry the traversal started from, as a refused traversal does ([#2740](https://github.com/greydragon888/real-router/issues/2740), [#2796](https://github.com/greydragon888/real-router/issues/2796)). A `navigate()` that a `TRANSITION_CANCEL` listener registered before the traversal began starts in a microtask after a guard cancels the traversal quietly is waited for the same way: when a guard refuses it at once, a redirect a listener of that refusal starts in a microtask owns the URL, where the traversal returned first. An entry an external fragment change created carries no position, so there the plugin rewrites it with the router's URL, as for a refused fragment change.
+  - Nothing is written while it runs. A traversal meanwhile is decided in its place, and `stop()` or removing the plugin drops the wait.
+  - The plugin's watch over newer navigations takes a `TRANSITION_SUCCESS` listener for each traversal as well. A router whose `limits.maxListeners` (10,000 by default) leaves no room on start, success, error or cancel refuses the watch, and a cancelled traversal then rewrites the entry the browser stands on, a guard's quiet cancel included — as when the limit refused the watch before.
+
 ## [2026-10-21]
 
 ### @real-router/core@0.151.0
