@@ -573,7 +573,7 @@ function replaceRoutes<
   store: RoutesStore<Dependencies>,
   batch: readonly Route<Dependencies>[],
   ctx: RouterInternals<Dependencies>,
-  currentState: State | undefined,
+  readState: () => State | undefined,
   onCommitted?: () => void,
 ): void {
   // Reject the silent-corruption cases `assertAddable` catches for `add`, BEFORE
@@ -649,6 +649,12 @@ function replaceRoutes<
   // refused. And it cannot be skipped on the happy path — `decodeParams` is not
   // isolated, so a throw from it leaves through `replace()` itself.
   store.revalidating = true;
+
+  // ⚑ Read where the window opens, not at `replace()`'s entry (#2786):
+  // application code runs above — the batch's guard factories among it — and
+  // a navigation started there can commit before this line. One started after
+  // it is refused by the window.
+  const currentState = readState();
 
   try {
     // TREE_CHANGED fires here (O-5): the new tree is committed but state is not
@@ -1146,8 +1152,6 @@ export function getRoutesApi<
 
       runChecks(ctx.checks, POSITION["replaceRoutes:batch"], batch);
 
-      const currentState = router.getState();
-
       // The flat removed/added diff is O(N) — compute it only when someone is
       // listening (Decision 3.B). Snapshot the old tree BEFORE the swap.
       const before =
@@ -1159,7 +1163,7 @@ export function getRoutesApi<
         store,
         batch,
         ctx,
-        currentState,
+        () => router.getState(),
         before === undefined
           ? undefined
           : () => {
