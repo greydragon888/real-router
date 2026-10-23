@@ -1,10 +1,8 @@
-# event-emitter
-
-[![Mutation Score](https://img.shields.io/endpoint?style=flat-square&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fgreydragon888%2Freal-router%2Fmaster%3Fmodule%3Devent-emitter)](https://dashboard.stryker-mutator.io/reports/github.com/greydragon888/real-router/master?module=event-emitter)
+# EventEmitter (`core/src/utils/event-emitter`)
 
 > Typed event emitter with listener limits, re-entrancy coalescing, and per-listener error isolation.
 
-**Internal package** — consumed by `@real-router/core`. Not published to npm.
+**Internal module of `@real-router/core`**, not a package.
 
 ## Purpose
 
@@ -17,7 +15,7 @@ Lightweight, type-safe event emitter powering the router's internal event system
 ## Public API
 
 ```typescript
-import { EventEmitter } from "event-emitter";
+import { EventEmitter } from "./utils/event-emitter"; // from a module in packages/core/src
 
 type Events = {
   start: [];

@@ -1,4 +1,4 @@
-// packages/route-tree/tests/property/segments.properties.ts
+// packages/core/tests/engine/property/segments.properties.ts
 
 import { test } from "@fast-check/vitest";
 

@@ -11,9 +11,9 @@ import type { SegmentMatcher } from "../../../../src/engine/path-matcher/Segment
  * **Where the strip actually lives (audit correction).** `SegmentMatcher.buildPath`
  * does NOT strip `undefined` query values itself — `#buildQueryStringForBuild`
  * copies the params object (undefined values included) straight to the injected
- * `buildQueryString`. The clean URL is produced by that engine
- * (production: `search-params`; here: the inline mirror in `createTestMatcher`,
- * which drops `undefined`). So the `undefined-strip invariants (level 2)`
+ * `buildQueryString`. The clean URL is produced by that engine: search-params'
+ * `build`, which drops `undefined` and which `createTestMatcher` wires as
+ * production `createMatcher` does. So the `undefined-strip invariants (level 2)`
  * describe below verifies a LAYERED contract — the matcher faithfully delegates
  * AND the engine strips — not a matcher-owned guard. The `#4 boundary` describe
  * is the negative witness that pins it: with a deliberately non-filtering
@@ -23,9 +23,8 @@ import type { SegmentMatcher } from "../../../../src/engine/path-matcher/Segment
  * These tests pair with:
  * - Level 1 invariants: `packages/core/tests/functional/navigation/navigate/query-params.test.ts`
  *   (describe "undefined params contract")
- * - Level 3 invariants: `packages/search-params/tests/functional/` (engine's
- *   own strip) + `packages/path-matcher/tests/unit/createTestMatcher.test.ts`
- *   (inline parser baseline)
+ * - Level 3 invariants: `packages/core/tests/engine/unit/search-params/`
+ *   (the engine's own strip)
  *
  * Together they close the RFC 5.3 bis "undefined-strip, layered" invariant.
  */

@@ -1,4 +1,4 @@
-// packages/route-node/tests/functional/validation-routes.test.ts
+// packages/core/tests/engine/functional/validation-routes.test.ts
 
 import { describe, it, expect } from "vitest";
 

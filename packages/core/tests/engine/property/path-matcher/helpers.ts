@@ -1,4 +1,4 @@
-// packages/path-matcher/tests/property/helpers.ts
+// packages/core/tests/engine/property/path-matcher/helpers.ts
 
 /**
  * Shared helpers for path-matcher property-based tests.

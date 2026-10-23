@@ -1,4 +1,4 @@
-// packages/browser-env/tests/property/helpers.ts
+// packages/browser-plugin/tests/property/browser-env/helpers.ts
 
 import { fc } from "@fast-check/vitest";
 

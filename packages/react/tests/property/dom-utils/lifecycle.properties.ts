@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-// packages/dom-utils/tests/property/lifecycle.properties.ts
+// packages/react/tests/property/dom-utils/lifecycle.properties.ts
 
 /**
  * Cross-factory lifecycle PBT — destroy idempotency for every long-lived

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { validatePercentEncoding } from "../../../../src/engine/path-matcher/percentEncoding";
 
 /**
- * KEEP-narrow white-box exception (allowlisted in packages/path-matcher/eslint.config.mjs).
+ * KEEP-narrow white-box exception (allowlisted in packages/core/eslint.config.mjs).
  *
  * `validatePercentEncoding` is a fast-reject OPTIMISATION, fully backstopped by
  * `SegmentMatcher.#decodeParams`'s decode try/catch (`SegmentMatcher.ts`, documented

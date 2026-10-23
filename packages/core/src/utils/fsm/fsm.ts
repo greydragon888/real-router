@@ -238,10 +238,9 @@ export class FSM<
    * **-88 B per navigation**, and doing it on `send` too collapses the p90
    * tail from 2384 to 2133 B, i.e. the array was intermittently escaping.
    *
-   * `@real-router/event-emitter` already made this trade the other way round
-   * for the same reason (`emit(name, a?, b?, c?, d?)` rather than `...args`);
-   * the FSM engine simply never received it. Keeping the tuple in the overload
-   * is what lets the engine have both.
+   * The sibling `event-emitter` makes the same trade for the same reason
+   * (`emit(name, a?, b?, c?, d?)` rather than `...args`). Keeping the tuple in
+   * the overload is what lets the engine have both.
    */
   send<E extends TEvents>(
     event: E,

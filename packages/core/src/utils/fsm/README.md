@@ -1,10 +1,8 @@
-# @real-router/fsm
-
-[![Mutation Score](https://img.shields.io/endpoint?style=flat-square&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fgreydragon888%2Freal-router%2Fmaster%3Fmodule%3Dfsm)](https://dashboard.stryker-mutator.io/reports/github.com/greydragon888/real-router/master?module=fsm)
+# FSM (`core/src/utils/fsm`)
 
 > Synchronous finite state machine engine.
 
-**Internal package** — consumed by `@real-router/core`. Published to npm by historical accident — do not depend on it directly.
+**Internal module of `@real-router/core`**, not a package. The `@real-router/fsm` package on npm is not built from this source — do not depend on it.
 
 ## Purpose
 
@@ -17,7 +15,7 @@ Drives the router's lifecycle state machine (`IDLE → STARTING → READY → TR
 ## Public API
 
 ```typescript
-import { FSM } from "@real-router/fsm";
+import { FSM } from "./utils/fsm"; // from a module in packages/core/src
 
 const fsm = new FSM({
   initial: "green",
@@ -37,7 +35,8 @@ fsm.getContext();         // { count: 0 }
 
 | Method | Description |
 |--------|-------------|
-| `send(event, payload?)` | Trigger transition, return current state. No-op if no transition defined |
+| `send(event, payload?)` | Trigger transition, return current state. No-op if no transition is defined or its `when` refuses |
+| `canSend(event, payload?)` | Whether `send` would fire from the current state: a transition is defined and its `when` accepts |
 | `getState()` | Current state |
 | `getContext()` | Context object (same reference as config) |
 | `onTransition(listener)` | Subscribe to transitions, returns unsubscribe |

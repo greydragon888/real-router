@@ -1,4 +1,4 @@
-// packages/route-node/tests/__mocks__/route-tree-mock.ts
+// packages/core/tests/engine/__mocks__/route-tree-mock.ts
 
 /**
  * Mock factories for RouteTree interface.

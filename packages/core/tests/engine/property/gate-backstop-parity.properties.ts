@@ -1,4 +1,4 @@
-// packages/route-tree/tests/property/gate-backstop-parity.properties.ts
+// packages/core/tests/engine/property/gate-backstop-parity.properties.ts
 
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";

@@ -3,10 +3,9 @@
 > [!NOTE]
 > **Dissolved into `@real-router/core` (#724).** The standalone `@real-router/logger`
 > npm package is gone — this code now lives inside core at `core/src/utils/logger/`.
-> Any badges / `npm install @real-router/logger` phrasing below is historical: there is
-> nothing to install separately. The former process-global **singleton** is replaced by a
-> **per-router `RouterLogger` instance** built from `createRouter(routes, { logger })` and
-> stored on `RouterInternals.logger`.
+> There is nothing to install separately. The former process-global **singleton** is
+> replaced by a **per-router `RouterLogger` instance** built from
+> `createRouter(routes, { logger })` and stored on `RouterInternals.logger`.
 
 Structured, per-router logger for [Real-Router](https://github.com/greydragon888/real-router):
 level filtering, custom callbacks, isomorphic. Owned by `@real-router/core`.

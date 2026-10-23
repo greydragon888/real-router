@@ -11,7 +11,7 @@
 //      `forceState`. Re-adding it (e.g. "just for a hot-path optimization")
 //      reds this immediately, before core can even call it. This is the layer
 //      with real mutation-discriminating power — re-adding the method to
-//      `packages/fsm/src/fsm.ts` fails this test.
+//      `packages/core/src/utils/fsm/fsm.ts` fails this test.
 //   2. Defense in depth (RFC §6.7 "no forceState in core") — a static scan of
 //      the ENTIRE core `src` graph asserts core never reads `.forceState`, so
 //      even if the primitive ever returns to the engine, core still cannot use

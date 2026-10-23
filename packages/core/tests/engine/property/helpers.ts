@@ -1,4 +1,4 @@
-// packages/route-tree/tests/property/helpers.ts
+// packages/core/tests/engine/property/helpers.ts
 
 /**
  * Shared helpers for route-tree property-based tests.

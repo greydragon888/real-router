@@ -4,7 +4,7 @@ import { EMPTY_STATIC_CHILDREN } from "../../../../src/engine/path-matcher/pathU
 import { createSegmentNode } from "../../../../src/engine/path-matcher/SegmentMatcher";
 
 /**
- * KEEP-narrow white-box exception (allowlisted in packages/path-matcher/eslint.config.mjs).
+ * KEEP-narrow white-box exception (allowlisted in packages/core/eslint.config.mjs).
  *
  * `createSegmentNode` + `EMPTY_STATIC_CHILDREN` are INTERNAL trie-node primitives. Their
  * observable behaviour — a fresh node has no children, gains a static child on

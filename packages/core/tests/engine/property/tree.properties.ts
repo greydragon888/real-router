@@ -1,4 +1,4 @@
-// packages/route-tree/tests/property/tree.properties.ts
+// packages/core/tests/engine/property/tree.properties.ts
 
 import { fc, test } from "@fast-check/vitest";
 

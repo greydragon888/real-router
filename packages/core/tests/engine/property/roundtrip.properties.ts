@@ -1,4 +1,4 @@
-// packages/route-tree/tests/property/roundtrip.properties.ts
+// packages/core/tests/engine/property/roundtrip.properties.ts
 
 import { fc, test } from "@fast-check/vitest";
 

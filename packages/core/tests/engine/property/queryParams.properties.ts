@@ -1,4 +1,4 @@
-// packages/route-tree/tests/property/queryParams.properties.ts
+// packages/core/tests/engine/property/queryParams.properties.ts
 
 import { test } from "@fast-check/vitest";
 
