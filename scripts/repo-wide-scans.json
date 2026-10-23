@@ -107,6 +107,10 @@
       "reads": "packages/core/src — from a test in @real-router/validation-plugin"
     },
     {
+      "file": "packages/validation-plugin/tests/functional/engine-boundary-1301.test.ts",
+      "reads": "core's manifest, for the subpaths its exports publish, and the files in packages/core an import of the plugin's src resolves to"
+    },
+    {
       "file": "packages/validation-plugin/tests/functional/predicate-totality-2245.test.ts",
       "reads": "core's INVARIANTS.md, to derive which predicates claim totality"
     },

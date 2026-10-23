@@ -21,8 +21,8 @@ import path.
 - The **only** in-repo consumer is core itself. `@real-router/validation-plugin` reaches the two
   engine functions it needs (`validateRoute`, `buildParamMeta`) through core's
   `@real-router/core/validation` subpath — never by importing this directory
-  ([#1301](https://github.com/greydragon888/real-router/issues/1301)); a plugin-level test blocks a
-  `route-tree` import.
+  ([#1301](https://github.com/greydragon888/real-router/issues/1301)); a plugin-level test refuses an
+  import that reaches core other than through its `exports`.
 
 Everything below documents this subsystem for **core contributors**.
 
