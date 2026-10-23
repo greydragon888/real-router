@@ -1,0 +1,13 @@
+extends: existence
+message: "'%s' cites a record by its number. ARCHITECTURE.md says what holds NOW; the record lives in IMPLEMENTATION_NOTES.md, changesets and issues."
+link: .claude/rules/docs.md
+level: error
+ignorecase: false
+# ⚠ A citation starts with `#`, and the word boundary Vale puts around a token
+# by default needs a word character before it, so `(#2556)` would never match.
+nonword: true
+tokens:
+  - '#\d+'
+  # The repository's own design documents, `RFC-4 M2`. The boundary after one
+  # or two digits keeps `RFC-3986`, the URI standard, out.
+  - '\bRFC-\d{1,2}\b'

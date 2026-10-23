@@ -15279,3 +15279,19 @@ Two kinds of ignored paths under `.claude/` stay visible to knip, none of them c
 - After the fix the Vue app stayed ~5× slower than React/Solid in absolute terms (~0.50 vs ~0.10 ms/nav). TanStack-Vue sat in the same Vue-runtime budget, so against it Real-Router's lead was ~2.3×, against ~14× / ~11.5× on React / Solid.
 
 **Why here.** A measurement on a retired harness cannot be re-run, so it is history, and history lives in this file. The three rejected rewrites are the part worth finding again: each looks like an obvious lever in `Link` or `useRouteNode`, and each measured as noise.
+
+## `lint:prose` fails on a record number in an ARCHITECTURE.md (2026-10-23)
+
+**Problem.** `.claude/rules/docs.md` holds every ARCHITECTURE.md to the present tense, with no issue, pull-request or RFC numbers, and no check held the files to it. On 2026-10-23 a sweep took the numbers out by hand: its commits rewrote 159 lines that carried one. Its own search, `#[0-9]{2,5}`, missed three single-digit references (`(#4)`, `(#1)`, `"Action #5"`), which a `#\d+` search found afterwards. Nothing would have stopped the next number from coming back.
+
+**Solution.** A Vale rule, `vale-styles/Architecture/RecordNumber.yml`, reports `#\d+` and the repository's own `RFC-\d{1,2}` as errors, and `.vale.ini` turns it on in a section of its own, `[{ARCHITECTURE.md,*/ARCHITECTURE.md}]`. `lint:prose` runs it with the rest of the corpus: in pre-push, and in the `prose-lint` job of every pull request.
+
+**Why this shape.**
+
+- **Vale, not a grep.** Vale already reads the tracked corpus, and it reads the prose only: fenced blocks, code spans (the `TokenIgnores` of `[*.md]` holds in this section too) and link targets stay out. `` `#actions` `` is a private field and `[…](#heading)` an anchor; a grep would report both.
+- **A style of its own.** `BasedOnStyles = RealRouter` runs every rule of that style in every Markdown file, and the corpus cites issues outside ARCHITECTURE.md, the CLAUDE.md files among it. A rule named alone, `Architecture.RecordNumber = YES`, loads from its file and runs only in the section that names it.
+- **Both globs.** Vale matches a section against the path as it was given, and `git ls-files` gives the root file as `ARCHITECTURE.md`, which `*/ARCHITECTURE.md` does not match: on a probe named that way, the narrower glob alone drew no error.
+- **`nonword: true`.** Vale wraps a token in word boundaries by default, and the boundary before `#` needs a word character, so `(#2556)` would never match.
+- **`RFC-3986` stays.** The URI standard is a citation of another kind, and the boundary after one or two digits keeps it out. Every `RFC-4 M2` the sweep removed sat beside an issue number, so `#\d+` alone would have caught those lines; the second token holds the form without one.
+
+**Measured (mutations).** A probe carrying `(#1234)` in prose, a bare `#42`, `RFC-4 M2`, `(#77)` in a table cell and `#8` in a heading drew 5 errors as `vale-probe/ARCHITECTURE.md`, as `ARCHITECTURE.md` from its own directory and by absolute path, and none as a `README.md` or a `CLAUDE.md` beside it. `RFC-3986`, `` `#999` ``, a fenced `"#555"` and the link `[…](#1234)` drew none. A `(#1234)` planted in the root ARCHITECTURE.md and in `packages/core/src/utils/fsm/ARCHITECTURE.md` drew 2 errors in the corpus run; with both restored, the corpus has 0 errors.
