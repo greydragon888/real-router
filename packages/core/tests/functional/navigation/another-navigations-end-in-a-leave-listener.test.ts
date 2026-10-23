@@ -10,10 +10,10 @@ import type { LeaveState, Route, Router, State } from "@real-router/core";
  *
  * A `subscribeLeave` listener that waits on work another navigation started —
  * that navigation's promise, or a request bound to its signal — receives that
- * navigation's END when it is cancelled. That is not THIS navigation's quiet
- * cancel (#2787): the navigation still running fails visibly with
- * `CANNOT_DEACTIVATE` and a `TRANSITION_ERROR`, as it does when a guard holds
- * the same value.
+ * navigation's END when it is cancelled or fails. That is not THIS navigation's
+ * quiet cancel (#2787), nor its own failure: the navigation still running fails
+ * visibly with `CANNOT_DEACTIVATE` and a `TRANSITION_ERROR`, as it does when a
+ * guard holds the same value.
  *
  * The CONTROLS hold the rest: a `RouterError(TRANSITION_CANCELLED)` the
  * listener built is a quiet cancel, a plain error fails the navigation with
@@ -209,6 +209,65 @@ describe("a leave listener waiting on another navigation's work fails when that 
       expect(run.state).toBe("home");
     },
   );
+});
+
+describe("a leave listener waiting on another navigation's work fails when that navigation fails", () => {
+  it("throws what a refused navigation's signal was aborted with: CANNOT_DEACTIVATE, not that navigation's CANNOT_ACTIVATE", async () => {
+    let refusedSignal: AbortSignal | undefined;
+    const router = createRouter([
+      { name: "home", path: "/" },
+      {
+        name: "refused",
+        path: "/refused",
+        canActivate: () => async (_toState, _fromState, signal) => {
+          refusedSignal = signal;
+          await Promise.resolve();
+
+          return false;
+        },
+      },
+      { name: "p", path: "/p" },
+    ]);
+    const log: string[] = [];
+
+    await router.start("/");
+    router.usePlugin(() => ({
+      onTransitionError: (
+        toState: State | undefined,
+        _fromState: State | undefined,
+        error: unknown,
+      ) => log.push(`ERROR:${toState?.name}:${String(describeError(error))}`),
+    }));
+
+    const first = await router
+      .navigate("refused")
+      .then(() => "resolved")
+      .catch(describeError);
+
+    router.subscribeLeave((leave) => {
+      if (leave.nextRoute.name === "p") {
+        throw refusedSignal?.reason;
+      }
+    });
+
+    const second = await router
+      .navigate("p")
+      .then(() => "resolved")
+      .catch(describeError);
+
+    expect(first).toBe(errorCodes.CANNOT_ACTIVATE);
+    expect(describeError(refusedSignal?.reason)).toBe(
+      errorCodes.CANNOT_ACTIVATE,
+    );
+    expect(second).toBe(errorCodes.CANNOT_DEACTIVATE);
+    expect(log).toStrictEqual([
+      `ERROR:refused:${errorCodes.CANNOT_ACTIVATE}`,
+      `ERROR:p:${errorCodes.CANNOT_DEACTIVATE}`,
+    ]);
+    expect(router.getState()?.name).toBe("home");
+
+    router.dispose();
+  });
 });
 
 describe("controls — what the listener raised itself, and its own navigation's end", () => {
