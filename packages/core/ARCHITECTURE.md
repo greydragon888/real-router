@@ -436,8 +436,8 @@ dropping either side silently regresses one case.
            ▼
 ┌──────────────────────┐
 │  Deactivation guards │  for each segment in toDeactivate (innermost → outermost):
-│                      │    guardFn(toState, fromState, signal)
-│                      │    false → RouterError(CANNOT_DEACTIVATE)
+│                      │    guardFn(toState, fromState, signal), a thenable awaited
+│                      │    anything but true → RouterError(CANNOT_DEACTIVATE)
 └──────────┬───────────┘
            │
            ▼
@@ -452,8 +452,8 @@ dropping either side silently regresses one case.
            ▼
 ┌──────────────────────┐
 │  Activation guards   │  for each segment in toActivate (outermost → innermost):
-│                      │    guardFn(toState, fromState, signal)
-│                      │    false → RouterError(CANNOT_ACTIVATE)
+│                      │    guardFn(toState, fromState, signal), a thenable awaited
+│                      │    anything but true → RouterError(CANNOT_ACTIVATE)
 └──────────┬───────────┘
            │
            ▼

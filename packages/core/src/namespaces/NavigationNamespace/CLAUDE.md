@@ -72,7 +72,8 @@ namespaces/NavigationNamespace/
 └── transition/
     ├── executeNavigation.ts   — executeNavigation + the two-pass prologue, completeImmediate,
     │                            finishAsyncNavigation, handleNoGuardsLeave, abortPreviousNavigation
-    ├── guardPhase.ts          — executeGuardPipeline, runFrom, resumeFrom, runPhase, runStep
+    ├── guardPhase.ts          — executeGuardPipeline, runFrom, resumeFrom, runPhase, runStep,
+    │                            adoptThenable
     ├── completeTransition.ts  — completeTransition, buildTransitionMeta
     ├── navigateToNotFound.ts  — the one commit primitive that is NOT a transition
     └── errorHandling.ts       — handleGuardError, routeTransitionError, resolveAsyncGuard

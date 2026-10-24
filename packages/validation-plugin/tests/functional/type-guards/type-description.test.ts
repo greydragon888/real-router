@@ -47,6 +47,25 @@ describe("Helper Functions", () => {
       expect(getTypeDescription({ constructor: "evil" })).toBe("object");
       expect(getTypeDescription({ constructor: 42 })).toBe("object");
       expect(getTypeDescription({ constructor: {} })).toBe("object");
+      expect(getTypeDescription({ constructor: { name: "Widget" } })).toBe(
+        "object",
+      );
+    });
+
+    it("reads the constructor's `name` once, so a drifting `name` cannot pass a non-string (#2823)", () => {
+      let reads = 0;
+      const constructor = (): void => {};
+
+      Object.defineProperty(constructor, "name", {
+        get(): unknown {
+          reads += 1;
+
+          return reads === 1 ? "Widget" : Symbol("drift");
+        },
+      });
+
+      expect(getTypeDescription({ constructor })).toBe("Widget");
+      expect(reads).toBe(1);
     });
 
     it("returns 'object' for a throwing `constructor` / `.name` getter or Proxy (#1052)", () => {
@@ -84,6 +103,39 @@ describe("Helper Functions", () => {
               },
             },
           ),
+        ),
+      ).toBe("object");
+    });
+
+    it("returns 'object' when the constructor's `name` is not a string (#2823)", () => {
+      // The description lands in a message: a Symbol or a null-prototype object
+      // handed back breaks the message, and a number prints as a type.
+      for (const name of [Symbol("name"), Object.create(null), 42]) {
+        const constructor = (): void => {};
+
+        Object.defineProperty(constructor, "name", { value: name });
+
+        expect(getTypeDescription({ constructor })).toBe("object");
+      }
+    });
+
+    it("returns 'object' for a revoked proxy and for an array proxy whose `length` read throws (#2823)", () => {
+      const { proxy, revoke } = Proxy.revocable({}, {});
+
+      revoke();
+
+      expect(getTypeDescription(proxy)).toBe("object");
+      expect(
+        getTypeDescription(
+          new Proxy([], {
+            get(_target, key) {
+              if (key === "length") {
+                throw new Error("BOOM");
+              }
+
+              return;
+            },
+          }),
         ),
       ).toBe("object");
     });

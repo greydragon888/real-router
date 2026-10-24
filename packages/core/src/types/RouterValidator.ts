@@ -115,6 +115,22 @@ export interface RouterValidator {
     validateCountThresholds: (count: number, methodName: string) => void;
     warnOverwrite: (name: string, type: string, methodName: string) => void;
     warnAsyncGuardSync: (name: string, methodName: string) => void;
+    /**
+     * The synchronous ask met an answer that is neither a boolean nor a
+     * thenable; `methodName` is the one `warnAsyncGuardSync` receives for the
+     * same ask (#2823).
+     */
+    warnNonBooleanGuardSync: (
+      name: string,
+      answer: unknown,
+      methodName: string,
+    ) => void;
+    /**
+     * A transition met an answer, or the value a thenable settled on, that is
+     * not a boolean. Several calls start a transition, so no door is named
+     * (#2823).
+     */
+    warnNonBooleanGuard: (name: string, answer: unknown) => void;
   };
 
   /**

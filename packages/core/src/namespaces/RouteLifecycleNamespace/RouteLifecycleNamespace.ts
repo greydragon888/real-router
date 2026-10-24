@@ -816,8 +816,10 @@ export class RouteLifecycleNamespace<
 
   /**
    * Shared implementation for synchronous guard checks.
-   * Warns if a guard returns a Promise (async guards are not supported in sync
-   * mode), and consumes that promise.
+   * Only `true` allows (#2823); every other answer is `false`. A thenable cannot
+   * be waited for here, so its promise is consumed, and the validator is told
+   * which of the two it met: a thenable, or an answer that is neither a boolean
+   * nor a thenable.
    * Catches exceptions and treats them as navigation-blocking (`false`).
    *
    * @param functions - Map of compiled guard functions to look up
@@ -840,18 +842,31 @@ export class RouteLifecycleNamespace<
     }
 
     try {
-      const result = guardFn(toState, fromState);
+      const answer: unknown = guardFn(toState, fromState);
 
-      if (typeof result === "boolean") {
-        return result;
+      if (typeof answer === "boolean") {
+        return answer;
       }
 
-      // An async guard's promise is application code's, and this check cannot
-      // wait for it. Consumed here, so one that rejects is not an unhandled
-      // rejection (#2797); a thenable from another realm is adopted (#2251).
-      void Promise.resolve(result).catch(() => undefined);
+      // The walk's own test for a thenable (`adoptThenable` in `guardPhase.ts`),
+      // read inside the guard's error channel for the same reason: a `then`
+      // that throws is the guard failing. The diagnostics sit inside it too: a
+      // diagnostic is not a verdict, so one that throws — a validator without
+      // the member — is logged below like a crashed guard, and the ask still
+      // answers `false`.
+      const then = (answer as { then?: unknown } | null | undefined)?.then;
+      const validator = this.#deps.getValidator();
 
-      this.#deps.getValidator()?.lifecycle.warnAsyncGuardSync(name, methodName);
+      if (typeof then === "function") {
+        // An async guard's promise is application code's, and this check cannot
+        // wait for it. Consumed here, so one that rejects is not an unhandled
+        // rejection (#2797); a thenable from another realm is adopted (#2251).
+        void Promise.resolve(answer).catch(() => undefined);
+
+        validator?.lifecycle.warnAsyncGuardSync(name, methodName);
+      } else {
+        validator?.lifecycle.warnNonBooleanGuardSync(name, answer, methodName);
+      }
 
       return false;
     } catch (error) {

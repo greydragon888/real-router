@@ -85,3 +85,36 @@ export function warnAsyncGuardSync(
     `Guard for "${name}" returned a Promise. Sync check cannot resolve async guards — returning false.`,
   );
 }
+
+/**
+ * A guard answered neither `true` nor `false` (#2823). Core refuses such an
+ * answer on every path; this names the guard and what it answered.
+ */
+function nonBooleanGuardMessage(name: string, answer: unknown): string {
+  return `Guard for "${name}" must answer true or false, got ${getTypeDescription(answer)} — read as a refusal.`;
+}
+
+/**
+ * The synchronous ask met a non-boolean answer; it reports under the channel
+ * `warnAsyncGuardSync` takes for the same ask.
+ */
+export function warnNonBooleanGuardSync(
+  name: string,
+  answer: unknown,
+  methodName: string,
+  logger: RouterLogger,
+): void {
+  logger.warn(`router.${methodName}`, nonBooleanGuardMessage(name, answer));
+}
+
+/**
+ * A transition met a non-boolean answer. Several calls start a transition, so
+ * the message logs under bare `router`.
+ */
+export function warnNonBooleanGuard(
+  name: string,
+  answer: unknown,
+  logger: RouterLogger,
+): void {
+  logger.warn("router", nonBooleanGuardMessage(name, answer));
+}

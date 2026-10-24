@@ -68,19 +68,28 @@ describe("Type Description Utilities - Property-Based Tests", () => {
 
     // #787: an adversarial own `constructor` must never crash the diagnostic
     // helper. Beyond "does not crash", the exact contract is: a function
-    // constructor named something other than `"Object"` yields its (non-empty)
-    // name, and anything else (a non-function constructor, an anonymous function,
-    // or one named `"Object"`) yields `"object"`. `fc.object()` never emits a
-    // `constructor` key and `fc.anything()` never emits a function, so the
-    // generator below mixes both function and non-function constructor values.
-    const withName = (name: string): (() => void) =>
+    // constructor whose `name` is a non-empty string other than `"Object"`
+    // yields that name, and anything else (a non-function constructor, an
+    // anonymous function, one named `"Object"`, or one whose `name` is not a
+    // string) yields `"object"`. `fc.object()` never emits a `constructor` key
+    // and `fc.anything()` never emits a function or a Symbol, so the generator
+    // below mixes function and non-function constructor values, and names of
+    // every type.
+    const withName = (name: unknown): (() => void) =>
       Object.defineProperty((): void => undefined, "name", { value: name });
     const constructorValueArbitrary = fc.oneof(
       fc.anything(), // non-function values (null, string, object, …)
+      fc.string().map((name) => ({ name })), // a non-function with a string `name`
       fc.func(fc.anything()), // functions with engine-assigned names
+      fc
+        .oneof(
+          fc.anything({ withNullPrototype: true }),
+          fc.string().map(Symbol),
+        )
+        .map(withName), // a `name` of any type (#2823)
       fc.constantFrom(
         withName("Widget"), // named function → returns the name
-        withName(""), // empty name → "object" (the `|| "object"` branch)
+        withName(""), // empty name → "object"
         withName("Object"), // name exactly "Object" → "object"
       ),
     );
@@ -89,13 +98,56 @@ describe("Type Description Utilities - Property-Based Tests", () => {
       "returns the constructor function's name, else 'object', for any own constructor (never throws)",
       (ctorValue) => {
         const result = getTypeDescription({ constructor: ctorValue, bad: 1 });
+        const name: unknown =
+          typeof ctorValue === "function" ? ctorValue.name : undefined;
 
-        const expected =
-          typeof ctorValue === "function" && ctorValue.name !== "Object"
-            ? ctorValue.name || "object"
-            : "object";
+        expect(result).toBe(
+          typeof name === "string" && name !== "" && name !== "Object"
+            ? name
+            : "object",
+        );
+      },
+    );
 
-        expect(result).toBe(expected);
+    // #2823: describing an object reads it, and a proxy answers those reads
+    // with application code. `fc.anything()` emits no proxy, so the generator
+    // emits a builder and the run builds the proxy — fast-check reads every
+    // value it generates, and a revoked proxy refuses that read. The builders:
+    // an array proxy answering `length` with a value of any type, one that
+    // throws on every read, and a revoked one.
+    const proxyBuilderArbitrary = fc.oneof(
+      fc
+        .oneof(
+          fc.anything({ withNullPrototype: true }),
+          fc.string().map(Symbol),
+        )
+        .map(
+          (length) => (): object =>
+            new Proxy([], {
+              get: (_target, key) => (key === "length" ? length : undefined),
+            }),
+        ),
+      fc.constant(
+        (): object =>
+          new Proxy([], {
+            get() {
+              throw new Error("BOOM");
+            },
+          }),
+      ),
+      fc.constant((): object => {
+        const { proxy, revoke } = Proxy.revocable({}, {});
+
+        revoke();
+
+        return proxy;
+      }),
+    );
+
+    test.prop([proxyBuilderArbitrary], { numRuns: 2000 })(
+      "answers a string for a proxy, whatever its reads answer (never throws)",
+      (build) => {
+        expect(typeof getTypeDescription(build())).toBe("string");
       },
     );
   });

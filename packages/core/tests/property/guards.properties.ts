@@ -6,6 +6,7 @@ import { getLifecycleApi } from "@real-router/core/api";
 
 import {
   createFixtureRouter,
+  arbGuardAnswer,
   arbNavigableRoute,
   FIXTURE_ROUTE_NAMES,
   ROUTE_PATHS,
@@ -66,6 +67,58 @@ describe("Guards + navigate() Interaction Properties", () => {
       );
 
       expect(state.name).toBe(targetRoute);
+
+      router.stop();
+    },
+  );
+
+  // #2823 — the rule is `=== true`, not truthiness: a truthy non-boolean
+  // (`return "login"`, a filtered array) is the answer truthiness let through.
+  test.prop(
+    [
+      arbNavigableRoute,
+      arbGuardAnswer,
+      fc.boolean(),
+      fc.constantFrom("canActivate", "canDeactivate"),
+    ],
+    { numRuns: NUM_RUNS.fast },
+  )(
+    "only `true` allows — any other answer refuses, given directly or through a promise",
+    async (targetRoute, answer, awaited, kind) => {
+      fc.pre(targetRoute !== "home");
+
+      const router = createFixtureRouter();
+      const lifecycle = getLifecycleApi(router);
+      const factory = () => () =>
+        (awaited ? Promise.resolve(answer) : answer) as boolean;
+
+      await router.start("/");
+
+      if (kind === "canActivate") {
+        lifecycle.addActivateGuard(targetRoute, factory);
+      } else {
+        lifecycle.addDeactivateGuard("home", factory);
+      }
+
+      let outcome: string;
+
+      try {
+        const state = await router.navigate(
+          targetRoute,
+          ...navArgsForRoute(targetRoute),
+        );
+
+        outcome = state.name;
+      } catch (error) {
+        outcome = (error as RouterError).code;
+      }
+
+      const refused =
+        kind === "canActivate"
+          ? errorCodes.CANNOT_ACTIVATE
+          : errorCodes.CANNOT_DEACTIVATE;
+
+      expect(outcome).toBe(answer === true ? targetRoute : refused);
 
       router.stop();
     },

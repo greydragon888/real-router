@@ -563,7 +563,7 @@ These are deliberately designed constraints. Violating them will break the syste
 
 ### Guards & Plugins
 
-- **Guards return `boolean | Promise<boolean>` only** — no redirects, no state modification, no `State` return.
+- **Guards return `boolean | Promise<boolean>` only** — no redirects, no state modification, no `State` return. Only `true` allows: every other answer refuses, a `State` or a route name included.
 - **Plugins are observers** — they react to events but cannot block or modify the transition pipeline.
 - **Guard execution order is fixed**: deactivation innermost → outermost, then activation outermost → innermost.
 - **`navigateToNotFound()` bypasses ACTIVATION guards and plugins** — plugins only see `onTransitionSuccess`, and nothing is activated at `UNKNOWN_ROUTE`. It does consult the current route's `canDeactivate`: leaving is still leaving.

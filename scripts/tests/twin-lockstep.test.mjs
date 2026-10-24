@@ -143,8 +143,7 @@ const INDEPENDENT = [
       "getTypeDescription: already diverged by consumer needs — the " +
       "validation-plugin copy adds an `array[N]` branch and cites #787 where " +
       "the engine copy cites #903. Error-MESSAGE helpers; divergence is benign " +
-      "(each package's tests pin its own messages). NOTE: route-batch.ts's " +
-      "in-file 'Byte-identical twin' comment predates this divergence.",
+      "(each package's tests pin its own messages).",
   },
   {
     path: "packages/core/src/engine/path-matcher/encoding.ts",
