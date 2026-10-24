@@ -181,7 +181,3 @@ The glob `web/*/*/*` in `examples/pnpm-workspace.yaml` registers subgrouped pack
 ## Playwright Config
 
 Each example's `playwright.config.ts` sets `testDir: "./e2e"` and pins a port of its own: the `webServer` command starts the preview there, and `port` and `use.baseURL` name the same `<N>`. A Vite example runs `pnpm preview --port <N>`; an Angular example runs `pnpm preview`, whose script carries the port; an SSR example builds first (`pnpm build:app && …`). The Electron examples declare no `webServer`. A new example copies a sibling's config and changes the port.
-
-## Scenario Plans
-
-See `.claude/example-scenarios.md` for full scenario descriptions and implementation plan.

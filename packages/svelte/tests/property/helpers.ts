@@ -7,7 +7,7 @@ import { fc } from "@fast-check/vitest";
 // =============================================================================
 
 /**
- * Per `tests/property/.claude/review-2026-05-10.md` §2.3:
+ * Run counts per tier:
  * - `standard` = 100 — old 50 baseline was too low for multi-field generators
  *   (shouldNavigate cmd⇄ctrl swap, buildActiveClassName Set-dedup);
  *   100 matches the fast-check default and gives adequate sensitivity without

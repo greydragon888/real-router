@@ -15,8 +15,7 @@
 // and the leaf / base / sharded jobs branch on `mode` + consume `matrix` /
 // `leaf_filter` (the explicit leaf execution filter — see buildPlan).
 //
-// Design doc: .claude/ci-acceleration-poc-ru.md (§3-A) + companion empirical
-// measurements .claude/ci-acceleration-empirical-2026-06-20.md (A/B/C/D).
+// Design doc: .claude/ci-acceleration-poc-ru.md (§3-A).
 //
 // ─────────────────────────────────────────────────────────────────────────────
 // TWO package sets, two turbo calls — do NOT collapse them (A5 + #1067):

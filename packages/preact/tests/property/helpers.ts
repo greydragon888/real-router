@@ -7,7 +7,7 @@ import { fc } from "@fast-check/vitest";
 // =============================================================================
 
 /**
- * Per `tests/property/.claude/review-2026-05-10.md` §2.3:
+ * Run counts per tier:
  * - `standard` = 100 — for 11-field comparators (areLinkPropsEqual) the 50-run
  *   baseline is too low; bump gives adequate sensitivity coverage without
  *   slowing the property suite materially.

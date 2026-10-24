@@ -8,9 +8,9 @@ import { reactive } from "vue";
 // =============================================================================
 
 /**
- * Per `packages/vue/.claude/review-2026-05-10.md` §2.3 — Vue's previous
- * baseline of `{ standard: 50, thorough: 100 }` was 2–5× lower than the
- * React/Preact/Solid/Svelte reference. Raised to match the canonical level:
+ * Vue's previous baseline of `{ standard: 50, thorough: 100 }` was 2–5×
+ * lower than the React/Preact/Solid/Svelte reference. Raised to match the
+ * canonical level:
  *
  * - `standard` = 100 — covers single-axis invariants and most pure-function
  *   checks (`isSegmentMatch`, `buildHref` shape, simple `shallowEqual`).

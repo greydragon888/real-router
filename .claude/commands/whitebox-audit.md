@@ -19,7 +19,7 @@ $ARGUMENTS
 
 - `packages/core/eslint.config.mjs` — первый white-box guardrail + аудит-доктрина в комментарии.
 - `packages/core/eslint.config.mjs` (блок `tests/engine/unit/path-matcher/**`) + `packages/core/tests/engine/unit/path-matcher/*` — ПОЛНАЯ миграция всеми тремя исходами (мигрирован / v8-ignore / KEEP-exception); `createSegmentNode.test.ts` и `percentEncoding.test.ts` — образцы KEEP-исключений с заголовком-обоснованием.
-- `.claude/whitebox-test-audit-2026-06-23.md` — исходный аудит core (если есть локально).
+- `packages/core/.claude/whitebox-test-audit-2026-06-23.md` — исходный аудит core (если есть локально).
 
 ---
 

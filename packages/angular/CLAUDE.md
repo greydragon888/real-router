@@ -592,6 +592,5 @@ All four examples use `provideRealRouterFactory` (not `provideRealRouter`); exis
 
 ### See Also
 
-- RFC: `.claude/rfc-angular-ssr-factory-ru.md`
 - Tracking issue: [#582](https://github.com/greydragon888/real-router/issues/582)
 - ssr-examples follow-up: [#581](https://github.com/greydragon888/real-router/issues/581) (parent)

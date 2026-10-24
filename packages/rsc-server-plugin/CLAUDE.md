@@ -41,7 +41,7 @@ Mirror of `@real-router/ssr-data-plugin/errors` — same `shared/ssr/errors.ts` 
 
 ## Variant B — `ReactNode`, not Flight bytes
 
-The plugin publishes a `ReactNode` (a Server Component element) — **not** a buffered Flight payload. Rationale (see `.claude/rfc-rsc-server-plugin.md` for full evidence):
+The plugin publishes a `ReactNode` (a Server Component element) — **not** a buffered Flight payload. Rationale:
 
 - **Streaming:** caller can pipe Flight in parallel with HTML rendering — TTFB-friendly
 - **Bundler-agnostic:** plugin never imports `react-server-dom-*`; signatures across webpack/turbopack/parcel/esm differ
