@@ -106,15 +106,15 @@ These are demonstrated end-to-end by 4 dedicated tests in `e2e/ssr.spec.ts` (Cac
 
 ## E2e
 
-[`e2e/ssr.spec.ts`](e2e/ssr.spec.ts) — 46 Playwright scenarios:
+[`e2e/ssr.spec.ts`](e2e/ssr.spec.ts) — Playwright scenarios:
 
 - baseline (per-request isolation, hydration round-trip, loaders, guards, query params, nested loaders, 404, 500, CSR navigation, `<Link>` href in no-JS mode)
 - Solid-specific: `_$HY` hydration runtime variable injected via `generateHydrationScript()`; `data-hk-*` markers present in server-rendered HTML (proof `hydratable: true` is active)
-- **Loader-driven HTTP** (5 tests): `/users/9999` → 404 + nested `/users/9999/posts` → 404 (leaf loader re-validates), `/legacy-user/2` → 301 + Location, `/legacy-user/3` follows to a hydrated profile, `/slow` → 504 within 2.5 s budget
-- **`<head>` injection** (2 tests): home title + reactive title for `/users?sort=`
-- **CSR navigate spy** (1 test): clicking a profile link issues zero document/fetch requests
-- **Mixed-guard concurrent** (1 test): admin × user × anon × 5 routes in parallel
-- **Cache-Control + ETag + AbortController** (4 tests): per-route Cache-Control directives match `src/router/cache-policies.ts`; `/users` 304 on conditional GET; `/` and `/users` yield distinct content hashes; `/slow` releases the handler in <1 s when the client disconnects (vs the 5 s loader delay)
+- **Loader-driven HTTP**: `/users/9999` → 404 + nested `/users/9999/posts` → 404 (leaf loader re-validates), `/legacy-user/2` → 301 + Location, `/legacy-user/3` follows to a hydrated profile, `/slow` → 504 within 2.5 s budget
+- **`<head>` injection**: home title + reactive title for `/users?sort=`
+- **CSR navigate spy**: clicking a profile link issues zero document/fetch requests
+- **Mixed-guard concurrent**: admin × user × anon × 5 routes in parallel
+- **Cache-Control + ETag + AbortController**: per-route Cache-Control directives match `src/router/cache-policies.ts`; `/users` 304 on conditional GET; `/` and `/users` yield distinct content hashes; `/slow` releases the handler in <1 s when the client disconnects (vs the 5 s loader delay)
 
 ## See Also
 

@@ -8,7 +8,7 @@
 pnpm bundle                                            # rebuild shared/dom-utils dist
 pnpm -F react-scroll-restoration-example dev           # http://localhost:5173
 pnpm -F react-scroll-restoration-example build         # tsc -b + vite build
-pnpm -F react-scroll-restoration-example test:e2e      # 13 tests / 7 describe blocks
+pnpm -F react-scroll-restoration-example test:e2e
 ```
 
 The floating **Scroll Meter** in the bottom-right corner shows live `scrollY`, the published `state.context.navigation` direction / navigationType, and the `sessionStorage` scroll-restore store keyed by `state.path`, the form the router prints the location in. Stable Playwright selectors live on `[data-testid="scroll-meter"]` (with `data-scroll-y` attribute for rAF-stable reads) and per-route `[data-testid="nav-*"]`.
@@ -42,7 +42,7 @@ See [Wiki › Scroll Restoration](https://github.com/greydragon888/real-router/w
 
 ² After #531 navigation-plugin reads `navigation.activation.navigationType` via `browser.getActivationType()` on initial load and primes `state.context.navigation.navigationType = "reload"` for F5. The utility takes the restore branch and writes saved scrollY back from `sessionStorage`.
 
-## Scenarios (7 base, 13 tests with sub-tests)
+## Scenarios
 
 | #   | Scenario               | Sub-tests | What it exercises                                                          |
 | --- | ---------------------- | --------- | -------------------------------------------------------------------------- |

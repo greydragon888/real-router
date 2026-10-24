@@ -73,7 +73,7 @@ In-memory mock store ([`src/database.ts`](src/database.ts)) — module-scoped si
 
 ## E2e Scenarios
 
-[`e2e/ssr-rsc.spec.ts`](e2e/ssr-rsc.spec.ts) — **26 Playwright scenarios**, organized by topic. The five "core" scenarios below establish the architectural contract; the remaining 21 cover query params, history navigation, race conditions, loader-driven HTTP, production HTTP semantics, Server Actions, and the `NotificationBanner` cross-component result pattern.
+[`e2e/ssr-rsc.spec.ts`](e2e/ssr-rsc.spec.ts) — Playwright scenarios, organized by topic. The five "core" scenarios below establish the architectural contract; the rest cover query params, history navigation, race conditions, loader-driven HTTP, production HTTP semantics, Server Actions, and the `NotificationBanner` cross-component result pattern.
 
 **Core (1-5)**
 1. **Initial HTML load** — `/users/1` → server-rendered `<UserProfile>` visible synchronously, `self.__FLIGHT_DATA` script tags present, no hydration warnings
@@ -95,7 +95,6 @@ In-memory mock store ([`src/database.ts`](src/database.ts)) — module-scoped si
 
 ```bash
 pnpm test:e2e
-# Running 26 tests using 1 worker
 # ✓ Scenarios 1-5 — core architectural contract
 # ✓ Scenarios 9-11 — loader rejection / history / race-safe abort
 # ✓ Scenarios 12-15 — search-param routing
@@ -189,6 +188,5 @@ Both endpoints (`GET /:path` and `GET /__rsc?route=...`) get production-grade pi
 - [@real-router/rsc-server-plugin](../../../../../packages/rsc-server-plugin) — the plugin itself (Variant B: ReactNode payload, bundler-agnostic)
 - [@real-router/ssr-data-plugin](../../../../../packages/ssr-data-plugin) — sibling plugin for plain JSON data
 - [examples/web/react/ssr-examples/ssr](../ssr) — classical SSR (no RSC) precedent
-- [.claude/rfc-rsc-vite-example.md](../../../../../.claude/rfc-rsc-vite-example.md) — RFC + design rationale + Stage 0 spike findings
 - [@vitejs/plugin-rsc](https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-rsc) — multi-environment RSC bundler
 - [rsc-html-stream](https://github.com/devongovett/rsc-html-stream) — Flight injection library (server + client)

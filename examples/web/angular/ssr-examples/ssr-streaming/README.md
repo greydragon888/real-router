@@ -179,7 +179,7 @@ pnpm test:e2e     # Playwright — 22 acceptance scenarios
 
 ## E2e Scenarios
 
-[`e2e/ssr-streaming.spec.ts`](e2e/ssr-streaming.spec.ts) — 22 Playwright scenarios mirroring the Vue baseline where the runtime allows, plus Angular-specific scenarios:
+[`e2e/ssr-streaming.spec.ts`](e2e/ssr-streaming.spec.ts) — Playwright scenarios mirroring the Vue baseline where the runtime allows, plus Angular-specific scenarios:
 
 1. **Critical content visible immediately on commit** — wall-clock < 1500 ms
 2. **`@defer` placeholders are server-rendered** — raw HTTP response check via `request.get()`

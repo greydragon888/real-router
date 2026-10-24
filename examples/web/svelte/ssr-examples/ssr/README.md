@@ -153,16 +153,16 @@ The e2e suite verifies the `ssr-data-plugin` contract (intercepts `start()`, not
 
 ## E2e
 
-[`e2e/ssr.spec.ts`](e2e/ssr.spec.ts) — 43 Playwright scenarios:
+[`e2e/ssr.spec.ts`](e2e/ssr.spec.ts) — Playwright scenarios:
 
-- 25 baseline (per-request isolation, hydration round-trip, loaders, guards, query params, nested loaders, 404, 500, CSR navigation, `<Link>` href in no-JS mode)
+- baseline (per-request isolation, hydration round-trip, loaders, guards, query params, nested loaders, 404, 500, CSR navigation, `<Link>` href in no-JS mode)
 - Svelte-specific: no hydration mismatch warnings (Svelte 5 emits `[svelte] hydration_*` warnings on mismatch)
 - **`<svelte:head>` per-route**: home page ships per-route `<title>` + `<meta description>` in raw SSR HTML; `/users` reflects the current `?sort` param via reactive `<svelte:head>`
 - **Loader-driven HTTP**: `/users/9999` → 404, `/users/9999/posts` → 404, `/legacy-user/2` → 301 + Location, `/legacy-user/3` follows to a hydrated profile, `/slow` → 504 within 2.5 s budget (5 s loader delay)
 - **CSR navigate spy**: clicking a profile link triggers zero document/fetch requests; `state.context.data` stays undefined
 - **Query params in `__SSR_STATE__`**: `?sort=desc` surfaces in the serialized blob
 - **Mixed-guard concurrent requests**: admin / user / anon contexts × 5 routes (admin, dashboard, users, profile, posts) in parallel — each context sees only its own `currentUser`
-- **Cache-Control + ETag + AbortController** (4 tests): per-route Cache-Control directives match `src/router/cache-policies.ts`; `/users` 304 on conditional GET; `/` clock invalidates ETag between requests; `/slow` releases the handler in <1 s when the client disconnects (vs the 5 s loader delay)
+- **Cache-Control + ETag + AbortController**: per-route Cache-Control directives match `src/router/cache-policies.ts`; `/users` 304 on conditional GET; `/` clock invalidates ETag between requests; `/slow` releases the handler in <1 s when the client disconnects (vs the 5 s loader delay)
 
 ## See Also
 

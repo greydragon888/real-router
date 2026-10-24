@@ -120,9 +120,9 @@ pnpm test:e2e                       # Playwright
 
 ## E2e Coverage
 
-[`e2e/ssg.spec.ts`](e2e/ssg.spec.ts) — 23 Playwright scenarios:
+[`e2e/ssg.spec.ts`](e2e/ssg.spec.ts) — Playwright scenarios:
 
-- 16 baseline (404.html, sitemap.xml, ssgServe redirect, dynamic-route data in HTML, no hydration mismatch, CSR navigation, absolute script paths, per-page title+description, build determinism)
+- baseline (404.html, sitemap.xml, ssgServe redirect, dynamic-route data in HTML, no hydration mismatch, CSR navigation, absolute script paths, per-page title+description, build determinism)
 - Svelte-specific: dual-mode mount works (no hydration mismatch on pre-rendered pages, fresh mount in dev)
 - **Filesystem layout**: `existsSync` for every expected `index.html`, including nested `/users/:id/posts/index.html`
 - **Overfetch protection**: `readdirSync(users)` returns exactly `["1","2","3"]`, no `users/4` etc.

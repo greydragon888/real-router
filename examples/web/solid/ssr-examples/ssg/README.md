@@ -116,7 +116,7 @@ pnpm test:e2e                       # Playwright
 
 ## E2e Coverage
 
-[`e2e/ssg.spec.ts`](e2e/ssg.spec.ts) — 24 Playwright scenarios across 7 functional groups:
+[`e2e/ssg.spec.ts`](e2e/ssg.spec.ts) — Playwright scenarios in these functional groups:
 
 - **Pre-rendered HTML with JS disabled** — every URL ships server-resolved markup before client takes over
 - **`__SSR_STATE__` baking + per-route isolation** — each `dist/<path>/index.html` carries its own router state; no leak between profile/posts pages

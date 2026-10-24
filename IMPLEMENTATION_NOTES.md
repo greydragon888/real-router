@@ -4282,7 +4282,7 @@ Depends on `^bundle` to ensure packages are compiled before examples run e2e tes
 
 **Problem:** Vercel Remote Cache evicted artifacts non-deterministically on the free tier. Same SHA rerun showed **4 tasks going HIT → MISS** in ~2 minutes with zero input drift (#490 evidence: `@real-router/{angular,preact,react,solid}#lint`; `@real-router/svelte#test:properties` never landed remotely). Cost: 30–60 s wasted per PR at random.
 
-**Solution:** Self-hosted [`ducktors/turborepo-remote-cache`](https://github.com/ducktors/turborepo-remote-cache) on Google Cloud Run with Cloudflare R2 as S3-compatible backend. Deployment runbook: [`.github/turbo-remote-cache-deployment.md`](.claude/turbo-remote-cache-deployment.md).
+**Solution:** Self-hosted [`ducktors/turborepo-remote-cache`](https://github.com/ducktors/turborepo-remote-cache) on Google Cloud Run with Cloudflare R2 as S3-compatible backend.
 
 **Why R2 + Cloud Run:**
 
@@ -7481,7 +7481,7 @@ This is a **forced same-route same-params transition** with `hashChange: true`:
 
 - `force: true` bypasses core's `SAME_STATES` short-circuit (name+params didn't change).
 - `hashChange: true` signals URL plugins (`browser-plugin` / `navigation-plugin`) to write `state.context.url = { hash: newHash, hashChanged: true }` in their `onTransitionSuccess` claim.
-- `replace: true` keeps `state.transition.replace === true` portable across both URL plugins so [`createScrollRestoration`](../shared/dom-utils/scroll-restore.ts) skips magnetic-snap on spy-emitted transitions (foundation #648).
+- `replace: true` keeps `state.transition.replace === true` portable across both URL plugins so [`createScrollRestoration`](shared/dom-utils/scroll-restore.ts) skips magnetic-snap on spy-emitted transitions (foundation #648).
 
 Same write API as `<Link hash>` click via `navigateWithHash`, just with `replace: true` so the spy doesn't pollute history with one entry per visible section.
 
@@ -7496,7 +7496,7 @@ The userland approach writes `history.replaceState({}, "", "#section")` and call
 3. Re-trigger `createActiveRouteSource` for sibling `<Link hash>` — TOC highlights stop matching scroll.
 4. Run lifecycle-plugin's `onStay` / `onNavigate` callbacks (same-route hash-only navigations).
 
-Routing through `router.navigate(...)` keeps the entire transition pipeline aware of the hash change. For same-route same-params transitions, [`getTransitionPath`](../packages/core/src/transitionPath.ts) returns empty `toDeactivate` / `toActivate` arrays — `runGuards` is a no-op. The only work is the URL plugin's `onTransitionSuccess` write and the `getTransitionSource` flip — cheap.
+Routing through `router.navigate(...)` keeps the entire transition pipeline aware of the hash change. For same-route same-params transitions, [`getTransitionPath`](packages/core/src/transitionPath.ts) returns empty `toDeactivate` / `toActivate` arrays — `runGuards` is a no-op. The only work is the URL plugin's `onTransitionSuccess` write and the `getTransitionSource` flip — cheap.
 
 ### Anti-flicker mechanisms
 

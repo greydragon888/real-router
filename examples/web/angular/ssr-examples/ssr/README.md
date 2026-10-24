@@ -14,7 +14,7 @@ Server-side rendering with Real-Router, Angular 21, `@angular/ssr` (`AngularNode
 - **Server-side data loading** via `@real-router/ssr-data-plugin` — route loaders run during `router.start(url)` and write to `state.context.data`. Components read it via `injectRoute()` signal.
 - **Cookie-based auth-gated routes** — `dashboard` and `admin` protected by `canActivate` guards consuming `getDep("currentUser")`.
 - **Query params + nested loaders** — `?sort` on `/users`, leaf-route loader for `/users/:id/posts` returns combined parent + child data.
-- **Loader error → 500 page** — rejected loader in `provideAppInitializer` propagates → `bootstrapApplication` rejects → server returns 500. See [`.claude/rfc-angular-ssr-factory-ru.md`](../../../../../.claude/rfc-angular-ssr-factory-ru.md) for the full design rationale.
+- **Loader error → 500 page** — rejected loader in `provideAppInitializer` propagates → `bootstrapApplication` rejects → server returns 500.
 - **Loader-driven HTTP semantics** — typed loader errors (`LoaderRedirect`, `LoaderNotFound`, `LoaderTimeout` from `@real-router/ssr-data-plugin/errors`) are caught by the express middleware and mapped to `301/302`, `404`, and `504` responses respectively. The plugin stays HTTP-agnostic; the application owns the bridge.
   - `users.profile` throws `LoaderNotFound` for ids that don't exist → server returns 404 (loader-driven path; rendered as `text/plain`).
   - `UNKNOWN_ROUTE` (`/nonexistent`) renders the `NotFoundComponent`, which mounts `<http-status-code [code]="404"/>` from `@real-router/angular/ssr` — the component injects `HTTP_STATUS_SINK` (provided per-request via Angular's `REQUEST_CONTEXT` token, see `app.config.ts`) and writes 404 in `ngOnInit`. `server.ts` reads `httpStatusSink.code` after `AngularNodeAppEngine.handle` resolves and lets it override `response.status`. This is the **render-time HTTP status path** — the status is decided by the rendered component, not by inspecting the request URL or `state.name === UNKNOWN_ROUTE` server-side.
@@ -243,7 +243,7 @@ These are demonstrated end-to-end by 4 dedicated tests in `e2e/ssr.spec.ts` (Cac
 - Async start via `provideAppInitializer(async () => router.start(...))`
 - `DestroyRef.onDestroy(() => router.dispose())` cleanup per-request
 
-See [`packages/angular/CLAUDE.md` → SSR Support](../../../../../packages/angular/CLAUDE.md#ssr-support) and the [RFC](../../../../../.claude/rfc-angular-ssr-factory-ru.md) for the full design rationale.
+See [`packages/angular/CLAUDE.md` → SSR Support](../../../../../packages/angular/CLAUDE.md#ssr-support) for the full design rationale.
 
 ## Running
 

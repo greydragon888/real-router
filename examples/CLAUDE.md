@@ -15,7 +15,7 @@ examples/
       navigation-api/       ← (react only) navigation-plugin exclusive extensions, 5 UX scenarios
       hash-examples/        ← (react only) thematic subgroup — hash-fragment + scroll coordination
         link-hash/          ← <Link hash> + state.context.url tab UI demo (#532)
-        scroll-restoration/ ← createScrollRestoration behavior matrix, 7 scenarios (table in its README)
+        scroll-restoration/ ← createScrollRestoration behavior matrix (scenario table in its README)
         scroll-spy/         ← createScrollSpy URL hash tracks visible section (#575)
       animation-examples/   ← (all six frameworks) thematic subgroup — four approaches to route animations
         view-transitions/   ← browser View Transitions API

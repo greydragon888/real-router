@@ -76,13 +76,13 @@ pnpm test:e2e     # Playwright tests
 
 `src/components/SearchForm.tsx` uses `useId()` for `<label htmlFor={...}>` ↔ `<input id={...}>` pairing. Returns a stable per-component-instance ID; SSR and client produce identical values, so the a11y contract survives hydration. Hand-rolled IDs (`Math.random`, module-level counter, `crypto.randomUUID`) all break this contract — useId is the canonical fix. Maps to Vue 3.5's `useId()` and Solid's `createUniqueId()`.
 
-React's useId emits IDs like `_R_u_` and `_R_uH1_` (internal format, stable per render). SearchForm is mounted on the home page; 3 e2e tests verify: label[for]=input[id] for both fields with distinct IDs, SSR-emitted ID matches client DOM with zero hydration warnings, form remains interactive post-hydration (typing into input updates state).
+React's useId emits IDs like `_R_u_` and `_R_uH1_` (internal format, stable per render). SearchForm is mounted on the home page; e2e tests verify: label[for]=input[id] for both fields with distinct IDs, SSR-emitted ID matches client DOM with zero hydration warnings, form remains interactive post-hydration (typing into input updates state).
 
 ## Per-route meta with canonical/og
 
 `src/router/meta.ts` resolves a `PageMeta` block (`title`, `description`, `canonical`, `ogTitle`, `ogDescription`) from the matched router state. `entry-server.tsx` calls `renderHeadFor(meta)` to produce the `<head>` markup; the server splices it into the `<!--ssr-meta-->` placeholder of the template before sending the response. canonical URLs are absolute (prefixed with `SITE_ORIGIN`, defaulting to `https://example.com`) — search engines and social-media crawlers reject relative canonicals.
 
-5 e2e tests verify: home title/description in raw SSR HTML, sort-param interpolation, name in profile title + og:title, absolute canonical, distinct og:description per route.
+The e2e tests verify: home title/description in raw SSR HTML, sort-param interpolation, name in profile title + og:title, absolute canonical, distinct og:description per route.
 
 ## Loader-driven HTTP: typed errors → 301/404/504
 
@@ -126,8 +126,8 @@ Replaces the prior `state.name === UNKNOWN_ROUTE ? 404 : 200` server-side check 
 
 Two layers of authorization, demonstrated end-to-end:
 
-- `/dashboard` — gated by `canActivate: () => getDep("currentUser") !== null`. Anonymous users get redirected to `/`. Verified by 2 e2e tests (anon → 302, authenticated → 200).
-- `/admin` — gated by a role-aware guard: `getDep("currentUser")?.role === "admin"`. Non-admin Bob (`userId=2`) gets a 302; admin Alice (`userId=1`) gets the admin page. Verified by 3 e2e tests (admin guard, non-admin redirect, dashboard allows non-admin).
+- `/dashboard` — gated by `canActivate: () => getDep("currentUser") !== null`. Anonymous users get redirected to `/`. Verified by e2e tests (anon → 302, authenticated → 200).
+- `/admin` — gated by a role-aware guard: `getDep("currentUser")?.role === "admin"`. Non-admin Bob (`userId=2`) gets a 302; admin Alice (`userId=1`) gets the admin page. Verified by e2e tests (admin guard, non-admin redirect, dashboard allows non-admin).
 
 `server/_auth.ts` parses the `userId` cookie (or legacy `auth=1`) into a `CurrentUser` object on the server; `entry-client.tsx` mirrors the same logic over `document.cookie` so the post-hydration guard sees the same DI value as the SSR pass — otherwise client-side guard checks would diverge.
 

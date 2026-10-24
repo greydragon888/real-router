@@ -84,7 +84,7 @@ Two Vue 3.5–specific surface-area pieces, mounted on the home page:
 - **Lazy hydration** — `src/components/HeavyAnalytics.vue` is wrapped via `defineAsyncComponent({ loader, hydrate: hydrateOnVisible() })`. Server fully renders the HTML (crawlers and JS-disabled clients see everything), but the client defers JS hydration until the component scrolls into view. Until the strategy fires, `onMounted` does NOT run, event handlers are not attached, and the component's separate JS chunk is not loaded — pure savings on time-to-interactive for content the user has not seen yet. Maps to Angular's `@defer (on viewport)` with incremental hydration. Other strategies available: `hydrateOnIdle()`, `hydrateOnInteraction()`, `hydrateOnMediaQuery()`, custom function.
 - **`useId()`** — `src/components/SearchForm.vue` uses `useId()` for `<label :for="...">` ↔ `<input :id="...">` pairing. Returns a stable per-component-instance ID; SSR and client produce identical values, so the a11y contract survives hydration. Hand-rolled IDs (`Math.random`, module-level counter, `crypto.randomUUID`) all break this contract — useId is the canonical fix. Maps to Solid's `createUniqueId()` and React's `useId()`.
 
-Verified by 5 e2e tests: SSR HTML present pre-hydration + counter unresponsive (×1), scroll-into-view fires hydration + counter responds (×1), code-split chunk exists on disk + is NOT preloaded by initial HTML (×1), label[for]=input[id] for both fields with distinct ids (×1), SSR-emitted id matches client DOM with zero hydration warnings (×1).
+Verified by e2e tests: SSR HTML present pre-hydration + counter unresponsive, scroll-into-view fires hydration + counter responds, code-split chunk exists on disk + is NOT preloaded by initial HTML, label[for]=input[id] for both fields with distinct ids, SSR-emitted id matches client DOM with zero hydration warnings.
 
 ## Per-route meta + Vue custom directive
 
@@ -95,7 +95,7 @@ Verified by 5 e2e tests: SSR HTML present pre-hydration + counter unresponsive (
 - `updated(el, binding)` — fires when the bound `binding.value` changes reactively. `UserProfile.vue` uses a `computed` that flips between `data.user.id` and `"999"` after a button click; Vue diffs the new binding and calls `updated()` with the new value.
 - `unmounted(el)` — disconnects the observer.
 
-Verified by 7 e2e tests in this file: meta per route (home title/description, sort-param interpolation, name in profile title + og:title, absolute canonical, distinct og:description), directive update lifecycle via `__VIEW_UPDATE_LOG__`, and SSR safety check confirming the directive body doesn't run server-side.
+Verified by e2e tests in this file: meta per route (home title/description, sort-param interpolation, name in profile title + og:title, absolute canonical, distinct og:description), directive update lifecycle via `__VIEW_UPDATE_LOG__`, and SSR safety check confirming the directive body doesn't run server-side.
 
 ## Loader-driven HTTP: typed errors → 301/404/504
 

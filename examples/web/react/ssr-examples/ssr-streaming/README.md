@@ -114,7 +114,7 @@ pnpm test:e2e     # Playwright — 18 acceptance scenarios
 
 ## E2e Scenarios
 
-[`e2e/ssr-streaming.spec.ts`](e2e/ssr-streaming.spec.ts) — 18 Playwright scenarios. Highlights:
+[`e2e/ssr-streaming.spec.ts`](e2e/ssr-streaming.spec.ts) — Playwright scenarios. Highlights:
 
 **Streaming basics (1-5)**
 1. Shell renders before deferred content — critical content visible in <750 ms

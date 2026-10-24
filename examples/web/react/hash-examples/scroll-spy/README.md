@@ -10,7 +10,7 @@ This example demonstrates **router-coordinated scroll spy** — `IntersectionObs
 pnpm bundle                                     # rebuild shared/dom-utils dist
 pnpm -F react-scroll-spy-example dev            # http://localhost:5173
 pnpm -F react-scroll-spy-example build          # tsc -b + vite build
-pnpm -F react-scroll-spy-example test:e2e       # 10 tests
+pnpm -F react-scroll-spy-example test:e2e
 ```
 
 Open `/article`, scroll through 12 sections — the URL bar tracks the active heading in real time. The Hash Indicator (bottom-left) shows `state.context.url.hash`; the Scroll Meter (bottom-right) shows `navigate()`/sec rate (≤ 10/sec acceptance per RFC §8.4).
@@ -23,7 +23,7 @@ Open `/article`, scroll through 12 sections — the URL bar tracks the active he
 - All routing-layer inputs the utility needs are already published by URL plugins (`browser-plugin` / `navigation-plugin`) via `state.context.url.hash`.
 - Symmetric to `createScrollRestoration`, `createRouteAnnouncer`, `createViewTransitions` — all framework-agnostic DOM helpers wired into `RouterProvider` per adapter.
 
-See [RFC §13 Out of scope](../../../../.claude/rfc-scroll-spy-utility-short.md#13-out-of-scope) for the full architectural rationale.
+See §13 "Out of scope" of `.claude/rfc-scroll-spy-utility-short.md`, a local file git does not track, for the full architectural rationale.
 
 ## Plugin & spy mode selectors
 
@@ -113,7 +113,7 @@ The tests of [`e2e/scroll-spy.spec.ts`](e2e/scroll-spy.spec.ts):
 | `browser-plugin` | yes (`?plugin=browser`) | Provides `state.context.url`; `state.transition.replace` is the only co-existence signal scroll-restoration honours (foundation RFC §10.7) |
 | `hash-plugin` | **NO** | `#` = path delimiter under hash-plugin → fundamentally incompatible. Spy warns once and no-ops. See `examples/web/react/hash-routing/` for hash-plugin URL strategy demo. |
 
-`browser-plugin` and `navigation-plugin` are **interchangeable** (not complementary) for scroll-spy. The example uses the query selector to switch between them at startup — both modes pass all 10 scenarios except Scenario 11, which is browser-plugin-specific (it validates the foundation RFC closure for browser-plugin's previous magnetic-snap behaviour).
+`browser-plugin` and `navigation-plugin` are **interchangeable** (not complementary) for scroll-spy. The example uses the query selector to switch between them at startup. The e2e suite runs under `navigation-plugin`, the default, except Scenario 11, which loads `?plugin=browser` because it validates the foundation RFC closure for browser-plugin's previous magnetic-snap behaviour.
 
 ## Implementation notes
 
@@ -125,8 +125,8 @@ The tests of [`e2e/scroll-spy.spec.ts`](e2e/scroll-spy.spec.ts):
 ## See also
 
 - [issue #575](https://github.com/greydragon888/real-router/issues/575) — design
-- [RFC `rfc-scroll-spy-utility-short.md`](../../../../.claude/rfc-scroll-spy-utility-short.md) — full design rationale
-- [Foundation RFC `rfc-transition-meta-discrimination.md`](../../../../.claude/rfc-transition-meta-discrimination.md) — `state.transition.replace` portable signal
+- RFC `.claude/rfc-scroll-spy-utility-short.md` — full design rationale, a local file git does not track
+- Foundation RFC `.claude/rfc-transition-meta-discrimination.md` — `state.transition.replace` portable signal, a local file git does not track
 - [`../link-hash/`](../link-hash) — `<Link hash>` tab UI demo (#532) — sibling in `hash-examples/`
 - [`../scroll-restoration/`](../scroll-restoration) — `createScrollRestoration` behaviour matrix (#534) — sibling
 - [Wiki: Scroll Spy](https://github.com/greydragon888/real-router/wiki/Scroll-Spy) — full API surface (after Stage 4)

@@ -88,9 +88,9 @@ pnpm test:e2e     # Playwright
 
 ## E2e Coverage
 
-[`e2e/ssr-streaming.spec.ts`](e2e/ssr-streaming.spec.ts) — 23 Playwright scenarios (numbered 1–20 plus 22–24, with one historical gap at 21):
+[`e2e/ssr-streaming.spec.ts`](e2e/ssr-streaming.spec.ts) — Playwright scenarios (numbered 1–20 plus 22–24, with one historical gap at 21):
 
-- 15 baseline (404, per-request isolation, no hydration warnings, critical data round-trip, deferred section visibility, `<template id="…">` OOO chunks, `_$HY` injection, fallback flicker) — Solid-specific OOO behaviour
+- baseline (404, per-request isolation, no hydration warnings, critical data round-trip, deferred section visibility, `<template id="…">` OOO chunks, `_$HY` injection, fallback flicker) — Solid-specific OOO behaviour
 - **Scenario 16**: typed `LoaderNotFound` for unknown product id → `404 + text/plain`. Streaming pipeline short-circuits before the first chunk.
 - **Scenario 17 (Solid-unique)**: `node:http` TCP frame timing — empirically measures **multiple TCP frames spanning the slowest server-side delay (>400 ms)**. This is the empirical proof that Solid streaming is **actually streaming** at the HTTP level. Compare with the equivalent test in `svelte/ssr-streaming` and `angular/ssr-streaming` — both measure 1 frame, ~0 ms span (their "streaming" is client-side incremental hydration, not progressive HTTP flush).
 - **Scenario 18 (Solid-unique)**: per-chunk content inspection — fallback marker appears in an early chunk, resolved review markup arrives in a later chunk. Proves the SERVER genuinely emits resolved sections separately from the shell, not just splits one buffered string across multiple TCP frames.

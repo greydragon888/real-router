@@ -150,7 +150,7 @@ pnpm test:e2e     # Playwright — 20 acceptance scenarios
 
 ## E2e Scenarios
 
-[`e2e/ssr-streaming.spec.ts`](e2e/ssr-streaming.spec.ts) — 20 Playwright scenarios. Scenarios 1–14 mirror the React example where Vue 3's runtime allows it, plus three Vue-specific surrogates that pin down the actual blocking-Suspense + chunked-transfer contract; Scenarios 15–20 cover Vue-only or production-grade pieces (Teleport, typed loader errors, Cache-Control + AbortController):
+[`e2e/ssr-streaming.spec.ts`](e2e/ssr-streaming.spec.ts) — Playwright scenarios. Scenarios 1–14 mirror the React example where Vue 3's runtime allows it, plus three Vue-specific surrogates that pin down the actual blocking-Suspense + chunked-transfer contract; Scenarios 15–20 cover Vue-only or production-grade pieces (Teleport, typed loader errors, Cache-Control + AbortController):
 
 1. **Shell renders before deferred content** — `page.goto(..., { waitUntil: "commit" })` + critical content visible quickly
 2. **Streaming response contains resolved deferred content** — HTTP-level test verifying the streamed HTML contains both reviews and related sections

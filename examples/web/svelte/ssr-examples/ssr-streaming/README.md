@@ -31,7 +31,7 @@ Svelte 5 stable does **not** implement chunked streaming with out-of-order place
 
 Practical consequence: the streamed HTML body **does not** contain `data-review-id="r1"` — Svelte ships the `reviews-fallback` placeholder, the `Promise.resolve(...)` finishes during client hydration, and the browser DOM updates to the resolved `reviews-section`. The HTTP-level proof in this example's e2e suite therefore checks for the **fallback** in the response, then asserts that the **resolved sections** become visible after `page.goto(...)`. Scenario 12 captures TCP frame timings via `node:http` to make the "no progressive flush" claim falsifiable.
 
-The plan-level decision behind this example is documented in [§5.3](../../../../../.claude/plan-ssr-dogfooding-solid-svelte-angular-ru.md): Outcome A (async SSR + `<svelte:boundary>` + `{#await}` works) is the likely default for Svelte; Outcome B (classical sync `render()` + `<svelte:boundary>` only for error handling, no streaming) is the fallback if Real-Router's lifecycle conflicts with async SSR. This implementation is Outcome A.
+The plan-level decision behind this example: Outcome A (async SSR + `<svelte:boundary>` + `{#await}` works) is the likely default for Svelte; Outcome B (classical sync `render()` + `<svelte:boundary>` only for error handling, no streaming) is the fallback if Real-Router's lifecycle conflicts with async SSR. This implementation is Outcome A.
 
 ## Architecture
 
@@ -84,9 +84,9 @@ pnpm test:e2e     # Playwright
 
 ## E2e Coverage
 
-[`e2e/ssr-streaming.spec.ts`](e2e/ssr-streaming.spec.ts) — 20 Playwright scenarios (numbered 1–20; the file lists 1–14 then 16–19 then 15 then 20 — historical insertion order, not a gap):
+[`e2e/ssr-streaming.spec.ts`](e2e/ssr-streaming.spec.ts) — Playwright scenarios (numbered 1–20; the file lists 1–14 then 16–19 then 15 then 20 — historical insertion order, not a gap):
 
-- 11 baseline (404, per-request isolation, hydration round-trip, critical data in `__SSR_STATE__`, no hydration warnings, error containment via `{:catch}`, empty deferred state) — mirrors Vue/Solid where the runtime allows
+- baseline (404, per-request isolation, hydration round-trip, critical data in `__SSR_STATE__`, no hydration warnings, error containment via `{:catch}`, empty deferred state) — mirrors Vue/Solid where the runtime allows
 - Svelte-specific: HTTP response carries the **pending fallback** (`reviews-fallback`, `related-fallback`); resolved sections appear in the browser after hydration
 - **Scenario 11**: `Transfer-Encoding: chunked` is **not** set on the response (Svelte returns single buffered HTML)
 - **Scenario 12 (new)**: `node:http` chunk-timing reproducer — empirical proof that body lands in 1 TCP frame with ~0 ms span. Falsifies any future "Svelte is now streaming" regression.

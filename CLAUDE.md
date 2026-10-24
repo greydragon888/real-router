@@ -219,6 +219,6 @@ Which root file owns what, and the opposite policies of `ARCHITECTURE.md` (prese
 - [packages/core/src/utils/fsm/CLAUDE.md](packages/core/src/utils/fsm/CLAUDE.md) — FSM engine internals
 - [benchmarks/CLAUDE.md](benchmarks/CLAUDE.md) — CodSpeed benchmark suites
 - [cross-router-bench/CLAUDE.md](cross-router-bench/CLAUDE.md) — Cross-router benchmark: real Chromium, the npm releases against the competitors
-- [MCP Servers Guide](.claude/mcp-guide.md)
+- `.claude/mcp-guide.md` — MCP Servers Guide, a local file git does not track
 - [Roadmap to 1.0](https://github.com/greydragon888/real-router/issues/296) — issue #296, milestone tracking
 - [Wiki](https://github.com/greydragon888/real-router/wiki) (local: `/Users/olegivanov/WebstormProjects/real-router.wiki`)
