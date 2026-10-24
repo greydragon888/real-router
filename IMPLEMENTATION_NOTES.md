@@ -12938,6 +12938,8 @@ Two edges outside their range are the entry's purpose, and their comments say so
 
 ## undici: the root provides danger's peer, the examples floor each major (#2605, 2026-09-27)
 
+> **Updated (2026-10-24).** The examples floor 8.x too, at `undici@8: '>=8.12.2 <9'`. Three advisories, GHSA-xjj6-f33q-929c among them, reach 8.11.2, which jsdom's `^8.10.2` admits, so jsdom's range no longer starts above the 8.x fix. The root still carries no undici entry, and `pnpm update undici` moves its copies.
+
 > ⚠ Superseded on 2026-09-28 for the root: the devDependency is gone, and
 > `.pnpmfile.mjs` makes undici danger's own dependency. See "undici: danger
 > installs its own copy".
@@ -13521,6 +13523,8 @@ After the change every consumer still re-keys `bundle`, `lint`, `test` and `type
 **Solution.** The fifteen files are deleted and the ten rules removed. A compile run that emits such a file again shows it in `git status`, where it gets deleted rather than hashed.
 
 ## undici leaves 7.29.0 for GHSA-3wwx-pv8p-q78v (2026-09-29)
+
+> **Updated (2026-10-24).** The floors are `'>=6.29.1 <7'` and `'>=7.30.1 <8'`, and 8.x has one too: jsdom's `^8.10.2` no longer starts at a fixed 8.x release. See "undici: the root provides danger's peer, the examples floor each major".
 
 **Problem.** GHSA-3wwx-pv8p-q78v, a denial of service in undici's WebSocket permessage-deflate handling (medium, published 28.09), covers `>= 6.25.0 < 6.28.1`, `>= 7.28.0 < 7.29.1` and `>= 8.1.0 < 8.10.2`. Both lockfiles held 7.29.0, the examples through their `undici@7` floor and the root through danger 14, and `lint:audit` failed on both. Dependabot's security job for `/examples` ended in `all_versions_ignored`: that entry ignores undici, whose versions the overrides set.
 

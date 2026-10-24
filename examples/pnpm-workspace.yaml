@@ -20,10 +20,6 @@ overrides:
   # run it. Lift when vite-plugin-solid supports babel 8. Why the entry is scoped to
   # the consumer rather than global is recorded in the root pnpm-workspace.yaml.
   'vite-plugin-solid>@babel/core': '>=7.29.6 <8'
-  # Floor raised for GHSA-4mjr-xmp4-gh2g + GHSA-x5fp-wj9c-mxmx (both Medium, 6.16.0).
-  # Parents are express and body-parser — the SSR examples' servers, never a
-  # published @real-router/* package.
-  qs: '>=6.16.0'
   # Floor raised for GHSA-mw96-cpmx-2vgc (arbitrary file write via path traversal,
   # High, fixed in 4.59.0). Unscoped because no example declares rollup itself;
   # the root pnpm-workspace.yaml says, under its `vite` entry, what an override
@@ -37,13 +33,13 @@ overrides:
   # parent's range admits it.
   ajv@8: ~8.20.0
   http-proxy-agent: 7.0.2
-  # undici, split by major: every parent here takes it as a regular dependency,
-  # so a floor per line holds — 7.29.1 on @electron/get's 7.x, 6.28.1 on node-gyp's
-  # 6.x, each the release that fixes that line's advisories, GHSA-3wwx-pv8p-q78v
-  # the latest. No entry for 8: jsdom's `^8.10.2` starts at the release that fixed
-  # that line, and a floor could only hold it back (#2605).
-  undici@6: '>=6.28.1 <7'
-  undici@7: '>=7.29.1 <8'
+  # undici, split by major: every parent here takes it as a dependency, not as a
+  # peer (#2605), so a floor per line holds — 8.12.2 on jsdom's 8.x, 7.30.1 on
+  # @electron/get's 7.x, 6.29.1 on node-gyp's 6.x, each the release that fixes
+  # that line's advisories, GHSA-xjj6-f33q-929c among them.
+  undici@6: '>=6.29.1 <7'
+  undici@7: '>=7.30.1 <8'
+  undici@8: '>=8.12.2 <9'
   # At the version @angular/build pins exactly; ng-packagr's `^5.0.0` admits it.
   piscina: '>=5.3.2 <6.0.0'
   path-to-regexp: '>=8.4.0'
@@ -102,9 +98,9 @@ overrides:
   # overrides check accepts it narrowing no range. Its floor is the vite
   # @angular/build pins.
   '@angular/build>vite': '>=8.3.0 <9'
-  # Floor for GHSA-hrr3-gc8f-f4qj (Medium), fixed in 3.1.8. Transitive via `ajv`,
-  # which declares `^3.0.1`.
-  fast-uri: '>=3.1.8 <4'
+  # Floor for the fast-uri advisories fixed in 3.1.8 and 3.1.9, GHSA-hrr3-gc8f-f4qj
+  # and GHSA-w74x-v6f9-j3xg among them. Transitive via `ajv`, which declares `^3.0.1`.
+  fast-uri: '>=3.1.9 <4'
   # @xmldom/xmldom < 0.8.15 (GHSA-6gmq-8vp8-gcm6, Medium). Its one parent is `plist`, pulled
   # by electron-builder for the desktop EXAMPLES — not in any published @real-router/* package,
   # and it parses our own Info.plist rather than untrusted input. Same-line patch, so a floor

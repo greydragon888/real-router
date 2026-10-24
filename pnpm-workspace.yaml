@@ -102,9 +102,9 @@ overrides:
   # `pnpm update --no-save` rewrites the specifier into a lockfile that
   # `install --frozen-lockfile` refuses.
   '@angular/build>vite': '>=8.3.0 <9'
-  # Floor for GHSA-hrr3-gc8f-f4qj (Medium), fixed in 3.1.8. Transitive via `ajv`,
-  # which declares `^3.0.1`.
-  fast-uri: '>=3.1.8 <4'
+  # Floor for the fast-uri advisories fixed in 3.1.8 and 3.1.9, GHSA-hrr3-gc8f-f4qj
+  # and GHSA-w74x-v6f9-j3xg among them. Transitive via `ajv`, which declares `^3.0.1`.
+  fast-uri: '>=3.1.9 <4'
   # postcss < 8.5.23 (GHSA-fxqj-rqcc-2cmp, Medium). Every parent is build- or lint-time:
   # vite, @angular/build, ng-packagr, @vue/compiler-sfc, beasties, postcss-scss /
   # -safe-parser / -load-config, eslint-plugin-svelte, svelte-eslint-parser. Not in any published

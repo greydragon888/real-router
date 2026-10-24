@@ -27,7 +27,7 @@ overrides:
   # exactly.
   picomatch@4: 4.0.7
   # ajv declares `^3.0.1`.
-  fast-uri: '>=3.1.6 <4'
+  fast-uri: '>=3.1.9 <4'
   # @angular/build, beasties and postcss-safe-parser declare ranges below the 8.5.23
   # fix; the floor sits at 8.5.28, the highest minimum a parent declares
   # (vite and @vue/compiler-sfc), so it holds no parent below its range.
