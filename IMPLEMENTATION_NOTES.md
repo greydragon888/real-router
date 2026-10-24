@@ -13956,6 +13956,8 @@ Kept, because none of them points at a record: measurement dates, which say when
 
 ## braces and http-cache-semantics are allowlisted: neither has a fixed release (2026-10-03)
 
+> **Updated (2026-10-24).** GHSA-vfj7-8cjw-p6xm is withdrawn, on 2026-10-23 by api.osv.dev, and osv-scanner listed it among its unused ignores, so the braces entry left `scripts/osv-scanner.toml` and `allow-ghsas`. Neither entry of this section stands.
+
 > **Updated (2026-10-19).** http-cache-semantics 4.3.0, published 2026-10-04, is clean by api.osv.dev, where 4.2.0 is still affected. `cacheable-request` 7.0.4 declares `^4.0.0`, so the examples lockfile takes 4.3.0 with no other change, and GHSA-ch52-4w7c-c8xp left `scripts/osv-scanner.toml` and `allow-ghsas`; the Dependabot alert closes on the lockfile. The advisory still names no fixed version, which is why Dependabot opened no update. The braces entry stands.
 
 **Problem.** Pre-push `lint:audit` went red on two High advisories, both published on 2026-09-18 and turned into failures only after OSV modified them on 2026-10-02 at 22:45Z. GHSA-vfj7-8cjw-p6xm affects `braces` up to 3.0.3, in the root lockfile; GHSA-ch52-4w7c-c8xp affects `http-cache-semantics` up to 4.2.0, in the examples lockfile. Each range ends at the package's latest release, so there is nothing to bump to.
@@ -14474,6 +14476,8 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 **Measured (2026-10-06).** jscpd printed no diagnostic for a `null` in any of the twelve keys, and every run matched the run without that key: on the repository, on a fixture of clones over the threshold and on a scan of no files. The exit code changed on `threshold` with the clones, on `failOnEmpty` with no files and on `ignore` on the repository. With the check off, the new cell fails, and so does a check that names only the first key set to `null`; `lint:config-sync` passes on the repository.
 
 ## Three more advisories: smol-toml takes 1.9.0, seroval's second and sprintf-js's are allowlisted (2026-10-06)
+
+> **Updated (2026-10-24).** GitHub withdrew GHSA-hp3w-g68c-fv3c, on 2026-10-22 by api.osv.dev; with osv-scanner reporting the sprintf-js entry unused, it went from `scripts/osv-scanner.toml` and `allow-ghsas`. The seroval entry stands.
 
 **Problem.** After the entry above was committed, `lint:audit` listed three more: GHSA-p6vx-979v-rg4c, seroval through 1.6.0 (critical, published 2026-10-05), in all three lockfiles; GHSA-r4xh-jqrq-34v2, smol-toml through 1.8.0 (medium), in the root; and GHSA-hp3w-g68c-fv3c, sprintf-js through 1.1.3 (medium, published in September), in the examples.
 

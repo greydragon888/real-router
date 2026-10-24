@@ -23,17 +23,6 @@ reason = "glib 0.18.5 VariantStrIter unsoundness (RUSTSEC-2024-0429). Transitive
 id = "GHSA-86w9-cpqp-85rv"  # node-forge RSA PKCS#1 v1.5 signature verification
 reason = "No fixed node-forge release (<= 1.4.0, the latest). Only dependent: root devDependency @sonar/scan 5.0.1, run locally by `pnpm sonar:local`; it uses node-forge solely to read a PKCS#12 truststore, a path that verifies no signature."
 
-# braces has no fixed release: every version through 3.0.3, the latest, is
-# affected. It arrives only through micromatch 4.0.8 under the root
-# devDependency `danger`, and danger calls micromatch only to expand the
-# patterns a dangerfile passes to `danger.git.fileMatch` and
-# `danger.git.linesOfCode` — dangerfile.ts calls neither. No published package
-# depends on it. Drop it when braces ships a fix — ask api.osv.dev per version.
-
-[[IgnoredVulns]]
-id = "GHSA-vfj7-8cjw-p6xm"  # braces stack-exhaustion DoS through deeply nested patterns
-reason = "No fixed braces release (<= 3.0.3, the latest). Only path: root devDependency danger 14.0.7 -> micromatch 4.0.8, which expands only the patterns a dangerfile passes to fileMatch and linesOfCode; dangerfile.ts calls neither. Not in any published @real-router/* package."
-
 # seroval's fix, 1.6.3, is outside the range solid-js 1.9.15 pins (`~1.5.4`,
 # with seroval-plugins), and solid-js has no newer 1.9 release. The affected
 # seroval is in the three lockfiles only through solid-js: in the root for
@@ -59,19 +48,6 @@ reason = "Fixed in seroval 1.6.3, outside solid-js 1.9.15's ~1.5.4; solid-js has
 [[IgnoredVulns]]
 id = "GHSA-p6vx-979v-rg4c"  # seroval fromJSON thenable assimilation invokes plugin-produced callables
 reason = "Fixed in seroval 1.6.2, outside solid-js 1.9.15's ~1.5.4; solid-js has no newer 1.9 release. The same paths as GHSA-jp82-f5mq-hwhp: solid-js in root devDependencies, the Solid examples and cross-router-bench; none published. The flaw is in fromJSON; solid-js imports only seroval's serializer, and nothing here imports seroval."
-
-# sprintf-js has no fixed release: every version through 1.1.3, the latest, is
-# affected. It arrives only in the examples lockfile, through electron-builder
-# (a devDependency of the three Electron examples) -> @electron/get ->
-# global-agent 3.0.0 -> roarr 2.15.4. The advisory needs a format string an
-# attacker controls; roarr formats the message its caller passes, and
-# global-agent passes only its own literals, none with a precision specifier.
-# The examples are never published. Drop it when sprintf-js ships a fix or the
-# chain stops pulling it — ask api.osv.dev per version.
-
-[[IgnoredVulns]]
-id = "GHSA-hp3w-g68c-fv3c"  # sprintf-js DoS through unbounded precision specifiers
-reason = "No fixed sprintf-js release (<= 1.1.3, the latest). Only path: electron-builder 26.15.3 (devDependency of examples/desktop/electron/*) -> @electron/get 3.1.0 -> global-agent 3.0.0 -> roarr 2.15.4, whose format strings are global-agent's own literals, none with a precision specifier. examples/ is never published."
 
 # shell-quote's fix, 1.11.0, is outside the 1.9.0 that concurrently 10.0.5
 # pins exactly, and concurrently has no newer release. It arrives only in the
