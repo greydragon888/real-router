@@ -951,7 +951,7 @@ export class EventBusNamespace {
     }
 
     // Freeze the payload wrapper so listeners cannot mutate it (`payload.route`
-    // is already deep-frozen via the State immutability invariant; this closes
+    // is already frozen under the State immutability invariant; this closes
     // the wrapper-mutation gap surfaced by audit `probe-05-payload-frozen`).
     const leaveState: LeaveState = freeze({
       route: fromState,

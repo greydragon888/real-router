@@ -251,9 +251,10 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
     pathNames: (name) =>
       ns.routes.hasRoute(name) ? ns.routes.getUrlParams(name) : undefined,
     // A closure because the port TYPES this member as `() => boolean`, not
-    // because anything can change the answer: options are immutable after
-    // construction (#63 removed `setOption`), `ns.options.get()` returns a
-    // deep-frozen bag, and `tsc` refuses a captured boolean here outright.
+    // because anything can change the answer: `queryParamsMode` sits on the
+    // options bag itself, which `ns.options.get()` returns frozen and nothing
+    // replaces after construction (#63), and `tsc` refuses a captured boolean
+    // here outright.
     admitsUndeclaredQuery: () =>
       resolveQueryParamsMode(ns.options.get().queryParamsMode) === "loose",
     // A GETTER for the same reason as its sibling below — a plain closure is

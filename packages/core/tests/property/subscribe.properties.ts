@@ -99,11 +99,12 @@ describe("subscribe() Event Delivery Properties", () => {
     router.stop();
   });
 
-  // PAYLOAD_FROZEN — the State delivered to a subscriber is a deeply-frozen
-  // immutable snapshot. Empirically (see probe in this PR): `payload.route` and
-  // `payload.previousRoute` are frozen, but the enclosing `{route, previousRoute}`
-  // envelope is NOT frozen — core freezes the States, not the per-emit wrapper.
-  // We pin BOTH facts so a regression in either direction is caught.
+  // PAYLOAD_FROZEN — the State delivered to a subscriber is a frozen snapshot,
+  // its params and transition included. Empirically (see probe in this PR):
+  // `payload.route` and `payload.previousRoute` are frozen, but the enclosing
+  // `{route, previousRoute}` envelope is NOT frozen — core freezes the States,
+  // not the per-emit wrapper. We pin BOTH facts so a regression in either
+  // direction is caught.
   test.prop([arbNavigableRoute], { numRuns: NUM_RUNS.standard })(
     "delivered route is frozen; payload envelope is not",
     async (targetRoute) => {

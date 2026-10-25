@@ -962,11 +962,6 @@ const NARRATION_BASELINE: readonly Row[] = [
   },
   {
     file: "packages/core/src/channels/modeGate.ts",
-    form: "had + participle",
-    count: 1,
-  },
-  {
-    file: "packages/core/src/channels/modeGate.ts",
     form: "was/were + state",
     count: 1,
   },

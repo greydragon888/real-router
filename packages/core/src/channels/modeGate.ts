@@ -101,12 +101,9 @@ export function admittedSearch<S extends SearchParams>(
 
   // Frozen, because this is the ONLY branch that hands back a bag the caller did
   // not already freeze: `search` arrives frozen from `mergeQueryChannel`, and the
-  // no-drop branch returns it untouched. Before nav-pipeline Phase 2 the gap was
-  // invisible — every consumer re-merged (and re-froze) downstream in the
-  // then-separate `makeState`. `materialize` deliberately does not, so an
-  // unfrozen `admitted` reached `state.search` verbatim and broke "states are
-  // deeply frozen" for exactly the states the gate had touched. Phase 4 folded
-  // `makeState` onto `canonicalize` + `materialize`, so there is no re-merge
-  // left anywhere: this freeze is now the only one on the drop path.
+  // no-drop branch returns it untouched. Nothing downstream re-merges or
+  // re-freezes the query channel (`materialize` publishes it as it receives
+  // it), so on the drop path this freeze is the one that keeps `state.search`
+  // frozen.
   return freeze(admitted ?? EMPTY_SEARCH) as S;
 }

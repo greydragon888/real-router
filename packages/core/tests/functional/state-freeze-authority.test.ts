@@ -4,7 +4,7 @@
 // The sibling of `committed-state-authority.test.ts`: that one locks WHO may
 // write the committed pair, this one locks WHO may CREATE a state and who may
 // freeze it. Both exist because the guarantee they protect is distributed by
-// design — "deeply frozen" is not one call but a policy of "each object is
+// design — the State freeze is not one call but a policy of "each object is
 // frozen once, where it is created" (INVARIANTS "State immutability"), and a
 // policy with five owners goes stale the moment a sixth appears quietly.
 //

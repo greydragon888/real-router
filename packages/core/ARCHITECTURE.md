@@ -95,7 +95,7 @@ Router.ts (facade — validates and delegates)
     │
     ├── OptionsNamespace          — immutable options store (its directory also holds the option adoption, limits and matcher options)
     ├── DependenciesStore         — DI container — a store, not a namespace
-    ├── StateNamespace            — makeState(), deep freeze; the committed pair is owned by the FSM context
+    ├── StateNamespace            — makeState(), areStatesEqual(); the committed pair is owned by the FSM context
     ├── RoutesNamespace           — route tree, matchPath(), buildPath(), forwarding
     ├── RouteLifecycleNamespace   — canActivate/canDeactivate guard registry
     ├── PluginsNamespace          — plugin lifecycle (factory → instance → hooks)
@@ -510,7 +510,7 @@ A listener tells a transition's failure from a direct emit by the `context` of t
 
 1. Check `isActive()` → throw ROUTER_NOT_STARTED if false
 2. Resolve path → `path ?? currentState.path`
-3. Build UNKNOWN_ROUTE state + deep freeze
+3. Build the UNKNOWN_ROUTE state and freeze its shell and its `transition` meta; the channels are the frozen empty singletons, and `context` stays writable
 4. **Ask the current route's `canDeactivate`** → throw `CANNOT_DEACTIVATE` + emit `TRANSITION_ERROR` if it refuses
 5. `systemCommit()` — a `SYSTEM_COMMIT` edge that writes the committed pair and announces it as ONE table fact
 6. Return State synchronously
@@ -904,7 +904,7 @@ SSR loader plugins read it through `getHydrationState(router)` from inside their
 | Single-entry transition path cache      | N-1 redundant computations eliminated per navigation                     |
 | validation-plugin opt-in                | DX validation via `@real-router/validation-plugin` (skip in production)  |
 | Per-router suppressors, split by owner  | One allocation per router, not per `navigate()`/`start()`                |
-| Deep freeze with WeakSet cache          | Avoids re-freezing already frozen state objects                          |
+| Each object frozen once, where created  | No recursive walk at publication re-freezes what a producer froze        |
 | `Array.includes()` for segment cleanup  | Faster than `new Set()` for 1-5 elements                                 |
 | FSM `canSend()` — O(1)                  | Cached `#currentTransitions` lookup                                      |
 | `createInterceptable()` fast path       | Empty-array check skips iteration when no interceptors                   |

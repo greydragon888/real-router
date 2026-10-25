@@ -2,7 +2,7 @@
 //
 // The behavioural sibling of `state-freeze-authority.test.ts`: that one locks
 // WHO may create and freeze a state, this one locks WHAT user code is handed
-// before the commit. Both exist for the same reason — "deeply frozen" is a
+// before the commit. Both exist for the same reason — the State freeze is a
 // policy, not a call — but they fail on different changes: a sixth constructor
 // trips the structural scan, a surface that starts handing over a writable
 // channel trips this one.

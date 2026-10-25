@@ -77,14 +77,14 @@ controller.abort();
 
 ### State
 
-| Method                                                      | Returns              | Description                          |
-| ----------------------------------------------------------- | -------------------- | ------------------------------------ |
-| `getState()`                                                | `State \| undefined` | Current router state (deeply frozen) |
-| `getPreviousState()`                                        | `State \| undefined` | Previous router state                |
-| `areStatesEqual(s1, s2, ignoreQP?)`                         | `boolean`            | Compare two states                   |
-| `isActiveRoute(name, params?, search?, strict?, ignoreQP?)` | `boolean`            | Check if route is active             |
-| `buildPath(name, params?, search?)`                         | `string`             | Build URL path from route name       |
-| `isLeaveApproved()`                                         | `boolean`            | True when deactivation guards pass   |
+| Method                                                      | Returns              | Description                                                                                              |
+| ----------------------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------- |
+| `getState()`                                                | `State \| undefined` | Current router state ([frozen](https://github.com/greydragon888/real-router/wiki/State#important-notes)) |
+| `getPreviousState()`                                        | `State \| undefined` | Previous router state                                                                                    |
+| `areStatesEqual(s1, s2, ignoreQP?)`                         | `boolean`            | Compare two states                                                                                       |
+| `isActiveRoute(name, params?, search?, strict?, ignoreQP?)` | `boolean`            | Check if route is active                                                                                 |
+| `buildPath(name, params?, search?)`                         | `string`             | Build URL path from route name                                                                           |
+| `isLeaveApproved()`                                         | `boolean`            | True when deactivation guards pass                                                                       |
 
 ### Events & Plugins
 

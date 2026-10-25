@@ -42,8 +42,9 @@ export class StateNamespace {
   /**
    * Returns the current router state.
    *
-   * The returned state is deeply frozen (immutable) for safety.
-   * Returns `undefined` if the router has not been started or has been stopped.
+   * The returned state is frozen to the depth INVARIANTS "State immutability"
+   * states. Returns `undefined` if the router has not been started or has been
+   * stopped.
    */
   get<P extends Params = Params>(): State<P> | undefined {
     return this.#ctx.current as State<P> | undefined; // NOSONAR -- generic narrowing needed for public API

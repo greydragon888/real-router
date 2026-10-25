@@ -95,14 +95,14 @@ describe("start / stop / dispose Lifecycle Properties", () => {
   );
 
   test.prop([arbStartPath], { numRuns: NUM_RUNS.standard })(
-    "start result is deeply frozen (state, params, transition, segments)",
+    "start result is frozen (state, params, transition, segments)",
     async (path) => {
       const router = createFixtureRouter();
 
       const state = await router.start(path);
 
-      // Top-level state and every nested structure a consumer can reach are
-      // frozen, so a misbehaving plugin or view cannot mutate committed state.
+      // The state, its params and its transition down to the segment arrays
+      // are frozen, so a misbehaving plugin or view cannot reassign them.
       // `state.context` is the documented exception (plugins write to it via
       // `claim.write()` post-creation), so it is deliberately NOT asserted here.
       expect(Object.isFrozen(state)).toBe(true);

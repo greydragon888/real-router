@@ -75,8 +75,8 @@ describe("State freeze semantics (via navigate + getState)", () => {
 /**
  * The producer matrix (#1599).
  *
- * "States are deeply frozen" is a documented guarantee with NO single owner: the
- * depth is assembled from unrelated places — `mergeQueryChannel`, the
+ * "A published State is frozen" is a documented guarantee with NO single owner:
+ * the depth is assembled from unrelated places — `mergeQueryChannel`, the
  * `EMPTY_*` singletons, `admittedSearch` in the mode gate, `materialize` for
  * `params` (#1598 / #1928, the one owner that IS at publication), and the shell
  * freeze above — and only one of them is the publisher. The describe above proves the

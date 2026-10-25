@@ -652,7 +652,7 @@ The navigate path is heavily optimized:
 - **FSM `send()` (table-driven)** — NAVIGATE/LEAVE_APPROVE/COMPLETE dispatch through the table (emit is the action); `forceState()` is not used. A deliberate trade of micro-optimization for structural determinism
 - **EventEmitter explicit params** — `emit(name, a?, b?, c?, d?)` avoids V8 rest-param array allocation
 - **Cached error rejections** — pre-allocated for common error codes
-- **Single-pass freeze** — `freezeStateInPlace` in one recursive traversal
+- **No recursive freeze** — each frozen object in a `State` is frozen once, where it is created, so publishing a state walks nothing (`packages/core/INVARIANTS.md`, "State immutability")
 
 ## See Also
 
