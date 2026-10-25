@@ -144,6 +144,13 @@ export const commonConfig = defineConfig({
     environment: "node",
 
     /**
+     * Runs ahead of a package's own setup file: `mergeConfig` concatenates
+     * `setupFiles`, this entry first. `vitest.setup.mts` holds every cell to
+     * the read budget.
+     */
+    setupFiles: [fileURLToPath(new URL("./vitest.setup.mts", import.meta.url))],
+
+    /**
      * Enable global test APIs (describe, it, expect)
      * Without this, you need to import from 'vitest' in each test file
      */

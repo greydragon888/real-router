@@ -983,24 +983,29 @@ const render = (findings: readonly Finding[]): string[] =>
   );
 
 describe("a message names a door that can reach it (#2457)", () => {
+  // The census is taken ONCE, here at collection, which no timeout reaches,
+  // and the cells read it: it builds a typed program over this package's `src`
+  // and reads core's (#2818).
+  const found = census();
+
   it("no message names a door that cannot reach it", () => {
-    expect(render(census().wrongDoor)).toStrictEqual([]);
+    expect(render(found.wrongDoor)).toStrictEqual([]);
   });
 
   it("every judged head has a door some derivation could determine", () => {
     // An undetermined door is not a pass: it means the walk lost the site, and a
     // lost site is where the next wrong door sits unseen.
-    expect(render(census().noDoor)).toStrictEqual([]);
+    expect(render(found.noDoor)).toStrictEqual([]);
   });
 
   it("a helper that builds its door interpolates one it was handed", () => {
     // The #2399 shape at its most dangerous is a SHARED helper with one door
     // written into it. This fails if a head is built without a door to build from.
-    expect(render(census().hardcodedShared)).toStrictEqual([]);
+    expect(render(found.hardcodedShared)).toStrictEqual([]);
   });
 
   it("the heads naming neither the facade nor a door are registered", () => {
-    const unregistered = [...census().otherHeads.keys()]
+    const unregistered = [...found.otherHeads.keys()]
       .filter((head) => !PUBLISHED_NAME.has(head))
       .toSorted((a, b) => a.localeCompare(b));
 
@@ -1008,7 +1013,7 @@ describe("a message names a door that can reach it (#2457)", () => {
   });
 
   it("CONTROL — every published name is still raised", () => {
-    const seen = census().otherHeads;
+    const seen = found.otherHeads;
     const stale = [...PUBLISHED_NAME].filter((head) => !seen.has(head));
 
     expect(stale).toStrictEqual([]);
@@ -1018,7 +1023,6 @@ describe("a message names a door that can reach it (#2457)", () => {
     // Floors, not counts: adding a door or a message must not make this a promise
     // to re-measure. Each sits far below what the trees hold.
     const core = readCoreOnce();
-    const seen = census();
 
     expect(core.vocabulary.size).toBeGreaterThan(20);
     expect(core.consulted.size).toBeGreaterThan(25);
@@ -1029,8 +1033,8 @@ describe("a message names a door that can reach it (#2457)", () => {
     // shapes that fix it — sum the count with the converted half where a
     // conversion MOVES a site, and move the anti-vacuum half to a control on a
     // purpose-built tree where a conversion EMPTIES it.
-    expect(seen.judged).toBeGreaterThan(40);
-    expect(seen.interpolated).toBeGreaterThan(20);
+    expect(found.judged).toBeGreaterThan(40);
+    expect(found.interpolated).toBeGreaterThan(20);
   });
 
   it("CONTROL — one name in separate files: the keys keep them apart", () => {

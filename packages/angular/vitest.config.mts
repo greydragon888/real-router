@@ -111,7 +111,13 @@ export default mergeConfig(
             globals: true,
             pool: "threads",
             include: ["./tests/aot/**/*.test.ts"],
-            setupFiles: "./tests/aot/setup.ts",
+            // The common config's setup file runs first here too — it holds
+            // every cell to the read budget. Read off the exported config, as
+            // the aliases above are, since this project inherits nothing.
+            setupFiles: [
+              ...[commonConfig.test?.setupFiles ?? []].flat(),
+              "./tests/aot/setup.ts",
+            ],
           },
         },
       ],

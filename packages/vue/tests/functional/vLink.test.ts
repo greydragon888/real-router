@@ -1,5 +1,7 @@
 import { createRouter } from "@real-router/core";
+import { mount } from "@vue/test-utils";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { defineComponent, h, ref } from "vue";
 
 import {
   vLink,
@@ -7,6 +9,7 @@ import {
   getDirectiveRouter,
   pushDirectiveRouter,
 } from "../../src/directives/vLink";
+import { RouterProvider } from "../../src/RouterProvider";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
 import type { LinkDirectiveValue } from "../../src/directives/vLink";
@@ -134,9 +137,6 @@ describe("v-link directive", () => {
 
   describe("nested provider isolation (router stack)", () => {
     it("inner RouterProvider mount overrides outer; unmount restores outer", async () => {
-      const { mount } = await import("@vue/test-utils");
-      const { defineComponent, h, ref } = await import("vue");
-      const { RouterProvider } = await import("../../src/RouterProvider.js");
       const outer = createTestRouterWithADefaultRouter();
       const inner = createTestRouterWithADefaultRouter();
 

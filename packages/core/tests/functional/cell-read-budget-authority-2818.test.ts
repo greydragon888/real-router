@@ -18,10 +18,11 @@ import {
   cellVerdict,
   hookVerdict,
   readPhase,
-} from "../cell-read-budget";
+} from "../../../../scripts/lib/cell-read-budget.mjs";
 
 /**
- * The controls of the cell read budget in `tests/cell-read-budget.ts` (#2818).
+ * The controls of the cell read budget in `scripts/lib/cell-read-budget.mjs`
+ * (#2818), which `vitest.setup.mts` installs.
  *
  * ⚑ The instrument failing OPEN is the outcome this file exists to rule out. A
  * wrapper that stopped counting passes every cell in the suite, and a green

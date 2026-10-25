@@ -5,7 +5,7 @@ import path from "node:path";
 import { rollup } from "rollup";
 import { loadConfigFile } from "rollup/loadConfigFile";
 import * as ts from "typescript";
-import { beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import type { InputOption, MergedRollupOptions, OutputOptions } from "rollup";
 
@@ -236,11 +236,19 @@ function jsxNodes(code: string): number {
   return count;
 }
 
-describe("rollup.config.mjs publishes one module graph (#2583)", () => {
-  let builds: MergedRollupOptions[];
-  let chunks: Chunk[];
-  let targets: Target[];
-  let conditions: string[];
+describe("rollup.config.mjs publishes one module graph (#2583)", async () => {
+  // The configs load and the builds bundle the package's `src` ONCE, here at
+  // collection, which no timeout reaches, and the cells read the result
+  // (#2818).
+  const { options } = await loadConfigFile(ROLLUP_CONFIG, {});
+  const builds = options.filter((build) =>
+    inputFiles(build.input).every(
+      (file) => !fromPackage(file).startsWith(`dist${path.sep}`),
+    ),
+  );
+  const chunks = await generate(builds);
+  const targets = runtimeTargets();
+  const conditions = [...new Set(targets.map((target) => target.condition))];
 
   const filesOf = (condition: string): string[] =>
     targets
@@ -253,19 +261,6 @@ describe("rollup.config.mjs publishes one module graph (#2583)", () => {
     Object.fromEntries(
       conditions.map((condition) => [condition, value(condition)]),
     );
-
-  beforeAll(async () => {
-    const { options } = await loadConfigFile(ROLLUP_CONFIG, {});
-
-    builds = options.filter((build) =>
-      inputFiles(build.input).every(
-        (file) => !fromPackage(file).startsWith(`dist${path.sep}`),
-      ),
-    );
-    chunks = await generate(builds);
-    targets = runtimeTargets();
-    conditions = [...new Set(targets.map((target) => target.condition))];
-  }, 60_000);
 
   describe("a consumer loads every module once", () => {
     it("every runtime condition is one this file knows how to check", () => {
