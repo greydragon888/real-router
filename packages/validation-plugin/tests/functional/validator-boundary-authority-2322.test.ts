@@ -441,6 +441,17 @@ function censusOf(files: Readonly<Record<string, readonly string[]>>): Census {
   }
 }
 
+/** The message `censusOf` refuses a synthetic tree with, or `"NO REFUSAL"`. */
+function refusalOf(files: Readonly<Record<string, readonly string[]>>): string {
+  try {
+    censusOf(files);
+
+    return "NO REFUSAL";
+  } catch (error) {
+    return (error as Error).message;
+  }
+}
+
 const sorted = (names: Iterable<string>): string[] =>
   [...names].toSorted((left, right) => left.localeCompare(right));
 
@@ -461,118 +472,123 @@ describe("each consultation the walk derives from core is classified (#2322)", (
     expect(census.diagnostics).toStrictEqual([]);
   });
 
-  it("CONTROL — the walk keys each spelling of the receiver, and lists what it cannot key", () => {
-    // ⚑ The walk resolves calls through the checker, so each spelling of the
-    // receiver here reaches the member — a property, a call's result, a narrowed
-    // local, the namespace held apart, a type the lib builds, an intersection —
-    // and a namesake on another object does not. A union of namespaces is keyed
-    // by both members in sorted order, though the checker meets `plugins`
-    // first, and an overloaded member once. A member handed on rather than
-    // called is listed, and so is a renamed destructuring, once, whatever its
-    // local is named. Here a member named by a value — an element access, a
-    // computed or quoted destructuring — is listed under each namespace its
-    // receiver reaches: a union read constituent by constituent, a generic
-    // constituent through its apparent type.
-    const synthetic = censusOf({
-      "RouterValidator.ts": [
-        "export interface RouterValidator {",
-        "  lifecycle: {",
-        "    viewed: () => void;",
-        "    property: () => void;",
-        "    result: () => void;",
-        "    narrowed: () => void;",
-        "    apart: () => void;",
-        "    unwrapped: () => void;",
-        "    crossed: () => void;",
-        "    shared: () => void;",
-        "    destructured: () => void;",
-        "    aliased: () => void;",
-        "    indexed: () => void;",
-        "    renamed: () => void;",
-        "    passed: () => void;",
-        "    bound: () => void;",
-        "    overloaded(value: string): void;",
-        "    overloaded(value: number): void;",
-        "  };",
-        "  plugins: {",
-        "    shared: () => void;",
-        "  };",
-        "}",
-      ],
-      "consumer.ts": [
-        'import type { RouterValidator } from "./RouterValidator";',
-        "",
-        "declare const ctx: { validator: RouterValidator | null };",
-        "declare function getValidator(): RouterValidator | null;",
-        "declare function consume(value: unknown): void;",
-        "declare const present: NonNullable<typeof ctx.validator>;",
-        "declare const crossing: { lifecycle: { crossed: () => void } } & RouterValidator;",
-        'declare const either: RouterValidator["lifecycle"] | RouterValidator["plugins"];',
-        "declare const timer: NodeJS.Timeout;",
-        'declare const disjoint: Pick<RouterValidator["lifecycle"], "apart"> | RouterValidator["plugins"];',
-        'declare const key: "renamed";',
-        'declare const both: Pick<RouterValidator["lifecycle"], "shared"> & RouterValidator["plugins"];',
-        "",
-        "export function early(): void {",
-        "  getValidator()?.plugins.shared();",
-        "}",
-        "",
-        'export function view(lifecycle: Readonly<RouterValidator["lifecycle"]>): void {',
-        "  lifecycle.viewed();",
-        "}",
-        "",
-        "export function consult(): void {",
-        "  ctx.validator?.lifecycle.property();",
-        "  getValidator()?.lifecycle.result();",
-        "  const validator = getValidator();",
-        "  if (validator) {",
-        "    validator.lifecycle.narrowed();",
-        "  }",
-        "  const lifecycle = getValidator()?.lifecycle;",
-        "  lifecycle?.apart();",
-        "  present.lifecycle.unwrapped();",
-        "  crossing.lifecycle.crossed();",
-        "  either.shared();",
-        '  validator!.lifecycle.overloaded("x");',
-        "  const {",
-        "    destructured =",
-        "      undefined,",
-        "  } = validator!.lifecycle;",
-        "  const aliased = validator?.lifecycle.aliased;",
-        "  const indexed = lifecycle?.[",
-        '    "indexed"',
-        "  ];",
-        '  const merged = both["shared"];',
-        "  const {",
-        "    [key]: byKey,",
-        "  } = validator!.lifecycle;",
-        '  const { "aliased": quoted } = validator!.lifecycle;',
-        "  const { renamed: result } = validator!.lifecycle;",
-        "  consume(validator?.lifecycle.passed);",
-        "  consume(validator?.lifecycle.bound.bind(null));",
-        "  const other = { lifecycle: { property: (): void => {} } };",
-        "  other.lifecycle.property();",
-        "  void destructured; void aliased; void indexed; void result; void timer;",
-        "  void merged; void byKey; void quoted;",
-        "}",
-        "",
-        'export function generic<T extends typeof disjoint, U extends RouterValidator["plugins"]>(',
-        "  value: T | U,",
-        "  name: keyof T & keyof U,",
-        "): void {",
-        "  void value[name];",
-        "}",
-        "",
-        'export function joined<T extends typeof disjoint, U extends RouterValidator["plugins"]>(',
-        "  value: (T & U) | undefined,",
-        "  name: keyof (T & U),",
-        "): void {",
-        "  void value?.[name];",
-        "}",
-      ],
-    });
+  // Each synthetic tree below is compiled ONCE, here at collection, right above
+  // the cell that reads it. A typed program built inside a cell runs under
+  // `testTimeout`, which a cell building several can miss under coverage on a
+  // loaded CI runner (#2818, #2839).
 
-    expect(synthetic.sites).toStrictEqual([
+  // ⚑ The walk resolves calls through the checker, so each spelling of the
+  // receiver here reaches the member — a property, a call's result, a narrowed
+  // local, the namespace held apart, a type the lib builds, an intersection —
+  // and a namesake on another object does not. A union of namespaces is keyed
+  // by both members in sorted order, though the checker meets `plugins`
+  // first, and an overloaded member once. A member handed on rather than
+  // called is listed, and so is a renamed destructuring, once, whatever its
+  // local is named. Here a member named by a value — an element access, a
+  // computed or quoted destructuring — is listed under each namespace its
+  // receiver reaches: a union read constituent by constituent, a generic
+  // constituent through its apparent type.
+  const spellings = censusOf({
+    "RouterValidator.ts": [
+      "export interface RouterValidator {",
+      "  lifecycle: {",
+      "    viewed: () => void;",
+      "    property: () => void;",
+      "    result: () => void;",
+      "    narrowed: () => void;",
+      "    apart: () => void;",
+      "    unwrapped: () => void;",
+      "    crossed: () => void;",
+      "    shared: () => void;",
+      "    destructured: () => void;",
+      "    aliased: () => void;",
+      "    indexed: () => void;",
+      "    renamed: () => void;",
+      "    passed: () => void;",
+      "    bound: () => void;",
+      "    overloaded(value: string): void;",
+      "    overloaded(value: number): void;",
+      "  };",
+      "  plugins: {",
+      "    shared: () => void;",
+      "  };",
+      "}",
+    ],
+    "consumer.ts": [
+      'import type { RouterValidator } from "./RouterValidator";',
+      "",
+      "declare const ctx: { validator: RouterValidator | null };",
+      "declare function getValidator(): RouterValidator | null;",
+      "declare function consume(value: unknown): void;",
+      "declare const present: NonNullable<typeof ctx.validator>;",
+      "declare const crossing: { lifecycle: { crossed: () => void } } & RouterValidator;",
+      'declare const either: RouterValidator["lifecycle"] | RouterValidator["plugins"];',
+      "declare const timer: NodeJS.Timeout;",
+      'declare const disjoint: Pick<RouterValidator["lifecycle"], "apart"> | RouterValidator["plugins"];',
+      'declare const key: "renamed";',
+      'declare const both: Pick<RouterValidator["lifecycle"], "shared"> & RouterValidator["plugins"];',
+      "",
+      "export function early(): void {",
+      "  getValidator()?.plugins.shared();",
+      "}",
+      "",
+      'export function view(lifecycle: Readonly<RouterValidator["lifecycle"]>): void {',
+      "  lifecycle.viewed();",
+      "}",
+      "",
+      "export function consult(): void {",
+      "  ctx.validator?.lifecycle.property();",
+      "  getValidator()?.lifecycle.result();",
+      "  const validator = getValidator();",
+      "  if (validator) {",
+      "    validator.lifecycle.narrowed();",
+      "  }",
+      "  const lifecycle = getValidator()?.lifecycle;",
+      "  lifecycle?.apart();",
+      "  present.lifecycle.unwrapped();",
+      "  crossing.lifecycle.crossed();",
+      "  either.shared();",
+      '  validator!.lifecycle.overloaded("x");',
+      "  const {",
+      "    destructured =",
+      "      undefined,",
+      "  } = validator!.lifecycle;",
+      "  const aliased = validator?.lifecycle.aliased;",
+      "  const indexed = lifecycle?.[",
+      '    "indexed"',
+      "  ];",
+      '  const merged = both["shared"];',
+      "  const {",
+      "    [key]: byKey,",
+      "  } = validator!.lifecycle;",
+      '  const { "aliased": quoted } = validator!.lifecycle;',
+      "  const { renamed: result } = validator!.lifecycle;",
+      "  consume(validator?.lifecycle.passed);",
+      "  consume(validator?.lifecycle.bound.bind(null));",
+      "  const other = { lifecycle: { property: (): void => {} } };",
+      "  other.lifecycle.property();",
+      "  void destructured; void aliased; void indexed; void result; void timer;",
+      "  void merged; void byKey; void quoted;",
+      "}",
+      "",
+      'export function generic<T extends typeof disjoint, U extends RouterValidator["plugins"]>(',
+      "  value: T | U,",
+      "  name: keyof T & keyof U,",
+      "): void {",
+      "  void value[name];",
+      "}",
+      "",
+      'export function joined<T extends typeof disjoint, U extends RouterValidator["plugins"]>(',
+      "  value: (T & U) | undefined,",
+      "  name: keyof (T & U),",
+      "): void {",
+      "  void value?.[name];",
+      "}",
+    ],
+  });
+
+  it("CONTROL — the walk keys each spelling of the receiver, and lists what it cannot key", () => {
+    expect(spellings.sites).toStrictEqual([
       { key: "plugins.shared", file: "consumer.ts" },
       { key: "lifecycle.viewed", file: "consumer.ts" },
       { key: "lifecycle.property", file: "consumer.ts" },
@@ -584,7 +600,7 @@ describe("each consultation the walk derives from core is classified (#2322)", (
       { key: "lifecycle.shared | plugins.shared", file: "consumer.ts" },
       { key: "lifecycle.overloaded", file: "consumer.ts" },
     ]);
-    expect(synthetic.unread).toStrictEqual([
+    expect(spellings.unread).toStrictEqual([
       { key: "lifecycle.destructured", file: "consumer.ts", line: 36 },
       { key: "lifecycle.aliased", file: "consumer.ts", line: 39 },
       { key: 'lifecycle."indexed"', file: "consumer.ts", line: 40 },
@@ -599,95 +615,98 @@ describe("each consultation the walk derives from core is classified (#2322)", (
     ]);
     // The tree compiles under core's own options — its `types` declare
     // `NodeJS.Timeout` — so what the walk misses in it is the walk's.
-    expect(synthetic.diagnostics).toStrictEqual([]);
+    expect(spellings.diagnostics).toStrictEqual([]);
   });
 
-  it("CONTROL — a syntax error and an unresolved name are reported, and a receiver the compiler cannot type is not keyed", () => {
-    const synthetic = censusOf({
-      "RouterValidator.ts": [
-        "export interface RouterValidator {",
-        "  lifecycle: {",
-        "    member: () => void;",
-        "  };",
-        "}",
-      ],
-      "broken.ts": ["export const broken = ;"],
-      "consumer.ts": [
-        'import type { RouterValidator } from "./RouterValidator";',
-        "",
-        "declare const untyped: Missing<RouterValidator>;",
-        "untyped.lifecycle.member();",
-      ],
-    });
-
-    expect(synthetic.sites).toStrictEqual([]);
-    expect(synthetic.unread).toStrictEqual([]);
-    expect(synthetic.diagnostics).toStrictEqual([
-      "Expression expected.",
-      "Cannot find name 'Missing'.",
-    ]);
-  });
-
-  it("CONTROL — a tree the walk cannot read is refused, not read as empty", () => {
-    expect(() => censusOf({ "consumer.ts": ["export {};"] })).toThrow(
-      "Expected one RouterValidator interface, found 0",
-    );
-
-    const declaration = [
+  const broken = censusOf({
+    "RouterValidator.ts": [
       "export interface RouterValidator {",
       "  lifecycle: {",
       "    member: () => void;",
       "  };",
       "}",
-    ];
+    ],
+    "broken.ts": ["export const broken = ;"],
+    "consumer.ts": [
+      'import type { RouterValidator } from "./RouterValidator";',
+      "",
+      "declare const untyped: Missing<RouterValidator>;",
+      "untyped.lifecycle.member();",
+    ],
+  });
 
-    expect(() =>
-      censusOf({ "first.ts": declaration, "second.ts": declaration }),
-    ).toThrow("Expected one RouterValidator interface, found 2");
-    expect(() =>
-      censusOf({
-        "RouterValidator.ts": [
-          "export interface RouterValidator extends Base {",
-          "  lifecycle: {",
-          "    member: () => void;",
-          "  };",
-          "}",
-          "interface Base {",
-          "  plugins: {",
-          "    member: () => void;",
-          "  };",
-          "  routes: {",
-          "    member: () => void;",
-          "  };",
-          "}",
-        ],
-      }),
-    ).toThrow(
+  it("CONTROL — a syntax error and an unresolved name are reported, and a receiver the compiler cannot type is not keyed", () => {
+    expect(broken.sites).toStrictEqual([]);
+    expect(broken.unread).toStrictEqual([]);
+    expect(broken.diagnostics).toStrictEqual([
+      "Expression expected.",
+      "Cannot find name 'Missing'.",
+    ]);
+  });
+
+  const declaration = [
+    "export interface RouterValidator {",
+    "  lifecycle: {",
+    "    member: () => void;",
+    "  };",
+    "}",
+  ];
+  const refused = {
+    noInterface: refusalOf({ "consumer.ts": ["export {};"] }),
+    twoInterfaces: refusalOf({
+      "first.ts": declaration,
+      "second.ts": declaration,
+    }),
+    inheritedNamespaces: refusalOf({
+      "RouterValidator.ts": [
+        "export interface RouterValidator extends Base {",
+        "  lifecycle: {",
+        "    member: () => void;",
+        "  };",
+        "}",
+        "interface Base {",
+        "  plugins: {",
+        "    member: () => void;",
+        "  };",
+        "  routes: {",
+        "    member: () => void;",
+        "  };",
+        "}",
+      ],
+    }),
+    namedNamespace: refusalOf({
+      "RouterValidator.ts": [
+        "export interface RouterValidator {",
+        "  lifecycle: Lifecycle;",
+        "}",
+        "interface Lifecycle {",
+        "  member: () => void;",
+        "}",
+      ],
+    }),
+    quotedMember: refusalOf({
+      "RouterValidator.ts": [
+        "export interface RouterValidator {",
+        "  lifecycle: {",
+        '    "quoted": () => void;',
+        "  };",
+        "}",
+      ],
+    }),
+  };
+
+  it("CONTROL — a tree the walk cannot read is refused, not read as empty", () => {
+    expect(refused.noInterface).toContain(
+      "Expected one RouterValidator interface, found 0",
+    );
+    expect(refused.twoInterfaces).toContain(
+      "Expected one RouterValidator interface, found 2",
+    );
+    expect(refused.inheritedNamespaces).toContain(
       "RouterValidator has a namespace its body does not list: plugins, routes",
     );
-    expect(() =>
-      censusOf({
-        "RouterValidator.ts": [
-          "export interface RouterValidator {",
-          "  lifecycle: Lifecycle;",
-          "}",
-          "interface Lifecycle {",
-          "  member: () => void;",
-          "}",
-        ],
-      }),
-    ).toThrow("A namespace of another shape");
-    expect(() =>
-      censusOf({
-        "RouterValidator.ts": [
-          "export interface RouterValidator {",
-          "  lifecycle: {",
-          '    "quoted": () => void;',
-          "  };",
-          "}",
-        ],
-      }),
-    ).toThrow("A member of another shape");
+    expect(refused.namedNamespace).toContain("A namespace of another shape");
+    expect(refused.quotedMember).toContain("A member of another shape");
   });
 
   it("the declared table covers the derived set, in both directions", () => {
