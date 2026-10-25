@@ -1457,12 +1457,20 @@ const HOPS = new Map([
     "the accessor `wireNamespaces` installs",
   ],
   [
+    "namespaces/NavigationNamespace/transition/errorHandling.ts › resolveAsyncGuard().warnNonBooleanGuard",
+    "the report a dependency bag carries, a closure `wireNamespaces` fills",
+  ],
+  [
     "namespaces/NavigationNamespace/transition/guardPhase.ts › runStep().emitLeaveApprove",
     "the pipeline's own step",
   ],
   [
     "namespaces/NavigationNamespace/transition/guardPhase.ts › runStep().isLive",
     "the pipeline's own liveness read",
+  ],
+  [
+    "namespaces/NavigationNamespace/transition/guardPhase.ts › runStep().warnNonBooleanGuard",
+    "the report a dependency bag carries, a closure `wireNamespaces` fills",
   ],
   [
     "namespaces/NavigationNamespace/types.ts › NavigationDependencies",
@@ -1665,11 +1673,11 @@ const PLACES = new Map([
   ],
   [`internals.ts › runChecks › call:${short(T_CHECKS)}`, INHERITS],
   [
-    "namespaces/NavigationNamespace/transition/guardPhase.ts › runStep › call:GuardFn",
+    "namespaces/NavigationNamespace/transition/guardPhase.ts › adoptThenable › then:Reflect.apply",
     SUPERSESSION,
   ],
   [
-    "namespaces/NavigationNamespace/transition/guardPhase.ts › runStep › then:Reflect.apply",
+    "namespaces/NavigationNamespace/transition/guardPhase.ts › runStep › call:GuardFn",
     SUPERSESSION,
   ],
   [

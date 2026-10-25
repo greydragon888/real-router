@@ -47,15 +47,21 @@ function getTypeDescription(value: unknown): string {
     // (null, a string, a number, …) is not a real constructor and must not crash
     // here nor yield a non-string (#903); a THROWING accessor — a `constructor`
     // getter, a function constructor with a throwing `.name` getter, or a Proxy
-    // that throws on [[Get]] — must not crash either (#1052). Both fall back to
-    // "object". (Byte-identical twin of type-guards' getTypeDescription —
-    // route-tree has no type-guards dependency, so the hardening is duplicated.)
+    // that throws on [[Get]] — must not crash either (#1052); and a `name` that
+    // is not a string describes nothing, because the description lands in a
+    // message. All of them fall back to "object". (The engine cannot depend on
+    // validation-plugin, which keeps its own copy with an `array[N]` branch.)
     try {
       const ctor: unknown = (value as { constructor?: unknown }).constructor;
 
-      // Return constructor name for class instances
-      if (typeof ctor === "function" && ctor.name !== "Object") {
-        return ctor.name || "object"; // empty name (anonymous class) → "object"
+      if (typeof ctor === "function") {
+        const name: unknown = ctor.name;
+
+        // Return constructor name for class instances; an anonymous class has
+        // an empty one.
+        if (typeof name === "string" && name !== "" && name !== "Object") {
+          return name;
+        }
       }
     } catch {
       // Throwing constructor/.name getter or Proxy [[Get]] → fall through (#1052).

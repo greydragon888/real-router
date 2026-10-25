@@ -120,7 +120,7 @@
     },
     {
       "file": "packages/validation-plugin/tests/functional/validator-boundary-authority-2322.test.ts",
-      "reads": "core's src, for every place core consults this plugin"
+      "reads": "core's src, for the places core consults this plugin"
     }
   ]
 }

@@ -5,6 +5,7 @@ import { getLifecycleApi } from "@real-router/core/api";
 
 import {
   createFixtureRouter,
+  arbGuardAnswer,
   arbNavigableRoute,
   arbSegmentName,
   FIXTURE_ROUTE_NAMES,
@@ -18,22 +19,28 @@ import type { Params, Router } from "@real-router/core";
 /** Register a single sync guard (last-add-wins) on a router. */
 function applyGuard(
   router: Router,
-  guard: { route: string; kind: string; val: boolean },
+  guard: { route: string; kind: "activate" | "deactivate"; val: unknown },
 ): void {
   const lifecycle = getLifecycleApi(router);
+  const answer = guard.val as boolean;
 
   if (guard.kind === "activate") {
-    lifecycle.addActivateGuard(guard.route, () => () => guard.val);
+    lifecycle.addActivateGuard(guard.route, () => () => answer);
   } else {
-    lifecycle.addDeactivateGuard(guard.route, () => () => guard.val);
+    lifecycle.addDeactivateGuard(guard.route, () => () => answer);
   }
 }
 
-/** A sync guard config drawn from the fixture (incl. shared ancestors). */
+/**
+ * A sync guard config drawn from the fixture (incl. shared ancestors). Its
+ * answer is any value, not only a boolean: drawing booleans alone, both halves
+ * of PARITY held while `navigate` took a truthy non-boolean for "allowed" and
+ * the predicate took it for "blocked" (#2823).
+ */
 const arbGuard = fc.record({
   route: fc.constantFrom(...FIXTURE_ROUTE_NAMES),
   kind: fc.constantFrom("activate", "deactivate"),
-  val: fc.boolean(),
+  val: arbGuardAnswer,
 });
 
 /**

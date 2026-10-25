@@ -105,6 +105,19 @@ export const NAVIGABLE_ROUTE_NAMES = [
   "search",
 ] as const;
 
+/**
+ * A guard's answer, of every shape rather than the declared booleans alone
+ * (#2823). `GuardFn` declares `boolean | Promise<boolean>`, untyped guard code
+ * answers anything, and a property drawing booleans alone holds on a reader
+ * that takes a truthy non-boolean for "allowed". No thenables: the synchronous
+ * ask cannot wait for one, so each caller decides whether to wrap the answer.
+ */
+export const arbGuardAnswer: fc.Arbitrary<unknown> = fc.oneof(
+  fc.boolean(),
+  fc.constantFrom<unknown>("login", 1, [], {}, "", 0, null, undefined),
+  fc.anything(),
+);
+
 /** Route-to-path mapping for start() */
 export const ROUTE_PATHS: Record<string, string> = {
   home: "/",

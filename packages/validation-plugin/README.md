@@ -39,6 +39,7 @@ Without this plugin, core has structural guards (constructor, plugin registratio
 - Argument shape checks for every public API call
 - `forwardTo` target existence, param compatibility, and cycle detection
 - Decoder/encoder async detection (sync required for `matchPath`/`buildPath`)
+- Guard answers: one that is neither `true` nor `false` is named with its type (core refuses it either way), and an async guard met by a synchronous check is reported as such
 - Dependency store structure validation
 - Limits consistency checks
 - Cross-field `Options` diagnostics: `warnListeners > maxListeners`, `callbackIgnoresLevel` without `callback`, `defaultRoute` pointing to a missing route (static at registration, callbacks at first use)
@@ -147,7 +148,7 @@ If the retrospective pass fails, the plugin rolls back cleanly. The router is le
 | Options       | `limits` object shape, individual limit values; cross-field `warnListeners ≤ maxListeners`; `logger.callbackIgnoresLevel` requires `logger.callback`; `defaultRoute` callback return value   |
 | Dependencies  | `setDependency` args, dependency name format, full store structure                                                                                                                           |
 | Plugins       | Plugin count vs `maxPlugins` limit, plugin hook names                                                                                                      |
-| Lifecycle     | Guard/hook handler type, count vs `maxLifecycleHandlers`                                                                                                                                     |
+| Lifecycle     | Guard/hook handler type, count vs `maxLifecycleHandlers`; a guard answering neither `true` nor `false`; an async guard in a synchronous check                                                |
 | Navigation    | `navigate` args, `navigateToDefault` args, `NavigationOptions` shape, `params` validation (navigate, buildPath, canNavigateTo), `start` path validation, a `defaultParams` / `defaultSearch` bag mutated after `createRouter()` |
 | State         | `makeState` args, `areStatesEqual` args                                                                                                                                                      |
 | Event bus     | Event name format, listener args                                                                                                                                                             |
