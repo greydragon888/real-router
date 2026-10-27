@@ -63,6 +63,23 @@ reason = "Fixed in seroval 1.6.2, outside solid-js 1.9.15's ~1.5.4; solid-js has
 id = "GHSA-pqg4-j6r4-53mv"  # shell-quote quote() command injection through a line terminator after a comment token
 reason = "Fixed in shell-quote 1.11.0, outside the exact 1.9.0 concurrently 10.0.5 pins; concurrently has no newer release. Only path: concurrently 10.0.5 (devDependency of examples/desktop/electron/*), which calls quote() only under --passthrough-arguments, and the examples' dev scripts do not pass it. examples/ is never published."
 
+# block-buffer's fix, 0.12.1, is outside the 0.10 line that digest 0.10.7
+# requires, and digest 0.10 is what sha2 0.10.9 depends on. The affected copy is
+# in the two examples/desktop/tauri/*/src-tauri/Cargo.lock only, through
+# tauri-codegen, whose one dependent there is the tauri-macros proc-macro, so it
+# runs at compile time and not in the built app; tauri-codegen 2.7.4, the
+# latest, still requires sha2 ^0.10. The advisory is a cursor kept inside the
+# buffer's own block, which input overwrites before a `compress` callback that
+# panics. block-buffer 0.10.4 keeps the cursor in a field of its own
+# (`pos: u8`), sets it only after `compress` returns and passes the block to it
+# read-only, and has no `ReadBuffer`. The advisory names the crate
+# `block_buffer`, so Dependabot opens no alert for it. Drop it when no Tauri
+# lockfile holds a block-buffer below 0.12.1 — ask api.osv.dev per version.
+
+[[IgnoredVulns]]
+id = "GHSA-qwgh-2vcv-g2f7"  # block-buffer panic in a callback corrupts the inline buffer position
+reason = "Fixed in block-buffer 0.12.1, outside digest 0.10.7's 0.10 line; tauri-codegen 2.7.4, the latest, still requires sha2 ^0.10. Only path: tauri-macros -> tauri-codegen -> sha2 0.10.9 -> digest -> block-buffer 0.10.4, compile time only, in examples/desktop/tauri/* (never published). 0.10.4 keeps the cursor in a separate field that a panicking compress callback cannot reach, and has no ReadBuffer."
+
 # NOTE (2026-09-10): ten entries stood here — RUSTSEC-2024-0411 through -0420,
 # the gtk-rs unmaintained-crate advisories (gdk, gtk, atk, their -sys crates and
 # gtk3-macros). They are gone, and the way they left is worth one paragraph
