@@ -70,11 +70,11 @@ This works via [module augmentation](https://www.typescriptlang.org/docs/handboo
 
 ## Configuration
 
-| Option    | Type                                    | Default         | Description                                                                                                                                                                                    |
-| --------- | --------------------------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mode`    | `"development" \| "production"`         | `"development"` | In development mode, logs invalid params with `console.error`. In production mode, strips silently without logging.                                                                            |
-| `strict`  | `boolean`                               | `false`         | When `false`, unknown params pass through alongside schema output. When `true`, only params present in the schema output are kept — unknown keys are removed.                                  |
-| `onError` | `(routeName, params, issues) => Params` | `undefined`     | Custom error handler. When set, overrides both `mode` logging and the built-in strip+merge recovery. Receives the raw validation issues; returned params are used as-is without re-validation. |
+| Option    | Type                                    | Default         | Description                                                                                                                                                                                                         |
+| --------- | --------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mode`    | `"development" \| "production"`         | `"development"` | In development mode, logs invalid params with `console.error`. In production mode, strips silently without logging.                                                                                                 |
+| `strict`  | `boolean`                               | `false`         | When `false`, unknown params pass through alongside schema output. When `true`, only the keys of the schema's output are kept, on every query the schema accepts — a repaired one included.                         |
+| `onError` | `(routeName, params, issues) => Params` | `undefined`     | Custom error handler. When set, overrides both `mode` logging and the built-in recovery (strip, restore, validate again). Receives the raw validation issues; returned params are used as-is without re-validation. |
 
 ## Behavior
 
@@ -94,16 +94,22 @@ When schema validation succeeds, the resolved params are merged back based on `s
 
 ### Invalid params + recovery
 
-When schema validation fails, the plugin strips only the keys with validation issues and restores their `defaultSearch` values:
+When schema validation fails, the plugin strips only the keys with validation issues, restores their `defaultSearch` values and validates the repaired query once more — so the kept keys come back as the schema outputs them:
 
 ```typescript
-// Route defaultSearch: { page: 1, sortBy: "price" }
-// URL: /products?page=foo&sortBy=price
+// Schema: z.object({ page: z.coerce.number().int().positive(), q: z.string().trim() })
+// Route defaultSearch: { page: 1 }
+// URL: /products?page=foo&q=%20shoes%20
 // Schema fails: page is not a valid number
-// Step 1 — strip invalid: { sortBy: "price" }
-// Step 2 — merge defaults: { page: 1, sortBy: "price" }  ← page restored from defaultSearch
-// Result: { page: 1, sortBy: "price" }
+// Step 1 — strip invalid:   { q: " shoes " }
+// Step 2 — restore default: { page: 1, q: " shoes " }  ← page restored from defaultSearch
+// Step 3 — validate again:  { page: 1, q: "shoes" }    ← the schema's output
+// Result: { page: 1, q: "shoes" } — as on /products?page=1&q=%20shoes%20
 ```
+
+The second run happens only when the first fails. A repaired query the schema still rejects has no output to write, so it is written back as decoded — without coercion, transforms or `.default()`, and under `strict` with its undeclared keys. A path-less `refine` issue (below) leads there: it names no key to repair.
+
+Write `defaultSearch` values in the form the schema outputs (`page: 1`, not `"1"`): a rejected key's default goes through that second run, while core merges the others as written. A schema that throws on a restored value refuses the navigation.
 
 In `mode: "development"`, a `console.error` is emitted with the route name and validation issues before the recovery happens.
 
@@ -133,7 +139,7 @@ In `mode: "development"` the plugin **warns** about a schema-violating `defaultS
 
 ```typescript
 router.usePlugin(searchSchemaPlugin({ strict: true }));
-// Unknown params (not described in schema) are removed on every navigation
+// Unknown params (not described in schema) are removed from every query the schema accepts, a repaired one included
 ```
 
 Per-route schema configuration (e.g., Zod's `.passthrough()` or `.strip()`) controls which keys appear in the schema output and effectively overrides the `strict` option for that route.

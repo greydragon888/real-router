@@ -4,9 +4,8 @@
 // application defining `Object.prototype.id` — the name it routes under —
 // intercepts the write.
 //
-// ⚠ Written because NOTHING covered the four call sites: reverting any one to a
-// plain store left the whole package green, and core's static scan walks
-// `packages/core/src` only.
+// ⚠ Written because nothing in this package covered these call sites:
+// reverting any one to a plain store left the whole package green.
 //
 // Measured before the fix:
 //
@@ -154,6 +153,48 @@ describe("a rebuilt channel survives an ambient accessor of its own name (#1852)
       "the control must SUCCEED with the right answer — a uniform failure agrees with itself",
     ).toStrictEqual({
       ok: { search: { q: "hello" }, path: "/s?q=hello" },
+    });
+    expect(answers).toStrictEqual(uniform(answers));
+  });
+
+  it("a rejected key restored from defaultSearch survives the repair copy", async () => {
+    // `helpers.pickKeys` — the key is the route's `defaultSearch` name, picked
+    // into the query the schema runs on once more (#2824). Under `strict` the
+    // copy decides the answer: a key it loses fails that run, and the query
+    // written back as decoded keeps `utm`, which the schema's output drops.
+    const answers = await underHazard("page", async () => {
+      const router = createRouter([
+        { name: "home", path: "/" },
+        {
+          name: "s",
+          path: "/s?q&page",
+          defaultSearch: { page: 1 },
+          searchSchema: searchSchema(),
+        },
+      ] as never);
+
+      router.usePlugin(
+        searchSchemaPlugin({ mode: "production", strict: true }),
+      );
+      await router.start("/");
+
+      const state = await router.navigate(
+        "s",
+        {},
+        { q: "x", page: "bad", utm: "u" },
+      );
+      const answer = { search: { ...state.search }, path: state.path };
+
+      router.dispose();
+
+      return answer;
+    });
+
+    expect(
+      answers.control,
+      "the control must SUCCEED with the right answer — a uniform failure agrees with itself",
+    ).toStrictEqual({
+      ok: { search: { q: "x", page: 1 }, path: "/s?q=x&page=1" },
     });
     expect(answers).toStrictEqual(uniform(answers));
   });

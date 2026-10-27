@@ -16,7 +16,7 @@
 
 1. `searchSchemaPlugin(options)` returns a `PluginFactory`
 2. On `router.usePlugin()`: registers `forwardState` interceptor + (dev mode only) subscribes to `TREE_CHANGED` via `getRoutesApi(router).subscribeChanges()`
-3. `forwardState` interceptor: `next()` → schema validate → strip invalid → merge defaults
+3. `forwardState` interceptor: `next()` → schema validate → on issues: strip the rejected keys → restore their `defaultSearch` values → validate the repaired query once more
 4. `TREE_CHANGED` listener: re-validates `defaultSearch` on `add` / `replace` (whole added subtree) and `update` (when `defaultSearch` changed) — dev mode only. A tree-change subscription sees `update` and `replace`, which an `add` interceptor would not
 5. Both directions (URL→State and State→URL) go through `forwardState` — single validation point
 
@@ -45,7 +45,7 @@ declare module "@real-router/core" {
 src/
 ├── factory.ts    — searchSchemaPlugin: validates options, freezes config, returns PluginFactory
 ├── plugin.ts     — SearchSchemaPlugin class: forwardState interceptor + TREE_CHANGED subscription, tree validation
-├── helpers.ts    — getInvalidKeys (extract keys from issues), omitKeys (shallow copy without keys)
+├── helpers.ts    — getInvalidKeys (extract keys from issues), omitKeys (shallow copy without keys), pickKeys (shallow copy of only those keys), collectPathParams (the path-slot names in a route's URL)
 ├── validation.ts — validateOptions: mode / strict / onError, TypeError at factory time
 ├── types.ts      — StandardSchemaV1 types (inline), SearchSchemaPluginOptions
 ├── constants.ts  — ERROR_PREFIX
@@ -64,15 +64,15 @@ Schema runs after `decodeParams` (URL→State) and before `encodeParams` (State�
 
 ### `.default()` fills before `defaultSearch` does
 
-The schema runs on what `next()` returns: the caller's channels plus any `forwardTo` hop's defaults — not the route's own `defaultSearch`, which core merges under the result afterwards (at `canonicalize`). So `z.number().default(1)` fires whenever the caller omits the key, and the value it produces is caller-side from core's point of view: `defaultSearch` merges under it.
+The schema runs on what `next()` returns: the caller's channels plus any `forwardTo` hop's defaults — not the route's own `defaultSearch`, which core merges under the result afterwards (at `canonicalize`). So `z.number().default(1)` fires whenever the caller omits the key, and the value it produces is caller-side from core's point of view: `defaultSearch` merges under it. The second run of a repair is handed, of the route's defaults, only the rejected keys' own — so there too an absent key takes `.default()` ahead of its `defaultSearch` value.
 
 ### `onError` bypasses all built-in error handling
 
-When `onError` is set, the plugin does NOT call `console.error` or strip params. The callback receives raw issues and must return clean params. No re-validation of returned params (avoids infinite loops).
+When `onError` is set, the plugin does NOT call `console.error`, strip params or validate a second time. The callback receives raw issues and must return clean params. No re-validation of returned params (avoids infinite loops).
 
 ### Path-less validation issues (cross-field `refine`) can't be stripped by key
 
-The strip-and-recover path removes only the keys a validation issue **names** in its `path` — `getInvalidKeys` (`helpers.ts`) skips any issue whose `path` is empty (an issue with no path concerns the whole object, not one key). So a **cross-field** `.refine()` / `.superRefine()` that reports a **path-less** issue strips **nothing**: `invalidKeys` is empty → `omitKeys` is a no-op → the invalid combination passes into `state` untouched. In `mode: "development"` a `console.error` is still logged; `mode: "production"` is **silent**.
+The strip-and-recover path removes only the keys a validation issue **names** in its `path` — `getInvalidKeys` (`helpers.ts`) skips any issue whose `path` is empty (an issue with no path concerns the whole object, not one key). So a **cross-field** `.refine()` / `.superRefine()` that reports a **path-less** issue strips **nothing**: `invalidKeys` is empty → `omitKeys` is a no-op → the second run rejects the same query → the invalid combination passes into `state` as decoded. In `mode: "development"` a `console.error` is still logged; `mode: "production"` is **silent**.
 
 ```typescript
 const schema = z
@@ -82,15 +82,23 @@ await router.navigate("range", {}, { min: 10, max: 5 }); // min/max are query-de
 router.getState().search; // { min: 10, max: 5 } — NOT stripped
 ```
 
-So the "schema validate → strip invalid → merge defaults" contract holds **per key**; it cannot recover a rule class for which strip-by-key is structurally impossible. To recover from a cross-field failure, give the refine a `path` (`{ message, path: ["max"] }`) so the offending key is stripped and its default restored, or handle it in `onError` (which sees the raw issues). A whole-object reset on a path-less failure is not built in — add it via `onError` if you need it.
+So the "validate → strip → restore → validate again" contract holds **per key**; it cannot recover a rule class for which strip-by-key is structurally impossible. To recover from a cross-field failure, give the refine a `path` (`{ message, path: ["max"] }`) so the offending key is stripped and its default restored, or handle it in `onError` (which sees the raw issues). A whole-object reset on a path-less failure is not built in — add it via `onError` if you need it.
 
 ### Async schemas throw immediately
 
 If `~standard.validate()` returns a Promise, the plugin throws `TypeError`. This is by design — `forwardState` is synchronous.
 
+### A schema that throws on a restored default refuses the navigation
+
+A rejected key's `defaultSearch` value goes through the second run, so a schema that throws on it — a callback that assumes a string, handed a numeric default — refuses the navigation (`repair-path-schema-output-2824.test.ts`). zod hands such a throw back as a rejected Promise, which the plugin refuses as an async schema.
+
+### A query key named after an `Object.prototype` member is unsupported
+
+The schema is handed a plain object, so a field named `constructor` or `toString` reads the inherited member when the query leaves the key out. zod rejects that value, and the query is written back as decoded.
+
 ### `strict: true` interaction with Zod
 
-Zod strip mode (default) removes unknown keys from output. With `strict: true`, the plugin uses `validation.value` directly (unknowns gone). With `strict: false`, it merges `{ ...original, ...validation.value }` (unknowns preserved from original).
+Zod strip mode (default) removes unknown keys from output. With `strict: true`, the plugin uses `validation.value` directly (unknowns gone). With `strict: false`, it merges `{ ...original, ...validation.value }` (unknowns preserved from original). A repair is held to the same rule, with the repaired query as the original; a repaired query the schema still rejects has no output, so `strict` removes nothing from it.
 
 ### Composition order with `persistent-params-plugin` decides whether persistent params are validated
 
@@ -124,9 +132,9 @@ At `usePlugin()` time, validates all existing routes' `defaultSearch` against th
 
 ### Invalid `defaultSearch` reaches state at runtime — core-injected, plugin cannot gate (#802)
 
-The runtime guarantee ("invalid params never reach `state`") holds for **user input** only. `defaultSearch` (and `defaultParams`) are **developer config** merged in by **core**, at layers _below_ the `forwardState` interceptor this plugin hooks — so an invalid default reaches state (`state.search` for a `defaultSearch` value, `state.params` for a `defaultParams` one — core routes defaults by channel since #1549), `state.path`, `router.buildPath()`, and `isActiveRoute()` comparisons, on every navigation, in every `mode`. The plugin **cannot** strip it from `forwardState`: whatever it returns, core re-applies the defaults afterwards in three uninterceptable spots — `StateNamespace.makeState` (channel-aware since #1549), `RoutesNamespace.buildPath`, `RoutesNamespace.isActiveRoute` (`InterceptableMethodMap` = `start` / `forwardState`; only `forwardState` is hooked). The re-application always lets caller values win, so an interceptor can add or replace a key but cannot **remove** one core will re-fill from config.
+The runtime guarantee ("invalid params never reach `state`") holds for **user input** only. `defaultSearch` (and `defaultParams`) are **developer config** merged in by **core**, at layers _below_ the `forwardState` interceptor this plugin hooks — so an invalid default reaches state (`state.search` for a `defaultSearch` value, `state.params` for a `defaultParams` one — core routes defaults by channel since #1549), `state.path`, `router.buildPath()`, and `isActiveRoute()` comparisons, on every navigation, in every `mode`. The plugin **cannot** strip it from `forwardState`: whatever it returns, core re-applies the defaults afterwards — `canonicalize` (`packages/core/src/pipeline/canonicalize.ts`) merges them under the interceptor's result, below the seam and out of an interceptor's reach (`InterceptableMethodMap` = `start` / `forwardState`; only `forwardState` is hooked). The re-application always lets caller values win, so an interceptor can add or replace a key but cannot **remove** one core will re-fill from config.
 
-Consequence: the restore branch `{ ...defaults, ...stripped }` in `#validateState` is **redundant with `makeState`'s merge** on the navigate/start paths — but it still matters for a direct `PluginApi.forwardState` call (which skips `makeState`), so **do not delete it**. The dev-time check above is a **config lint**, not a runtime gate. Documented limitation, not a plugin bug — a runtime fix would require core changes (single-merge-point refactor; see the #802 analysis). Priority-low, no user report; the plugin's honest contract is "invalid _input_ never reaches state".
+Consequence: the `...defaults` merge that ends `#repair` is **redundant with core's own merge** on the navigate/start/`buildPath` paths — but a direct `PluginApi.forwardState` call skips that merge, so **do not delete it** (`repair-path-schema-output-2824.test.ts` pins it there, on both outcomes of the second run). A rejected key's own default goes through that second run, and an invalid one still lands: it fails the run, and the outer merge puts it back as written. The dev-time check above is a **config lint**, not a runtime gate. Documented limitation, not a plugin bug — a runtime fix would require core changes. Priority-low, no user report; the plugin's honest contract is "invalid _input_ never reaches state".
 
 Known gap (#802 side-finding): swapping `searchSchema` via `getRoutesApi(router).update(name, { searchSchema })` emits **no** `TREE_CHANGED` (custom fields aren't in `buildStructuralPatch` — only `forwardTo` / `defaultParams` / `defaultSearch` / `encodeParams` / `decodeParams`), so the dev check does **not** re-validate existing `defaultSearch` against a newly-swapped schema.
 

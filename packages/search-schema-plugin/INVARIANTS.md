@@ -20,14 +20,21 @@
 | 3   | No mutation                 | The input `params` object is not modified. A fresh object is always returned.                                             |
 | 4   | Empty exclusion is identity | `omitKeys(params, new Set())` deep-equals `params` (same own keys and values).                                            |
 
+## pickKeys
+
+| #   | Invariant              | Description                                                                                                |
+| --- | ---------------------- | ---------------------------------------------------------------------------------------------------------- |
+| 1   | Selection guarantee    | The result holds exactly the own keys of `params` that are in `keys`, each with the same value.            |
+| 2   | Complement of omitKeys | `{ ...omitKeys(params, keys), ...pickKeys(params, keys) }` has exactly the own keys and values of `params`. |
+
 ## Validation Pipeline (forwardState interceptor)
 
 | #   | Invariant                                | Description                                                                                                                                                                                              |
 | --- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Valid params pass-through                | With a subset schema (simulating Zod strip mode), validated keys are preserved with correct values AND extra keys pass through in non-strict mode. Tests with non-echo schema to avoid tautology.        |
-| 2   | Invalid key stripping                    | When schema returns `{ issues }`, invalid keys are absent from result AND valid params alongside them are preserved with correct values.                                                                 |
-| 3   | DefaultParams recovery                   | When schema returns `{ issues }` and route has `defaultParams`, stripped keys are filled from defaults AND valid params alongside them are preserved.                                                    |
-| 4   | Strict mode output isolation             | With `strict: true` and valid params, result params equal `validation.value` exactly. No keys from the original params leak through.                                                                     |
+| 2   | Invalid key stripping                    | When schema returns `{ issues }`, invalid keys are absent from result AND each key alongside them carries the schema's output for the repaired query — or its value as decoded when that query fails too.  |
+| 3   | defaultSearch recovery                   | When schema returns `{ issues }` and route has `defaultSearch`, each rejected key takes its default AND each key of the repaired query carries the schema's output — or its value as decoded when that query fails too. A default for a key that was not rejected is merged as given. |
+| 4   | Strict mode output isolation             | With `strict: true`, on valid params and on a repaired query the schema accepts, result params equal the schema's output exactly. No keys from the original params leak through.                        |
 | 5   | Non-strict mode: override + preservation | With `strict: false`, schema-transformed values (uppercased) override originals for known keys, while extra keys pass through unchanged. Tests with transforming schema to prove override, not identity. |
 | 6   | Async rejection                          | If `~standard.validate()` returns a Promise, TypeError is thrown. The plugin never awaits.                                                                                                               |
 
@@ -52,6 +59,6 @@
 
 | File                                      | Invariants | Category                                       |
 | ----------------------------------------- | ---------- | ---------------------------------------------- |
-| `tests/property/helpers.properties.ts`    | 8          | getInvalidKeys, omitKeys                       |
+| `tests/property/helpers.properties.ts`    | 10         | getInvalidKeys, omitKeys, pickKeys             |
 | `tests/property/validation.properties.ts` | 6          | Factory Options Validation                     |
 | `tests/property/pipeline.properties.ts`   | 7          | Validation Pipeline (forwardState interceptor), Channel Isolation |

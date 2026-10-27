@@ -4,17 +4,17 @@
 
 ## Overview
 
-`@real-router/search-schema-plugin` validates route search parameters against a [Standard Schema V1](https://github.com/standard-schema/standard-schema)-compatible schema attached to each route definition. On every navigation — whether initiated by `router.navigate()` or by the browser parsing a URL — the plugin intercepts the resolved state, validates its params against the route's `searchSchema`, and either passes them through (valid), strips invalid keys and restores `defaultParams` (invalid), or delegates entirely to a custom `onError` handler. The plugin works with any schema library that implements Standard Schema V1 (Zod 3.24+, Valibot 1.0+, ArkType) without importing any of them.
+`@real-router/search-schema-plugin` validates route search parameters against a [Standard Schema V1](https://github.com/standard-schema/standard-schema)-compatible schema attached to each route definition. On every navigation — whether initiated by `router.navigate()` or by the browser parsing a URL — the plugin intercepts the resolved state, validates its params against the route's `searchSchema`, and either passes them through (valid), repairs them (invalid: strips the rejected keys, restores their `defaultSearch` values and validates the repaired query once more), or delegates entirely to a custom `onError` handler. The plugin works with any schema library that implements Standard Schema V1 (Zod 3.24+, Valibot 1.0+, ArkType) without importing any of them.
 
 **Core role:** A stateless validation layer that sits after core's `forwardState` pipeline. Reads `searchSchema` from route configuration, validates deserialized params, and returns a safe state. Contains no URL parsing or browser logic — only schema dispatch, key stripping, and default merging.
 
 **Integration points with the core:**
 
 - `addInterceptor("forwardState", ...)` — validates params of every resolved state (both URL→State and State→URL directions)
-- `routesApi.subscribeChanges(...)` — re-validates `defaultParams` on `add`/`update`/`replace` route-tree mutations (development mode only)
+- `routesApi.subscribeChanges(...)` — re-validates `defaultSearch` on `add`/`update`/`replace` route-tree mutations (development mode only)
 - `pluginApi.getRouteConfig(name)` — reads the `searchSchema` field from a route's config at validation time
-- `pluginApi.getTree()` — walks the full route tree at plugin initialization to validate existing `defaultParams` (development mode only)
-- `routesApi.get(name)` — reads `defaultParams` for error recovery (merging defaults over stripped params)
+- `pluginApi.getTree()` — names the route's path slots on every validation (cached per tree), and is walked at plugin initialization to validate existing `defaultSearch` (development mode only)
+- `routesApi.get(name)` — reads `defaultSearch` for error recovery (a rejected key takes its default) and for the dev-time check
 - Plugin hook (`teardown`) — removes the interceptor and the TREE_CHANGED subscription
 
 ## Package Structure
@@ -25,7 +25,7 @@ search-schema-plugin/
 │   ├── index.ts        — Public API (exports factory + types + Route module augmentation)
 │   ├── factory.ts      — searchSchemaPlugin (options validation, freeze, returns PluginFactory)
 │   ├── plugin.ts       — SearchSchemaPlugin class (forwardState interceptor + TREE_CHANGED subscription, tree walk)
-│   ├── helpers.ts      — Pure param utilities (getInvalidKeys, omitKeys)
+│   ├── helpers.ts      — Pure param utilities (getInvalidKeys, omitKeys, pickKeys, collectPathParams)
 │   ├── types.ts        — StandardSchemaV1 types (inline), SearchSchemaPluginOptions
 │   ├── constants.ts    — ERROR_PREFIX
 │   └── validation.ts   — validateOptions (factory-time type checks)
@@ -132,7 +132,7 @@ this.#removeForwardStateInterceptor = this.#pluginApi.addInterceptor(
     this.#validateState(next(routeName, routeParams, routeSearch)),
 );
 
-// dev mode only — re-validate defaultParams on add/update/replace
+// dev mode only — re-validate defaultSearch on add/update/replace
 this.#removeChangesSubscription =
   this.#mode === "development"
     ? this.#routesApi.subscribeChanges((event) => {
@@ -157,7 +157,8 @@ navigate(name, params, search) / matchPath(url)
         │
         ├── result = next(routeName, routeParams, routeSearch)
         │     └── core builds/resolves State { name, params, search }
-        │         (merges route defaultParams for undefined keys, channel-aware)
+        │         (a forwardTo hop's defaults are merged here; core merges the
+        │          route's own defaults under the result afterwards)
         │
         └── #validateState(result)
               │
@@ -200,19 +201,27 @@ navigate(name, params, search) / matchPath(url)
                     ├── mode === "development"?
                     │     YES: console.error(routeName, issues)
                     │
-                    ├── invalidKeys = getInvalidKeys(issues)
-                    │     └── extracts top-level path[0] key from each issue with a path
-                    │
-                    ├── stripped = omitKeys(channel, invalidKeys)
-                    │
-                    ├── defaults = { ...omitKeys(route.defaultParams, pathParams),
-                    │                 ...route.defaultSearch }
-                    │     ← the route's query-channel defaults (`defaultSearch` is their
-                    │       home; a `defaultParams` entry reaches the query channel
-                    │       too, for a declared query key — minus path slots)
-                    │
-                    └── return writeBack({ ...defaults, ...stripped })
-                                  ← defaults fill stripped keys; valid keys kept as-is
+                    └── return writeBack(#repair(schema, routeName, channel, issues))
+
+  #repair(schema, routeName, channel, issues)
+        ├── invalidKeys = getInvalidKeys(issues)
+        │     └── extracts top-level path[0] key from each issue with a path
+        │
+        ├── stripped = omitKeys(channel, invalidKeys)
+        │
+        ├── defaults = route.defaultSearch   ← the route's query-channel defaults
+        │
+        ├── repaired = { ...pickKeys(defaults, invalidKeys), ...stripped }
+        │     ← each rejected key takes its default, or is dropped
+        │
+        ├── schema["~standard"].validate(repaired)   ← the second run; a Promise throws
+        │
+        ├── "value" in the result?
+        │     YES: { ...defaults, ...output }   ← output merged over `repaired`,
+        │                                          or alone under strict
+        │
+        └── NO:  { ...defaults, ...stripped }   ← no output to write: the
+                                                   repaired query as decoded
 
   #writeBack(result, pathParams, validated)
         ├── params := path slots verbatim + the validated value for every key that
@@ -225,10 +234,10 @@ navigate(name, params, search) / matchPath(url)
 ### Happy path (valid params)
 
 ```
-navigate("products", { page: 2, sortBy: "name", utm_source: "email" })
+navigate("products", {}, { page: 2, sortBy: "name", utm_source: "email" })
         │
         ▼
-  next() → State { params: { page: 2, sortBy: "name", utm_source: "email" } }
+  next() → State { search: { page: 2, sortBy: "name", utm_source: "email" } }
         │
         ▼
   schema.validate({ page: 2, sortBy: "name", utm_source: "email" })
@@ -242,11 +251,11 @@ navigate("products", { page: 2, sortBy: "name", utm_source: "email" })
 ### Error path (invalid params + recovery)
 
 ```
-navigate("products", { page: -1, sortBy: "name" })   — or URL: /products?page=-1
+navigate("products", {}, { page: -1, sortBy: "name" })   — or URL: /products?page=-1&sortBy=name
         │
         ▼
-  next() → State { params: { page: -1, sortBy: "name" } }
-        │         (defaultParams.page=1 not applied — page is defined, just invalid)
+  next() → State { search: { page: -1, sortBy: "name" } }
+        │         (the route's own `defaultSearch` is not merged here — core merges it under the result)
         ▼
   schema.validate({ page: -1, sortBy: "name" })
   → { issues: [{ message: "...", path: ["page"] }] }
@@ -258,8 +267,16 @@ navigate("products", { page: -1, sortBy: "name" })   — or URL: /products?page=
   invalidKeys = { "page" }
   stripped    = { sortBy: "name" }
   defaults    = { page: 1, limit: 20, sortBy: "price" }
-  restored    = { page: 1, limit: 20, sortBy: "name" }
-                 ← defaults fill stripped "page"; valid "sortBy" kept from stripped
+  repaired    = { page: 1, sortBy: "name" }
+                 ← the rejected "page" takes its default; the valid "sortBy" is kept
+        │
+        ▼
+  schema.validate({ page: 1, sortBy: "name" })
+  → { value: { page: 1, sortBy: "name" } }
+        │
+        ▼
+  result      = { page: 1, limit: 20, sortBy: "name" }
+                 ← the schema's output, over the rest of the defaults
 ```
 
 ### URL→State and State→URL: single validation point
@@ -268,13 +285,15 @@ The `forwardState` interceptor handles both navigation directions:
 
 ```
 URL → State:
-  Browser URL parsed → decodeParams → core forwardState (merges defaults)
+  Browser URL parsed → decodeParams → core forwardState
   → [forwardState interceptor: schema validates]
+  → core merges the route's defaults under the result
   → State committed
 
 State → URL:
-  navigate(name, params, search) → core forwardState (merges defaults)
+  navigate(name, params, search) → core forwardState
   → [forwardState interceptor: schema validates whichever channel holds the query]
+  → core merges the route's defaults under the result
   → encodeParams → URL built
 ```
 
@@ -285,8 +304,8 @@ Schema sees deserialized objects, not raw query strings. `z.number().positive()`
 `router.buildPath()` runs the `forwardState` chain on the caller's intent — the one this plugin registers. It registers no `buildPath` hook and needs none:
 
 ```
-router.navigate("search", { page: "bad" })
-  → forwardState interceptor → schema validates → page stripped → default page=1
+router.navigate("search", {}, { page: "bad" })
+  → forwardState interceptor → schema rejects page → page=1 restored, validated again
   → URL built with page=1  ✓
 
 router.buildPath("search", {}, { page: "bad" })
@@ -297,7 +316,7 @@ router.buildPath("search", {}, { page: "bad" })
 
 `router.buildPath` runs the `forwardState` seam on the caller's intent, so the schema governs the href exactly as it governs `navigate`. One intent produces one URL.
 
-⚠ **The coverage is core's, not this plugin's**: no line of this package registers a `buildPath` hook, and none needs to. *"`buildPath` is a pure URL builder; validation is a navigation-time concern"* holds only while the builder prints what navigation prints — with a route `defaultSearch` it does not, and a builder that prints a different URL is not one anyone can use. That divergence is `INVARIANTS.md` row 7.
+⚠ **The coverage is core's, not this plugin's**: no line of this package registers a `buildPath` hook, and none needs to. *"`buildPath` is a pure URL builder; validation is a navigation-time concern"* holds only while the builder prints what navigation prints — with a route `defaultSearch` it does not, and a builder that prints a different URL is not one anyone can use. That divergence is the invariant "href equals destination" of core's `INVARIANTS.md`.
 
 ## Teardown Lifecycle
 
@@ -310,8 +329,8 @@ unsubscribe() or router.dispose()
         ├── #removeForwardStateInterceptor()
         │     └── pure array.splice — cannot throw
         │
-        └── #removeAddInterceptor()
-              └── pure array.splice — cannot throw
+        └── #removeChangesSubscription()
+              └── TREE_CHANGED unsubscribe, a no-op in production — cannot throw
 ```
 
 Both unsubscribe calls are unconditional and infallible. Unlike `persistent-params-plugin`, there is no `setRootPath` call to restore — the plugin makes no global router state changes beyond interceptor registration.
@@ -330,29 +349,28 @@ Both unsubscribe calls are unconditional and infallible. Unlike `persistent-para
 
 Throws `TypeError` with a descriptive message on any violation. The factory never returns a `PluginFactory` if options are invalid.
 
-### Dev-time defaultParams validation (constructor + TREE_CHANGED)
+### Dev-time defaultSearch validation (constructor + TREE_CHANGED)
 
-In development mode only, the plugin validates that each route's `defaultParams` pass its own `searchSchema`. This catches configuration mismatches early — before any navigation happens.
+In development mode only, the plugin validates that each route's `defaultSearch` passes its own `searchSchema`. This catches configuration mismatches early — before any navigation happens.
 
 **At constructor time** — existing routes:
 
 ```
 constructor()
         │
-        ├── mode !== "development"? → skip
-        │
         └── #validateExistingDefaultParams()
-              └── #validateRouteTreeDefaultParams()
-                    └── #walkTree(pluginApi.getTree())
-                          │
-                          └── for each node with fullName:
-                                #validateSingleRouteDefaultParams(node.fullName)
-                                  │
-                                  ├── no schema for route? → skip
-                                  ├── no defaultParams? → skip
-                                  ├── schema.validate(defaultParams) returns Promise? → skip
-                                  └── "issues" in validation?
-                                        YES: console.warn(routeName, issues)
+              ├── mode !== "development"? → skip
+              │
+              └── #walkTree(pluginApi.getTree())
+                    │
+                    └── for each node with fullName:
+                          #validateSingleRouteDefaultSearch(node.fullName)
+                            │
+                            ├── no schema for route? → skip
+                            ├── no defaultSearch? → skip
+                            ├── schema.validate(defaultSearch) returns Promise? → skip
+                            └── "issues" in validation?
+                                  YES: console.warn(routeName, issues)
 ```
 
 **At TREE_CHANGED time** (dev mode only) — runtime tree mutations:
@@ -365,16 +383,16 @@ routesApi.add / update / replace / remove / clear
         │
         └── #onTreeChanged(event)
               ├── op "add" / "replace": for each route in event.added (FLAT,
-              │     full dotted names) → #validateSingleRouteDefaultParams(route.name)
-              ├── op "update": if event.patch.defaultParams changed
-              │     → #validateSingleRouteDefaultParams(event.name)
+              │     full dotted names) → #validateSingleRouteDefaultSearch(route.name)
+              ├── op "update": if event.patch.defaultSearch is set
+              │     → #validateSingleRouteDefaultSearch(event.name)
               └── op "remove" / "clear": no-op (routes gone)
                     (same single-route check as above)
 ```
 
 ### Runtime schema validation (forwardState interceptor)
 
-On every navigation, `#validateState` calls `schema["~standard"].validate(params)`. The Standard Schema V1 contract guarantees:
+On every navigation, `#validateState` calls `schema["~standard"].validate(channel)`, and after issues `#repair` calls it once more on the repaired query. The Standard Schema V1 contract guarantees:
 
 - **Success:** returns `{ value: Output }` — typed, coerced, transformed output
 - **Failure:** returns `{ issues: readonly StandardSchemaV1Issue[] }` — array of validation problems
@@ -393,23 +411,28 @@ Recovery applies only when `onError` is not set. The sequence is:
             → Set<string> of invalid top-level keys
 
 2. omitKeys(channel, invalidKeys)
-      └── shallow copy of the validated channel (state.search or state.params)
-          without invalid keys
+      └── shallow copy of the validated channel without invalid keys
           → "stripped" params
 
-3. { ...defaults, ...stripped }
-      └── spread defaults first (fills stripped keys with route defaults)
-          spread stripped second (keeps valid keys at their navigated values)
-          → restored params, written back to the same channel
+3. { ...pickKeys(defaults, invalidKeys), ...stripped }
+      └── each rejected key takes its `defaultSearch` value, or is dropped
+          → the "repaired" query
+
+4. schema["~standard"].validate(repaired)
+      ├── value  → { ...defaults, ...output }   (output over `repaired`; alone under strict)
+      └── issues → { ...defaults, ...stripped } (no output to write: as decoded)
+          → written back to the channel each key came from
 ```
+
+So a repaired query the schema accepts comes back as the schema outputs it, and one it still rejects as decoded. The second run happens only after issues.
 
 **Mode behavior:**
 
-| Scenario                        | `console.error`       | Strip + merge defaults |
-| ------------------------------- | --------------------- | ---------------------- |
-| `mode: "development"` (default) | Yes — before strip    | Yes                    |
-| `mode: "production"`            | No                    | Yes                    |
-| `onError` set (any mode)        | No — callback owns it | No — callback owns it  |
+| Scenario                        | `console.error`       | Repair (strip, restore, validate again) |
+| ------------------------------- | --------------------- | --------------------------------------- |
+| `mode: "development"` (default) | Yes — before strip    | Yes                                     |
+| `mode: "production"`            | No                    | Yes                                     |
+| `onError` set (any mode)        | No — callback owns it | No — callback owns it                   |
 
 **`onError` contract:**
 
@@ -426,7 +449,8 @@ Recovery applies only when `onError` is not set. The sequence is:
 | Early return when no schema                        | `plugin.ts`  | Routes without `searchSchema` bypass all validation — zero overhead          |
 | `getInvalidKeys` with `Set`                        | `helpers.ts` | O(n issues) build, O(1) membership checks in `omitKeys`                      |
 | `omitKeys` single pass                             | `helpers.ts` | One `Object.keys` iteration — no intermediate structures                     |
-| Dev-time defaultParams check skipped in production | `plugin.ts`  | Tree walk gated on `mode !== "development"`; the TREE_CHANGED subscription is not registered at all in production |
+| Second validation only after issues                | `plugin.ts`  | A query the schema accepts runs it once                                      |
+| Dev-time defaultSearch check skipped in production | `plugin.ts`  | Tree walk gated on `mode !== "development"`; the TREE_CHANGED subscription is not registered at all in production |
 
 ## Related Documents
 

@@ -63,6 +63,19 @@ export function omitKeys(params: Params, keys: ReadonlySet<string>): Params {
   return result;
 }
 
+/** Create a shallow copy of params with only the specified keys. */
+export function pickKeys(params: Params, keys: ReadonlySet<string>): Params {
+  const result: Params = {};
+
+  for (const [key, value] of objectEntries(params)) {
+    if (keys.has(key)) {
+      putField(result, key, value);
+    }
+  }
+
+  return result;
+}
+
 /**
  * The names a route binds to PATH slots — its own plus every ancestor's, read
  * off the engine's own `paramMeta` (`urlParams` covers params AND splats).

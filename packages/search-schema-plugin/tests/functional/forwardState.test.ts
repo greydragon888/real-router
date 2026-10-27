@@ -457,7 +457,9 @@ describe("Search schema plugin", () => {
 
       await expect(
         router.navigate("search", {}, { q: "test" }),
-      ).rejects.toThrow(/Async schema validation is not supported/);
+      ).rejects.toThrow(
+        '[search-schema-plugin] Async schema validation is not supported. Route "search" returned a Promise from ~standard.validate().',
+      );
     });
   });
 

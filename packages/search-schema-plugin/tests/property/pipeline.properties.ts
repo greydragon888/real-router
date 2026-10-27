@@ -11,16 +11,6 @@ import type { Params, SearchParams } from "@real-router/core";
 // Schema Helpers
 // =============================================================================
 
-function createPassSchema(output: SearchParams): StandardSchemaV1 {
-  return {
-    "~standard": {
-      version: 1,
-      vendor: "test",
-      validate: () => ({ value: output }),
-    },
-  };
-}
-
 function createSubsetSchema(knownKeys: readonly string[]): StandardSchemaV1 {
   const keySet = new Set(knownKeys);
 
@@ -81,6 +71,56 @@ function createUppercaseSchema(knownKeys: readonly string[]): StandardSchemaV1 {
   };
 }
 
+/**
+ * Uppercases every string and rejects every non-string — so it rejects a query
+ * carrying {@link INVALID}, and accepts the same query once the marked keys are
+ * dropped or carry a string default (#2824).
+ */
+function createRejectingUppercaseSchema(): StandardSchemaV1 {
+  return {
+    "~standard": {
+      version: 1,
+      vendor: "test",
+      validate: (value: unknown) => {
+        const params = value as Record<string, unknown>;
+        const output: Record<string, unknown> = {};
+        const issues: StandardSchemaV1Issue[] = [];
+
+        for (const key of Object.keys(params)) {
+          const val = params[key];
+
+          if (typeof val === "string") {
+            output[key] = val.toUpperCase();
+          } else {
+            issues.push({ message: `${key} is invalid`, path: [key] });
+          }
+        }
+
+        return issues.length > 0 ? { issues } : { value: output };
+      },
+    },
+  };
+}
+
+/** Answers `output` for a query without {@link INVALID}, and rejects the marked keys otherwise. */
+function createRejectingPassSchema(output: SearchParams): StandardSchemaV1 {
+  return {
+    "~standard": {
+      version: 1,
+      vendor: "test",
+      validate: (value: unknown) => {
+        const issues: StandardSchemaV1Issue[] = Object.entries(
+          value as Record<string, unknown>,
+        )
+          .filter(([, val]) => val === INVALID)
+          .map(([key]) => ({ message: `${key} is invalid`, path: [key] }));
+
+        return issues.length > 0 ? { issues } : { value: output };
+      },
+    },
+  };
+}
+
 function createAsyncSchema(): StandardSchemaV1 {
   return {
     "~standard": {
@@ -101,6 +141,19 @@ const ALL_KEYS = [...VALIDATED_KEYS, ...EXTRA_KEYS];
 const ROUTE_PATH = `/test?${ALL_KEYS.join("&")}`;
 
 const arbParamValue = fc.string({ minLength: 1, maxLength: 10 });
+
+/**
+ * The value a rejected key carries. Every arbitrary here produces strings, so no
+ * generated value — a kept one or a default — can be mistaken for it.
+ */
+const INVALID = 0;
+
+/**
+ * Whether the repaired query passes the schema (#2824): the schema rejects only
+ * the {@link INVALID} keys and transforms the rest, or it rejects every query,
+ * so the repair is written back as decoded.
+ */
+const arbRepairOutcome = fc.constantFrom("passes", "fails");
 
 const arbValidatedParams = fc.dictionary(
   fc.constantFrom(...VALIDATED_KEYS),
@@ -184,11 +237,12 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
         fc.asyncProperty(
           arbValidatedParams,
           fc.subarray(EXTRA_KEYS, { minLength: 1 }),
-          async (validParams, invalidKeys) => {
+          arbRepairOutcome,
+          async (validParams, invalidKeys, outcome) => {
             const allParams: SearchParams = { ...validParams };
 
             for (const key of invalidKeys) {
-              allParams[key] = "bad-value";
+              allParams[key] = INVALID;
             }
 
             const issues: StandardSchemaV1Issue[] = invalidKeys.map((key) => ({
@@ -202,7 +256,10 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
                 {
                   name: "test",
                   path: ROUTE_PATH,
-                  searchSchema: createFailSchema(issues),
+                  searchSchema:
+                    outcome === "passes"
+                      ? createRejectingUppercaseSchema()
+                      : createFailSchema(issues),
                 },
               ],
               { defaultRoute: "home" },
@@ -218,8 +275,12 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
               expect(state?.search).not.toHaveProperty(key);
             }
 
+            // A kept key carries the schema's output for the repaired query —
+            // or, when that query fails too, its value as decoded.
             for (const [key, value] of Object.entries(validParams)) {
-              expect(state?.search[key]).toBe(value);
+              expect(state?.search[key]).toBe(
+                outcome === "passes" ? String(value).toUpperCase() : value,
+              );
             }
 
             router.stop();
@@ -243,11 +304,12 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
             minKeys: EXTRA_KEYS.length,
             maxKeys: EXTRA_KEYS.length,
           }),
-          async (validParams, invalidKeys, defaults) => {
+          arbRepairOutcome,
+          async (validParams, invalidKeys, defaults, outcome) => {
             const allParams: SearchParams = { ...validParams };
 
             for (const key of invalidKeys) {
-              allParams[key] = "bad-value";
+              allParams[key] = INVALID;
             }
 
             const issues: StandardSchemaV1Issue[] = invalidKeys.map((key) => ({
@@ -267,7 +329,10 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
                   // is refused at registration. This is also the only slot the
                   // plugin's recovery reads now, for the same reason.
                   defaultSearch: defaults,
-                  searchSchema: createFailSchema(issues),
+                  searchSchema:
+                    outcome === "passes"
+                      ? createRejectingUppercaseSchema()
+                      : createFailSchema(issues),
                 },
               ],
               { defaultRoute: "home" },
@@ -278,13 +343,25 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
             await router.navigate("test", {}, allParams);
 
             const state = router.getState();
+            const asOutput = (value: unknown): unknown =>
+              outcome === "passes" ? String(value).toUpperCase() : value;
 
+            // The repaired query carries the rejected key's default, so the
+            // schema's output for it is what lands.
             for (const key of invalidKeys) {
-              expect(state?.search[key]).toBe(defaults[key]);
+              expect(state?.search[key]).toBe(asOutput(defaults[key]));
             }
 
             for (const [key, value] of Object.entries(validParams)) {
-              expect(state?.search[key]).toBe(value);
+              expect(state?.search[key]).toBe(asOutput(value));
+            }
+
+            // A default for a key that was not rejected is not part of the
+            // repaired query: it merges as configured, as on a valid URL.
+            for (const key of EXTRA_KEYS) {
+              if (!invalidKeys.includes(key)) {
+                expect(state?.search[key]).toBe(defaults[key]);
+              }
             }
 
             router.stop();
@@ -305,11 +382,17 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
         fc.asyncProperty(
           arbValidatedParams,
           arbExtraParams,
-          async (schemaOutput, extraParams) => {
+          fc.boolean(),
+          async (schemaOutput, extraParams, repaired) => {
             const navigateParams: SearchParams = {
               ...schemaOutput,
               ...extraParams,
             };
+
+            // A repaired query is held to `strict` as a valid one is (#2824).
+            if (repaired) {
+              navigateParams[Object.keys(extraParams)[0]] = INVALID;
+            }
 
             const router = createRouter(
               [
@@ -317,7 +400,7 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
                 {
                   name: "test",
                   path: ROUTE_PATH,
-                  searchSchema: createPassSchema(schemaOutput),
+                  searchSchema: createRejectingPassSchema(schemaOutput),
                 },
               ],
               { defaultRoute: "home" },

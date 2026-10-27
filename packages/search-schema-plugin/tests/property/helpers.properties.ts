@@ -1,7 +1,7 @@
 import * as fc from "fast-check";
 import { describe, it, expect } from "vitest";
 
-import { getInvalidKeys, omitKeys } from "../../src/helpers";
+import { getInvalidKeys, omitKeys, pickKeys } from "../../src/helpers";
 
 import type { StandardSchemaV1Issue } from "../../src/types";
 import type { Params } from "@real-router/core";
@@ -73,6 +73,20 @@ const arbIssues = fc.array(arbIssue, { minLength: 0, maxLength: 10 });
 const arbKeySet = fc
   .array(arbKey, { minLength: 0, maxLength: 5 })
   .map((keys) => new Set(keys));
+
+/**
+ * Params and a key set drawn partly from their own keys. Two independent draws
+ * almost never share a key, which leaves a key-set property nothing to select
+ * or exclude.
+ */
+const arbParamsWithKeys = arbParams.chain((params) =>
+  fc.tuple(
+    fc.constant(params),
+    fc
+      .tuple(fc.subarray(Object.keys(params)), arbKeySet)
+      .map(([own, other]) => new Set([...own, ...other])),
+  ),
+);
 
 // =============================================================================
 // getInvalidKeys
@@ -177,7 +191,7 @@ describe("getInvalidKeys", () => {
 describe("omitKeys", () => {
   it("Exclusion guarantee", () => {
     fc.assert(
-      fc.property(arbParams, arbKeySet, (params, keys) => {
+      fc.property(arbParamsWithKeys, ([params, keys]) => {
         const result = omitKeys(params, keys);
 
         for (const key of keys) {
@@ -189,7 +203,7 @@ describe("omitKeys", () => {
 
   it("Retention guarantee", () => {
     fc.assert(
-      fc.property(arbParams, arbKeySet, (params, keys) => {
+      fc.property(arbParamsWithKeys, ([params, keys]) => {
         const result = omitKeys(params, keys);
 
         for (const key of Object.keys(params)) {
@@ -203,7 +217,7 @@ describe("omitKeys", () => {
 
   it("No mutation", () => {
     fc.assert(
-      fc.property(arbParams, arbKeySet, (params, keys) => {
+      fc.property(arbParamsWithKeys, ([params, keys]) => {
         const before = Object.entries(params);
 
         omitKeys(params, keys);
@@ -227,6 +241,47 @@ describe("omitKeys", () => {
 
         for (const key of ownKeys) {
           expect(result[key]).toBe(params[key]);
+        }
+      }),
+    );
+  });
+});
+
+// =============================================================================
+// pickKeys
+// =============================================================================
+
+describe("pickKeys", () => {
+  const cmp = (a: string, b: string): number => a.localeCompare(b);
+
+  it("Selection guarantee", () => {
+    fc.assert(
+      fc.property(arbParamsWithKeys, ([params, keys]) => {
+        const result = pickKeys(params, keys);
+        const selected = Object.keys(params).filter((key) => keys.has(key));
+
+        expect(Object.keys(result).toSorted(cmp)).toStrictEqual(
+          selected.toSorted(cmp),
+        );
+
+        for (const key of selected) {
+          expect(result[key]).toBe(params[key]);
+        }
+      }),
+    );
+  });
+
+  it("Complement of omitKeys", () => {
+    fc.assert(
+      fc.property(arbParamsWithKeys, ([params, keys]) => {
+        const joined = { ...omitKeys(params, keys), ...pickKeys(params, keys) };
+
+        expect(Object.keys(joined).toSorted(cmp)).toStrictEqual(
+          Object.keys(params).toSorted(cmp),
+        );
+
+        for (const key of Object.keys(params)) {
+          expect(joined[key]).toBe(params[key]);
         }
       }),
     );
