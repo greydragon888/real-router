@@ -52,7 +52,7 @@ export interface SearchSchemaPluginOptions {
    * - "development" (default): strip invalid + console.error
    * - "production": silent strip
    *
-   * For recovery of invalid params use defaultParams (strip + merge + diagnostics).
+   * For recovery of invalid params use defaultSearch (strip + restore + diagnostics).
    * For filling absent params use .default() in schema (no diagnostics).
    * .catch() is not recommended — suppresses errors, mode: "development" won't see the issue.
    */
@@ -61,7 +61,8 @@ export interface SearchSchemaPluginOptions {
   /**
    * Strip search params not described in schema.
    * - false (default): unknown params pass through
-   * - true: unknown params are removed
+   * - true: unknown params are removed from every query the schema accepts,
+   *   a repaired one included
    *
    * Per-route override: .strict() / .passthrough() in Zod schema.
    */

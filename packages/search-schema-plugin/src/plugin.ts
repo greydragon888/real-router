@@ -1,12 +1,18 @@
 import { putField } from "@real-router/core/utils";
 
 import { ERROR_PREFIX } from "./constants";
-import { collectPathParams, getInvalidKeys, omitKeys } from "./helpers";
+import {
+  collectPathParams,
+  getInvalidKeys,
+  omitKeys,
+  pickKeys,
+} from "./helpers";
 
 import type {
   SearchSchemaPluginOptions,
   StandardSchemaV1,
   StandardSchemaV1Issue,
+  StandardSchemaV1Result,
 } from "./types";
 import type {
   Params,
@@ -76,10 +82,9 @@ export class SearchSchemaPlugin {
         this.#validateState(next(routeName, routeParams, routeSearch)),
     );
 
-    // Dev-time defaultParams validation for runtime tree mutations. Replaces the
-    // old `add` interceptor: TREE_CHANGED additionally covers `update` (changed
-    // defaultParams) and `replace` (new route set) — the gap the interceptor
-    // could not reach. Production mode skips the subscription entirely.
+    // Dev-time defaultSearch validation for runtime tree mutations: TREE_CHANGED
+    // covers `add`, `update` (a changed `defaultSearch`) and `replace` (a new
+    // route set). Production mode skips the subscription entirely.
     this.#removeChangesSubscription =
       this.#mode === "development"
         ? this.#routesApi.subscribeChanges((event) => {
@@ -144,21 +149,13 @@ export class SearchSchemaPlugin {
       ...result.search,
     } as Params;
 
-    const validation = schema["~standard"].validate(channel);
-
-    if (validation instanceof Promise) {
-      throw new TypeError(
-        `${ERROR_PREFIX} Async schema validation is not supported. Route "${result.name}" returned a Promise from ~standard.validate().`,
-      );
-    }
+    const validation = this.#runSchema(schema, result.name, channel);
 
     if ("value" in validation) {
       return this.#writeBack(
         result,
         pathParams,
-        this.#strict
-          ? (validation.value as Params)
-          : { ...channel, ...(validation.value as Params) },
+        this.#schemaOutput(channel, validation.value),
       );
     }
 
@@ -177,9 +174,29 @@ export class SearchSchemaPlugin {
       );
     }
 
-    const invalidKeys = getInvalidKeys(validation.issues);
+    return this.#writeBack(
+      result,
+      pathParams,
+      this.#repair(schema, result.name, channel, validation.issues),
+    );
+  }
+
+  /**
+   * Recovery after issues: a rejected key takes its `defaultSearch` value, or is
+   * dropped, and the schema runs once more on that repaired query — so the keys
+   * come back as the schema outputs them for it (#2824). A repaired query the
+   * schema still rejects is written back as decoded: a failed run has no output
+   * to write.
+   */
+  #repair(
+    schema: StandardSchemaV1,
+    routeName: string,
+    channel: Params,
+    issues: readonly StandardSchemaV1Issue[],
+  ): Params {
+    const invalidKeys = getInvalidKeys(issues);
     const stripped = omitKeys(channel, invalidKeys);
-    const route = this.#routesApi.get(result.name);
+    const route = this.#routesApi.get(routeName);
     // Recovery fills from the route's query-channel defaults, and `defaultSearch`
     // is the ONLY place those live. Mining `defaultParams` minus the path slots
     // is NOT a second source: core separates no channels — a `defaultParams`
@@ -188,9 +205,42 @@ export class SearchSchemaPlugin {
     // into the query channel would be this plugin re-creating a repair core
     // does not perform.
     const defaults = (route?.defaultSearch ?? {}) as Params;
-    const restored = { ...defaults, ...stripped };
+    const repaired = { ...pickKeys(defaults, invalidKeys), ...stripped };
+    const revalidation = this.#runSchema(schema, routeName, repaired);
 
-    return this.#writeBack(result, pathParams, restored);
+    return {
+      ...defaults,
+      ...("value" in revalidation
+        ? this.#schemaOutput(repaired, revalidation.value)
+        : stripped),
+    };
+  }
+
+  /**
+   * The schema's output for `input`: under `strict` exactly that, otherwise
+   * merged over `input`, so a key the schema does not declare passes through.
+   */
+  #schemaOutput(input: Params, value: unknown): Params {
+    return this.#strict
+      ? (value as Params)
+      : { ...input, ...(value as Params) };
+  }
+
+  /** `forwardState` is synchronous, so a schema that answers with a Promise is refused. */
+  #runSchema(
+    schema: StandardSchemaV1,
+    routeName: string,
+    input: Params,
+  ): StandardSchemaV1Result {
+    const validation = schema["~standard"].validate(input);
+
+    if (validation instanceof Promise) {
+      throw new TypeError(
+        `${ERROR_PREFIX} Async schema validation is not supported. Route "${routeName}" returned a Promise from ~standard.validate().`,
+      );
+    }
+
+    return validation;
   }
 
   /**
