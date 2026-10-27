@@ -1,5 +1,12 @@
 # router-benchmarks
 
+## 0.3.182
+
+### Patch Changes
+
+- Updated dependencies [[`47a0d9d`](https://github.com/greydragon888/real-router/commit/47a0d9d47cb772d97295193e4ebe5ca1653ea9ba)]:
+  - @real-router/search-schema-plugin@0.8.0
+
 ## 0.3.181
 
 ### Patch Changes
