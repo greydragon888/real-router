@@ -33,7 +33,6 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -110,7 +109,11 @@ export function packAll(packages, outDir, run = execFileSync) {
   const names = [];
 
   for (const pkg of packages) {
-    const staging = mkdtempSync(path.join(tmpdir(), "checkout-tarball-"));
+    // Next to `outDir`, not in tmpdir(): `rename` cannot cross filesystems,
+    // and `/tmp` is a filesystem of its own on the ubuntu-26.04 runners.
+    const staging = mkdtempSync(
+      path.join(path.dirname(outDir), "checkout-tarball-"),
+    );
 
     try {
       run("pnpm", ["pack", "--pack-destination", staging], {
