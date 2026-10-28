@@ -4,9 +4,9 @@
 
 ## Overview
 
-`@real-router/search-schema-plugin` validates route search parameters against a [Standard Schema V1](https://github.com/standard-schema/standard-schema)-compatible schema attached to each route definition. On every navigation — whether initiated by `router.navigate()` or by the browser parsing a URL — the plugin intercepts the resolved state, validates its params against the route's `searchSchema`, and either passes them through (valid), repairs them (invalid: strips the rejected keys, restores their `defaultSearch` values and validates the repaired query once more), or delegates entirely to a custom `onError` handler. The plugin works with any schema library that implements Standard Schema V1 (Zod 3.24+, Valibot 1.0+, ArkType) without importing any of them.
+`@real-router/search-schema-plugin` validates route search parameters against a [Standard Schema V1](https://github.com/standard-schema/standard-schema)-compatible schema attached to each route definition. On every navigation — whether initiated by `router.navigate()` or by the browser parsing a URL — the plugin intercepts the resolved state, validates its params against the route's `searchSchema` — trying each rejected number or boolean once more as its text — and either passes them through (valid), repairs them (invalid: strips the rejected keys, restores their `defaultSearch` values and validates the repaired query once more), or delegates entirely to a custom `onError` handler. The plugin works with any schema library that implements Standard Schema V1 (Zod 3.24+, Valibot 1.0+, ArkType) without importing any of them.
 
-**Core role:** A stateless validation layer that sits after core's `forwardState` pipeline. Reads `searchSchema` from route configuration, validates deserialized params, and returns a safe state. Contains no URL parsing or browser logic — only schema dispatch, key stripping, and default merging.
+**Core role:** A stateless validation layer that sits after core's `forwardState` pipeline. Reads `searchSchema` from route configuration, validates deserialized params, and returns a safe state. Contains no URL parsing or browser logic — only schema dispatch, the text retry, key stripping, default merging and the development report.
 
 **Integration points with the core:**
 
@@ -25,7 +25,8 @@ search-schema-plugin/
 │   ├── index.ts        — Public API (exports factory + types + Route module augmentation)
 │   ├── factory.ts      — searchSchemaPlugin (options validation, freeze, returns PluginFactory)
 │   ├── plugin.ts       — SearchSchemaPlugin class (forwardState interceptor + TREE_CHANGED subscription, tree walk)
-│   ├── helpers.ts      — Pure param utilities (getInvalidKeys, omitKeys, pickKeys, collectPathParams)
+│   ├── helpers.ts      — Pure param utilities (getInvalidKeys, issueKey, namesOneOf, segmentKey, isNumberOrBoolean, readAsText, omitKeys, pickKeys, collectPathParams)
+│   ├── report.ts       — describeRejection (the mode "development" console.error message)
 │   ├── types.ts        — StandardSchemaV1 types (inline), SearchSchemaPluginOptions
 │   ├── constants.ts    — ERROR_PREFIX
 │   └── validation.ts   — validateOptions (factory-time type checks)
@@ -39,21 +40,26 @@ index.ts
             ├── plugin.ts
             │       ├── helpers.ts
             │       │       └── (types.ts — types only)
+            │       ├── report.ts
+            │       │       ├── helpers.ts
+            │       │       ├── (types.ts — types only)
+            │       │       └── constants.ts
             │       ├── (types.ts — types only)
             │       └── constants.ts
             └── validation.ts
                     └── constants.ts
 
-types.ts     ← imported by factory.ts, plugin.ts, helpers.ts, validation.ts
-constants.ts ← imported by plugin.ts, validation.ts
+types.ts     ← imported by index.ts, factory.ts, plugin.ts, helpers.ts, report.ts, validation.ts
+constants.ts ← imported by plugin.ts, report.ts, validation.ts
 ```
 
 External dependencies:
 
 | Dependency              | What it provides                                         | Used in                                 |
 | ----------------------- | -------------------------------------------------------- | --------------------------------------- |
-| `@real-router/core`     | `Params`, `Plugin`, `Route`, `PluginFactory` types       | `factory.ts`, `plugin.ts`, `helpers.ts` |
+| `@real-router/core`     | `Params`, `Plugin`, `Route`, `PluginFactory` types       | `factory.ts`, `plugin.ts`, `helpers.ts`, `report.ts`, `types.ts` |
 | `@real-router/core/api` | `getPluginApi`, `getRoutesApi`, `PluginApi`, `RoutesApi` | `factory.ts`, `plugin.ts`               |
+| `@real-router/core/utils` | `putField`                                             | `plugin.ts`, `helpers.ts`               |
 
 No schema library dependency — Standard Schema V1 types are inlined in `types.ts`.
 
@@ -179,29 +185,54 @@ navigate(name, params, search) / matchPath(url)
               │       slots are excluded — the schema never sees or rewrites them.
               │       A twin goes to `search`, mirroring core's precedence
               │
-              ├── schema["~standard"].validate(channel)
+              ├── verdict = #validate(schema, routeName, channel)
+              │     └── { input, value } or { input, issues, text } — see below
               │
-              ├── validation returns Promise?
-              │     YES: throw TypeError  ← async schemas not supported
-              │
-              ├── "value" in validation (success path)
+              ├── "value" in verdict (success path)
               │     │
-              │     ├── strict: false → writeBack({ ...channel, ...validation.value })
+              │     ├── strict: false → writeBack({ ...verdict.input, ...verdict.value })
               │     │                   (unknown keys preserved from original)
               │     │
-              │     └── strict: true  → writeBack(validation.value)
+              │     └── strict: true  → writeBack(verdict.value)
               │                         (only schema output, unknowns removed)
               │
-              └── "issues" in validation (error path)
+              └── "issues" in verdict (error path)
                     │
                     ├── onError set?
-                    │     YES: return writeBack(onError(result.name, channel, issues))
+                    │     YES: return writeBack(onError(result.name, verdict.input, verdict.issues))
                     │          (no logging, no strip — full callback control)
                     │
                     ├── mode === "development"?
-                    │     YES: console.error(routeName, issues)
+                    │     YES: console.error(describeRejection(routeName, input, issues, text), issues)
                     │
-                    └── return writeBack(#repair(schema, routeName, channel, issues))
+                    └── return writeBack(#repair(schema, routeName, verdict.input, verdict.issues))
+
+  #validate(schema, routeName, channel)
+        ├── first = schema["~standard"].validate(channel)   ← a Promise throws TypeError
+        │     └── "value" in first? YES: { input: channel, value }
+        │
+        ├── rounds, while input = readAsText(channel, input, issues, done) names a value:
+        │     ├── input: a copy where each number or boolean the latest
+        │     │   issues name — a key's value, or an array element by its
+        │     │   index — is String(value), where `channel` holds a number
+        │     │   or a boolean too; a value in `done` is not named twice, so
+        │     │   the rounds end
+        │     └── run = schema["~standard"].validate(input)   ← a text run; a Promise throws
+        │           └── "value" in run? YES: { input, value }
+        │         (a schema that reports every issue at once takes one round;
+        │          a staged one names the next value once the one before is text,
+        │          and one that stops at its first issue takes a round per value)
+        │
+        ├── unfixed = the keys tried as text that the last run still rejects
+        ├── text    = the last input, and the last run's issues about the unfixed keys (for the report)
+        │
+        └── the settled query — each key the text fixed as text, every other key
+            as decoded — with the schema's issues on it:
+              ├── no key unfixed:          { input: the last input, issues: the last run's }
+              ├── every key tried unfixed: { input: channel,        issues: first's }
+              └── otherwise: run = schema["~standard"].validate(settled)   ← a Promise throws
+                    ├── "value" in run? YES: { input: settled, value }
+                    └── { input: settled, issues: the run's }
 
   #repair(schema, routeName, channel, issues)
         ├── invalidKeys = getInvalidKeys(issues)
@@ -214,21 +245,22 @@ navigate(name, params, search) / matchPath(url)
         ├── repaired = { ...pickKeys(defaults, invalidKeys), ...stripped }
         │     ← each rejected key takes its default, or is dropped
         │
-        ├── schema["~standard"].validate(repaired)   ← the second run; a Promise throws
+        ├── schema["~standard"].validate(repaired)   ← the repair's run; a Promise throws
         │
         ├── "value" in the result?
         │     YES: { ...defaults, ...output }   ← output merged over `repaired`,
         │                                          or alone under strict
         │
         └── NO:  { ...defaults, ...stripped }   ← no output to write: the
-                                                   repaired query as decoded
+                                                   repaired query as built
 
   #writeBack(result, pathParams, validated)
         ├── params := path slots verbatim + the validated value for every key that
         │             rode in the params bag (a key the schema dropped is removed)
         └── search := every validated key that did NOT go back to params, plus the
                       keys that came from `search` (a schema-invented key is a query
-                      value by definition, so it lands here)
+                      value by definition, so it lands here) — none came from it
+                      when a single-bag buildPath(name, params) hands no `search`
 ```
 
 ### Happy path (valid params)
@@ -260,8 +292,15 @@ navigate("products", {}, { page: -1, sortBy: "name" })   — or URL: /products?p
   schema.validate({ page: -1, sortBy: "name" })
   → { issues: [{ message: "...", path: ["page"] }] }
         │
+        ▼  page is a number: the text run
+  schema.validate({ page: "-1", sortBy: "name" })
+  → { issues: [{ message: "...", path: ["page"] }] }   ← the text is rejected too
+        │
         ▼  mode: "development"
-  console.error('...[search-schema-plugin] Route "products": invalid search params', issues)
+  console.error('[search-schema-plugin] Route "products": the schema rejected these search params; …', issues)
+        │     (a line per issue with its value as decoded, then what the last
+        │      text run said about page as text, then how the router decodes —
+        │      page goes back as decoded, so the issues are the first run's)
         │
         ▼
   invalidKeys = { "page" }
@@ -392,7 +431,7 @@ routesApi.add / update / replace / remove / clear
 
 ### Runtime schema validation (forwardState interceptor)
 
-On every navigation, `#validateState` calls `schema["~standard"].validate(channel)`, and after issues `#repair` calls it once more on the repaired query. The Standard Schema V1 contract guarantees:
+On every navigation, `#validate` calls `schema["~standard"].validate(channel)`, once more on each text copy while the latest run rejects a number or a boolean not tried before, once more on the query the runs settle on when the text fixed some of the keys it tried and not the others, and after the issues left `#repair` calls it on the repaired query. The Standard Schema V1 contract guarantees:
 
 - **Success:** returns `{ value: Output }` — typed, coerced, transformed output
 - **Failure:** returns `{ issues: readonly StandardSchemaV1Issue[] }` — array of validation problems
@@ -402,7 +441,7 @@ Issues with a `path` array contribute to key-level stripping via `getInvalidKeys
 
 ## Error Recovery Strategy
 
-Recovery applies only when `onError` is not set. The sequence is:
+Recovery applies only when `onError` is not set, to the query the text runs settle on and the schema's issues on it: a key whose text passed is text there, every other key as decoded. The sequence is:
 
 ```
 1. getInvalidKeys(issues)
@@ -420,11 +459,11 @@ Recovery applies only when `onError` is not set. The sequence is:
 
 4. schema["~standard"].validate(repaired)
       ├── value  → { ...defaults, ...output }   (output over `repaired`; alone under strict)
-      └── issues → { ...defaults, ...stripped } (no output to write: as decoded)
+      └── issues → { ...defaults, ...stripped } (no output to write: as built)
           → written back to the channel each key came from
 ```
 
-So a repaired query the schema accepts comes back as the schema outputs it, and one it still rejects as decoded. The second run happens only after issues.
+So a repaired query the schema accepts comes back as the schema outputs it, and one it still rejects as built — a key the text fixed as its text. The repair's run happens only when issues are left.
 
 **Mode behavior:**
 
@@ -434,9 +473,11 @@ So a repaired query the schema accepts comes back as the schema outputs it, and 
 | `mode: "production"`            | No                    | Yes                                     |
 | `onError` set (any mode)        | No — callback owns it | No — callback owns it                   |
 
+The text runs come first in every row, so a query the text fixes reaches neither `console.error`, the repair nor `onError`.
+
 **`onError` contract:**
 
-- Receives: `(routeName: string, params: Params, issues: readonly StandardSchemaV1Issue[])`
+- Receives: `(routeName: string, params: Params, issues: readonly StandardSchemaV1Issue[])` — called after the text runs, only when issues are left: `params` holds each key the text fixed as text and every other key as decoded, and `issues` are the schema's own on those `params`
 - Must return: `Params` — used as-is, no re-validation (avoids infinite loops)
 - Exceptions from `onError` propagate up without suppression — consistent with interceptor behavior in core
 
@@ -450,6 +491,9 @@ So a repaired query the schema accepts comes back as the schema outputs it, and 
 | `getInvalidKeys` with `Set`                        | `helpers.ts` | O(n issues) build, O(1) membership checks in `omitKeys`                      |
 | `omitKeys` single pass                             | `helpers.ts` | One `Object.keys` iteration — no intermediate structures                     |
 | Second validation only after issues                | `plugin.ts`  | A query the schema accepts runs it once                                      |
+| Text run only for a rejected number or boolean     | `helpers.ts` | `readAsText` reads the values the issues name, not the whole query, and copies the query only when one of them is a number or a boolean not tried before; otherwise no run — `decoded-text-retry-2725.test.ts` records what each run is handed |
+| The settled query runs unless it is the first or the last | `plugin.ts`  | Its issues are the first run's when every key tried goes back as decoded and the last run's when none does; it gets a run of its own only when the text fixed some keys and not the others, and with a staged schema that run can repeat a round's — `decoded-text-retry-2725.test.ts` records what each run is handed |
+| Development report linear in the issues            | `report.ts`  | The text issues are grouped by key once, and a tried element is checked against a `Set` of the places they name; each issue is read a fixed number of times — `decoded-text-retry-2725.test.ts` counts the reads |
 | Dev-time defaultSearch check skipped in production | `plugin.ts`  | Tree walk gated on `mode !== "development"`; the TREE_CHANGED subscription is not registered at all in production |
 
 ## Related Documents

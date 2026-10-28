@@ -93,5 +93,14 @@ test.describe("Search schema plugin", () => {
       await expect(page).toHaveURL(/q=laptop/);
       await expect(page.locator("code")).toContainText("q=laptop");
     });
+
+    test("a digit-only query keeps q after a reload", async ({ page }) => {
+      await page.goto("/products?page=1&sort=name");
+      await page.fill("#search-input", "17");
+      await expect(page).toHaveURL(/q=17/);
+      await page.reload();
+      await expect(page).toHaveURL(/q=17/);
+      await expect(page.locator("code")).toContainText("q=17");
+    });
   });
 });
