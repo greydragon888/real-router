@@ -110,7 +110,7 @@ export default [
   esm("persistent-params-plugin", "1.6 kB", ignoreCore),
   esm("lifecycle-plugin", "650 B", ignoreCore),
   esm("preload-plugin", "1.3 kB", ignoreCore),
-  esm("search-schema-plugin", "1.5 kB", ignoreCore),
+  esm("search-schema-plugin", "3 kB", ignoreCore),
   esm("validation-plugin", "8.7 kB", ignoreCore),
   esm("ssr-data-plugin", "2.7 kB", [...ignoreCore, ...ignoreShared]),
   esm("rsc-server-plugin", "2.7 kB", [...ignoreCore, ...ignoreShared]),

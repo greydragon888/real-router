@@ -4,10 +4,15 @@ import { ERROR_PREFIX } from "./constants";
 import {
   collectPathParams,
   getInvalidKeys,
+  namesOneOf,
   omitKeys,
   pickKeys,
+  readAsText,
 } from "./helpers";
+import { describeRejection } from "./report";
 
+import type { TextPlaces } from "./helpers";
+import type { TextRun } from "./report";
 import type {
   SearchSchemaPluginOptions,
   StandardSchemaV1,
@@ -39,6 +44,20 @@ import type { PluginApi, RoutesApi } from "@real-router/core/api";
  */
 const objectEntries = Object.entries;
 const hasOwn = Object.hasOwn;
+
+/**
+ * The schema's verdict on a query: its output, or its issues on the query the
+ * text runs settled on — each key the text fixed as text, every other as
+ * decoded — with the last text run's query and its issues about each key the
+ * text did not fix.
+ */
+type Verdict =
+  | { readonly input: Params; readonly value: unknown }
+  | {
+      readonly input: Params;
+      readonly issues: readonly StandardSchemaV1Issue[];
+      readonly text: TextRun;
+    };
 
 export class SearchSchemaPlugin {
   readonly #pluginApi: PluginApi;
@@ -149,13 +168,13 @@ export class SearchSchemaPlugin {
       ...result.search,
     } as Params;
 
-    const validation = this.#runSchema(schema, result.name, channel);
+    const verdict = this.#validate(schema, result.name, channel);
 
-    if ("value" in validation) {
+    if ("value" in verdict) {
       return this.#writeBack(
         result,
         pathParams,
-        this.#schemaOutput(channel, validation.value),
+        this.#schemaOutput(verdict.input, verdict.value),
       );
     }
 
@@ -163,30 +182,110 @@ export class SearchSchemaPlugin {
       return this.#writeBack(
         result,
         pathParams,
-        this.#onError(result.name, channel, validation.issues),
+        this.#onError(result.name, verdict.input, verdict.issues),
       );
     }
 
     if (this.#mode === "development") {
       console.error(
-        `${ERROR_PREFIX} Route "${result.name}": invalid search params`,
-        validation.issues,
+        describeRejection(
+          result.name,
+          verdict.input,
+          verdict.issues,
+          verdict.text,
+        ),
+        verdict.issues,
       );
     }
 
     return this.#writeBack(
       result,
       pathParams,
-      this.#repair(schema, result.name, channel, validation.issues),
+      this.#repair(schema, result.name, verdict.input, verdict.issues),
     );
+  }
+
+  /**
+   * Runs the schema, and again while it rejects a number or a boolean: on a
+   * copy where each one it rejected is its text, `String(value)`. Under
+   * `numberFormat` / `booleanFormat: "auto"` the router decodes `?q=17` to 17,
+   * and the text is what the URL holds (#2725). A schema that judges in stages
+   * — a discriminated union, a refinement that runs once the object parses —
+   * names a number only once the value before it is text, so each round tries
+   * what the latest run rejected. A key whose text passes keeps it, and a key
+   * the last text run still rejects goes back as decoded. The issues are the
+   * schema's on that query, not on the text: a check a type issue stops, as a
+   * zod refinement is, can reject the decoded query and never run on its text.
+   */
+  #validate(
+    schema: StandardSchemaV1,
+    routeName: string,
+    channel: Params,
+  ): Verdict {
+    const first = this.#runSchema(schema, routeName, channel);
+
+    if ("value" in first) {
+      return { input: channel, value: first.value };
+    }
+
+    let input = channel;
+    let { issues } = first;
+    const done: TextPlaces = new Map();
+
+    // Each round tries only values the decoded query holds, and none an earlier
+    // round tried, so the rounds end.
+    for (
+      let text = readAsText(channel, input, issues, done);
+      text !== undefined;
+      text = readAsText(channel, input, issues, done)
+    ) {
+      input = text;
+
+      const run = this.#runSchema(schema, routeName, input);
+
+      if ("value" in run) {
+        return { input, value: run.value };
+      }
+
+      issues = run.issues;
+    }
+
+    const rejected = getInvalidKeys(issues);
+    const unfixed = new Set(
+      [...done.keys()].filter((key) => rejected.has(key)),
+    );
+    const text: TextRun = {
+      input,
+      issues: issues.filter((issue) => namesOneOf(issue, unfixed)),
+    };
+
+    // The query settled on is the last run's when no key goes back as decoded,
+    // and the first run's when every key tried does; otherwise it gets a run.
+    if (unfixed.size === 0) {
+      return { input, issues, text };
+    }
+
+    if (unfixed.size === done.size) {
+      return { input: channel, issues: first.issues, text };
+    }
+
+    // A key never tried holds in `input` what it holds in `channel`, unless the
+    // schema writes into its input: `readAsText` copies the query and rewrites
+    // only the values it tries.
+    const settled = { ...input, ...pickKeys(channel, unfixed) };
+    const run = this.#runSchema(schema, routeName, settled);
+
+    return "value" in run
+      ? { input: settled, value: run.value }
+      : { input: settled, issues: run.issues, text };
   }
 
   /**
    * Recovery after issues: a rejected key takes its `defaultSearch` value, or is
    * dropped, and the schema runs once more on that repaired query — so the keys
    * come back as the schema outputs them for it (#2824). A repaired query the
-   * schema still rejects is written back as decoded: a failed run has no output
-   * to write.
+   * schema still rejects is written back as the repair built it: a failed run
+   * has no output to write.
    */
   #repair(
     schema: StandardSchemaV1,
@@ -270,11 +369,13 @@ export class SearchSchemaPlugin {
     }
 
     const search: Params = {};
+    // A single-bag `buildPath(name, params)` hands the seam no `search`.
+    const fromSearch = (result.search as SearchParams | undefined) ?? {};
 
     for (const [key, value] of objectEntries(validated)) {
       const wentToParams = hasOwn(result.params, key) && !pathParams.has(key);
 
-      if (!wentToParams || hasOwn(result.search, key)) {
+      if (!wentToParams || hasOwn(fromSearch, key)) {
         // The schema's OUTPUT (#1852) — under a setter the schema ran, reported
         // success, and its result reached neither `state.search` nor the URL.
         putField(search, key, value);

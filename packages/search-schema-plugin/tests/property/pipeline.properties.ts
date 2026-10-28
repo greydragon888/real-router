@@ -4,7 +4,11 @@ import { describe, it, expect, vi } from "vitest";
 
 import { searchSchemaPlugin } from "../../src/index";
 
-import type { StandardSchemaV1, StandardSchemaV1Issue } from "../../src/types";
+import type {
+  StandardSchemaV1,
+  StandardSchemaV1Issue,
+  StandardSchemaV1Result,
+} from "../../src/types";
 import type { Params, SearchParams } from "@real-router/core";
 
 // =============================================================================
@@ -143,10 +147,14 @@ const ROUTE_PATH = `/test?${ALL_KEYS.join("&")}`;
 const arbParamValue = fc.string({ minLength: 1, maxLength: 10 });
 
 /**
- * The value a rejected key carries. Every arbitrary here produces strings, so no
- * generated value — a kept one or a default — can be mistaken for it.
+ * The value a rejected key carries: `null`, what the router decodes a key
+ * without a value to. The plugin never tries it as text, so every schema here
+ * rejects it for good — a number would be tried as its text and kept by a
+ * schema that accepts text (#2725). Every arbitrary in this section produces
+ * strings, so no generated value — a kept one or a default — can be mistaken
+ * for it.
  */
-const INVALID = 0;
+const INVALID = null;
 
 /**
  * Whether the repaired query passes the schema (#2824): the schema rejects only
@@ -637,5 +645,379 @@ describe("Channel isolation (#1564)", () => {
         },
       ),
     );
+  });
+});
+
+// =============================================================================
+// Decoded text (#2725)
+// =============================================================================
+
+const TEXT_KEYS = ["a", "b", "c", "d"] as const;
+
+/**
+ * A query value as the URL spells it. Under the default formats the router
+ * decodes a canonical number or `true` / `false`; the rest stays text.
+ */
+const arbUrlText = fc.oneof(
+  fc.integer({ min: -999, max: 999 }).map(String),
+  fc
+    .double({ min: -99, max: 99, noNaN: true, noDefaultInfinity: true })
+    .map(String),
+  fc.constantFrom("true", "false"),
+  fc.constantFrom("007", "1e3", "-0", "2.0"),
+  fc.stringMatching(/^[a-z][\da-z]{0,5}$/),
+);
+
+/** One key of the query: a value, a key without one, or a `brackets` array. */
+type Spelling =
+  | { readonly kind: "value"; readonly text: string }
+  | { readonly kind: "flag" }
+  | { readonly kind: "array"; readonly texts: readonly string[] };
+
+const arbSpelling: fc.Arbitrary<Spelling> = fc.oneof(
+  arbUrlText.map((text) => ({ kind: "value" as const, text })),
+  fc.constant({ kind: "flag" as const }),
+  fc
+    .array(arbUrlText, { minLength: 1, maxLength: 3 })
+    .map((texts) => ({ kind: "array" as const, texts })),
+);
+
+const arbTextQuery = fc.dictionary(fc.constantFrom(...TEXT_KEYS), arbSpelling, {
+  minKeys: 1,
+  maxKeys: TEXT_KEYS.length,
+});
+
+function toUrl(query: Readonly<Record<string, Spelling>>): string {
+  const parts = Object.entries(query).flatMap(([key, spelling]) => {
+    switch (spelling.kind) {
+      case "value": {
+        return [`${key}=${spelling.text}`];
+      }
+      case "flag": {
+        return [key];
+      }
+      case "array": {
+        return spelling.texts.map((text) => `${key}[]=${text}`);
+      }
+    }
+  });
+
+  return `/text?${parts.join("&")}`;
+}
+
+/** A decoded value the schema was handed: its type, and whether it was a key's value or an array element. */
+interface Decoded {
+  readonly type: "number" | "boolean";
+  readonly where: "value" | "element";
+  readonly key: string;
+}
+
+/** Hands `onDecoded` each number or boolean in `params`. */
+function reportDecoded(
+  params: Params,
+  onDecoded: (decoded: Decoded) => void,
+): void {
+  for (const [key, val] of Object.entries(params)) {
+    const where = Array.isArray(val) ? "element" : "value";
+
+    for (const element of Array.isArray(val) ? val : [val]) {
+      if (typeof element === "number") {
+        onDecoded({ type: "number", where, key });
+      } else if (typeof element === "boolean") {
+        onDecoded({ type: "boolean", where, key });
+      }
+    }
+  }
+}
+
+/**
+ * Accepts text only: a string or an array of strings, each of which `accept`
+ * must pass. Anything else — a number, a boolean, `null` — is an issue.
+ * `onDecoded` hears of each number or boolean it is handed.
+ */
+function createTextSchema(
+  accept: (text: string) => boolean,
+  onDecoded: (decoded: Decoded) => void,
+): StandardSchemaV1 {
+  return {
+    "~standard": {
+      version: 1,
+      vendor: "test",
+      validate: (value: unknown) => {
+        const issues: StandardSchemaV1Issue[] = [];
+
+        reportDecoded(value as Params, onDecoded);
+
+        for (const [key, val] of Object.entries(value as Params)) {
+          if (Array.isArray(val)) {
+            val.forEach((element: unknown, index) => {
+              if (typeof element !== "string" || !accept(element)) {
+                issues.push({ message: "rejected", path: [key, index] });
+              }
+            });
+          } else if (typeof val !== "string" || !accept(val)) {
+            issues.push({ message: "rejected", path: [key] });
+          }
+        }
+
+        return issues.length > 0 ? { issues } : { value };
+      },
+    },
+  };
+}
+
+/**
+ * {@link createTextSchema}, and a rule that judges the query as a whole:
+ * `refine` may name a key, or at `""` the query itself. `handed` gets a copy
+ * of each query the schema is handed.
+ */
+function createRefinedSchema(
+  accept: (text: string) => boolean,
+  refine: (query: string) => string | undefined,
+  handed: Params[],
+): StandardSchemaV1 {
+  const text = createTextSchema(accept, () => undefined)["~standard"];
+
+  return {
+    "~standard": {
+      version: 1,
+      vendor: "test",
+      validate: (value: unknown) => {
+        handed.push(structuredClone(value as Params));
+
+        const result = text.validate(value) as StandardSchemaV1Result;
+        const issues = "issues" in result ? [...result.issues] : [];
+        const named = refine(JSON.stringify(value));
+
+        if (named !== undefined) {
+          issues.push(
+            named === ""
+              ? { message: "refined" }
+              : { message: "refined", path: [named] },
+          );
+        }
+
+        return issues.length > 0 ? { issues } : { value };
+      },
+    },
+  };
+}
+
+/**
+ * Whether `after` holds something other than a string where `before` holds
+ * one — a key's own value or an element: a value back as decoded.
+ */
+function holdsDecodedAgain(before: Params, after: Params): boolean {
+  return Object.entries(after).some(([key, val]) => {
+    const was: unknown[] = [before[key]].flat();
+
+    return [val]
+      .flat()
+      .some(
+        (element: unknown, index) =>
+          typeof was[index] === "string" && typeof element !== "string",
+      );
+  });
+}
+
+/**
+ * Which of the queries the schema was handed `params` is: the only one; the
+ * decoded one, after text runs; the last text run's; a run of its own, with
+ * a value back as decoded; or none of them.
+ */
+type Handed = "only" | "decoded" | "text" | "settled" | "none";
+
+function whichHanded(params: Params, handed: readonly Params[]): Handed {
+  if (fc.stringify(params) === fc.stringify(handed[0])) {
+    return handed.length === 1 ? "only" : "decoded";
+  }
+
+  if (fc.stringify(params) !== fc.stringify(handed[handed.length - 1])) {
+    return "none";
+  }
+
+  return holdsDecodedAgain(handed[handed.length - 2], params)
+    ? "settled"
+    : "text";
+}
+
+async function settleText(
+  schema: StandardSchemaV1,
+  url: string,
+  formats: "default" | "none",
+): Promise<{ search: SearchParams; path: string }> {
+  const router = createRouter(
+    [
+      { name: "home", path: "/" },
+      {
+        name: "text",
+        path: `/text?${TEXT_KEYS.join("&")}`,
+        searchSchema: schema,
+      },
+    ],
+    {
+      defaultRoute: "home",
+      queryParams: {
+        arrayFormat: "brackets",
+        ...(formats === "none" && {
+          numberFormat: "none",
+          booleanFormat: "none",
+        }),
+      },
+    },
+  );
+
+  router.usePlugin(searchSchemaPlugin({ mode: "production" }));
+
+  const { search, path } = await router.start(url);
+
+  router.stop();
+
+  return { search, path };
+}
+
+describe("Decoded text (#2725)", () => {
+  it('the two formats decode apart: a number by default, its text under "none" (control)', async () => {
+    const schema = createSubsetSchema(TEXT_KEYS);
+
+    await expect(
+      settleText(schema, "/text?a=17", "default"),
+    ).resolves.toStrictEqual({ search: { a: 17 }, path: "/text?a=17" });
+    await expect(
+      settleText(schema, "/text?a=17", "none"),
+    ).resolves.toStrictEqual({ search: { a: "17" }, path: "/text?a=17" });
+  });
+
+  it('a schema that accepts only text settles a URL as under numberFormat / booleanFormat "none"', async () => {
+    // Runs where a decoded value was handed to the schema and its key kept:
+    // the case the text decides, as without it the key is stripped. Without
+    // each kind, the two formats agree for want of anything to differ on.
+    const fixed = { number: 0, boolean: 0, value: 0, element: 0 };
+
+    await fc.assert(
+      fc.asyncProperty(
+        arbTextQuery,
+        fc.func(fc.boolean()),
+        async (query, accept) => {
+          const decoded: Decoded[] = [];
+          const schema = createTextSchema(accept, (value) => {
+            decoded.push(value);
+          });
+          const url = toUrl(query);
+          const asText = await settleText(schema, url, "none");
+
+          await expect(
+            settleText(schema, url, "default"),
+          ).resolves.toStrictEqual(asText);
+
+          const kept = decoded.filter(({ key }) =>
+            Object.hasOwn(asText.search, key),
+          );
+
+          for (const kind of ["number", "boolean"] as const) {
+            fixed[kind] += kept.some(({ type }) => type === kind) ? 1 : 0;
+          }
+
+          for (const where of ["value", "element"] as const) {
+            fixed[where] += kept.some((value) => value.where === where) ? 1 : 0;
+          }
+        },
+      ),
+    );
+
+    // Measured over 300 seeds of 100 runs: each at least 5.
+    expect(fixed.number).toBeGreaterThan(0);
+    expect(fixed.boolean).toBeGreaterThan(0);
+    expect(fixed.value).toBeGreaterThan(0);
+    expect(fixed.element).toBeGreaterThan(0);
+  });
+
+  it("onError is handed a query and the schema's own issues on it", async () => {
+    // Which query onError got, and how often, after text runs, its issues
+    // hold one the rule about the whole query raised.
+    const reached: Record<Handed | "refined", number> = {
+      only: 0,
+      decoded: 0,
+      text: 0,
+      settled: 0,
+      none: 0,
+      refined: 0,
+    };
+
+    await fc.assert(
+      fc.asyncProperty(
+        arbTextQuery,
+        fc.func(fc.boolean()),
+        fc.func(
+          fc.oneof(
+            { arbitrary: fc.constant(undefined), weight: 1 },
+            { arbitrary: fc.constantFrom("", ...TEXT_KEYS), weight: 2 },
+          ),
+        ),
+        async (query, accept, refine) => {
+          const handed: Params[] = [];
+          const schema = createRefinedSchema(accept, refine, handed);
+          const calls: {
+            readonly params: Params;
+            readonly issues: readonly StandardSchemaV1Issue[];
+            readonly which: Handed;
+          }[] = [];
+          const router = createRouter(
+            [
+              { name: "home", path: "/" },
+              {
+                name: "text",
+                path: `/text?${TEXT_KEYS.join("&")}`,
+                searchSchema: schema,
+              },
+            ],
+            { defaultRoute: "home", queryParams: { arrayFormat: "brackets" } },
+          );
+
+          router.usePlugin(
+            searchSchemaPlugin({
+              mode: "production",
+              onError: (_route, params, issues) => {
+                calls.push({
+                  params,
+                  issues,
+                  which: whichHanded(params, handed),
+                });
+
+                return {};
+              },
+            }),
+          );
+
+          await router.start(toUrl(query));
+          router.stop();
+
+          for (const { params, issues, which } of calls) {
+            expect(which).not.toBe("none");
+
+            reached[which]++;
+
+            if (
+              which !== "only" &&
+              issues.some(({ message }) => message === "refined")
+            ) {
+              reached.refined++;
+            }
+
+            expect(schema["~standard"].validate(params)).toStrictEqual({
+              issues,
+            });
+          }
+        },
+      ),
+      { numRuns: 300 },
+    );
+
+    // Measured over 40 seeds of 300 runs: each at least 12.
+    expect(reached.only).toBeGreaterThan(0);
+    expect(reached.decoded).toBeGreaterThan(0);
+    expect(reached.text).toBeGreaterThan(0);
+    expect(reached.settled).toBeGreaterThan(0);
+    expect(reached.refined).toBeGreaterThan(0);
   });
 });
