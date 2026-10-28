@@ -27,11 +27,12 @@ overrides:
   # admits the affected releases: @sonar/scan pins an exact 1.20.0, and an
   # unscoped floor would replace that pin too.
   '@codspeed/core>axios': '>=1.18.0'
-  # Floor raised for GHSA-4mjr-xmp4-gh2g + GHSA-x5fp-wj9c-mxmx (both Medium, 6.16.0).
+  # Floor for GHSA-4mjr-xmp4-gh2g + GHSA-x5fp-wj9c-mxmx (both Medium, fixed in
+  # 6.16.0) and GHSA-6pq8-jhm2-2vcw (Medium, fixed in 6.16.1).
   # Parents are @gitbeaker and typed-rest-client — CI tooling, never a published
   # @real-router/* package. typed-rest-client pins an exact 6.15.1, an affected
   # release, so this floor overrides that pin on purpose.
-  qs: '>=6.16.0'
+  qs: '>=6.16.1'
   minimatch@9: ~9.0.7
   minimatch@10: ~10.2.6
   ajv@6: ~6.14.0

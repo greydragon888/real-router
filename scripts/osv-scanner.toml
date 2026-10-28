@@ -80,6 +80,22 @@ reason = "Fixed in shell-quote 1.11.0, outside the exact 1.9.0 concurrently 10.0
 id = "GHSA-qwgh-2vcv-g2f7"  # block-buffer panic in a callback corrupts the inline buffer position
 reason = "Fixed in block-buffer 0.12.1, outside digest 0.10.7's 0.10 line; tauri-codegen 2.7.4, the latest, still requires sha2 ^0.10. Only path: tauri-macros -> tauri-codegen -> sha2 0.10.9 -> digest -> block-buffer 0.10.4, compile time only, in examples/desktop/tauri/* (never published). 0.10.4 keeps the cursor in a separate field that a panicking compress callback cannot reach, and has no ReadBuffer."
 
+# deepmerge has no fixed release: every version from 4.2.0 through 4.3.1, the
+# latest, is affected. It arrives in the three lockfiles through two build
+# plugins, each at its latest release: @rollup/plugin-node-resolve 16.0.3 (a
+# devDependency of @real-router/solid) and @sveltejs/vite-plugin-svelte 7.3.1
+# (devDependencies of @real-router/svelte, the benchmarks, the Svelte examples
+# and cross-router-bench). The advisory needs a source object that holds an own
+# `__proto__` key, as `JSON.parse` of attacker input produces. The rollup plugin
+# merges only its own module-level `defaults`; vite-plugin-svelte merges its
+# defaults with svelte.config.js and the plugin's inline options, which the
+# developer writes. Neither runs in a published package. Drop it when deepmerge
+# ships a fix or both plugins stop depending on it — ask api.osv.dev per version.
+
+[[IgnoredVulns]]
+id = "GHSA-gcqx-w48m-w2h4"  # deepmerge mergeObject() prototype poisoning of the returned object
+reason = "No fixed deepmerge release (<= 4.3.1, the latest). Paths: @rollup/plugin-node-resolve 16.0.3 and @sveltejs/vite-plugin-svelte 7.3.1, both latest, build and test tooling in the root, examples/ and cross-router-bench; none published. The rollup plugin merges only its own constant defaults; vite-plugin-svelte merges its defaults with svelte.config.js and inline plugin options, written by the developer, so no merged source carries an attacker's own __proto__ key."
+
 # NOTE (2026-09-10): ten entries stood here — RUSTSEC-2024-0411 through -0420,
 # the gtk-rs unmaintained-crate advisories (gdk, gtk, atk, their -sys crates and
 # gtk3-macros). They are gone, and the way they left is worth one paragraph
