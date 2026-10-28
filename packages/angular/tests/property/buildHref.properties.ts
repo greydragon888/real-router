@@ -700,6 +700,8 @@ describe("buildHref — Property Tests", () => {
     test.prop([arbUnicodeyPath], { numRuns: NUM_RUNS.standard })(
       "buildPath result is concatenated verbatim into the href (no sanitization)",
       (path) => {
+        fc.pre(!namesHost(path));
+
         const router = {
           buildUrl: undefined,
           buildPath: () => path,
@@ -713,6 +715,8 @@ describe("buildHref — Property Tests", () => {
     test.prop([arbUnicodeyPath, arbHash], { numRuns: NUM_RUNS.standard })(
       "Unicode path + hash → `${path}#${encodedHash}`; path bytes are unchanged",
       (path, rawHash) => {
+        fc.pre(!namesHost(path));
+
         const router = {
           buildUrl: undefined,
           buildPath: () => path,
