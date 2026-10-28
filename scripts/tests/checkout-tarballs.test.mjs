@@ -5,6 +5,7 @@
 
 import assert from "node:assert/strict";
 import {
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -100,9 +101,12 @@ test("without RR_TARBALLS the pnpmfile leaves the config as it found it", async 
 });
 
 test("packAll: one tarball per package, a hash in its name, stale ones gone", () => {
-  const out = mkdtempSync(path.join(tmpdir(), "checkout-tarballs-out-"));
+  const root = mkdtempSync(path.join(tmpdir(), "checkout-tarballs-out-"));
+  const out = path.join(root, "checkout-tarballs");
+  const destinations = [];
 
   try {
+    mkdirSync(out);
     writeFileSync(path.join(out, "real-router-core-0.1.0-deadbeef.tgz"), "old");
 
     // `pnpm pack --pack-destination <dir>` writes `real-router-<name>-<v>.tgz`.
@@ -110,6 +114,7 @@ test("packAll: one tarball per package, a hash in its name, stale ones gone", ()
       const destination = args[args.indexOf("--pack-destination") + 1];
       const bare = path.basename(cwd);
 
+      destinations.push(destination);
       writeFileSync(
         path.join(destination, `real-router-${bare}-1.2.3.tgz`),
         `bytes of ${bare}`,
@@ -128,8 +133,15 @@ test("packAll: one tarball per package, a hash in its name, stale ones gone", ()
     assert.match(names[0], /^real-router-core-1\.2\.3-[0-9a-f]{12}\.tgz$/);
     assert.match(names[1], /^real-router-ssr-utils-1\.2\.3-[0-9a-f]{12}\.tgz$/);
     assert.deepEqual(readdirSync(out).toSorted(), names);
+    // Staged beside `out`, so the move is a rename on one filesystem; and
+    // nothing of the staging is left there.
+    assert.deepEqual(
+      destinations.map((dir) => path.dirname(dir)),
+      [root, root],
+    );
+    assert.deepEqual(readdirSync(root), ["checkout-tarballs"]);
   } finally {
-    rmSync(out, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
