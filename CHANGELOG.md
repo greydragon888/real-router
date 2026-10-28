@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-10-28]
+
+### @real-router/search-schema-plugin@0.9.0
+
+### Minor Changes
+
+- [#2855](https://github.com/greydragon888/real-router/pull/2855) [`4550042`](https://github.com/greydragon888/real-router/commit/455004220a600c3d0270874cb729d2b1a9152eff) Thanks [@greydragon888](https://github.com/greydragon888)! - A number or boolean the schema rejects is tried once more as its text ([#2725](https://github.com/greydragon888/real-router/issues/2725))
+
+  Under `numberFormat` / `booleanFormat: "auto"` (the default) the router decodes `?q=17` to the number `17` and `?q=true` to `true`, so a `z.string()` field rejected them and the plugin removed the key — a search for `17` did not survive a reload. The plugin now runs the schema again on the query with each rejected number or boolean — a key's value or an array element — replaced by its text, `String(value)`, and keeps the text where the schema accepts it. A schema that judges in stages — a discriminated union, a refinement that runs once the object parses — names a number only once another value is text, so a run follows for each value it names next; no value is tried twice. `?q=17` now gives `{ q: "17" }`, and `?step=2&code=123456` on a discriminated union `{ step: "2", code: "123456" }`, as under `"none"`. A key the text does not fix goes back as decoded, and the repair goes by the schema's issues on that query: where step 2 needs a six-digit code, `?step=2&code=abc` now gives `{ step: "2" }`, as under `"none"`, while the rejected number `step` used to make way for its `defaultSearch` value, `{ step: "1", code: "abc" }`. A number or boolean the caller passes is tried the same way, under every format: `navigate("search", {}, { q: 17 })` keeps `q: "17"`, and `buildPath("search", {}, { q: 17 })` prints `?q=17`.
+
+  - Under `booleanFormat: "empty-true"` a key without a value decodes to `true`, so a `z.string()` field now keeps it as `"true"` and the URL prints `?q=true`. Declare the field `z.boolean()` to read it as a flag.
+  - `buildPath(name, params)` without a search argument threw `TypeError: Cannot convert undefined or null to object` whenever the plugin kept a key of `params` that is not a path slot — a query key the route declares, or one it does not. It now builds the path, and a `<Link routeParams>` holding a query key of the route gets its `href` back without a URL plugin.
+
+  **Breaking change:**
+
+  - `onError` is called after the text runs, and only when issues are left: a query the text fixes no longer reaches it. Its `params` hold each key the text fixed as text and every other key as decoded, and its issues are the schema's own on those `params`. An `onError` that turned such values into text itself can drop that code.
+  - Each validation runs the schema once more per round of texts, and once more on the query the runs settle on when the text fixed some of the keys it tried and not the others, where it ran at most twice: up to four times for a schema that reports every issue at once, and a round per value for one that stops at its first issue. A side effect in the schema runs again.
+  - A schema that throws, or answers with a Promise, on a query that holds a text — which every run after the first can, the repair's included — now refuses where the number was removed or handed to `onError`: the navigation rejects, `buildPath()` and `router.buildUrl()` throw, `canNavigateTo()` answers `false` and a `<Link>` gets no `href`. zod hands a throw in a transform or a refinement back as a rejected Promise, which the plugin refuses with the async `TypeError` and leaves unhandled, so a Node process without an `unhandledRejection` handler ends; a schema that throws itself refuses with its own error. Report an issue instead of throwing.
+  - A number or boolean passed in the params bag for a query key of the route — or of the route a `forwardTo` alias leads to — was removed as rejected. Its text is now accepted, so core refuses it as it refuses any value in that bag: through an alias, `navigate("old", { q: 17 })` rejects and `canNavigateTo("old", { q: 17 })` answers `false`; under a URL plugin, `router.buildUrl(name, { q: 17 })` throws. A `<Link routeParams={{ q: 17 }}>` gets no `href` under a URL plugin, and through an alias without one, the alias's own path. Pass the query in the search argument or `routeSearch`.
+  - In `mode: "development"` the `console.error` message is new. It lists each issue with the value it is about in that query; under each listed key the text did not fix, what the last text run said about it, with its values as text, and each element tried as text that none of those issues names, marked `no issue reported` — a rule may name only the first element it refuses, or the array as a whole; and it explains the decoding when a rejected value is a number, a boolean or `null`. A key the text fixes is listed only when an issue on that query names it. Its first line reads `Route "…": the schema rejected these search params` where it read `Route "…": invalid search params`, so a test or a log filter that matches the old text has to match the new one; the issues are still the second argument.
+
 ## [2026-10-27]
 
 ### @real-router/search-schema-plugin@0.8.0
