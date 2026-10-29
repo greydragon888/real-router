@@ -78,6 +78,7 @@ packages/**/.eslintcache
 !/.claude/prompts/benchmark-harness-audit.md
 !/.claude/prompts/boolean-flag-audit.md
 !/.claude/prompts/perf-optimization-deep-analysis.md
+!/.claude/prompts/rfc-plan-contract.md
 .sisyphus
 .omo
 
