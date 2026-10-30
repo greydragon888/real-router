@@ -10703,6 +10703,8 @@ cells. Read the mutation, not only the colour.
 
 ## The bench process is OOM-killed at the cohort boundary, and the diagnosis that named Chromium was reading Node's own thread name (#1746, 2026-09-10)
 
+> **Updated (2026-10-30).** Node 25.5.0 renamed the main thread to `node-MainThread` (nodejs/node#61307), and 24.22.2 still says `MainThread`; with `.nvmrc` on 26 the harness on the runner carries the new name. Linux keeps all 15 of its characters in `comm`, so the OOM line names `node-MainThread`, and `pgrep node` and `pkill node` match the harness again, through the prefix, while `pgrep -x node` does not. Measured in Linux containers with procps-ng 4.0.6, a second after the start: `/proc/<pid>/comm` reads `node-MainThread` on 26.13.0 and `MainThread` on 24.22.2, and `pgrep node` and `pkill node` reach the process on 26.13.0 only. Read at once, as the one-liner below does, `comm` was `node` in 8 runs of 8 on both, before Node names the thread. The command-line match this record advises finds it on both — see "Node 26 is the runtime".
+
 **Problem.** The weekly cross-router matrix has been OOM-killed three times: 10.6 GB on
 07-21 (one process for all five cohorts), then **9.6 GB on 08-31** (run 33341557512) and
 **9.07 GB on 09-07** (run 34065154917) — both AFTER the per-cohort split shipped promising
@@ -15411,3 +15413,7 @@ The strict date parse is a commit of its own after this one, and a revert of thi
 **Not covered.** After this commit no job runs the packages' tests, or installs them as a consumer does, on Node 24 or 22, while consumers run them there — `createRequestScope` in ssr-utils documents Node 22 — and the es2022 target lowers syntax, not the APIs a newer V8 brings. A run on 24 in the smoke job is a separate decision.
 
 **CodSpeed measures this commit.** `scripts/codspeed-gate.mjs` lists `.nvmrc` in `HARNESS`, so the push runs its `core` and `adapters` jobs on V8 14.6 against baselines from V8 13.6; what else the commit changes in the measured program is comments and type declarations.
+
+**Measured on the push: the CodSpeed baselines did not step.** CodSpeed ran `e283ce544` on Node 26.13.0 (V8 14.6.202.34) against `ac1c6c69f` on 24.18.0 (V8 13.6.233.17), runs `6ae4076c14c773d9dc0ec258` and `6ae3e59eb480d72e796a6f85`, and marks all 99 benchmarks unchanged, with an impact of −0.67 %. The geometric mean of the times it prints is 0.67 % higher, and at their 0.1 ms rounding no benchmark moved by more than 6 %. The K sizes stand: the lightest batch, `matchPath/no-match`, takes 3.21 ms against 3.14 ms before, above the ~3 ms floor.
+
+**The bench harness's process name changes too.** Node renamed its main thread in 25.5.0; the banner on "The bench process is OOM-killed at the cohort boundary, and the diagnosis that named Chromium was reading Node's own thread name" has the new name and what it does to `pgrep`.
