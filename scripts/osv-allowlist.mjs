@@ -13,18 +13,15 @@
 // Dependency Review reads no other kind, and the `RUSTSEC-*` entries are there
 // for osv-scanner.
 //
-// ⚠ A day that does not exist in its month passes as an `ignoreUntil`:
-// `smol-toml` rolls 2026-02-30 over to 2026-03-02, and the parsed value cannot
-// tell. osv-scanner refuses such a file whole, so `lint:audit` fails on it.
-//
-// `smol-toml`'s strict mode, `useLegacyDate: false`, refuses such a day as
-// osv-scanner does, but needs a global `Temporal`: Node 24 has none, Node 26
-// has one by default.
+// The parse is `smol-toml`'s strict one, `useLegacyDate: false`: it reads a
+// date as a `Temporal.PlainDate`, through the global `Temporal` that Node 26
+// has by default, and refuses a day its month lacks, such as 2026-02-30, as
+// osv-scanner refuses it.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { TomlDate, parse } from "smol-toml";
+import { parse } from "smol-toml";
 
 /** The source, from the repository root. */
 export const SOURCE = "scripts/osv-scanner.toml";
@@ -49,6 +46,7 @@ export function records(root) {
       new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
         readFileSync(join(root, SOURCE)),
       ),
+      { useLegacyDate: false },
     );
   } catch (error) {
     throw new Error(`${SOURCE}: ${error.message.split("\n")[0]}`);
@@ -95,7 +93,7 @@ export function records(root) {
     }
     if (
       record.ignoreUntil !== undefined &&
-      !(record.ignoreUntil instanceof TomlDate && record.ignoreUntil.isDate())
+      !(record.ignoreUntil instanceof Temporal.PlainDate)
     ) {
       throw new Error(
         `${name}: \`ignoreUntil\` is not a TOML local date such as 2026-11-09`,

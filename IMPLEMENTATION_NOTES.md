@@ -14777,6 +14777,8 @@ Three rounds of review of the fix found the same order of the text in two more p
 
 > **Updated (2026-10-11).** The wiring cell reads every composite action git tracks, wherever it lies, and not only those under `.github/actions/`: a local `uses:` can name any directory.
 
+> **Updated (2026-10-30).** With `.nvmrc` on Node 26, the parse takes the strict mode, `useLegacyDate: false`, and `ignoreUntil` is checked as a `Temporal.PlainDate`, the type that mode gives a local date. A day its month lacks is refused by the parser, as osv-scanner 2.6.0 refuses it, and the divergence is gone. The check reads no `TomlDate`, so the Measured bullet on a `smol-toml` major reddening the cells no longer holds. The nine dates above and 2026-11-09 are a cell each. In memory, the default mode reds seven cells: the two dates read, the four days past their month's end, and the cell of both forms of a record, whose record holds a date. Dropping the type check, or widening it to any object, reds the cell of the kinds that are no local date. On Node 24.22.2 without a flag, the strict parse of every date fails with "Temporal is not defined"; a refusal cell asserts the global `Temporal` first, so it does not pass on that refusal (measured on 2026-10-30).
+
 **Problem.** The advisories the repository accepts lived twice: in `scripts/osv-scanner.toml`, which osv-scanner reads for `lint:audit`, and in the `allow-ghsas` input of the Dependency Review step of `codeql.yml`, a comma-separated copy with an explanation per id above it. A comment asked to keep the two in step, and nothing checked it.
 
 **Solution.**
@@ -15368,6 +15370,8 @@ Two kinds of ignored paths under `.claude/` stay visible to knip, none of them c
 - **The cell is the guard, not the runner.** On macOS `os.tmpdir()` and the checkout share a volume, so `EXDEV` does not reproduce locally. Measured: against the previous `packAll` the cell fails, its staging parent reading `os.tmpdir()` instead of the cell's root.
 
 ## Node 26 is the runtime — `.nvmrc`, `@types/node` and the dev machine (2026-10-30)
+
+> **Updated (2026-10-30).** The strict date parse is in (the banner of this date on "`allow-ghsas` is generated from `scripts/osv-scanner.toml`, which a TOML parser reads"). `node --test scripts/tests/osv-allowlist.test.mjs` then passes 22 of 22 on 26.13.0; on the official 24.22.2 it passes 10 of 22 without a flag and 22 of 22 with `--harmony-temporal`.
 
 **Problem.** CI and the dev machine ran Node 24, which entered maintenance on 2026-10-20; 26 became LTS on 2026-10-28 (Node's release schedule). No package declares `engines`, and the tsdown bundles target es2022, so the move is about what runs on the host: the test suites, the hooks and `scripts/`. One planned change needs 26 itself: the strict date parse of `scripts/osv-allowlist.mjs` (RFC-3 §10 item 34) reads `Temporal`, which 26 has by default and 24 only behind `--harmony-temporal`.
 
