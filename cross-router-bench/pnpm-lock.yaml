@@ -53,7 +53,7 @@ importers:
         version: 0.7.0(@real-router/core@0.148.0)
       '@real-router/solid':
         specifier: '*'
-        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)
+        version: 0.26.0(@real-router/core@0.148.0)(solid-js@1.9.17)
       '@real-router/svelte':
         specifier: '*'
         version: 0.24.0(@real-router/core@0.148.0)(svelte@5.57.1(@typescript-eslint/types@8.70.1))
@@ -62,13 +62,13 @@ importers:
         version: 0.25.0(@real-router/core@0.148.0)(vue@3.5.43(typescript@6.0.3))
       '@solidjs/router':
         specifier: ~1.0.0
-        version: 1.0.0(solid-js@1.9.15)
+        version: 1.0.0(solid-js@1.9.17)
       '@tanstack/react-router':
         specifier: ~1.170.17
         version: 1.170.40(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@tanstack/solid-router':
         specifier: ~1.170.17
-        version: 1.170.37(solid-js@1.9.15)
+        version: 1.170.37(solid-js@1.9.17)
       '@tanstack/vue-router':
         specifier: ~1.170.16
         version: 1.170.36(vue@3.5.43(typescript@6.0.3))
@@ -83,7 +83,7 @@ importers:
         version: 8.4.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       solid-js:
         specifier: ~1.9.14
-        version: 1.9.15
+        version: 1.9.17
       sv-router:
         specifier: ~0.19.0
         version: 0.19.0(svelte@5.57.1(@typescript-eslint/types@8.70.1))
@@ -201,7 +201,7 @@ importers:
         version: 8.3.3(@types/node@26.6.3)(esbuild@0.28.2)(sass-embedded@1.104.1)(sass@1.104.1)(yaml@2.9.1)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(solid-js@1.9.15)(supports-color@8.1.1)(vite@8.3.3(@types/node@26.6.3)(esbuild@0.28.2)(sass-embedded@1.104.1)(sass@1.104.1)(yaml@2.9.1))
+        version: 2.11.14(solid-js@1.9.17)(supports-color@8.1.1)(vite@8.3.3(@types/node@26.6.3)(esbuild@0.28.2)(sass-embedded@1.104.1)(sass@1.104.1)(yaml@2.9.1))
 
 packages:
 
@@ -3320,24 +3320,14 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
-  seroval-plugins@1.5.6:
-    resolution: {integrity: sha512-HXuLAX2pu/UByPpaeo/TaMfvMIi+1QqIoPJYCcAtU8QkVNwgR6MPlGuCQTErV1JwraaMbYaWVIBX7mppzGLATQ==}
+  seroval-plugins@1.6.12:
+    resolution: {integrity: sha512-+reiwp/lYxiyctSrdvX7OQ1YLrcbWYgBiZrhSFL+V43b0/DGRLNVSDyZINbQe+tWplPOI2fw2dPrdv6hcc09kQ==}
     engines: {node: '>=10'}
     peerDependencies:
       seroval: ^1.0
 
-  seroval-plugins@1.6.7:
-    resolution: {integrity: sha512-4Nk35ttD3DTDJW4hgw5StsVAPeU6qnDFnULAouw6tQ7oLTV/ICXrWpsXo2EE52eSP2joUMazbVf52mFEcADqRw==}
-    engines: {node: '>=10'}
-    peerDependencies:
-      seroval: ^1.0
-
-  seroval@1.5.6:
-    resolution: {integrity: sha512-rVQVWjjSvlINzaQPZH5JFqsqEsIWdTxY3iJZCnTL/5gQbXIRooVZKI60tVCkOVfzcRPejboxO2t0P89dg5mQaA==}
-    engines: {node: '>=10'}
-
-  seroval@1.6.7:
-    resolution: {integrity: sha512-AeDcLh0yO2SFm9W71essgnSzLV9DI8ZH0x0knXn2DMnUZj728mpLbxjlbB6IqKCmqh8JA3cEqRyGoNkt584JcQ==}
+  seroval@1.6.12:
+    resolution: {integrity: sha512-CqbIVfk/7GL3ITwZI55lcPbpQbjHZ2DD5cUj4iH7E9YsCfHNJV1mx7yNp86Z84w5IpmkZZS/2s5vPOWmVWSdQg==}
     engines: {node: '>=10'}
 
   shebang-command@2.0.0:
@@ -3356,8 +3346,8 @@ packages:
     resolution: {integrity: sha512-aBY19bn/XA+hKOKX0qL7Z0UfdBsbQvc9hn993U8ALUjzxCvDcuZqLoRXjGJrUARWAlwMnsRVD9sw2AFNOYvalA==}
     engines: {node: '>=22'}
 
-  solid-js@1.9.15:
-    resolution: {integrity: sha512-EeiY2xfpZJqPLjXspVEKjAII4yv8NyG//NxZ3IpOFHdUNnnTyL0uJOeS9LWGvA7cFCz5y94cjFwYlmw5Luncsg==}
+  solid-js@1.9.17:
+    resolution: {integrity: sha512-4GAmLOWPfNV8H9Jfn2LSFTpNEG6jiOKPiwd5lnLGQtehHaX6l3TOLzJqQ7mqwB/3k1Yy3zyumFVopmc/tm34ow==}
 
   solid-refresh@0.6.3:
     resolution: {integrity: sha512-F3aPsX6hVw9ttm5LYlth8Q15x6MlI/J3Dn+o3EQyRTtTxidepSTwAYdozt01/YA+7ObcciagGEyXIopGZzQtbA==}
@@ -4697,12 +4687,12 @@ snapshots:
     dependencies:
       '@real-router/core': 0.148.0
 
-  '@real-router/solid@0.26.0(@real-router/core@0.148.0)(solid-js@1.9.15)':
+  '@real-router/solid@0.26.0(@real-router/core@0.148.0)(solid-js@1.9.17)':
     dependencies:
       '@real-router/core': 0.148.0
       '@real-router/route-utils': 0.4.0(@real-router/core@0.148.0)
       '@real-router/sources': 0.15.0(@real-router/core@0.148.0)
-      solid-js: 1.9.15
+      solid-js: 1.9.17
 
   '@real-router/sources@0.15.0(@real-router/core@0.148.0)':
     dependencies:
@@ -4828,22 +4818,22 @@ snapshots:
 
   '@sindresorhus/base62@1.0.0': {}
 
-  '@solid-primitives/refs@1.1.4(solid-js@1.9.15)':
+  '@solid-primitives/refs@1.1.4(solid-js@1.9.17)':
     dependencies:
-      '@solid-primitives/utils': 6.4.1(solid-js@1.9.15)
-      solid-js: 1.9.15
+      '@solid-primitives/utils': 6.4.1(solid-js@1.9.17)
+      solid-js: 1.9.17
 
-  '@solid-primitives/utils@6.4.1(solid-js@1.9.15)':
+  '@solid-primitives/utils@6.4.1(solid-js@1.9.17)':
     dependencies:
-      solid-js: 1.9.15
+      solid-js: 1.9.17
 
-  '@solidjs/meta@0.29.4(solid-js@1.9.15)':
+  '@solidjs/meta@0.29.4(solid-js@1.9.17)':
     dependencies:
-      solid-js: 1.9.15
+      solid-js: 1.9.17
 
-  '@solidjs/router@1.0.0(solid-js@1.9.15)':
+  '@solidjs/router@1.0.0(solid-js@1.9.17)':
     dependencies:
-      solid-js: 1.9.15
+      solid-js: 1.9.17
 
   '@sonarsource/analyzer-commons-configurations@2.31.0-5284': {}
 
@@ -4892,17 +4882,17 @@ snapshots:
     dependencies:
       '@tanstack/history': 1.162.4
       cookie-es: 3.1.1
-      seroval: 1.6.7
-      seroval-plugins: 1.6.7(seroval@1.6.7)
+      seroval: 1.6.12
+      seroval-plugins: 1.6.12(seroval@1.6.12)
 
-  '@tanstack/solid-router@1.170.37(solid-js@1.9.15)':
+  '@tanstack/solid-router@1.170.37(solid-js@1.9.17)':
     dependencies:
-      '@solid-primitives/refs': 1.1.4(solid-js@1.9.15)
-      '@solidjs/meta': 0.29.4(solid-js@1.9.15)
+      '@solid-primitives/refs': 1.1.4(solid-js@1.9.17)
+      '@solidjs/meta': 0.29.4(solid-js@1.9.17)
       '@tanstack/history': 1.162.4
       '@tanstack/router-core': 1.171.33
       isbot: 5.2.2
-      solid-js: 1.9.15
+      solid-js: 1.9.17
 
   '@tanstack/store@0.11.1': {}
 
@@ -5330,12 +5320,12 @@ snapshots:
       html-entities: 2.3.3
       parse5: 7.3.0
 
-  babel-preset-solid@1.9.15(@babel/core@7.29.7(supports-color@8.1.1))(solid-js@1.9.15):
+  babel-preset-solid@1.9.15(@babel/core@7.29.7(supports-color@8.1.1))(solid-js@1.9.17):
     dependencies:
       '@babel/core': 7.29.7(supports-color@8.1.1)
       babel-plugin-jsx-dom-expressions: 0.40.10(@babel/core@7.29.7(supports-color@8.1.1))
     optionalDependencies:
-      solid-js: 1.9.15
+      solid-js: 1.9.17
 
   balanced-match@4.0.4: {}
 
@@ -6523,17 +6513,11 @@ snapshots:
 
   semver@7.8.5: {}
 
-  seroval-plugins@1.5.6(seroval@1.5.6):
+  seroval-plugins@1.6.12(seroval@1.6.12):
     dependencies:
-      seroval: 1.5.6
+      seroval: 1.6.12
 
-  seroval-plugins@1.6.7(seroval@1.6.7):
-    dependencies:
-      seroval: 1.6.7
-
-  seroval@1.5.6: {}
-
-  seroval@1.6.7: {}
+  seroval@1.6.12: {}
 
   shebang-command@2.0.0:
     dependencies:
@@ -6548,18 +6532,18 @@ snapshots:
       ansi-styles: 6.2.3
       is-fullwidth-code-point: 5.1.0
 
-  solid-js@1.9.15:
+  solid-js@1.9.17:
     dependencies:
       csstype: 3.2.3
-      seroval: 1.5.6
-      seroval-plugins: 1.5.6(seroval@1.5.6)
+      seroval: 1.6.12
+      seroval-plugins: 1.6.12(seroval@1.6.12)
 
-  solid-refresh@0.6.3(solid-js@1.9.15)(supports-color@8.1.1):
+  solid-refresh@0.6.3(solid-js@1.9.17)(supports-color@8.1.1):
     dependencies:
       '@babel/generator': 7.29.8
       '@babel/helper-module-imports': 7.29.7(supports-color@8.1.1)
       '@babel/types': 7.29.8
-      solid-js: 1.9.15
+      solid-js: 1.9.17
     transitivePeerDependencies:
       - supports-color
 
@@ -6752,14 +6736,14 @@ snapshots:
 
   verkit@0.3.2: {}
 
-  vite-plugin-solid@2.11.14(solid-js@1.9.15)(supports-color@8.1.1)(vite@8.3.3(@types/node@26.6.3)(esbuild@0.28.2)(sass-embedded@1.104.1)(sass@1.104.1)(yaml@2.9.1)):
+  vite-plugin-solid@2.11.14(solid-js@1.9.17)(supports-color@8.1.1)(vite@8.3.3(@types/node@26.6.3)(esbuild@0.28.2)(sass-embedded@1.104.1)(sass@1.104.1)(yaml@2.9.1)):
     dependencies:
       '@babel/core': 7.29.7(supports-color@8.1.1)
       '@types/babel__core': 7.20.5
-      babel-preset-solid: 1.9.15(@babel/core@7.29.7(supports-color@8.1.1))(solid-js@1.9.15)
+      babel-preset-solid: 1.9.15(@babel/core@7.29.7(supports-color@8.1.1))(solid-js@1.9.17)
       merge-anything: 5.1.7
-      solid-js: 1.9.15
-      solid-refresh: 0.6.3(solid-js@1.9.15)(supports-color@8.1.1)
+      solid-js: 1.9.17
+      solid-refresh: 0.6.3(solid-js@1.9.17)(supports-color@8.1.1)
       vite: 8.3.3(@types/node@26.6.3)(esbuild@0.28.2)(sass-embedded@1.104.1)(sass@1.104.1)(yaml@2.9.1)
       vitefu: 1.1.3(vite@8.3.3(@types/node@26.6.3)(esbuild@0.28.2)(sass-embedded@1.104.1)(sass@1.104.1)(yaml@2.9.1))
     transitivePeerDependencies:

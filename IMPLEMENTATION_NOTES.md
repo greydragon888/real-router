@@ -14458,6 +14458,8 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 
 ## Five advisories: four leave the lockfiles within their parents' ranges, seroval's is allowlisted (2026-10-06)
 
+> **Updated (2026-10-30).** solid-js 1.9.17 declares `seroval ~1.6.8`, and each lockfile now holds one seroval past every fix: 1.6.12 in the root, through solid-js 1.9.17; 1.6.11 in the examples, through solid-js 1.9.17; 1.6.12 in cross-router-bench, through solid-js 1.9.17 and @tanstack/router-core. With osv-scanner reporting GHSA-jp82-f5mq-hwhp unused, it went from `scripts/osv-scanner.toml` and `allow-ghsas`.
+
 **Problem.** `lint:audit` stopped a push on 2026-10-06 at GHSA-rj75-hqrm-r3gf — postcss-selector-parser below 7.1.6 (medium, published 2026-10-05), in the root and examples lockfiles. A later run listed four more: GHSA-68fv-2mgg-jv7q, source-map-js below 1.2.2 (high), in all three lockfiles; GHSA-jqcg-44mw-7w3h, proxy-addr below 2.0.8 (critical), and GHSA-wr44-6hxh-3jwq, joi 18 below 18.2.9 (medium), in the examples; and GHSA-jp82-f5mq-hwhp, seroval through 1.6.2 (high), in all three. The source-map-js and joi advisories were published in September, and the push's run had not listed them.
 
 **Solution.**
@@ -14482,6 +14484,8 @@ In the main checkout a push that leaves the tooling alone now spends about 8 s o
 ## Three more advisories: smol-toml takes 1.9.0, seroval's second and sprintf-js's are allowlisted (2026-10-06)
 
 > **Updated (2026-10-24).** GitHub withdrew GHSA-hp3w-g68c-fv3c, on 2026-10-22 by api.osv.dev; with osv-scanner reporting the sprintf-js entry unused, it went from `scripts/osv-scanner.toml` and `allow-ghsas`. The seroval entry stands.
+
+> **Updated (2026-10-30).** The seroval entry went too, with the first one: see the note on the section above.
 
 **Problem.** After the entry above was committed, `lint:audit` listed three more: GHSA-p6vx-979v-rg4c, seroval through 1.6.0 (critical, published 2026-10-05), in all three lockfiles; GHSA-r4xh-jqrq-34v2, smol-toml through 1.8.0 (medium), in the root; and GHSA-hp3w-g68c-fv3c, sprintf-js through 1.1.3 (medium, published in September), in the examples.
 

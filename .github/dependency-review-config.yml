@@ -81,8 +81,6 @@ allow-dependencies-licenses:
 allow-ghsas:
   - GHSA-wrw7-89jp-8q8g
   - GHSA-86w9-cpqp-85rv
-  - GHSA-jp82-f5mq-hwhp
-  - GHSA-p6vx-979v-rg4c
   - GHSA-pqg4-j6r4-53mv
   - GHSA-qwgh-2vcv-g2f7
   - GHSA-gcqx-w48m-w2h4

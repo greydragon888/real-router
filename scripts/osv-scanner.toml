@@ -23,32 +23,6 @@ reason = "glib 0.18.5 VariantStrIter unsoundness (RUSTSEC-2024-0429). Transitive
 id = "GHSA-86w9-cpqp-85rv"  # node-forge RSA PKCS#1 v1.5 signature verification
 reason = "No fixed node-forge release (<= 1.4.0, the latest). Only dependent: root devDependency @sonar/scan 5.0.1, run locally by `pnpm sonar:local`; it uses node-forge solely to read a PKCS#12 truststore, a path that verifies no signature."
 
-# seroval's fix, 1.6.3, is outside the range solid-js 1.9.15 pins (`~1.5.4`,
-# with seroval-plugins), and solid-js has no newer 1.9 release. The affected
-# seroval is in the three lockfiles only through solid-js: in the root for
-# @real-router/solid's tests and the benchmarks, in examples/ for the Solid
-# examples, in cross-router-bench for its Solid app — none published, and
-# @real-router/solid takes solid-js as a peer. cross-router-bench also holds
-# seroval 1.6.7, through @tanstack/router-core, which this advisory does not
-# affect. The advisory is in deserializing seroval JSON (`fromJSON`,
-# `fromCrossJSON`); solid-js imports only seroval's serializer, in its server
-# build, and no code here imports seroval. Drop it when solid-js takes a
-# seroval past 1.6.2 — ask api.osv.dev per version.
-
-[[IgnoredVulns]]
-id = "GHSA-jp82-f5mq-hwhp"  # seroval memory exhaustion through a TypedArray length in its JSON
-reason = "Fixed in seroval 1.6.3, outside solid-js 1.9.15's ~1.5.4; solid-js has no newer 1.9 release. The affected copy comes only via solid-js: root devDependencies (@real-router/solid tests, benchmarks), the Solid examples, cross-router-bench (whose seroval 1.6.7, via @tanstack/router-core, is past the fix); none published, and @real-router/solid takes solid-js as a peer. The flaw is in fromJSON/fromCrossJSON; solid-js imports only seroval's serializer, and nothing here imports seroval."
-
-# A second seroval advisory, also in `fromJSON` — a deserialized fulfilled
-# Promise can invoke a plugin-produced callable through thenable assimilation —
-# is fixed in 1.6.2, again outside solid-js 1.9.15's `~1.5.4`. The entry above
-# holds for it word for word: solid-js imports only seroval's serializer, and
-# nothing here imports seroval. Drop it with the entry above.
-
-[[IgnoredVulns]]
-id = "GHSA-p6vx-979v-rg4c"  # seroval fromJSON thenable assimilation invokes plugin-produced callables
-reason = "Fixed in seroval 1.6.2, outside solid-js 1.9.15's ~1.5.4; solid-js has no newer 1.9 release. The same paths as GHSA-jp82-f5mq-hwhp: solid-js in root devDependencies, the Solid examples and cross-router-bench; none published. The flaw is in fromJSON; solid-js imports only seroval's serializer, and nothing here imports seroval."
-
 # shell-quote's fix, 1.11.0, is outside the 1.9.0 that concurrently 10.0.5
 # pins exactly, and concurrently has no newer release. It arrives only in the
 # examples lockfile, through concurrently, a devDependency of the three
