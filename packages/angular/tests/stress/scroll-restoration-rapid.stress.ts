@@ -23,7 +23,7 @@ class Host {
  * capture/restore" as the missing scenarios. We verify:
  *
  *   1. 1000 sequential navigations under `mode: "restore"` — bounded heap,
- *      sessionStorage stays within quota (jsdom enforces ~5MB).
+ *      sessionStorage stays within its quota.
  *   2. Rapid mount/unmount of the provider — each unmount must restore
  *      `history.scrollRestoration` and remove the pagehide listener.
  *   3. pagehide event after destroy — handler is unregistered, no leak.
@@ -37,7 +37,7 @@ describe("scrollRestoration stress — rapid pushState", () => {
     try {
       sessionStorage.clear();
     } catch {
-      // jsdom usually has sessionStorage; ignore quota/security errors.
+      // The host's sessionStorage may throw (quota, security); ignore it.
     }
   });
 
@@ -184,8 +184,7 @@ describe("scrollRestoration stress — rapid pushState", () => {
   it("rapid navigations under mode='top' — no sessionStorage writes (mode 'top' still captures)", async () => {
     // mode: "top" still subscribes (to capture leave positions for back/
     // traverse), but on entry it always scrolls to top. We confirm that
-    // 200 navigations do not blow up sessionStorage past its 5MB jsdom
-    // ceiling.
+    // 200 navigations do not blow up sessionStorage past its quota.
     TestBed.configureTestingModule({
       imports: [Host],
       providers: [

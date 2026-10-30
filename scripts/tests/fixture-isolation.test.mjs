@@ -110,6 +110,7 @@ const NOT_WRITES = new Set([
   "lstat",
   "lstatSync",
   "openAsBlob",
+  "openAsBlobSync",
   "opendir",
   "opendirSync",
   "read",

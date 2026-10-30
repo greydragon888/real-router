@@ -45,10 +45,10 @@ runs:
       # Now covered — Dependabot bumps it with the rest.
       uses: actions/setup-node@v7
       with:
-        # Read from `.nvmrc` (repo root, resolved against GITHUB_WORKSPACE) so
-        # the major CI runs and the major a dev machine selects cannot drift —
-        # they did, and it cost ten days of a locally-red / CI-green test suite.
-        # Safe here because every caller checks out first, as documented above.
+        # Read from `.nvmrc` (repo root, resolved against GITHUB_WORKSPACE): CI
+        # runs the major the file names, the one `.husky/pre-commit` compares a
+        # dev machine against. Safe here because every caller checks out first,
+        # as documented above.
         node-version-file: .nvmrc
         cache: ${{ inputs.node-cache }}
 

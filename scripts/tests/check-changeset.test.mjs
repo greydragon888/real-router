@@ -13,7 +13,7 @@
 // of `.changeset/check-changeset.mjs` inside a fixture checkout, from the root
 // and from below it.
 //
-// Stdlib node:test/node:assert only (Node 24) — `scripts/scripts-tests.mjs`,
+// Stdlib node:test/node:assert only — `scripts/scripts-tests.mjs`,
 // which pre-push and Repo Lints run, picks this file up from `scripts/tests/`.
 
 import assert from "node:assert/strict";

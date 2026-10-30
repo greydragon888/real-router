@@ -178,6 +178,8 @@ marker.
 
 ## V8's `JSON.parse` renames escaped keys — property tests that parse generated keys (#1709, 2026-09-24)
 
+> **Updated (2026-10-30).** The backport of `93cd21e8254b` ships in Node 24.22.1 and 26.12.1, both released 2026-10-21 (Node's changelogs). The probe in the last paragraph prints `[ '', '"' ]` on 24.22.2 and 26.13.0 and `[ '', '\\' ]` on 24.18.1. With `.nvmrc` on 26 the generator filters, their pins and the core regression cell with its helpers are removed, and the text comparison stays. That makes 26.12.1 a floor on the 26 line: below it the `sources` and `ssr-utils` properties can again fail without replaying, and `.husky/pre-commit` compares the major only — see "Node 26 is the runtime".
+
 **Problem.** The JSON round-trip property of `packages/core/tests/property/error/serialization.properties.ts` failed twice — a local build and release PR #2470 (run 35524491155) — and neither failure replayed: the first not from its printed `{ seed, path }`, green 11 of 11 times, the second not from its shrunk counterexample. Both were one key substitution: a `"` key parsed back as `\` (`expected { '': {}, '\': {} } to strictly equal { '': {}, '"': {} }`; the first sighting's `expected undefined to strictly equal {}` is the same swap seen from the missing key).
 
 The cause is V8's, fixed upstream in `93cd21e8254b` (2026-09-17, Chromium bug 521080746). To find an existing hidden-class transition for a key, `JSON.parse` compares the key's RAW source characters, cut to its DECODED length. For `"\""` that cut is the lone backslash, so once an object with a `\` key after the same preceding keys exists, a parsed object with as many keys gets its quote key back as `\`. Measured on 2026-09-24: v24.18.1, v24.21.0 and v26.10.0 all reproduce it.
@@ -2366,7 +2368,7 @@ CI job `smoke` (added after #413 and #418): packs all 24 public packages into ta
 
 These packages are verified as installed (directory exists) but not imported.
 
-Node.js 24 only (no matrix). Runs on `ubuntu-latest`.
+Node comes from `.nvmrc`, through `.github/actions/setup` (no matrix). Runs on `ubuntu-latest`.
 
 ### Incremental Builds with --filter
 
@@ -8748,6 +8750,8 @@ The deck already renders every scenario the REPORTs did, from the same `results/
 
 ## Adapter scroll tests mock `sessionStorage` — Node ≥ 26 shadows jsdom's Storage (2026-07-30)
 
+> **Updated (2026-10-30).** `.nvmrc` is `26`, so CI meets the shadowing as well: the mocks are what keep the storage spies counting on every run, and the CI/dev divergence its Problem describes is closed by both sides running 26 — see "Node 26 is the runtime".
+
 **Problem.** Seven `createScrollRestoration` tests failed on a Node 26 dev machine while CI (Node 24) stayed green: `RouterProvider.scroll.test.*` ×1 in each of preact/react/solid/svelte/vue, plus `angular/tests/functional/scroll-restore.test.ts` ×2. All of them asserted through `vi.spyOn(Storage.prototype, "setItem")`, and the spy recorded **zero** calls. Worse than the failures: in each of the five adapter suites the _other_ four assertions on that spy are `expect(setItem).not.toHaveBeenCalled()` — 20 assertions that pass **vacuously** when the spy can never fire, unable to distinguish "correctly skipped the write" from "never wrote at all". Angular's two were a third mode: `spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw QuotaExceededError })` never injected the failure, so the storage-error branch was silently unexercised. Cause chain, measured end-to-end: (1) Node ≥ 26 ships Web Storage as **unflagged globals** — `node -p "typeof sessionStorage"` is `"object"` on 26.5.0 and `"undefined"` on 24.11.1 (`localStorage` is present but evaluates to `undefined` without `--localstorage-file`); (2) vitest's jsdom environment only overrides a global that already exists on Node when the key is in its own allowlist — `getWindowKeys` does `if (k in global) return keysArray.includes(k)`, and `keysArray = additionalKeys + KEYS`, where `KEYS = LIVING_KEYS.concat(OTHER_KEYS)` contains the **`Storage`** interface but neither `sessionStorage` nor `localStorage`; (3) so the pair is mismatched — `globalThis.Storage` is jsdom's webidl class (`class Storage { constructor() { throw new globalObject.TypeError("Illegal constructor")`) while `globalThis.sessionStorage` is Node's native instance (`function Storage() { [native code] }`), and `Object.getPrototypeOf(sessionStorage) !== Storage.prototype`. A prototype spy patches a class nothing calls. On Node 24 both sides are the same jsdom class and the identical spy records 1 call. A/B on one commit, one tree: preact's suite is `1 failed | 35 passed` under node 26.5.0 and `36 passed` under node 24.11.1.
 
 **Solution.** A store-backed **plain-object mock** installed per test with `vi.stubGlobal("sessionStorage", createMockStorage())` (`Map`-backed `getItem`/`setItem`/`removeItem`/`clear`/`key`/`length`), in every suite that spies on storage: the five adapter `RouterProvider.scroll.test.*`, `angular/tests/functional/scroll-restore.test.ts`, `react/tests/functional/dom-utils/scroll-restore.test.ts`, `preact/tests/stress/scroll-restoration-quota.stress.tsx`, `solid/tests/stress/scroll-restoration-rapid.stress.tsx`. Spies then target `sessionStorage` (i.e. the mock) rather than `Storage.prototype`, and the failure-path tests get their injection back by making the mock's `setItem`/`getItem` throw. The mock is also what un-blocked three preact quota-stress tests that had been `it.skip`ped rather than fixed.
@@ -8755,6 +8759,8 @@ The deck already renders every scenario the REPORTs did, from the same `results/
 **Why a mock and not a spy on the live object.** Spying the real `sessionStorage` fails on **every** Node version, independent of the shadowing above: Web Storage is a Proxy implementing the WHATWG named-property setter, so `vi.spyOn(sessionStorage, "setItem")` is not installed as a JS own property at all — it is swallowed as a **stored item** (`sessionStorage.getItem("setItem")` becomes non-null) while `setItem` keeps resolving through the prototype. Measured: 0 calls on both 24 and 26. Replacing the whole global with a plain object is therefore the only spyable option, and it has the side benefit of removing the tests' dependency on _which_ Storage implementation the host happens to provide. Related: `.nvmrc` was added in the same batch so a dev machine cannot silently diverge from CI's Node major again (see the next entry) — that divergence is the only reason this was invisible for ten days.
 
 ## `.nvmrc` as the Node single source of truth — dev/CI major drift is invisible otherwise (2026-07-30)
+
+> **Updated (2026-10-30).** `.nvmrc` is `26` — see "Node 26 is the runtime". The macOS setup in the last paragraph changes with it: the unversioned brew `node` (26) plus `brew pin node`, with `brew unpin node && brew upgrade node && brew pin node` for a 26.x update and for the repair a pinned `node` misses when a library it links moves (`brew upgrade` lists it as "broken and outdated, but pinned"), and `node@26` once 27 ships.
 
 **Problem.** The repo pinned Node only inside the workflows (`node-version: 24`, repeated in eight places) and had no `.nvmrc` and no `engines`. Nothing told a dev machine which major to run, and nothing noticed when it diverged. The cost was concrete: a local upgrade to Node 26 silently changed the host globals a jsdom test environment inherits — Node ≥ 26 ships Web Storage unflagged, which shadows jsdom's `sessionStorage` under vitest (see the previous entry) — and seven adapter scroll tests failed locally for ten days while CI stayed green. The failure mode is the worst kind: reproducible, deterministic, and _not_ a bug in the code under test, so the natural reaction is to go looking in the wrong place. The repeated literal was a second problem: a future bump of the CI major would leave any advisory file behind and re-open the same gap.
 
@@ -8777,6 +8783,8 @@ The deck already renders every scenario the REPORTs did, from the same `results/
 **Second failure mode of one seam.** `@changesets/get-github-info` → `api.github.com/graphql` has now broken twice, for unrelated reasons and with unrelated fixes: this one on query **size**, and the earlier one on the **transport** (Node 24.17.0's CVE-2026-48931 keep-alive change surfacing a latent node-fetch@2 bug as a false `ERR_STREAM_PREMATURE_CLOSE`, fixed by pinning `node-version: 24.18.0` in `changesets.yml` — see that entry above). Both scale with release size, both only appear at release time, and neither is covered by any PR gate. When this integration misbehaves again, check size and transport separately before assuming a flake.
 
 ## pnpm 11.9.0 → 11.18.0 — nine minors of package-manager security fixes; the churn is peer-keys only (#1596, 2026-07-30)
+
+> **Updated (2026-10-30).** The "Gotcha: `pnpm doctor`" paragraph no longer holds. pnpm 12.11.2's `pnpm doctor` prints the `node` on `PATH` — `Node.js 24.22.2` with a 24 build first on `PATH`, `26.13.0` without it — and `.nvmrc` is `26`.
 
 **Problem.** `packageManager` had sat at `pnpm@11.9.0` since the pnpm 11 migration (#874) while the registry moved to `11.18.0`. The lag is not a feature gap — it is pnpm's _own_ CVE surface, and several of the fixes sit directly on this repo's release path: **credentials printed in `publish` output**, path traversal via scoped package names, crafted lockfiles writing outside the virtual store, environment-variable expansion disabled in `httpProxy`/`httpsProxy`/`noProxy`/`proxy` read from workspace configs, `adm-zip` bumped so crafted ZIPs can't force excessive memory allocation (11.15), and web authentication no longer exhausting memory against a malicious registry (11.17). A package manager is the one dependency that runs before every gate, so its lag is the least visible and the least acceptable.
 
@@ -12481,6 +12489,8 @@ Turbo keys a package's `test` task on `tests/**/*.{ts,tsx}`, so inside core the 
 
 ## Every CLI decides it was run with `import.meta.main` (#2539, 2026-09-24)
 
+> **Updated (2026-10-30).** The 24.15 floor named in "Why" is the 24 line's. The runtime is Node 26 (`.nvmrc`), and `import.meta.main` is there from 24.2.0 on, so every 26 release has it.
+
 **Problem.** Twelve CLIs in `scripts/` and `.changeset/` decided "was I run?" by comparing `process.argv[1]` with their own URL, in three spellings, and two more (`scripts/check-issue-refs.mjs`, `benchmarks/plugin-seam/bench.mts`) compared it with their file name through `endsWith`. Node resolves a main module's symlinks and escapes a space in its URL, so through a symlinked or space-carrying path the comparison was false, main() never ran, and the script exited 0 without a word. Measured on `4900d489f`: all twelve were silent through a directory symlink whose name holds a space, and each was observable when run directly. Every caller reads a silent exit 0 as "nothing to do": no source in the diff, no examples to lint, no benchmark to run. Hooks and workflows call these scripts by relative path, so CI never reached the defect; a test that ran a copy from the macOS temp directory did (#2543).
 
 **Solution.** All fourteen use `import.meta.main`, as `raiser-text-equality.mjs` and `refusal-census.mjs` already did (#2547). `scripts/cli-entry.test.mjs` holds the class:
@@ -14230,6 +14240,8 @@ zizmor did not report one more: `sonar-trusted.yml` holds four scanner arguments
 
 ## The fork path runs `master`'s Node under Node's permission model (2026-10-05)
 
+> **Updated (2026-10-30).** On Node 26 the model refuses the network as well, unless `--allow-net` grants it — measured: a TCP connect under `--permission` fails with `ERR_ACCESS_DENIED` on 26.13.0 and with `ECONNREFUSED` on 24.22.2, which does not check the network and refuses `--allow-net` as a bad option. A read through a symlink out of the granted directory still goes through on both.
+
 **Problem.** The boundary of `sonar-trusted.yml` — it executes only base-repository code, and the PR's tree is data — was held statically. `sonar-trusted-boundary.test.mjs` refuses each way a module of the closure could load code from outside `.trusted/`, one form at a time, and names what it cannot see, a computed member such as `process["dlopen"]`. It reads loads, not what the loaded code does: a write through `node:fs`, a built-in the closure may load, passes every rule. What runs the closure was read loosely. A regular expression looked for a script path right after `node`, so a flag before the script hid the line from it, and a preload, an env file, a second command on the line and `NODE_OPTIONS` went unread. Where `.trusted/` came from was not read at all. And `actions/setup-node` read Node's version from the PR's `.nvmrc`, so the PR chose the runtime of the code that holds the boundary; its package-manager cache, on by default, reads the PR's `package.json` too.
 
 **Solution.**
@@ -14979,6 +14991,8 @@ Not measured: whether 12.9.0, which moves an optional peer to the version alread
 
 ## Overrides are judged against the ranges their parents declare (2026-10-13)
 
+> **Updated (2026-10-30).** There are three. With `@types/node` on 26, `jsdoc-type-pratt-parser`'s `^26.4.0` is no longer above it, and both "below" entries left `scripts/overrides-accepted.json`.
+
 **Problem.** Nothing read the `overrides` of the three workspaces but `pnpm install`, and `lint:audit` judges only the result (#2646). Each class the issue names had happened and was found by hand: an entry nothing needs, a floor below the version a parent declares, an entry wider than its edge. The issue judged "still needed" by resolving without the entry, and since pnpm 12.7.0 removing an override re-resolves its targets ("pnpm 12.11.2, and each lockfile deduplicated by it"). That verdict moved with npm: on 12.11.2, `postcss` in all three workspaces and `rollup` in the examples read as needed only because newer releases had appeared, 8.5.29 and 4.63.6.
 
 **Solution.** `pnpm lint:overrides` runs `scripts/check-overrides.mjs`, with the rules in `scripts/overrides.mjs`. It reads every workspace whose `pnpm-workspace.yaml` git tracks, the root among them, and judges each key over the edges the key rewrites:
@@ -15352,3 +15366,44 @@ Two kinds of ignored paths under `.claude/` stay visible to knip, none of them c
 
 - **A sibling directory is on the destination's filesystem, so the move stays a `rename`.** A copy-and-delete fallback would answer `EXDEV` too, but copies every tarball on every runner whose `/tmp` is separate.
 - **The cell is the guard, not the runner.** On macOS `os.tmpdir()` and the checkout share a volume, so `EXDEV` does not reproduce locally. Measured: against the previous `packAll` the cell fails, its staging parent reading `os.tmpdir()` instead of the cell's root.
+
+## Node 26 is the runtime — `.nvmrc`, `@types/node` and the dev machine (2026-10-30)
+
+**Problem.** CI and the dev machine ran Node 24, which entered maintenance on 2026-10-20; 26 became LTS on 2026-10-28 (Node's release schedule). No package declares `engines`, and the tsdown bundles target es2022, so the move is about what runs on the host: the test suites, the hooks and `scripts/`. One planned change needs 26 itself: the strict date parse of `scripts/osv-allowlist.mjs` (RFC-3 §10 item 34) reads `Temporal`, which 26 has by default and 24 only behind `--harmony-temporal`.
+
+**Solution.**
+
+- `.nvmrc` is `26`. `@types/node` is `26.6.6`, pinned exactly in every manifest that declares it — the root and the examples workspace — and the `$@types/node` override in the `pnpm-workspace.yaml` of each follows it. `cross-router-bench` declares none and has no such override.
+- The two "below" entries for `@types/node` leave `scripts/overrides-accepted.json`. The major block in `.github/dependabot.yml` stays: Dependabot reads it against the current version, so it holds 27 now.
+- `scripts/tests/fixture-isolation.test.mjs` classifies `fs.openAsBlobSync`, new in Node 26.10, as a function that writes nothing.
+- The V8 #1709 workaround goes, so the floor on the 26 line is 26.12.1, which carries the V8 fix; see the banner on "V8's `JSON.parse` renames escaped keys".
+- Prose about the runtime follows: the CLAUDE.md toolchain table and its Node.js note, the comments of `.husky/pre-commit` and `.github/actions/setup/action.yml`, the `sonar-trusted` headers, and banners on the records whose statement about the current runtime stopped holding.
+
+The strict date parse is a commit of its own after this one, and a revert of this one reverts it first: Node 24 has no `Temporal` without a flag.
+
+**Why the bump is manual.** Types ahead of the runtime let `tsc` accept APIs the runtime lacks, so `@types/node` stays on the runtime's major and moves by hand with `.nvmrc`; between two moves the Dependabot block holds the next major.
+
+**The Electron examples are an accepted exception.** `examples/desktop/electron/*` run their main process on Electron's own Node: 24.22.0 for the pinned 44.9.3, and 24.22.1 for 45.1.0, the latest stable, and for the 46 alphas (releases.electronjs.org, 2026-10-30). Their `build` runs `tsc -p electron/tsconfig.json` against `@types/node` 26: `electron` declares `@types/node ^24.9.0`, and the `$@types/node` override resolves it to 26.6.6. An API new in 26 therefore passes `tsc` and fails at run time; the e2e in `examples.yml` launch a real Electron, but only on the paths they walk. Holding these examples on 24 types would take them out from under the shared override. The exception ends with an `electron` major whose Node is ≥ 26 — electron/electron#55418, open on 2026-10-30, moves `main` to Node 26.13.0 and carries `target/46-x-y`. The PR that bumps `electron` — usually a grouped Dependabot PR, so the CLAUDE.md list of what a reviewer checks by hand names it — checks the new Electron's Node on releases.electronjs.org, removes the line from `examples/CLAUDE.md` and that item, and banners this record.
+
+**Measured (2026-10-30)**, on the dev machine (macOS, arm64):
+
+| probe                                                     | brew 24.18.1          | official 24.22.2      | brew 26.13.0                      |
+| --------------------------------------------------------- | --------------------- | --------------------- | --------------------------------- |
+| `typeof` `Temporal` / `sessionStorage` / `localStorage`   | `undefined` ×3        | `undefined` ×3        | `object` / `object` / `undefined` |
+| `fs.readFileSync` calls on `require` / `import()` of CJS  | 46 / 72               | 46 / 72               | 46 / 72                           |
+| largest `[].push(...array)`                               | 124 415               | 124 397               | 124 423                           |
+| `node --throw-deprecation --import tsx -e 0`              | exit 0                | exit 0                | exit 0                            |
+| `node --test scripts/tests/osv-allowlist.test.mjs`        | 12 of 12              | 12 of 12              | 12 of 12                          |
+| the #1709 probe                                           | `[ '', '\\' ]`        | `[ '', '"' ]`         | `[ '', '"' ]`                     |
+| `process.versions.icu`                                    | 78.3, from `icu4c@78` | 78.3, bundled         | 79.1, from `icu4c@79`             |
+
+- The first row is without flags. On 24.22.2, `--harmony-temporal` and `--experimental-webstorage` make `Temporal` and `sessionStorage` objects too.
+- `fixture-isolation.test.mjs` without the `openAsBlobSync` line fails 1 cell on 26.13.0 (`control: every function node:fs exports is classified`) and passes 65 of 65 on 24.22.2. `fs.openAsBlobSync` leaves a file's size and mtime and its directory listing as they were, and answers `ENOENT` on a missing path without creating it.
+- The lockfile change moves turbo's `hashOfExternalDependencies` (`766f0be49846f1e3` → `1e67f57a38facdb4`), so no `test` or `lint` verdict computed on 24 is replayed. On 26.13.0 with `@types/node` 26.6.6, `type-check` runs 29 of 29 tasks with none from the cache and is green, and so are `lint:deps`, `lint:dedupe`, `lint:overrides` and `lint:config-sync`.
+- **ICU differs between dev and CI.** The brew formula `node` links the system `icu4c@79`; the official builds, which `setup-node` installs on CI, bundle 78.3, which Node 26 took in 26.0.0. A test that passes in dev and fails on CI, or the reverse, checks ICU first.
+- **Homebrew moves shared libraries under the old keg.** `brew install node` took simdjson 4.6.5 → 5.0.7, whose library is `libsimdjson.34.dylib`; the `node@24` 24.18.1 keg links `libsimdjson.33.dylib` and stops starting (`dyld: Library not loaded`). A comparison against 24 on the dev machine uses an official 24.x build.
+- The brew build disables Single Executable Applications, because it links a shared libnode; nothing in the repository builds one.
+
+**Not covered.** After this commit no job runs the packages' tests, or installs them as a consumer does, on Node 24 or 22, while consumers run them there — `createRequestScope` in ssr-utils documents Node 22 — and the es2022 target lowers syntax, not the APIs a newer V8 brings. A run on 24 in the smoke job is a separate decision.
+
+**CodSpeed measures this commit.** `scripts/codspeed-gate.mjs` lists `.nvmrc` in `HARNESS`, so the push runs its `core` and `adapters` jobs on V8 14.6 against baselines from V8 13.6; what else the commit changes in the measured program is comments and type declarations.

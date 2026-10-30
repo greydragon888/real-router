@@ -14,7 +14,7 @@
 // weight on the refusing direction, and the repository cells run the predicate
 // over real history rather than over fixtures alone.
 //
-// Stdlib node:test/node:assert only (Node 24) — scripts/ is not a vitest
+// Stdlib node:test/node:assert only — scripts/ is not a vitest
 // workspace.
 
 import assert from "node:assert/strict";

@@ -1,18 +1,6 @@
 [
   {
     "workspace": ".",
-    "key": "@types/node",
-    "rule": "below",
-    "why": "@types/node is held to the Node.js major of .nvmrc, as .github/dependabot.yml says: types ahead of the runtime let TypeScript resolve APIs the runtime lacks. A parent that asks for a newer major gets the root's too."
-  },
-  {
-    "workspace": "examples",
-    "key": "@types/node",
-    "rule": "below",
-    "why": "@types/node is held to the Node.js major of .nvmrc, as .github/dependabot.yml says: types ahead of the runtime let TypeScript resolve APIs the runtime lacks. A parent that asks for a newer major gets the root's too."
-  },
-  {
-    "workspace": ".",
     "key": "@angular/build>vite",
     "rule": "dead",
     "why": "A dedupe pin: it narrows no range, it widens the exact vite of @angular/build onto the one the workspace holds, so the tree keeps one vite. Its comment in pnpm-workspace.yaml says so."

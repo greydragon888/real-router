@@ -36,8 +36,7 @@ name: Sonar (trusted)
 # write, to `$GITHUB_ENV` and `$GITHUB_PATH` too, a child process, a worker,
 # an addon and WASI are refused at run time. That is a second layer, not the
 # first: Node calls the model a seat belt, not a defence against malicious
-# code, a read follows a symlink out of the workspace, and the network is
-# not restricted.
+# code, and a read follows a symlink out of the workspace.
 # `ci.yml`'s own comment names the trap this avoids: a workflow with
 # `pull-requests: write` executing attacker-shaped JS.
 #

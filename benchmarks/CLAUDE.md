@@ -104,15 +104,16 @@ the suite). Check anyway: it was never 100 % reproducible.
 
 The model can report a step the clock does not see. Measured on
 `navigate/sync-baseline`: **+15.5 % under CodSpeed, −2.9 % by the clock on the
-same x64 runner** (and +0.3 % on arm64) — i.e. the "slow" build was faster. The
-arc's state there is gated by the **summed bytecode** of `beginTransition` +
-`planPhases` (slow inside 600…821 bytes), so any refactor moving that pair by
-~30 bytes flips the report by 15 % in either direction.
+same x64 runner** (and +0.3 % on arm64) — i.e. the "slow" build was faster. On
+V8 13.6 the arc's state there is gated by the **summed bytecode** of
+`beginTransition` + `planPhases` (slow inside 600…821 bytes), so any refactor
+moving that pair by ~30 bytes flips the report by 15 % in either direction.
 
-⚠ That window was measured with Maglev on, before `@codspeed/core` 6.0 added
-`--no-maglev` (IMPLEMENTATION_NOTES "CodSpeed simulation runs without
+⚠ That window was measured on V8 13.6 with Maglev on, before `@codspeed/core`
+6.0 added `--no-maglev` (IMPLEMENTATION_NOTES "CodSpeed simulation runs without
 Maglev"). A window gated by bytecode size fits a tier-up landing inside the
-measured call; whether it survives without Maglev is unmeasured.
+measured call; whether it survives without Maglev, or on another V8, is
+unmeasured.
 
 Protocol, ~3 minutes, and it settles the question outright:
 

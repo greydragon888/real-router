@@ -126,7 +126,8 @@ updates:
       # source of truth; see the CLAUDE.md toolchain table). Block semver-major:
       # type defs ahead of the runtime let TS resolve Node APIs that don't exist
       # at runtime (compiles, then fails on the runtime). Patch/minor still flow.
-      # Lift this when the project moves to a newer Node major.
+      # The major moves by hand together with `.nvmrc`; this block then holds
+      # the next one.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
       # typescript is pinned to the current major until the type-tooling

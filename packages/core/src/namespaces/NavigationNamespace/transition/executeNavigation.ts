@@ -218,11 +218,11 @@ function bridgeLateIfOnlyGuardsCanAbort(
  * states once at the top of its file, measured here rather than assumed. Six of
  * the ten are those entry reads, and folding them into a bag costs an object
  * literal per navigation on cut A plus bytecode on the `beginTransition` +
- * `planPhases` pair — the pair #1728's model gates the arc on, and it sits close
- * enough to that model's edge that the bag spends real headroom without buying
- * anything. Re-measure with esbuild + `node --no-opt --no-lazy --print-bytecode`
- * before trading on the margin; `--no-lazy` is required or neither function is
- * compiled at all.
+ * `planPhases` pair — the pair #1728's model gates the arc on, and on V8 13.6
+ * it sits close enough to that model's edge that the bag spends real headroom
+ * without buying anything. Re-measure with esbuild +
+ * `node --no-opt --no-lazy --print-bytecode` before trading on the margin;
+ * `--no-lazy` is required or neither function is compiled at all.
  */
 function beginTransition( // NOSONAR -- S107: see the note on flat parameters above
   deps: NavigationDependencies,

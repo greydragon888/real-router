@@ -10,7 +10,7 @@
 // reading the updates off Dependabot's commit metadata, and refusing a lockfile
 // that lost one.
 //
-// Stdlib node:test/node:assert only (Node 24) — scripts/ is not a vitest
+// Stdlib node:test/node:assert only — scripts/ is not a vitest
 // workspace.
 
 import assert from "node:assert/strict";

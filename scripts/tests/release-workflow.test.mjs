@@ -22,7 +22,7 @@
 //    Removing it (e.g. while tightening permissions) breaks OIDC publishing
 //    exactly as thoroughly, and just as invisibly.
 //
-// Stdlib node:test/node:assert only (Node 24) — scripts/ is not a vitest
+// Stdlib node:test/node:assert only — scripts/ is not a vitest
 // workspace. Deliberately NOT a YAML library: the extractors are
 // single-purpose and fail-closed, so a restructured changesets.yml makes the
 // assertions fail and point here rather than silently pass.

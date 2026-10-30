@@ -9,7 +9,7 @@
 // whose `origin/master` holds a base commit and whose `HEAD` holds the pull
 // request's, and runs the step in it under bash with real git.
 //
-// Stdlib node:test/node:assert only (Node 24) — scripts/ is not a vitest
+// Stdlib node:test/node:assert only — scripts/ is not a vitest
 // workspace.
 
 import assert from "node:assert/strict";

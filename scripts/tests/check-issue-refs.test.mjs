@@ -9,7 +9,7 @@
 // pinned is which strings count as a citation — and every cell below is a
 // distinction the first draft of the pattern got wrong.
 //
-// Stdlib node:test/node:assert only (Node 24) — scripts/ is not a vitest
+// Stdlib node:test/node:assert only — scripts/ is not a vitest
 // workspace; `scripts/scripts-tests.mjs`, which pre-push and Repo Lints run,
 // picks this file up from `scripts/tests/`.
 

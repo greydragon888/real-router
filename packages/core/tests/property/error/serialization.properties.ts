@@ -1,5 +1,5 @@
 import { test } from "@fast-check/vitest";
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import { RouterError } from "@real-router/core";
 
@@ -24,9 +24,9 @@ interface Options {
  * `customFieldsArbitrary` excludes. The expected text is taken before the
  * error is built, so an error that rewrote the caller's values would show.
  *
- * ⚑ Compared as TEXT. `JSON.parse` is the engine's, and V8's substitutes keys
- * in a way no printed seed replays (#1709, see `parseAdoptsPlantedKey`). The
- * text also checks the fields whose values `JSON.stringify` drops or rewrites.
+ * ⚑ Compared as TEXT (#1709): no `JSON.parse` takes part in the verdict, and
+ * the text also checks the fields whose values `JSON.stringify` drops or
+ * rewrites.
  */
 function assertStringifiesAsRecord(
   code: string,
@@ -43,62 +43,6 @@ function assertStringifiesAsRecord(
 
   expect(JSON.stringify(new RouterError(code, { ...options, ...fields }))).toBe(
     expected,
-  );
-}
-
-const BACKSLASH = "\\";
-
-/**
- * An object whose second key is `second`, after `prefix`, padded to sixteen
- * keys. V8 roots object shapes by property count, and a root stops taking new
- * shapes once full; a check that parsed the generated inputs would fill the
- * small counts, not this one.
- */
-function sixteenKeys(
-  prefix: string,
-  second: string,
-  value: unknown,
-): Record<string, unknown> {
-  const record: Record<string, unknown> = { [prefix]: value, [second]: value };
-
-  for (let index = 0; index < 14; index++) {
-    record[`filler${index}`] = value;
-  }
-
-  return record;
-}
-
-function throughJsonParse(record: Record<string, unknown>): unknown {
-  // eslint-disable-next-line unicorn/prefer-structured-clone -- the point is the shape `JSON.parse` leaves behind, which a clone never builds
-  return JSON.parse(JSON.stringify(record));
-}
-
-/**
- * Parses an object whose `prefix` key is followed by a backslash key, which
- * leaves that shape in the realm for later parses to find.
- *
- * ⚠ The caller must hold the returned object until its check is done: once
- * nothing uses the shape, a full garbage collection drops it.
- */
-function plantBackslashShape(prefix: string): unknown {
-  return throughJsonParse(sixteenKeys(prefix, BACKSLASH, 0));
-}
-
-/**
- * Whether this engine's `JSON.parse` carries V8's escaped-key defect: once a
- * backslash key has been parsed after some prefix, a one-character ESCAPED key
- * after the same prefix, in an object of as many keys — a quote, a newline, a
- * `\u0041` — comes back as the backslash (#1709). Fixed upstream in V8
- * `93cd21e8254b` (Chromium bug 521080746).
- */
-function parseAdoptsPlantedKey(): boolean {
-  const prefix = "#1709 engine probe";
-  const planted = plantBackslashShape(prefix);
-  const parsed = throughJsonParse(sixteenKeys(prefix, '"', 0)) as object;
-
-  // Reading `planted` after the parse keeps its shape alive through it.
-  return (
-    Object.hasOwn(planted as object, BACKSLASH) && !Object.hasOwn(parsed, '"')
   );
 }
 
@@ -242,24 +186,6 @@ describe("RouterError Serialization Properties", () => {
       "JSON.stringify prints exactly the expected record",
       (code, options, fields) => {
         assertStringifiesAsRecord(code, options, fields);
-      },
-    );
-
-    it.skipIf(!parseAdoptsPlantedKey())(
-      "the check does not depend on object shapes an earlier JSON.parse left behind (#1709)",
-      () => {
-        const prefix = "#1709 regression cell";
-        const planted = plantBackslashShape(prefix);
-
-        expect(() => {
-          assertStringifiesAsRecord(
-            "NOT_STARTED",
-            {},
-            { field: sixteenKeys(prefix, '"', {}) },
-          );
-        }).not.toThrow();
-        // Keeps `planted` reachable until the check above has run.
-        expect(planted).toStrictEqual(sixteenKeys(prefix, BACKSLASH, 0));
       },
     );
   });

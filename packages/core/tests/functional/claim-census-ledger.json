@@ -486,7 +486,7 @@
       "2bcaafe20e34",
       "fa65391a7532",
       "2763d7fd06ce",
-      "c4c21a8fa01d",
+      "094c754d1aa3",
       "386b972be3ed",
       "679097229bed",
       "186183c1bbb8",
@@ -532,7 +532,7 @@
       "0315222f8f86",
       "9325ed655908",
       "40188487bb22",
-      "1b4957267bef",
+      "5690899d2b2a",
       "4f5f6c1df68f"
     ],
     "packages/core/src/namespaces/OptionsNamespace/adoption.ts": [
@@ -1471,6 +1471,7 @@
       "a417c270bd66",
       "d46204beacb8",
       "e640cb872bbe",
+      "eff9adb98c03",
       "1002a4d43e68",
       "508da06be954",
       "5be01a5066c1",

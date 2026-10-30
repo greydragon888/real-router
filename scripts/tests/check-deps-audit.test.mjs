@@ -28,7 +28,7 @@
 // The stub also answers `--version`, by default with the script's own version
 // floor, so every test runs AT the boundary. The floor's tests are the last two.
 //
-// Stdlib node:test/node:assert only (Node 24) — scripts/ is not a vitest
+// Stdlib node:test/node:assert only — scripts/ is not a vitest
 // workspace; `scripts/scripts-tests.mjs`, which pre-push and Repo Lints run,
 // picks this file up from `scripts/tests/`, so the preventer needs no wiring of
 // its own.

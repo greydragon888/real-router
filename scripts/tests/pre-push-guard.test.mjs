@@ -15,7 +15,7 @@
 // inside pre-push, and a push from a linked worktree exports GIT_DIR to it;
 // inherited, it would aim these fixtures' commands at the real repository.
 //
-// Stdlib node:test/node:assert only (Node 24) — `scripts/scripts-tests.mjs`,
+// Stdlib node:test/node:assert only — `scripts/scripts-tests.mjs`,
 // which pre-push and Repo Lints run, picks this file up from `scripts/tests/`.
 
 import assert from "node:assert/strict";

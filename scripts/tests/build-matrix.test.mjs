@@ -2,7 +2,7 @@
 //
 // Run:  node --test scripts/tests/build-matrix.test.mjs
 //
-// Stdlib node:test/node:assert only (Node 24) — scripts/ is not a vitest
+// Stdlib node:test/node:assert only — scripts/ is not a vitest
 // workspace, and these run with zero install/turbo dependency. Two levels per
 // the design doc acceptance E1 (.claude/ci-acceleration-poc-ru.md §4 PoC-2):
 //   • Level 1 — affected derivation (A5): the rx-only regression that proves the

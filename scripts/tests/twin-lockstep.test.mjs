@@ -19,7 +19,7 @@
 // needed. Sonar/jscpd CPD-exclude these files (sonar-project.properties,
 // .jscpd.json — see #1523); THIS test is the actual drift guard.
 //
-// Stdlib node:test/node:assert only (Node 24) — scripts/ is not a vitest
+// Stdlib node:test/node:assert only — scripts/ is not a vitest
 // workspace.
 
 import assert from "node:assert/strict";

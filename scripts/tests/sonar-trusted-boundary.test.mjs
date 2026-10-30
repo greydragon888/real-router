@@ -34,10 +34,9 @@
 // file of the fork's tree is not read.
 //
 // The permission model is a second layer — Node calls it a seat belt, not a
-// defence against malicious code, a read follows a symlink out of the
-// workspace, and the network is not restricted — so the closure stays the
-// first, and the cells at the end run the scope script under the flags and
-// hold what the flags refuse.
+// defence against malicious code, and a read follows a symlink out of the
+// workspace — so the closure stays the first, and the cells at the end run
+// the scope script under the flags and hold what the flags refuse.
 //
 // The workflow is read through the `yaml` parser (`closed-yaml.mjs`), and a
 // shell line is matched whole against the forms above. The modules are read

@@ -187,11 +187,12 @@ export interface NavigationContext {
    * ⚠ **CodSpeed reports ≈15 % on `navigate/sync-baseline` for this change, and
    * that step is the MODEL, not the clock — #1728, closed as not-planned.**
    * `cpuTotal` is a valgrind model in which this arc is gated by the COMBINED
-   * bytecode of `beginTransition` + `planPhases`: slow inside 600…821 bytes,
-   * fast outside, both edges found to the byte, and the snapshot added 28 and
-   * crossed it. Wall-clock on the x64 runner has master FASTER by 2.9 %. So
-   * there is no cost here to pay down, and any step this arc reports is worth a
-   * wall-clock check before it is worth an investigation.
+   * bytecode of `beginTransition` + `planPhases`: on V8 13.6, slow inside
+   * 600…821 bytes, fast outside, both edges found to the byte, and the
+   * snapshot added 28 and crossed it. Wall-clock on the x64 runner has master
+   * FASTER by 2.9 %. So there is no cost here to pay down, and any step this
+   * arc reports is worth a wall-clock check before it is worth an
+   * investigation.
    *
    * ⚠ Snapshotting does NOT change what plugins receive — the announcement
    * still hands over `opts` ITSELF, because keys core never declared are a
