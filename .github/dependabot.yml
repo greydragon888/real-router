@@ -151,8 +151,8 @@ updates:
         update-types: ["version-update:semver-major"]
       # vitest and its two plugins peer each other's exact version, so any one of
       # them bumped alone fails the re-resolve (measured 2026-09-27: vitest 5.0.1
-      # beside @vitest/coverage-v8 and @vitest/ui 4.1.11), and the Vitest 5
-      # migration is blocked on its own. Majors move by hand, as one.
+      # beside @vitest/coverage-v8 and @vitest/ui 4.1.11). Majors move by hand,
+      # as one.
       - dependency-name: "vitest"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@vitest/coverage-v8"
@@ -250,8 +250,8 @@ updates:
       # under strictPeerDependencies and errors the whole job. Majors move by hand.
       - dependency-name: "vite"
         update-types: ["version-update:semver-major"]
-      # vitest 5 peers @vitest/* at its own exact version and fails the
-      # re-resolve beside their 4.x — the root block has the measurement.
+      # vitest peers @vitest/* at its own exact version, so a major fails the
+      # re-resolve beside the previous one — the root block has the measurement.
       - dependency-name: "vitest"
         update-types: ["version-update:semver-major"]
       # @angular/* peers each other EXACTLY, so any single-package bump breaks

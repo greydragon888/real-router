@@ -57,11 +57,11 @@ export default mergeConfig(
           },
         },
         {
-          // Hand-rolled config — deliberately NO `extends: true`: the analog
-          // plugin must be FIRST in the plugin chain, and inheriting the root
-          // would put any plugin the root config declares ahead of it. (Not
-          // inheriting is the default; `extends: false` is not even a valid
-          // type.)
+          // Hand-rolled config — `extends: false`: the analog plugin must be
+          // FIRST in the plugin chain, and inheriting the root would put any
+          // plugin the root config declares ahead of it. Inheriting is the
+          // default for an inline project.
+          extends: false,
           plugins: [
             angular({
               tsconfig: new URL("./tsconfig.spec.aot.json", import.meta.url)
@@ -110,6 +110,9 @@ export default mergeConfig(
             environment: "jsdom",
             globals: true,
             pool: "threads",
+            // Projects of one run share a worker budget: Vitest refuses two
+            // that differ in it unless `sequence.groupOrder` splits them.
+            maxWorkers: unitConfig.test?.maxWorkers,
             include: ["./tests/aot/**/*.test.ts"],
             // The common config's setup file runs first here too — it holds
             // every cell to the read budget. Read off the exported config, as

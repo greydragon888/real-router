@@ -84,10 +84,10 @@ export default mergeConfig(
        * every iteration — creating/destroying 65k+ spies causes severe slowdowns.
        * Property tests manage their own mock lifecycle via beforeAll/afterAll.
        *
-       * ⚠ All three are stated explicitly because their DEFAULTS differ across
-       * vitest majors — `clearMocks` is off in 4 and on in 5. An omitted flag
-       * here reads as "no opinion" and silently acquires one on the next bump,
-       * against the intent above. `vitest.config.common.mts` needs no such line:
+       * ⚠ All three are stated explicitly because a default can change with a
+       * vitest major, and `clearMocks` defaults to on. An omitted flag here
+       * reads as "no opinion" and takes the default, against the intent above.
+       * `vitest.config.common.mts` needs no such line:
        * it sets `mockReset: true`, which is strictly stronger than `clearMocks`.
        */
       restoreMocks: false,

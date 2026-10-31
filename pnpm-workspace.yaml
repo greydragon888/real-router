@@ -127,14 +127,6 @@ overrides:
   # override outranks semver, so a lower floor can keep a parent on an older release. Drop when
   # the toolchain pulls >=8.5.23 on its own.
   postcss: '>=8.5.29'
-  # fflate < 0.8.3: `unzipSync` can loop forever on a malformed ZIP64 archive
-  # (GHSA-px8p-9vwx-vf98, 7.5). `@arethetypeswrong/core` (via its CLI and tsdown)
-  # declares `^0.8.3`, but `@vitest/ui` declares `^0.8.2`, a range that admits
-  # the affected release; the floor is what excludes it.
-  # Root devDeps, build and test tooling, never in a published @real-router/*
-  # package, and what they unzip is our own build output rather than untrusted
-  # input. Bounded `<0.9` because on a 0.x line the minor IS the major. No 0.9 exists today, so the bound costs nothing.
-  fflate: '>=0.8.3 <0.9'
   # js-yaml 4.x — GHSA-5p4m-2wfm-xmqj (High, quadratic CPU in `!!omap`, fixed 4.3.1)
   # and GHSA-2883-xcg3-v3hh (High, 7.5, fixed 4.3.2). Every parent is dev/build
   # tooling that parses OUR OWN yaml (cosmiconfig, for @commitlint/load), never a

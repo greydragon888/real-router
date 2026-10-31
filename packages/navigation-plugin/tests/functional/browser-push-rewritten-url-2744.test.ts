@@ -310,6 +310,44 @@ describe("a navigation the browser makes to an alias of the route the router sho
     expect(started.getState()?.context.url?.hash).toBe("part");
   });
 
+  it("a navigation the browser starts before the plugin publishes the fragment is not refused as the same state", async () => {
+    const [kase] = CASES;
+    const mock = new MockNavigation("http://localhost/home");
+    const errors: string[] = [];
+    let published: unknown = "not read";
+    let thrown: unknown;
+
+    mock.disablePrecommit();
+    router = createRouter(kase.routes, { defaultRoute: "home" });
+    router.usePlugin(
+      () => ({
+        onTransitionError: (_toState, _fromState, error) => {
+          errors.push(error.code);
+        },
+        onTransitionSuccess: (toState) => {
+          if (toState.name === "users.list") {
+            published = toState.context.url;
+
+            try {
+              mock.navigate("http://localhost/old#part");
+            } catch (error) {
+              thrown = error;
+            }
+          }
+        },
+      }),
+      navigationPluginFactory({}, createMockNavigationBrowser(mock)),
+    );
+    await router.start();
+    await router.navigate("users.list");
+    await settle();
+
+    expect(published).toBeUndefined();
+    expect(thrown).toBeUndefined();
+    expect(errors).toStrictEqual([]);
+    expect(router.getState()?.context.url?.hash).toBe("part");
+  });
+
   it("control: a link to another route with a fragment is not a fragment-only navigation", async () => {
     const [kase] = CASES;
     const seen: NavigationOptions[] = [];

@@ -21,13 +21,9 @@ const config = mergeConfig(
 // `shared/ssr` realpath, which the base `src/**` include drops —
 // without this block the shared sources were measured nowhere.
 // `allowExternal: true` keeps files outside the package root, and the include
-// must be REPLACED with the two specific paths (not concatenated with the
-// base wildcard): a bare `src/**` alongside allowExternal would drag the
-// workspace packages its tests load (core among them) into the report.
+// names this package's own src root-relative, which leaves out the workspace
+// packages its tests load (core among them).
 config.test.coverage.allowExternal = true;
-config.test.coverage.include = [
-  "**/packages/ssr-data-plugin/src/**/*.ts",
-  "**/shared/ssr/**/*.ts",
-];
+config.test.coverage.include = ["src/**/*.ts", "**/shared/ssr/**/*.ts"];
 
 export default config;

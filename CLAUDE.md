@@ -33,7 +33,7 @@ shared/
 
 ## Toolchain Versions
 
-`major.minor` of the key tooling/runtime, kept in context so suggested APIs, flags and config formats match what's actually installed (this stack is bleeding-edge — TS 6, ESLint 10 flat-config, Vitest 4, Turbo 2 — so defaults from training tend to lag). **When a version changes, or you notice a mismatch with the "source of truth" column, update this table.** `major.minor` only — patch drift is noise.
+`major.minor` of the key tooling/runtime, kept in context so suggested APIs, flags and config formats match what's actually installed (this stack is bleeding-edge — TS 6, ESLint 10 flat-config, Vitest 5, Turbo 2 — so defaults from training tend to lag). **When a version changes, or you notice a mismatch with the "source of truth" column, update this table.** `major.minor` only — patch drift is noise.
 
 | Tool / runtime  | Version                                          | Source of truth (actualize from here)                                                          |
 | --------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
@@ -41,7 +41,7 @@ shared/
 | npm             | 11.20                                            | bundled with Node 26 — notes below the table                                                   |
 | pnpm            | 12.11                                            | `packageManager` field, root `package.json` — notes below the table                            |
 | TypeScript      | 6.0                                              | root `devDependencies` (pinned exact, `save-exact`)                                            |
-| Vitest          | 4.1                                              | root `devDependencies`                                                                         |
+| Vitest          | 5.0                                              | root `devDependencies`                                                                         |
 | tsdown          | 0.23                                             | root `devDependencies`                                                                         |
 | Turbo           | 2.11                                             | root `devDependencies`                                                                         |
 | ESLint          | 10.11                                            | root `devDependencies` (flat config)                                                           |

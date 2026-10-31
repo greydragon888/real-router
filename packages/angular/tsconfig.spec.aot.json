@@ -6,7 +6,7 @@
   //
   // module/moduleResolution OVERRIDE the root's NodeNext on purpose. The
   // analog plugin emits by tsconfig `module`, and NodeNext resolves this
-  // package's `"type": "commonjs"` to CJS emit — vitest 4 then rejects the
+  // package's `"type": "commonjs"` to CJS emit — vitest then rejects the
   // `require("vitest")` with "Vitest cannot be imported in a CommonJS module".
   // ES2022 + bundler forces ESM
   // emit regardless of package type — the exact combination proven by

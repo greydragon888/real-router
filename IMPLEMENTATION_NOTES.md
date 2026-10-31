@@ -10202,6 +10202,8 @@ All 22 new mutants come from `CallExpression`, the `empty-expression-mutator` th
 
 ## Coverage globs were repo-relative, and Vitest 4 was the only reason that worked (2026-09-07)
 
+> **Updated (2026-10-31).** The migration-time task below is done: `browser-plugin`, `react` and `ssr-data-plugin` take the root-relative `src/**` on Vitest 5 — see "Vitest 5: three coverage reports shrink at 100 %, and a nested `??` becomes a branch". Under strict matching the bare `src/**` these paragraphs refuse no longer reaches another package.
+
 **Problem.** `vitest.config.unit.mts` declared `coverage.include: ["packages/*/src/**/*.ts", …]`, but every package runs `vitest` from its own directory, so the coverage root is `packages/<pkg>` and the real paths are `src/**`. Vitest 4 matched anyway through loose "contains" matching. Vitest 5 matches strictly against the root, where `packages/*/src/**` matches nothing: measured on the whole workspace, **16 of 23 packages dropped to 0 statements**, `lcov.info` went to 0 bytes, and the 100 % thresholds passed **vacuously** — exit code 0, CI green, SonarCloud fed 0 % on new code. The `.claude/pnpm-12-…` study found the same shape one layer down; this is the class, not the incident.
 
 **Solution.** The root include becomes `["src/**/*.ts", "src/**/*.tsx"]`, and `packages/svelte` — the one package whose own override was repo-relative without `allowExternal` — becomes `src/**/*.{ts,svelte,svelte.ts}`. Both were verified on BOTH majors: on Vitest 4 all 23 packages reproduce their baseline statement counts and percentages exactly (46/46 turbo tasks green), and on Vitest 5 no package reports zero.
@@ -15566,3 +15568,43 @@ Without a `dist`, core's dry run passes with 5737 tests, the 5740 of a hand excl
 **The CodSpeed gate missed the name of its own exception.** `scripts/codspeed-gate.mjs` skips a measured package's vitest, eslint and stryker configs, and its pattern read `^(vitest|eslint|stryker)\.config\.`, which `vitest.stryker.config.mts` does not match. The edit above came back `RUN` on a file only Stryker's runner reads. The pattern now names that file, and `scripts/tests/codspeed-gate.test.mjs` holds each of the five names.
 
 **Not covered.** logger-plugin and rx got full runs. core got dry runs and that one file, so its whole-package score after the major is still the unmeasured baseline "Stryker 10 needs Babel 8" names. All of it ran on macOS.
+
+## Vitest 5: three coverage reports shrink at 100 %, and a nested `??` becomes a branch (2026-10-31)
+
+**Problem.** `vitest`, `@vitest/ui` and `@vitest/coverage-v8` move from 4.1.12 to 5.0.5 as one, by hand: Dependabot's `ignore` holds the major, because the three peer each other's exact version. The install needs nothing. Strict peers pass, the tree holds one `vitest`, and no override moves, so what breaks is what a test count does not show. With the bump alone, 22 of 23 packages report their v4 test count, and the failures are of three kinds.
+
+| package             | v4                  | v5, bump alone         | shown by               |
+| ------------------- | ------------------- | ---------------------- | ---------------------- |
+| `react`             | 41 files in `lcov`  | 7 files, 100 %, green  | nothing                |
+| `ssr-data-plugin`   | 16 files            | 9 files, 100 %, green  | nothing                |
+| `browser-plugin`    | 21 files            | 17 files, 100 %, green | nothing                |
+| `angular`           | 447 tests           | 881 tests, 4 failed    | the run                |
+| `navigation-plugin` | 199 of 199 branches | 204 of 205 branches    | the coverage threshold |
+
+**Three reports shrink, and the thresholds stay met.** The three owners of `shared/<dir>` kept repo-relative includes because no literal was exact under both majors (see "Coverage globs were repo-relative"). Vitest 5 matches them strictly against the package root, where they match nothing, so each report keeps its shared files and loses the package's own. All three now name `src/**`:
+
+```ts
+// Before
+config.test.coverage.include = ["packages/react/src/**/*.ts", "packages/react/src/**/*.tsx", "**/shared/dom-utils/**/*.ts"];
+
+// After
+config.test.coverage.include = ["src/**/*.ts", "src/**/*.tsx", "**/shared/dom-utils/**/*.ts"];
+```
+
+Lines, branches and functions equal v4 in all three: 909/531/177, 646/376/147 and 350/216/61. The files `lcov.info` gains (5, 1 and 1) carry no line: they are type-only. No file of another package enters.
+
+⚠ **The test that holds these includes read them as Vitest 4 did.** `check-coverage-scope.test.mjs` prefixed an owner's entries with `**/`, so the old globs passed it on v5 while the reports shrank. An owner's files are now held from the package's directory like every other package's, and restoring either old form fails the test. The same test called `resolveConfig`, which returns the Vite config itself on v5, and it compares `exclude` as a prefix because v5 appends entries of its own there.
+
+**The gap of "Coverage leaves files out by role, and Sonar's coverage exclusions are generated (2026-10-07)" closes.** The note left an owner reporting only the files its tests load. 5.0.4 fixes that for `allowExternal` ([#11513](https://github.com/vitest-dev/vitest/issues/11513)). A planted file no test imports, in `ssr-data-plugin/src`, now fails the thresholds at 99.71 %, where v4 exits 0 at 100 %.
+
+**`angular`'s `aot` project inherits by default.** `extends` is `true` for an inline project on v5, so `aot` took the root's `include` and ran the whole suite under the Angular compiler. `extends: false` restores it, and Vitest then refuses the run, in 240 ms and with "no tests": _"Projects "aot" and "jit" have different 'maxWorkers' but same 'sequence.groupOrder'"_. `jit` inherits 4 and `aot` inherited nothing, so `aot` now reads `unitConfig.test?.maxWorkers`. Tests and `lcov.info` then equal v4.
+
+**`ast-v8-to-istanbul` 1.0.7 walks into nested logical expressions** ([#203](https://github.com/AriPerkkio/ast-v8-to-istanbul/pull/203)), and `@vitest/coverage-v8` 5 requires it. `navigation-plugin` gains 6 branches. Five are taken, and the sixth is the `?? ""` of `hashChange` in `navigate-handler.ts`, whose right side no test had run. Every committed state carries `context.url`, so that side is reachable only between the commit and the plugin's `onTransitionSuccess`: a listener registered before the plugin starts a browser navigation there. With precommit handlers the plugin's own write aborts that navigation before its commit, and the fallback's value reaches nothing. Without them, `mock.disablePrecommit()`, the value decides whether the navigation is forced or ends in `SAME_STATES`. A test on that path (`browser-push-rewritten-url-2744.test.ts`) kills both mutants, `?? "part"` and the chain without `?.`. On the precommit path the first of them cannot die, and the second dies only on an assertion at the call: core isolates what a listener throws.
+
+**Why `fsModuleCache` stays on, and what it does not buy.** 5.0.4 turned it on by default, and it writes `node_modules/.vitest-cache` at the workspace root (139 MB after two full `test` runs, 434 MB after the runs of this migration). It buys no time a full run can show: in one window, full `test` took 143 s on v4 and 144 s on v5 cold, then 120 s on v5 warm and 120 s on the closing v4 repeat, so the second pass is faster on either major. It stays because turning it off would be one more line for no gain, and it moves no result: `lcov.info` is byte-identical with the cache off, cold and warm; an edit in `core` reaches a cached run of `sources`. The case to fear was the AOT project, whose output for a fixture can depend on an imported directive, and `@analogjs/vite-plugin-angular` does not opt out. A changed input name and a changed selector on `RealLink`, with the fixture untouched, gave the same 4 and 6 failures warm and with the cache off. Vitest runs on GitHub-hosted runners only, so the directory never accumulates in CI. `vitest --clearCache` empties it.
+
+**What did not move.** `test:properties` and `test:stress` report the v4 counts in every package, and the 33 examples their 382 tests one by one. Core's four shards merge to the unsharded `lcov.info`, and three of the four go red. The read budget still fails a cell and passes the same read at collection. `@stryker-mutator/vitest-runner` 10.1.1 needs no patch: logger-plugin has 413 mutants and a dry run of 191 tests on both majors, 90.53 % on v4 and 90.83 % on v5 without `CompileError`, and one mutant moves between Killed and Survived, in the timing-dependent `timing.ts`. The dry runs of rx and core hold 168 and 5737 tests. `pnpm dedupe` moves `magic-string` 1.4.1 → 1.4.5 under `@sveltejs/vite-plugin-svelte`, whose `vitePreprocess` builds the published package, and `svelte-package` gives a byte-identical `dist`.
+
+**The `fflate` floor goes.** `@vitest/ui` 5 declares `^0.8.3`, as `@arethetypeswrong/core` does, so no parent admits the release GHSA-px8p-9vwx-vf98 affects and `lint:overrides` reports the entry dead. The tree stays on 0.8.3.
+
+**Not covered.** Core's whole-package mutation score stays unmeasured on either major. The Dependabot `ignore` stays: it holds the next major the same way.

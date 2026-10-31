@@ -1405,7 +1405,9 @@ describe("RouteView", () => {
       expect(screen.getByTestId("spinner")).toBeInTheDocument();
 
       // After lazy resolves, content is shown
-      await expect(screen.findByTestId("lazy-keep")).resolves.toBeVisible();
+      const content = await screen.findByTestId("lazy-keep");
+
+      expect(content).toBeVisible();
 
       // Navigate away — content is hidden via Activity
       await act(async () => {

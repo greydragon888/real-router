@@ -130,7 +130,7 @@ const ROLE_EXCLUDE = [
 /**
  * Vitest's reading of each package's config, from the package's directory, as
  * `vitest run` reads it there: the config it finds, and the coverage options
- * that config sets before vitest adds its own. It writes them to the file its
+ * that config sets, with what vitest adds. It writes them to the file its
  * first argument names, so nothing a plugin prints can garble them.
  */
 const RESOLVE = `
@@ -146,7 +146,7 @@ const RESOLVE = `
     const dir = join(root, "packages", name);
 
     process.chdir(dir);
-    const { viteConfig } = await resolveConfig({ root: dir, watch: false });
+    const viteConfig = await resolveConfig({ root: dir, watch: false });
     const coverage = viteConfig.test.coverage;
 
     resolved[name] = {
@@ -185,10 +185,9 @@ test("every package's coverage options resolve by role, and isPhantom reads its 
   // A name in `exclude`, or an `include` that narrows by name, leaves out a
   // file with code in that package — a name in the base list does it in all of
   // them at once (#1838). Each tracked code file of a package is held to its
-  // `include` as vitest finds a file no test loads: by the glob, from the
-  // package's directory. An owner — `allowExternal`, to measure its
-  // `shared/<dir>` — reports only the files its tests load (#2694), so its own
-  // files and its shared dir are held as vitest matches a loaded file.
+  // `include` as vitest matches a file: by the glob, from the package's
+  // directory. An owner — `allowExternal`, to measure its `shared/<dir>` — has
+  // that dir outside the package, and its entry reaches it with a `**/`.
   const names = readdirSync(join(ROOT, "packages"))
     .filter((name) =>
       existsSync(join(ROOT, "packages", name, "vitest.config.mts")),
@@ -225,20 +224,14 @@ test("every package's coverage options resolve by role, and isPhantom reads its 
     const owned = options.include
       .map((entry) => /^\*\*\/shared\/([a-z-]+)\//.exec(entry)?.[1])
       .filter((dir) => dir !== undefined);
-    const files = options.allowExternal
-      ? [
-          ...codeFiles(`packages/${name}/src`),
-          ...owned.flatMap((dir) => codeFiles(`shared/${dir}`)),
-        ]
-      : codeFiles(`packages/${name}/src`).map((path) =>
-          path.slice(`packages/${name}/`.length),
-        );
-    const included = options.allowExternal
-      ? (file) =>
-          options.include.some((entry) =>
-            matchesGlob(file, entry.startsWith("**/") ? entry : `**/${entry}`),
-          )
-      : (file) => options.include.some((entry) => matchesGlob(file, entry));
+    const files = [
+      ...codeFiles(`packages/${name}/src`).map((path) =>
+        path.slice(`packages/${name}/`.length),
+      ),
+      ...owned.flatMap((dir) => codeFiles(`shared/${dir}`)),
+    ];
+    const included = (file) =>
+      options.include.some((entry) => matchesGlob(file, entry));
 
     assert.equal(
       options.configFile,
@@ -251,9 +244,12 @@ test("every package's coverage options resolve by role, and isPhantom reads its 
       "./coverage",
       `${name}: reportsDirectory`,
     );
+    const exclude = [...links, ...ROLE_EXCLUDE];
+
+    // Vitest appends its own entries after these.
     assert.deepEqual(
-      options.exclude,
-      [...links, ...ROLE_EXCLUDE],
+      options.exclude.slice(0, exclude.length),
+      exclude,
       `${name}: exclude`,
     );
     assert.equal(
