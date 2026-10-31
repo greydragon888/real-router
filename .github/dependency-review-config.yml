@@ -80,8 +80,8 @@ allow-dependencies-licenses:
 # >>> sync-config: allow-ghsas — the GHSA ids of scripts/osv-scanner.toml
 allow-ghsas:
   - GHSA-wrw7-89jp-8q8g
-  - GHSA-86w9-cpqp-85rv
   - GHSA-pqg4-j6r4-53mv
-  - GHSA-qwgh-2vcv-g2f7
   - GHSA-gcqx-w48m-w2h4
+  - GHSA-3g3m-2fjr-6pw4
+  - GHSA-g3hv-75wg-m249
 # <<< sync-config: allow-ghsas

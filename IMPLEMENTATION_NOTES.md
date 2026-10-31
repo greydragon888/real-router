@@ -13897,6 +13897,8 @@ Code in either step reaches the later steps through `$GITHUB_ENV` and `$GITHUB_P
 
 ## devalue takes the 5.9 patch, and node-forge's advisory is allowlisted (2026-10-02)
 
+> **Updated (2026-10-31).** node-forge 1.4.1 fixes GHSA-86w9-cpqp-85rv, and `@sonar/scan` still pins 1.4.0: an override on that edge replaces the allowlist entry ("`lint:audit` goes red on advisories of one evening: three packages move, two enter the allowlist").
+
 **Problem.** Pre-push `lint:audit` went red on two packages. `devalue` 5.9.2, in the root and the examples lockfiles, is affected by seven advisories, three of them High and published on 2026-10-01; 5.9.3 fixes all of them. `node-forge` 1.4.0, in the root lockfile only, is affected by GHSA-86w9-cpqp-85rv (High): published on 2026-09-03, it turned the gate red only after OSV modified it on 2026-10-01 at 21:40Z. Dependabot's security PRs #2647 and #2648 proposed `devalue` 6.0.2.
 
 **Solution.**
@@ -15419,3 +15421,22 @@ The strict date parse is a commit of its own after this one, and a revert of thi
 **The bench harness's process name changes too.** Node renamed its main thread in 25.5.0; the banner on "The bench process is OOM-killed at the cohort boundary, and the diagnosis that named Chromium was reading Node's own thread name" has the new name and what it does to `pgrep`.
 
 **Where the cross-router bench measures on Node, the deep chain moved for two engines, `tanstack` and real-router.** `matcher-bench` matches routes in Node itself, with the same 9 reps in every run. A dispatch on `1a84e915a` (run `41014230952`, Node 26.13.0) against the scheduled run of 2026-10-25 (`40243315968`, Node 24.18.0), at the same router versions, puts the deep chain at 0.79 of its old time for `tanstack` and at 0.87 for real-router. Two pairs of weekly scheduled runs on 24.18.0 — 10-18 against 10-12 (`39174401885`, `38187814030`), where no matcher's version changed, and 10-25 against 10-18, where real-router's core moved from 0.148.0 to 0.154.0 and `@angular/router` from 22.2.0 to 22.2.3 — keep the deep chain of every matcher whose version stayed at 0.96–1.00, `tanstack`'s at 0.99 in both and real-router's at 0.99 in the first; the other deep chains of the Node 26 pair lie at 0.96–1.01. The flat table drifts more: 0.86–1.10 by engine for the matchers whose version stayed in the two weekly pairs, against 0.89–1.06 in the Node 26 pair. The geometric mean over its 100 points is 0.928, and 0.973 without the two deep chains. The browser cells run in Playwright's Chromium; their median ratio over 2097 points is 1.017, from 10 runs on a weekday morning against 50–100 on a Sunday night, too coarse to show a runtime effect.
+
+## `lint:audit` goes red on advisories of one evening: three packages move, two enter the allowlist (2026-10-31)
+
+**Problem.** `lint:audit` failed in `Repo Lints` and in pre-push with no commit behind it. On `3fcff6308` it reported 23 findings from 15 advisories that GitHub published on 2026-10-30 between 22:59Z and 23:10Z: 11 on `node-forge` 1.4.0, and one each on `follow-redirects` 1.16.1, `joi` 18.2.9, `glob` 13.0.6 and `minimatch` 3.1.5, 5.1.9, 9.0.9 and 10.2.6. The same run listed GHSA-qwgh-2vcv-g2f7 under `has unused ignores:`.
+
+**Solution.**
+
+- `node-forge` resolves to 1.4.2 through `'@sonar/scan>node-forge': ~1.4.1` in the root `pnpm-workspace.yaml`. `@sonar/scan` pins an exact 1.4.0 through 5.0.2, its latest, so no bump of the parent moves it.
+- GHSA-86w9-cpqp-85rv leaves `scripts/osv-scanner.toml`: api.osv.dev answers clean for 1.4.1 and 1.4.2, which meets the entry's condition.
+- `follow-redirects` 1.16.2, in the root and the examples, through `pnpm update`. No override: `axios` 1.20.0 declares `^1.16.0`, and the lockfile is what holds the version.
+- `joi` 18.3.1 in the examples, and their floor rises from `>=18.2.5` to `>=18.3.1`.
+- GHSA-3g3m-2fjr-6pw4 (`glob`) and GHSA-g3hv-75wg-m249 (`minimatch`) enter the allowlist.
+- GHSA-qwgh-2vcv-g2f7 leaves it. OSV modified the advisory on 2026-10-30 at 15:45Z to the range from `block-buffer` 0.11.0 to 0.12.1, and both Tauri lockfiles hold 0.10.4. This is the fourth shape of the entry above, "the advisory was WITHDRAWN": the record moved, not the dependency.
+
+**Why an override for node-forge.** The allowlist entry stood because no release fixed the advisory. One does now, on the same line, and an override leaves the tree clean of all 12 advisories instead of adding 11 entries for a package the entry's own text calls unused by every published package.
+
+**Why allowlist entries for glob and minimatch.** Each fix sits in a major no parent declares: `glob` 14.0.2 above the `^13` of `rimraf` 6.1.3 and `js-beautify` 2.0.3, `minimatch` 11.0.1 above the lines of ESLint, its plugins, Stryker and the rest, and no release of those lines has it. An override would run them on a major they never declared, to close advisories that do not reach this repository. Each entry's comment gives the path; `pnpm why -r --prod` finds neither package.
+
+**Measured.** `lint:audit` finds no issue in the five lockfiles and prints no unused ignore; `lint:overrides`, `lint:dedupe`, `lint:deps` and `lint:config-sync` pass, and so do the 31 tests of `osv-allowlist` and `check-deps-audit`. No workflow runs `pnpm sonar:local`, so the calls of `extractTruststoreCerts` from `@sonar/scan`'s `src/request.js` ran by hand against its node-forge 1.4.2, over a PKCS#12 file built with the same library: they return the certificate as PEM. `wait-on` 9.1.0 with `joi` 18.3.1 waits on a file resource and exits 0.

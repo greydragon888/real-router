@@ -125,12 +125,13 @@ overrides:
   # Bounded `<5` deliberately: 5.x is a separate major these consumers don't declare, and an
   # open floor would let dedupe jump the whole tree onto it. Drop when the tooling pulls >=4.3.2.
   js-yaml: '>=4.3.2 <5'
-  # joi < 18.2.5 — GHSA-gg4h-3hg2-grpc and GHSA-6w3j-5fw6-r9vr (both Low, 3.7),
-  # fixed in 18.2.4 and 18.2.5 respectively, so one floor at 18.2.5 clears both.
+  # joi < 18.3.1 — GHSA-gg4h-3hg2-grpc and GHSA-6w3j-5fw6-r9vr (both Low, 3.7),
+  # fixed in 18.2.4 and 18.2.5, and GHSA-4528-x5fx-h6hg (High), fixed in 18.3.1,
+  # so one floor at 18.3.1 clears all three.
   # Its only consumer is `wait-on`, which the example e2e suites use to block on a
   # dev server — dev tooling, never a published @real-router/* package. Unbounded
   # above like the other 18.x floors here: joi is on a stable major.
-  joi: '>=18.2.5'
+  joi: '>=18.3.1'
 updateNotifier: false
 saveExact: true
 # ⚠ `ignore` keeps pnpm-lock.yaml ONE YAML document: GitHub's dependency graph
