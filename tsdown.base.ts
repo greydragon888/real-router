@@ -130,13 +130,11 @@ export const createConfig = (opts: CreateConfigOptions = {}): UserConfig[] => {
     // judged intended against a reference library of the same build (see each
     // package's CLAUDE.md); this config ignores nothing.
     publint: true,
-    // ⚠ `profile` is explicit because tsdown 0.23.0 changed the default from
-    // `strict` to `esm-only`, which ignores CJS resolution failures — and the
-    // typings still document `@default 'strict'`, so the change is invisible
-    // from the config's type. This repo publishes dual ESM/CJS, and `dist/cjs`
-    // has been the half that broke unnoticed before, so the coverage named
-    // above (node10 / node16-cjs / node16-esm / bundler) is required rather
-    // than default.
+    // ⚠ `profile` is explicit because tsdown defaults to `esm-only`, which
+    // ignores node10 and CJS resolution failures. This repo publishes dual
+    // ESM/CJS, and `dist/cjs` has been the half that broke unnoticed before, so
+    // the coverage named above (node10 / node16-cjs / node16-esm / bundler) is
+    // required rather than default.
     attw: { profile: "strict" },
   };
 
@@ -151,6 +149,11 @@ export const createConfig = (opts: CreateConfigOptions = {}): UserConfig[] => {
     defineConfig({
       ...commonConfig,
       format: "cjs",
+      // ⚠ tsdown builds `cjs` for Node.js whatever `platform` says. From 0.23.4 it
+      // warns on `"browser"`, and `failOnWarn` makes that warning a failed
+      // `bundle` under CI alone. `"neutral"` reaches the same rolldown
+      // `platform: "node"`.
+      platform: platform === "browser" ? "neutral" : platform,
       outDir: "dist/cjs",
       ...custom,
     }),

@@ -15472,3 +15472,40 @@ The strict date parse is a commit of its own after this one, and a revert of thi
 - The real `@sonar/scan` CLI, with a `.p12` truststore and a stub on 127.0.0.1, logs `1 CA certificates found in truststore` on node-forge 1.4.2.
 
 **Not covered.** No Windows installer was built. NSIS and Squirrel run on Windows, or through wine and mono, and the path through `electron-winstaller` was exercised by its calls alone.
+
+## tsdown 0.23.4 warns on a browser CJS build, and `failOnWarn` fails it under CI alone (2026-10-31)
+
+**Problem.** tsdown 0.23.4 warns when a `cjs` config says `platform: "browser"`, because it builds `cjs` for Node.js whatever the config says. `createConfig` passed one `platform` to both formats, so all seven packages of `createBrowserConfig` reach the warning. `failOnWarn: "ci-only"` sends it to `logger.error`, which prints and sets `process.exitCode = 1` without throwing: `dist` comes out whole and `bundle` exits 1. Without `CI` the same tree prints a `WARN` and exits 0, so the local hooks pass what CI refuses. On a bare bump under `CI=1`, six packages failed and `pnpm -r` skipped six that depend on them, `persistent-params-plugin` among them, which fails on its own too.
+
+**Solution.** The CJS half of `createConfig` asks for `"neutral"` where the package asked for `"browser"`:
+
+```ts
+// before
+defineConfig({ ...commonConfig, format: "cjs", outDir: "dist/cjs", ...custom }),
+
+// after
+defineConfig({
+  ...commonConfig,
+  format: "cjs",
+  platform: platform === "browser" ? "neutral" : platform,
+  outDir: "dist/cjs",
+  ...custom,
+}),
+```
+
+The fix lands alone. `tsdown` stays at 0.23.1 until 0.23.4 and rolldown 1.2.16 are past the seven-day `cooldown` of `.github/dependabot.yml`: both were two days old, and the measurements below are of the bump that will follow.
+
+**Why `"neutral"`.** It changes nothing that is built. Both versions pass rolldown `platform: "node"` for every `cjs` build, and the warning aside, `config.platform` is only compared with `"node"`, where `"browser"` and `"neutral"` agree. The warning's other suggestion, `inputOptions: { platform: "browser" }`, does change the build: rolldown then leaves `import.meta` to tsdown's `ShimsPlugin`.
+
+**The `attw` comment in `tsdown.base.ts`.** 0.23.4 corrects the typings to `@default 'esm-only'`, so the comment no longer says they disagree; "tsdown 0.23 quietly relaxes `attw`" above records when they did. The same release filters problems through `visibleProblems`. `strict` loses nothing to it, because `checkPackage` lists each problem under the resolution that found it.
+
+**Measured** under `CI=1`, every package bundled, on macOS.
+
+- A repeated build gives 658 of 658 files identical, on 0.23.1 and on 0.23.4.
+- The fix alone: 0.23.1 with and without it, 658 of 658 identical; 0.23.4 with and without it, the seven packages identical. So it can land before the bump.
+- 0.23.4 with rolldown 1.2.16 against 0.23.1 with 1.2.14: exported names and external specifiers do not differ, and `angular`, `solid` and `svelte` are byte-identical. 24 of the 127 JS files differ. With mangled names, chunk hashes and the order of chunk imports taken out, 12 of them remain, and they come from three source sites where the minifier writes `!a && b` as `a || b` on a discarded value. The 162 `.d.ts` that differ lose their `//#region` markers, 21 kB of 1 MB, and differ otherwise by the order of imports and, in `cloneRouter`, by which of two `Router` imports takes the `$1` alias. The chunk order matches rolldown#11298 and the markers rolldown#11235 in the changelogs; neither was isolated.
+- Chunk import order is evaluation order, so it was run rather than read: `smoke-test-packages.sh` loads 68 of 68 exports, and a router flow through core and `logger-plugin` prints the same on both versions, ESM and CJS.
+- A `.d.ts` importing a missing file (`InternalResolutionError`, no `resolutionKind`) and a `require` condition pointing at ESM (`CJSResolvesToESM`) give `rc=1` and the same lines from `attw` on both versions; the clean package passes on both.
+- `size-limit` exceeds on the same five entries before and after. `codspeed-gate.mjs` answers `RUN`: rolldown and `@oxc-project/types` are in vite's closure. A commit touching docs alone answers `skip`.
+
+**Not covered.** CI runs rolldown's Linux binding and these runs used the macOS one. CodSpeed's numbers were not read.
