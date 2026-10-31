@@ -14979,6 +14979,8 @@ Nothing in the repository caught either form. Under the configuration before thi
 > **Updated (2026-10-13).** The overrides check judges an entry by the ranges it
 > rewrites, not by resolving without it. See "Overrides are judged against the ranges their parents declare".
 
+> **Updated (2026-10-31).** Measured: 12.9.0 makes the `@vue/test-utils` hook of both `.pnpmfile.mjs` unnecessary, and 12.7.0 the root's `danger` hook. See "pnpm 12.16.1, and the optional peer each lockfile now records".
+
 **Problem.** The pin was pnpm 12.4.1, seven minors behind `latest`, 12.11.2. Two of the changes since touch what this repository reads.
 
 - ⚠ **Removing an override re-resolves the packages it targeted** (12.7.0, pnpm#4587). 12.4.1 kept the version an override had locked while every declared range still accepted it. The check #2646 asks for decides whether an override is still needed by resolving without it, so its verdict moves with the pnpm: on a copy of the root, removing `postcss: '>=8.5.26'` leaves the locked 8.5.28 under 12.4.1 and resolves 8.5.29, a newer release, under 12.11.2.
@@ -15608,3 +15610,36 @@ Lines, branches and functions equal v4 in all three: 909/531/177, 646/376/147 an
 **The `fflate` floor goes.** `@vitest/ui` 5 declares `^0.8.3`, as `@arethetypeswrong/core` does, so no parent admits the release GHSA-px8p-9vwx-vf98 affects and `lint:overrides` reports the entry dead. The tree stays on 0.8.3.
 
 **Not covered.** Core's whole-package mutation score stays unmeasured on either major. The Dependabot `ignore` stays: it holds the next major the same way.
+
+## pnpm 12.16.1, and the optional peer each lockfile now records (2026-10-31)
+
+**Problem.** The pin was pnpm 12.11.2, five minors behind `latest`, 12.16.1. Three of the changes since reach what this repository runs:
+
+- ⚠ **The lockfile records every peer a package declares, one its own dependency supplies included** (12.15.0, pnpm#17056). `ajv-formats` 3.0.1 declares `ajv` both as a dependency and as an optional peer, so from 12.15.0 on `pnpm dedupe --check` fails in all three workspaces — "The lockfile would be rewritten, but no dependency resolution would change" — while it passes under 12.14.0 and 12.11.2.
+- **`pnpm dedupe --check` ignores a `deprecated` notice that the registry added or removed after the lockfile was written** (12.16.0, pnpm#17198). Such a notice turned `lint:dedupe` red on Dependabot PR #2658, on a runner whose metadata cache was fresh.
+- **`pnpm pack` and `pnpm publish` honour an `.npmignore` below the package root when `files` is set** (12.14.0, pnpm#16909). ng-packagr writes `packages/angular/dist/.npmignore`, which names `ssr/package.json`.
+
+**Solution.**
+
+- `packageManager` → `pnpm@12.16.1` in the root, `examples/` and `cross-router-bench/` manifests. The `+sha512.<hex>` is decoded from `pnpm view pnpm@12.16.1 dist.integrity`; the decoder reproduced the outgoing 12.11.2 pin first, and the sha512 of the downloaded tarball equals the decoded value.
+- One `pnpm dedupe` per workspace. Each lockfile gains five lines: the optional peer of `ajv-formats@3.0.1`, recorded as `ajv: ~8.20.0`, the range the `ajv@8` override writes. No resolved version moves.
+- `pnpm self-update 12.16.1` on each machine, outside the repository.
+
+**Why — measured**, with the `@pnpm/exe.darwin-arm64` binary of each version, in a worktree at `d143f414b`:
+
+- ⚠ **`lint:dedupe` passes under one of the two versions at a time.** On the new lockfiles, 12.11.2's `pnpm dedupe` removes the five lines in each workspace, while its `install --frozen-lockfile` accepts them. A machine still on 12.11.2 fails pre-push here, and `.husky/pre-commit` refuses its commit before that.
+- 12.16.1's `install --frozen-lockfile` takes 0.18 s on a `node_modules` that 12.11.2 installed, and its `pnpm update` passes there; 12.16.0 makes `pnpm update` refuse a `node_modules` it judges incompatible. `install --lockfile-only` leaves each lockfile as it was. The lockfile stays one YAML document under `pmOnFail: ignore`; a probe project without the setting gets two.
+- The `deprecated` fix, with a control: the examples' lockfile with the `deprecated:` line of `boolean@3.2.0` removed fails 12.11.2's `dedupe --check` with the message of #2658 and passes 12.16.1's.
+- Publishing: `pnpm pack` of the 23 packages gives 22 tarballs byte-identical to 12.11.2's, whose packing is deterministic. `@real-router/angular` leaves out `dist/ssr/package.json` from 12.14.0 on, as `npm pack`, which `attw --pack` runs for `lint:types`, already does. attw reports the same problems and resolutions for the tarballs of both versions, and a tarball without `dist/types/real-router-angular-ssr.d.ts` changes them.
+- `pnpm view` answers `ERR_PNPM_FETCH_404` for an absent package and `ERR_PNPM_PACKAGE_NOT_FOUND` with "No matching version found" for an absent version, the answers `.changeset/unpublished-packages.mjs` classifies.
+- 12.16.0 resolves a project's dependencies from its own ranges when `autoDedupe` is off, and pnpm's documentation advises `autoDedupe: true` where CI runs `pnpm dedupe --check`. Six merged Dependabot PRs, replayed on their parents — the manifest edits, then the updates in the form `scripts/resolve-dependabot.sh` reapplies them — leave duplicates in three under 12.11.2 (#2805, #2712, #2812), in two under 12.16.1 (#2805, #2812), and in one with `autoDedupe: true` (#2805); #2842, #2808 and #2803 leave none under any. The dedupe of `.husky/pre-commit` and `dependabot-dedupe.yml` stays needed either way, and the setting is not adopted.
+- `lint:audit`, `lint:deps` and `lint:overrides` pass. The new peer record lies outside the edges `lint:overrides` reads: another range written there leaves its verdict as it was.
+- `scripts/codspeed-gate.mjs` answers `skip` for this change and `RUN` for the merge of #2805, which moved vue.
+
+**The `readPackage` hooks of both `.pnpmfile.mjs` stopped being needed before 12.11.2.** Without the `danger` block, a fresh resolution of the root manifests leaves danger without undici under 12.4.1, 12.5.0 and 12.6.0, and gives it undici 7.30.1 under 12.7.0 and every later version measured. Without the `@vue/test-utils` block, locking vue at 3.5.43 and then updating it alone to 3.5.44 keeps `@vue/server-renderer` 3.5.43 beside 3.5.44 under 12.4.1 and 12.8.2, and leaves only 3.5.44 from 12.9.0 on. Each of these resolutions writes its lockfile and then fails `strictPeerDependencies` on `@emnapi/core` and `@emnapi/runtime` of the `benchmarks` project, under every version measured. Removing the hooks is a change of its own.
+
+**Repeated on `7ea1f6408`, 13 commits after `d143f414b` and past Vitest 5:** each lockfile needs the same five lines. `pnpm dedupe --check` passes under 12.16.1 and fails under 12.11.2 in all three workspaces, the pin equals the decoded `dist.integrity`, and `lint:overrides`, `lint:deps` and `lint:audit` pass. The other measurements above stay at `d143f414b`.
+
+⚠ **A worktree on a commit that pins 12.11.2 cannot commit on a machine that runs 12.16.1**, as with the previous pin; it commits again once rebased onto this one.
+
+**Not measured.** The publish itself: the release job's OIDC exchange and provenance run under 12.16.1 for the first time on the next release.

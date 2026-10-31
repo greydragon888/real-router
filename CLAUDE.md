@@ -39,7 +39,7 @@ shared/
 | --------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
 | Node.js         | 26                                               | **`.nvmrc`** — notes below the table                                                           |
 | npm             | 11.20                                            | bundled with Node 26 — notes below the table                                                   |
-| pnpm            | 12.11                                            | `packageManager` field, root `package.json` — notes below the table                            |
+| pnpm            | 12.16                                            | `packageManager` field, root `package.json` — notes below the table                            |
 | TypeScript      | 6.0                                              | root `devDependencies` (pinned exact, `save-exact`)                                            |
 | Vitest          | 5.0                                              | root `devDependencies`                                                                         |
 | tsdown          | 0.23                                             | root `devDependencies`                                                                         |
