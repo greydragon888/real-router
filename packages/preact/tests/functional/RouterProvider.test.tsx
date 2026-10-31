@@ -15,7 +15,7 @@ import type { ComponentChildren, FunctionComponent } from "preact";
 describe("RouterProvider component", () => {
   let router: Router;
 
-  const wrapper = ({ children }: { children: ComponentChildren }) => (
+  const wrapper = ({ children }: { children?: ComponentChildren }) => (
     <RouterProvider router={router}>{children}</RouterProvider>
   );
 

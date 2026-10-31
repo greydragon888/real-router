@@ -19,7 +19,7 @@ import type { FunctionComponent, ComponentChildren } from "preact";
 describe("useRouteNode - Integration Tests", () => {
   let router: Router;
 
-  const wrapper = ({ children }: { children: ComponentChildren }) => (
+  const wrapper = ({ children }: { children?: ComponentChildren }) => (
     <RouterProvider router={router}>{children}</RouterProvider>
   );
 

@@ -10,7 +10,7 @@ import type { ComponentChildren } from "preact";
 
 const wrapper =
   (router: Router) =>
-  ({ children }: { children: ComponentChildren }) => (
+  ({ children }: { children?: ComponentChildren }) => (
     <RouterProvider router={router}>{children}</RouterProvider>
   );
 

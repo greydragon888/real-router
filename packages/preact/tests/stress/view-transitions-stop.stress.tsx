@@ -209,7 +209,9 @@ describe("R — viewTransitions + router.stop() mid-VT (§7.2 #9, M20)", () => {
     // Unmount triggers the useEffect cleanup → vt.destroy() is called.
     // destroy() calls resolveAndClear() + skipTransition(). Both are
     // idempotent if already resolved / already called during stop's abort.
-    expect(() => unmount()).not.toThrow();
+    expect(() => {
+      unmount();
+    }).not.toThrow();
   });
 
   // -----------------------------------------------------------------------
