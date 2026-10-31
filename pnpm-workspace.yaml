@@ -33,6 +33,10 @@ overrides:
   # @real-router/* package. typed-rest-client pins an exact 6.15.1, an affected
   # release, so this floor overrides that pin on purpose.
   qs: '>=6.16.1'
+  # GHSA-86w9-cpqp-85rv and the node-forge advisories of 2026-10-30, all fixed in
+  # 1.4.1. @sonar/scan pins an exact 1.4.0, through 5.0.2, its latest, so this
+  # overrides that pin on purpose. Drop it when @sonar/scan takes 1.4.1 or later.
+  '@sonar/scan>node-forge': ~1.4.1
   minimatch@9: ~9.0.7
   minimatch@10: ~10.2.6
   ajv@6: ~6.14.0

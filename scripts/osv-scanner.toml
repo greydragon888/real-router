@@ -9,20 +9,6 @@
 id = "GHSA-wrw7-89jp-8q8g"
 reason = "glib 0.18.5 VariantStrIter unsoundness (RUSTSEC-2024-0429). Transitive via Tauri 2.x → GTK/WebKit on Linux only, pulled by examples/desktop/tauri/*/src-tauri/. Not in any published @real-router/* package. Tauri 2.x pins glib < 0.20, so the fix can only land via an upstream Tauri bump that re-bases its GTK stack."
 
-# node-forge has no fixed release: every version through 1.4.0, the latest, is
-# affected. Its one dependent here is `@sonar/scan`, the root devDependency that
-# `pnpm sonar:local` runs on a developer's machine — no workflow runs it and no
-# published package depends on it. The advisory is about RSA PKCS#1 v1.5
-# signature verification, and @sonar/scan 5.0.1 calls node-forge only to read a
-# PKCS#12 truststore into PEM certificates (`extractTruststoreCerts` in its
-# `src/request.js`, reached only when `sonar.scanner.truststorePath` is set),
-# which verifies no signature. Drop it when node-forge ships a fix or
-# @sonar/scan stops depending on it — ask api.osv.dev per version.
-
-[[IgnoredVulns]]
-id = "GHSA-86w9-cpqp-85rv"  # node-forge RSA PKCS#1 v1.5 signature verification
-reason = "No fixed node-forge release (<= 1.4.0, the latest). Only dependent: root devDependency @sonar/scan 5.0.1, run locally by `pnpm sonar:local`; it uses node-forge solely to read a PKCS#12 truststore, a path that verifies no signature."
-
 # shell-quote's fix, 1.11.0, is outside the 1.9.0 that concurrently 10.0.5
 # pins exactly, and concurrently has no newer release. It arrives only in the
 # examples lockfile, through concurrently, a devDependency of the three
@@ -36,23 +22,6 @@ reason = "No fixed node-forge release (<= 1.4.0, the latest). Only dependent: ro
 [[IgnoredVulns]]
 id = "GHSA-pqg4-j6r4-53mv"  # shell-quote quote() command injection through a line terminator after a comment token
 reason = "Fixed in shell-quote 1.11.0, outside the exact 1.9.0 concurrently 10.0.5 pins; concurrently has no newer release. Only path: concurrently 10.0.5 (devDependency of examples/desktop/electron/*), which calls quote() only under --passthrough-arguments, and the examples' dev scripts do not pass it. examples/ is never published."
-
-# block-buffer's fix, 0.12.1, is outside the 0.10 line that digest 0.10.7
-# requires, and digest 0.10 is what sha2 0.10.9 depends on. The affected copy is
-# in the two examples/desktop/tauri/*/src-tauri/Cargo.lock only, through
-# tauri-codegen, whose one dependent there is the tauri-macros proc-macro, so it
-# runs at compile time and not in the built app; tauri-codegen 2.7.4, the
-# latest, still requires sha2 ^0.10. The advisory is a cursor kept inside the
-# buffer's own block, which input overwrites before a `compress` callback that
-# panics. block-buffer 0.10.4 keeps the cursor in a field of its own
-# (`pos: u8`), sets it only after `compress` returns and passes the block to it
-# read-only, and has no `ReadBuffer`. The advisory names the crate
-# `block_buffer`, so Dependabot opens no alert for it. Drop it when no Tauri
-# lockfile holds a block-buffer below 0.12.1 — ask api.osv.dev per version.
-
-[[IgnoredVulns]]
-id = "GHSA-qwgh-2vcv-g2f7"  # block-buffer panic in a callback corrupts the inline buffer position
-reason = "Fixed in block-buffer 0.12.1, outside digest 0.10.7's 0.10 line; tauri-codegen 2.7.4, the latest, still requires sha2 ^0.10. Only path: tauri-macros -> tauri-codegen -> sha2 0.10.9 -> digest -> block-buffer 0.10.4, compile time only, in examples/desktop/tauri/* (never published). 0.10.4 keeps the cursor in a separate field that a panicking compress callback cannot reach, and has no ReadBuffer."
 
 # deepmerge has no fixed release: every version from 4.2.0 through 4.3.1, the
 # latest, is affected. It arrives in the three lockfiles through two build
@@ -69,6 +38,32 @@ reason = "Fixed in block-buffer 0.12.1, outside digest 0.10.7's 0.10 line; tauri
 [[IgnoredVulns]]
 id = "GHSA-gcqx-w48m-w2h4"  # deepmerge mergeObject() prototype poisoning of the returned object
 reason = "No fixed deepmerge release (<= 4.3.1, the latest). Paths: @rollup/plugin-node-resolve 16.0.3 and @sveltejs/vite-plugin-svelte 7.3.1, both latest, build and test tooling in the root, examples/ and cross-router-bench; none published. The rollup plugin merges only its own constant defaults; vite-plugin-svelte merges its defaults with svelte.config.js and inline plugin options, written by the developer, so no merged source carries an attacker's own __proto__ key."
+
+# glob's fix, 14.0.2, is a major above the ^13 that rimraf 6.1.3 and js-beautify
+# 2.0.3 declare, each at its latest release. The advisory is an async walk that
+# keeps reading directories after its `signal` aborts. This repository runs
+# rimraf only as a CLI without `--glob`, so rimraf never calls glob here.
+# js-beautify calls `globSync`, with no signal, in its CLI alone; it arrives
+# through @vue/test-utils, which uses its API. Neither is in a published
+# package. Drop it when no lockfile holds a glob from 9.0.0 through 14.0.1 —
+# ask api.osv.dev per version.
+
+[[IgnoredVulns]]
+id = "GHSA-3g3m-2fjr-6pw4"  # glob async walk continues after its AbortSignal aborts
+reason = "Fixed in glob 14.0.2, a major above the ^13 of rimraf 6.1.3 and js-beautify 2.0.3, both latest. rimraf runs here as a CLI without --glob, so it never calls glob; js-beautify calls globSync with no signal, in its CLI alone. Neither is in a published package."
+
+# minimatch's fix is 11.0.1: no release on the 3, 5, 9 or 10 lines has it, and
+# the lockfiles already hold the latest of each. No parent takes that major:
+# ESLint, its plugins, Stryker, editorconfig, glob and the packaging tooling of
+# the Electron examples declare the older lines, so an override would run them
+# on a major they never declared. The advisory needs a pattern an attacker
+# writes, and the patterns here come from this repository's configs and
+# scripts. None of these parents is in a published package. Drop it when no
+# lockfile holds a minimatch below 11.0.1 — ask api.osv.dev per version.
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"  # minimatch denial of service through globparts amplification
+reason = "Fixed in minimatch 11.0.1 alone; 3.1.5, 5.1.9, 9.0.9 and 10.2.6 are the latest of their lines, and no parent declares 11. Build and lint tooling only, in the root, examples/ and cross-router-bench, none published. The advisory needs an attacker's pattern; patterns here come from this repository's configs and scripts."
 
 # NOTE (2026-09-10): ten entries stood here — RUSTSEC-2024-0411 through -0420,
 # the gtk-rs unmaintained-crate advisories (gdk, gtk, atk, their -sys crates and
