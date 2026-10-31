@@ -201,11 +201,48 @@ test("a GHSA id YAML would read as another value is refused", () => {
   }
 });
 
-test("ignoreUntil is read as a TOML local date and nothing else", () => {
-  assert.deepEqual(
-    rendered(`[[IgnoredVulns]]\nid = "${A}"\nignoreUntil = 2026-11-09\n`),
-    ["allow-ghsas:", `  - ${A}`],
-  );
+/** The region of a file whose one record holds `ignoreUntil = <value>`. */
+const withIgnoreUntil = (value) =>
+  rendered(`[[IgnoredVulns]]\nid = "${A}"\nignoreUntil = ${value}\n`);
+
+for (const date of ["2026-11-09", "2028-02-29"]) {
+  test(`ignoreUntil = ${date} is read as a TOML local date`, () => {
+    assert.deepEqual(withIgnoreUntil(date), ["allow-ghsas:", `  - ${A}`]);
+  });
+}
+
+// The first four are days past their month's end, which the parser's default
+// mode rolls over into the next month.
+for (const date of [
+  "2026-02-29",
+  "2026-02-30",
+  "2026-04-31",
+  "2100-02-29",
+  "2026-01-32",
+  "2026-13-01",
+  "2026-00-10",
+  "2026-01-00",
+]) {
+  test(`ignoreUntil = ${date} is refused by the parser, as osv-scanner refuses it`, () => {
+    assert.equal(
+      typeof Temporal,
+      "object",
+      "without a global Temporal the parser refuses every date",
+    );
+    assert.throws(
+      () => withIgnoreUntil(date),
+      (error) => {
+        assert.ok(
+          error.message.startsWith(`${SOURCE}: Invalid TOML document: `),
+          error.message,
+        );
+        return true;
+      },
+    );
+  });
+}
+
+test("an ignoreUntil that is no local date is refused by name", () => {
   for (const value of [
     '"2026-11-09"',
     "2026-11-09T10:00:00Z",
@@ -213,7 +250,7 @@ test("ignoreUntil is read as a TOML local date and nothing else", () => {
     "10:00:00",
   ]) {
     assert.throws(
-      () => rendered(`[[IgnoredVulns]]\nid = "${A}"\nignoreUntil = ${value}\n`),
+      () => withIgnoreUntil(value),
       {
         message: `${SOURCE}: record 1 (${A}): \`ignoreUntil\` is not a TOML local date such as 2026-11-09`,
       },

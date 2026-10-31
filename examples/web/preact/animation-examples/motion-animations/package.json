@@ -15,7 +15,7 @@
     "@real-router/browser-plugin": "*",
     "@real-router/core": "*",
     "@real-router/preact": "*",
-    "motion": "14.3.0",
+    "motion": "14.6.0",
     "preact": "~10.29.7"
   },
   "devDependencies": {
