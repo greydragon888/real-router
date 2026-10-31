@@ -37,8 +37,15 @@ overrides:
   # 1.4.1. @sonar/scan pins an exact 1.4.0, through 5.0.2, its latest, so this
   # overrides that pin on purpose. Drop it when @sonar/scan takes 1.4.1 or later.
   '@sonar/scan>node-forge': ~1.4.1
-  minimatch@9: ~9.0.7
-  minimatch@10: ~10.2.6
+  # GHSA-g3hv-75wg-m249 and GHSA-3g3m-2fjr-6pw4 are fixed in minimatch 11.0.1 and
+  # glob 14.0.2 alone, a major above what the parents declare. minimatch 11 removes
+  # `makeRe`: of every parent in the three workspaces only eslint-plugin-import-x
+  # reads it, which is why eslint.config.mjs loads that plugin's CJS entry. Bounded
+  # by `~`: an open floor would let dedupe take the next major. Drop an entry when
+  # its parents declare the fix.
+  minimatch@9: ~11.0.3
+  minimatch@10: ~11.0.3
+  glob@13: ~14.0.3
   ajv@6: ~6.14.0
   # At the version @angular-devkit/core pins exactly (8.20.0); every other
   # parent's range admits it.
@@ -47,8 +54,8 @@ overrides:
   # an optional peer; `.pnpmfile.mjs` drops the peer declaration, so danger
   # installs a 7.x of its own. jsdom 30 takes 8.x on its own range.
   #
-  # ReDoS in brace-expansion (GHSA-3jxr-9vmj-r5cp, High). Two major lines, @2 and @5, are in the tree
-  # via assorted dev/tooling deps — pin each to its patched release. EXACT (not '>=') because the
+  # ReDoS in brace-expansion (GHSA-3jxr-9vmj-r5cp, High). One major line, @5, is in the tree via
+  # minimatch 11 — pinned to its patched release. EXACT (not '>=') because the
   # '@N' selector value can't be an open range without risking a cross-major jump (a '>=1.1.16' on
   # the @1-selected dep could resolve up to 5.x). Bump each line when its next patch lands.
   #
@@ -79,7 +86,9 @@ overrides:
   # 2026-09-30: three more (GHSA-6j4f-fj2g-mc7p and GHSA-qhr7-859c-m2p7, High; GHSA-q2hr-2g5m-vwhr,
   # Medium) affect 1.1.18, 2.1.4 and 5.0.9. The last fix on each line is 1.1.21 / 2.1.7 / 5.0.12,
   # and api.osv.dev answers clean for each of those versions, queried one by one.
-  brace-expansion@2: 2.1.7
+  #
+  # 2026-10-31: minimatch 11 is the one minimatch in the tree, and it depends on @5 alone, so the
+  # pins of the older lines are gone. The ⛔ above holds again the day an older minimatch returns.
   brace-expansion@5: 5.0.12
   picomatch@2: 2.3.2
   # 4.0.7 is the highest minimum a parent declares (`^4.0.7`: @changesets/config,

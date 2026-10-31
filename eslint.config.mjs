@@ -5,6 +5,7 @@
 // Using globalIgnores helper with typescript-eslint
 // ============================================
 
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { globalIgnores, includeIgnoreFile } from "eslint/config";
@@ -15,7 +16,6 @@ import eslintPluginPrettierRecommended from "eslint-plugin-prettier/recommended"
 import sonarjsPlugin from "eslint-plugin-sonarjs";
 import vitestPlugin from "@vitest/eslint-plugin";
 import turboConfig from "eslint-config-turbo/flat";
-import importX from "eslint-plugin-import-x";
 import { createTypeScriptImportResolver } from "eslint-import-resolver-typescript";
 import jsdoc from "eslint-plugin-jsdoc";
 import unicorn from "eslint-plugin-unicorn";
@@ -24,6 +24,14 @@ import security from "eslint-plugin-security";
 import tsParser from "@typescript-eslint/parser";
 import sveltePlugin from "eslint-plugin-svelte";
 import svelteParser from "svelte-eslint-parser";
+
+// The CJS entry: the ESM one imports `makeRe`, which minimatch 11 removed, and
+// fails to load. The CJS one reads it inside `no-internal-modules` alone, a rule
+// this config leaves off. Back to a plain import when the plugin declares
+// minimatch 11.
+const importX = createRequire(import.meta.url)(
+  "eslint-plugin-import-x",
+).default;
 
 const gitignorePath = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),

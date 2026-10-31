@@ -15424,6 +15424,8 @@ The strict date parse is a commit of its own after this one, and a revert of thi
 
 ## `lint:audit` goes red on advisories of one evening: three packages move, two enter the allowlist (2026-10-31)
 
+> **Updated (2026-10-31).** The two allowlist entries left the same day, and the override this entry rules out turned out to work: "minimatch and glob take the majors that fix them".
+
 **Problem.** `lint:audit` failed in `Repo Lints` and in pre-push with no commit behind it. On `3fcff6308` it reported 23 findings from 15 advisories that GitHub published on 2026-10-30 between 22:59Z and 23:10Z: 11 on `node-forge` 1.4.0, and one each on `follow-redirects` 1.16.1, `joi` 18.2.9, `glob` 13.0.6 and `minimatch` 3.1.5, 5.1.9, 9.0.9 and 10.2.6. The same run listed GHSA-qwgh-2vcv-g2f7 under `has unused ignores:`.
 
 **Solution.**
@@ -15440,3 +15442,33 @@ The strict date parse is a commit of its own after this one, and a revert of thi
 **Why allowlist entries for glob and minimatch.** Each fix sits in a major no parent declares: `glob` 14.0.2 above the `^13` of `rimraf` 6.1.3 and `js-beautify` 2.0.3, `minimatch` 11.0.1 above the lines of ESLint, its plugins, Stryker and the rest, and no release of those lines has it. An override would run them on a major they never declared, to close advisories that do not reach this repository. Each entry's comment gives the path; `pnpm why -r --prod` finds neither package.
 
 **Measured.** `lint:audit` finds no issue in the five lockfiles and prints no unused ignore; `lint:overrides`, `lint:dedupe`, `lint:deps` and `lint:config-sync` pass, and so do the 31 tests of `osv-allowlist` and `check-deps-audit`. No workflow runs `pnpm sonar:local`, so the calls of `extractTruststoreCerts` from `@sonar/scan`'s `src/request.js` ran by hand against its node-forge 1.4.2, over a PKCS#12 file built with the same library: they return the certificate as PEM. `wait-on` 9.1.0 with `joi` 18.3.1 waits on a file resource and exits 0.
+
+## minimatch and glob take the majors that fix them (2026-10-31)
+
+**Problem.** GHSA-g3hv-75wg-m249 and GHSA-3g3m-2fjr-6pw4 stood in the allowlist because each fix sits in a major no parent declares, and the owner asked for them fixed. Such an override can break a parent without any gate saying so: `lint:audit` and `lint:overrides` read versions and ranges, not imports. Both were green on a tree where `eslint-plugin-import-x` could not load.
+
+**Solution.**
+
+- `minimatch@9` and `minimatch@10` resolve to `~11.0.3` in the three workspaces, and `glob@13` to `~14.0.3` in the root and the examples.
+- minimatch 3 and 5 leave the examples through their parents, since 3 and 5 export the function itself and 11 a named one, the shape `brace-expansion` has between its lines. `@electron/asar` moves to `~4.3.1` and `@electron/universal` to `~3.0.6`, which drops `dir-compare`; `ejs>jake` moves to `~13.0.3` and `temp>rimraf` to `~6.1.3`.
+- `brace-expansion@1` and `@2` lose every edge, `lint:overrides` fails them as dead, and they go.
+- The three `eslint.config.mjs` load `eslint-plugin-import-x` through `createRequire`.
+- Both entries leave `scripts/osv-scanner.toml`, and `allow-ghsas` follows.
+
+**Why the plugin's CJS entry.** minimatch 11 removes `makeRe`. The plugin's ESM entry imports it statically, so loading it fails with `does not provide an export named 'makeRe'`. Its CJS bundle reads it inside `no-internal-modules` alone, a rule no config enables; a scan of every importer of `minimatch` in the three stores finds no other reader of the API that 11 removes. An override scoped to the plugin would leave 10.2.6, and the advisory, in three lockfiles. A `pnpm patch` would live in three workspaces and be redone on each bump.
+
+⚠ `no-internal-modules` with `allow` or `forbid` throws under this tree, because `makeRe` is undefined.
+
+**Measured.**
+
+- `lint:audit` finds no issue and prints no unused ignore; `lint:overrides`, `lint:dedupe`, `lint:deps`, `lint:config-sync` and `lint:unused` pass.
+- 68 glob patterns from the three ESLint configs and two Stryker configs, over the 6375 tracked files, with `dot: true`: minimatch 10.2.6 and 11.0.3 agree on all 433500 comparisons, and 45 of the patterns match something.
+- `eslint --print-config` gives one rule set per file on both versions, over 15 files; only a `basePath` option differs, by the checkout's path. On a real file `import-x/no-duplicates`, `import-x/order` and `import-x/no-unresolved` report.
+- Stryker on `logger-plugin` reads the 38 tracked files and instruments 8 files with 426 mutants on both versions. It counts 91 tests in a tree without `dist` and 191 with it: 4 of its 9 test files resolve `@real-router/core` through `dist`.
+- `rimraf` 6.1.3 removes a path and a `--glob` on glob 14.0.3; `js-beautify` formats through a recursive pattern and an `.editorconfig`; the 491 tests of `@real-router/vue` pass.
+- `electron-builder --mac --dir` packages `examples/desktop/electron/react`, and the packaged app opens `app://real-router/` and renders Home from its `app.asar`. `--universal` gives an x86_64 and arm64 binary.
+- From `electron-winstaller`'s location, `require("@electron/asar")` extracts a file from that archive, and `temp` `track`, `mkdir` and `cleanupSync` remove a directory on rimraf 6.1.3.
+- `test:lint-config` passes, as do `lint:example` in six examples and the bench's `lint`.
+- The real `@sonar/scan` CLI, with a `.p12` truststore and a stub on 127.0.0.1, logs `1 CA certificates found in truststore` on node-forge 1.4.2.
+
+**Not covered.** No Windows installer was built. NSIS and Squirrel run on Windows, or through wine and mono, and the path through `electron-winstaller` was exercised by its calls alone.

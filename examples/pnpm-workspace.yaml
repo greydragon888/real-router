@@ -25,9 +25,22 @@ overrides:
   # the root pnpm-workspace.yaml says, under its `vite` entry, what an override
   # does to a direct dependency.
   rollup: '>=4.59.0'
-  minimatch@3: ~3.1.4
-  minimatch@9: ~9.0.7
-  minimatch@10: ~10.2.6
+  # Fixed in minimatch 11.0.1 and glob 14.0.2 alone; the root pnpm-workspace.yaml
+  # says why these two reach above what their parents declare.
+  minimatch@9: ~11.0.3
+  minimatch@10: ~11.0.3
+  glob@13: ~14.0.3
+  # The older minimatch lines cannot follow: 3 and 5 export the function itself and
+  # 11 a named one, as brace-expansion's lines below. These four entries take them
+  # out of electron-builder's tree instead, one level above each edge. 4.x and 3.x
+  # are ESM-only, and app-builder-lib reaches both through a dynamic import;
+  # electron-winstaller requires asar, which Node 26 loads. dir-compare goes with
+  # @electron/universal 2. jake serves only the ejs CLI, which nothing here runs.
+  # temp calls `rimraf.sync` on the path electron-winstaller takes.
+  '@electron/asar': ~4.3.1
+  '@electron/universal': ~3.0.6
+  'ejs>jake': ~13.0.3
+  'temp>rimraf': ~6.1.3
   ajv@6: ~6.14.0
   # At the version @angular-devkit/core pins exactly (8.20.0); every other
   # parent's range admits it.
@@ -43,8 +56,8 @@ overrides:
   # At the version @angular/build pins exactly; ng-packagr's `^5.0.0` admits it.
   piscina: '>=5.3.2 <6.0.0'
   path-to-regexp: '>=8.4.0'
-  # ReDoS in brace-expansion (GHSA-3jxr-9vmj-r5cp, High). All three major lines are in the tree
-  # via assorted dev/tooling deps — pin each to its patched release. EXACT (not '>=') because the
+  # ReDoS in brace-expansion (GHSA-3jxr-9vmj-r5cp, High). One major line, @5, is in the tree via
+  # minimatch 11 — pinned to its patched release. EXACT (not '>=') because the
   # '@N' selector value can't be an open range without risking a cross-major jump (a '>=1.1.16' on
   # the @1-selected dep could resolve up to 5.x). Bump each line when its next patch lands.
   #
@@ -75,8 +88,9 @@ overrides:
   # 2026-09-30: three more (GHSA-6j4f-fj2g-mc7p and GHSA-qhr7-859c-m2p7, High; GHSA-q2hr-2g5m-vwhr,
   # Medium) affect 1.1.18, 2.1.4 and 5.0.9. The last fix on each line is 1.1.21 / 2.1.7 / 5.0.12,
   # and api.osv.dev answers clean for each of those versions, queried one by one.
-  brace-expansion@1: 1.1.21
-  brace-expansion@2: 2.1.7
+  #
+  # 2026-10-31: minimatch 11 is the one minimatch in the tree, and it depends on @5 alone, so the
+  # pins of the older lines are gone. The ⛔ above holds again the day an older minimatch returns.
   brace-expansion@5: 5.0.12
   picomatch@2: 2.3.2
   # At the version @angular-devkit/core and @angular/build pin exactly (4.0.7);

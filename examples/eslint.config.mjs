@@ -8,6 +8,8 @@
 // The rule set is the root's as it stood when the examples moved out, and the
 // two are not kept in sync. Only the weekly `examples.yml` lints here.
 
+import { createRequire } from "node:module";
+
 import { globalIgnores } from "eslint/config";
 import eslint from "@eslint/js";
 import stylistic from "@stylistic/eslint-plugin";
@@ -15,7 +17,6 @@ import tsEslint from "typescript-eslint";
 import eslintPluginPrettierRecommended from "eslint-plugin-prettier/recommended";
 import sonarjsPlugin from "eslint-plugin-sonarjs";
 import vitestPlugin from "@vitest/eslint-plugin";
-import importX from "eslint-plugin-import-x";
 import { createTypeScriptImportResolver } from "eslint-import-resolver-typescript";
 import jsdoc from "eslint-plugin-jsdoc";
 import unicorn from "eslint-plugin-unicorn";
@@ -26,6 +27,13 @@ import sveltePlugin from "eslint-plugin-svelte";
 import svelteParser from "svelte-eslint-parser";
 import vueParser from "vue-eslint-parser";
 
+// The CJS entry: the ESM one imports `makeRe`, which minimatch 11 removed, and
+// fails to load. The CJS one reads it inside `no-internal-modules` alone, a rule
+// this config leaves off. Back to a plain import when the plugin declares
+// minimatch 11.
+const importX = createRequire(import.meta.url)(
+  "eslint-plugin-import-x",
+).default;
 
 // ============================================
 // COMPONENTS — a .svelte or .vue file is TypeScript with markup

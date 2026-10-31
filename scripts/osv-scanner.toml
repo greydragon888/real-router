@@ -39,32 +39,6 @@ reason = "Fixed in shell-quote 1.11.0, outside the exact 1.9.0 concurrently 10.0
 id = "GHSA-gcqx-w48m-w2h4"  # deepmerge mergeObject() prototype poisoning of the returned object
 reason = "No fixed deepmerge release (<= 4.3.1, the latest). Paths: @rollup/plugin-node-resolve 16.0.3 and @sveltejs/vite-plugin-svelte 7.3.1, both latest, build and test tooling in the root, examples/ and cross-router-bench; none published. The rollup plugin merges only its own constant defaults; vite-plugin-svelte merges its defaults with svelte.config.js and inline plugin options, written by the developer, so no merged source carries an attacker's own __proto__ key."
 
-# glob's fix, 14.0.2, is a major above the ^13 that rimraf 6.1.3 and js-beautify
-# 2.0.3 declare, each at its latest release. The advisory is an async walk that
-# keeps reading directories after its `signal` aborts. This repository runs
-# rimraf only as a CLI without `--glob`, so rimraf never calls glob here.
-# js-beautify calls `globSync`, with no signal, in its CLI alone; it arrives
-# through @vue/test-utils, which uses its API. Neither is in a published
-# package. Drop it when no lockfile holds a glob from 9.0.0 through 14.0.1 —
-# ask api.osv.dev per version.
-
-[[IgnoredVulns]]
-id = "GHSA-3g3m-2fjr-6pw4"  # glob async walk continues after its AbortSignal aborts
-reason = "Fixed in glob 14.0.2, a major above the ^13 of rimraf 6.1.3 and js-beautify 2.0.3, both latest. rimraf runs here as a CLI without --glob, so it never calls glob; js-beautify calls globSync with no signal, in its CLI alone. Neither is in a published package."
-
-# minimatch's fix is 11.0.1: no release on the 3, 5, 9 or 10 lines has it, and
-# the lockfiles already hold the latest of each. No parent takes that major:
-# ESLint, its plugins, Stryker, editorconfig, glob and the packaging tooling of
-# the Electron examples declare the older lines, so an override would run them
-# on a major they never declared. The advisory needs a pattern an attacker
-# writes, and the patterns here come from this repository's configs and
-# scripts. None of these parents is in a published package. Drop it when no
-# lockfile holds a minimatch below 11.0.1 — ask api.osv.dev per version.
-
-[[IgnoredVulns]]
-id = "GHSA-g3hv-75wg-m249"  # minimatch denial of service through globparts amplification
-reason = "Fixed in minimatch 11.0.1 alone; 3.1.5, 5.1.9, 9.0.9 and 10.2.6 are the latest of their lines, and no parent declares 11. Build and lint tooling only, in the root, examples/ and cross-router-bench, none published. The advisory needs an attacker's pattern; patterns here come from this repository's configs and scripts."
-
 # NOTE (2026-09-10): ten entries stood here — RUSTSEC-2024-0411 through -0420,
 # the gtk-rs unmaintained-crate advisories (gdk, gtk, atk, their -sys crates and
 # gtk3-macros). They are gone, and the way they left is worth one paragraph

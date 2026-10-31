@@ -74,6 +74,10 @@ const VI_LOADERS = new Set([
 /** The files that may load by a path this test cannot read, and why each may. */
 const COMPUTED_LOADS = new Map([
   [
+    "eslint.config.mjs",
+    "loads the CJS entry of eslint-plugin-import-x, a package, and nothing of scripts/",
+  ],
+  [
     "packages/angular/scripts/finalize-dist-manifest.mjs",
     "resolves the package's own name from its dist/ through createRequire, and loads nothing",
   ],
@@ -408,12 +412,13 @@ test("CONTROL — on the repository, the keys are turbo's, and the exemptions ar
     ),
   );
   // Without the exemptions, exactly the files they name fail, and only by
-  // loads this test cannot read — two of them hold no `scripts/` at all.
+  // loads this test cannot read — three of them hold no `scripts/` at all.
   const computed = (file, how) =>
     `${file} loads by ${how}, so this test cannot tell what it loads — load by a literal path, or name the file in COMPUTED_LOADS with the reason`;
   assert.deepEqual(
     findViolations(tasks, lib, new Set(), new Map(), readRepo).sort(),
     [
+      computed("eslint.config.mjs", "`createRequire`"),
       computed(
         "packages/angular/scripts/finalize-dist-manifest.mjs",
         "`createRequire`",
