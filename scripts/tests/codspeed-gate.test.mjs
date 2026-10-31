@@ -263,6 +263,22 @@ test("a measured package's turbo.json is not measured; a build config beside it 
   );
 });
 
+test("the configs only a test or mutation runner reads are not measured", () => {
+  for (const file of [
+    "vitest.config.mts",
+    "vitest.config.stress.mts",
+    "vitest.stryker.config.mts",
+    "stryker.config.mjs",
+    "eslint.config.mjs",
+  ]) {
+    const result = verdict({
+      [`packages/core/${file}`]: "export default {};\n",
+    });
+
+    assert.equal(result.run, false, `${file}: ${result.reasons.join("; ")}`);
+  }
+});
+
 test("a package the suites never load is not measured", () => {
   const result = verdict({
     "packages/other/src/index.ts": "export const other = 2;\n",

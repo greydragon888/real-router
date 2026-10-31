@@ -7738,6 +7738,8 @@ Separately, several packages down core's foundation chain had no mutation testin
 
 ## Mutation testing: explicit `plugins` + dep resolution via `internal-source` condition, NOT dep-aliases (logger-plugin, rx)
 
+> **Updated (2026-10-31).** The condition now sits under `ssr.resolve`, not `resolve` as the snippet below has it: "Stryker 10.1.1 fails a test file it cannot collect, and `internal-source` sat under a key the tests do not read".
+
 Two separate defects surfaced running `test:mutation` on `@real-router/logger-plugin`, then the second was found to also affect `@real-router/rx`. This section **supersedes the dep-alias guidance** in "Stryker self-alias must match the package name" above for these two packages — the manual workspace-dep aliases described there as correct are in fact the root cause of silently understated scores.
 
 ### Problem
@@ -10899,6 +10901,8 @@ reported; and a `child_process` call whose tree is not named by a literal, since
 unfoldable COMMAND is not evidence of an escape the way an unfoldable PATH is.
 
 ## Stryker on core reached zero mutants, because a source-reading test fails in the DRY RUN (2026-09-11)
+
+> **Updated (2026-10-31).** The predicate also follows value imports into the suite's own modules, because a test can read source through a helper: "Stryker 10.1.1 fails a test file it cannot collect, and `internal-source` sat under a key the tests do not read".
 
 **Problem.** `pnpm exec stryker run` inside `packages/core` never scored a mutant. Not a
 low score — **zero mutants tested**, every time, because the run aborts in the dry run and
@@ -15509,3 +15513,56 @@ The fix lands alone. `tsdown` stays at 0.23.1 until 0.23.4 and rolldown 1.2.16 a
 - `size-limit` exceeds on the same five entries before and after. `codspeed-gate.mjs` answers `RUN`: rolldown and `@oxc-project/types` are in vite's closure. A commit touching docs alone answers `skip`.
 
 **Not covered.** CI runs rolldown's Linux binding and these runs used the macOS one. CodSpeed's numbers were not read.
+
+## Stryker 10.1.1 fails a test file it cannot collect, and `internal-source` sat under a key the tests do not read (2026-10-31)
+
+**Problem.** Bumping `@stryker-mutator/{core,typescript-checker,vitest-runner}` 10.0.0 → 10.1.1 left `stryker run` failing in logger-plugin and rx on any checkout without `dist`: _"An error occurred outside of a test run: … Failed to resolve entry for package "@real-router/core"."_ The release did not break them. stryker-js#6269 stops ignoring a test file that fails at collection, and those files were already failing. 10.0.0 dropped them without a word and the run went on:
+
+| without `dist` | tests in the suite | 10.0.0 dry run | 10.1.1 dry run |
+| -------------- | ------------------ | -------------- | -------------- |
+| logger-plugin  | 191                | runs 91        | refuses        |
+| rx             | 168                | runs 65        | refuses        |
+
+A full 10.0.0 run there scores logger-plugin at 43.09 %, with 203 NoCoverage, 151 of them in `plugin.ts`, and exit 1 from `break: 60`. It reads as weak tests. With `dist` the same package scores 90.31 %.
+
+**The cause is in our configs.** Both set `resolve.conditions` so that workspace deps resolve to `src`, and that key does not reach the environment the tests run in. In Vite 8.3.3 `getDefaultEnvironmentOptions` hands every non-client environment a `resolve` with `conditions: void 0`, the ssr environment takes its conditions from `ssr.resolve.conditions`, and the default is `DEFAULT_SERVER_CONDITIONS`. The `@default rootConfig.resolve.conditions` in Vite's `index.d.ts` is wrong for this version. So `@real-router/core` resolved through `import` to `dist`: a checkout with a `dist` ran the tests against it whatever its age, and one without lost every test file that imports core at runtime.
+
+**Solution.** The key moves to `ssr.resolve.conditions` in both `vitest.stryker.config.mts`. Core's config resolves itself through `resolve.alias` and has no such key.
+
+```ts
+// Before
+resolve: { conditions: ["@real-router/internal-source", "import", "node"], alias: { … } },
+
+// After
+resolve: { alias: { … } },
+ssr: { resolve: { conditions: ["@real-router/internal-source", "import", "node"] } },
+```
+
+**Why a fix and not a `dist`.** A branch lives in a worktree and a worktree builds no `dist`, so `test:mutation` there would refuse to start on 10.1.1. On the committed config, with no `dist` in the tree, logger-plugin runs 191 of 191 tests at 90.68 % and rx 168 of 168 at 94.59 %.
+
+**What the bump moves in the numbers: nothing a repeat does not move.** Across both versions on one input, in logger-plugin and rx, no mutant goes between Killed and Survived. Every difference has `CompileError` on one side, and that status is not stable: 10.0.0 on one input gave 90.31 % and then 90.91 %, with 20 mutants changing status. Compare two runs with those mutants left out. logger-plugin's survivors ran the same 1611 tests on both versions, so the filter stryker-js#6246 anchors selects nothing narrower there.
+
+**What it does change.**
+
+- Incremental reuse narrows to the test. Vitest results now carry `startPosition`, so editing one test body re-tests 3 mutants in 5 s where 10.0.0 re-tested 53 in 27 s; on an untouched tree both reuse 426 of 426. `/mutation-score` still deletes the cache for a final figure.
+- The JSON report gains `duration` on a tested mutant and `location` on a test. `scripts/mutation-analyze.mjs` reads neither and still reads the report.
+- stryker-js#6214 adds the Vitest 5 test-name separator, which the v5 migration was waiting for. Read in the tarball, not run: this tree is on Vitest 4.
+
+**Not adopted.** `vitest.pool`, new in this release. The default stays `threads` on both versions, measured from inside a test, so the `pool: "forks"` the three `vitest.stryker.config.mts` carried was overridden, and the line leaves them. Real forks buy nothing here: logger-plugin takes 1 min 42 s against 1 min 47 s, inside the spread of repeats, and core's dry run 67 s against 54 s.
+
+**core's dry run was red on both versions, and the predicate that should have kept it green moves.** `construction-freeze-authority-2528.test.ts` reads source through `../helpers`, and the exclusion in core's `vitest.stryker.config.mts` looked for `readFileSync` or `globSync` in the text of the test file alone. It now follows value imports into the suite's own modules. A flat "imports a reader" would have been a guess about a helper that behavioural tests might share, so it was counted first: `tests/functional/helpers.ts` has 5 importers, all of them scans, and the walk adds 2 files of 359, `#2528` and `route-not-found-naming-authority-1785.test.ts`, whose 3 cells are a census and its two controls.
+
+| form of arrival                       | excluded |
+| ------------------------------------- | -------- |
+| value import of a reader              | yes      |
+| the same import wrapped across lines  | yes      |
+| the same import with a `.js` suffix   | yes      |
+| through a second module's re-export   | yes      |
+| `import type`, which loads nothing    | no       |
+| a test that imports no reader         | no       |
+
+Without a `dist`, core's dry run passes with 5737 tests, the 5740 of a hand exclusion of `#2528` minus those 3 cells, so the new collection check finds nothing else there. A scored run on `src/utils/logger/RouterLogger.ts` kills 72 of 77 valid mutants and times out on 1: 94.81 %.
+
+**The CodSpeed gate missed the name of its own exception.** `scripts/codspeed-gate.mjs` skips a measured package's vitest, eslint and stryker configs, and its pattern read `^(vitest|eslint|stryker)\.config\.`, which `vitest.stryker.config.mts` does not match. The edit above came back `RUN` on a file only Stryker's runner reads. The pattern now names that file, and `scripts/tests/codspeed-gate.test.mjs` holds each of the five names.
+
+**Not covered.** logger-plugin and rx got full runs. core got dry runs and that one file, so its whole-package score after the major is still the unmeasured baseline "Stryker 10 needs Babel 8" names. All of it ran on macOS.

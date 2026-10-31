@@ -1,6 +1,17 @@
 import { defineConfig } from "vitest/config";
-import { globSync, readFileSync } from "node:fs";
+import { existsSync, globSync, readFileSync } from "node:fs";
 import path from "node:path";
+
+const TESTS = path.resolve(import.meta.dirname, "./tests");
+
+/** The suite's own module a relative specifier names, if it names one. */
+const suiteModule = (from: string, specifier: string): string | undefined => {
+  const stem = path.resolve(path.dirname(from), specifier.replace(/\.js$/, ""));
+
+  return [`${stem}.ts`, `${stem}.tsx`, `${stem}/index.ts`].find(
+    (candidate) => candidate.startsWith(TESTS) && existsSync(candidate),
+  );
+};
 
 /**
  * ⚑ **A test that reads SOURCE TEXT cannot run in the Stryker sandbox, and it
@@ -16,15 +27,34 @@ import path from "node:path";
  * ⚠ **The cost is named rather than hidden.** A file that MIXES a source scan
  * with behavioural cells loses both, so its behavioural cells contribute no
  * mutation signal — the reason to keep a scan in its own file.
+ *
+ * ⚠ **Reading through the suite's own helper is reading.** The predicate follows
+ * value imports, so a helper that reads takes every importer with it — the
+ * reason to keep one out of a module behavioural tests import.
  */
-const sourceScanningTests = globSync("**/*.test.{ts,tsx}", {
-  cwd: path.resolve(import.meta.dirname, "./tests"),
-})
-  .filter((file) =>
-    /\b(readFileSync|globSync)\b/.test(
-      readFileSync(path.resolve(import.meta.dirname, "./tests", file), "utf8"),
-    ),
-  )
+const readsSource = (file: string, seen = new Set<string>()): boolean => {
+  if (seen.has(file)) {
+    return false;
+  }
+
+  seen.add(file);
+
+  const text = readFileSync(file, "utf8");
+
+  return (
+    /\b(readFileSync|globSync)\b/.test(text) ||
+    [
+      ...text.matchAll(/^(?:import|export) (?!type\b)[^;]*?from "(\.[^"]+)"/gm),
+    ].some(([, specifier]) => {
+      const target = suiteModule(file, specifier);
+
+      return target !== undefined && readsSource(target, seen);
+    })
+  );
+};
+
+const sourceScanningTests = globSync("**/*.test.{ts,tsx}", { cwd: TESTS })
+  .filter((file) => readsSource(path.resolve(TESTS, file)))
   .map((file) => `./tests/${file}`);
 
 /**
@@ -82,8 +112,6 @@ export default defineConfig({
     testTimeout: 5000,
     hookTimeout: 5000,
 
-    // Use forks for better isolation during mutation testing
-    pool: "forks",
     isolate: true,
 
     // Minimal reporter for speed

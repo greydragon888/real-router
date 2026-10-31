@@ -7,26 +7,33 @@ import path from "node:path";
  * Standalone config - does not extend base to avoid sandbox resolution issues.
  * Optimized for mutation testing speed and isolation.
  *
- * Alias rules (mirrors logger-plugin):
+ * Resolution rules (mirrors logger-plugin):
  * - THIS package: relative ./src = sandbox-mutated code. rx's own tests import
  *   via relative paths (../../src), so this self-alias is parity-only, kept for
  *   consistency and future package-name imports.
- * - Workspace dep @real-router/core: ORIGINAL (unmutated) src — we mutate rx, not
- *   core. Paths are computed (portable), not hardcoded. The `/api` subpath is
- *   listed first so it matches before the bare `@real-router/core` prefix.
+ * - Workspace dep @real-router/core: ORIGINAL (unmutated) src, through the
+ *   condition under `ssr` — we mutate rx, not core.
  */
 export default defineConfig({
   cacheDir: "./.vitest-stryker",
 
   resolve: {
-    // Resolve workspace deps to their src via the internal-source export
-    // condition (sandbox node_modules symlinks → original src). Do NOT add
-    // manual aliases for deps: they break vitest's module dedup so rx's own
-    // barrel-reached code (state$/events$/operators) loads a non-instrumented
-    // copy and loses Stryker mutant activation (false 0% coverage).
-    conditions: ["@real-router/internal-source", "import", "node"],
     alias: {
       "@real-router/rx": path.resolve(import.meta.dirname, "./src"),
+    },
+  },
+
+  // Under `ssr`, not `resolve`: Vitest runs `environment: "node"` in Vite's ssr
+  // environment, and Vite gives a root `resolve.conditions` to the client
+  // environment alone.
+  ssr: {
+    resolve: {
+      // Resolve workspace deps to their src via the internal-source export
+      // condition (sandbox node_modules symlinks → original src). Do NOT add
+      // manual aliases for deps: they break vitest's module dedup so rx's own
+      // barrel-reached code (state$/events$/operators) loads a non-instrumented
+      // copy and loses Stryker mutant activation (false 0% coverage).
+      conditions: ["@real-router/internal-source", "import", "node"],
     },
   },
 
@@ -53,8 +60,6 @@ export default defineConfig({
     testTimeout: 5000,
     hookTimeout: 5000,
 
-    // Use forks for better isolation during mutation testing
-    pool: "forks",
     isolate: true,
 
     // Minimal reporter for speed

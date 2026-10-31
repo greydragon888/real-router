@@ -440,7 +440,7 @@ export function classify(file, scope) {
       rel.startsWith("tests/") ||
       rel.endsWith(".md") ||
       rel === "turbo.json" ||
-      /^(vitest|eslint|stryker)\.config\./.test(rel)
+      /^(vitest(\.stryker)?|eslint|stryker)\.config\./.test(rel)
     ) {
       return undefined;
     }

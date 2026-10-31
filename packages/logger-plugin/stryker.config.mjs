@@ -37,7 +37,7 @@ export default {
   },
 
   // ✨ CRITICAL: "perTest" is ignored for Vitest, but kept for compatibility
-  // Workspace dependencies work through absolute paths in vitest.stryker.config.mts
+  // Workspace dependencies resolve through the condition in vitest.stryker.config.mts
   coverageAnalysis: "perTest",
 
   // Local tsconfig
