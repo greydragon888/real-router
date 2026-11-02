@@ -1,5 +1,13 @@
 # @real-router/react
 
+## 0.37.5
+
+### Patch Changes
+
+- [#2888](https://github.com/greydragon888/real-router/pull/2888) [`f4d68e9`](https://github.com/greydragon888/real-router/commit/f4d68e9c760568baf7a39c36713b4a90ddd9837e) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` labels the navigation after a URL plugin's return `forward` ([#2879](https://github.com/greydragon888/real-router/issues/2879))
+
+  A URL plugin now holds the write of a navigation that commits while the plugin's return travels, so that return's `popstate` finds another address than the router's and arms the tracker's flag, with no transition behind it. The tracker spends such a flag when the next transition starts at the router's address: `<html data-nav-direction>` reads `forward` there, not `back`. A flag a transition's end passes on is left alone, so a Back replayed after another keeps `back`. Upgrade together with the URL plugin.
+
 ## 0.37.4
 
 ### Patch Changes
