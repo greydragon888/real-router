@@ -166,6 +166,12 @@ app.use((request, nodeResponse, next) => {
       nodeResponse.end(buffer);
     })
     .catch((error: unknown) => {
+      // The client disconnected: `handle()` rejects with an AbortError, and
+      // there is no one left to answer — not an error to hand to Express.
+      if (abortController.signal.aborted) {
+        return;
+      }
+
       const code = readErrorCode(error);
 
       if (code === "CANNOT_ACTIVATE") {

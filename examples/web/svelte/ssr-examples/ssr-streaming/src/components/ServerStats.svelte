@@ -55,6 +55,11 @@
   }
 
   const props: { productId: string } = $props();
+
+  // svelte-ignore state_referenced_locally
+  // Read once: a mounted ServerStats never sees another productId — a
+  // client navigation between products leaves the route without data, and
+  // ProductDetail unmounts it (e2e Scenario 14).
   const stats = await fetchStats(props.productId);
 </script>
 

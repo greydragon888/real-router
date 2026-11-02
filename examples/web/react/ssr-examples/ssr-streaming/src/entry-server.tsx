@@ -107,6 +107,12 @@ export async function render(
     </RouterProvider>,
     {
       onError(error: unknown) {
+        // A client that disconnected cancels the stream, and React reports
+        // the abort once per pending boundary — not an error of the render.
+        if (scope.signal.aborted) {
+          return;
+        }
+
         console.error("[ssr] render error:", error);
       },
     },

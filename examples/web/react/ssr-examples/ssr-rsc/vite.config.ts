@@ -14,4 +14,22 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rolldownOptions: {
+      // The client and ssr builds keep `"use client"` as an inert directive and
+      // rolldown warns about it; the rsc build turns it into client references.
+      // `@vitejs/plugin-react` drops the same warning, and this config does not
+      // load that plugin.
+      onLog(level, log, defaultHandler) {
+        if (
+          log.code === "MODULE_LEVEL_DIRECTIVE" &&
+          log.message.includes('"use client"')
+        ) {
+          return;
+        }
+
+        defaultHandler(level, log);
+      },
+    },
+  },
 });
