@@ -303,12 +303,16 @@ To keep URLs no route matches inside the application, declare a catch-all route 
 
 ## Limitations
 
-Both concern a navigation to a URL the router rewrites — a `forwardTo` source, a trailing slash `trailingSlash: "never"` strips, a query `defaultSearch` adds, among others:
+The first two concern a navigation to a URL the router rewrites — a `forwardTo` source, a trailing slash `trailingSlash: "never"` strips, a query `defaultSearch` adds, among others:
 
 - **`navigateerror` fires with `AbortError`, and `finished` rejects**, where the plugin cannot give the navigation the router's URL before its commit: on every such navigation in a browser without precommit handlers (Safari; Chrome before 141), and on `history.pushState()` / `replaceState()` in any browser. The scroll is applied all the same, so telemetry that records `navigateerror` sees noise there, not failures.
 - **On those navigations the plugin calls `event.scroll()` once the router lands.** A `navigate` listener of the app's own that intercepts one with `scroll: "manual"` and calls `event.scroll()` after that gets `InvalidStateError`: a navigation scrolls once.
 
 Details: [Wiki — Edge Cases](https://github.com/greydragon888/real-router/wiki/navigation-plugin#edge-cases).
+
+**In WebKit, a `beforeunload` listener can cancel the plugin's write.** A WebKit build that runs `beforeunload` for `navigation.navigate()` — Safari 26.6 among them — lets a listener that calls `preventDefault()` cancel the write of the router's URL after a click: the browser asks whether to leave, the write does not happen, and the router stands on the new route while the URL stays on the old one. The browser reports the cancelled write as an unhandled `AbortError`, and the plugin leaves that report in place: it is the only signal of the cancel the plugin gets. Have such a listener stand down for a navigation the router has allowed.
+
+**In Firefox, a Back pressed while the plugin returns can move the URL and not the router.** After a refused Back the plugin takes the browser back with `navigation.traverseTo()`, and Firefox 155 announces no `navigate` for a `history.back()` made while that traversal travels; the browser's own Back in that moment ends the same way. A second Back then leaves the router where it was, or on a navigation committed meanwhile, and moves the URL to the Back's entry ([#2884](https://github.com/greydragon888/real-router/issues/2884)).
 
 ## SSR Support
 

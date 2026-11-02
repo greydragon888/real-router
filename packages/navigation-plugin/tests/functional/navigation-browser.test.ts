@@ -26,7 +26,10 @@ describe("createNavigationBrowser", () => {
     mockNav = {
       navigate: vi.fn(),
       updateCurrentEntry: vi.fn(),
-      traverseTo: vi.fn(),
+      traverseTo: vi.fn(() => ({
+        committed: Promise.resolve(),
+        finished: Promise.resolve(),
+      })),
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
       entries: vi.fn(() => []),
@@ -155,6 +158,26 @@ describe("createNavigationBrowser", () => {
     });
   });
 
+  describe("a write that did not happen (#2877)", () => {
+    it("leaves the rejection of committed for the browser to report", async () => {
+      const committed = Promise.reject(new DOMException("", "AbortError"));
+      const caught = vi.spyOn(committed, "catch");
+      const chained = vi.spyOn(committed, "then");
+
+      mockNav.navigate.mockReturnValue({
+        committed,
+        finished: Promise.resolve(),
+      });
+      browser.navigate("/path", { state: {}, history: "push" });
+
+      expect(mockNav.navigate).toHaveBeenCalledTimes(1);
+      expect(caught).not.toHaveBeenCalled();
+      expect(chained).not.toHaveBeenCalled();
+
+      await expect(committed).rejects.toThrow();
+    });
+  });
+
   describe("updateCurrentEntry", () => {
     it("delegates to nav.updateCurrentEntry without info (no navigate event fired)", () => {
       browser.updateCurrentEntry({ state: { updated: true } });
@@ -175,6 +198,118 @@ describe("createNavigationBrowser", () => {
         info: PLUGIN_SYNC_INFO,
       });
     });
+  });
+
+  describe("while a traversal travels (#2879)", () => {
+    const ENTRY = {
+      key: "key-1",
+      id: "id-1",
+      index: 1,
+      url: "http://localhost:3000/landing",
+    };
+    const landing = (
+      committed = new Promise<NavigationHistoryEntry>(() => undefined),
+    ) => {
+      mockNav.entries.mockReturnValue([ENTRY]);
+      mockNav.traverseTo.mockReturnValue({
+        committed,
+        finished: Promise.resolve(),
+      });
+      browser.traverseTo(ENTRY.key);
+    };
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("currentEntry answers the entry it goes to", () => {
+      landing();
+
+      expect(browser.currentEntry).toStrictEqual(ENTRY);
+    });
+
+    it("currentEntry carries the absolute URL of a held write", () => {
+      landing();
+      browser.navigate("/written", { state: {}, history: "replace" });
+
+      expect(mockNav.navigate).not.toHaveBeenCalled();
+      expect(browser.currentEntry?.url).toBe(
+        new URL("/written", globalThis.location.href).href,
+      );
+    });
+
+    it("a held update keeps the state it was called with, whatever its writer does to the buffer", async () => {
+      const buffer = { name: "home" };
+
+      landing(Promise.resolve({} as NavigationHistoryEntry));
+      browser.updateCurrentEntry({ state: buffer });
+      buffer.name = "about";
+      await Promise.resolve();
+
+      expect(mockNav.updateCurrentEntry).toHaveBeenCalledWith({
+        state: { name: "home" },
+      });
+    });
+
+    it("removing the listener ends the wait: currentEntry is the live entry, and no write runs", () => {
+      vi.useFakeTimers();
+
+      const live = {} as NavigationHistoryEntry;
+      const remove = browser.addNavigateListener(() => undefined);
+
+      mockNav.currentEntry = live;
+      landing();
+      browser.navigate("/written", { state: {}, history: "replace" });
+      remove();
+      vi.advanceTimersByTime(5000);
+
+      expect(browser.currentEntry).toBe(live);
+      expect(mockNav.navigate).not.toHaveBeenCalled();
+    });
+
+    it("an unknown key: takes both rejections, which the browser marks unhandled, and the writes run", async () => {
+      const error = new DOMException("", "InvalidStateError");
+      const committed = Promise.reject(error);
+      const finished = Promise.reject(error);
+      const thenSpy = vi.spyOn(committed, "then");
+      const catchSpy = vi.spyOn(finished, "catch");
+
+      mockNav.traverseTo.mockReturnValue({ committed, finished });
+      browser.traverseTo("unknown");
+
+      expect(thenSpy).toHaveBeenCalledTimes(1);
+      expect(catchSpy).toHaveBeenCalledTimes(1);
+
+      await expect(committed).rejects.toThrow();
+      await expect(finished).rejects.toThrow();
+
+      browser.navigate("/written", { state: {}, history: "replace" });
+
+      expect(mockNav.navigate).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ["nothing", undefined],
+      ["no promises", {}],
+    ])(
+      "CONTROL — a double whose traverseTo returns %s: the writes run at once",
+      (_label, result) => {
+        const live = {} as NavigationHistoryEntry;
+
+        mockNav.currentEntry = live;
+        mockNav.entries.mockReturnValue([ENTRY]);
+        mockNav.traverseTo.mockReturnValue(result);
+
+        expect(() => {
+          browser.traverseTo(ENTRY.key);
+        }).not.toThrow();
+
+        browser.navigate("/written", { state: {}, history: "replace" });
+
+        expect(mockNav.navigate).toHaveBeenCalledTimes(1);
+        expect(browser.currentEntry).toBe(live);
+      },
+    );
   });
 
   describe("entries", () => {

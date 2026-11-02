@@ -537,12 +537,9 @@ describe("#2802 — a Back a newer navigation cancels leaves what that navigatio
     },
   );
 
-  it.each([
-    ["a microtask", 0],
-    ["a task", 1],
-  ] as const)(
-    "a redirect a TRANSITION_ERROR listener defers by %s after the newer navigation's refusal: the Back travels %i times",
-    async (deferral, times) => {
+  it.each(["a microtask", "a task"] as const)(
+    "a redirect a TRANSITION_ERROR listener defers by %s after the newer navigation's refusal: the Back does not travel",
+    async (deferral) => {
       const r = await setup();
       const end = gate(r);
       let armed = false;
@@ -577,7 +574,7 @@ describe("#2802 — a Back a newer navigation cancels leaves what that navigatio
       expect({ ...at(), travelled }).toStrictEqual({
         path: "/",
         route: "index",
-        travelled: times,
+        travelled: 0,
       });
     },
   );

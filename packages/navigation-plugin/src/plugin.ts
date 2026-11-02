@@ -100,8 +100,9 @@ export class NavigationPlugin {
   readonly #transitions = new WeakMap<object, NavigationRecord | undefined>();
   // Reusable buffer for the {name, params, path} payload passed to
   // browser.navigate / browser.updateCurrentEntry. The Navigation API
-  // structured-clones state synchronously inside the call, so this object
-  // never escapes — same trick createReplaceHistoryState uses.
+  // structured-clones state synchronously inside the call and a held write
+  // keeps a copy, so this object never escapes — same trick
+  // createReplaceHistoryState uses.
   readonly #historyStateBuffer: {
     name: string;
     params: object;

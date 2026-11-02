@@ -1,7 +1,7 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
 import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createDirectionTracker } from "../../../src/dom-utils";
 
@@ -69,6 +69,37 @@ describe("createDirectionTracker beside a URL plugin that returns from a refused
 
       expect(document.documentElement.dataset.navDirection).toBe("forward");
     } finally {
+      destroy();
+    }
+  });
+
+  it("a redirect committed while the return travels does not label the next navigation back (#2879)", async () => {
+    const { router: r, destroy } = await setup();
+    const go = globalThis.history.go.bind(globalThis.history);
+    let refusing = true;
+
+    getLifecycleApi(r).addDeactivateGuard("about", () => () => !refusing);
+
+    const spy = vi
+      .spyOn(globalThis.history, "go")
+      .mockImplementationOnce((delta) => {
+        go(delta);
+        refusing = false;
+        void r.navigate("contact", {}, undefined, { replace: true });
+      });
+
+    try {
+      globalThis.history.back();
+      await settle();
+
+      expect(r.getState()?.name).toBe("contact");
+      expect(globalThis.location.pathname).toBe("/contact");
+
+      await r.navigate("home");
+
+      expect(document.documentElement.dataset.navDirection).toBe("forward");
+    } finally {
+      spy.mockRestore();
       destroy();
     }
   });

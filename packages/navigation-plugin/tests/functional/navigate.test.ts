@@ -410,7 +410,7 @@ describe("Navigation Plugin — Navigate", () => {
       // The buffered entry state is the other half: `search` is part of the
       // documented shape (CLAUDE.md "State in NavigationHistoryEntry"), and a
       // reader restoring from it must not see a state the router never held.
-      expect(browser.currentEntry?.getState()).toMatchObject({
+      expect(mockNav.currentEntry?.getState()).toMatchObject({
         name: "users.list",
         search: { tab: "a", sort: "z" },
       });

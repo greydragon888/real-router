@@ -57,7 +57,7 @@ index.ts
             │       ├── constants.ts
             │       └── browser-env (shouldReplaceHistory)
             ├── navigation-browser.ts
-            │       └── browser-env (safelyEncodePath, extractPath)
+            │       └── browser-env (createHeldWrites, safelyEncodePath, extractPath)
             ├── ssr-fallback.ts
             │       └── browser-env (createWarnOnce)
             ├── validation.ts
@@ -76,7 +76,7 @@ External dependencies:
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `@real-router/core`  | `getPluginApi`, types (`Router`, `PluginApi`, `State`, `Plugin`, etc.)                                                                                                                                                | `factory.ts`, `plugin.ts`, `navigate-handler.ts`, `index.ts`                                                                           |
 | `@real-router/core/types` | `StateContext` interface (for module augmentation)                                                                                                                                                                    | `index.ts`                                                                                                                             |
-| `browser-env`        | `normalizeBase`, `safelyEncodePath`, `safeParseUrl`, `shouldReplaceHistory`, `isBrowserEnvironment`, `createWarnOnce`, `createOptionsValidator`, `extractPath`, `buildUrl`, `urlToPath`, `extractPathFromAbsoluteUrl` | `factory.ts`, `plugin.ts`, `navigate-handler.ts`, `navigation-browser.ts`, `ssr-fallback.ts`, `validation.ts`, `history-extensions.ts` |
+| `browser-env`        | `createHeldWrites`, `normalizeBase`, `safelyEncodePath`, `safeParseUrl`, `shouldReplaceHistory`, `isBrowserEnvironment`, `createWarnOnce`, `createOptionsValidator`, `extractPath`, `buildUrl`, `urlToPath`, `extractPathFromAbsoluteUrl` | `factory.ts`, `plugin.ts`, `navigate-handler.ts`, `navigation-browser.ts`, `ssr-fallback.ts`, `validation.ts`, `history-extensions.ts` |
 
 ## Factory + Class Pattern
 
@@ -183,7 +183,8 @@ interface NavigationBrowser {
   traverseTo: (key: string) => void;
   addNavigateListener: (fn: (evt: NavigateEvent) => void) => () => void;
   entries: () => NavigationHistoryEntry[];
-  currentEntry: NavigationHistoryEntry | null;
+  /** `key`, `id`, `index`, `url`: while a traversal travels, of the entry it goes to. */
+  currentEntry: CurrentEntry | null;
   /**
    * Type of the cross-document navigation that activated this document.
    * Reads `navigation.activation.navigationType`. Returns `undefined` when
@@ -484,11 +485,11 @@ User clicks back/forward/link, submits a form, or navigation.navigate() fires
         │                                     → event.scroll() (scrollIfAborted)
         │                       SAME_STATES → also syncUrlToRouterState() for an entry
         │                                     at another path or query
-        │                       TRANSITION_CANCELLED → once a look — a microtask
-        │                                     after the last end, or the read
-        │                                     when no look is queued — finds
-        │                                     no router navigation announced
-        │                                     since running
+        │                       TRANSITION_CANCELLED → a task after a look — a
+        │                                     microtask after the last end —
+        │                                     finds no router navigation
+        │                                     announced since running, or at the
+        │                                     read when no look is queued
         │                                     (newer.whenSettled):
         │                                     another navigation owns the URL → nothing,
         │                                     the record stays; none → returnToOrigin(),
@@ -713,9 +714,9 @@ The mechanism is identity-based: `createNavigationBrowser` tags every router-dri
 
 ```typescript
 // navigation-browser.ts (createNavigationBrowser)
-navigate: (url, options) => {
-  nav.navigate(url, { ...options, info: PLUGIN_SYNC_INFO });
-},
+writes.run(options.state, (state) => {
+  nav.navigate(url, { ...options, state, info: PLUGIN_SYNC_INFO });
+});
 
 // navigate-handler.ts (createNavigateHandler)
 if (event.info === PLUGIN_SYNC_INFO) {
@@ -729,6 +730,10 @@ The bare `return` is not enough — per Navigation API spec, a same-origin `canI
 **Why identity, not a flag**: Chromium fires `navigate` events synchronously inside `nav.navigate(...)`, but Safari 26.2 WKWebView delivers them on a subsequent task. A flag raised around the call is lowered by then, so the handler would take the plugin's own write for a user navigation and re-issue it — a render-loop in Tauri releases on macOS 26.2. `event.info` travels with the event, so detection is timing-independent.
 
 `updateCurrentEntry` is **not** tagged: it dispatches `currententrychange`, not `navigate`, so there is no event to short-circuit.
+
+`writes` is the hold of a traversal: while a `traverseTo` travels, `navigate`, `replaceState` and `updateCurrentEntry` wait, each with a copy of its state, until `committed` settles or ten ticks of 100 ms pass (`createHeldWrites`). `currentEntry` answers a snapshot of the entry the traversal goes to meanwhile, at the URL the held writes leave it. A later `traverseTo` drops what was held before it, and so does removing the navigate listener.
+
+Of the promises a call returns, the browser marks only `finished` of a navigation it starts as handled, and a call it refuses at once rejects both unmarked. `traverseTo` takes both of its own and counts a double that returns none as landed. A write's `committed` stays the browser's to report: it rejects only for a write that did not happen.
 
 ## Same-URL guard in onTransitionSuccess
 

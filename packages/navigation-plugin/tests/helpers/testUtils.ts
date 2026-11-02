@@ -1,4 +1,7 @@
-import { PLUGIN_SYNC_INFO } from "../../src/navigation-browser";
+import {
+  createNavigationBrowser,
+  PLUGIN_SYNC_INFO,
+} from "../../src/navigation-browser";
 
 import type { MockNavigation } from "./mockNavigation";
 import type { NavigationBrowser } from "../../src/types";
@@ -97,6 +100,26 @@ export function createMockNavigationBrowser(
     get: () => mock.currentEntry,
     enumerable: true,
   }) as NavigationBrowser;
+}
+
+/**
+ * The plugin's own `NavigationBrowser` over `mock`, where
+ * `createMockNavigationBrowser` is a stand-in for it. It reads
+ * `globalThis.navigation` once, when created; `getLocation` and `getHash` read
+ * the document's location, so a router over it starts from an explicit path.
+ */
+export function createNavigationBrowserOver(
+  mock: MockNavigation,
+): NavigationBrowser {
+  const scope = globalThis as unknown as Record<string, unknown>;
+
+  scope.navigation = mock;
+
+  const browser = createNavigationBrowser("");
+
+  delete scope.navigation;
+
+  return browser;
 }
 
 export const withoutMeta = (

@@ -11,6 +11,7 @@ import { PLUGIN_SYNC_INFO } from "./navigation-browser";
 
 import type { NewerNavigations } from "./browser-env";
 import type {
+  CurrentEntry,
   NavigationBrowser,
   NavigationDirection,
   NavigationMeta,
@@ -326,7 +327,7 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
 function take(
   signal: AbortSignal,
   earlier: Taken | undefined,
-  origin: NavigationHistoryEntry | null,
+  origin: CurrentEntry | null,
   state: State | undefined,
 ): Taken {
   const { from, fromId, fromUrl } =

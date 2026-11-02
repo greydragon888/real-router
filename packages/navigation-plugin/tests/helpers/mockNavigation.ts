@@ -458,6 +458,10 @@ export class MockNavigation implements Navigation {
       };
     }
 
+    if (this._deferTraversals) {
+      return this._traverseOnNextTask(key, options?.info);
+    }
+
     return this._performTraversal(targetIndex, false, options?.info);
   }
 
@@ -592,6 +596,40 @@ export class MockNavigation implements Navigation {
     });
   }
 
+  /**
+   * The traversal commits a task after the call. A write in between lands on
+   * the entry the browser still stands on; an entry a push removed aborts it.
+   */
+  private _traverseOnNextTask(key: string, info: unknown): NavigationResult {
+    if (this._hangTraversals) {
+      return {
+        committed: new Promise(() => undefined),
+        finished: new Promise(() => undefined),
+      };
+    }
+
+    const landing = new Promise<NavigationResult>((resolve, reject) => {
+      setTimeout(() => {
+        const index = this._entries.findIndex((entry) => entry.key === key);
+
+        if (index === -1) {
+          reject(new DOMException("The entry is gone", "AbortError"));
+        } else {
+          resolve(this._performTraversal(index, false, info));
+        }
+      }, 0);
+    });
+
+    const committed = landing.then((result) => result.committed);
+    const finished = landing.then((result) => result.finished);
+
+    // `finished` is marked handled and `committed` is not, as the browser
+    // does: see `_performNavigation`.
+    finished.catch(() => undefined);
+
+    return { committed, finished };
+  }
+
   private _performNavigation(params: NavigationParams): NavigationResult {
     if (this._ongoingAbortController) {
       this._ongoingAbortController.abort();
@@ -714,10 +752,12 @@ export class MockNavigation implements Navigation {
         }
       });
 
-      // Marked as handled, as the browser does: a refused navigation nobody
-      // awaits fires `navigateerror` and no `unhandledrejection` (measured on
-      // Chromium 153). An awaiting caller still sees the rejection.
-      committedPromise.catch(() => undefined);
+      // `finished` is marked handled, as the browser does: a refused
+      // navigation nobody awaits fires `navigateerror` and no
+      // `unhandledrejection` (measured on Chromium 153). `committed` is not:
+      // a navigation cancelled before its commit is reported unless its
+      // caller takes the rejection (measured on Chromium 153, Firefox 155
+      // and WebKit 26.6, #2877).
       finishedPromise.catch(() => undefined);
 
       return { committed: committedPromise, finished: finishedPromise };
@@ -852,6 +892,8 @@ export class MockNavigation implements Navigation {
   private readonly _crossDocumentNavigations: string[] = [];
   private readonly _downloads: string[] = [];
   private _asyncDispatch = false;
+  private _deferTraversals = false;
+  private _hangTraversals = false;
 
   /**
    * Make a cross-document navigation that no listener intercepted although it
@@ -874,6 +916,25 @@ export class MockNavigation implements Navigation {
    */
   enableAsyncDispatch(): void {
     this._asyncDispatch = true;
+  }
+
+  /**
+   * `traverseTo()` commits a task after the call, as a browser does (measured
+   * on Chromium 153, Firefox 155 and WebKit 26.6). `back()` and `forward()`
+   * stay synchronous: they stand for the user's traversal, which starts the
+   * scenario.
+   */
+  deferTraversals(): void {
+    this._deferTraversals = true;
+  }
+
+  /**
+   * A deferred `traverseTo()` never commits and neither of its promises
+   * settles: a traversal onto another document that loads nothing, or one a
+   * push in its task strands in Firefox (measured on Firefox 155).
+   */
+  hangTraversals(): void {
+    this._hangTraversals = true;
   }
 
   /**

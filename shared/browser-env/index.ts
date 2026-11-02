@@ -35,6 +35,10 @@ export {
 
 export type { EntryPosition, EntryPositions } from "./history-position.js";
 
+export { createHeldWrites } from "./held-writes.js";
+
+export type { HeldWrites } from "./held-writes.js";
+
 export { watchNewerNavigations } from "./newer-navigations.js";
 
 export type { NewerNavigations } from "./newer-navigations.js";

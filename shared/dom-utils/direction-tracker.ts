@@ -59,6 +59,8 @@ export function createDirectionTracker(router: Router): DirectionTracker {
   // A URL plugin starts its traversal after that transition, so its flag is
   // kept apart from the one the transition in flight may own.
   let replay: string | undefined;
+  // The last transition passed the flag on.
+  let passedOn = false;
 
   // ⚑ The flag is SPENT by the transition it belongs to, whether or not that
   // transition reaches a leave phase (#1924). It is armed by any `popstate` on
@@ -147,6 +149,7 @@ export function createDirectionTracker(router: Router): DirectionTracker {
   const onSettled = (): void => {
     inFlight = undefined;
     popstateFlag = replay !== undefined;
+    passedOn = popstateFlag;
     replay = undefined;
   };
 
@@ -177,6 +180,16 @@ export function createDirectionTracker(router: Router): DirectionTracker {
   const unsubs = [
     api.addEventListener(events.TRANSITION_START, (toState: State) => {
       inFlight = toState;
+
+      // A flag armed between transitions that finds the router's address is a
+      // return's: it landed before the write of a navigation committed on its
+      // way, so its popstate read another address (#2879). A History plugin
+      // starts a traversal within its popstate, at the address that popstate
+      // read. A flag passed on is left alone: the plugin can write the router's
+      // URL over the entry its replay reached.
+      if (popstateFlag && !passedOn && landsOnRouterState()) {
+        popstateFlag = false;
+      }
     }),
     api.addEventListener(events.TRANSITION_SUCCESS, onSettled),
     api.addEventListener(events.TRANSITION_ERROR, onError),

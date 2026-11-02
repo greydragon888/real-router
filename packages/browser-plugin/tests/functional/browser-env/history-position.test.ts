@@ -117,28 +117,76 @@ describe("createEntryPositions (#2740)", () => {
     expect(positions.current).toBeUndefined();
   });
 
-  it("awaits a return once, and moves to its origin", () => {
+  it("awaits a return until it settles, and moves to its origin", () => {
     const positions = createEntryPositions();
     const origin = { run: "x", index: 2 };
 
     positions.returnTo(origin);
 
     expect(positions.current).toBe(origin);
-    expect(positions.takeReturn()).toBe(origin);
-    expect(positions.takeReturn()).toBeUndefined();
+    expect(positions.awaited).toBe(origin);
+
+    positions.settleReturn();
+
+    expect(positions.awaited).toBeUndefined();
+    expect(positions.current).toBe(origin);
   });
 
-  it.each(["push", "replace"] as const)(
-    "a %s drops the awaited return",
-    (write) => {
+  it("a write waits for the return, and runs when it settles", () => {
+    const positions = createEntryPositions();
+    const write = vi.fn<(state: string) => void>();
+
+    positions.returnTo({ run: "x", index: 2 });
+    positions.write("state", write);
+
+    expect(write).not.toHaveBeenCalled();
+
+    positions.settleReturn();
+
+    expect(write).toHaveBeenCalledWith("state");
+  });
+
+  it("a return whose bound passes settles", () => {
+    vi.useFakeTimers();
+
+    try {
       const positions = createEntryPositions();
+      const write = vi.fn<(state: string) => void>();
 
       positions.returnTo({ run: "x", index: 2 });
-      positions[write]();
+      positions.write("state", write);
+      vi.advanceTimersByTime(1000);
 
-      expect(positions.takeReturn()).toBeUndefined();
-    },
-  );
+      expect(positions.awaited).toBeUndefined();
+      expect(write).toHaveBeenCalledWith("state");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("an abandoned return drops its writes, and the position of an entry the router no longer has", () => {
+    const positions = createEntryPositions();
+    const write = vi.fn<(state: string) => void>();
+
+    positions.returnTo({ run: "x", index: 2 });
+    positions.write("state", write);
+    positions.abandonReturn();
+
+    expect(positions.awaited).toBeUndefined();
+    expect(positions.current).toBeUndefined();
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("an abandoned return with no write keeps the position the router stands on", () => {
+    const positions = createEntryPositions();
+    const origin = { run: "x", index: 2 };
+
+    positions.returnTo(origin);
+    positions.abandonReturn();
+
+    expect(positions.awaited).toBeUndefined();
+    expect(positions.current).toBe(origin);
+  });
 });
 
 describe("withEntryPositions (#2740)", () => {
@@ -157,6 +205,26 @@ describe("withEntryPositions (#2740)", () => {
 
     return { browser, pushState, replaceState };
   }
+
+  it("a write held for a return takes its position from the entry the return reached", () => {
+    let live: unknown = { position: { run: "x", index: 3 } };
+    const pushState = vi.fn<(state: unknown, path: string) => void>();
+    const positions = createEntryPositions();
+    const browser = withEntryPositions(
+      { ...browserOn(undefined).browser, getState: () => live, pushState },
+      positions,
+    );
+
+    positions.returnTo({ run: "x", index: 4 });
+    browser.pushState({ name: "home" }, "/home");
+    live = { position: { run: "x", index: 4 } };
+    positions.settleReturn();
+
+    expect(pushState).toHaveBeenCalledWith(
+      { name: "home", position: { run: "x", index: 5 } },
+      "/home",
+    );
+  });
 
   it("a replace keeps the position of the entry the browser stands on", () => {
     const { browser, replaceState } = browserOn({

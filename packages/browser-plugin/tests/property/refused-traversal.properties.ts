@@ -1,7 +1,7 @@
 import { fc, test } from "@fast-check/vitest";
 import { createRouter, errorCodes, RouterError } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
-import { describe, expect } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import { browserPluginFactory } from "@real-router/browser-plugin";
 
@@ -153,6 +153,21 @@ function gate(
   };
 }
 
+/** A guard that answers its first call with `verdict`, and allows the others. */
+function refusesOnce(verdict: Verdict) {
+  let first = true;
+
+  return () => (): boolean | Promise<boolean> => {
+    if (!first) {
+      return true;
+    }
+
+    first = false;
+
+    return answer(verdict);
+  };
+}
+
 const paramsOf = (name: string): Record<string, string> =>
   name === "users.view" ? { id: "1" } : {};
 
@@ -283,6 +298,78 @@ describe("refused traversal — browser-plugin (#2740)", () => {
 
         expect(globalThis.location.pathname).toBe(paths[target]);
       } finally {
+        router.stop();
+      }
+    },
+  );
+
+  test.prop(
+    [
+      fc.array(fc.constantFrom(...NAMES), { minLength: 1, maxLength: 4 }),
+      fc.nat({ max: 4 }),
+      fc.nat({ max: 4 }),
+      fc.constantFrom("leave" as const, "enter" as const),
+      fc.constantFrom(...VERDICTS),
+      fc.nat({ max: 3 }),
+      fc.boolean(),
+    ],
+    { numRuns: NUM_RUNS.fast },
+  )(
+    "a navigation committed while the return travels stands, written where the return lands (#2879)",
+    async (journey, back, to, guard, verdict, pick, replace) => {
+      const { router, paths, origin } = await start(journey, back);
+      const go = vi.spyOn(globalThis.history, "go");
+
+      try {
+        const target = to % paths.length;
+        const originRoute = routeOf(paths[origin]);
+        const targetRoute = routeOf(paths[target]);
+
+        fc.pre(targetRoute !== originRoute);
+
+        const others = NAMES.filter((name) => name !== originRoute);
+        const redirect = others[pick % others.length];
+        const lifecycle = getLifecycleApi(router);
+        const once = refusesOnce(verdict);
+
+        if (guard === "leave") {
+          lifecycle.addDeactivateGuard(originRoute, once);
+        } else {
+          lifecycle.addActivateGuard(targetRoute, once);
+        }
+
+        globalThis.history.go(target - origin);
+
+        // The plugin's return is the call after this one.
+        go.mockImplementationOnce((delta) => {
+          go.mockRestore();
+          globalThis.history.go(delta);
+          void router
+            .navigate(redirect, paramsOf(redirect), undefined, { replace })
+            .catch(() => undefined);
+        });
+        await settle();
+
+        expect(globalThis.location.pathname).toBe(PATHS[redirect]);
+        expect(router.getState()?.name).toBe(redirect);
+
+        // A replace took the place of the entry the return landed on, a push
+        // came after it.
+        router.stop();
+
+        if (replace) {
+          globalThis.history.go(target - origin);
+          await settle();
+
+          expect(globalThis.location.pathname).toBe(paths[target]);
+        } else {
+          globalThis.history.back();
+          await settle();
+
+          expect(globalThis.location.pathname).toBe(paths[origin]);
+        }
+      } finally {
+        go.mockRestore();
         router.stop();
       }
     },

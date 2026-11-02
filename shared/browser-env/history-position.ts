@@ -1,3 +1,6 @@
+import { createHeldWrites } from "./held-writes.js";
+
+import type { HeldWrites } from "./held-writes.js";
 import type { Browser } from "./types.js";
 
 /**
@@ -22,18 +25,27 @@ export interface EntryPosition {
  */
 export interface EntryPositions {
   readonly current: EntryPosition | undefined;
+  /** The entry the return in flight goes to. */
+  readonly awaited: EntryPosition | undefined;
   /** The router stands on the entry holding `state`. */
   adopt: (state: unknown) => void;
-  /**
-   * Positions for a push from the current entry and a replace of it; either
-   * drops an awaited return.
-   */
+  /** Positions for a push from the current entry and a replace of it. */
   push: () => EntryPosition;
   replace: () => EntryPosition;
-  /** The plugin sent the browser back to `origin` with `history.go()`. */
+  /**
+   * The plugin sent the browser back to `origin` with `history.go()`. Writes
+   * wait until the return ends (#2879).
+   */
   returnTo: (origin: EntryPosition) => void;
-  /** The return the next traversal completes, consumed by reading it. */
-  takeReturn: () => EntryPosition | undefined;
+  /** The return landed, or its bound passed: the writes it held run. */
+  settleReturn: () => void;
+  /**
+   * The return ends without landing, and the writes it held are dropped. With
+   * one dropped, no entry holds the router's state, and `current` is unknown.
+   */
+  abandonReturn: () => void;
+  /** Runs a write at once, or when the return in flight settles. */
+  write: HeldWrites["run"];
   /**
    * A traversal arrived at the entry holding `state`, and runs until
    * `depart()`. While it runs, a write onto the entry the browser stands on
@@ -110,10 +122,19 @@ export function createEntryPositions(): EntryPositions {
   let current: EntryPosition | undefined;
   let awaited: EntryPosition | undefined;
   let arrived: EntryPosition | undefined;
+  const writes = createHeldWrites();
+  const settleReturn = (): void => {
+    awaited = undefined;
+    writes.release();
+  };
 
   return {
     get current() {
       return current;
+    },
+
+    get awaited() {
+      return awaited;
     },
 
     adopt: (state) => {
@@ -121,7 +142,6 @@ export function createEntryPositions(): EntryPositions {
     },
 
     push: () => {
-      awaited = undefined;
       current = current
         ? { run: current.run, index: current.index + 1 }
         : startRun();
@@ -130,7 +150,6 @@ export function createEntryPositions(): EntryPositions {
     },
 
     replace: () => {
-      awaited = undefined;
       current ??= startRun();
 
       return current;
@@ -139,15 +158,20 @@ export function createEntryPositions(): EntryPositions {
     returnTo: (origin) => {
       current = origin;
       awaited = origin;
+      writes.hold(settleReturn);
     },
 
-    takeReturn: () => {
-      const origin = awaited;
+    settleReturn,
 
+    abandonReturn: () => {
       awaited = undefined;
 
-      return origin;
+      if (writes.drop()) {
+        current = undefined;
+      }
     },
+
+    write: writes.run,
 
     arrive: (state) => {
       arrived = readPosition(state);
@@ -179,7 +203,8 @@ export function createEntryPositions(): EntryPositions {
  * transition is still running. A replace while a traversal runs writes
  * nothing when the browser measurably stands on another entry than the one
  * that traversal reached: the History API writes only the current entry, and
- * that one is a later traversal's.
+ * that one is a later traversal's. Every write waits for a return in flight,
+ * and then reads the entry the browser stands on (`positions.write`).
  *
  * Every member calls `browser`'s own at call time, so a class instance keeps
  * its prototype and private fields, and a method replaced later is the one
@@ -197,20 +222,24 @@ export function withEntryPositions(
     addPopstateListener: (fn) => browser.addPopstateListener(fn),
     addHashChangeListener: (fn) => browser.addHashChangeListener(fn),
     pushState: (state, url) => {
-      positions.adopt(browser.getState?.());
-      browser.pushState(stamp(state, positions.push()), url);
+      positions.write(state, (kept) => {
+        positions.adopt(browser.getState?.());
+        browser.pushState(stamp(kept, positions.push()), url);
+      });
     },
     replaceState: (state, url) => {
-      const live = browser.getState?.();
+      positions.write(state, (kept) => {
+        const live = browser.getState?.();
 
-      // The entry the browser stands on is another traversal's: the one in
-      // flight reached an entry the browser has left.
-      if (positions.movedOn(live)) {
-        return;
-      }
+        // The entry the browser stands on is another traversal's: the one in
+        // flight reached an entry the browser has left.
+        if (positions.movedOn(live)) {
+          return;
+        }
 
-      positions.adopt(live);
-      browser.replaceState(stamp(state, positions.replace()), url);
+        positions.adopt(live);
+        browser.replaceState(stamp(kept, positions.replace()), url);
+      });
     },
     ...(browser.getState && { getState: () => browser.getState?.() }),
     ...(browser.go && {

@@ -15,7 +15,7 @@ This document lists all invariants that must hold in `@real-router/navigation-pl
 
 **Postcondition:**
 - `browser.getLocation()` returns a path that matches `S.path`
-- `browser.currentEntry.getState()` contains `{ name: S.name, params: S.params, search: S.search, path: S.path }` — the entry state is two-channel since RFC-4 M2 (#1548); the recovery writer was the last one still omitting `search` (#1586)
+- `navigation.currentEntry.getState()` contains `{ name: S.name, params: S.params, search: S.search, path: S.path }` — the entry state is two-channel since RFC-4 M2 (#1548); the recovery writer was the last one still omitting `search` (#1586)
 - If `navOptions.replace === true`, history was replaced (not pushed)
 - If `navOptions.replace === false`, history was pushed
 
@@ -909,6 +909,25 @@ The guard is implemented by the pure helper `isSameHref(target, currentHref)` in
 
 ---
 
+### F6. A Navigation Committed While the Return Travels Stands (#2879)
+**Category:** Error Recovery
+**Testable:** PBT
+**Description:** A commit that comes while the plugin's traversal back to the origin travels is written where that traversal lands.
+
+**Precondition:**
+- A traversal or a push that a guard refuses, and a navigation the router commits while the return travels
+
+**Postcondition:**
+- A replace leaves the entries as they were, with the redirect's URL on the origin's index, and the browser there
+- A push leaves the entries up to the origin, with the redirect's URL after it, and the browser there
+- The router stands on the redirect
+
+**Test:** `tests/property/refused-navigation.properties.ts`; the arcs one by one in `tests/functional/return-keeps-redirect-2879.test.ts`.
+
+**Why it matters:** Nothing cancels a `traverseTo()`. A write in that moment either is overtaken by it, and the URL leaves the router's, or aborts it, and the browser reports an unhandled `AbortError`.
+
+---
+
 ## G. URL Handling Invariants
 
 ### G1. Base Path Stripping Correctness
@@ -1247,6 +1266,7 @@ agnostic parsing; validation is the matcher's job, not the parser's. See
 | F3. No Recursive Navigation | Error | Example | Critical |
 | F4. Double-Error Handling | Error | Example | Medium |
 | F5. Refused Navigation Returns to Origin (#2740) | Error | PBT | Critical |
+| F6. Commit During the Return Stands (#2879) | Error | PBT | Critical |
 | G1. Base Path Stripping | URL | PBT | High |
 | G2. Base Path Building | URL | PBT | High |
 | G3. URL Parsing Robustness | URL | PBT | High |

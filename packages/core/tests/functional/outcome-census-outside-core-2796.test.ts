@@ -1574,6 +1574,7 @@ const LEDGER: Readonly<Record<string, Readonly<Record<string, string>>>> = {
     "watchNewerNavigations › sign:addEventListener(TRANSITION_SUCCESS)":
       CONTEXT,
     "watchNewerNavigations › slot:committed": EQ_COMMITTED,
+    "watchNewerNavigations › slot:decision": NO,
     "watchNewerNavigations › slot:ends": CONTEXT,
     "watchNewerNavigations › slot:looking": GENERATION,
     "watchNewerNavigations › slot:looks": GENERATION,
@@ -1626,6 +1627,7 @@ const LEDGER: Readonly<Record<string, Readonly<Record<string, string>>>> = {
       EQ_END,
     "createDirectionTracker › sign:subscribeLeave": EQ_REPLAY,
     "createDirectionTracker › slot:inFlight": CONTEXT,
+    "createDirectionTracker › slot:passedOn": EQ_REPLAY,
     "createDirectionTracker › slot:popstateFlag": EQ_REPLAY,
     "createDirectionTracker › slot:replay": EQ_REPLAY,
   },
