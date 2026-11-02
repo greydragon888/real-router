@@ -53,7 +53,7 @@ header-max-length caps the whole header, so docs(config): leaves 86
 characters for the description, and each extra scope takes more.
 ```
 
-Выведи только готовый commit message без пояснений.
+Выведи только готовый commit message без пояснений; вызван из другой команды — после него вернись к её шагам.
 
 ## Самокоррекция скила (журнал кандидатов)
 
