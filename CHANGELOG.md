@@ -5,6 +5,110 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-11-02]
+
+### @real-router/browser-plugin@0.27.0
+
+### Minor Changes
+
+- [#2888](https://github.com/greydragon888/real-router/pull/2888) [`f4d68e9`](https://github.com/greydragon888/real-router/commit/f4d68e9c760568baf7a39c36713b4a90ddd9837e) Thanks [@greydragon888](https://github.com/greydragon888)! - A navigation that commits while a refused Back or Forward returns stands ([#2879](https://github.com/greydragon888/real-router/issues/2879))
+
+  When a newer navigation that cancelled a Back was refused, the plugin sent the Back's return before that navigation's own `.catch()` or `await` ran. A `replace` redirect from there went onto the entry the browser was leaving, and the return then took the router off it, with the redirect's page left behind in history. A regression of [#2802](https://github.com/greydragon888/real-router/issues/2802). A `replace` that committed while any return travelled met the same end.
+
+  - A traversal a newer navigation cancelled is decided a task after that navigation's end, where it was a microtask, when the plugin is already waiting for it. A redirect the application commits in reaction to that end within that task — from a `.catch()`, an `await`, a listener's `setTimeout(0)` — owns the URL, and the browser is not sent back. A test on fake timers has to run them to see the return.
+  - A navigation that commits while the return travels, one behind an async guard of its own included, stands on the router and in the URL. Its write waits for the landing: a replace takes the place of the entry the traversal started from, and a push comes after it, so that entry stays one Back away. When the browser ignores `history.go()`, the writes go onto the entry it stands on after about a second. `replaceHistoryState()` waits the same way.
+  - A Back or Forward that lands elsewhere meanwhile is decided as a traversal of its own, and the waiting writes are dropped, as `stop()` and removing the plugin drop them.
+  - A waiting write that throws no longer reaches its caller: it is reported with `console.error`, which the router's `logger` option does not silence, and the other writes run.
+
+  **Breaking Change:** while the return travels, the history entry the plugin writes in `onTransitionSuccess` waits for the landing. Until then `location` and `history.state` lag `router.getState()` — after `await navigate()`, in `router.subscribe` and in the hooks of plugins registered after this one.
+
+  **Migration:** code that reads where the router stands from `location` or `history.state` right after a commit reads `router.getState()` instead, and `router.buildUrl()` for the URL.
+
+### @real-router/hash-plugin@0.17.0
+
+### Minor Changes
+
+- [#2888](https://github.com/greydragon888/real-router/pull/2888) [`f4d68e9`](https://github.com/greydragon888/real-router/commit/f4d68e9c760568baf7a39c36713b4a90ddd9837e) Thanks [@greydragon888](https://github.com/greydragon888)! - A navigation that commits while a refused Back or Forward returns stands ([#2879](https://github.com/greydragon888/real-router/issues/2879))
+
+  When a newer navigation that cancelled a Back was refused, the plugin sent the Back's return before that navigation's own `.catch()` or `await` ran. A `replace` redirect from there went onto the entry the browser was leaving, and the return then took the router off it, with the redirect's page left behind in history. A regression of [#2802](https://github.com/greydragon888/real-router/issues/2802). A `replace` that committed while any return travelled met the same end.
+
+  - A traversal a newer navigation cancelled is decided a task after that navigation's end, where it was a microtask, when the plugin is already waiting for it. A redirect the application commits in reaction to that end within that task — from a `.catch()`, an `await`, a listener's `setTimeout(0)` — owns the URL, and the browser is not sent back. A test on fake timers has to run them to see the return.
+  - A navigation that commits while the return travels, one behind an async guard of its own included, stands on the router and in the URL. Its write waits for the landing: a replace takes the place of the entry the traversal started from, and a push comes after it, so that entry stays one Back away. When the browser ignores `history.go()`, the writes go onto the entry it stands on after about a second. `replaceHistoryState()` waits the same way.
+  - A Back or Forward that lands elsewhere meanwhile is decided as a traversal of its own, and the waiting writes are dropped, as `stop()` and removing the plugin drop them.
+  - A waiting write that throws no longer reaches its caller: it is reported with `console.error`, which the router's `logger` option does not silence, and the other writes run.
+
+  **Breaking Change:** while the return travels, the history entry the plugin writes in `onTransitionSuccess` waits for the landing. Until then `location.hash` and `history.state` lag `router.getState()` — after `await navigate()`, in `router.subscribe` and in the hooks of plugins registered after this one.
+
+  **Migration:** code that reads where the router stands from `location.hash` or `history.state` right after a commit reads `router.getState()` instead, and `router.buildUrl()` for the hash URL.
+
+### @real-router/navigation-plugin@0.17.0
+
+### Minor Changes
+
+- [#2888](https://github.com/greydragon888/real-router/pull/2888) [`f4d68e9`](https://github.com/greydragon888/real-router/commit/f4d68e9c760568baf7a39c36713b4a90ddd9837e) Thanks [@greydragon888](https://github.com/greydragon888)! - A navigation that commits while the plugin's traversal travels stands ([#2879](https://github.com/greydragon888/real-router/issues/2879), [#2877](https://github.com/greydragon888/real-router/issues/2877))
+
+  The plugin's write of a commit raced a `traverseTo()` still travelling: the return after a refusal, or `router.traverseToLast()` with a navigation right after it ([#2877](https://github.com/greydragon888/real-router/issues/2877)). In Chromium and Firefox the traversal could land after the write and leave the URL behind the router; in Chromium and WebKit the write could abort it, and the browser reported an unhandled `AbortError` (measured on Chromium 153, Firefox 155 and WebKit 26.6).
+
+  - `navigate`, `replaceState` and `updateCurrentEntry` now wait while a traversal travels, until its `committed` settles or about a second passes, and the write goes onto the entry the traversal reached. `replaceHistoryState()` waits with them. A later traversal drops the writes held before it, and `stop()` and removing the plugin drop them all.
+  - A held write runs once the traversal commits and before it finishes. After `router.traverseToLast()` with a navigation right after it, the traversal therefore ends with `navigateerror` (`AbortError`), which the released version did not fire there; the plugin takes the rejected `finished`.
+  - In Firefox, a second Back pressed while the plugin returns after a refused Back, with a navigation committed in that moment, now leaves the router on that navigation and the URL on the Back's entry: Firefox 155 announces no `navigate` for a `history.back()` made while a `traverseTo()` travels ([#2884](https://github.com/greydragon888/real-router/issues/2884)), and the held write no longer aborts the return before that Back comes. On the released version it did, and the router and the URL ended in step. Without such a navigation both versions leave the URL on the Back's entry and the router where it was; see README, Limitations.
+  - A navigation a newer router navigation cancelled is decided a task after that navigation's end, where it was a microtask, when the handler is already waiting for it. A redirect the application commits in reaction to that end within that task — from a `.catch()`, an `await`, a listener's `setTimeout(0)` — owns the URL; one behind an async guard of its own commits while the return travels and waits with the other writes. A commit to another URL aborts the cancelled navigation, as since [#2802](https://github.com/greydragon888/real-router/issues/2802): `finished` rejects with `AbortError`. A test on fake timers has to run them before that navigation settles.
+  - A waiting write that throws no longer reaches its caller: it is reported with `console.error`, which the router's `logger` option does not silence, and the other writes run.
+  - The plugin takes the rejections of its own `traverseTo()`, which the browser leaves unhandled: `committed` of a traversal a navigation aborts before its commit, and both promises for an unknown key. A write the browser cancels still reports its `AbortError`, as before: see README, Limitations.
+  - The wait lives in `createNavigationBrowser`: a custom `NavigationBrowser` holds nothing. A test double of `navigation` whose `traverseTo()` returns no `committed` counts as landed at once, so its writes run at once, as on the released version.
+
+  **Breaking Change:** while a traversal travels, the history entry the plugin writes in `onTransitionSuccess` waits for it. Until it lands, `location` and `navigation.currentEntry` lag `router.getState()` — after `await navigate()`, in `router.subscribe` and in the hooks of plugins registered after this one — and `peekBack()`, `canGoBack()`, the visit counts and the other history extensions answer from the history before the write; no event of the plugin tells when it lands. `NavigationBrowser.currentEntry` narrows from `NavigationHistoryEntry | null` to `key`, `id`, `index` and `url`, and answers the entry the traversal goes to.
+
+  **Migration:** code that reads where the router stands from `location` or `navigation.currentEntry` right after a commit reads `router.getState()` instead. Code that reads entry state or listens through `NavigationBrowser.currentEntry` reads `navigation.currentEntry`, or holds its own object. An implementation of `NavigationBrowser` compiles unchanged.
+
+### @real-router/angular@0.24.7
+
+### Patch Changes
+
+- [#2888](https://github.com/greydragon888/real-router/pull/2888) [`f4d68e9`](https://github.com/greydragon888/real-router/commit/f4d68e9c760568baf7a39c36713b4a90ddd9837e) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` labels the navigation after a URL plugin's return `forward` ([#2879](https://github.com/greydragon888/real-router/issues/2879))
+
+  A URL plugin now holds the write of a navigation that commits while the plugin's return travels, so that return's `popstate` finds another address than the router's and arms the tracker's flag, with no transition behind it. The tracker spends such a flag when the next transition starts at the router's address: `<html data-nav-direction>` reads `forward` there, not `back`. A flag a transition's end passes on is left alone, so a Back replayed after another keeps `back`. Upgrade together with the URL plugin.
+
+### @real-router/preact@0.24.5
+
+### Patch Changes
+
+- [#2888](https://github.com/greydragon888/real-router/pull/2888) [`f4d68e9`](https://github.com/greydragon888/real-router/commit/f4d68e9c760568baf7a39c36713b4a90ddd9837e) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` labels the navigation after a URL plugin's return `forward` ([#2879](https://github.com/greydragon888/real-router/issues/2879))
+
+  A URL plugin now holds the write of a navigation that commits while the plugin's return travels, so that return's `popstate` finds another address than the router's and arms the tracker's flag, with no transition behind it. The tracker spends such a flag when the next transition starts at the router's address: `<html data-nav-direction>` reads `forward` there, not `back`. A flag a transition's end passes on is left alone, so a Back replayed after another keeps `back`. Upgrade together with the URL plugin.
+
+### @real-router/react@0.37.5
+
+### Patch Changes
+
+- [#2888](https://github.com/greydragon888/real-router/pull/2888) [`f4d68e9`](https://github.com/greydragon888/real-router/commit/f4d68e9c760568baf7a39c36713b4a90ddd9837e) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` labels the navigation after a URL plugin's return `forward` ([#2879](https://github.com/greydragon888/real-router/issues/2879))
+
+  A URL plugin now holds the write of a navigation that commits while the plugin's return travels, so that return's `popstate` finds another address than the router's and arms the tracker's flag, with no transition behind it. The tracker spends such a flag when the next transition starts at the router's address: `<html data-nav-direction>` reads `forward` there, not `back`. A flag a transition's end passes on is left alone, so a Back replayed after another keeps `back`. Upgrade together with the URL plugin.
+
+### @real-router/solid@0.26.6
+
+### Patch Changes
+
+- [#2888](https://github.com/greydragon888/real-router/pull/2888) [`f4d68e9`](https://github.com/greydragon888/real-router/commit/f4d68e9c760568baf7a39c36713b4a90ddd9837e) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` labels the navigation after a URL plugin's return `forward` ([#2879](https://github.com/greydragon888/real-router/issues/2879))
+
+  A URL plugin now holds the write of a navigation that commits while the plugin's return travels, so that return's `popstate` finds another address than the router's and arms the tracker's flag, with no transition behind it. The tracker spends such a flag when the next transition starts at the router's address: `<html data-nav-direction>` reads `forward` there, not `back`. A flag a transition's end passes on is left alone, so a Back replayed after another keeps `back`. Upgrade together with the URL plugin.
+
+### @real-router/svelte@0.24.5
+
+### Patch Changes
+
+- [#2888](https://github.com/greydragon888/real-router/pull/2888) [`f4d68e9`](https://github.com/greydragon888/real-router/commit/f4d68e9c760568baf7a39c36713b4a90ddd9837e) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` labels the navigation after a URL plugin's return `forward` ([#2879](https://github.com/greydragon888/real-router/issues/2879))
+
+  A URL plugin now holds the write of a navigation that commits while the plugin's return travels, so that return's `popstate` finds another address than the router's and arms the tracker's flag, with no transition behind it. The tracker spends such a flag when the next transition starts at the router's address: `<html data-nav-direction>` reads `forward` there, not `back`. A flag a transition's end passes on is left alone, so a Back replayed after another keeps `back`. Upgrade together with the URL plugin.
+
+### @real-router/vue@0.25.5
+
+### Patch Changes
+
+- [#2888](https://github.com/greydragon888/real-router/pull/2888) [`f4d68e9`](https://github.com/greydragon888/real-router/commit/f4d68e9c760568baf7a39c36713b4a90ddd9837e) Thanks [@greydragon888](https://github.com/greydragon888)! - `createDirectionTracker` labels the navigation after a URL plugin's return `forward` ([#2879](https://github.com/greydragon888/real-router/issues/2879))
+
+  A URL plugin now holds the write of a navigation that commits while the plugin's return travels, so that return's `popstate` finds another address than the router's and arms the tracker's flag, with no transition behind it. The tracker spends such a flag when the next transition starts at the router's address: `<html data-nav-direction>` reads `forward` there, not `back`. A flag a transition's end passes on is left alone, so a Back replayed after another keeps `back`. Upgrade together with the URL plugin.
+
 ## [2026-10-28]
 
 ### @real-router/search-schema-plugin@0.9.0
