@@ -18,6 +18,12 @@ export interface NavigationPluginOptions {
   base?: string;
 }
 
+/** What the plugin reads off the entry the browser stands on. */
+export type CurrentEntry = Pick<
+  NavigationHistoryEntry,
+  "key" | "id" | "index" | "url"
+>;
+
 /**
  * Browser abstraction over Navigation API.
  * Replaces History API's Browser interface with Navigation API equivalents.
@@ -34,7 +40,7 @@ export interface NavigationBrowser {
   traverseTo: (key: string) => void;
   addNavigateListener: (fn: (evt: NavigateEvent) => void) => () => void;
   entries: () => NavigationHistoryEntry[];
-  currentEntry: NavigationHistoryEntry | null;
+  currentEntry: CurrentEntry | null;
   /**
    * Type of the cross-document navigation that activated this document.
    * Reads `navigation.activation.navigationType` (Baseline 2026 — Chrome 123+, Firefox 147+, Safari 26.2+).

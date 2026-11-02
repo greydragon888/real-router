@@ -12,6 +12,10 @@ import type { Browser, SharedFactoryState } from "./types.js";
 import type { Plugin, Router, State } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
+const isPopstate = (
+  evt: PopStateEvent | HashChangeEvent,
+): evt is PopStateEvent => "state" in evt;
+
 /**
  * Navigation options used by the popstate handler to trigger a
  * router.navigate() call from a back/forward event. `source` identifies
@@ -122,9 +126,10 @@ export interface PopstateHandler {
 
   /**
    * Drops an event queued behind an in-flight transition, so the transition's
-   * `finally` has nothing to replay, and a cancelled traversal's wait for the
+   * `finally` has nothing to replay, a cancelled traversal's wait for the
    * navigation that cancelled it, so that navigation's end moves nothing
-   * (#2802). Idempotent, and scoped to this handler — in a factory pool each
+   * (#2802), and the writes a return in flight holds (#2879). Idempotent, and
+   * scoped to this handler — in a factory pool each
    * plugin instance owns its own queue, so this never touches another
    * router's (#758 / #1213).
    */
@@ -257,7 +262,7 @@ export function createPopstateHandler(
           browser.go(distance);
         } catch {
           // No traversal will arrive.
-          positions.takeReturn();
+          positions.settleReturn();
           rollbackUrlToCurrentState();
 
           return;
@@ -275,18 +280,40 @@ export function createPopstateHandler(
   }
 
   /**
-   * Whether this event is the traversal `returnOrRollback` started: it lands
-   * on the entry the return was sent to, where the router already stands. A
-   * traversal that lands anywhere else is taken as one of its own — the
-   * user's, or one the browser made in place of the return.
+   * Whether this event belongs to the return `returnOrRollback` started. It
+   * lands on the entry it was sent to, where the router already stands, and
+   * the writes that waited for it run. A `hashchange` on another entry of the
+   * run is the refused traversal's, past the dedup of
+   * `createHashSyncLifecycle` (measured on Chromium 153 and Firefox 155). A
+   * traversal that lands anywhere else is taken as one of its own — the user's,
+   * or one the browser made in place of the return. It decides, and those
+   * writes are dropped.
    */
-  function isReturnArriving(): boolean {
-    const awaited = deps.positions?.takeReturn();
+  function belongsToReturn(evt: PopStateEvent | HashChangeEvent): boolean {
+    const { positions, browser } = deps;
 
-    return (
-      awaited !== undefined &&
-      distanceBetween(readPosition(deps.browser.getState?.()), awaited) === 0
+    if (positions?.awaited === undefined) {
+      return false;
+    }
+
+    const distance = distanceBetween(
+      readPosition(browser.getState?.()),
+      positions.awaited,
     );
+
+    if (distance === 0) {
+      positions.settleReturn();
+
+      return true;
+    }
+
+    if (distance !== undefined && !isPopstate(evt)) {
+      return true;
+    }
+
+    positions.abandonReturn();
+
+    return false;
   }
 
   /**
@@ -360,7 +387,7 @@ export function createPopstateHandler(
     location: string,
     hash: string | undefined,
   ): Promise<void> {
-    if (isReturnArriving()) {
+    if (belongsToReturn(evt)) {
       return;
     }
 
@@ -386,8 +413,9 @@ export function createPopstateHandler(
     // The entry this traversal arrived at: the event's own state, since the
     // browser may have moved on by the time the transition lands (#757). A
     // `hashchange` carries none — its entry is the one the browser stands on.
-    const arrivedState =
-      "state" in evt ? (evt.state as unknown) : deps.browser.getState?.();
+    const arrivedState = isPopstate(evt)
+      ? (evt.state as unknown)
+      : deps.browser.getState?.();
     // The router now stands on the entry the traversal reached; a write skipped
     // as a no-op (#1353) did not record it.
     const adoptLanded = (): void => {
@@ -491,6 +519,7 @@ export function createPopstateHandler(
   handler.discard = () => {
     deferred = null;
     waitedOn?.stop();
+    deps.positions?.abandonReturn();
   };
 
   return handler;
@@ -549,10 +578,11 @@ export function createPopstateLifecycle(
 
 /**
  * Lifecycle for hash-plugin (#759): syncs the router with the URL fragment on
- * BOTH `popstate` (back/forward) and `hashchange` (external fragment changes —
- * native anchors, address-bar edits, `location.hash = ...`). browser-plugin
- * keeps `createPopstateLifecycle` (popstate only) — for it a path change is a
- * full navigation, and `hashchange` would be noise.
+ * BOTH `popstate` and `hashchange`. A traversal and a fragment navigation — a
+ * native anchor, `location.hash = ...` — fire the two in that order (measured
+ * on Chromium 153, Firefox 155 and WebKit 26.6). browser-plugin keeps
+ * `createPopstateLifecycle` (popstate only) — for it a path change is a full
+ * navigation, and `hashchange` would be noise.
  *
  * Dedup: a hash-changing history traversal fires the `popstate`+`hashchange`
  * pair in ONE browser task — but a microtask checkpoint runs BETWEEN the two
@@ -566,7 +596,9 @@ export function createPopstateLifecycle(
  * pair, distinct user gestures land in later macrotasks and are never coalesced,
  * and same-type bursts (two rapid `popstate`s → the deferred-event path) are
  * unaffected because a `popstate` only blocks a following `hashchange`, never
- * another `popstate`.
+ * another `popstate`. A refused traversal's `hashchange` can come after the
+ * reset (measured on Chromium 153 and Firefox 155): while a return travels,
+ * `belongsToReturn` takes one on an entry of the return's run.
  *
  * Both listeners are stored under the single `shared.removePopStateListener`
  * slot as a combined remover, under the factory-pool last-wins cleanup (#758).

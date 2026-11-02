@@ -1,11 +1,15 @@
 import { fc, test } from "@fast-check/vitest";
-import { errorCodes, RouterError } from "@real-router/core";
+import { createRouter, errorCodes, RouterError } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 import { describe, expect } from "vitest";
 
-import { NUM_RUNS, createPluginRouterWithMock } from "./helpers";
+import { navigationPluginFactory } from "@real-router/navigation-plugin";
 
-import type { MockNavigation } from "../helpers/mockNavigation";
+import { NUM_RUNS, ROUTES, createPluginRouterWithMock } from "./helpers";
+import { PLUGIN_SYNC_INFO } from "../../src/navigation-browser";
+import { MockNavigation } from "../helpers/mockNavigation";
+import { createNavigationBrowserOver } from "../helpers/testUtils";
+
 import type { Router } from "@real-router/core";
 
 /**
@@ -154,6 +158,32 @@ function gate(
   };
 }
 
+/** A refusal of the arc's first guard call; every later one is allowed. */
+function refuseOnce(
+  router: Router,
+  guard: "leave" | "enter",
+  origin: string,
+  target: string,
+): void {
+  const lifecycle = getLifecycleApi(router);
+  let first = true;
+  const once = () => (): boolean => {
+    if (!first) {
+      return true;
+    }
+
+    first = false;
+
+    return false;
+  };
+
+  if (guard === "leave") {
+    lifecycle.addDeactivateGuard(origin, once);
+  } else {
+    lifecycle.addActivateGuard(target, once);
+  }
+}
+
 const paramsOf = (name: string): Record<string, string> =>
   name === "users.view" ? { id: "1" } : {};
 
@@ -281,6 +311,76 @@ describe("refused browser navigation — navigation-plugin (#2740)", () => {
           expect(mockNav.currentEntry?.index).toBe(originIndex);
           expect(router.getState()?.name).toBe(origin);
         }
+      } finally {
+        router.stop();
+      }
+    },
+  );
+
+  test.prop(
+    [
+      fc.array(fc.constantFrom(...NAMES), { minLength: 1, maxLength: 5 }),
+      fc.nat({ max: 5 }),
+      fc.constantFrom("leave" as const, "enter" as const),
+      arbArc,
+      fc.nat({ max: 3 }),
+      fc.boolean(),
+    ],
+    { numRuns: NUM_RUNS.fast },
+  )(
+    "a navigation committed while the return travels stands, written where the return lands (#2879)",
+    async (journey, back, guard, arc, pick, replace) => {
+      const mock = new MockNavigation("http://localhost/");
+      const router = createRouter(ROUTES, { defaultRoute: "home" });
+
+      router.usePlugin(
+        navigationPluginFactory({}, createNavigationBrowserOver(mock)),
+      );
+      await router.start("/");
+
+      try {
+        await walk(router, mock, journey, back);
+
+        const origin = router.getState()?.name ?? "";
+        const before = mock.entries().map((entry) => entry.url);
+        const originIndex = mock.currentEntry?.index ?? -1;
+        const target = targetOf(arc, before) ?? "";
+
+        fc.pre(target !== origin);
+
+        const others = NAMES.filter((name) => name !== origin);
+        const redirect = others[pick % others.length];
+        const traverseTo = mock.traverseTo.bind(mock);
+
+        mock.deferTraversals();
+        mock.traverseTo = (key, options) => {
+          const result = traverseTo(key, options);
+
+          if (options?.info === PLUGIN_SYNC_INFO) {
+            void router
+              .navigate(redirect, paramsOf(redirect), undefined, { replace })
+              .catch(() => undefined);
+          }
+
+          return result;
+        };
+        refuseOnce(router, guard, origin, target);
+
+        perform(mock, arc);
+        await settle();
+
+        const left = expectedUrls(arc, before, originIndex);
+        const written = ORIGIN + PATHS[redirect];
+
+        expect(mock.entries().map((entry) => entry.url)).toStrictEqual(
+          replace
+            ? left.with(originIndex, written)
+            : [...left.slice(0, originIndex + 1), written],
+        );
+        expect(mock.currentEntry?.index).toBe(
+          replace ? originIndex : originIndex + 1,
+        );
+        expect(router.getState()?.name).toBe(redirect);
       } finally {
         router.stop();
       }

@@ -53,6 +53,7 @@
 | #   | Invariant | Description |
 | --- | --------- | ----------- |
 | 1   | A refused traversal returns to the entry it started from | After any journey of router navigations, a Back, Forward or `go(±n)` to an entry of another route that `canDeactivate` or `canActivate` refuses leaves the browser on the entry it started from, with the router's state unchanged, and the entry it reached keeps its URL: the same traversal after `stop()` lands on it. |
+| 2   | A navigation committed while the return travels stands | After a refusal, a navigation the router commits while the plugin's `history.go()` travels stands on the router and the URL, and it is written where the return lands: a replace in place of the entry the traversal started from, a push after it (#2879) |
 
 ## Same-Origin URL
 
@@ -66,5 +67,5 @@
 | File                                         | Invariants | Category                                                                                              |
 | -------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------- |
 | `tests/property/browserPlugin.properties.ts` | 15         | URL roundtrip, base path, trailing slash, query string resilience, path extraction, negative matching |
-| `tests/property/refused-traversal.properties.ts` | 1 | refused traversal |
+| `tests/property/refused-traversal.properties.ts` | 2 | refused traversal |
 | `tests/property/browser-env/browserEnv.properties.ts` | 2 of its properties | same-origin URL |

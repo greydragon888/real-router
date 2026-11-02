@@ -7,10 +7,10 @@ import type { PluginApi } from "@real-router/core/api";
 export interface NewerNavigations {
   /**
    * Calls `settled` and ends the watch once a look finds none of them
-   * running: at once when none runs and no look is queued, else a microtask
-   * after the last end. `committed` tells whether the router committed a
-   * navigation while the watch ran. Answers `false`, and calls nothing, when
-   * the router refused the watch.
+   * running: at once when none runs and no look is queued, else a task after
+   * the look. `committed` tells whether the router committed a navigation
+   * while the watch ran. Answers `false`, and calls nothing, when the router
+   * refused the watch.
    */
   readonly whenSettled: (settled: (committed: boolean) => void) => boolean;
   readonly stop: () => void;
@@ -30,12 +30,13 @@ export interface NewerNavigations {
  * microtask the watch waits after an end. An end looks only when no later one
  * comes before its look runs — of the ends within one call, the last, after
  * the microtasks that listeners registered before the watch queued for all of
- * them. A look can come before the plugin reads the watch — a newer
- * navigation that ends within the call that cancels the plugin's own — and
- * what it finds stands; a read that comes while a look is queued leaves the
- * decision to that look. A listener the router calls before the watch's can
- * end a navigation inside its announce, so an end can reach the watch before
- * the start does.
+ * them. A look that finds none running calls `settled` a task later (#2879),
+ * and `stop()` drops that call. A look can come before the plugin reads the
+ * watch — a newer navigation that ends within the call that cancels the
+ * plugin's own — and what it finds stands; a read that comes while a look is
+ * queued leaves the decision to that look. A listener the router calls before
+ * the watch's can end a navigation inside its announce, so an end can reach
+ * the watch before the start does.
  *
  * ⚠ The watch takes a listener on each of four events — start, success,
  * error and cancel. A router whose listener limit (`limits.maxListeners`)
@@ -52,17 +53,19 @@ export function watchNewerNavigations(api: PluginApi): NewerNavigations {
   // A look is queued, and the plugin's read waits for it.
   let looking = false;
   let settled: ((committed: boolean) => void) | undefined;
+  let decision: ReturnType<typeof setTimeout> | undefined;
   const removers: (() => void)[] = [];
   const stop = (): void => {
     settled = undefined;
+    clearTimeout(decision);
 
     for (const remove of removers) {
       remove();
     }
   };
-  const settleIfIdle = (): void => {
+  const takeSettled = (): ((committed: boolean) => void) | undefined => {
     if (running !== undefined) {
-      return;
+      return undefined;
     }
 
     const done = settled;
@@ -70,7 +73,8 @@ export function watchNewerNavigations(api: PluginApi): NewerNavigations {
     // A look ends the watch before the plugin reads it too: what starts from
     // here on is newer still, and the read finds none running.
     stop();
-    done?.(committed);
+
+    return done;
   };
   const ended = (toState: State | undefined): void => {
     if (toState === undefined) {
@@ -92,7 +96,14 @@ export function watchNewerNavigations(api: PluginApi): NewerNavigations {
         // A later end looks itself.
         if (generation === looks) {
           looking = false;
-          settleIfIdle();
+
+          const done = takeSettled();
+
+          if (done) {
+            decision = setTimeout(() => {
+              done(committed);
+            }, 0);
+          }
         }
       });
     }
@@ -135,7 +146,7 @@ export function watchNewerNavigations(api: PluginApi): NewerNavigations {
       settled = callback;
 
       if (!looking) {
-        settleIfIdle();
+        takeSettled()?.(committed);
       }
 
       return true;

@@ -334,9 +334,13 @@ User clicks back/forward (popstate) OR changes the fragment externally (hashchan
         │
         ├── location = browser.getLocation()   (snapshot at fire time)
         │
-        ├── the return returnOrRollback started, landing on its origin?
-        │     (positions.takeReturn() consumes it either way)
-        │     YES: return — no transition
+        ├── a return returnOrRollback started in flight?
+        │     landing on its origin: positions.settleReturn() runs the writes
+        │       it held; return — no transition
+        │     a hashchange on another entry of the run: return — the refused
+        │       traversal's, past the dedup
+        │     landing anywhere else: positions.abandonReturn() drops them,
+        │       and the event decides as a traversal of its own
         │
         ├── isTransitioning === true?
         │     YES: deferred = { evt, location }  (last-write-wins)
@@ -344,7 +348,7 @@ User clicks back/forward (popstate) OR changes the fragment externally (hashchan
         │
         ├── isTransitioning = true
         │
-        ├── start = { origin: positions.current, state: router.getState() }
+        ├── start = { position: positions.current, state: router.getState() }
         │
         ├── getRouteFromEvent(evt, api, location)
         │     │
@@ -355,17 +359,17 @@ User clicks back/forward (popstate) OR changes the fragment externally (hashchan
         │               └── Hash URL matching as fallback
         │
         ├── route found?
-        │     YES: await router.navigate(route.name, route.params, route.search, transitionOptions)
+        │     YES: await api.navigateToState(route, transitionOptions)
         │     NO + allowNotFound: router.navigateToNotFound(location)
         │     NO + !allowNotFound: api.emitTransitionError(ROUTE_NOT_FOUND) + returnOrRollback(start)
         │                          (no silent navigateToDefault)
         │
         ├── catch (error):
         │     SAME_STATES → rollbackUrlToCurrentState() (nothing refused)
-        │     TRANSITION_CANCELLED → newer.whenSettled(): once a look — a
-        │       microtask after the last end, or the read when no look is
-        │       queued — finds none of the navigations announced during the
-        │       traversal running →
+        │     TRANSITION_CANCELLED → newer.whenSettled(): a task after a look
+        │       — a microtask after the last end — finds none of the navigations
+        │       announced during the traversal running, or at the read when no
+        │       look is queued →
         │       returnOrRollback(start), which writes nothing when one of them
         │       committed; a traversal the browser makes meanwhile, stop() and
         │       teardown drop the wait
@@ -399,6 +403,8 @@ returnOrRollback(start)
 
 The positions come from `withEntryPositions`: every state the plugin writes carries `position: { run, index }` — a replace keeps the place of the entry it rewrites, a push follows it, and each write reads that place off the live entry first. The position goes onto a copy of the writer's state, so the History API receives an object no writer keeps, and an entry holds the state it was written with even where the host stores state by reference, as jsdom does. A run starts on an entry that carries no position — the one a document loads with, one the browser or other code wrote — so only two entries of one run are `index` apart. A plugin started on an entry that carries one, as after a reload, continues its run.
 
+While a return travels, `withEntryPositions` holds every write, each with a copy of its state, until the return lands on its origin or ten ticks of 100 ms pass (`createHeldWrites`). A replace then takes the place of the entry the traversal started from, and a push comes after it; past the bound the writes go onto the entry the browser stands on. A traversal that lands anywhere else decides, and the writes are dropped, as `stop()` and teardown drop them.
+
 ### Deferred popstate Handling
 
 Rapid back/forward clicks generate multiple popstate events in quick succession. Processing each one is pointless — only the final state matters.
@@ -415,7 +421,7 @@ After the current transition completes, `processDeferredEvent()` processes the l
 - **Separate gestures** land in separate tasks → the macrotask reset clears the flags between them, so each is handled.
 - **Same-type bursts** (two rapid `popstate`s → the deferred path above) are unaffected: a `popstate` only blocks a following `hashchange`, never another `popstate`.
 
-An **external** fragment change fires `hashchange` alone (no popstate), so it is never dropped; without the `hashchange` listener it would not reach the router at all.
+An **external** fragment change — a native `<a href="#/x">` or `location.hash =` — fires the same pair, `popstate` first, and the dedup drops its `hashchange`.
 
 See [`shared/browser-env/popstate-handler.ts`](../../shared/browser-env/popstate-handler.ts) (`createHashSyncLifecycle`) for implementation details.
 

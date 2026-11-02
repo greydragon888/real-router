@@ -652,12 +652,11 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
     });
 
     it("syncs the router on an external hashchange with no popstate (native anchor / address-bar edit / location.hash=)", async () => {
-      // Router boots at "index" ("/"). An external fragment change — a native
-      // `<a href="#/users/list">`, a manual address-bar hash edit, or
-      // `location.hash = ...` from app/third-party code — updates location.hash
-      // and fires `hashchange` ONLY (popstate fires on traversal; pushState/
-      // replaceState never fire hashchange). Before #759 the plugin listened to
-      // popstate alone, so this external channel never reached the router.
+      // Router boots at "index" ("/"). A lone `hashchange` reaches the router:
+      // a browser fires `popstate` before it for a native anchor or for
+      // `location.hash = ...` (measured on Chromium 153, Firefox 155 and
+      // WebKit 26.6), and the dedup drops the second of the pair, so this cell
+      // holds the listener itself. pushState/replaceState fire neither.
       expect(router.getState()?.name).toBe("index");
 
       globalThis.history.replaceState({}, "", "/#/users/list");

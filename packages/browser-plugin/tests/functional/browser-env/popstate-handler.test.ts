@@ -167,6 +167,67 @@ describe("popstate handler", () => {
       expect(positions.current).toStrictEqual(position);
     });
 
+    describe("an event while a return travels (#2879)", () => {
+      const AWAITED = { run: "return-run", index: 1 };
+
+      function travelling(position: unknown): {
+        positions: ReturnType<typeof createEntryPositions>;
+        handler: ReturnType<typeof createPopstateHandler>;
+      } {
+        const positions = createEntryPositions();
+
+        positions.returnTo(AWAITED);
+
+        return {
+          positions,
+          handler: createPopstateHandler(
+            makeDeps({
+              browser: {
+                ...makeFakeBrowser("/users"),
+                getState: () => ({
+                  name: "users",
+                  params: {},
+                  path: "/users",
+                  position,
+                }),
+              },
+              positions,
+            }),
+          ),
+        };
+      }
+
+      it("a hashchange on another entry of the run leaves the return travelling", async () => {
+        const { positions, handler } = travelling({ ...AWAITED, index: 2 });
+
+        handler(makeHashChangeEvent());
+        await flushAsync();
+
+        expect(positions.awaited).toBe(AWAITED);
+        expect(router.getState()?.name).toBe("home");
+
+        positions.settleReturn();
+      });
+
+      it.each([
+        ["a hashchange on an entry of no run", undefined, makeHashChangeEvent],
+        [
+          "a popstate on another entry of the run",
+          { ...AWAITED, index: 2 },
+          () =>
+            makePopStateEvent({ name: "users", params: {}, path: "/users" }),
+        ],
+      ])("%s decides in its place", async (_event, position, event) => {
+        const { positions, handler } = travelling(position);
+
+        handler(event());
+        await flushAsync();
+
+        expect(positions.awaited).toBeUndefined();
+        expect(router.getState()?.name).toBe("users");
+      });
+    });
+
     it("navigates to the matched state without hash augmentation (hash-plugin wiring)", async () => {
       const deps = makeDeps();
       const handler = createPopstateHandler(deps);

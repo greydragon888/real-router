@@ -1,6 +1,6 @@
-import { safelyEncodePath, extractPath } from "./browser-env";
+import { createHeldWrites, safelyEncodePath, extractPath } from "./browser-env";
 
-import type { NavigationBrowser } from "./types";
+import type { CurrentEntry, NavigationBrowser } from "./types";
 
 /**
  * Sentinel carried on `event.info` for every router-driven mutation.
@@ -31,6 +31,30 @@ const TRAVERSE_OPTS: NavigationOptions = Object.freeze({
 });
 
 /**
+ * Calls `landed` once the traversal's `committed` settles, and at once for a
+ * test double that returns nothing. An unknown key rejects both promises, and
+ * the browser marks neither handled (measured on Chromium 153, Firefox 155 and
+ * WebKit 26.6).
+ */
+function onLanding(
+  result: NavigationResult | undefined,
+  landed: () => void,
+): void {
+  if (result?.committed) {
+    void result.committed.then(landed, landed);
+  } else {
+    landed();
+  }
+
+  void result?.finished?.catch(() => undefined);
+}
+
+/** The entry a traversal in flight goes to; held writes move its `url`. */
+interface LandingEntry extends CurrentEntry {
+  url: string | null;
+}
+
+/**
  * Creates a NavigationBrowser wrapping the real Navigation API.
  * Only call this when `"navigation" in globalThis` is true.
  *
@@ -42,9 +66,45 @@ const TRAVERSE_OPTS: NavigationOptions = Object.freeze({
  * (`scroll: "manual"`) lives in `navigate-handler.ts`'s `NOOP_INTERCEPT`
  * — `scroll` is an `event.intercept()` option, not a `nav.navigate()`
  * option per WHATWG Navigation API spec.
+ *
+ * While a `traverseTo` travels, writes wait for its `committed` and
+ * `currentEntry` answers the entry it goes to, at the URL the held writes leave
+ * it: the plugin decides about the entry its write lands on (#2879). A
+ * traversal started in that moment drops the writes held before it: the router
+ * has moved past them.
  */
 export function createNavigationBrowser(base: string): NavigationBrowser {
   const nav = globalThis.navigation;
+  const writes = createHeldWrites();
+  let landing: LandingEntry | undefined;
+  const settle = (): void => {
+    landing = undefined;
+    writes.release();
+  };
+  const landingOn = (key: string): LandingEntry | undefined => {
+    const entry = nav.entries().find((candidate) => candidate.key === key);
+
+    return (
+      entry && {
+        key: entry.key,
+        id: entry.id,
+        index: entry.index,
+        url: entry.url,
+      }
+    );
+  };
+  const write: NavigationBrowser["navigate"] = (url, options) => {
+    writes.run(options.state, (state) => {
+      // `committed` is left for the browser to report. It rejects only for a
+      // write that did not happen, and it is the only signal of that the
+      // plugin gets (#2877).
+      nav.navigate(url, { ...options, state, info: PLUGIN_SYNC_INFO });
+    });
+
+    if (landing) {
+      landing.url = new URL(url, globalThis.location.href).href;
+    }
+  };
 
   return {
     getLocation: () =>
@@ -53,24 +113,29 @@ export function createNavigationBrowser(base: string): NavigationBrowser {
 
     getHash: () => globalThis.location.hash,
 
-    navigate: (url, options) => {
-      nav.navigate(url, { ...options, info: PLUGIN_SYNC_INFO });
-    },
+    navigate: write,
 
     replaceState: (state, url) => {
-      nav.navigate(url, {
-        state,
-        history: "replace",
-        info: PLUGIN_SYNC_INFO,
-      });
+      write(url, { state, history: "replace" });
     },
 
     updateCurrentEntry: (options) => {
-      nav.updateCurrentEntry(options);
+      writes.run(options.state, (state) => {
+        nav.updateCurrentEntry({ state });
+      });
     },
 
     traverseTo: (key) => {
-      nav.traverseTo(key, TRAVERSE_OPTS);
+      const target = landingOn(key);
+
+      landing = target;
+      writes.hold(settle);
+
+      onLanding(nav.traverseTo(key, TRAVERSE_OPTS), () => {
+        if (landing === target) {
+          settle();
+        }
+      });
     },
 
     addNavigateListener: (fn) => {
@@ -78,13 +143,16 @@ export function createNavigationBrowser(base: string): NavigationBrowser {
 
       return () => {
         nav.removeEventListener("navigate", fn);
+        // Without the listener a write is a navigation that loads a document.
+        landing = undefined;
+        writes.drop();
       };
     },
 
     entries: () => nav.entries(),
 
     get currentEntry() {
-      return nav.currentEntry;
+      return landing ?? nav.currentEntry;
     },
 
     getActivationType: () => nav.activation?.navigationType,

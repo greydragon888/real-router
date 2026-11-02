@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { createDirectionTracker } from "../../../src/dom-utils";
 
-import type { Route, Router } from "@real-router/core";
+import type { Options, Route, Router } from "@real-router/core";
 
 /**
  * A popstate belongs to the traversal it starts. One that arrives while a
@@ -33,6 +33,7 @@ const ROUTES: Route[] = [
   { name: "home", path: "/" },
   { name: "about", path: "/about" },
   { name: "contact", path: "/contact" },
+  { name: "pricing", path: "/pricing" },
 ];
 
 let router: Router | undefined;
@@ -42,12 +43,13 @@ const direction = (): string | undefined =>
   document.documentElement.dataset.navDirection;
 
 /** The tracker is installed before the URL plugin, as it documents. */
-async function install(): Promise<Router> {
+async function install(options: Partial<Options> = {}): Promise<Router> {
   globalThis.history.replaceState(null, "", "/");
 
   const created = createRouter(ROUTES, {
     defaultRoute: "home",
     logger: { level: "none" },
+    ...options,
   });
 
   destroyTracker = createDirectionTracker(created).destroy;
@@ -84,12 +86,12 @@ function holdFirst(): {
 }
 
 /**
- * A guard that holds its first call until `end` gives the verdict — a refusal
- * or a quiet cancel — and allows the rest.
+ * A guard that holds its first call until `end` gives the verdict, and allows
+ * the rest.
  */
 function holdFirstUntil(): {
   guard: () => () => boolean | Promise<boolean>;
-  end: (verdict: "refuses" | "cancels quietly") => void;
+  end: (verdict: "allows" | "refuses" | "cancels quietly") => void;
 } {
   let decide: ((allowed: boolean) => void) | undefined;
   let cancel: ((error: unknown) => void) | undefined;
@@ -106,10 +108,10 @@ function holdFirstUntil(): {
       });
     },
     end: (verdict) => {
-      if (verdict === "refuses") {
-        decide?.(false);
-      } else {
+      if (verdict === "cancels quietly") {
         cancel?.(new RouterError(errorCodes.TRANSITION_CANCELLED));
+      } else {
+        decide?.(verdict === "allows");
       }
     },
   };
@@ -142,6 +144,75 @@ async function backsHeldBeforeLeave(sequential: boolean): Promise<string[]> {
   globalThis.history.back(); // to /
   await settle();
   held.release();
+  await settle();
+
+  return [String(created.getState()?.name), ...labels];
+}
+
+/** What the traversal behind the held one reaches, written before it runs. */
+const REACHED = {
+  "its own URL": async () => undefined,
+  "a fragment": async (created: Router) => {
+    await created.navigate("about", {}, undefined, { hash: "team" });
+    await created.navigate("contact");
+  },
+  "a query no route declares": async (created: Router) => {
+    await created.navigate("home");
+    globalThis.history.pushState(null, "", "/about?utm=1");
+    await created.navigate("contact");
+  },
+  "a trailing slash": async (created: Router) => {
+    await created.navigate("about");
+    globalThis.history.replaceState(null, "", "/about/");
+    await created.navigate("contact");
+  },
+  "a query the browser encodes": async (created: Router) => {
+    await created.navigate("about", {}, { q: "a'b" });
+    await created.navigate("contact");
+  },
+} as const;
+
+type Reached = keyof typeof REACHED;
+
+const OPTIONS_OF: Partial<Record<Reached, Partial<Options>>> = {
+  "a query the browser encodes": { rewritePathOnMatch: false },
+};
+
+const VERDICTS = [
+  ["allows", ["about", "back", "back"]],
+  ["refuses", ["about", "back"]],
+] as const;
+
+/**
+ * From "pricing", a Back onto an entry the browser wrote, held before its
+ * leave, and a traversal to "about" behind it. The plugin measures no distance
+ * from that entry, so the end of the first writes the router's URL over the
+ * entry the second reached. Returns where the router lands, then the label of
+ * each leave.
+ */
+async function traversalsOverEntryNoPluginWrote(
+  verdict: "allows" | "refuses",
+  reached: Reached,
+): Promise<string[]> {
+  const created = await install(OPTIONS_OF[reached]);
+  const held = holdFirstUntil();
+  const labels: string[] = [];
+
+  await REACHED[reached](created);
+  globalThis.location.hash = "part";
+  await settle();
+  await created.navigate("pricing");
+
+  getLifecycleApi(created).addDeactivateGuard("pricing", held.guard);
+  created.subscribeLeave(() => {
+    labels.push(String(direction()));
+  });
+
+  globalThis.history.back(); // to /contact#part, held before its leave
+  await settle();
+  globalThis.history.go(-2); // to /about
+  await settle();
+  held.end(verdict);
   await settle();
 
   return [String(created.getState()?.name), ...labels];
@@ -193,6 +264,19 @@ describe("createDirectionTracker — overlapping traversals", () => {
       "back",
     ]);
   });
+
+  it.each(
+    (Object.keys(REACHED) as Reached[]).flatMap((reached) =>
+      VERDICTS.map(([verdict, labels]) => [reached, verdict, labels] as const),
+    ),
+  )(
+    "a traversal behind a held one, over an entry no plugin wrote, onto %s is labelled back when the guard %s the first",
+    async (reached, verdict, labels) => {
+      await expect(
+        traversalsOverEntryNoPluginWrote(verdict, reached),
+      ).resolves.toStrictEqual(labels);
+    },
+  );
 
   it("CONTROL — the first Back lands before the second", async () => {
     await expect(backsHeldBeforeLeave(true)).resolves.toStrictEqual([
