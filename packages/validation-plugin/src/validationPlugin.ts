@@ -112,6 +112,15 @@ const atValidationPlugin = raiser("validation-plugin");
 const atAddRoute = raiser("router", "addRoute");
 const atAreStatesEqual = raiser("router", "areStatesEqual");
 
+/**
+ * A `search` that `areStatesEqual(…, false)` can compare: an object that is
+ * neither `null` nor an array — the shape `validateSearch` accepts for a query
+ * bag.
+ */
+function isSearchBag(value: unknown): boolean {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 /** The one question existence asks of a tree node: its children by segment. */
 interface TreeNode {
   children: ReadonlyMap<string, TreeNode>;
@@ -376,6 +385,18 @@ function buildValidatorObject(
         }
         if (ignoreQP !== undefined && !isBoolean(ignoreQP)) {
           throw atAreStatesEqual.type`Invalid ignoreQueryParams: ${getTypeDescription(ignoreQP)}. Expected boolean.`;
+        }
+        // `false` compares both states' `search`. `isState` does not read it:
+        // its fields are `isRequiredFields`, which
+        // `scripts/tests/twin-lockstep.test.mjs` holds code-identical to the
+        // history-entry guard's copy, where `search` may be absent.
+        if (ignoreQP === false) {
+          if (!isSearchBag(s1.search)) {
+            throw atAreStatesEqual.type`Invalid state1.search: ${getTypeDescription(s1.search)}. Expected a plain object.`;
+          }
+          if (!isSearchBag(s2.search)) {
+            throw atAreStatesEqual.type`Invalid state2.search: ${getTypeDescription(s2.search)}. Expected a plain object.`;
+          }
         }
       },
     },

@@ -128,6 +128,58 @@ describe("plugin API validation — with validationPlugin", () => {
         raw.areStatesEqual(validState, validState, "not-boolean"),
       ).toThrow(TypeError);
     });
+
+    // `ignoreQueryParams: false` compares both states' `search`, which the
+    // State check does not read.
+    it.each([
+      ["undefined", undefined],
+      ["null", null],
+      ["string", ""],
+      ["number", 0],
+      ["boolean", true],
+      ["array[0]", []],
+    ])(
+      "throws TypeError for a state2 search that is %s when query params are compared",
+      (description, search) => {
+        const validState = router.getState()!;
+        const raw = router as unknown as {
+          areStatesEqual: (s1: unknown, s2: unknown, iqp?: unknown) => boolean;
+        };
+
+        expect(() =>
+          raw.areStatesEqual(validState, { ...validState, search }, false),
+        ).toThrow(
+          `[router.areStatesEqual] Invalid state2.search: ${description}. Expected a plain object.`,
+        );
+      },
+    );
+
+    it("throws TypeError for a state1 search that is not a plain object", () => {
+      const validState = router.getState()!;
+      const raw = router as unknown as {
+        areStatesEqual: (s1: unknown, s2: unknown, iqp?: unknown) => boolean;
+      };
+
+      expect(() =>
+        raw.areStatesEqual({ ...validState, search: null }, validState, false),
+      ).toThrow(
+        "[router.areStatesEqual] Invalid state1.search: null. Expected a plain object.",
+      );
+    });
+
+    it("leaves search unchecked when query params are ignored", () => {
+      const validState = router.getState()!;
+      const raw = router as unknown as {
+        areStatesEqual: (s1: unknown, s2: unknown, iqp?: unknown) => boolean;
+      };
+      const withoutSearch = { ...validState, search: undefined };
+
+      expect(raw.areStatesEqual(validState, withoutSearch)).toBe(true);
+      expect(raw.areStatesEqual(validState, withoutSearch, true)).toBe(true);
+      expect(
+        raw.areStatesEqual(validState, { ...validState, search: {} }, false),
+      ).toBe(true);
+    });
   });
 
   describe("buildNavigationState validation", () => {
