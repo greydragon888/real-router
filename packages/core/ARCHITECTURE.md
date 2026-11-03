@@ -527,11 +527,16 @@ A listener tells a transition's failure from a direct emit by the `context` of t
 
 // users.list → users.profile
 { intersection: "users", toDeactivate: ["users.list"], toActivate: ["users.profile"] }
+
+// orders.list?status=new → orders.list?status=closed, where `orders` declares `?status`
+{ intersection: "", toDeactivate: ["orders.list", "orders"], toActivate: ["orders", "orders.list"] }
 ```
+
+A segment both states share differs when a name it declares changes value in either channel; [INVARIANTS.md](INVARIANTS.md) "navigate / transition.segments" row 1 states the rule.
 
 **`nameToIDs()` fast paths:** Optimized for 0-4 segments via `indexOf()`-based scanning (avoids `split()`). 5+ segments use general path.
 
-**Single-entry cache:** `getTransitionPath()` caches the last result by reference equality — eliminates N-1 redundant computations when `shouldUpdateNode()` calls it N times per navigation.
+**Two-entry cache:** `getTransitionPath()` caches the last two results by reference equality — eliminates N-1 redundant computations when `shouldUpdateNode()` calls it N times per navigation.
 
 ### Cancellation
 
@@ -901,7 +906,7 @@ SSR loader plugins read it through `getHydrationState(router)` from inside their
 | Optimization                            | Purpose                                                                  |
 | --------------------------------------- | ------------------------------------------------------------------------ |
 | `nameToIDs()` fast paths (0-4 segments) | Avoids `split()` for most common route depths                            |
-| Single-entry transition path cache      | N-1 redundant computations eliminated per navigation                     |
+| Two-entry transition path cache         | N-1 redundant computations eliminated per navigation                     |
 | validation-plugin opt-in                | DX validation via `@real-router/validation-plugin` (skip in production)  |
 | Per-router suppressors, split by owner  | One allocation per router, not per `navigate()`/`start()`                |
 | Each object frozen once, where created  | No recursive walk at publication re-freezes what a producer froze        |
