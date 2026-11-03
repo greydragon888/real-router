@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-11-03]
 
+### @real-router/core@0.155.1
+
+### Patch Changes
+
+- [#2899](https://github.com/greydragon888/real-router/pull/2899) [`a9c9156`](https://github.com/greydragon888/real-router/commit/a9c9156cf580a55894e1508e0e9bf750704814f1) Thanks [@greydragon888](https://github.com/greydragon888)! - Fill a channel a route codec leaves out of its return with the channel the codec was handed ([#2896](https://github.com/greydragon888/real-router/issues/2896))
+
+  An `encodeParams` / `decodeParams` that returns only `{ params }` or only `{ search }`, or `null` for one of them, no longer loses that channel. A nullish return of the whole object already fell back to the input; a nullish channel now does too.
+
+  - `buildPath` and `navigate` print the query from the `search` the encoder was handed. Before, it was rebuilt from the path bag: `/items/:id?id&q` printed `?id=5` for `{ id: "7", q: "x" }`, and `queryParamsMode: "loose"` printed a params-only key. The committed `state.path` now agrees with `state.search`.
+  - The URL `matchPath` rebuilds under `rewritePathOnMatch` takes the same fallback.
+  - An encoder that returns no `params` builds the path from the caller's params instead of throwing `Missing required param`.
+  - A decoder that returns no `search` keeps the parsed query in `state.search` and in the rebuilt `state.path`; one that returns no `params` keeps the matched path params.
+  - With `@real-router/validation-plugin`, a decoder that returns no `params` is still refused with `Invalid routeParams`.
+
+### @real-router/validation-plugin@0.31.1
+
+### Patch Changes
+
+- [#2901](https://github.com/greydragon888/real-router/pull/2901) [`8dac14b`](https://github.com/greydragon888/real-router/commit/8dac14b81d4521cf5f1a02be4e6e58ede896f5cd) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse a malformed `state.search` in `areStatesEqual(…, false)` ([#2897](https://github.com/greydragon888/real-router/issues/2897))
+
+  With `ignoreQueryParams: false`, `router.areStatesEqual` compares the `search` of both states, and the plugin checked neither. A state whose `search` was missing or `null` reached core and threw a bare `TypeError: Cannot convert undefined or null to object`. A string or array `search` answered `false`.
+
+  - The plugin now throws `[router.areStatesEqual] Invalid state1.search: {type}. Expected a plain object.` for a `search` that is not an object, is `null` or is an array. The second state reports `state2.search`.
+  - The default call (`ignoreQueryParams` omitted or `true`) reads no `search` and is unchanged.
+
+- Updated dependencies [[`a9c9156`](https://github.com/greydragon888/real-router/commit/a9c9156cf580a55894e1508e0e9bf750704814f1)]:
+  - @real-router/core@0.155.1
+
+
 ### @real-router/core@0.155.0
 
 ### Minor Changes
