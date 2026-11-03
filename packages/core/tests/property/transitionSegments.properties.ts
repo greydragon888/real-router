@@ -17,7 +17,12 @@ import {
   navArgsForRoute,
 } from "./helpers";
 
-import type { PluginFactory, Route, State } from "@real-router/core";
+import type {
+  PluginFactory,
+  Route,
+  SearchParamValue,
+  State,
+} from "@real-router/core";
 
 // =============================================================================
 // Deep, param-less route tree + independent model oracle
@@ -36,11 +41,9 @@ import type { PluginFactory, Route, State } from "@real-router/core";
 // code under test) now asserts the exact arrays via `toStrictEqual`, across
 // cross-level and shared-ancestor transitions.
 //
-// NOTE (follow-up): the non-empty-intersection / partial-chain path
-// (`pointOfDifference`, transitionPath.ts) only engages for routes carrying
-// state META params (`defaultParams`). Modelling it needs a `segmentParamsEqual`
-// oracle and is left as a separate targeted suite; this file covers the dominant
-// param-less branch exactly.
+// The branch where a shared ancestor's own params decide (`pointOfDifference` /
+// `segmentParamsEqual`) has its own model: the "meta-param branch" property
+// over PARAM_TREE below, path and query channels both (#2689).
 
 /** Nested, param-less route tree `depth` levels deep, `breadth` wide. */
 function buildDeepTree(depth: number, breadth: number): Route[] {
@@ -92,23 +95,50 @@ function modelIds(name: string): string[] {
   return parts.map((_, i) => parts.slice(0, i + 1).join("."));
 }
 
-// Tree with a PARAM-bearing ancestor ("parent" owns :pid) to exercise the
-// meta-param branch of computeTransitionPath (`pointOfDifference` /
-// `segmentParamsEqual`): a shared ancestor whose NAME matches must still
-// re-mount when its OWN param value changes between from and to.
+// Tree with PARAM-bearing segments to exercise the meta-param branch of
+// computeTransitionPath (`pointOfDifference` / `segmentParamsEqual`): "parent"
+// declares the path param `pid` and the query param `pq`, "childA" the query
+// param `cq`. A segment whose NAME matches must still re-mount when a param it
+// declares, in either channel, prints a different value (#2689).
 const PARAM_TREE: Route[] = [
   { name: "home", path: "/home" },
   {
     name: "parent",
-    path: "/parent/:pid",
+    path: "/parent/:pid?pq",
     children: [
-      { name: "childA", path: "/a" },
+      { name: "childA", path: "/a?cq" },
       { name: "childB", path: "/b" },
     ],
   },
 ];
 
 const arbPid = fc.constantFrom("1", "2", "3");
+
+/**
+ * A query value — absent included — in the forms the two directions produce
+ * for one URL: a number and its text, a boolean and its text, a singleton
+ * array and its element. The text `"undefined"` prints where an absent value
+ * prints nothing.
+ */
+const QUERY_VALUES: readonly (SearchParamValue | undefined)[] = [
+  undefined,
+  "undefined",
+  "x",
+  "y",
+  "1",
+  1,
+  "true",
+  true,
+  ["x"],
+  ["x", "y"],
+];
+
+const arbQueryValue = fc.constantFrom(...QUERY_VALUES);
+
+/** Independent model of a value's printed form; `undefined` prints nothing. */
+function printed(value: SearchParamValue | undefined): string | undefined {
+  return value === undefined ? undefined : [value].flat().map(String).join("&");
+}
 
 describe("navigate() → transition.segments Properties", () => {
   test.prop([arbDeepNode, arbDeepNode], { numRuns: NUM_RUNS.standard })(
@@ -174,33 +204,96 @@ describe("navigate() → transition.segments Properties", () => {
     },
   );
 
-  test.prop([arbPid, arbPid], { numRuns: NUM_RUNS.standard })(
-    "meta-param branch: a name-matching ancestor stays mounted IFF its own param is unchanged",
-    async (pidFrom, pidTo) => {
+  it("the query-value domain holds forms of one printed value, and different printed values", () => {
+    // 10 values in 7 printed classes: three are a second form of another one.
+    expect(QUERY_VALUES).toHaveLength(10);
+    expect(new Set(QUERY_VALUES.map((value) => printed(value))).size).toBe(7);
+    // The three pairs: a number, a boolean and a singleton array, each beside
+    // its text.
+    expect(QUERY_VALUES).toStrictEqual(
+      expect.arrayContaining(["1", 1, "true", true, "x", ["x"]]),
+    );
+  });
+
+  test.prop(
+    [
+      fc.record({ pid: arbPid, pq: arbQueryValue, cq: arbQueryValue }),
+      fc.record({ pid: arbPid, pq: arbQueryValue, cq: arbQueryValue }),
+      fc.constantFrom("parent.childA", "parent.childB"),
+    ],
+    {
+      numRuns: NUM_RUNS.standard,
+      // The rare pairs on every seed: one printing the same URL, one where the
+      // parent differs only in form, and one where an absent value meets the
+      // text "undefined".
+      examples: [
+        [
+          { pid: "1", pq: "1", cq: ["x"] },
+          { pid: "1", pq: 1, cq: "x" },
+          "parent.childA",
+        ],
+        [
+          { pid: "2", pq: true, cq: "y" },
+          { pid: "2", pq: "true", cq: undefined },
+          "parent.childB",
+        ],
+        [
+          { pid: "3", pq: undefined, cq: "x" },
+          { pid: "3", pq: "undefined", cq: "x" },
+          "parent.childA",
+        ],
+      ],
+    },
+  )(
+    "meta-param branch: a name-matching segment stays mounted IFF every param it declares, path and query, prints the same",
+    async (from, to, toName) => {
       const router = createRouter(PARAM_TREE, { defaultRoute: "home" });
 
       await router.start("/home");
-      await router.navigate("parent.childA", { pid: pidFrom });
+      await router.navigate(
+        "parent.childA",
+        { pid: from.pid },
+        { pq: from.pq, cq: from.cq },
+      );
 
-      const state = await router.navigate("parent.childB", { pid: pidTo });
+      const parentSame =
+        from.pid === to.pid && printed(from.pq) === printed(to.pq);
+      const leafSame =
+        toName === "parent.childA" && printed(from.cq) === printed(to.cq);
+      const navigation = router.navigate(
+        toName,
+        { pid: to.pid },
+        toName === "parent.childA" ? { pq: to.pq, cq: to.cq } : { pq: to.pq },
+      );
+
+      if (parentSame && leafSame) {
+        // Nothing either state declares prints differently: the same URL.
+        await expect(navigation).rejects.toMatchObject({
+          code: errorCodes.SAME_STATES,
+        });
+
+        router.stop();
+
+        return;
+      }
+
+      const state = await navigation;
       const { deactivated, activated, intersection } =
         state.transition.segments;
 
-      if (pidFrom === pidTo) {
-        // Ancestor "parent" param unchanged → it stays the intersection; only
-        // the diverging leaf re-mounts (segmentParamsEqual("parent") === true,
-        // so pointOfDifference walks past the ancestor to the name divergence).
+      if (parentSame) {
+        // "parent" prints the same → segmentParamsEqual("parent") === true, so
+        // pointOfDifference walks past it, and only the leaf re-mounts.
         expect(intersection).toBe("parent");
         expect([...deactivated]).toStrictEqual(["parent.childA"]);
-        expect([...activated]).toStrictEqual(["parent.childB"]);
+        expect([...activated]).toStrictEqual([toName]);
       } else {
-        // Ancestor "parent"'s OWN param changed → segmentParamsEqual("parent")
-        // is false, so pointOfDifference stops AT the ancestor: it deactivates +
-        // re-activates and the intersection empties, even though its NAME
-        // matches. This is the meta-param path the param-less model can't reach.
+        // A param "parent" declares changed, in either channel → the walk stops
+        // AT the ancestor: it deactivates + re-activates and the intersection
+        // empties, even though its NAME matches.
         expect(intersection).toBe("");
         expect([...deactivated]).toStrictEqual(["parent.childA", "parent"]);
-        expect([...activated]).toStrictEqual(["parent", "parent.childB"]);
+        expect([...activated]).toStrictEqual(["parent", toName]);
       }
 
       router.stop();

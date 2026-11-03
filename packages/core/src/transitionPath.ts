@@ -1,5 +1,7 @@
 // packages/core/src/transitionPath.ts
 
+import { areParamValuesEqual } from "./helpers";
+
 import type { State } from "./types";
 
 /** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
@@ -30,12 +32,6 @@ const objectKeys = Object.keys;
 export type RouteMetaLookup = (
   name: string,
 ) => Record<string, Record<string, "url" | "query">> | undefined;
-
-/**
- * Parameters extracted from a route segment.
- * Maps parameter names to their string values.
- */
-type PrimitiveParam = string | number | boolean;
 
 /**
  * Represents a transition path between two router states.
@@ -94,19 +90,73 @@ function nameToIDsGeneral(name: string): string[] {
   return ids;
 }
 
-const PRIMITIVE_TYPES: ReadonlySet<string> = new Set([
-  "string",
-  "number",
-  "boolean",
-]);
-
-function isPrimitive(value: unknown): value is PrimitiveParam {
-  return PRIMITIVE_TYPES.has(typeof value);
+/** A non-null object. Arrays never reach it: the walk below takes them first. */
+function isObjectValue(value: unknown): boolean {
+  return typeof value === "object" && value !== null;
 }
 
 /**
- * Compares segment parameters between two states without creating intermediate objects.
- * Returns true if all primitive params for the given segment are equal in both states.
+ * Whether one param value leaves its segment unchanged.
+ *
+ * The rule is `areParamValuesEqual`'s — the same value in another form,
+ * `2 ≡ "2"` or `["a"] ≡ "a"`, is no change — with one exception: two objects
+ * count as unchanged. That rule compares objects by identity, and a codec or a
+ * search schema can hand back a fresh object for an unchanged value on every
+ * navigation. Arrays are walked here rather than handed to it, so the exception
+ * reaches their elements.
+ *
+ * ⚠ A changed object is therefore not seen either: a navigation that changes
+ * only a `Date` a segment declares, bare or inside an array that keeps its
+ * length, re-enters nothing.
+ */
+function isSameSegmentValue(toVal: unknown, fromVal: unknown): boolean {
+  // One value on both sides is not walked: an array that contains itself would
+  // never end the walk.
+  if (toVal === fromVal) {
+    return true;
+  }
+
+  const toIsList = Array.isArray(toVal);
+  const fromIsList = Array.isArray(fromVal);
+
+  if (!toIsList && !fromIsList) {
+    return (
+      (isObjectValue(toVal) && isObjectValue(fromVal)) ||
+      areParamValuesEqual(toVal, fromVal)
+    );
+  }
+
+  // A bare value counts as a one-element array, as in `areParamValuesEqual`.
+  const toItems: readonly unknown[] = toIsList ? toVal : [toVal];
+  const fromItems: readonly unknown[] = fromIsList ? fromVal : [fromVal];
+  // One read of the length, for the reason `areParamValuesEqual` gives.
+  const length = toItems.length;
+
+  if (length !== fromItems.length) {
+    return false;
+  }
+
+  for (let i = 0; i < length; i++) {
+    if (!isSameSegmentValue(toItems[i], fromItems[i])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Whether every param the segment declares — path and query alike (#2689) — is
+ * unchanged between the two states.
+ *
+ * Each declared name is read in BOTH channels. `buildParamMeta` keeps one
+ * `paramTypeMap` entry per name, so a segment declaring `/:id?id` lists `id`
+ * once, and reading only the channel that entry names would never see the
+ * query twin.
+ *
+ * ⚠ A name declared at two levels, once in each channel, re-enters the ancestor
+ * when only the descendant's half changes: the comparison over-reports there
+ * rather than miss a change.
  */
 function segmentParamsEqual(
   name: string,
@@ -121,13 +171,9 @@ function segmentParamsEqual(
   }
 
   for (const key of objectKeys(keys)) {
-    const toVal = toState.params[key];
-    const fromVal = fromState.params[key];
-
     if (
-      isPrimitive(toVal) &&
-      isPrimitive(fromVal) &&
-      String(toVal) !== String(fromVal)
+      !isSameSegmentValue(toState.params[key], fromState.params[key]) ||
+      !isSameSegmentValue(toState.search[key], fromState.search[key])
     ) {
       return false;
     }
@@ -140,7 +186,7 @@ function segmentParamsEqual(
  * Finds the point where two state paths diverge based on segments and parameters.
  * Compares both segment names and their parameters to find the first difference.
  *
- * @param toMetaParams - Cached meta.params from toState (avoids per-segment WeakMap lookup)
+ * @param toMetaParams - The declared params of toState's route (fromState's when it has none), looked up once per path
  * @param toState - Target state
  * @param fromState - Source state
  * @param toStateIds - Segment IDs for target state
@@ -339,10 +385,10 @@ function computeNameToIDs(name: string): string[] {
  * //   toDeactivate: ['users.profile', 'users']
  * // }
  */
-// Single-entry cache: shouldUpdateNode calls getTransitionPath N times per
+// Two-entry cache: shouldUpdateNode calls getTransitionPath N times per
 // navigation with the same state objects (once per subscribed node).
 // Cache by reference eliminates N-1 redundant computations.
-// Module-global (≤2 State refs); not cleared on dispose — negligible, not per-router.
+// Module-global (≤4 State refs); not cleared on dispose — negligible, not per-router.
 let cached1To: State | undefined;
 let cached1From: State | undefined;
 let cached1Result: TransitionPath | null = null;
