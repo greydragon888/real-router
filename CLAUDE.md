@@ -41,7 +41,7 @@ shared/
 | npm             | 11.20                                            | bundled with Node 26 — notes below the table                                                   |
 | pnpm            | 12.16                                            | `packageManager` field, root `package.json` — notes below the table                            |
 | TypeScript      | 6.0                                              | root `devDependencies` (pinned exact, `save-exact`)                                            |
-| Vitest          | 5.0                                              | root `devDependencies`                                                                         |
+| Vitest          | 5.1                                              | root `devDependencies`                                                                         |
 | tsdown          | 0.23                                             | root `devDependencies`                                                                         |
 | Turbo           | 2.11                                             | root `devDependencies`                                                                         |
 | ESLint          | 10.11                                            | root `devDependencies` (flat config)                                                           |

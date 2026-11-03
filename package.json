@@ -103,9 +103,9 @@
     "@stylistic/eslint-plugin": "5.10.0",
     "@types/node": "26.6.6",
     "@typescript-eslint/parser": "8.70.1",
-    "@vitest/coverage-v8": "5.0.5",
+    "@vitest/coverage-v8": "5.1.0",
     "@vitest/eslint-plugin": "1.6.28",
-    "@vitest/ui": "5.0.5",
+    "@vitest/ui": "5.1.0",
     "czg": "1.14.0",
     "danger": "14.0.7",
     "dotenv-cli": "11.0.0",
@@ -139,7 +139,7 @@
     "turbo": "2.11.10",
     "typescript": "6.0.3",
     "typescript-eslint": "8.70.1",
-    "vitest": "5.0.5",
+    "vitest": "5.1.0",
     "yaml": "2.9.1"
   },
   "packageManager": "pnpm@12.16.1+sha512.091d1dee7927575661b25dab3c2ae31cafc1c54d6b71ed6a6600cf0c1cb10434a447eae14015f1b23e2e6bedeed79df94a932e2164d2832280dce3fb32f656d1"
