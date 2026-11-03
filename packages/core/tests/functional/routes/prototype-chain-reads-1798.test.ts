@@ -384,13 +384,14 @@ describe("the URL build direction reads a declared name off the caller's bag (#1
 
   it("BOUNDARY — the codec seam is the one bag this read sees unnormalised", async () => {
     // Two facts the empty-bag table cannot show, both about `encodeParams`:
-    // `RoutesNamespace` forwards a codec's return value to the matcher VERBATIM,
-    // so it is the only bag that reaches this read without passing through
-    // `normalizeParams`. Hence (a) the nullish half of the guard is load-bearing
-    // — `Object.hasOwn` does `ToObject` and THROWS on `null`, where the
-    // `params?.[…]` it replaced was nullish-safe — and (b) the own-property rule
-    // now holds for ANY prototype, not only `Object.prototype`'s members, which
-    // is a wider contract than the table above states.
+    // `RoutesNamespace` forwards a codec's non-nullish return to the matcher
+    // VERBATIM, so it is the only bag that reaches this read without passing
+    // through `normalizeParams`. Hence (a) a `null` channel is one the codec
+    // did not return, so the input fills it and the matcher never sees `null`
+    // from this seam — its nullish guard is pinned on the matcher itself, in
+    // `SegmentMatcher.test.ts` — and (b) the own-property rule now holds for
+    // ANY prototype, not only `Object.prototype`'s members, which is a wider
+    // contract than the table above states.
     const { getRoutesApi } = await import("@real-router/core/api");
 
     const nullBag = createRouter([
@@ -402,10 +403,8 @@ describe("the URL build direction reads a declared name off the caller's bag (#1
       encodeParams: () => ({ params: null, search: {} }),
     } as never);
 
-    // (a) the NAMED refusal, not `TypeError: Cannot convert … to object`
-    expect(() => nullBag.buildPath("a", { id: "7" })).toThrow(
-      "Missing required param 'id'",
-    );
+    // (a) the input fills the channel the codec returned as `null`
+    expect(nullBag.buildPath("a", { id: "7" })).toBe("/a/7");
 
     nullBag.dispose();
 
@@ -453,10 +452,9 @@ describe("the URL build direction reads a declared name off the caller's bag (#1
 
     inheritedSearch.dispose();
 
-    // (d) the `undefined` term of the three-term guard, which this file's own
-    // docblock calls load-bearing while pinning only the `null` half. Reaching
-    // it needs the seam too — the facade's `normalizeParams` never yields
-    // `undefined` either.
+    // (d) the `undefined` spelling of (a): the input fills it too. The guard's
+    // `undefined` term is pinned on the matcher, by `SegmentMatcher.test.ts`'s
+    // "should throw for missing required param".
     const undefinedBag = createRouter([
       { name: "a", path: "/a/:id" },
       { name: "home", path: "/home" },
@@ -466,9 +464,7 @@ describe("the URL build direction reads a declared name off the caller's bag (#1
       encodeParams: () => ({ params: undefined, search: {} }),
     } as never);
 
-    expect(() => undefinedBag.buildPath("a", { id: "7" })).toThrow(
-      "Missing required param 'id'",
-    );
+    expect(undefinedBag.buildPath("a", { id: "7" })).toBe("/a/7");
 
     undefinedBag.dispose();
   });

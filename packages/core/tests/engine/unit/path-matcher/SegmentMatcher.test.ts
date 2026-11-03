@@ -2248,6 +2248,16 @@ describe("SegmentMatcher", () => {
       );
     });
 
+    // `Object.hasOwn` throws on `null`; the bag's nullish test is what keeps
+    // the refusal named.
+    it("should throw the named refusal for a null params bag", () => {
+      const matcher = createParamBuildMatcher();
+
+      expect(() => matcher.buildPath("users.profile", null as never)).toThrow(
+        "[router.buildPath] Missing required param 'id'",
+      );
+    });
+
     // #740 item 3: an empty value for a required param silently collapsed the
     // segment (`/users/` → matched the parent), so it is now rejected at build.
     it("should throw for an empty-string required param (#740)", () => {
