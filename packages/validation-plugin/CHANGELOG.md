@@ -1,5 +1,19 @@
 # @real-router/validation-plugin
 
+## 0.31.1
+
+### Patch Changes
+
+- [#2901](https://github.com/greydragon888/real-router/pull/2901) [`8dac14b`](https://github.com/greydragon888/real-router/commit/8dac14b81d4521cf5f1a02be4e6e58ede896f5cd) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse a malformed `state.search` in `areStatesEqual(…, false)` ([#2897](https://github.com/greydragon888/real-router/issues/2897))
+
+  With `ignoreQueryParams: false`, `router.areStatesEqual` compares the `search` of both states, and the plugin checked neither. A state whose `search` was missing or `null` reached core and threw a bare `TypeError: Cannot convert undefined or null to object`. A string or array `search` answered `false`.
+
+  - The plugin now throws `[router.areStatesEqual] Invalid state1.search: {type}. Expected a plain object.` for a `search` that is not an object, is `null` or is an array. The second state reports `state2.search`.
+  - The default call (`ignoreQueryParams` omitted or `true`) reads no `search` and is unchanged.
+
+- Updated dependencies [[`a9c9156`](https://github.com/greydragon888/real-router/commit/a9c9156cf580a55894e1508e0e9bf750704814f1)]:
+  - @real-router/core@0.155.1
+
 ## 0.31.0
 
 ### Minor Changes
