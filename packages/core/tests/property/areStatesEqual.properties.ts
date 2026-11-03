@@ -1,12 +1,13 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 
+import { createRouter } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 
 import { arbState, createFixtureRouter, NUM_RUNS } from "./helpers";
 import { DEFAULT_TRANSITION } from "../helpers";
 
-import type { Params, State } from "@real-router/core";
+import type { Params, Route, State } from "@real-router/core";
 
 describe("areStatesEqual Properties", () => {
   const router = createFixtureRouter();
@@ -230,6 +231,127 @@ describe("areStatesEqual Properties", () => {
           viewState({ id: String(id) }),
         ),
       ).toBe(true);
+    },
+  );
+
+  // ── #2905: the same property on routes with a codec ────────────────────────
+  //
+  // Only the URL direction runs a route's `decodeParams` (the contract
+  // `Route.decodeParams` states), so the property holds for a decoder that
+  // undoes its `encodeParams` and adds no key, and fails for one that does not.
+  // INVARIANTS areStatesEqual #8 names the conditions.
+  const CODEC_ROUTES: Route[] = [
+    {
+      name: "product",
+      path: "/product/:id",
+      encodeParams: ({ params, search }) => ({
+        params: { ...params, id: (params.id as number).toString() },
+        search,
+      }),
+      decodeParams: ({ params, search }) => ({
+        params: { ...params, id: Number(params.id) },
+        search,
+      }),
+    },
+    {
+      name: "derived",
+      path: "/derived/:slug",
+      decodeParams: ({ params, search }) => ({
+        params: { ...params, kind: "car" },
+        search,
+      }),
+    },
+    {
+      name: "lossy",
+      path: "/lossy/:slug",
+      decodeParams: ({ params, search }) => ({
+        params: { ...params, slug: (params.slug as string).toUpperCase() },
+        search,
+      }),
+    },
+    { name: "seam", path: "/seam/:slug" },
+  ];
+  /** Starts with a letter, so `toUpperCase()` always changes it. */
+  const arbSlug = fc.stringMatching(/^[a-z][a-z0-9-]{0,7}$/);
+
+  const codecRouter = createRouter(CODEC_ROUTES);
+  const codecApi = getPluginApi(codecRouter);
+
+  // The remedy `Route.decodeParams` names: the same key, derived in a
+  // `forwardState` interceptor.
+  const seamRouter = createRouter(CODEC_ROUTES);
+  const seamApi = getPluginApi(seamRouter);
+
+  seamApi.addInterceptor("forwardState", (next, name, params, search) => {
+    const resolved = next(name, params, search);
+
+    return resolved.name === "seam"
+      ? { ...resolved, params: { ...resolved.params, kind: "car" } }
+      : resolved;
+  });
+
+  test.prop([fc.integer({ min: 0, max: 99_999 })], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "provenance independence: a decoder that undoes its encoder (#2905)",
+    (id) => {
+      // The form the decoder returns, and the form the URL prints.
+      for (const intent of [id, String(id)]) {
+        const fromIntent = codecApi.makeState("product", { id: intent });
+        const fromUrl = codecApi.matchPath(fromIntent.path);
+
+        expect(fromUrl?.params).toStrictEqual({ id });
+        expect(codecRouter.areStatesEqual(fromIntent, fromUrl, false)).toBe(
+          true,
+        );
+      }
+    },
+  );
+
+  test.prop([arbSlug], { numRuns: NUM_RUNS.standard })(
+    "provenance independence fails for a decoder that adds a key or changes a value: the intent side never decodes (#2905)",
+    (slug) => {
+      for (const name of ["derived", "lossy"]) {
+        const fromUrl = codecApi.matchPath(
+          codecApi.makeState(name, { slug }).path,
+        );
+
+        expect(fromUrl).toBeDefined();
+
+        // `buildNavigationState` resolves an intent the way `navigate` does.
+        for (const fromIntent of [
+          codecApi.makeState(name, { slug }),
+          codecApi.buildNavigationState(name, { slug }),
+        ]) {
+          expect(fromIntent?.params).toStrictEqual({ slug });
+          expect(codecRouter.areStatesEqual(fromIntent, fromUrl, false)).toBe(
+            false,
+          );
+        }
+      }
+    },
+  );
+
+  test.prop([arbSlug], { numRuns: NUM_RUNS.standard })(
+    "a key derived in a forwardState interceptor is on both sides of a navigation, and not on the literal makeState (#2905)",
+    (slug) => {
+      const fromUrl = seamApi.matchPath(`/seam/${slug}`);
+
+      expect(fromUrl?.params).toStrictEqual({ slug, kind: "car" });
+      expect(
+        seamRouter.areStatesEqual(
+          seamApi.buildNavigationState("seam", { slug }),
+          fromUrl,
+          false,
+        ),
+      ).toBe(true);
+      expect(
+        seamRouter.areStatesEqual(
+          seamApi.makeState("seam", { slug }),
+          fromUrl,
+          false,
+        ),
+      ).toBe(false);
     },
   );
 

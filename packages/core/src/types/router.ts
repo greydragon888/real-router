@@ -519,6 +519,12 @@ export interface Route<
    * Receives `{ params, search }` (path params + parsed query) and returns
    * `{ params, search }`. Runs inside `matchPath`, **before** any search-schema
    * plugin validation — the v1 transformation order (engine codec → plugin).
+   *
+   * Only the URL side runs it: `navigate`, `buildPath` and `makeState` take
+   * params in the form it returns. So it must undo `encodeParams` and add no
+   * key — a key only the decoder writes is in the state after a reload and
+   * missing after a link (#2905). Derive such a value in a `forwardState`
+   * interceptor instead: `navigate` and `matchPath` both run it.
    */
   decodeParams?: (channels: ParamsSearch) => ParamsSearch;
   /**
