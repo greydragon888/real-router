@@ -151,8 +151,9 @@ export interface RouteResolver {
     ((routeName: string, key: string) => void) | undefined;
 
   /**
-   * The route's PATH slot names, or `undefined` when there is NO SUCH ROUTE —
-   * the other half of "is this key declared?". Needed only by the undeclared-key
+   * The PATH slot names the route's URL prints, the root's (`setRootPath`)
+   * included, or `undefined` when there is NO SUCH ROUTE — the other half of
+   * "is this key declared?". Needed only by the undeclared-key
    * diagnostic (#1579), which asks whether a key is declared ANYWHERE;
    * `queryNames` alone cannot answer that.
    *

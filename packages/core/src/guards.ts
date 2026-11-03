@@ -226,6 +226,22 @@ export function assertRouteNameIsString(
 }
 
 /**
+ * Refuses a guard on the root node `""` (#2895). The root is no segment: no
+ * transition activates or deactivates it, so the guard would register cleanly
+ * and never run.
+ */
+export function assertGuardTargetIsNotRoot(
+  name: string,
+  methodName: string,
+): void {
+  if (name === "") {
+    const at = raiser("router", methodName);
+
+    throw at.type`A guard on the root node "" never runs: no navigation activates or deactivates the root`;
+  }
+}
+
+/**
  * Is this a plain bag — an object whose own enumerable keys are the caller's,
  * rather than indices or an instance's fields?
  *

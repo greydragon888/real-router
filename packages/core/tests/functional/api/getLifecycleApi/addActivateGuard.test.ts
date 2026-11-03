@@ -68,17 +68,17 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       expect(router.canNavigateTo("admin")).toBe(false);
     });
 
-    it("should allow empty string as valid route name (root node)", async () => {
+    // The root is no segment: no navigation activates or deactivates it, so a
+    // guard registered there would report success and never run (#2895).
+    it('should refuse the root node "" with a TypeError', async () => {
+      expect(() => {
+        lifecycle.addActivateGuard("", () => () => false);
+      }).toThrow(
+        '[router.addActivateGuard] A guard on the root node "" never runs: no navigation activates or deactivates the root',
+      );
       expect(() => {
         lifecycle.addActivateGuard("", true);
-      }).not.toThrow();
-
-      // The root ("") guard is NOT re-evaluated for a navigation that keeps the
-      // root mounted — shared-ancestor guards are not re-checked (#970), and the
-      // root is always mounted after start() — so a post-start navigate("admin")
-      // still resolves. (The old masking try/catch asserted a block that never
-      // fired, hiding that the "affects all routes" belief does not hold here.)
-      lifecycle.addActivateGuard("", false);
+      }).toThrow(TypeError);
 
       await expect(router.navigate("admin")).resolves.toMatchObject({
         name: "admin",

@@ -34,7 +34,7 @@ has been wrong at least once; the derivation is green or it is red.
 
 ## Invariant Guards (always active, no plugin required)
 
-Ten, and the criterion for another is **(a)** silent corruption or **(b)** a
+Eleven, and the criterion for another is **(a)** silent corruption or **(b)** a
 deferred crash in a user-facing API. (The count is written as a cardinal, not an
 ordinal naming "the next one": an ordinal adds a second edit to every addition.)
 
@@ -98,6 +98,11 @@ InterceptableMethodMap]: K }` ties it to the type in both directions: a seam
   the name. ⚑ The channel is REFUSAL-ONLY — a check may throw and may do nothing
   else — which is what separates it from a seam: measured, no shipped interceptor
   refuses and no validator refusal replaces an argument.
+- **`addActivateGuard("")` / `addDeactivateGuard("")`** — refuse the root node
+  (#2895), by criterion **(a)**: the root is no segment, so no transition
+  activates or deactivates it, and a guard there would register cleanly and
+  never run. `removeActivateGuard("")` / `removeDeactivateGuard("")` stay
+  accepted: they clear the external lane, which never holds a guard on `""`.
 - **`extendRouter(extensions)`** — the argument must be a plain object (#2243).
   Criterion **(a)**, and the refused write lands on the router ITSELF rather than
   in an internal registry: own enumerable keys are copied onto the live router,

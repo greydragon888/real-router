@@ -84,6 +84,24 @@ describe("validation-plugin — undeclared params-bag key diagnostic (#1579)", (
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
+  it("stays silent for a slot the root path declares (#2895)", async () => {
+    router = mk();
+    getPluginApi(router).setRootPath("/app/:tenant");
+    await router.start("/app/a/plain");
+
+    // The root slot reaches the URL of every route.
+    const state = await router.navigate("plain", { tenant: "b" });
+
+    expect(state.path).toBe("/app/b/plain");
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    // A key declared nowhere still warns beside it.
+    await router.navigate("plain", { tenant: "c", foo: "1" });
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(`"foo"`));
+  });
+
   it("de-duplicates per route + key", async () => {
     router = mk();
     await router.start("/h");
