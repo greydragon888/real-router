@@ -248,8 +248,19 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
     // answers `[]` for that case and for a real route with no path slots alike,
     // and the diagnostic downstream cannot tell those apart. `hasRoute` is the
     // matcher's own predicate, so no second derivation of existence appears.
-    pathNames: (name) =>
-      ns.routes.hasRoute(name) ? ns.routes.getUrlParams(name) : undefined,
+    // The root's slots join the route's own: `setRootPath("/app/:tenant")`
+    // prints `tenant` into every URL, and `getUrlParams` lists the route's
+    // segments only (#2895).
+    pathNames: (name) => {
+      if (!ns.routes.hasRoute(name)) {
+        return;
+      }
+
+      const own = ns.routes.getUrlParams(name);
+      const root = store.tree.paramMeta.urlParams;
+
+      return root.length === 0 ? own : [...root, ...own];
+    },
     // A closure because the port TYPES this member as `() => boolean`, not
     // because anything can change the answer: `queryParamsMode` sits on the
     // options bag itself, which `ns.options.get()` returns frozen and nothing

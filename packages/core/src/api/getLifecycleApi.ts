@@ -1,4 +1,4 @@
-import { assertRouteNameIsString } from "../guards";
+import { assertGuardTargetIsNotRoot, assertRouteNameIsString } from "../guards";
 import {
   getInternals,
   POSITION,
@@ -21,6 +21,7 @@ export function getLifecycleApi<
       throwIfDisposed(ctx.isDisposed);
 
       assertRouteNameIsString(name, "addActivateGuard");
+      assertGuardTargetIsNotRoot(name, "addActivateGuard");
       runChecks(ctx.checks, POSITION["addActivateGuard:entry"], name, handler);
 
       // Handler-limit enforcement lives at the namespace registration choke point
@@ -34,6 +35,7 @@ export function getLifecycleApi<
       throwIfDisposed(ctx.isDisposed);
 
       assertRouteNameIsString(name, "addDeactivateGuard");
+      assertGuardTargetIsNotRoot(name, "addDeactivateGuard");
       runChecks(
         ctx.checks,
         POSITION["addDeactivateGuard:entry"],

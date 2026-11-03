@@ -532,7 +532,7 @@ A listener tells a transition's failure from a direct emit by the `context` of t
 { intersection: "", toDeactivate: ["orders.list", "orders"], toActivate: ["orders", "orders.list"] }
 ```
 
-A segment both states share differs when a name it declares changes value in either channel; [INVARIANTS.md](INVARIANTS.md) "navigate / transition.segments" row 1 states the rule.
+A segment both states share differs when a name it declares changes value in either channel; [INVARIANTS.md](INVARIANTS.md) "navigate / transition.segments" row 1 states the rule. The root node is not a segment, so a name the root declares (`setRootPath`) belongs to none: its change alone deactivates and activates nothing.
 
 **`nameToIDs()` fast paths:** Optimized for 0-4 segments via `indexOf()`-based scanning (avoids `split()`). 5+ segments use general path.
 

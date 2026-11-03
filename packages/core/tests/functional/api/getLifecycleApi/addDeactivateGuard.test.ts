@@ -97,6 +97,18 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
       }).not.toThrow();
     });
 
+    // The twin of addActivateGuard's refusal: the root is no segment (#2895).
+    it('should refuse the root node "" with a TypeError', () => {
+      expect(() => {
+        lifecycle.addDeactivateGuard("", () => () => false);
+      }).toThrow(
+        '[router.addDeactivateGuard] A guard on the root node "" never runs: no navigation activates or deactivates the root',
+      );
+      expect(() => {
+        lifecycle.addDeactivateGuard("", true);
+      }).toThrow(TypeError);
+    });
+
     it("should throw TypeError for invalid handler types", () => {
       expect(() => {
         // @ts-expect-error: testing null
