@@ -1,5 +1,27 @@
 # @real-router/core
 
+## 0.156.0
+
+### Minor Changes
+
+- [#2903](https://github.com/greydragon888/real-router/pull/2903) [`0d701f9`](https://github.com/greydragon888/real-router/commit/0d701f97078368939e890c8ea985466a14ee68ca) Thanks [@greydragon888](https://github.com/greydragon888)! - `addActivateGuard("")` and `addDeactivateGuard("")` refuse the root node ([#2895](https://github.com/greydragon888/real-router/issues/2895))
+
+  `""` names the root node, and the root is no segment: no navigation activates or deactivates it, `start()` included. A guard registered there was accepted and never called, so a refusing one let every navigation through. Both methods now throw a `TypeError` at registration:
+
+  `[router.addActivateGuard] A guard on the root node "" never runs: no navigation activates or deactivates the root`
+
+  `removeActivateGuard("")` and `removeDeactivateGuard("")` stay accepted and do nothing.
+
+  **Breaking Change:** a call that registers a guard on `""` throws.
+
+  **Migration:** delete the call — the guard it registered was never called. A check meant for every route goes on each top-level route: a navigation that enters a top-level route's subtree runs that route's guard.
+
+### Patch Changes
+
+- [#2903](https://github.com/greydragon888/real-router/pull/2903) [`0d701f9`](https://github.com/greydragon888/real-router/commit/0d701f97078368939e890c8ea985466a14ee68ca) Thanks [@greydragon888](https://github.com/greydragon888)! - The undeclared-param diagnostic counts a slot the root declares as declared ([#2895](https://github.com/greydragon888/real-router/issues/2895))
+
+  With `@real-router/validation-plugin` installed and `setRootPath("/app/:tenant")`, `navigate("users.view", { tenant: "b" })` warned `Param "tenant" is declared nowhere on route "users.view"`, although the value reaches the URL (`/app/b/users/view`). The diagnostic now counts the root's path slots as declared on every route, as the URL builder does. A key declared nowhere still warns.
+
 ## 0.155.1
 
 ### Patch Changes
