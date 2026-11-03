@@ -461,14 +461,16 @@ export class SegmentMatcher {
       // `Object.hasOwn` does
       // `ToObject` first and THROWS on `null`. Dropping `null` here turned a
       // named `Missing required param` into a bare
-      // `TypeError: Cannot convert undefined or null to object`. The bag reaches
-      // this line unnormalised only from a route's own `encodeParams`, whose
-      // return value `RoutesNamespace` forwards verbatim — the facade's
-      // `normalizeChannel` never yields `null`. The sibling read in
-      // `#buildQueryStringForBuild` guards the same way (`if (!params)`).
+      // `TypeError: Cannot convert undefined or null to object`. No caller in
+      // core hands this method a nullish bag — `RoutesNamespace` substitutes
+      // the input for a codec channel that is one, and the facade's
+      // `normalizeChannel` never yields `null` — so `null` arrives from a
+      // direct caller of the matcher, which this layer does not own. The
+      // sibling read in `#buildQueryStringForBuild` guards the same way
+      // (`if (!params)`).
       const value =
         params !== undefined &&
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the STATIC type is narrower than the runtime: `RoutesNamespace` forwards a route's `encodeParams` return VERBATIM (its `encoded.params` is unvalidated user output), so `null` really arrives here. Same shape as `Router.ts`'s runtime guard for `navigate(null)`.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the STATIC type is narrower than the runtime: a direct caller of the matcher can hand it `null`. Same shape as `Router.ts`'s runtime guard for `navigate(null)`.
         params !== null &&
         hasOwn(params, slot.paramName)
           ? params[slot.paramName]

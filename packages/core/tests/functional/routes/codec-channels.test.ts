@@ -190,5 +190,114 @@ describe("core/routes — two-channel encode/decode (RFC-4 M2 §4)", () => {
       expect(state?.params).toStrictEqual({ id: "5" });
       expect(state?.search).toStrictEqual({ page: 2 });
     });
+
+    // A JavaScript codec can return one channel and leave the other out. The
+    // channel it leaves out keeps the value the codec was handed.
+    const paramsOnly = ({ params }: ParamsSearch) =>
+      ({ params }) as ParamsSearch;
+    const searchOnly = ({ search }: ParamsSearch) =>
+      ({ search }) as ParamsSearch;
+
+    it("prints the query an encoder does not return from the search it was handed", () => {
+      const router = createRouter([
+        { name: "items", path: "/items/:id?id&q", encodeParams: paramsOnly },
+      ]);
+
+      // `id` is declared in both channels: read from the path bag, it prints `?id=5`.
+      expect(router.buildPath("items", { id: "5" }, { id: "7", q: "x" })).toBe(
+        "/items/5?id=7&q=x",
+      );
+    });
+
+    it("keeps a params-only key out of the URL under loose mode", () => {
+      const router = createRouter(
+        [{ name: "items", path: "/items/:id?q", encodeParams: paramsOnly }],
+        { queryParamsMode: "loose" },
+      );
+
+      expect(
+        router.buildPath("items", { id: "5", extra: "e" }, { q: "x" }),
+      ).toBe("/items/5?q=x");
+    });
+
+    it("rebuilds the matched URL from the query an encoder does not return", () => {
+      const router = createRouter([
+        { name: "items", path: "/items/:id?id&q", encodeParams: paramsOnly },
+      ]);
+
+      expect(getPluginApi(router).matchPath("/items/5?id=7&q=x")?.path).toBe(
+        "/items/5?id=7&q=x",
+      );
+    });
+
+    it("rebuilds the matched URL from the params an encoder does not return", () => {
+      const router = createRouter([
+        { name: "y", path: "/y/:id?a&b", encodeParams: searchOnly },
+      ]);
+
+      // The rebuild prints `a` before `b`. A rebuild that throws keeps the
+      // source URL, `?b=1&a=2`.
+      expect(getPluginApi(router).matchPath("/y/5?b=1&a=2")?.path).toBe(
+        "/y/5?a=2&b=1",
+      );
+    });
+
+    it("builds the path from the params an encoder does not return", () => {
+      const router = createRouter([
+        { name: "y", path: "/y/:id?page", encodeParams: searchOnly },
+      ]);
+
+      expect(router.buildPath("y", { id: "5" }, { page: "2" })).toBe(
+        "/y/5?page=2",
+      );
+    });
+
+    it("keeps the query a decoder does not return", () => {
+      const router = createRouter([
+        { name: "y", path: "/y/:id?page", decodeParams: paramsOnly },
+      ]);
+
+      const state = getPluginApi(router).matchPath("/y/5?page=2");
+
+      expect(state?.search).toStrictEqual({ page: 2 });
+      expect(state?.path).toBe("/y/5?page=2");
+    });
+
+    it("keeps the params a decoder does not return", () => {
+      const router = createRouter([
+        { name: "y", path: "/y/:id?page", decodeParams: searchOnly },
+      ]);
+
+      expect(
+        getPluginApi(router).matchPath("/y/5?page=2")?.params,
+      ).toStrictEqual({ id: "5" });
+    });
+
+    it("reads a null channel as one the codec did not return", () => {
+      const router = createRouter([
+        {
+          name: "y",
+          path: "/y/:id?page",
+          decodeParams: ({ params }: ParamsSearch) =>
+            ({ params, search: null }) as unknown as ParamsSearch,
+        },
+      ]);
+
+      expect(
+        getPluginApi(router).matchPath("/y/5?page=2")?.search,
+      ).toStrictEqual({ page: 2 });
+    });
+
+    it("prints a returned empty channel as given", () => {
+      const router = createRouter([
+        {
+          name: "y",
+          path: "/y/:id?page",
+          encodeParams: ({ params }: ParamsSearch) => ({ params, search: {} }),
+        },
+      ]);
+
+      expect(router.buildPath("y", { id: "5" }, { page: "2" })).toBe("/y/5");
+    });
   });
 });

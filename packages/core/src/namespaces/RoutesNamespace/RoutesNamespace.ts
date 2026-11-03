@@ -50,6 +50,7 @@ import type {
   ForwardToCallback,
   AnyOptions,
   Params,
+  ParamsSearch,
   RouterLogger,
   SearchParams,
   State,
@@ -372,7 +373,12 @@ export class RoutesNamespace<
     const encoder = this.#store.config.encoders[route];
 
     if (typeof encoder === "function") {
-      const encoded = encoder({
+      // A channel the codec does not return — `undefined` or `null` — keeps the
+      // value it was handed: the return type requires both, which binds a
+      // TypeScript codec only, and the matcher would build an absent `search`
+      // from the path bag. The decode side and the `matchPath` rebuild below
+      // take the same fallback; `codec-channels.test.ts` pins each site.
+      const encoded: Partial<ParamsSearch> = encoder({
         // BOTH channels spread, and the symmetry is the point. Only `search`
         // arrives frozen: `path` is frozen by `materialize` at the publication
         // boundary and is still live here (#1928, measured from inside the
@@ -387,8 +393,8 @@ export class RoutesNamespace<
 
       return this.#store.matcher.buildPath(
         route,
-        encoded.params,
-        encoded.search,
+        encoded.params ?? params,
+        encoded.search ?? search,
         this.#getBuildPathOptions(options),
       );
     }
@@ -554,8 +560,14 @@ export class RoutesNamespace<
       // call sites below — mutation says so: substituting either call site back
       // survives, removing this line does not. Every consumer after this point
       // reads a plain object, so none of them can reach the accessor again.
-      const decodedParams = decoded.params;
-      const decodedSearch = decoded.search;
+      //
+      // A channel the decoder does not return keeps the matched one, by
+      // `buildPath`'s rule for the encoder. The shape check below judges what
+      // the decoder returned, so the plugin still names a missing `params`.
+      const returned: Partial<ParamsSearch> = decoded;
+      const returnedParams = returned.params;
+      const decodedParams = returnedParams ?? params;
+      const decodedSearch = returned.search ?? search;
 
       decoded = { params: decodedParams, search: decodedSearch };
 
@@ -570,7 +582,7 @@ export class RoutesNamespace<
       // `forwardState` dep wrapper and blamed that method for a `matchPath` fault.
       this.#deps
         .getValidator()
-        ?.routes.validateStateBuilderArgs(name, decodedParams, "matchPath");
+        ?.routes.validateStateBuilderArgs(name, returnedParams, "matchPath");
 
       // The channel half of the same boundary — always on, unlike the shape
       // check above. A decoder that moves a declared `?key` into the params bag
@@ -654,7 +666,9 @@ export class RoutesNamespace<
       // one publishes a State whose `name` IS the interceptor's object. Recorded
       // here so the next reader does not take the bind for a closure it is not.
       const encoder = this.#store.config.encoders[routeName];
-      const encoded =
+      // A channel the encoder does not return keeps the canonical one, by
+      // `buildPath`'s rule.
+      const encoded: Partial<ParamsSearch> =
         typeof encoder === "function"
           ? encoder({
               params: routeParams,
@@ -680,8 +694,8 @@ export class RoutesNamespace<
         // `getOptions()` keeps reporting the real value.
         builtPath = this.#store.matcher.buildPath(
           routeName,
-          encoded.params,
-          encoded.search,
+          encoded.params ?? routeParams,
+          encoded.search ?? forwardedSearch,
           {
             trailingSlash: narrowTrailingSlash(ts),
             queryParamsMode: resolveQueryParamsMode(opts.queryParamsMode),

@@ -52,6 +52,10 @@ describe("validation-plugin — a decoder's output is user input (#1582)", () =>
       ["a Map", new Map([["a", "1"]])],
       ["a class instance", new Custom()],
       ["an object with a custom prototype", Object.create({ inherited: "x" })],
+      // Bare core fills a missing `params` with the matched one; the check
+      // judges what the decoder returned.
+      ["undefined", undefined],
+      ["null", null],
     ])("%s", (_label, decoded) => {
       router = withDecoder(decoded);
       router.usePlugin(validationPlugin());
