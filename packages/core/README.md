@@ -311,15 +311,17 @@ const routes: Route<{ authService: AuthService }>[] = [
     path: "/product/:id",
     // Codecs are two-channel: receive `{ params, search }`, return `{ params,
     // search }` — transform the channel you own, pass the other through.
+    // Within `params`, too: it holds every slot of the URL, a parent route's
+    // and the root path's included, so convert `id` and spread the rest.
     // Only the URL side runs `decodeParams`: `navigate` and `buildPath` take
     // `id` as the number it returns, so it must undo `encodeParams` and add no
     // key — derive values in a `forwardState` interceptor instead.
-    encodeParams: ({ params: { id }, search }) => ({
-      params: { id: String(id) },
+    encodeParams: ({ params, search }) => ({
+      params: { ...params, id: String(params.id) },
       search,
     }),
-    decodeParams: ({ params: { id }, search }) => ({
-      params: { id: Number(id) },
+    decodeParams: ({ params, search }) => ({
+      params: { ...params, id: Number(params.id) },
       search,
     }),
   },
