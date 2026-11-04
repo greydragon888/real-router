@@ -26,6 +26,11 @@ export type { RouterInternals } from "./internals";
 // throws is left to the consumer that needed the value.
 export { findMisChanneledKey } from "./channels";
 
+// The value comparison `areStatesEqual` makes, re-exported for the same reason:
+// the plugin's codec diagnostic judges a round trip by the printed form this
+// rule defines (#2905), and a copy would drift from it.
+export { areParamValuesEqual } from "./helpers";
+
 export { validateRoute } from "./engine";
 
 // The params a path declares. Core builds a registered route's `paramMeta` with

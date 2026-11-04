@@ -90,6 +90,7 @@ import {
   guardNoAsyncCallbacks,
 } from "./validators/routes";
 import {
+  createCodecRoundTripReporter,
   createDroppedQueryKeyReporter,
   createUndeclaredParamKeyReporter,
   validateMakeStateArgs,
@@ -376,6 +377,7 @@ function buildValidatorObject(
       // fired for request #1 and never again.
       reportDroppedQueryKey: createDroppedQueryKeyReporter(),
       reportUndeclaredParamKey: createUndeclaredParamKeyReporter(),
+      reportCodecRoundTrip: createCodecRoundTripReporter(api.logger),
       validateAreStatesEqualArgs(s1, s2, ignoreQP) {
         if (!isState(s1)) {
           throw atAreStatesEqual.type`Invalid state1: ${getTypeDescription(s1)}. Expected State object.`;

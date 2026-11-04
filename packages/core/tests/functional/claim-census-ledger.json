@@ -780,7 +780,9 @@
       "b206e32e49c2",
       "cdcd74c009d9",
       "9de45fd9b178",
-      "af2dc1c7afee"
+      "af2dc1c7afee",
+      "e9b9c2b1da54",
+      "e899d4cb659f"
     ],
     "packages/core/src/Router.ts": [
       "7234e7246996",
@@ -1301,7 +1303,11 @@
       "3f46ffa2320d"
     ],
     "packages/validation-plugin/src/validators/state.ts": [
-      "acf9cb3e010e"
+      "acf9cb3e010e",
+      "4d0b1530e365",
+      "b0353174b759",
+      "be3fcc821f2c",
+      "1f47bfd6857f"
     ],
     "packages/vue/src/composables/useRouteEnter.ts": [
       "1f43b0061665"
@@ -2104,7 +2110,7 @@
     "packages/core/src/pipeline/CLAUDE.md": [
       "5441994dd5a0",
       "8569ec805ca5",
-      "20a234fccf1d",
+      "f2c8b679d6c0",
       "f72592d37d48",
       "65ad1efb369e"
     ],
@@ -2187,7 +2193,7 @@
       "3400cc879023",
       "12e61264c5e2",
       "4319712a7f6e",
-      "a90df2f9be6f",
+      "d192ef89b892",
       "c460d0800c1d",
       "651b745cc19a",
       "e623c09d4aac",

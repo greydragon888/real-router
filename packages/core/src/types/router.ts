@@ -525,6 +525,8 @@ export interface Route<
    * key — a key only the decoder writes is in the state after a reload and
    * missing after a link (#2905). Derive such a value in a `forwardState`
    * interceptor instead: `navigate` and `matchPath` both run it.
+   * `@real-router/validation-plugin` runs the pair on each state a navigation
+   * commits and warns about a key that does not come back.
    */
   decodeParams?: (channels: ParamsSearch) => ParamsSearch;
   /**

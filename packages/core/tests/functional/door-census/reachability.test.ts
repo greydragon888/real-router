@@ -227,6 +227,7 @@ describe("reachability census (#2303)", () => {
   it("/validation — the plugin-facing surface", () => {
     expect(exportsOf(SUBPATHS[4].file)).toStrictEqual({
       values: [
+        "areParamValuesEqual",
         "buildParamMeta",
         "findMisChanneledKey",
         "getInternals",

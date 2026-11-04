@@ -257,7 +257,13 @@ export function getPluginApi<
         ctx.port().queryNames(canonical.name),
       );
 
-      return materialize(canonical, buildURL(canonical, ctx.port()));
+      const state = materialize(canonical, buildURL(canonical, ctx.port()));
+
+      // The second committing producer: the state it returns is judged as
+      // `navigate`'s is (#2905).
+      ctx.port().reportCodecRoundTrip?.(state);
+
+      return state;
     },
     // ⚠ **Delegating, not composed here, and the difference is load-bearing.**
     // The two members above it spell `canonicalize` + `buildURL` in this file,

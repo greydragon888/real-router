@@ -19,7 +19,7 @@ import type { RouterLifecycleDependencies } from "../namespaces/RouterLifecycleN
 import type { RoutesDependencies } from "../namespaces/RoutesNamespace";
 import type { RouteResolver } from "../pipeline";
 import type { Router } from "../Router";
-import type { DefaultDependencies } from "../types";
+import type { DefaultDependencies, State } from "../types";
 import type { RouterValidator } from "../types/RouterValidator";
 
 /** The `getDependency` every factory and callback receives. */
@@ -28,6 +28,11 @@ type GetDependency<Dependencies extends DefaultDependencies> = <
 >(
   name: K,
 ) => Dependencies[K];
+
+/** A route's two codecs as the codec diagnostic receives them (#2905). */
+type RouteCodec = Parameters<
+  RouterValidator["state"]["reportCodecRoundTrip"]
+>[1];
 
 /**
  * Compiles a guard/plugin factory against the router + a cached `getDependency`
@@ -224,6 +229,38 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
     ctx.validator?.state.reportDroppedQueryKey(routeName, key);
   };
 
+  // The path slots a route's URL prints. The root's slots join the route's own:
+  // `setRootPath("/app/:tenant")` prints `tenant` into every URL, and
+  // `getUrlParams` lists the route's segments only (#2895).
+  const printedPathSlots = (name: string): readonly string[] => {
+    const own = ns.routes.getUrlParams(name);
+    const root = store.tree.paramMeta.urlParams;
+
+    return root.length === 0 ? own : [...root, ...own];
+  };
+
+  const reportCodecRoundTrip = (state: State): void => {
+    const { name } = state;
+    // `config.*` maps are null-prototype, so a route with no codec reads
+    // `undefined` here, which the maps' declared type does not say.
+    const codec: RouteCodec = {
+      encode: store.config.encoders[name],
+      decode: store.config.decoders[name],
+    };
+
+    // A route with no codec has nothing to round-trip, and most routes have
+    // none, so the validator is not asked about them.
+    if (codec.encode === undefined && codec.decode === undefined) {
+      return;
+    }
+
+    ctx.validator?.state.reportCodecRoundTrip(
+      state,
+      codec,
+      printedPathSlots(name),
+    );
+  };
+
   return {
     resolveForward: (name, params, search) =>
       ctx.forwardState(name, params, search),
@@ -248,19 +285,8 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
     // answers `[]` for that case and for a real route with no path slots alike,
     // and the diagnostic downstream cannot tell those apart. `hasRoute` is the
     // matcher's own predicate, so no second derivation of existence appears.
-    // The root's slots join the route's own: `setRootPath("/app/:tenant")`
-    // prints `tenant` into every URL, and `getUrlParams` lists the route's
-    // segments only (#2895).
-    pathNames: (name) => {
-      if (!ns.routes.hasRoute(name)) {
-        return;
-      }
-
-      const own = ns.routes.getUrlParams(name);
-      const root = store.tree.paramMeta.urlParams;
-
-      return root.length === 0 ? own : [...root, ...own];
-    },
+    pathNames: (name) =>
+      ns.routes.hasRoute(name) ? printedPathSlots(name) : undefined,
     // A closure because the port TYPES this member as `() => boolean`, not
     // because anything can change the answer: `queryParamsMode` sits on the
     // options bag itself, which `ns.options.get()` returns frozen and nothing
@@ -286,6 +312,11 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
     // not the precedent this stands on.
     get reportUndeclaredParamKey() {
       return ctx.validator ? reportUndeclaredParamKey : undefined;
+    },
+    // A GETTER for the reason its two siblings give: bare core reads
+    // `undefined` and never looks up the route's codecs.
+    get reportCodecRoundTrip() {
+      return ctx.validator ? reportCodecRoundTrip : undefined;
     },
   };
 }
@@ -355,7 +386,13 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
         port.queryNames(canonical.name),
       );
 
-      return materialize(canonical, buildURL(canonical, port));
+      const state = materialize(canonical, buildURL(canonical, port));
+
+      // After ⑤, so the codec diagnostic judges the state this navigation
+      // builds, and only an intent that printed a URL (#2905).
+      port.reportCodecRoundTrip?.(state);
+
+      return state;
     },
     resolveDefault: () => {
       const options = ns.options.get();
