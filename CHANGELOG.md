@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-11-04]
+
+### @real-router/core@0.157.0
+
+### Minor Changes
+
+- [#2907](https://github.com/greydragon888/real-router/pull/2907) [`ebd8648`](https://github.com/greydragon888/real-router/commit/ebd86486548891098bc5121c91563f4818e01cec) Thanks [@greydragon888](https://github.com/greydragon888)! - Add the codec round-trip sink for `@real-router/validation-plugin` ([#2905](https://github.com/greydragon888/real-router/issues/2905))
+
+  `navigate` takes params in the form a route's `decodeParams` returns and never runs it, so a link and a reload of the same URL commit different states when the decoder adds a key or does not undo `encodeParams`. Core now hands a validator what a check of that needs, and does nothing more without one.
+
+  - **Breaking:** `RouterValidator["state"]` has a new required member, `reportCodecRoundTrip(state, codec, pathSlots)`. A custom `RouterValidator` implementation must add it; a no-op satisfies it.
+  - `navigate` and `PluginApi.buildNavigationState` call it with the state they build, the route's `encodeParams` and `decodeParams` (either may be `undefined`) and the path slots its URL prints, the root's included — only while a validator is installed, and only for a route that has a codec.
+  - `@real-router/core/validation` exports `areParamValuesEqual`, the value comparison `areStatesEqual` makes.
+
+### @real-router/validation-plugin@0.32.0
+
+### Minor Changes
+
+- [#2907](https://github.com/greydragon888/real-router/pull/2907) [`ebd8648`](https://github.com/greydragon888/real-router/commit/ebd86486548891098bc5121c91563f4818e01cec) Thanks [@greydragon888](https://github.com/greydragon888)! - Warn about a route codec that does not round-trip a navigation's state ([#2905](https://github.com/greydragon888/real-router/issues/2905))
+
+  `navigate` never runs `decodeParams`; a reload of the URL it builds does. The plugin now runs a route's `encodeParams` and `decodeParams` over each state `navigate` and `buildNavigationState` build, and warns through the router's logger about each key a reload would not give back:
+
+  - a key the codec adds — derive it in a `forwardState` interceptor instead;
+  - a value the codec changes, compared by printed form, and an object by the piece `encodeParams` prints for it;
+  - a path slot, the root's included, or a query key the codec drops.
+
+  One warning per route, channel and key, per router. A codec that throws during the check is left to `buildPath` and `matchPath`, and the navigation is unaffected. Needs the `@real-router/core` release that adds `RouterValidator["state"]["reportCodecRoundTrip"]`.
+
+### Patch Changes
+
+- Updated dependencies [[`ebd8648`](https://github.com/greydragon888/real-router/commit/ebd86486548891098bc5121c91563f4818e01cec)]:
+  - @real-router/core@0.157.0
+
 ## [2026-11-03]
 
 ### @real-router/core@0.156.0
