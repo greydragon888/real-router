@@ -266,7 +266,11 @@ describe("surface census (#2303)", () => {
     expect(
       accessorNames(i.port() as unknown as object),
       "the opt-in diagnostic sinks — absent for REAL in bare core (#1584)",
-    ).toStrictEqual(["reportDroppedQueryKey", "reportUndeclaredParamKey"]);
+    ).toStrictEqual([
+      "reportCodecRoundTrip",
+      "reportDroppedQueryKey",
+      "reportUndeclaredParamKey",
+    ]);
     expect(accessorNames(i.routeGetStore() as unknown as object)).toStrictEqual(
       ["definitions"],
     );
@@ -304,7 +308,7 @@ describe("surface census (#2303)", () => {
       // `cached: false` below is what makes that sentence checkable.
       getCloneState: row(() => i.getCloneState() as unknown as object),
     }).toStrictEqual({
-      port: { n: 10, frozen: false, cached: true },
+      port: { n: 11, frozen: false, cached: true },
       routeGetStore: { n: 16, frozen: false, cached: true },
       dependenciesGetStore: { n: 2, frozen: false, cached: true },
       getTree: { n: 9, frozen: true, cached: true },

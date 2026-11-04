@@ -57,15 +57,16 @@ A **read-model over the routes layer — a narrow port, not a new layer.** The m
 | `admitsUndeclaredQuery`                                | mode gate          | A boolean, not the mode — the pipeline never learns which mode it is in                  |
 | `pathNames`                                            | diagnostics        | `undefined` means NO SUCH ROUTE — the arm is load-bearing (#1584)                        |
 | `reportDroppedQueryKey?` / `reportUndeclaredParamKey?` | opt-in sinks       | Absent unless `validation-plugin` is installed                                           |
+| `reportCodecRoundTrip?`                                | opt-in sink        | Read by the committing producers after ⑤b, never by `canonicalize` (#2905)               |
 
 **Two wiring facts are load-bearing and were measured, not assumed** — changing either is a behaviour change, not a refactor. One end is interceptable and the other deliberately is not:
 
 - **`port.resolveForward` IS the `forwardState` seam** (`Router.ts`) — the interceptable chain _plus_ the centralized channel ASSERTION. The check lives in the port implementation and never inside this module.
 - **`port.buildPath` is NOT interceptable** (#1938). It goes straight to `RoutesNamespace.buildPath`, so nothing stands between the port and the engine. A seam there would sit BELOW the route-default merge, where an injection reaches the URL and not `state.search`; the one seam sits above it and every door runs it. `seam-coverage-authority-1938` owns the door × seam table.
 
-**Members arrive with their consumers, never before.** `queryNames` came with the channel guard, `admitsUndeclaredQuery` and later `printedQueryNames` with the mode gate (#1575 / #1932), `pathNames` and the two sinks with the diagnostics (#1579 / #1584). One member RFC §4.5 listed never arrived at all: `encode` — the route codecs stayed with the entry points that own their direction (`buildPath` calls `config.encoders`, `matchPath` calls `config.decoders`). A member added early is dead weight nothing detects: **knip has no issue type for unused members of an interface.**
+**Members arrive with their consumers, never before.** `queryNames` came with the channel guard, `admitsUndeclaredQuery` and later `printedQueryNames` with the mode gate (#1575 / #1932), `pathNames` and two sinks with the diagnostics (#1579 / #1584), a third sink with the codec diagnostic (#2905). One member RFC §4.5 listed never arrived at all: `encode` — the route codecs stayed with the entry points that own their direction (`buildPath` calls `config.encoders`, `matchPath` calls `config.decoders`). A member added early is dead weight nothing detects: **knip has no issue type for unused members of an interface.**
 
-⚠ **The two optional sinks must be absent for REAL.** The router implements them as GETTERS returning `undefined` while `validator === null`, not as closures forwarding into an optional-chained validator — a closure is always truthy, so the pipeline's `?.` reads as taken and bare core pays the lookup with nothing to feed. The `| undefined` in the type is what lets the getter say so under `exactOptionalPropertyTypes`.
+⚠ **The optional sinks must be absent for REAL.** The router implements them as GETTERS returning `undefined` while `validator === null`, not as closures forwarding into an optional-chained validator — a closure is always truthy, so the pipeline's `?.` reads as taken and bare core pays the lookup with nothing to feed. The `| undefined` in the type is what lets the getter say so under `exactOptionalPropertyTypes`.
 
 ## Why the pipeline never repairs a mis-channelled bag
 

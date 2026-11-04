@@ -11,6 +11,8 @@
  * rather than the container it was read from (#2382).
  */
 
+import type { ParamsSearch, State } from "./base";
+
 export interface RouterValidator {
   /**
    * Route validation methods
@@ -188,6 +190,28 @@ export interface RouterValidator {
 
     /** Opt-in diagnostic for a key the route declares NOWHERE (#1579). */
     reportUndeclaredParamKey: (routeName: string, key: string) => void;
+
+    /**
+     * Opt-in diagnostic for a route codec that does not round-trip the state a
+     * navigation commits (#2905). `navigate` takes params in the form
+     * `decodeParams` returns and never runs it, so the state a link commits and
+     * the state its own URL matches back to agree only when `decodeParams`
+     * undoes `encodeParams` and adds no key.
+     *
+     * Called by the two committing producers, `navigate` and
+     * `buildNavigationState`, with the state each builds, and only for a
+     * route that has a codec. `pathSlots` are the path slot names the route's
+     * URL prints, the root's included: a params key outside them never reaches
+     * the URL (#1553).
+     */
+    reportCodecRoundTrip: (
+      state: State,
+      codec: {
+        readonly encode: ((channels: ParamsSearch) => ParamsSearch) | undefined;
+        readonly decode: ((channels: ParamsSearch) => ParamsSearch) | undefined;
+      },
+      pathSlots: readonly string[],
+    ) => void;
   };
 
   /**

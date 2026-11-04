@@ -135,6 +135,7 @@ const OWNER: Record<string, string> = {
   "routes.validateSetRootPathArgs": "routes.validation.test.ts",
   "routes.validateShouldUpdateNodeArgs": "router-methods.validation.test.ts",
   "routes.validateStateBuilderArgs": "plugin-api.validation.test.ts",
+  "state.reportCodecRoundTrip": "codec-round-trip.test.ts",
   "state.reportDroppedQueryKey": "dropped-query-key.test.ts",
   "state.reportUndeclaredParamKey": "undeclared-param-key.test.ts",
   "state.validateAreStatesEqualArgs": "plugin-api.validation.test.ts",

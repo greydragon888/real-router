@@ -1,6 +1,6 @@
 // packages/core/src/pipeline/port.ts
 
-import type { Params, SearchParams } from "../types";
+import type { Params, SearchParams, State } from "../types";
 
 /**
  * The pipeline's read-model over the routes layer — a narrow port, not a new
@@ -32,8 +32,8 @@ import type { Params, SearchParams } from "../types";
  *
  * Accessors arrived with their consumers, as designed — `queryNames` with the
  * channel guard, `admitsUndeclaredQuery` and later `printedQueryNames` with the
- * mode gate (#1575 / #1932), `pathNames` and the two sinks with the diagnostics
- * (#1579 / #1584). One
+ * mode gate (#1575 / #1932), `pathNames` and two sinks with the diagnostics
+ * (#1579 / #1584), a third sink with the codec diagnostic (#2905). One
  * member the design (RFC §4.5) listed never arrived at all: `encode`. The route
  * codecs stayed with the entry points that own their direction (`buildPath`
  * calls `config.encoders`, `matchPath` calls `config.decoders`), so the port
@@ -194,4 +194,19 @@ export interface RouteResolver {
    */
   reportUndeclaredParamKey?:
     ((routeName: string, key: string) => void) | undefined;
+
+  /**
+   * Opt-in sink for a route codec's round trip (#2905). Absent unless
+   * `validation-plugin` is installed, so bare core reads one `undefined` per
+   * commit and runs no codec for it.
+   *
+   * ⚑ Read by the two committing producers, not by `canonicalize`: what is
+   * judged is the state they build, which exists only after ⑤. The router's
+   * implementation hands the route's codecs and the path slots its URL prints
+   * to the validator, and only for a route that has a codec.
+   *
+   * ⚠ A GETTER on the router's port, like the two sinks above, so the absence
+   * is real.
+   */
+  reportCodecRoundTrip?: ((state: State) => void) | undefined;
 }
