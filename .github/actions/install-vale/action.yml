@@ -1,0 +1,46 @@
+name: Install Vale
+description: The Vale release `vale-styles/VERSION` pins, in /usr/local/bin,
+  checked against the sha256 that file holds. The archive comes from the Actions
+  cache when an entry holds it — `ci-tool-cache.yml` fills the entry on master,
+  which every pull request reads — and from the release otherwise. The caller
+  must run actions/checkout first.
+runs:
+  using: composite
+  steps:
+    # The key hashes this file and `vale-styles/VERSION`, which holds the pin: a
+    # new pin is a new entry.
+    - name: Restore the Vale download
+      id: cache
+      uses: actions/cache/restore@v6
+      with:
+        path: ~/.cache/ci-tools/vale
+        key: vale-${{ runner.os }}-${{ hashFiles('.github/actions/install-vale/action.yml', 'vale-styles/VERSION') }}
+
+    # A restored archive that does not match the checksum is downloaded again,
+    # and a download that does not match it fails the step, so the save below
+    # never stores it.
+    - name: Install Vale
+      shell: bash
+      run: |
+        VALE_VERSION="$(sed -n 's/^VALE_VERSION=//p' vale-styles/VERSION)"
+        VALE_SHA256="$(sed -n 's/^VALE_SHA256=//p' vale-styles/VERSION)"
+        DIR="$HOME/.cache/ci-tools/vale"
+        FILE="$DIR/vale_${VALE_VERSION}_Linux_64-bit.tar.gz"
+        mkdir -p "$DIR"
+        if ! echo "${VALE_SHA256}  ${FILE}" | sha256sum --check --strict --status 2> /dev/null; then
+          curl -fsSL --retry 5 -o "$FILE" \
+            "https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz"
+        fi
+        echo "${VALE_SHA256}  ${FILE}" | sha256sum --check --strict
+        tar -xzf "$FILE" -C /tmp vale
+        sudo install -m 0755 /tmp/vale /usr/local/bin/vale
+        vale --version
+
+    # After a miss only: an exact hit is the entry already. A pull request's run
+    # saves into its own merge ref, which only its later runs read.
+    - name: Save the Vale download
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: ~/.cache/ci-tools/vale
+        key: ${{ steps.cache.outputs.cache-primary-key }}

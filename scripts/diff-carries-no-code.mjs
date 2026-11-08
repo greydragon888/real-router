@@ -11,11 +11,11 @@
 // only from the NO_CODE line: a crash before that line, a run that never
 // answers and an empty diff all run the pipeline.
 //
-// CI configuration is `.github/` outside `.github/actions/`. The composite
-// actions run in every build job, so a change there is code the pipeline
-// exercises; a workflow file has Repo Lints on every pull request and
-// actionlint on every one but Dependabot's for a package, and Markdown has
-// prose-lint.
+// CI configuration is `.github/` outside `.github/actions/`. A composite action
+// there is taken for code: the setup action runs in every build job, so a
+// change to it is code the pipeline exercises; a workflow file has Repo Lints
+// on every pull request and actionlint on every one but Dependabot's for a
+// package, and Markdown has prose-lint.
 //
 // A path is taken as git prints it: a name with a space at either end is that
 // name, not a shorter one.

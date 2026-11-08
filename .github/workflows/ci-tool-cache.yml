@@ -1,0 +1,50 @@
+name: CI tool cache
+
+# Fills the Actions cache entries that the tool installs of `ci.yml` restore:
+# osv-scanner for Repo Lints, Vale for the prose lint. An entry a pull
+# request's run saves belongs to that pull request's merge ref, and only its own
+# runs restore it. Every pull request also restores the default branch's
+# entries, and only a run on master started by a trusted trigger writes them —
+# push, schedule or workflow_dispatch here, not workflow_run. This workflow is
+# that run: a pull request downloads a tool from its GitHub release only while
+# master holds no entry for the tool's pin.
+on:
+  push:
+    branches: [master]
+    # Each key hashes these files.
+    paths:
+      - ".github/actions/install-osv-scanner/**"
+      - ".github/actions/install-vale/**"
+      - "vale-styles/VERSION"
+      - ".github/workflows/ci-tool-cache.yml"
+  # GitHub evicts an entry no run has read for seven days. The weekly run reads
+  # both, and saves again one the cache dropped.
+  schedule:
+    - cron: "30 2 * * 1" # Mon at 09:30 ICT (UTC+7)
+  workflow_dispatch: {}
+
+# Least privilege: none for the workflow; the job names the one it uses.
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  fill:
+    name: Fill the CI tool cache
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install osv-scanner
+        uses: ./.github/actions/install-osv-scanner
+
+      - name: Install Vale
+        uses: ./.github/actions/install-vale

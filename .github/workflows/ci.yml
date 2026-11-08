@@ -763,19 +763,12 @@ jobs:
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
 
-      # lint:audit reads every lockfile with osv-scanner, pinned and checked
-      # against the release's checksum; `scripts/check-deps-audit.sh` refuses a
-      # version below its floor.
+      # lint:audit reads every lockfile with osv-scanner. The action installs the
+      # release it pins, checked against the release's checksum, and takes the
+      # binary from the Actions cache that `ci-tool-cache.yml` fills on master
+      # when that holds it.
       - name: Install osv-scanner
-        env:
-          OSV_SCANNER_VERSION: "2.6.0"
-          OSV_SCANNER_SHA256: "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108"
-        run: |
-          curl -fsSL --retry 5 -o /tmp/osv-scanner \
-            "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64"
-          echo "${OSV_SCANNER_SHA256}  /tmp/osv-scanner" | sha256sum --check --strict
-          sudo install -m 0755 /tmp/osv-scanner /usr/local/bin/osv-scanner
-          osv-scanner --version
+        uses: ./.github/actions/install-osv-scanner
 
       # lint:security and lint:workflow-security run semgrep and zizmor through
       # uvx, which fetches each only when its check runs: a skipped semgrep
@@ -1507,17 +1500,11 @@ jobs:
 
       # The version and its checksum live in vale-styles/VERSION: a range that
       # edits them lints the whole corpus, and check-prose.sh holds a local Vale
-      # to that version or newer.
+      # to that version or newer. The action installs that release, and takes
+      # the archive from the Actions cache that `ci-tool-cache.yml` fills on
+      # master when that holds it.
       - name: Install Vale
-        run: |
-          VALE_VERSION="$(sed -n 's/^VALE_VERSION=//p' vale-styles/VERSION)"
-          VALE_SHA256="$(sed -n 's/^VALE_SHA256=//p' vale-styles/VERSION)"
-          curl -fsSL --retry 5 -o /tmp/vale.tar.gz \
-            "https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz"
-          echo "${VALE_SHA256}  /tmp/vale.tar.gz" | sha256sum --check --strict
-          tar -xzf /tmp/vale.tar.gz -C /tmp vale
-          sudo install -m 0755 /tmp/vale /usr/local/bin/vale
-          vale --version
+        uses: ./.github/actions/install-vale
 
       # `pnpm lint:prose`, not a bare call of the script: the check registry
       # sees this job run it (`ciBy`). pnpm installs every dependency before a

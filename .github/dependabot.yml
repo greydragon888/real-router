@@ -327,11 +327,12 @@ updates:
     # 7" updated six workflow files and left `.github/actions/setup/action.yml`
     # on v6; `git log -- .github/actions/` shows no dep bump in the directory's
     # history. That action sets up many CI jobs, i.e. the pins most worth updating
-    # were the only ones frozen. Listing its directory explicitly puts it in
-    # scope.
+    # were the only ones frozen. The glob below puts every composite action
+    # under `.github/actions/` in scope, one added later included: `directories`
+    # takes globs.
     directories:
       - "/"
-      - "/.github/actions/setup"
+      - "/.github/actions/*"
     schedule:
       interval: "weekly"
       day: "monday"

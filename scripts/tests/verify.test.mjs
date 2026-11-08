@@ -709,6 +709,12 @@ const SETUP = readFileSync(
   "utf8",
 );
 
+/** The action Repo Lints installs osv-scanner with, before the skip machinery. */
+const OSV = readFileSync(
+  join(repoRoot, ".github", "actions", "install-osv-scanner", "action.yml"),
+  "utf8",
+);
+
 /** The file the setup action's stamp step runs. */
 const STAMP = readFileSync(
   join(repoRoot, ".github", "actions", "setup", "stamp.sh"),
@@ -736,16 +742,17 @@ const stepShape = (step) =>
   );
 
 /**
- * The steps of Repo Lints before the skip machinery's, and of the setup
- * action, as `stepShape` reads them, and the sha256 of `stamp.sh`: the setup
- * action's stamp step only calls it.
+ * The steps of Repo Lints before the skip machinery's, and of the setup and
+ * osv-scanner actions, as `stepShape` reads them, and the sha256 of
+ * `stamp.sh`: the setup action's stamp step only calls it.
  */
-function stepsBeforeHold(ci, setup, stamp = STAMP) {
+function stepsBeforeHold(ci, setup, stamp = STAMP, osv = OSV) {
   const steps = readClosedYaml(ci).toJS().jobs["repo-lints"].steps;
   return {
     job: steps.slice(0, -2).map(stepShape),
     setup: readClosedYaml(setup).toJS().runs.steps.map(stepShape),
     stamp: sha256(stamp),
+    osv: readClosedYaml(osv).toJS().runs.steps.map(stepShape),
   };
 }
 
@@ -764,8 +771,7 @@ const BEFORE_HOLD = {
     { name: "Setup (pnpm + Node + install)", uses: "./.github/actions/setup" },
     {
       name: "Install osv-scanner",
-      env: ["OSV_SCANNER_VERSION", "OSV_SCANNER_SHA256"],
-      run: "627516a6b1db388f0a6d32bfe1b7484eca7ec0a64fc239380b2b3744947af317",
+      uses: "./.github/actions/install-osv-scanner",
     },
     {
       name: "Install uv",
@@ -794,9 +800,29 @@ const BEFORE_HOLD = {
     },
   ],
   stamp: "6a3c0b5804d689be9686e4e17092a7dad7f34825d58d7e82b930d20491a3416e",
+  osv: [
+    {
+      name: "Restore the osv-scanner download",
+      id: "cache",
+      uses: "actions/cache/restore",
+      with: ["path", "key"],
+    },
+    {
+      name: "Install osv-scanner",
+      shell: "bash",
+      env: ["OSV_SCANNER_VERSION", "OSV_SCANNER_SHA256"],
+      run: "09ccb0bcd9d989963510e746a7e7804baa75625bf31d4c9a85601b165299057f",
+    },
+    {
+      name: "Save the osv-scanner download",
+      if: "steps.cache.outputs.cache-hit != 'true'",
+      uses: "actions/cache/save",
+      with: ["path", "key"],
+    },
+  ],
 };
 
-test("the steps before the skip machinery's, and the setup action's, are these, key for key: none writes to the environment it inherits but the stamp", () => {
+test("the steps before the skip machinery's, and the setup and osv-scanner actions', are these, key for key: none writes to the environment it inherits but the stamp", () => {
   assert.deepEqual(stepsBeforeHold(CI, SETUP), BEFORE_HOLD);
 });
 
@@ -814,6 +840,19 @@ test("the setup action's directory tracks action.yml and stamp.sh alone: the rul
   ]);
 });
 
+test("the osv-scanner action's directory tracks action.yml alone: the rule above reads it", () => {
+  // A file beside it that a step runs would pass unread.
+  const tracked = execFileSync(
+    "git",
+    ["ls-files", "-z", "--", join(".github", "actions", "install-osv-scanner")],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+
+  assert.deepEqual(tracked.split("\0").filter(Boolean).sort(), [
+    ".github/actions/install-osv-scanner/action.yml",
+  ]);
+});
+
 const HOLD_LINE = "      - name: Hold the skip machinery\n";
 const STAMP_END = '} >> "$GITHUB_ENV"\n';
 const once = (text, anchor, replacement) => {
@@ -822,7 +861,7 @@ const once = (text, anchor, replacement) => {
 };
 const EXPORT = 'echo "NODE_TEST_CONTEXT=child-v8" >> "$GITHUB_ENV"';
 
-for (const [name, ci, setup, stamp = STAMP] of [
+for (const [name, ci, setup, stamp = STAMP, osv = OSV] of [
   [
     "a step above writing NODE_TEST_CONTEXT to $GITHUB_ENV",
     once(
@@ -842,13 +881,22 @@ for (const [name, ci, setup, stamp = STAMP] of [
     SETUP,
   ],
   [
-    "the osv-scanner step writing it",
-    once(
-      CI,
-      "          osv-scanner --version\n",
-      `          osv-scanner --version\n          ${EXPORT}\n`,
-    ),
+    "the osv-scanner action's install writing it",
+    CI,
     SETUP,
+    STAMP,
+    once(
+      OSV,
+      "        osv-scanner --version\n",
+      `        osv-scanner --version\n        ${EXPORT}\n`,
+    ),
+  ],
+  [
+    "a step appended to the osv-scanner action writing it",
+    CI,
+    SETUP,
+    STAMP,
+    `${OSV}\n    - name: Tune node\n      shell: bash\n      run: ${EXPORT}\n`,
   ],
   [
     "the setup action's stamp writing it",
@@ -876,7 +924,7 @@ for (const [name, ci, setup, stamp = STAMP] of [
   ],
 ]) {
   test(`the steps before the skip machinery's are held: ${name} is refused`, () => {
-    assert.notDeepEqual(stepsBeforeHold(ci, setup, stamp), BEFORE_HOLD);
+    assert.notDeepEqual(stepsBeforeHold(ci, setup, stamp, osv), BEFORE_HOLD);
   });
 }
 
@@ -885,7 +933,11 @@ test("the steps before the skip machinery's are held up to each action's version
 
   assert.notEqual(bumped(CI), CI);
   assert.notEqual(bumped(SETUP), SETUP);
-  assert.deepEqual(stepsBeforeHold(bumped(CI), bumped(SETUP)), BEFORE_HOLD);
+  assert.notEqual(bumped(OSV), OSV);
+  assert.deepEqual(
+    stepsBeforeHold(bumped(CI), bumped(SETUP), STAMP, bumped(OSV)),
+    BEFORE_HOLD,
+  );
 });
 
 /**
