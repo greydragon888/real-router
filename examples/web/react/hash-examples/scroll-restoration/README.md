@@ -1,6 +1,6 @@
 # Real-Router — Scroll Restoration Example
 
-> Dedicated React-only example exercising every behavioral branch of `createScrollRestoration` (#497). Covers all three modes (`restore` / `top` / `native`), all three behavior values (`auto` / `instant` / `smooth`), all four `navigationType` values (`push` / `replace` / `traverse` / `reload`), anchor scrolling (4 entry points after #531/#532), custom `scrollContainer`, and `pagehide` save + F5 restore.
+> Dedicated React-only example of `createScrollRestoration` under `navigation-plugin` (#497); Back and Forward under `browser-plugin` are exercised by the [scroll-spy sibling](../scroll-spy) (Scenario 12). Covers all three modes (`restore` / `top` / `native`), all three behavior values (`auto` / `instant` / `smooth`), all four `navigationType` values (`push` / `replace` / `traverse` / `reload`), anchor scrolling (4 entry points after #531/#532), custom `scrollContainer`, and `pagehide` save + F5 restore.
 
 ## Quick start
 
