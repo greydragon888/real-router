@@ -15782,3 +15782,11 @@ Measured after the fix on the stand, in all three engines: Back 700 → 2200; th
 - A non-boolean `replace` or `reload` from untyped JS is read for truthiness, as on the released tree. `shouldReplaceHistory` reads `replace === true`, so `replace: "yes"` pushes an entry while the utility leaves the scroll; reading `=== true` here would move the disagreement onto core and memory-plugin, which read truthiness too.
 
 **Unchanged.** On a page that can hold the position at once, navigation-plugin's push, Back, Forward and F5 land where they did (measured, three engines); the window retry, the container hold rule and the token apply under it as under the other plugins. browser-plugin's start and F5: the start commit is a replace (jsdom probe with the real plugin), so the scroll stays where the browser put it.
+
+## The CI tool installs retry a transient download error (2026-11-08)
+
+**Problem.** `Install osv-scanner` (job `repo-lints`) and `Install Vale` (job `prose-lint`) in `ci.yml` fetch a pinned binary from a GitHub release with `curl -fsSL`, one request each. On 2026-11-08 both release URLs answered `504 Gateway Timeout`, and both steps failed with `curl: (22)` before their check ran, twice on the release PR #2916: at 08:56 and 08:58 UTC, and again at 09:05 and 09:06 after a re-run. `CI Result` needs both jobs, so the PR went red over a download.
+
+**Solution.** Both downloads pass `--retry 5`. curl retries a timeout and the HTTP codes 408, 429, 500, 502, 503, 504, 522 and 524, under `--fail` too, and waits 1 s before the first retry and twice as long before each next one. Measured with a local server that answers every request with 504 (curl 8.7.1, macOS): `-fsSL` makes 1 request, `--retry 2` makes 3 in 3.0 s, `--retry 5` makes 6 in 31.1 s, and each exits with 22. The checksum check after the download is unchanged.
+
+**Why.** A gateway error that clears within half a minute stops failing the job. A longer outage outlasts the retries: at 09:09 UTC both URLs answered 504, and at 09:14 the osv-scanner asset downloaded while Vale's answered 504 after 22.8 s. The five retries wait 31 s in all, on top of the requests' own time. `scripts/ci-install-electron.sh` retries its own download, with `--retry 3 --retry-delay 2`.

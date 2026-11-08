@@ -765,7 +765,7 @@ const BEFORE_HOLD = {
     {
       name: "Install osv-scanner",
       env: ["OSV_SCANNER_VERSION", "OSV_SCANNER_SHA256"],
-      run: "101603b3224185249b70fac12c0e78763c0b9f066677f953d4f3c337949845c2",
+      run: "627516a6b1db388f0a6d32bfe1b7484eca7ec0a64fc239380b2b3744947af317",
     },
     {
       name: "Install uv",

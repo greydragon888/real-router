@@ -771,7 +771,7 @@ jobs:
           OSV_SCANNER_VERSION: "2.6.0"
           OSV_SCANNER_SHA256: "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108"
         run: |
-          curl -fsSL -o /tmp/osv-scanner \
+          curl -fsSL --retry 5 -o /tmp/osv-scanner \
             "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64"
           echo "${OSV_SCANNER_SHA256}  /tmp/osv-scanner" | sha256sum --check --strict
           sudo install -m 0755 /tmp/osv-scanner /usr/local/bin/osv-scanner
@@ -1512,7 +1512,7 @@ jobs:
         run: |
           VALE_VERSION="$(sed -n 's/^VALE_VERSION=//p' vale-styles/VERSION)"
           VALE_SHA256="$(sed -n 's/^VALE_SHA256=//p' vale-styles/VERSION)"
-          curl -fsSL -o /tmp/vale.tar.gz \
+          curl -fsSL --retry 5 -o /tmp/vale.tar.gz \
             "https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz"
           echo "${VALE_SHA256}  /tmp/vale.tar.gz" | sha256sum --check --strict
           tar -xzf /tmp/vale.tar.gz -C /tmp vale
