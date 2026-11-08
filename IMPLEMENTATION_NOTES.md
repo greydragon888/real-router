@@ -15007,6 +15007,8 @@ Not measured: whether 12.9.0, which moves an optional peer to the version alread
 
 > **Updated (2026-10-30).** There are three. With `@types/node` on 26, `jsdoc-type-pratt-parser`'s `^26.4.0` is no longer above it, and both "below" entries left `scripts/overrides-accepted.json`.
 
+> **Updated (2026-11-08).** The script's installs prune each store to its lockfile, and a `name@version` whose directories declare different dependencies is refused — see "Follow-up (2026-11-08)" at the end of this entry.
+
 **Problem.** Nothing read the `overrides` of the three workspaces but `pnpm install`, and `lint:audit` judges only the result (#2646). Each class the issue names had happened and was found by hand: an entry nothing needs, a floor below the version a parent declares, an entry wider than its edge. The issue judged "still needed" by resolving without the entry, and since pnpm 12.7.0 removing an override re-resolves its targets ("pnpm 12.11.2, and each lockfile deduplicated by it"). That verdict moved with npm: on 12.11.2, `postcss` in all three workspaces and `rollup` in the examples read as needed only because newer releases had appeared, 8.5.29 and 4.63.6.
 
 **Solution.** `pnpm lint:overrides` runs `scripts/check-overrides.mjs`, with the rules in `scripts/overrides.mjs`. It reads every workspace whose `pnpm-workspace.yaml` git tracks, the root among them, and judges each key over the edges the key rewrites:
@@ -15043,6 +15045,27 @@ It runs in pre-push alone, by the owner's decision. A finding is drift, not a vu
 ⚠ **"Dead" reads the ranges, not the effect.** A key that narrows a range is needed by the rule even when the narrowing does harm: the root `minimatch@9` narrows the `^9.0.3 || ^10.1.2` of `eslint-plugin-import-x`, which keeps a second, older minimatch in the tree. A key that widens on purpose, such as the vite dedupe pins, reads as dead; the accepted list holds those.
 
 ⚠ **What edits a manifest in memory is invisible to the check.** A `readPackage` hook of `.pnpmfile.mjs` does, and so do pnpm's own package extensions: the lockfile records `typescript: '*'` among the peers of `@volar/typescript` 2.4.28, whose manifest declares none. The check reads the manifest on disk and refuses an edge such an edit adds, when a key could rewrite it. Both hooks today drop peer declarations alone, which adds no edge.
+
+### Follow-up (2026-11-08) — the store holds directories its lockfile no longer names (#2915)
+
+**Problem.** After an example ran this checkout's packages — `pnpm dev` runs `predev`, the examples workspace's `use-checkout` — and went back to the recorded releases, `examples/node_modules/.pnpm` kept the tarballs' directories: pnpm keeps a package its lockfile no longer names for `modulesCacheMaxAge`, 10080 minutes by default. `installedManifests` keyed every manifest there by `name@version`, the last one read winning, and ten packages of the checkout carry the version of their recorded release with `>=0.157.0` as their peer floor on `@real-router/core`, where the releases declare `>=0.130.0` to `>=0.151.0`. The next pre-push refused: `cannot judge — examples: the lockfile records >=0.148.0 for @real-router/core in @real-router/lifecycle-plugin@0.9.0, where the check derives >=0.157.0: how pnpm applies overrides is not what this check reads`. The script's own install put the examples back on the releases and left the directories.
+
+**Solution.**
+
+- The script installs `examples` and `cross-router-bench` with `--config.modules-cache-max-age=0`, so each store holds only what its lockfile names when the check reads it.
+- `installedManifests` refuses a `name@version` whose directories declare different dependencies — the three fields `declaredBy` reads, compared by `isDeepStrictEqual`, so neither the order of the keys nor an empty field against a missing one counts — and names both directories and the prune command. Directories with one manifest pass: pnpm hard links a package once per set of its peers ("How peers are resolved" in pnpm's documentation). The refusal covers what the script does not install, the root workspace among them.
+
+```diff
+-"lint:overrides": "pnpm --dir examples install --frozen-lockfile --prefer-offline && pnpm --dir cross-router-bench install --frozen-lockfile --prefer-offline && node scripts/check-overrides.mjs",
++"lint:overrides": "pnpm --dir examples install --frozen-lockfile --prefer-offline --config.modules-cache-max-age=0 && pnpm --dir cross-router-bench install --frozen-lockfile --prefer-offline --config.modules-cache-max-age=0 && node scripts/check-overrides.mjs",
+```
+
+**Why — measured** on `b89d6301a`, after `node scripts/checkout-tarballs.mjs examples` and `pnpm --dir examples install --frozen-lockfile`, with 21 tarball directories in the examples' store:
+
+- `node scripts/check-overrides.mjs` alone refuses, exit 2: `@real-router/lifecycle-plugin@0.9.0 has two manifests in node_modules/.pnpm that declare different dependencies, in @real-router+lifecycle-plugin@0.9.0_@real-router+core@0.154.0 and @real-router+lifecycle-plugin@file+…`. `pnpm lint:overrides` passes and leaves none of the 21. On `504508ddf`, before the fix, the same round trip failed `pnpm lint:overrides`.
+- The new cell of `scripts/tests/check-overrides.test.mjs` fails on `b89d6301a`'s `scripts/overrides.mjs` ("Missing expected exception"), and so do seven of eight mutants of the new code: never refusing, refusing every second directory, leaving out each of the three fields, comparing the JSON text, and counting an empty field as a different one. The eighth names the two directories in the order the listing returns them, and survives: the listing here returns the release's directory first, and the sort keeps the message independent of it.
+- The peer sets have the cell alone. Pruned, none of the three stores holds a `name@version` in two directories: one package of the root lockfile has two peer sets, `@napi-rs/wasm-runtime@1.1.6`, and pnpm skips it on macOS.
+- The flag costs 0.2–0.3 s with nothing to prune: of three interleaved pairs of the two installs and the check, the one with it took 0.17 to 0.30 s longer. It gives up what pnpm keeps the directories for, a faster install when a lockfile names them again: the next `use-checkout` creates them again.
 
 ## A new workspace's obligations are a checklist in CLAUDE.md (2026-10-13)
 

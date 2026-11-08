@@ -36,11 +36,17 @@
 // `node_modules/.modules.yaml`) has no manifest, and an edge from it that a key
 // could rewrite is refused, not passed over. So is an edge the manifest on disk
 // does not declare: a `readPackage` hook of `.pnpmfile.mjs` and pnpm's own
-// package extensions edit a manifest in memory only.
+// package extensions edit a manifest in memory only. And so is a `name@version`
+// whose directories there declare different dependencies: pnpm writes one
+// directory per peer set of a package, each with the same manifest, and keeps
+// the directory of a package its lockfile no longer names for
+// `modules-cache-max-age` minutes (#2915), so the store does not say which of
+// them the lockfile means.
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { isDeepStrictEqual } from "node:util";
 
 import semver from "semver";
 import { isMap, isScalar } from "yaml";
@@ -569,7 +575,19 @@ function example(edges) {
 }
 
 /**
- * The manifests of a workspace's virtual store, by `name@version`.
+ * What `declaredBy` reads of a manifest.
+ *
+ * @param {Record<string, unknown>} manifest
+ */
+function declarations(manifest) {
+  return ["optionalDependencies", "dependencies", "peerDependencies"].map(
+    (field) => manifest[field] ?? {},
+  );
+}
+
+/**
+ * The manifests of a workspace's virtual store, by `name@version`; a key two
+ * of its directories declare differently is refused.
  *
  * @param {string} dir the workspace's directory
  * @returns {Map<string, Record<string, unknown>>}
@@ -583,11 +601,26 @@ export function installedManifests(dir) {
   }
   /** @type {Map<string, Record<string, unknown>>} */
   const manifests = new Map();
+  /** @type {Map<string, { directory: string, declared: unknown[] }>} */
+  const firstOf = new Map();
   /** @param {string} file */
   const read = (file) => {
     if (!existsSync(file)) return;
     const manifest = readJson(file, path.relative(dir, file));
-    manifests.set(`${manifest.name}@${manifest.version}`, manifest);
+    const key = `${manifest.name}@${manifest.version}`;
+    const directory = path.relative(store, file).split(path.sep)[0];
+    const declared = declarations(manifest);
+    const first = firstOf.get(key);
+    if (first === undefined) {
+      firstOf.set(key, { directory, declared });
+      manifests.set(key, manifest);
+      return;
+    }
+    if (isDeepStrictEqual(first.declared, declared)) return;
+    const [one, other] = [first.directory, directory].sort();
+    refuse(
+      `${key} has two manifests in node_modules/.pnpm that declare different dependencies, in ${one} and ${other}, and the store does not say which one the lockfile means. pnpm keeps the directory of a package its lockfile no longer names for modules-cache-max-age minutes, and \`pnpm install --frozen-lockfile --config.modules-cache-max-age=0\` in the workspace removes such a directory`,
+    );
   };
   for (const entry of readdirSync(store, { withFileTypes: true })) {
     if (!entry.isDirectory() || entry.name === "node_modules") continue;

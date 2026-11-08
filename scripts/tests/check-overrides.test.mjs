@@ -781,6 +781,69 @@ test("refused: a value that is not a string, and an anchor in the file", () => {
   }
 });
 
+test("refused: a name@version two directories of the store declare differently; control: the same declarations in a directory per peer set", () => {
+  const tree = {
+    overrides: /** @type {[string, string][]} */ ([["c", "1.2.5"]]),
+    packages: parentsOfC({ a: "^1.2.0", b: "^1.0.0" }, "1.2.5"),
+  };
+  /**
+   * Writes the manifest of a@1.0.0 in `directory` of the store of `root`.
+   *
+   * @param {string} root
+   * @param {string} directory
+   * @param {Record<string, unknown>} fields
+   */
+  const writeA = (root, directory, fields) => {
+    const at = path.join(
+      root,
+      "node_modules",
+      ".pnpm",
+      directory,
+      "node_modules",
+      "a",
+    );
+    mkdirSync(at, { recursive: true });
+    writeFileSync(
+      path.join(at, "package.json"),
+      JSON.stringify({ name: "a", version: "1.0.0", ...fields }),
+    );
+    return root;
+  };
+
+  // The same declarations, in another key order and with an empty field.
+  const peerSet = writeA(repository(tree), "a@1.0.0", {
+    dependencies: { c: "^1.2.0", z: "1.0.0" },
+  });
+  writeA(peerSet, "a@1.0.0_x@2.0.0", {
+    dependencies: { z: "1.0.0", c: "^1.2.0" },
+    peerDependencies: {},
+  });
+  assert.equal(judgeWorkspace(peerSet, ".").findings.size, 0);
+
+  // The directory of a tarball the lockfile named before an install put the
+  // registry's version back, differing in each field `declaredBy` reads.
+  for (const fields of [
+    { dependencies: { c: "^1.3.0" } },
+    { dependencies: { c: "^1.2.0" }, optionalDependencies: { z: "1.0.0" } },
+    { dependencies: { c: "^1.2.0" }, peerDependencies: { x: ">=2.0.0" } },
+  ]) {
+    const orphan = writeA(
+      repository(tree),
+      "a@file+..+tarballs+a-1.0.0.tgz",
+      fields,
+    );
+    assert.throws(
+      () => judgeWorkspace(orphan, "."),
+      (error) =>
+        error instanceof OverridesRefusal &&
+        /^the root workspace: a@1\.0\.0 has two manifests in node_modules\/\.pnpm that declare different dependencies, in a@1\.0\.0 and a@file\+\.\.\+tarballs\+a-1\.0\.0\.tgz, and the store does not say which one the lockfile means\. .*`pnpm install --frozen-lockfile --config\.modules-cache-max-age=0`/.test(
+          error.message,
+        ),
+      JSON.stringify(fields),
+    );
+  }
+});
+
 // ── accepted findings ──────────────────────────────────────────────────────
 
 /**

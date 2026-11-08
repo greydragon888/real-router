@@ -44,7 +44,7 @@
     "lint:deps": "syncpack lint",
     "lint:deps:fix": "syncpack fix && pnpm dedupe && pnpm install",
     "lint:dedupe": "pnpm dedupe --check && pnpm --dir examples dedupe --check && pnpm --dir cross-router-bench dedupe --check",
-    "lint:overrides": "pnpm --dir examples install --frozen-lockfile --prefer-offline && pnpm --dir cross-router-bench install --frozen-lockfile --prefer-offline && node scripts/check-overrides.mjs",
+    "lint:overrides": "pnpm --dir examples install --frozen-lockfile --prefer-offline --config.modules-cache-max-age=0 && pnpm --dir cross-router-bench install --frozen-lockfile --prefer-offline --config.modules-cache-max-age=0 && node scripts/check-overrides.mjs",
     "lint:changeset": "node .changeset/check-changeset.mjs",
     "resolve:dependabot": "bash scripts/resolve-dependabot.sh",
     "type-check": "turbo run type-check type-check:tests",

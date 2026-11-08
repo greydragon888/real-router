@@ -234,7 +234,9 @@ export const CHECKS = [
     // installs cross-router-bench: the ranges it reads are in each
     // workspace's node_modules. ⚠ That install
     // puts examples that `scripts/checkout-tarballs.mjs` set up from this
-    // checkout's tarballs back on the npm versions.
+    // checkout's tarballs back on the npm versions, and at
+    // `--config.modules-cache-max-age=0` removes the tarballs' directories,
+    // which pnpm would keep and the check would refuse.
     id: "lint:overrides",
     run: ["pnpm", "lint:overrides"],
     stages: ["pre-push"],
