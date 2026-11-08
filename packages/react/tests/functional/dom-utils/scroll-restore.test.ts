@@ -38,6 +38,21 @@ function makeState(
   };
 }
 
+// What browser-plugin writes: every popstate is `{ source: "popstate",
+// direction: "back" }`, a Forward included (#2912).
+function browserContext(
+  source: "popstate" | "navigate",
+  hash = "",
+): Record<string, unknown> {
+  return {
+    url: { hash, hashChanged: hash !== "" },
+    browser: {
+      source,
+      direction: source === "popstate" ? "back" : "forward",
+    },
+  };
+}
+
 function makeFakeRouter(initial?: State): FakeRouter {
   const listeners = new Set<Listener>();
   let current = initial;
@@ -603,6 +618,29 @@ describe("createScrollRestoration", () => {
     sr.destroy();
   });
 
+  // Angular's `provideRealRouterFactory` installs the utility in an environment
+  // initializer, before the app initializer starts the router; `start()`
+  // commits a replace with no previous route.
+  it("the start commit, a replace with no previous route, keeps the next capture", () => {
+    const fake = makeFakeRouter();
+    const sr = track(createScrollRestoration(fake.router));
+
+    fake.emit(makeState("home", {}, {}, { replace: true }));
+    Object.defineProperty(globalThis, "scrollY", {
+      value: 350,
+      configurable: true,
+    });
+    fake.emit(makeState("about"), makeState("home"));
+
+    const saved = JSON.parse(
+      sessionStorage.getItem(STORAGE_KEY) ?? "{}",
+    ) as Record<string, number>;
+
+    expect(saved["/home"]).toBe(350);
+
+    sr.destroy();
+  });
+
   // ===========================================================================
   // #782 — the previousRoute scroll position is captured synchronously inside
   // router.subscribe, but the snap/restore effect runs in a requestAnimationFrame.
@@ -1005,7 +1043,7 @@ describe("createScrollRestoration", () => {
     expect(elementScrollToSpy).not.toHaveBeenCalled();
   });
 
-  it("restore: instant container scroll stops re-applying once it sticks", () => {
+  it("restore: an instant container restore stops once the container can hold the position", () => {
     const element = document.createElement("div");
 
     element.id = "sticky-scroller";
@@ -1049,69 +1087,65 @@ describe("createScrollRestoration", () => {
     );
 
     expect(element.scrollTop).toBe(1200);
-    // Stuck on the first apply → no wasted re-applies across the frame budget.
+    // The container can hold 1200, so the first apply ends the loop.
     expect(scrollToSpy).toHaveBeenCalledTimes(1);
 
     sr.destroy();
   });
 
-  it("restore: smooth container scroll re-applies across the whole frame budget", () => {
-    const element = document.createElement("div");
+  it.each([
+    // A smooth scroll has not moved when the loop samples it, so the loop
+    // stops on the content's height, not on the position (#2912).
+    ["applies once when the content holds the position", 5000, 1],
+    // Initial attempt + RESTORE_RETRY_FRAMES retries.
+    ["re-applies across the budget while the content is too short", 800, 11],
+  ])(
+    "restore: a smooth container restore %s",
+    (_label, scrollHeight, calls) => {
+      const element = document.createElement("div");
 
-    element.id = "smooth-scroller";
-    Object.defineProperty(element, "scrollHeight", {
-      value: 5000,
-      configurable: true,
-    });
-    Object.defineProperty(element, "clientHeight", {
-      value: 500,
-      configurable: true,
-    });
-    let top = 0;
+      element.id = "smooth-scroller";
+      Object.defineProperty(element, "scrollHeight", {
+        value: scrollHeight,
+        configurable: true,
+      });
+      Object.defineProperty(element, "clientHeight", {
+        value: 500,
+        configurable: true,
+      });
+      // An animating scroll: the position moves after the call, not in it.
+      const scrollToSpy = vi.fn();
 
-    Object.defineProperty(element, "scrollTop", {
-      get: () => top,
-      set: (value: number) => {
-        top = value;
-      },
-      configurable: true,
-    });
-    const scrollToSpy = vi.fn((opts?: ScrollToOptions) => {
-      element.scrollTop = Math.min(opts?.top ?? 0, 5000 - 500);
-    });
+      element.scrollTo = scrollToSpy;
 
-    element.scrollTo = scrollToSpy as unknown as typeof element.scrollTo;
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = track(
+        createScrollRestoration(fake.router, {
+          scrollContainer: () => element,
+          behavior: "smooth",
+        }),
+      );
 
-    const fake = makeFakeRouter(makeState("home"));
-    const sr = track(
-      createScrollRestoration(fake.router, {
-        scrollContainer: () => element,
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/about": 1200 }));
+      fake.emit(
+        makeState(
+          "about",
+          {},
+          { navigation: { direction: "back", navigationType: "traverse" } },
+        ),
+        makeState("home"),
+      );
+
+      expect(scrollToSpy).toHaveBeenCalledTimes(calls);
+      expect(scrollToSpy).toHaveBeenLastCalledWith({
+        top: 1200,
+        left: 0,
         behavior: "smooth",
-      }),
-    );
+      });
 
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/about": 1200 }));
-    fake.emit(
-      makeState(
-        "about",
-        {},
-        { navigation: { direction: "back", navigationType: "traverse" } },
-      ),
-      makeState("home"),
-    );
-
-    // Smooth restores animate asynchronously, so the sampled position never
-    // matches synchronously — the loop never early-stops and runs the full
-    // budget (initial attempt + RESTORE_RETRY_FRAMES retries = 11 applies).
-    expect(scrollToSpy).toHaveBeenCalledTimes(11);
-    expect(scrollToSpy).toHaveBeenLastCalledWith({
-      top: 1200,
-      left: 0,
-      behavior: "smooth",
-    });
-
-    sr.destroy();
-  });
+      sr.destroy();
+    },
+  );
 
   it("anchorScrolling=false + hash → ignores hash, scrolls to top", () => {
     const anchor = document.createElement("div");
@@ -1768,6 +1802,44 @@ describe("createScrollRestoration", () => {
       sr.destroy();
     });
 
+    // Core commits both flags as a JS caller passed them, non-booleans
+    // included, and the arms read them for truthiness.
+    it("a truthy transition.reload that is not a boolean restores", () => {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/home": 333 }));
+
+      const fake = makeFakeRouter(makeState("about"));
+      const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+      const sr = track(createScrollRestoration(fake.router));
+
+      fake.emit(
+        makeState("home", {}, {}, { reload: "yes" as unknown as boolean }),
+        makeState("about"),
+      );
+
+      expect(scrollSpy).toHaveBeenLastCalledWith({
+        top: 333,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+    });
+
+    it("a truthy transition.replace that is not a boolean leaves the scroll untouched", () => {
+      const fake = makeFakeRouter(makeState("home"));
+      const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+      const sr = track(createScrollRestoration(fake.router));
+
+      fake.emit(
+        makeState("about", {}, {}, { replace: 1 as unknown as boolean }),
+        makeState("home"),
+      );
+
+      expect(scrollSpy).not.toHaveBeenCalled();
+
+      sr.destroy();
+    });
+
     it("browser-plugin like (no context.navigation) + plain push (no replace/reload) → scrollToHashOrTop", () => {
       const fake = makeFakeRouter(makeState("home"));
       const scrollSpy = vi.spyOn(globalThis, "scrollTo");
@@ -2101,6 +2173,627 @@ describe("createScrollRestoration", () => {
       expect(
         Object.keys(JSON.parse(store) as Record<string, number>),
       ).toHaveLength(1);
+
+      sr.destroy();
+    });
+  });
+
+  // ===========================================================================
+  // #2912 — browser-plugin and memory-plugin publish a traversal in namespaces
+  // of their own, and a traversal under either carries `transition.replace`.
+  // The cells hand the utility the context each plugin writes;
+  // `scroll-restore-history-plugins-2912.test.ts` has the real plugins write it.
+  // ===========================================================================
+  describe("#2912 — traversals published outside context.navigation", () => {
+    it.each([
+      [
+        "a browser-plugin popstate onto another location",
+        browserContext("popstate"),
+      ],
+      ["memory-plugin back()", { memory: { direction: "back" } }],
+      ["memory-plugin forward()", { memory: { direction: "forward" } }],
+    ])("%s restores the saved position", (_label, context) => {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/home": 640 }));
+
+      const fake = makeFakeRouter(makeState("about"));
+      const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+      const sr = track(createScrollRestoration(fake.router));
+
+      fake.emit(
+        makeState("home", {}, context, { replace: true }),
+        makeState("about"),
+      );
+
+      expect(scrollSpy).toHaveBeenLastCalledWith({
+        top: 640,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+    });
+
+    it.each([
+      // A fragment navigation (an in-page anchor, `location.hash = …`) fires
+      // popstate too, and keeps the location.
+      [
+        "a browser-plugin popstate that keeps the location",
+        browserContext("popstate", "part"),
+        "home",
+      ],
+      [
+        "a programmatic replace under browser-plugin",
+        browserContext("navigate"),
+        "about",
+      ],
+      [
+        "a programmatic replace under memory-plugin",
+        { memory: { direction: "navigate" } },
+        "about",
+      ],
+    ])("%s leaves the scroll untouched", (_label, context, from) => {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/home": 640 }));
+
+      const fake = makeFakeRouter(makeState(from));
+      const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+      const sr = track(createScrollRestoration(fake.router));
+
+      fake.emit(
+        makeState("home", {}, context, { replace: true }),
+        makeState(from),
+      );
+
+      expect(scrollSpy).not.toHaveBeenCalled();
+
+      sr.destroy();
+    });
+
+    // `replaceHistoryState` moved the URL to `?page=3` without a commit, so the
+    // router still holds the bare location and the popstate seems to change it.
+    function popstateFromStaleLocation(state: unknown): {
+      scrollSpy: ReturnType<typeof vi.spyOn>;
+      sr: { destroy: () => void };
+    } {
+      sessionStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ "/home?page=3": 640 }),
+      );
+
+      const fake = makeFakeRouter(makeState("home"));
+      const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+      const sr = track(createScrollRestoration(fake.router));
+
+      globalThis.dispatchEvent(new PopStateEvent("popstate", { state }));
+      fake.emit(
+        makeState("home", { page: 3 }, browserContext("popstate", "part"), {
+          replace: true,
+        }),
+        makeState("home"),
+      );
+
+      return { scrollSpy, sr };
+    }
+
+    it("a popstate onto a new entry, which carries no state, leaves the scroll untouched", () => {
+      const { scrollSpy, sr } = popstateFromStaleLocation(null);
+
+      expect(scrollSpy).not.toHaveBeenCalled();
+
+      sr.destroy();
+    });
+
+    it("a popstate onto an entry carrying state restores, from the same stale location", () => {
+      const { scrollSpy, sr } = popstateFromStaleLocation({ name: "home" });
+
+      expect(scrollSpy).toHaveBeenLastCalledWith({
+        top: 640,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+    });
+
+    // navigation-plugin writes no history state, and WebKit dispatches the
+    // traversal's popstate before the restore frame.
+    it("a navigation-plugin traversal restores although its popstate carries no state", () => {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/home": 640 }));
+
+      const fake = makeFakeRouter(makeState("about"));
+      const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+      const sr = track(createScrollRestoration(fake.router));
+
+      globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+      fake.emit(
+        makeState(
+          "home",
+          {},
+          { navigation: { navigationType: "traverse", direction: "back" } },
+          { replace: true },
+        ),
+        makeState("about"),
+      );
+
+      expect(scrollSpy).toHaveBeenLastCalledWith({
+        top: 640,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+    });
+
+    // Two quick Backs, across an anchor's entry, while the landing route's
+    // guard is pending: the plugin replays the second once the first commits,
+    // and both commit before a frame. The page still shows the offset of the
+    // route left before them.
+    it("a popstate keeping the location of a commit whose frame has not run restores", () => {
+      const frames: FrameRequestCallback[] = [];
+
+      vi.stubGlobal(
+        "requestAnimationFrame",
+        (cb: FrameRequestCallback): number => frames.push(cb),
+      );
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/home": 640 }));
+
+      const fake = makeFakeRouter(makeState("about"));
+      const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+      const sr = track(createScrollRestoration(fake.router));
+      const anchorEntry = makeState(
+        "home",
+        {},
+        browserContext("popstate", "part"),
+        { replace: true },
+      );
+
+      fake.emit(anchorEntry, makeState("about"));
+      fake.emit(
+        makeState("home", {}, browserContext("popstate"), { replace: true }),
+        anchorEntry,
+      );
+
+      for (const cb of frames.splice(0)) {
+        cb(0);
+      }
+
+      expect(scrollSpy).toHaveBeenLastCalledWith({
+        top: 640,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+    });
+  });
+
+  // ===========================================================================
+  // #2912 — a restore onto `window` outlasts a page that is still growing: the
+  // target route can be laid out frames after the restore frame, and one
+  // `scrollTo` clamps to the page as it is at that moment.
+  // ===========================================================================
+  describe("#2912 — a window restore re-applies while the page grows", () => {
+    const traversal = { navigation: { direction: "back" } };
+
+    // A page whose scroll range is `max`: scrollTo lands clamped to it at once.
+    // The root reports the range as its `scrollHeight` less a `clientHeight`
+    // of `viewport`.
+    function makeWindow(initialMax: number, viewport = 0) {
+      let y = 0;
+      let max = initialMax;
+      const queue: FrameRequestCallback[] = [];
+      const scrollTo = vi.fn((opts: ScrollToOptions) => {
+        y = Math.min(opts.top ?? 0, max);
+      });
+
+      Object.defineProperty(globalThis, "scrollY", {
+        get: () => y,
+        configurable: true,
+      });
+      Object.defineProperty(document.documentElement, "scrollHeight", {
+        get: () => max + viewport,
+        configurable: true,
+      });
+      Object.defineProperty(document.documentElement, "clientHeight", {
+        get: () => viewport,
+        configurable: true,
+      });
+      vi.stubGlobal("scrollTo", scrollTo);
+      vi.stubGlobal(
+        "requestAnimationFrame",
+        (cb: FrameRequestCallback): number => {
+          queue.push(cb);
+
+          return queue.length;
+        },
+      );
+
+      return {
+        scrollTo,
+        grow: (next: number) => {
+          max = next;
+        },
+        frame: () => {
+          for (const cb of queue.splice(0)) {
+            cb(0);
+          }
+        },
+        pending: () => queue.length,
+      };
+    }
+
+    afterEach(() => {
+      Object.defineProperty(globalThis, "scrollY", {
+        value: 0,
+        configurable: true,
+        writable: true,
+      });
+      Reflect.deleteProperty(document.documentElement, "scrollHeight");
+      Reflect.deleteProperty(document.documentElement, "clientHeight");
+      Reflect.deleteProperty(document, "scrollingElement");
+    });
+
+    it.each([
+      ["shorter than the position", 300, 0],
+      // Content still loading: taller than 1200, yet 800 of it is the viewport.
+      ["taller than the position by less than the viewport", 700, 800],
+      // Past the pixel of tolerance.
+      ["short of the position by two pixels", 1198, 0],
+    ])(
+      "re-applies while the page is %s, then stops",
+      (_label, initialMax, viewport) => {
+        const win = makeWindow(initialMax, viewport);
+
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/home": 1200 }));
+
+        const fake = makeFakeRouter(makeState("about"));
+        const sr = track(createScrollRestoration(fake.router));
+
+        fake.emit(makeState("home", {}, traversal), makeState("about"));
+        win.frame();
+
+        expect(globalThis.scrollY, "the first attempt clamps").toBe(initialMax);
+
+        win.grow(5000);
+        win.frame();
+
+        expect(globalThis.scrollY).toBe(1200);
+        expect(win.pending(), "landed, so no further frame").toBe(0);
+
+        sr.destroy();
+      },
+    );
+
+    it.each([
+      ["taller than the position", 5000, 1200],
+      // A position read at a fractional scroll offset, against an integer range.
+      ["holding a fractional position to the pixel", 1200, 1200.5],
+      ["short of the position by a pixel", 1200, 1201],
+    ])(
+      "an instant restore onto a page %s schedules no retry",
+      (_label, initialMax, top) => {
+        const win = makeWindow(initialMax);
+
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/home": top }));
+
+        const fake = makeFakeRouter(makeState("about"));
+        const sr = track(createScrollRestoration(fake.router));
+
+        fake.emit(makeState("home", {}, traversal), makeState("about"));
+        win.frame();
+
+        expect(globalThis.scrollY).toBe(1200);
+        expect(win.scrollTo).toHaveBeenCalledTimes(1);
+        expect(win.pending()).toBe(0);
+
+        sr.destroy();
+      },
+    );
+
+    it("reads the page's range off the document's scrolling element", () => {
+      const win = makeWindow(5000);
+      const scroller = document.createElement("div");
+
+      // The root reports no range of its own, as in quirks mode.
+      Object.defineProperty(document.documentElement, "scrollHeight", {
+        value: 0,
+        configurable: true,
+      });
+      Object.defineProperty(scroller, "scrollHeight", { value: 5000 });
+      Object.defineProperty(document, "scrollingElement", {
+        value: scroller,
+        configurable: true,
+      });
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/home": 1200 }));
+
+      const fake = makeFakeRouter(makeState("about"));
+      const sr = track(createScrollRestoration(fake.router));
+
+      fake.emit(makeState("home", {}, traversal), makeState("about"));
+      win.frame();
+
+      expect(win.scrollTo).toHaveBeenCalledTimes(1);
+      expect(win.pending()).toBe(0);
+
+      sr.destroy();
+    });
+
+    it("a container getter that resolves nothing yet keeps retrying on a page that holds the position", () => {
+      const win = makeWindow(5000);
+      const element = document.createElement("div");
+      const elementScrollTo = vi.fn();
+      let mounted = false;
+
+      element.scrollTo = elementScrollTo;
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/home": 1200 }));
+
+      const fake = makeFakeRouter(makeState("about"));
+      const sr = track(
+        createScrollRestoration(fake.router, {
+          scrollContainer: () => (mounted ? element : null),
+        }),
+      );
+
+      fake.emit(makeState("home", {}, traversal), makeState("about"));
+      win.frame();
+
+      expect(
+        win.scrollTo,
+        "the window stands in for the container",
+      ).toHaveBeenCalledTimes(1);
+      expect(win.pending(), "the page holds 1200, yet it retries").toBe(1);
+
+      mounted = true;
+      win.frame();
+
+      expect(elementScrollTo).toHaveBeenLastCalledWith({
+        top: 1200,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+    });
+
+    it("an unreachable position stops at the frame budget", () => {
+      const win = makeWindow(300);
+
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/home": 1200 }));
+
+      const fake = makeFakeRouter(makeState("about"));
+      const sr = track(createScrollRestoration(fake.router));
+
+      fake.emit(makeState("home", {}, traversal), makeState("about"));
+
+      for (let i = 0; i < 50 && (i === 0 || win.pending() > 0); i++) {
+        win.frame();
+      }
+
+      // The initial attempt + RESTORE_RETRY_FRAMES retries, as for a container.
+      expect(win.scrollTo).toHaveBeenCalledTimes(11);
+      expect(win.pending()).toBe(0);
+      expect(globalThis.scrollY).toBe(300);
+
+      sr.destroy();
+    });
+
+    it("a smooth restore stops once the page can hold the position", () => {
+      const win = makeWindow(300);
+
+      // An animating scroll: the page has not moved by the next frame.
+      win.scrollTo.mockImplementation(() => undefined);
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/home": 1200 }));
+
+      const fake = makeFakeRouter(makeState("about"));
+      const sr = track(
+        createScrollRestoration(fake.router, { behavior: "smooth" }),
+      );
+
+      fake.emit(makeState("home", {}, traversal), makeState("about"));
+      win.frame();
+
+      expect(win.pending(), "too short, so it re-applies").toBe(1);
+
+      win.grow(5000);
+      win.frame();
+
+      // One more apply ends the loop before the animation lands: WebKit delays
+      // a smooth scroll that is re-applied on every frame.
+      expect(win.scrollTo).toHaveBeenCalledTimes(2);
+      expect(win.scrollTo).toHaveBeenLastCalledWith({
+        top: 1200,
+        left: 0,
+        behavior: "smooth",
+      });
+      expect(win.pending()).toBe(0);
+
+      sr.destroy();
+    });
+
+    it.each([
+      ["a push onto another route", makeState("other")],
+      ["a push onto the same route", makeState("home", { page: 2 })],
+      [
+        "a reload that replaces onto another location of the route",
+        makeState("home", { page: 2 }, {}, { reload: true, replace: true }),
+      ],
+    ])("%s retires the retry of the previous restore", (_label, next) => {
+      const win = makeWindow(300);
+
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/home": 1200 }));
+
+      const fake = makeFakeRouter(makeState("about"));
+      const sr = track(createScrollRestoration(fake.router));
+
+      fake.emit(makeState("home", {}, traversal), makeState("about"));
+      win.frame();
+
+      expect(win.pending(), "the clamped restore keeps retrying").toBe(1);
+
+      fake.emit(next, makeState("home"));
+      win.frame();
+      win.grow(5000);
+      win.frame();
+
+      expect(globalThis.scrollY, "the newer navigation's own position").toBe(0);
+      expect(win.pending()).toBe(0);
+
+      sr.destroy();
+    });
+
+    // A restore still retrying, on a page 300 tall that holds 1200 later.
+    function retryingRestore() {
+      const win = makeWindow(300);
+
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/home": 1200 }));
+
+      const fake = makeFakeRouter(makeState("about"));
+      const sr = track(createScrollRestoration(fake.router));
+
+      fake.emit(makeState("home", {}, traversal), makeState("about"));
+      win.frame();
+
+      expect(win.pending(), "the clamped restore keeps retrying").toBe(1);
+
+      return { fake, sr, win };
+    }
+
+    it.each([
+      [
+        "a query synced into the URL",
+        makeState("home", { page: 2 }, {}, { replace: true }),
+      ],
+      [
+        "a scroll-spy hash update",
+        makeState(
+          "home",
+          {},
+          { url: { hash: "part", hashChanged: true } },
+          { replace: true },
+        ),
+      ],
+    ])("%s on the same route leaves the restore running", (_label, update) => {
+      const { fake, sr, win } = retryingRestore();
+
+      fake.emit(update, makeState("home"));
+      win.grow(5000);
+      win.frame();
+
+      expect(globalThis.scrollY).toBe(1200);
+      expect(win.pending()).toBe(0);
+
+      sr.destroy();
+    });
+
+    it.each([
+      [
+        "a replace onto another route",
+        makeState("other", {}, {}, { replace: true }),
+      ],
+      // The browser's scroll to the fragment has to stand.
+      [
+        "a fragment navigation on the same route",
+        makeState("home", {}, browserContext("popstate", "part"), {
+          replace: true,
+        }),
+      ],
+    ])("%s retires the restore", (_label, next) => {
+      const { fake, sr, win } = retryingRestore();
+
+      fake.emit(next, makeState("home"));
+      win.frame();
+      win.grow(5000);
+      win.frame();
+
+      expect(globalThis.scrollY, "where the clamped restore left it").toBe(300);
+      expect(
+        win.scrollTo,
+        "the newer commit writes nothing",
+      ).toHaveBeenCalledTimes(1);
+      expect(win.pending()).toBe(0);
+
+      sr.destroy();
+    });
+
+    it("a commit in the same frame retires the restore before its first write", () => {
+      const win = makeWindow(5000);
+
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/home": 1200 }));
+
+      const fake = makeFakeRouter(makeState("about"));
+      const sr = track(createScrollRestoration(fake.router));
+
+      // A redirect on landing: the replace commits before the traversal's frame.
+      fake.emit(makeState("home", {}, traversal), makeState("about"));
+      fake.emit(
+        makeState("other", {}, {}, { replace: true }),
+        makeState("home"),
+      );
+      win.frame();
+
+      expect(win.scrollTo).not.toHaveBeenCalled();
+
+      sr.destroy();
+    });
+
+    it("a push retires a container restore that is still retrying", () => {
+      let limit = 120;
+      let scrollTop = 0;
+      const queue: FrameRequestCallback[] = [];
+      const element = document.createElement("div");
+
+      vi.stubGlobal(
+        "requestAnimationFrame",
+        (cb: FrameRequestCallback): number => {
+          queue.push(cb);
+
+          return queue.length;
+        },
+      );
+      vi.stubGlobal("scrollTo", vi.fn());
+      Object.defineProperty(element, "scrollTop", {
+        get: () => scrollTop,
+        set: (v: number) => {
+          scrollTop = Math.min(v, limit);
+        },
+        configurable: true,
+      });
+      // jsdom's `clientHeight` is 0, so the scroll range is the height.
+      Object.defineProperty(element, "scrollHeight", {
+        get: () => limit,
+        configurable: true,
+      });
+      element.scrollTo = ((o: ScrollToOptions) => {
+        element.scrollTop = o.top ?? 0;
+      }) as typeof element.scrollTo;
+
+      const flush = (): void => {
+        for (const cb of queue.splice(0)) {
+          cb(0);
+        }
+      };
+
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/a": 900 }));
+
+      const fake = makeFakeRouter(makeState("home"));
+      const sr = track(
+        createScrollRestoration(fake.router, {
+          scrollContainer: () => element,
+        }),
+      );
+
+      fake.emit(makeState("a", {}, traversal), makeState("home"));
+      flush();
+
+      expect(element.scrollTop, "clamped").toBe(120);
+      expect(queue, "so the loop keeps retrying").toHaveLength(1);
+
+      fake.emit(makeState("b"), makeState("a"));
+      flush();
+      limit = 2000;
+      flush();
+
+      expect(element.scrollTop, "the push lands at the top").toBe(0);
+      expect(queue).toHaveLength(0);
 
       sr.destroy();
     });

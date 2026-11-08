@@ -130,6 +130,7 @@
   "devDependencies": {
     "@real-router/browser-plugin": "workspace:^",
     "@real-router/core": "workspace:^",
+    "@real-router/memory-plugin": "workspace:^",
     "@real-router/validation-plugin": "workspace:^",
     "@testing-library/dom": "~10.4.1",
     "@testing-library/jest-dom": "~7.0.1",

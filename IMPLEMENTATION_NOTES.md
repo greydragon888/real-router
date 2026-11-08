@@ -6272,6 +6272,8 @@ Each listener ends the transition only on an error whose `toState` carries that 
 
 **Why not a `@real-router/scroll-plugin`.** `window.scrollY` is a DOM concern; router-core is DOM-agnostic (`state.name` / `params` / `context` only). A plugin would be a layering leak — the same mistake as Angular's `TitleStrategy` inside router-core. The routing-layer inputs the utility needs (direction, navigationType) are already published by `@real-router/navigation-plugin` via `state.context.navigation`. A plugin would duplicate an existing channel without adding value.
 
+**Extended by #2912.** A step through history is read from browser-plugin's `state.context.browser` and memory-plugin's `state.context.memory` as well — see "Scroll restoration reads the step each URL plugin publishes".
+
 ### Key-Synthesis Decision: Composite Route Identity, Not Per-Entry UUID
 
 **Problem.** The issue specification (#497) called for keying saved positions by `history.state.key`. Investigation showed:
@@ -6309,6 +6311,8 @@ A second defect rode along: `{ ...params, ...search }` let a query twin win the 
 2. `pagehide` — single listener that saves the current route's position on reload / tab close.
 
 No throttling, no timers, no scroll listener. Precision guaranteed because capture runs at the exact navigation boundary rather than "within 100ms of the last scroll."
+
+**#2912** adds a third listener, on `popstate`. It captures nothing: it records whether the entry the browser landed on carries state, for the fragment check of the next frame.
 
 ### Why Default Mode = `"restore"`
 
@@ -7325,6 +7329,8 @@ Internally `replace` is a **core-level decision**: it originates in `router.navi
 - `nav?.direction === "back" || nav?.navigationType === "traverse"` → restore.
 - otherwise → `scrollToHashOrTop`.
 
+**Corrected by #2912.** The restore arm reads browser-plugin's and memory-plugin's namespaces too; a popstate onto an entry without state keeps the scroll, and so does one onto the location it left once the capture has run; every commit retires a pending restore except a same-route replace that neither steps through history nor reloads — see "Scroll restoration reads the step each URL plugin publishes".
+
 Both arms in the `replace` and `reload` checks are intentional. The plugin arm preserves F5/cross-document scroll restoration under navigation-plugin (`getActivationType()` #531 priming sets `nav.navigationType === "reload"` while leaving `opts.reload` undefined on the initial transition). Dropping the plugin arm would silently regress F5 under navigation-plugin.
 
 ### Why
@@ -7345,6 +7351,8 @@ Both arms in the `replace` and `reload` checks are intentional. The plugin arm p
 | F5 cross-document (browser-driven reload)                                             | `scrollToHashOrTop`                                  | `scrollToHashOrTop` (**unchanged** — `opts.reload` is undefined on the initial transition and browser-plugin has no Navigation API `getActivationType` analogue; closing this requires a core-level F5 priming, out of scope) |
 | Browser back/forward (popstate)                                                       | `scrollToHashOrTop` (snap)                           | `scrollToHashOrTop` (unchanged — `direction`/`traverse` disambiguation requires navigation-plugin)                                                                                                                            |
 | `navigateToNotFound()`                                                                | `scrollToHashOrTop`                                  | **skip** (driven by inline `transition.replace = true`)                                                                                                                                                                       |
+
+**Corrected by #2912.** browser-plugin commits a popstate with `replace: true`, and its start commit reaches subscribers as a replace too, so on the released tree the popstate and F5 rows took the replace-skip: the scroll stayed where it was. #2912 restores on the popstate row; the F5 row stays a skip.
 
 Opt-out for users who relied on the legacy snap-on-every-transition behaviour: `scrollRestoration={{ mode: "top" }}`.
 
@@ -15711,3 +15719,43 @@ Lines, branches and functions equal v4 in all three: 909/531/177, 646/376/147 an
 ⚠ **A worktree on a commit that pins 12.11.2 cannot commit on a machine that runs 12.16.1**, as with the previous pin; it commits again once rebased onto this one.
 
 **Not measured.** The publish itself: the release job's OIDC exchange and provenance run under 12.16.1 for the first time on the next release.
+
+## Scroll restoration reads the step each URL plugin publishes (#2912, 2026-11-08)
+
+**Problem.**
+
+- `createScrollRestoration` in `mode: "restore"` read a step through history only from `state.context.navigation`, which navigation-plugin alone writes. browser-plugin's popstate handler and memory-plugin's `back()`, `forward()` and `go()` commit with `replace: true`, so the replace-skip took every step under them: nothing was restored, and the scroll stayed where the page being left had it. Measured on the browser stand under browser-plugin, a list left at 2200 and a page at 700: Back landed at 700 in Chromium, Firefox and WebKit.
+- The documents disagreed with the code and with each other. The adapter READMEs promise "Restores scroll on back/forward"; the wiki said the `back` / `traverse` column "degrades to `"top"`" without navigation-plugin; the Before/After table of "Replace Flag Propagation in `TransitionMeta`" gives `scrollToHashOrTop` for the popstate and F5 rows. On the released tree both rows took the replace-skip.
+- With no `scrollContainer` a restore was one `scrollTo` in the frame after the commit, which clamps short on a page that grows after mount. Measured under browser-plugin, a list that grows 40 ms after mount, Back: 140 with the step read and one write, in all three engines.
+- A retrying container restore was retired by the next restore, not by the next commit. A push left it running, and it wrote the previous route's position onto the new page once that page grew; a commit in the same frame as a traversal did not stop the traversal's first write either. The cells "a push retires a container restore that is still retrying" and "a commit in the same frame retires the restore before its first write" are red on the released tree.
+
+**Solution.**
+
+- A step through history is read from the namespace of each URL plugin that publishes one: `state.context.browser.source === "popstate"`, `state.context.navigation` (`direction === "back"`, `navigationType === "traverse"`) and `state.context.memory.direction` (`"back"`, `"forward"`). The restore branches run before the replace-skip. hash-plugin publishes none and keeps the skip.
+- browser-plugin marks every popstate, a fragment navigation's included, and stamps state into every entry it commits. The utility's own `popstate` listener records whether the entry the browser landed on has none (`event.state` is `null`; `undefined` under jsdom): a fragment navigation — an in-page anchor, `location.hash = …` — or an entry other code made. A popstate onto such an entry leaves the scroll, and so does one that keeps the location, Back from an anchor's entry onto the page it was made on, where a restore would write back the position just captured. Keeping the location counts only once the capture has run (`settled`), so two quick Backs across an anchor's entry, while the landing route's async guard holds the first, still restore.
+- `restorePos` writes on each frame, for at most `RESTORE_RETRY_FRAMES` (10) more, until the target can hold the position: `scrollHeight - clientHeight >= top - 1` on the container, or with no getter on `document.scrollingElement ?? document.documentElement`; while a getter returns `null`, each frame writes to `window` and none ends the loop. A container restore stopped on "the position landed" when instant and ran the whole budget when smooth; one hold rule now ends both.
+- The restore token is taken per commit in `subscribe` and checked before every write, the first one included. Every commit retires a pending restore except a replace on the same route that neither steps through history nor reloads — a scroll-spy update, a query synced into the URL.
+
+Measured after the fix on the stand, in all three engines: Back 700 → 2200; the growing list 2200; the two quick Backs 3040 (the release 700 / 700 / 3040 in Chromium / Firefox / WebKit). A `behavior: "smooth"` container restore writes once instead of 11 times, and the first sampled frame at the position is 46 → 46 in Chromium, 40 → 40 in Firefox and 22 → 12 in WebKit.
+
+**Why.**
+
+- **The plugins' namespaces, not a core flag.** browser-, navigation- and memory-plugin already publish the kind of commit they made, so the change stays in the one file the six adapters share, and `TransitionMeta` is untouched.
+- **`event.state`, not the location.** After a URL rewritten without a commit (`replaceHistoryState`) the router's location is stale, and an anchor click seems to change it (cell "a fragment navigation after a URL rewritten without a commit leaves the scroll too"). `history.state` is no witness either: the plugin stamps it before the frame. The flag is read in the frame because the plugin's listener can commit before the utility's runs.
+- **A hold rule, not "landed".** WebKit delays a smooth scroll re-applied on every frame (22 → 12 above). A scroll that CSS animates (`scroll-behavior: smooth`, scroll-snap) does not land at once either; that half is read from the code, not measured.
+- **A token per commit.** The two red cells above.
+
+**Left as limitations, in the wiki's Known Limitations.**
+
+- hash-plugin publishes no step: Back and Forward leave the scroll.
+- One position per location: the key is `state.path` (#1923).
+- Back onto an entry other code pushed, or whose state it cleared, reads as a fragment navigation and leaves the scroll (jsdom probe with browser-plugin: a history-backed modal's entry, `history.replaceState(null, "")`).
+- A navigation made while a restore still re-applies captures the position reached so far: 1500 instead of 3040 in a jsdom probe with browser-plugin. Read from the released code, the release gave 700 there, restoring nothing, and under navigation-plugin the same 1500, its one write clamped.
+- A scroll the user makes while a restore re-applies is pulled back, as the container loop did in the release.
+
+**Left unsupported, each exotic.**
+
+- A synthetic `PopStateEvent` dispatched between a commit and its frame decides that frame's fragment check by its own `state`, as the docblock of `landedOnNewEntry` warns.
+- A non-boolean `replace` or `reload` from untyped JS is read for truthiness, as on the released tree. `shouldReplaceHistory` reads `replace === true`, so `replace: "yes"` pushes an entry while the utility leaves the scroll; reading `=== true` here would move the disagreement onto core and memory-plugin, which read truthiness too.
+
+**Unchanged.** On a page that can hold the position at once, navigation-plugin's push, Back, Forward and F5 land where they did (measured, three engines); the window retry, the container hold rule and the token apply under it as under the other plugins. browser-plugin's start and F5: the start commit is a replace (jsdom probe with the real plugin), so the scroll stays where the browser put it.

@@ -18,7 +18,7 @@ The floating **Scroll Meter** in the bottom-right corner shows live `scrollY`, t
 `createScrollRestoration` lives in `shared/dom-utils/`, not as a `@real-router/scroll-plugin`. Reasons:
 
 - Router-core is DOM-agnostic — `window.scrollY` is a DOM concern.
-- All routing-layer inputs the utility needs (`direction`, `navigationType`) are already published by `navigation-plugin` via `state.context.navigation`. A plugin would duplicate an existing channel without adding value.
+- Every routing-layer input the utility needs is already published: `replace` / `reload` by core in `state.transition`, a step through history by navigation-, browser- and memory-plugin, each in its own namespace (`state.context.navigation`, `state.context.browser`, `state.context.memory`). A plugin would duplicate those channels without adding value.
 - Symmetric to `createRouteAnnouncer` — both are framework-agnostic DOM helpers wired into `RouterProvider` per adapter.
 
 See [Wiki › Scroll Restoration](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration) for the full architectural rationale.
@@ -46,7 +46,7 @@ See [Wiki › Scroll Restoration](https://github.com/greydragon888/real-router/w
 
 | #   | Scenario               | Sub-tests | What it exercises                                                          |
 | --- | ---------------------- | --------- | -------------------------------------------------------------------------- |
-| 1   | Restore on back        | —         | `direction === "back"` → `writePos(loadStore()[keyOf(route)])`             |
+| 1   | Restore on back        | —         | `direction === "back"` → `restorePos`: `loadStore()[keyOf(route)]`, written on each frame of the budget — on `/articles` the `scrollContainer` getter returns `null` |
 | 2   | Top on forward push    | —         | `default` branch → `scrollToHashOrTop` → `writePos(0)`                     |
 | 3   | Anchor scrolling       | 4 (a/b/c/d) | initial goto / cross-path `<Link hash>` / same-path auto-force / cyrillic |
 | 4   | Replace no-op          | —         | `navigationType === "replace"` early return; store key under previousRoute |
@@ -58,9 +58,9 @@ See [Wiki › Scroll Restoration](https://github.com/greydragon888/real-router/w
 
 | Plugin            | In example | Alternative    | Effect of substitution                                                                                                                                                                        |
 | ----------------- | ---------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| navigation-plugin | yes        | browser-plugin | browser-plugin does not publish `state.context.navigation` → utility degrades to top semantics (`!nav → scrollToHashOrTop` branch); scenarios **1, 4, 7b, 7c** stop working. Scenario 5 and 7a are plugin-agnostic. |
+| navigation-plugin | yes        | browser-plugin | browser-plugin's first transition is a plain replace and nothing primes it, so scenario **7b** (F5 restore) stops working. Scenario 1 reads the step from `state.context.browser.source`, 4 and 7c read `state.transition`; 5 and 7a are plugin-agnostic. |
 
-navigation-plugin and browser-plugin are **interchangeable** (not complementary) URL-navigation sources. We pick navigation-plugin because only it publishes `direction` and `navigationType`. Scenarios 5 (mode toggle) and 7a (`pagehide` save) are plugin-agnostic.
+navigation-plugin and browser-plugin are **interchangeable** (not complementary) URL-navigation sources. We pick navigation-plugin because only it primes the first transition from `navigation.activation` (#531), which F5 restore needs. Scenarios 5 (mode toggle) and 7a (`pagehide` save) are plugin-agnostic.
 
 ## Out of scope
 
@@ -73,6 +73,6 @@ navigation-plugin and browser-plugin are **interchangeable** (not complementary)
 ## Implementation notes
 
 - **Scroll measurement tolerance** — Playwright reads scrollY through `[data-testid="scroll-meter"][data-scroll-y]`. rAF jitter and hi-DPI rounding make ±20px the safe tolerance; `expect.poll(...).toSatisfy(y => Math.abs(y - target) < 20)` is the pattern. `toBeCloseTo(val, -1)` only gives ±5 — too tight.
-- **Mode switching reload** — sense: utility is constructed once on RouterProvider mount; hot-swap is not supported. Mode is persisted in `localStorage["scroll-restoration-mode"]`, applied on next mount. Documented UX quirk: switching with non-zero scroll on `/settings` may "jump" to a saved position after reload (the utility's `restore` branch writePos's the previously-captured `settings:{}` key).
+- **Mode switching reload** — sense: utility is constructed once on RouterProvider mount; hot-swap is not supported. Mode is persisted in `localStorage["scroll-restoration-mode"]`, applied on next mount. Documented UX quirk: switching with non-zero scroll on `/settings` may "jump" to a saved position after reload (the utility's `restore` branch restores the position captured under the `/settings` key).
 - **Custom scrollContainer applies globally** — `scrollContainer: () => document.getElementById("virtual-scroller")` returns `null` on routes without that element. `readPos` / `writePos` lazy-resolve and fall back to `window`. Demonstrated as a feature on Scenario 6.
 - **`pagehide` save edge-case** — save runs in `pagehide` listener which fires on tab close / reload / cross-document navigate. Within one document, between routes, save runs through `router.subscribe(({ previousRoute }) => putPos(...))`. Edge case: navigating away from `/gallery`, the Gallery component unmounts before the subscribe callback's `readPos()` runs → `getContainer()` returns `null` → falls back to `window.scrollY` (=0 on the freshly-mounted next route). Acceptable trade-off for an example; documented in the plan.
