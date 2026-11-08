@@ -268,7 +268,7 @@ In the isolated matcher microbench ([`matcher-bench`](cross-router-bench/matcher
 - **Plugin architecture** — intercept and extend router behavior
 - **Observable state** — RxJS and TC39 Observable compatible
 - **Immutable state** — every `State` and its `params`, `search` and `transition` objects are frozen (shallowly); plugins publish per-route data into `state.context` through namespace claims
-- **Scroll restoration** — opt-in via `RouterProvider.scrollRestoration` ([docs](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration)); restores on back/forward, scrolls to top / `#hash` on push; `restore` / `top` / `native` modes; custom scroll containers
+- **Scroll restoration** — opt-in via `RouterProvider.scrollRestoration` ([docs](https://github.com/greydragon888/real-router/wiki/Scroll-Restoration)); restores on back/forward (except under `@real-router/hash-plugin`), scrolls to top / `#hash` on push; `restore` / `top` / `native` modes; custom scroll containers
 - **Scroll spy** — opt-in via `RouterProvider.scrollSpy` ([docs](https://github.com/greydragon888/real-router/wiki/Scroll-Spy)); router-coordinated `IntersectionObserver` syncs the URL hash to the topmost visible anchor as you scroll
 
 ## Quick Start
