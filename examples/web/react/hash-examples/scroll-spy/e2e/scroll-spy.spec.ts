@@ -38,6 +38,17 @@ const SCROLL_TO = async (p: Page, sel: string): Promise<void> => {
   });
 };
 
+// Scroll values drift a few pixels with rAF timing and hi-DPI rounding.
+const SCROLL_TOLERANCE = 20;
+
+async function expectScrollNear(page: Page, target: number): Promise<void> {
+  await expect
+    .poll(async () =>
+      Math.abs((await page.evaluate(() => globalThis.scrollY)) - target),
+    )
+    .toBeLessThan(SCROLL_TOLERANCE);
+}
+
 async function installNavCounter(page: Page): Promise<void> {
   await page.evaluate(() => {
     if (!window.__router) {
@@ -213,6 +224,47 @@ test.describe("Scenario 11 — Spy + scroll-restoration coexistence under browse
 
     const yAfter = await page.evaluate(() => window.scrollY);
     expect(Math.abs(yAfter - yBefore)).toBeLessThan(30);
+  });
+});
+
+test.describe("Scenario 12 — Back and Forward restore the scroll under browser-plugin (#2912)", () => {
+  test("Back returns to the position /article was left at, Forward to the one /guide was left at", async ({
+    page,
+  }) => {
+    await page.goto("/article?plugin=browser");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.locator('[data-testid="plugin-badge"]')).toContainText(
+      "browser",
+    );
+
+    await SCROLL_TO(page, "#section-6");
+    await page.waitForTimeout(DEBOUNCE_MS);
+    await expect.poll(() => URL_HASH(page)).toBe("section-6");
+
+    const articleY = await page.evaluate(() => globalThis.scrollY);
+
+    // dispatchEvent: Playwright's click scrolls the link into view first, and
+    // the router captures the position the page is left at.
+    await page.locator('[data-testid="nav-guide"]').dispatchEvent("click");
+    await expect(page.locator('[data-testid="guide"]')).toBeVisible();
+
+    await SCROLL_TO(page, "#step-2");
+    await page.waitForTimeout(DEBOUNCE_MS);
+    await expect.poll(() => URL_HASH(page)).toBe("step-2");
+
+    const guideY = await page.evaluate(() => globalThis.scrollY);
+
+    // Far apart, so neither step can pass by staying where the other left it.
+    expect(Math.abs(articleY - guideY)).toBeGreaterThan(SCROLL_TOLERANCE * 10);
+
+    await page.goBack();
+    await expect(page.locator('[data-testid="article"]')).toBeVisible();
+    await expectScrollNear(page, articleY);
+
+    await page.goForward();
+    await expect(page.locator('[data-testid="guide"]')).toBeVisible();
+    await expectScrollNear(page, guideY);
   });
 });
 

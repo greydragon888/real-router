@@ -861,12 +861,22 @@ describe("RouterProvider — scrollRestoration", () => {
     expect(Object.values(saved)).toContain(120); // new capture merged in
   });
 
-  it("smooth container restore runs the full retry budget (no early stop)", async () => {
+  it.each([
+    // jsdom lays nothing out, so `scrollHeight` is 0 unless a cell sets it.
+    // Initial attempt + the retry budget.
+    ["re-applies while the content cannot hold the position", 0, 11],
+    ["applies once when the content holds the position", 5000, 1],
+  ])("smooth container restore %s", async (_label, scrollHeight, calls) => {
     const container = document.createElement("div");
 
     document.body.append(container);
+    // The position the reload captures, and then restores.
     Object.defineProperty(container, "scrollTop", {
-      get: () => 0,
+      get: () => 900,
+      configurable: true,
+    });
+    Object.defineProperty(container, "scrollHeight", {
+      value: scrollHeight,
       configurable: true,
     });
     const containerScrollTo = vi.fn();
@@ -888,13 +898,16 @@ describe("RouterProvider — scrollRestoration", () => {
 
     containerScrollTo.mockClear();
 
-    // reload → restorePos; smooth never early-stops, so it re-applies every
-    // frame across the retry budget.
     await act(async () => {
       await router.navigate("test", {}, undefined, { reload: true });
     });
 
-    expect(containerScrollTo.mock.calls.length).toBeGreaterThan(1);
+    expect(containerScrollTo).toHaveBeenCalledTimes(calls);
+    expect(containerScrollTo).toHaveBeenLastCalledWith({
+      top: 900,
+      left: 0,
+      behavior: "smooth",
+    });
 
     container.remove();
   });
@@ -1182,9 +1195,9 @@ describe("RouterProvider — scrollRestoration (destroyed guard)", () => {
     const navRouter = createNavRouter({ direction: "back" });
 
     await navRouter.start("/");
-    // Pre-store a non-zero position for "about" that the fixed-at-0 container
-    // can never reach → restorePos keeps retrying instead of early-stopping.
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 200 }));
+    // A position the container cannot hold — jsdom lays it out at no height —
+    // so restorePos keeps retrying.
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/about": 200 }));
 
     const container = document.createElement("div");
 
@@ -1214,10 +1227,15 @@ describe("RouterProvider — scrollRestoration (destroyed guard)", () => {
       await navRouter.navigate("about");
     });
 
-    // One frame: restorePos(200) first attempt writes 200, container stays 0 →
-    // no early stop → schedules the next retry frame.
+    // One frame: the first attempt writes 200 and schedules the next retry.
     act(() => {
       vi.advanceTimersToNextTimer();
+    });
+
+    expect(containerScrollTo).toHaveBeenLastCalledWith({
+      top: 200,
+      left: 0,
+      behavior: "auto",
     });
 
     const callsBeforeDestroy = containerScrollTo.mock.calls.length;

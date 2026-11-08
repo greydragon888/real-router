@@ -41,9 +41,9 @@ read side:                │   createActiveRouteSource notifies subscribers
 | URL plugin | `<Link hash>` | `createScrollRestoration` | `createScrollSpy` |
 | --- | --- | --- | --- |
 | `navigation-plugin` | ✅ Full + direction/traverse signals | ✅ Full (replace/reload/traverse disambiguation) | ✅ Full |
-| `browser-plugin` | ✅ Full | ✅ After foundation RFC (`transition.replace` portable) | ✅ Full |
-| `hash-plugin` | ❌ warn-once + no-op | ⚠️ `anchorScrolling` ignored | ❌ warn-once + no-op |
-| `memory-plugin` | ❌ no URL | ❌ no DOM | ❌ no URL |
+| `browser-plugin` | ✅ Full | ✅ replace / programmatic reload (`transition.replace` / `.reload`, portable); Back / Forward via `state.context.browser`; no F5 restore | ✅ Full |
+| `hash-plugin` | ❌ warn-once + no-op | ⚠️ `anchorScrolling` ignored; Back / Forward do not restore ([#2913](https://github.com/greydragon888/real-router/issues/2913)) | ❌ warn-once + no-op |
+| `memory-plugin` | ❌ no URL | ✅ `back()` / `forward()` / `go()` restore | ❌ no URL |
 
 ## Quick start (any of the three)
 

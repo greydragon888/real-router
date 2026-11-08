@@ -5,10 +5,11 @@ const objectCreate = Object.create;
 
 const DEFAULT_STORAGE_KEY = "real-router:scroll";
 
-// Bounded retry budget for resolving a late-mounting scroll container on the
-// restore path. A per-route container (e.g. an `overflow:auto` div rendered
-// only on one route) can be committed to the DOM a few frames after the
-// navigation settles — heavier routes paint later than the subscribe's rAF.
+// Bounded retry budget on the restore path. The restored route — a per-route
+// container (e.g. an `overflow:auto` div rendered only on one route), or the
+// content that makes the document tall enough — can be committed to the DOM a
+// few frames after the navigation settles: heavier routes paint later than
+// the subscribe's rAF.
 // ~10 frames (≈160ms at 60fps) comfortably covers a React commit of a large
 // route without being perceptible. See the doc-block on `restorePos`.
 const RESTORE_RETRY_FRAMES = 10;
@@ -51,6 +52,16 @@ export interface ScrollRestorationOptions {
 interface NavigationContext {
   direction?: "forward" | "back" | "unknown";
   navigationType?: "push" | "replace" | "traverse" | "reload";
+}
+
+/**
+ * What plugins publish about the navigation that produced a state, each in a
+ * namespace of its own. Read by name, so this file imports no plugin.
+ */
+interface PluginContext {
+  navigation?: NavigationContext;
+  browser?: { source?: "popstate" | "navigate" };
+  memory?: { direction?: "back" | "forward" | "navigate" };
 }
 
 export function createScrollRestoration(
@@ -168,71 +179,71 @@ export function createScrollRestoration(
     }
   };
 
-  // Restore path (back / traverse / reload). Unlike `writePos`, this tolerates a
-  // scroll container that both MOUNTS and LAYS OUT a few frames AFTER the
-  // navigation settles.
+  // ⚑ A restore loop stops once a later commit has taken a new token: without
+  // it a loop whose target is unreachable writes the previous route's offset
+  // onto the current page the moment that page's layout grows (#1924).
   //
-  // The capture-side `readPos` always runs against an already-mounted DOM (the
-  // route being left). On restore the target route — and its container — is
-  // still being committed by the view layer. The subscribe callback schedules a
-  // single rAF; for a heavy route (e.g. a long virtual list) the framework's
-  // commit can land AFTER that frame. Two distinct failures follow, each losing
-  // the saved position (Scenario 6 e2e, reproduced under CI's slower runner):
+  // Every commit takes one except a replace on the same route that neither
+  // steps through history nor reloads — a scroll-spy hash update, a query
+  // synced into the URL — which leaves the restore running. It is taken at the
+  // commit rather than in the frame, so a second commit in the same frame
+  // retires a restore before its first write.
+  // `view-transitions.ts` carries the same idea as `scheduledVT` (#781).
+  let restoreToken = 0;
+
+  // Restore path (back / traverse / reload). Unlike `writePos`, this tolerates a
+  // target route that MOUNTS and LAYS OUT a few frames AFTER the navigation
+  // settles: the view layer can commit it after the subscribe's frame. Two
+  // failures follow, each losing the saved position:
   //
   //   1. Container not mounted yet → `getContainer()` is `null`, the scroll
   //      silently falls back to `window`, which on a container-only route has
   //      nothing to scroll.
-  //   2. Container mounted but its content not laid out yet → `scrollHeight`
-  //      is still small, so a single `scrollTo({ top })` clamps short of the
-  //      saved position and never re-applies once layout grows.
+  //   2. Content not laid out yet, in the container or in the document → a
+  //      single `scrollTo({ top })` clamps short of the saved position and
+  //      never re-applies once layout grows.
   //
-  // With no `scrollContainer` getter the target is always `window`, present
-  // from the first frame — restore in a single shot (unchanged behaviour). When
-  // a getter is configured we cannot tell "this route legitimately uses window"
-  // from "the container is still mounting", so re-apply the scroll on every
-  // frame for a bounded budget: window as a fallback while the container is
-  // absent (harmless clamp on container routes), the container itself once it
-  // appears. For instant restores we stop early the moment the position sticks;
-  // smooth restores animate asynchronously, so they run the full budget. The
-  // frame budget is the hard backstop against an unreachable target (saved
-  // position taller than the restored content).
-  let restoreToken = 0;
-
-  const restorePos = (top: number): void => {
-    if (!getContainer) {
-      globalThis.scrollTo({ top, left: 0, behavior });
-
-      return;
-    }
-
+  // Scenario 6 of the scroll-restoration example's e2e reproduces both in a
+  // container.
+  //
+  // So the scroll is re-applied on every frame until the target can hold the
+  // position — its content is tall enough, and one scroll then lands it,
+  // instant or smooth — or until the budget, the backstop against an
+  // unreachable target, runs out. A smooth scroll re-applied on every frame
+  // arrives later in WebKit, which is why the loop stops at the first frame
+  // that can hold it rather than at the first that shows it. With no getter
+  // the target is `window`. With one we cannot tell "this route uses window"
+  // from "the container is still mounting": window takes the scroll as a
+  // fallback while the container is absent (a harmless clamp on container
+  // routes), and only the container, once it appears, ends the loop early.
+  const restorePos = (route: State, token: number): void => {
+    const top = loadStore()[keyOf(route)] ?? 0;
     let frames = 0;
-    // ⚑ A per-restore token, the idea `view-transitions.ts` carries as
-    // `scheduledVT` (#781) and this file already carries as `scrollSettled` on
-    // the capture side (#782). Without it the budget is gated by `destroyed`
-    // alone, so a loop whose target is unreachable — a container that clamps
-    // short and keeps retrying — is still running when the next navigation
-    // lands, and writes the PREVIOUS route's offset onto the current page the
-    // moment that container's layout grows (#1924).
-    const token = (restoreToken += 1);
+    const holds = (scroller: Element): boolean =>
+      scroller.scrollHeight - scroller.clientHeight >= top - 1;
 
     const attempt = (): void => {
       if (destroyed || token !== restoreToken) {
         return;
       }
 
-      const element = getContainer();
+      const element = getContainer?.();
 
       if (element) {
         element.scrollTo({ top, left: 0, behavior });
 
-        // Instant restore landed within rounding tolerance → done; no point
-        // re-applying. Smooth restore never matches synchronously, so let it
-        // ride the budget.
-        if (behavior !== "smooth" && Math.abs(element.scrollTop - top) <= 1) {
+        if (holds(element)) {
           return;
         }
       } else {
         globalThis.scrollTo({ top, left: 0, behavior });
+
+        if (
+          !getContainer &&
+          holds(document.scrollingElement ?? document.documentElement)
+        ) {
+          return;
+        }
       }
 
       if (frames >= RESTORE_RETRY_FRAMES) {
@@ -309,23 +320,76 @@ export function createScrollRestoration(
   // value survives the transit). A real user scroll in this <16ms window is
   // physically impossible.
   let scrollSettled = true;
+  // browser-plugin writes state into every entry it commits, so a popstate onto
+  // an entry without state lands on one it did not commit — a fragment
+  // navigation (an in-page anchor, `location.hash = …`) or an entry other code
+  // pushed — rather than stepping through history. An entry whose state other
+  // code has cleared reads the same. The location cannot tell a fragment
+  // navigation from a step: after a URL rewritten without a commit
+  // (`replaceHistoryState`) the router's location is stale, and an anchor click
+  // seems to change it. `event.state` is read rather than `history.state`,
+  // which the plugin has stamped by the frame; the flag is read in the frame
+  // rather than in `subscribe`, because the plugin's listener can commit before
+  // this one runs.
+  //
+  // ⚠ The flag is the last popstate's: one that arrives between a commit and
+  // its frame decides that frame.
+  let landedOnNewEntry = false;
+
+  const onPopState = (event: PopStateEvent): void => {
+    // `null` in a browser; `undefined` under jsdom.
+    landedOnNewEntry = event.state === null || event.state === undefined;
+  };
 
   const unsubscribe = router.subscribe(({ route, previousRoute }) => {
-    const nav = (route.context as { navigation?: NavigationContext })
-      .navigation;
+    const context = route.context as PluginContext;
+    const nav = context.navigation;
+    const memory = context.memory?.direction;
+    const fromPopState = context.browser?.source === "popstate";
+    // A step through history, from the namespace of the URL plugin that
+    // publishes one. browser-plugin marks every popstate, a fragment
+    // navigation's included; the frame below tells the two apart.
+    const historyStep =
+      fromPopState ||
+      nav?.direction === "back" ||
+      nav?.navigationType === "traverse" ||
+      memory === "back" ||
+      memory === "forward";
+    // Optional although the type requires it: core commits a foreign State's
+    // ABSENT `transition` rather than fabricating one (#1792 / #1976), and this
+    // runs on whatever `subscribe` hands over. Absent falls through to the
+    // plugin arm. A flag is read for truthiness: core commits a JS caller's
+    // non-boolean flag unchanged.
+    const transition = route.transition as State["transition"] | undefined;
+    const reload =
+      (transition?.reload ?? false) || nav?.navigationType === "reload";
+    const replace =
+      (transition?.replace ?? false) || nav?.navigationType === "replace";
+    const settled = scrollSettled;
 
     // Browsers dispatch reload as the initial navigation after refresh, so
     // previousRoute is undefined and capture is naturally skipped. The
     // pre-refresh position was already persisted via pagehide. Capture is also
     // skipped while the scroll is unsettled — a second navigation in the same
     // frame, before the prior nav's rAF snap (see `scrollSettled`, #782).
-    if (previousRoute && scrollSettled) {
+    if (previousRoute && settled) {
       putPos(keyOf(previousRoute), readPos());
     }
 
     // This navigation's scroll effect is now pending: the viewport position no
     // longer belongs to `route` until the rAF below runs and settles it.
     scrollSettled = false;
+
+    if (
+      !replace ||
+      historyStep ||
+      reload ||
+      previousRoute?.name !== route.name
+    ) {
+      restoreToken += 1;
+    }
+
+    const token = restoreToken;
 
     requestAnimationFrame(() => {
       if (destroyed) {
@@ -343,42 +407,47 @@ export function createScrollRestoration(
       }
 
       // Restore branches (reload, back/traverse) MUST be evaluated before the
-      // replace-skip below. Since #657 lifted `replace` into TransitionMeta, a
-      // history TRAVERSAL (back/forward) under navigation-plugin carries
-      // `transition.replace === true` — a traversal reuses an existing history
-      // entry, which is replace-shaped at the history level. If the replace-skip
-      // ran first it would swallow every back/forward navigation and restore
-      // would never fire (the Scenario 6 e2e regression). Genuine in-place
-      // replaces (`router.navigate({ replace: true })`, navigateToNotFound) are
-      // not traversals and fall through to the skip below.
+      // replace-skip below: a history TRAVERSAL reuses an existing entry, which
+      // is replace-shaped at the history level, so browser-plugin and
+      // memory-plugin commit every one with `transition.replace === true`, and
+      // navigation-plugin every one the browser starts. The skip would swallow
+      // them. Genuine in-place replaces (`router.navigate({ replace: true })`,
+      // navigateToNotFound) are not traversals and fall through to the skip
+      // below.
       //
-      // Both arms of each check are required: `transition.reload` only fires for
-      // programmatic `router.navigate({reload:true})`. F5 under navigation-plugin
-      // primes `nav.navigationType === "reload"` via #531 getActivationType but
-      // leaves opts.reload undefined, so dropping the plugin arm would regress F5
-      // scroll-restore. Browser-plugin's F5 is not covered (no priming, out of
-      // scope).
-      // `?.` on a required field: core commits a foreign State's ABSENT
-      // `transition` rather than fabricating one (#1792 / #1976), and this runs
-      // on whatever `subscribe` hands over. Absent falls through to the plugin
-      // arm, which is the pre-#1976 answer for a state carrying no meta.
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the required field is genuinely absent on a foreign committed State
-      if (route.transition?.reload || nav?.navigationType === "reload") {
-        restorePos(loadStore()[keyOf(route)] ?? 0);
+      // Both arms of the reload check are required: `transition.reload` only
+      // fires for programmatic `router.navigate({reload:true})`. F5 under
+      // navigation-plugin primes `nav.navigationType === "reload"` via #531
+      // getActivationType but leaves opts.reload undefined, so dropping the
+      // plugin arm would regress F5 scroll-restore. Browser-plugin's F5 is not
+      // covered (no priming, out of scope).
+      if (reload) {
+        restorePos(route, token);
 
         return;
       }
 
-      if (nav?.direction === "back" || nav?.navigationType === "traverse") {
-        restorePos(loadStore()[keyOf(route)] ?? 0);
+      // A fragment navigation lands on an entry the plugin did not commit
+      // (`landedOnNewEntry`). A popstate that keeps the location has nothing
+      // to restore either: a restore would write back the position just
+      // captured. Unsettled, the page still shows an older location, the
+      // capture was skipped, and the popstate restores.
+      const keepsLocation =
+        settled &&
+        previousRoute !== undefined &&
+        keyOf(previousRoute) === keyOf(route);
+
+      if (
+        historyStep &&
+        !(fromPopState && (landedOnNewEntry || keepsLocation))
+      ) {
+        restorePos(route, token);
 
         return;
       }
 
       // Genuine in-place replace (not a traversal) — leave scroll untouched.
-      // `?.` for the same reason as the reload arm above.
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the required field is genuinely absent on a foreign committed State
-      if (route.transition?.replace || nav?.navigationType === "replace") {
+      if (replace) {
         return;
       }
 
@@ -395,6 +464,7 @@ export function createScrollRestoration(
   };
 
   globalThis.addEventListener("pagehide", onPageHide);
+  globalThis.addEventListener("popstate", onPopState);
 
   return {
     destroy: () => {
@@ -407,6 +477,7 @@ export function createScrollRestoration(
       destroyed = true;
       unsubscribe();
       globalThis.removeEventListener("pagehide", onPageHide);
+      globalThis.removeEventListener("popstate", onPopState);
 
       try {
         history.scrollRestoration = prevScrollRestoration;

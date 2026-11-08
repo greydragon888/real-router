@@ -13,8 +13,9 @@
  *
  * - `createRouteAnnouncer`         — Safari-ready timeout + clear timeout +
  *                                    router subscription + announcer DOM node
- * - `createScrollRestoration`      — pagehide listener + router subscription +
- *                                    history.scrollRestoration flip
+ * - `createScrollRestoration`      — pagehide and popstate listeners + router
+ *                                    subscription + history.scrollRestoration
+ *                                    flip
  * - `createDirectionTracker`       — popstate listener + router subscribeLeave +
  *                                    four transition-lifecycle listeners +
  *                                    `<html>` dataset attribute. Needs a real
@@ -116,16 +117,40 @@ function createMockRouter(initial?: State): MockRouter {
 
 // =============================================================================
 // Global listener tracking — counts addEventListener / removeEventListener
-// pairs so create/destroy cycle invariants can assert "net zero" leaks.
+// calls, and keeps the registrations still attached: a removal detaches the
+// registration with its type, listener and capture flag, as in the DOM.
 // =============================================================================
+
+interface Registration {
+  type: string;
+  listener: EventListenerOrEventListenerObject;
+  capture: boolean;
+}
+
+function captureOf(options?: EventListenerOptions | boolean): boolean {
+  return typeof options === "boolean" ? options : (options?.capture ?? false);
+}
 
 function trackGlobalListeners(): {
   added: () => Map<string, number>;
   removed: () => Map<string, number>;
+  live: () => string[];
   restore: () => void;
 } {
   const addedMap = new Map<string, number>();
   const removedMap = new Map<string, number>();
+  const attached: Registration[] = [];
+  const indexOf = (
+    type: string,
+    listener: EventListenerOrEventListenerObject,
+    capture: boolean,
+  ): number =>
+    attached.findIndex(
+      (entry) =>
+        entry.type === type &&
+        entry.listener === listener &&
+        entry.capture === capture,
+    );
 
   const origAdd = globalThis.addEventListener.bind(globalThis);
   const origRemove = globalThis.removeEventListener.bind(globalThis);
@@ -135,7 +160,13 @@ function trackGlobalListeners(): {
     listener: EventListenerOrEventListenerObject,
     options?: AddEventListenerOptions | boolean,
   ) => {
+    const capture = captureOf(options);
+
     addedMap.set(type, (addedMap.get(type) ?? 0) + 1);
+
+    if (indexOf(type, listener, capture) === -1) {
+      attached.push({ type, listener, capture });
+    }
 
     origAdd(type, listener, options);
   }) as any;
@@ -145,7 +176,13 @@ function trackGlobalListeners(): {
     listener: EventListenerOrEventListenerObject,
     options?: EventListenerOptions | boolean,
   ) => {
+    const index = indexOf(type, listener, captureOf(options));
+
     removedMap.set(type, (removedMap.get(type) ?? 0) + 1);
+
+    if (index !== -1) {
+      attached.splice(index, 1);
+    }
 
     origRemove(type, listener, options);
   }) as any;
@@ -153,6 +190,7 @@ function trackGlobalListeners(): {
   return {
     added: () => addedMap,
     removed: () => removedMap,
+    live: () => attached.map((entry) => entry.type),
     restore: () => {
       globalThis.addEventListener = origAdd;
       globalThis.removeEventListener = origRemove;
@@ -254,7 +292,7 @@ describe("Lifecycle factories — destroy idempotency PBT (audit-2026-05-17 §6 
     );
 
     test.prop([arbCycleCount], { numRuns: NUM_RUNS.standard })(
-      "K create+destroy cycles leave router subscription and pagehide listener at zero",
+      "K create+destroy cycles leave the router subscription and every window listener at zero",
       (k) => {
         const mock = createMockRouter();
         const tracker = trackGlobalListeners();
@@ -263,14 +301,18 @@ describe("Lifecycle factories — destroy idempotency PBT (audit-2026-05-17 §6 
           for (let i = 0; i < k; i++) {
             const handle = createScrollRestoration(mock.router);
 
+            expect(mock.subscribeCount()).toBe(1);
+
             handle.destroy();
           }
 
-          const added = tracker.added().get("pagehide") ?? 0;
-          const removed = tracker.removed().get("pagehide") ?? 0;
+          const added = tracker.added();
 
-          expect(added).toBe(k);
-          expect(removed).toBe(k);
+          // The listeners the utility installs; without them the check below
+          // holds for a utility that listens to nothing.
+          expect(added.get("pagehide")).toBe(k);
+          expect(added.get("popstate")).toBe(k);
+          expect(tracker.live()).toStrictEqual([]);
           expect(mock.subscribeCount()).toBe(0);
         } finally {
           tracker.restore();

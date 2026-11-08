@@ -1137,24 +1137,23 @@ describe("createScrollRestoration (Angular dom-utils)", () => {
       expect(elementScrollToSpy).not.toHaveBeenCalled();
     });
 
-    it("instant container scroll stops re-applying once it sticks", () => {
+    it("instant container restore stops once the container can hold the position", () => {
       const element = document.createElement("div");
 
       element.id = "sticky-scroller";
-      let top = 0;
-
-      Object.defineProperty(element, "scrollTop", {
-        get: () => top,
-        set: (value: number) => {
-          top = value;
-        },
+      Object.defineProperty(element, "scrollHeight", {
+        value: 5000,
         configurable: true,
       });
-      const scrollToSpy = vi.fn((opts?: ScrollToOptions) => {
-        element.scrollTop = Math.min(opts?.top ?? 0, 5000 - 500);
+      Object.defineProperty(element, "clientHeight", {
+        value: 500,
+        configurable: true,
       });
+      // The position lands after the call: a container with CSS
+      // `scroll-behavior: smooth` animates an "auto" scroll too.
+      const scrollToSpy = vi.fn();
 
-      element.scrollTo = scrollToSpy as unknown as typeof element.scrollTo;
+      element.scrollTo = scrollToSpy;
 
       const fake = makeFakeRouter(makeState("home"));
       const sr = track(
@@ -1173,9 +1172,14 @@ describe("createScrollRestoration (Angular dom-utils)", () => {
         makeState("home"),
       );
 
-      expect(element.scrollTop).toBe(1200);
-      // Stuck on the first apply → no wasted re-applies across the frame budget.
+      // The container can hold 1200, so the first apply ends the loop before
+      // the position lands.
       expect(scrollToSpy).toHaveBeenCalledTimes(1);
+      expect(scrollToSpy).toHaveBeenLastCalledWith({
+        top: 1200,
+        left: 0,
+        behavior: "auto",
+      });
 
       sr.destroy();
     });

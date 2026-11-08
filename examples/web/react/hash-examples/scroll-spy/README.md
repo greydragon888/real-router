@@ -47,6 +47,7 @@ The example bundles **both** `@real-router/browser-plugin` and `@real-router/nav
 | Route without `[id]` anchors (`/about`) | Spy doesn't emit; previous hash preserved |
 | Invalid CSS selector | Spy enters `silenced` state, one `console.warn`, no emits |
 | Under `?plugin=browser` | Spy-emit `replace:true` → scroll-restoration skips (no magnetic snap) — foundation RFC §10.7 closure |
+| Back / Forward under `?plugin=browser` | Scroll returns to the position each page was left at |
 
 ## Recipes
 
@@ -99,6 +100,7 @@ The tests of [`e2e/scroll-spy.spec.ts`](e2e/scroll-spy.spec.ts):
 | 4 | `/article#nonexistent` → self-heals to topmost real anchor | §8.3 #4 |
 | 5 | TOC sidebar auto-highlight follows scroll | §8.3 #5 |
 | 11 | `?plugin=browser` — spy + scroll-restoration coexist (no magnetic snap) | Foundation RFC §10.7 |
+| 12 | `?plugin=browser` — Back and Forward return to the position each page was left at | — |
 | Bonus 6 | Invalid selector handling (silenced state) | RFC §7 |
 | Bonus 9 | `?spy=per-route` — per-route selector excludes `.no-spy` h2 on `/guide` | RFC §11 |
 | Bonus 10 | Route without `[id]` (`/about`) — no emits, hash preserved | RFC §7 |
@@ -110,10 +112,10 @@ The tests of [`e2e/scroll-spy.spec.ts`](e2e/scroll-spy.spec.ts):
 | Plugin | In example | Effect |
 | --- | --- | --- |
 | `navigation-plugin` | yes (default) | Provides `state.context.url` + `state.context.navigation` (rich direction/traverse) |
-| `browser-plugin` | yes (`?plugin=browser`) | Provides `state.context.url`; `state.transition.replace` is the only co-existence signal scroll-restoration honours (foundation RFC §10.7) |
+| `browser-plugin` | yes (`?plugin=browser`) | Provides `state.context.url` and `state.context.browser`; scroll-restoration takes a popstate (`state.context.browser.source`) for a step through history and skips the spy's `replace: true` emits (foundation RFC §10.7) |
 | `hash-plugin` | **NO** | `#` = path delimiter under hash-plugin → fundamentally incompatible. Spy warns once and no-ops. See `examples/web/react/hash-routing/` for hash-plugin URL strategy demo. |
 
-`browser-plugin` and `navigation-plugin` are **interchangeable** (not complementary) for scroll-spy. The example uses the query selector to switch between them at startup. The e2e suite runs under `navigation-plugin`, the default, except Scenario 11, which loads `?plugin=browser` because it validates the foundation RFC closure for browser-plugin's previous magnetic-snap behaviour.
+`browser-plugin` and `navigation-plugin` are **interchangeable** (not complementary) for scroll-spy. The example uses the query selector to switch between them at startup. The e2e suite runs under `navigation-plugin`, the default, except Scenarios 11 and 12, which load `?plugin=browser`: Scenario 11 validates the foundation RFC closure for browser-plugin's previous magnetic-snap behaviour, Scenario 12 that Back and Forward restore the scroll under browser-plugin.
 
 ## Implementation notes
 

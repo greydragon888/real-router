@@ -1651,6 +1651,7 @@ const LEDGER: Readonly<Record<string, Readonly<Record<string, string>>>> = {
     "createScrollRestoration › read:transition": NO,
     "createScrollRestoration › sign:subscribe": NO,
     "createScrollRestoration › slot:destroyed": NO,
+    "createScrollRestoration › slot:landedOnNewEntry": NO,
     "createScrollRestoration › slot:restoreToken": NO,
     "createScrollRestoration › slot:scrollSettled": NO,
     "createScrollRestoration › slot:store": NO,
