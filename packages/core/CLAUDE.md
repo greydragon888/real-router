@@ -569,10 +569,12 @@ query values while an intent keeps whatever the caller passed, so a strict
 comparison would report two states on the SAME location as unequal.
 `areParamValuesEqual` treats values as equal when they print into the same URL:
 `string` / `number` / `boolean` by printed form, arrays element-wise, and a
-singleton array against a bare scalar. `null`, `undefined` and objects stay strict
-— they print differently, so tolerating them would equate different URLs. Storage
-is untouched; comparison is the single place that knows both domains describe one
-location.
+singleton array against a bare scalar. `null` and `undefined` stay strict — they
+print differently, so tolerating them would equate different URLs. Two objects
+compare by the key `objectComparisonKey` gives each, by identity when it gives
+none, and an object never equals a scalar (#2905); its docblock in `helpers.ts`
+owns the key. Storage is untouched; comparison is the single place that knows
+both domains describe one location.
 
 ### Hook Execution Order
 

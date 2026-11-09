@@ -1,6 +1,10 @@
 // packages/core/src/transitionPath.ts
 
-import { areParamValuesEqual } from "./helpers";
+import {
+  areParamValuesEqual,
+  isObjectValue,
+  objectComparisonKey,
+} from "./helpers";
 
 import type { State } from "./types";
 
@@ -90,24 +94,23 @@ function nameToIDsGeneral(name: string): string[] {
   return ids;
 }
 
-/** A non-null object. Arrays never reach it: the walk below takes them first. */
-function isObjectValue(value: unknown): boolean {
-  return typeof value === "object" && value !== null;
-}
-
 /**
  * Whether one param value leaves its segment unchanged.
  *
  * The rule is `areParamValuesEqual`'s — the same value in another form,
- * `2 ≡ "2"` or `["a"] ≡ "a"`, is no change — with one exception: two objects
- * count as unchanged. That rule compares objects by identity, and a codec or a
- * search schema can hand back a fresh object for an unchanged value on every
- * navigation. Arrays are walked here rather than handed to it, so the exception
- * reaches their elements.
+ * `2 ≡ "2"` or `["a"] ≡ "a"`, is no change, and two objects compare by
+ * `objectComparisonKey` (#2905) — with one exception: two objects with no key
+ * count as unchanged, where that rule compares them by identity, because a
+ * codec or a search schema can hand back a fresh object for an unchanged value
+ * on every navigation. Arrays are walked here rather than handed to it, so the
+ * exception reaches their elements.
  *
- * ⚠ A changed object is therefore not seen either: a navigation that changes
- * only a `Date` a segment declares, bare or inside an array that keeps its
- * length, re-enters nothing.
+ * ⚠ A changed object with no key is therefore not seen: a navigation that
+ * changes only such a value re-enters nothing.
+ *
+ * ⚠ A value the URL does not print still counts (#2894): `[]` against an
+ * absent key, or `null` against it under `nullFormat: "hidden"`, re-enters the
+ * segment though both states print one URL.
  */
 function isSameSegmentValue(toVal: unknown, fromVal: unknown): boolean {
   // One value on both sides is not walked: an array that contains itself would
@@ -120,10 +123,9 @@ function isSameSegmentValue(toVal: unknown, fromVal: unknown): boolean {
   const fromIsList = Array.isArray(fromVal);
 
   if (!toIsList && !fromIsList) {
-    return (
-      (isObjectValue(toVal) && isObjectValue(fromVal)) ||
-      areParamValuesEqual(toVal, fromVal)
-    );
+    return isObjectValue(toVal) && isObjectValue(fromVal)
+      ? objectComparisonKey(toVal) === objectComparisonKey(fromVal)
+      : areParamValuesEqual(toVal, fromVal);
   }
 
   // A bare value counts as a one-element array, as in `areParamValuesEqual`.

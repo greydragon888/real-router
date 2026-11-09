@@ -133,7 +133,38 @@ const QUERY_VALUES: readonly (SearchParamValue | undefined)[] = [
   ["x", "y"],
 ];
 
-const arbQueryValue = fc.constantFrom(...QUERY_VALUES);
+/** A value class with a `toString` of its own, the shape of `Temporal.PlainDate`. */
+class Label {
+  constructor(readonly text: string) {}
+
+  toString(): string {
+    return this.text;
+  }
+}
+
+/** A fresh `Date` at UTC midnight of a January 2024 day. */
+const dayAt = (date: number): SearchParamValue =>
+  new Date(Date.UTC(2024, 0, date)) as unknown as SearchParamValue;
+
+/** A fresh `Label`, whose text no value of `QUERY_VALUES` prints. */
+const labelOf = (text: string): SearchParamValue =>
+  new Label(text) as unknown as SearchParamValue;
+
+/**
+ * An object value, built FRESH on every draw, as a codec or a search schema
+ * hands one back (#2905). The query string prints it with `String()`, so these
+ * two kinds print exactly by the key they compare by: a `Date` at a whole
+ * second, an object with a `toString` of its own.
+ */
+const arbObjectValue = fc.oneof(
+  fc.constantFrom(1, 2).map((date) => dayAt(date)),
+  fc.constantFrom("p", "q").map((text) => labelOf(text)),
+);
+
+const arbQueryValue = fc.oneof(
+  { arbitrary: fc.constantFrom(...QUERY_VALUES), weight: 5 },
+  { arbitrary: arbObjectValue, weight: 2 },
+);
 
 /** Independent model of a value's printed form; `undefined` prints nothing. */
 function printed(value: SearchParamValue | undefined): string | undefined {
@@ -215,6 +246,23 @@ describe("navigate() → transition.segments Properties", () => {
     );
   });
 
+  it("the object domain prints by its key, apart from every scalar form (#2905)", () => {
+    const objects = [dayAt(1), dayAt(2), labelOf("p"), labelOf("q")];
+    const scalarForms = new Set(QUERY_VALUES.map((value) => printed(value)));
+
+    // A fresh copy prints the same, and the four print four ways.
+    expect(printed(dayAt(1))).toBe(printed(dayAt(1)));
+    expect(printed(labelOf("p"))).toBe(printed(labelOf("p")));
+    expect(new Set(objects.map((value) => printed(value))).size).toBe(4);
+    // An object never equals a scalar, so none may print like one.
+    expect(
+      objects.filter((value) => scalarForms.has(printed(value))),
+    ).toStrictEqual([]);
+    expect(
+      fc.sample(arbObjectValue, 20).every((v) => typeof v === "object"),
+    ).toBe(true);
+  });
+
   test.prop(
     [
       fc.record({ pid: arbPid, pq: arbQueryValue, cq: arbQueryValue }),
@@ -241,6 +289,23 @@ describe("navigate() → transition.segments Properties", () => {
           { pid: "3", pq: undefined, cq: "x" },
           { pid: "3", pq: "undefined", cq: "x" },
           "parent.childA",
+        ],
+        // A fresh Date of the same day on the parent while the leaf changes,
+        // a Date that moves a day, and an object whose own toString changes.
+        [
+          { pid: "1", pq: dayAt(1), cq: "x" },
+          { pid: "1", pq: dayAt(1), cq: "y" },
+          "parent.childA",
+        ],
+        [
+          { pid: "2", pq: dayAt(1), cq: "x" },
+          { pid: "2", pq: dayAt(2), cq: "x" },
+          "parent.childA",
+        ],
+        [
+          { pid: "3", pq: labelOf("p"), cq: "x" },
+          { pid: "3", pq: labelOf("q"), cq: "x" },
+          "parent.childB",
         ],
       ],
     },

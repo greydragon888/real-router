@@ -309,6 +309,7 @@
       "868106217fed",
       "f257fc577182",
       "de56b8058ff6",
+      "fece9307cae8",
       "575d43afc75e",
       "e8b39fab8afd",
       "57aa710640f1",
@@ -895,7 +896,8 @@
     "packages/core/src/transitionPath.ts": [
       "1a9864dfed80",
       "d7294177f708",
-      "4689d3ae873a",
+      "e02a6ac48d6d",
+      "ff9377ffd77a",
       "c8d3e1326959"
     ],
     "packages/core/src/types/api.ts": [
@@ -1304,9 +1306,13 @@
     ],
     "packages/validation-plugin/src/validators/state.ts": [
       "acf9cb3e010e",
-      "4d0b1530e365",
       "b0353174b759",
-      "be3fcc821f2c",
+      "d83409f77456",
+      "d29f0a6fefc6",
+      "400b437ffb59",
+      "638aae652969",
+      "a58b35fe436e",
+      "550b2f553a6b",
       "1f47bfd6857f"
     ],
     "packages/vue/src/composables/useRouteEnter.ts": [
@@ -2194,7 +2200,7 @@
       "3400cc879023",
       "12e61264c5e2",
       "4319712a7f6e",
-      "d192ef89b892",
+      "6cbab15f70ad",
       "c460d0800c1d",
       "651b745cc19a",
       "e623c09d4aac",

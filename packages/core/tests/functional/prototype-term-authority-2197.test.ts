@@ -242,6 +242,11 @@ describe("every prototype judgement uses one of the two decided terms (#2197)", 
         constructorTerm: 0,
       },
       {
+        file: "packages/sources/src/canonicalJson.ts",
+        identity: 1,
+        constructorTerm: 0,
+      },
+      {
         file: "packages/validation-plugin/src/type-guards/guards/params.ts",
         identity: 2,
         constructorTerm: 0,

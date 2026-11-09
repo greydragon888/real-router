@@ -1,4 +1,5 @@
 import { fc, test } from "@fast-check/vitest";
+import { areParamValuesEqual } from "@real-router/core/validation";
 import { describe, expect } from "vitest";
 
 import { canonicalJson } from "../../src/canonicalJson.js";
@@ -56,13 +57,33 @@ function shuffleKeysDeep(value: unknown): unknown {
   return value;
 }
 
+/** The bag with its own keys reversed and every value left as it was. */
+function reverseRootKeys(
+  record: Record<string, unknown>,
+): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(record).toReversed());
+}
+
 describe("canonicalJson — invariants", () => {
   test.prop([arbJsonRecord], { numRuns: PURE_RUNS })(
-    "key-order invariance: canonicalJson(x) === canonicalJson(reorder(x))",
+    "key-order invariance at the root: canonicalJson(x) === canonicalJson(reorder(x))",
     (record) => {
-      const reordered = shuffleKeysDeep(record);
+      expect(canonicalJson(record)).toBe(
+        canonicalJson(reverseRootKeys(record)),
+      );
+    },
+  );
 
-      expect(canonicalJson(record)).toBe(canonicalJson(reordered));
+  test.prop([arbJsonRecord], { numRuns: PURE_RUNS })(
+    "a value's own key order is part of the key, as JSON.stringify spells it for core (#2905)",
+    (record) => {
+      const value = shuffleKeysDeep(record);
+
+      fc.pre(JSON.stringify(value) !== JSON.stringify(record));
+
+      expect(canonicalJson({ v: value })).not.toBe(
+        canonicalJson({ v: record }),
+      );
     },
   );
 
@@ -126,19 +147,110 @@ describe("canonicalJson — invariants", () => {
 // Audit §2 / §6 (HIGH gaps) — throw-contract, locale-independence, edge cases.
 // =============================================================================
 
+/** A value class that keeps its state in a `#private` field. */
+class Slug {
+  readonly #text: string;
+
+  constructor(text: string) {
+    this.#text = text;
+  }
+
+  toString(): string {
+    return this.#text;
+  }
+}
+
+/** A value class whose state is an own field, printed by its own `toString`. */
+class Day {
+  constructor(readonly iso: string) {}
+
+  toString(): string {
+    return this.iso;
+  }
+}
+
+/** A value class whose state is an own field, with no `toString` of its own. */
+class Box {
+  constructor(readonly value: string) {}
+}
+
+/** Two times, so that a `Date` and an ISO string of either are often drawn together. */
+const arbTime = fc.constantFrom(0, 86_400_000);
+
+/**
+ * Values a codec decodes, drawn from small sets so that two draws often share
+ * a cache key. A class instance and a plain object of the same fields are both
+ * drawn, as are two instances of a class core compares by identity, a `Date`
+ * beside its ISO string, as a value, in an array and in a plain object, two
+ * plain objects with their keys in another order, `null` beside NaN or
+ * ±Infinity, and a plain object holding a field JSON drops.
+ */
+const arbDecodedValue: fc.Arbitrary<unknown> = fc.oneof(
+  fc.constantFrom("a", "b", "1"),
+  fc.constantFrom(1, 2),
+  fc.boolean(),
+  arbTime.map((time) => new Date(time)),
+  arbTime.map((time) => new Date(time).toISOString()),
+  arbTime.map((time) => [new Date(time)]),
+  arbTime.map((time) => [new Date(time).toISOString()]),
+  arbTime.map((time) => ({ at: new Date(time) })),
+  arbTime.map((time) => ({ at: new Date(time).toISOString() })),
+  fc.constantFrom("a", "b").map((k) => ({ k })),
+  fc.constantFrom({ a: 1, b: 2 }, { b: 2, a: 1 }).map((pair) => ({ ...pair })),
+  fc.constantFrom(null, Number.NaN, Infinity, -Infinity),
+  fc.constantFrom(null, Number.NaN).map((x) => ({ x })),
+  fc.constantFrom({ k: "a" }, { k: "a", f: () => 1 }).map((k) => ({ ...k })),
+  fc.constantFrom("2024-03-15", "2024-03-16").map((iso) => new Day(iso)),
+  fc.constantFrom("2024-03-15", "2024-03-16").map((iso) => ({ iso })),
+  fc.constantFrom("a", "b").map((value) => new Box(value)),
+  fc
+    .constantFrom("2024-03-15", "2024-03-16")
+    .map((iso) => Temporal.PlainDate.from(iso)),
+  fc.constantFrom("a", "b").map((text) => new Slug(text)),
+);
+
+/** The cache key of one value, or `undefined` when the key refuses it. */
+function keyOf(value: unknown): string | undefined {
+  try {
+    return canonicalJson({ v: value });
+  } catch {
+    return undefined;
+  }
+}
+
+describe("canonicalJson — a cache key two values share (#2905)", () => {
+  test.prop([arbDecodedValue, arbDecodedValue], { numRuns: PURE_RUNS })(
+    "two values that share a cache key are two values core compares equal",
+    (left, right) => {
+      const key = keyOf(left);
+
+      fc.pre(key !== undefined && key === keyOf(right));
+
+      expect(areParamValuesEqual(left, right)).toBe(true);
+    },
+  );
+});
+
 describe("canonicalJson — throw-contract (audit §6 HIGH)", () => {
   // One arbitrary per throw-class. `fc.constantFrom` of factory closures ensures
-  // each shrunken counter-example produces a fresh instance.
+  // each shrunken counter-example produces a fresh instance. The last five are
+  // class instances core compares by their `toString` or by identity, two of
+  // them with own fields JSON would spell (#2905).
   const arbDisallowedBuiltin: fc.Arbitrary<unknown> = fc.constantFrom(
     () => new Map([["k", "v"]]),
     () => new Set([1, 2]),
     () => new WeakMap(),
     () => new WeakSet(),
     () => /pattern/,
+    () => Temporal.PlainDate.from("2024-03-15"),
+    () => new URL("https://example.test/a"),
+    () => new Slug("a"),
+    () => new Day("2024-03-15"),
+    () => new Box("a"),
   );
 
   test.prop([arbDisallowedBuiltin], { numRuns: PURE_RUNS })(
-    "Map / Set / WeakMap / WeakSet / RegExp at top level → TypeError",
+    "an object other than a plain one, an array or a Date, at top level → TypeError",
     (factory) => {
       const value = (factory as () => unknown)();
 
@@ -149,7 +261,7 @@ describe("canonicalJson — throw-contract (audit §6 HIGH)", () => {
   test.prop([arbDisallowedBuiltin, fc.string({ minLength: 1, maxLength: 4 })], {
     numRuns: PURE_RUNS,
   })(
-    "Map / Set / WeakMap / WeakSet / RegExp nested at depth ≥ 2 → TypeError",
+    "an object other than a plain one, an array or a Date, nested at depth ≥ 2 → TypeError",
     (factory, key) => {
       const value = (factory as () => unknown)();
       const wrapped = { outer: { [key]: value } };
@@ -230,9 +342,9 @@ describe("canonicalJson — DAG vs cycle (audit §6)", () => {
 
       expect(() => canonicalJson(arr)).not.toThrow();
       // Each slot is independently serialised — the result must not collapse
-      // to a single element.
+      // to a single element. An element is a value, spelled as JSON spells it.
       expect(canonicalJson(arr)).toBe(
-        `[${Array.from({ length: n }, () => canonicalJson(shared)).join(",")}]`,
+        `[${Array.from({ length: n }, () => JSON.stringify(shared)).join(",")}]`,
       );
     },
   );
@@ -356,19 +468,13 @@ describe("canonicalJson — edge JSON values pin (audit §6 MEDIUM)", () => {
     ],
     { numRuns: PURE_RUNS },
   )(
-    "NaN / ±Infinity collapse to `null` — `{x:a}` and `{x:b}` share the same canonical form for any two such values",
+    "NaN / ±Infinity throw as a value, in an array and in a field, rather than collapse to `null` (#2905)",
     (a, b) => {
-      expect(canonicalJson({ x: a })).toBe(canonicalJson({ x: b }));
-      expect(canonicalJson({ x: a })).toBe('{"x":null}');
+      expect(() => canonicalJson({ x: a })).toThrow(TypeError);
+      expect(() => canonicalJson({ x: [b] })).toThrow(TypeError);
+      expect(() => canonicalJson({ x: { y: a } })).toThrow(TypeError);
     },
   );
-
-  test("NaN and Infinity collide with explicit `null` value", () => {
-    expect(canonicalJson({ x: Number.NaN })).toBe(canonicalJson({ x: null }));
-    expect(canonicalJson({ x: Number.POSITIVE_INFINITY })).toBe(
-      canonicalJson({ x: null }),
-    );
-  });
 
   test("-0 collides with +0 (JSON.stringify drops the sign)", () => {
     expect(canonicalJson({ x: -0 })).toBe(canonicalJson({ x: 0 }));
@@ -376,10 +482,10 @@ describe("canonicalJson — edge JSON values pin (audit §6 MEDIUM)", () => {
     expect(canonicalJson([-0, 0])).toBe("[0,0]");
   });
 
-  test('top-level NaN / Infinity serialize to the string "null" (JSON.stringify semantics)', () => {
-    expect(canonicalJson(Number.NaN)).toBe("null");
-    expect(canonicalJson(Number.POSITIVE_INFINITY)).toBe("null");
-    expect(canonicalJson(Number.NEGATIVE_INFINITY)).toBe("null");
+  test("top-level NaN / Infinity throw too (#2905)", () => {
+    expect(() => canonicalJson(Number.NaN)).toThrow(TypeError);
+    expect(() => canonicalJson(Number.POSITIVE_INFINITY)).toThrow(TypeError);
+    expect(() => canonicalJson(Number.NEGATIVE_INFINITY)).toThrow(TypeError);
   });
 });
 

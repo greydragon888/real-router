@@ -24,6 +24,10 @@
 // iterator, a conversion (`String(x)`, a template, `toJSON`), a getter read by
 // a property access.
 //
+// ⚠ A protocol call is seen through the property access that names it: an
+// invoker captured into a binding (`const apply = Reflect.apply`) and called
+// through it is out of reach.
+//
 // ⚠ A platform `abort()` dispatches listeners of its own;
 // `abort-dispatch-authority-2778.test.ts` holds those.
 
@@ -1560,6 +1564,10 @@ const OWN_PROTOCOL = new Map([
     "`Array.prototype.slice` called on a bag",
   ],
   [
+    "helpers.ts › timeKey › then:call",
+    "`Date.prototype.getTime` called on a value",
+  ],
+  [
     `${EBN} › settleLeavePromises › then:then`,
     "the promise `Promise.allSettled` returns",
   ],
@@ -1628,6 +1636,7 @@ const INHERITS = "inherits";
 const BOOT_RESTART = "unsupported:boot-restart";
 const VALIDATOR = "unsupported:third-party-validator";
 const LOGGER_MEMBER = "unsupported:replaced-logger-member";
+const VALUE_KEY = "unsupported:navigating-value-key";
 
 /**
  * The verdict of every place.
@@ -1667,6 +1676,7 @@ const PLACES = new Map([
   ],
   [`${EBN} › emitTreeChanged › emit:TREE_CHANGED`, INHERITS],
   [`${EBN} › settleLeavePromises › then:Promise.allSettled`, SUPERSESSION],
+  ["helpers.ts › objectComparisonKey › then:Reflect.apply", VALUE_KEY],
   [
     `internals.ts › executeInterceptorChain › call:${short(T_INTERCEPTORS)}`,
     BOOT_RESTART,
@@ -1730,6 +1740,10 @@ const UNSUPPORTED = new Map([
   [
     LOGGER_MEMBER,
     "a member replaced on `getInternals(router).logger` runs at every logging call: the slot is deliberately bare (#2303)",
+  ],
+  [
+    VALUE_KEY,
+    "a param value whose own `toString` navigates: its key is read wherever two values compare, the transition path among them (#2905)",
   ],
 ]);
 

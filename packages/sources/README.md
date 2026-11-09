@@ -104,7 +104,7 @@ const source = createActiveRouteSource(router, "users", undefined, undefined, {
 | `ignoreQueryParams` | `boolean`   | `true`        | Whether to drop query-string params before comparing.                                                                                                                                                                                                          |
 | `hash`              | `string`    | `undefined`   | When set, source is active iff route matches **and** `state.context.url.hash` equals this value. Requires a URL-publishing plugin (browser/navigation); under hash-plugin or memory-plugin (no `context.url` namespace), a **non-empty** hash is always `false`, while `hash: ""` still matches an active route (the missing namespace reads as "no fragment", #532). |
 
-`params` and `search` are each hashed with `canonicalJson()`, so `{a: 1, b: 2}` and `{b: 2, a: 1}` hit the same cache entry. `BigInt`/circular refs fall back to a fresh non-cached source with a working `destroy()` — call it to release the router subscription.
+`params` and `search` are each keyed with `canonicalJson()`, which spells a value as `@real-router/core` compares it. The bag's own keys are sorted, so `{a: 1, b: 2}` and `{b: 2, a: 1}` hit the same cache entry; a plain object inside the bag keeps its key order, and a `Date` is keyed by its time. A value it cannot spell that way — a `BigInt` or a cycle, a function, `NaN`, a class instance, among others the `canonicalJson` docblock lists — falls back to a fresh non-cached source with a working `destroy()`: call it to release the router subscription.
 
 ## Usage Examples
 

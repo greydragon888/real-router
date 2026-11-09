@@ -624,7 +624,7 @@ All **source** caches live inside `@real-router/sources`. The adapter keeps two 
 | `useRouteNodeStore(name)` | cached `createRouteNodeSource(router, nodeName)`                                                                                                                                                                                   |
 | `useRouterTransition()`   | cached `getTransitionSource(router)`                                                                                                                                                                                               |
 | `RouterErrorBoundary`     | cached `createDismissableError(router)` — shared error source with integrated dismissal state                                                                                                                                      |
-| Link (slow path)          | cached `createActiveRouteSource(router, name, params, search, opts)` — params/search hashed via `canonicalJson` (key-order-insensitive)                                                                                             |
+| Link (slow path)          | cached `createActiveRouteSource(router, name, params, search, opts)` — params/search hashed via `canonicalJson` (the bag's key order ignored)                                                                                             |
 
 > **`useRoute()` vs `useRouteStore()` sharing.** `useRoute()` is shared
 > per-`RouterProvider`: the Provider builds one `createRouteSource` and hands the
@@ -665,7 +665,7 @@ See also: [Solid Integration — Server-Side Rendering](https://github.com/greyd
 
 - `useRouteNode` uses cached `createRouteNodeSource` from `@real-router/sources` — one router subscription per `(router, nodeName)` shared across all consumers
 - No `memo()` needed — Solid components run once, signals handle granular updates
-- No params stabilization needed — `createActiveRouteSource` hashes params via `canonicalJson` (key-order-insensitive)
+- No params stabilization needed — `createActiveRouteSource` hashes params via `canonicalJson` (the bag's key order ignored)
 - `Link` uses `createSelector` from `RouterProvider` for O(1) active route detection (only 2 links update per navigation instead of n). Falls back to cached per-(router, key) `createActiveRouteSource` under the slow-path conditions listed in "Link Props Are Captured at Init (Slow Path)".
 - Source caches live in `@real-router/sources` and are auto-evicted on router GC; the adapter's own caches are `useRouteUtils`'s per-router `WeakMap` (also released with the router) and `RouteView`'s module-scoped candidate `Map` (bounded by the number of route names)
 - `EMPTY_PARAMS` and `EMPTY_OPTIONS` frozen singletons avoid allocation for default props

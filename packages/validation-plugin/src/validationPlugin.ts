@@ -98,6 +98,7 @@ import {
 
 import type { EventName, EventMethodMap } from "./validators/eventBus";
 import type { RouteLookup } from "./validators/forwardTo";
+import type { ReloadPath } from "./validators/state";
 import type {
   DefaultDependencies,
   PluginApi,
@@ -216,6 +217,7 @@ function buildValidatorObject(
   api: PluginApi,
   lookup: RouteLookup,
   defaultsWatch: DefaultsMutationWatch,
+  reloadPath: ReloadPath,
 ): RouterValidator {
   // One de-dup cache per validator object, i.e. per registration, i.e. per router
   // (#1583) — the same lifetime the mode gate's reporters get, for the same
@@ -377,7 +379,11 @@ function buildValidatorObject(
       // fired for request #1 and never again.
       reportDroppedQueryKey: createDroppedQueryKeyReporter(),
       reportUndeclaredParamKey: createUndeclaredParamKeyReporter(),
-      reportCodecRoundTrip: createCodecRoundTripReporter(api.logger),
+      reportCodecRoundTrip: createCodecRoundTripReporter(
+        api.logger,
+        reloadPath,
+        api.forwardState,
+      ),
       validateAreStatesEqualArgs(s1, s2, ignoreQP) {
         if (!isState(s1)) {
           throw atAreStatesEqual.type`Invalid state1: ${getTypeDescription(s1)}. Expected State object.`;
@@ -474,6 +480,14 @@ export function validationPlugin<
     // this line already has a baseline to compare against.
     defaultsWatch.watch(api.getAdoptedOrigins());
 
+    // The codec diagnostic's reload (#2905) does not rebuild the path: the
+    // rebuild runs `encodeParams` over what the reload decoded, and an encoder
+    // that cannot print it would throw away the reload the diagnostic judges.
+    // `PluginApi.matchPath` takes the router's options, so the reload is asked
+    // of the internals.
+    const reloadPath: ReloadPath = (path) =>
+      ctx.matchPath(path, { ...api.getOptions(), rewritePathOnMatch: false });
+
     // ⚑ The object is held so teardown can prove it is still the holder.
     // The slot has no owner — `RouterInternals.validator` is plain data on a
     // surface pinned `accessorNames === []`, so a second writer cannot be
@@ -485,7 +499,12 @@ export function validationPlugin<
     // write and on release (#2059 / #1929) — here only the release half is
     // reachable, and the write half waits for the slot to go away.
     const lookup = createRouteLookup(api);
-    const ownValidator = buildValidatorObject(api, lookup, defaultsWatch);
+    const ownValidator = buildValidatorObject(
+      api,
+      lookup,
+      defaultsWatch,
+      reloadPath,
+    );
     // One branch, shared by the error path below and by `teardown`: both ask
     // the same question, so they share the site rather than each growing an
     // arm the other's test has to reach.

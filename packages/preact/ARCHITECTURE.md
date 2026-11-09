@@ -180,7 +180,7 @@ RouterErrorBoundary
 | Optimization                     | Location                                 | Mechanism                                                                                   |
 | -------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------- |
 | Node-scoped subscriptions        | `useRouteNode`                           | Cached `createRouteNodeSource(router, nodeName)` — N consumers share one router subscription |
-| Canonical params cache           | `useIsActiveRoute`                       | `createActiveRouteSource` hashes params via `canonicalJson` — key-order-insensitive          |
+| Canonical params cache           | `useIsActiveRoute`                       | `createActiveRouteSource` hashes params via `canonicalJson` — the bag's key order ignored          |
 | Shared transition/error sources  | `useRouterTransition`, `RouterErrorBoundary` | `getTransitionSource` / `createDismissableError` — one eager router subscription per router |
 | Custom memo comparator           | `Link`                                   | `areLinkPropsEqual`: `shallowEqual` for params/options, `===` for primitives                 |
 | Frozen singletons                | `constants.ts`                           | `EMPTY_PARAMS`, `EMPTY_OPTIONS` avoid allocation for default props                           |

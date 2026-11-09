@@ -169,7 +169,7 @@ All caches live inside `@real-router/sources` — no local WeakMaps in this adap
 | `useRouteNodeStore(name)` | `createRouteNodeSource(router, nodeName)`              | `(router, nodeName)`                                             |
 | `useRouterTransition()`   | `getTransitionSource(router)`                          | `(router)`                                                       |
 | `RouterErrorBoundary`     | `createDismissableError(router)`                       | `(router)` — integrated dismissal state                          |
-| Link (slow path)          | `createActiveRouteSource(router, name, params, search, opts)`  | `(router, name, canonicalJson(params), canonicalJson(search), strict, ignoreQueryParams)` — key-order-insensitive |
+| Link (slow path)          | `createActiveRouteSource(router, name, params, search, opts)`  | `(router, name, canonicalJson(params), canonicalJson(search), strict, ignoreQueryParams)` — the bag's key order ignored |
 
 Routers are WeakMap keys, so per-router state is released automatically when the router is GC'd — no explicit teardown needed. Lazy sources disconnect from the router when their last listener unsubscribes; upon re-subscription, they reconcile their snapshot so signals never observe stale values (enforced by `createSignalFromSource` re-reading `getSnapshot()` after subscribe).
 

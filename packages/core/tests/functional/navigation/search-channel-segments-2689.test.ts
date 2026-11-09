@@ -244,6 +244,20 @@ const FORM_ONLY_CHANGES: [string, string, SearchParams, SearchParams][] = [
   ],
 ];
 
+/**
+ * The parent's query param appears as a value the URL does not print, beside a
+ * change of the leaf's: the parent re-enters, though its piece of the URL stays
+ * the same (#2894). Columns: the router options, the target `search`.
+ */
+const UNPRINTED_PRESENCE: [string, Partial<Options>, SearchParams][] = [
+  ["an empty array against an absent key", {}, { tags: [], page: "2" }],
+  [
+    "null against an absent key under nullFormat hidden",
+    { queryParams: { nullFormat: "hidden" } },
+    { status: null, page: "2" },
+  ],
+];
+
 /** `range` from one navigation, then from the next: fresh objects, same days. */
 const OBJECT_FORM_ONLY: [string, SearchParamValue, SearchParamValue][] = [
   ["an array of objects against a fresh copy", dates(1, 2), dates(1, 2)],
@@ -291,6 +305,7 @@ describe("a segment's query params are part of its identity (#2689)", () => {
   it("registers every row of its tables", () => {
     expect(PRESENCE_CHANGES).toHaveLength(8);
     expect(FORM_ONLY_CHANGES).toHaveLength(2);
+    expect(UNPRINTED_PRESENCE).toHaveLength(2);
     expect(OBJECT_FORM_ONLY).toHaveLength(3);
     expect(OBJECT_LENGTH_CHANGES).toHaveLength(2);
     expect(QUERY_PARAMS_MODES).toHaveLength(3);
@@ -332,6 +347,34 @@ describe("a segment's query params are part of its identity (#2689)", () => {
         "activate orders.list",
       ]);
     });
+
+    it.each(UNPRINTED_PRESENCE)(
+      "re-enters the parent for a value of its query param the URL does not print: %s",
+      async (_, options, target) => {
+        // Control: the same options and URL without the key re-enter the leaf.
+        const [control] = await startAt(
+          "/orders/list?page=1",
+          ordersTree(),
+          options,
+        );
+        const without = await control.navigate(
+          "orders.list",
+          {},
+          { page: "2" },
+        );
+
+        expect(segmentsOf(without)).toStrictEqual(LEAF_ONLY);
+
+        control.dispose();
+
+        const [r] = await startAt("/orders/list?page=1", ordersTree(), options);
+
+        const to = await r.navigate("orders.list", {}, target);
+
+        expect(to.path).toBe(without.path);
+        expect(segmentsOf(to)).toStrictEqual(PARENT_AND_LEAF);
+      },
+    );
 
     it("asks the guard of the segment that owns the changed key, so a change it refuses is refused", async () => {
       const [r] = await startAt("/orders/list?status=new&page=2", ordersTree());
@@ -460,7 +503,7 @@ describe("a segment's query params are part of its identity (#2689)", () => {
       const [r] = await startAt("/orders/list?page=1", ordersTree());
 
       // A codec or a search schema can hand back a fresh object for a value
-      // that did not change, so two objects are not compared at all.
+      // that did not change: two `Date`s of one instant share a key (#2905).
       const first = await r.navigate(
         "orders.list",
         {},
