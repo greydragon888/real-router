@@ -12,42 +12,36 @@
  * (#1798), which is the doctrine's own caveat and travels with it.
  */
 const objectKeys = Object.keys;
+const getPrototypeOf = Object.getPrototypeOf;
+const dateGetTime = Date.prototype.getTime;
 
 /** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
 const objectCreate = Object.create;
 
 /**
- * Serializes a value into a stable JSON string — object keys are sorted at
- * every level so that `{ a: 1, b: 2 }` and `{ b: 2, a: 1 }` produce the same
- * output.
+ * Serializes a params or search bag into a stable cache key: the bag's own keys
+ * are sorted, so `{ a: 1, b: 2 }` and `{ b: 2, a: 1 }` produce the same output.
  *
- * Used as a cache key for `createActiveRouteSource` so that equivalent params
- * objects share the same cached source regardless of key order.
- *
- * **Divergence from `shared/dom-utils/scroll-restore.canonicalJson` — by
- * design.** That sibling implementation is the cheap navigation-hot-path
- * variant (uses `localeCompare`, plain-object accumulator, native cycle
- * detector) and pairs with `safeKeyOf` for crash-tolerance. This one is the
- * strict cache-key variant: byte-order compare, prototype-less accumulator,
- * bespoke cycle detection — eagerly throws on inputs that would cause
- * collisions or pollution, so callers can fall back to non-cached sources.
- * They are NOT interchangeable; cross-package equivalence is explicitly not
- * a goal (audit-2 / audit-2026-05-17 §2).
+ * Used as a cache key for `createActiveRouteSource`, so two bags share a
+ * cached source only when `@real-router/core` compares them equal: each value
+ * is spelled as core compares it (#2905).
  *
  * Edge cases:
- * - Arrays preserve order (canonical: index-ordered already).
+ * - A plain object inside the bag keeps its own key order: core compares it by
+ *   `JSON.stringify`, which spells `{ a, b }` and `{ b, a }` apart.
+ * - An array is read by index, as core compares it, and keeps its order.
  * - `undefined` values are dropped (standard JSON behaviour).
- * - `Date` is serialized via its `toJSON` method (ISO string). **Collision
- *   caveat:** `{ d: new Date(0) }` and `{ d: "1970-01-01T00:00:00.000Z" }`
- *   produce the **same** cache key (both reduce to the ISO string), so the two
- *   inputs share one cached source. Harmless in practice — `Date` params are
- *   exotic and `isActiveRoute` stringifies them identically post-encoding.
- * - `Symbol` becomes `undefined` (standard JSON behaviour).
+ * - A `Date` that is a value, or an element of an array value, is spelled by
+ *   its `getTime()`, apart from every string, because core never equates a
+ *   `Date` with a string there. Inside a plain object it is its `toJSON` ISO
+ *   string, as `JSON.stringify` spells it for core.
+ * - A function, a symbol, a number that is not finite, and `undefined` in an
+ *   array value throw: JSON drops them or spells them `null`.
  * - `BigInt` throws via `JSON.stringify` defaults.
- * - `Map`, `Set`, `RegExp`, `WeakMap`, `WeakSet` would silently collapse to
- *   `"{}"` (no enumerable own keys), which would cause **different inputs to
- *   share the same cache key**. We detect these explicitly and throw — callers
- *   then take the non-cached fallback path (same behaviour as `BigInt`).
+ * - Any other object that is not a plain one or an array throws: a `Map`, a
+ *   `Set`, a `RegExp`, a class instance, a `Temporal` value, a `URL`. JSON would
+ *   spell it by its own enumerable fields, or as `"{}"`, while core compares it
+ *   by its `toString` or by identity.
  * - Circular references throw `TypeError` (parity with native `JSON.stringify`).
  *   The replacer copies each object level into a fresh prototype-less record,
  *   so we must run our own cycle detection — the native detector never sees
@@ -55,11 +49,31 @@ const objectCreate = Object.create;
  * - `__proto__` keys are preserved as own properties (no prototype pollution
  *   and no silent collision between `{ __proto__: x, b: 1 }` and `{ b: 1 }`).
  *
- * In practice, route params carry primitives (`string | number | boolean`);
- * the cache-key-collision edge cases above are defensive bugs caught loudly.
+ * A throw sends the caller to its non-cached fallback path. Only a plain
+ * object whose single key is `"\u0000Date"` shares a `Date`'s spelling, which
+ * is unsupported.
  */
 export function canonicalJson(value: unknown): string {
-  return JSON.stringify(canonicalize(value, new Set<object>()));
+  return JSON.stringify(canonicalize(value, new Set<object>(), "root"));
+}
+
+/**
+ * Where a value sits, which decides how it is spelled: `root` is the bag, whose
+ * keys are sorted; `value` is a value of the bag or an element of an array
+ * value, which core compares one by one; `field` is inside a plain object,
+ * which core compares by `JSON.stringify`.
+ */
+type Level = "root" | "value" | "field";
+
+/** An object JSON spells by its own enumerable keys: a plain one or an array. */
+function isSpelledByKeys(value: object): boolean {
+  if (Array.isArray(value)) {
+    return true;
+  }
+
+  const proto: unknown = getPrototypeOf(value);
+
+  return proto === null || proto === Object.prototype;
 }
 
 // Key comparison uses byte-order (`<` / `>`) instead of `localeCompare()` so
@@ -69,35 +83,69 @@ function compareKeys(left: string, right: string): number {
   return left < right ? -1 : 1;
 }
 
+function unspelled(what: string): TypeError {
+  return new TypeError(
+    `canonicalJson: cannot serialize ${what} — JSON drops it or spells it null, so two values core tells apart would share one cache key.`,
+  );
+}
+
+/** A `Date` outside a plain object: by its time, in a record no string spells. */
+function spellDate(value: Date): Record<string, unknown> {
+  const record = objectCreate(null) as Record<string, unknown>;
+
+  record["\u0000Date"] = dateGetTime.call(value);
+
+  return record;
+}
+
+/** A value that is not an object, as JSON spells it. */
+function spelledScalar(value: unknown): unknown {
+  if (typeof value === "function" || typeof value === "symbol") {
+    throw unspelled(`a ${typeof value}`);
+  }
+
+  if (typeof value === "number" && !Number.isFinite(value)) {
+    throw unspelled(String(value));
+  }
+
+  return value;
+}
+
+/** The refusal of an object the key is not built from. */
+function refusedObject(value: object): TypeError {
+  const kind = (value as { constructor?: { name?: unknown } }).constructor
+    ?.name;
+
+  return new TypeError(
+    `canonicalJson: cannot serialize ${typeof kind === "string" && kind !== "" ? kind : "an object"} — a cache-key is built only from plain objects, arrays, Dates and JSON values: core compares any other object by its toString or by identity, not by its fields.`,
+  );
+}
+
 /**
- * Returns a structural clone with object keys sorted at every level. Path-based
- * cycle detection (`path` set) matches the semantics of native `JSON.stringify`
- * — a `TypeError` is thrown on a true cycle, but the same object reachable via
- * two independent branches (DAG) serialises fine.
+ * Returns a structural clone with the root's keys sorted. Path-based cycle
+ * detection (`path` set) matches the semantics of native `JSON.stringify` — a
+ * `TypeError` is thrown on a true cycle, but the same object reachable via two
+ * independent branches (DAG) serialises fine.
  *
- * `Date` instances pass through unchanged so `JSON.stringify` can invoke their
- * `toJSON` hook. Other built-ins (`Map`, `Set`, `WeakMap`, `WeakSet`, `RegExp`)
- * throw eagerly to avoid silent cache-key collisions.
+ * A `Date` inside a plain object passes through unchanged, so `JSON.stringify`
+ * can invoke its `toJSON` hook. Any other object that is not a plain one or an
+ * array throws eagerly, for the reason the module docblock gives.
  */
-function canonicalize(value: unknown, path: Set<object>): unknown {
-  if (value === null || typeof value !== "object") {
-    return value;
+function canonicalize(
+  value: unknown,
+  path: Set<object>,
+  level: Level,
+): unknown {
+  if (typeof value !== "object" || value === null) {
+    return spelledScalar(value);
   }
 
   if (value instanceof Date) {
-    return value;
+    return level === "field" ? value : spellDate(value);
   }
 
-  if (
-    value instanceof Map ||
-    value instanceof Set ||
-    value instanceof WeakMap ||
-    value instanceof WeakSet ||
-    value instanceof RegExp
-  ) {
-    throw new TypeError(
-      `canonicalJson: cannot serialize ${(value as { constructor: { name: string } }).constructor.name} — non-enumerable own keys collapse to "{}" and would cause cache-key collisions. Pass primitive params (string | number | boolean) instead.`,
-    );
+  if (!isSpelledByKeys(value)) {
+    throw refusedObject(value);
   }
 
   if (path.has(value)) {
@@ -109,24 +157,70 @@ function canonicalize(value: unknown, path: Set<object>): unknown {
   path.add(value);
   try {
     if (Array.isArray(value)) {
-      return value.map((item) => canonicalize(item, path));
+      return canonicalizeArray(
+        value,
+        path,
+        level === "field" ? "field" : "value",
+      );
     }
 
-    // Use a null-prototype record so `__proto__` is treated as a regular
-    // own property — assigning to a plain `{}` would set the prototype
-    // chain instead and silently collide with inputs that omit the key.
-    const sorted: Record<string, unknown> = objectCreate(null) as Record<
-      string,
-      unknown
-    >;
-    const keys = objectKeys(value).toSorted(compareKeys);
-
-    for (const key of keys) {
-      sorted[key] = canonicalize((value as Record<string, unknown>)[key], path);
-    }
-
-    return sorted;
+    return canonicalizeRecord(value as Record<string, unknown>, path, level);
   } finally {
     path.delete(value);
   }
+}
+
+/**
+ * A plain object's own keys, sorted at the root only. A null-prototype record
+ * treats `__proto__` as a regular own property — assigning to a plain `{}`
+ * would set the prototype chain instead and silently collide with inputs that
+ * omit the key.
+ */
+function canonicalizeRecord(
+  value: Readonly<Record<string, unknown>>,
+  path: Set<object>,
+  level: Level,
+): Record<string, unknown> {
+  const record = objectCreate(null) as Record<string, unknown>;
+  const keys =
+    level === "root"
+      ? objectKeys(value).toSorted(compareKeys)
+      : objectKeys(value);
+  const inner = level === "root" ? "value" : "field";
+
+  for (const key of keys) {
+    // `record` has no prototype chain and never leaves `canonicalJson` — the
+    // exemption the rule names, which its pattern does not recognise here.
+    // nosemgrep: unguarded-computed-key-write
+    record[key] = canonicalize(value[key], path, inner);
+  }
+
+  return record;
+}
+
+/**
+ * An array's elements, each at the given level. JSON spells `undefined` in an
+ * array as `null`, which core keeps apart from it in an array value.
+ */
+function canonicalizeArray(
+  value: readonly unknown[],
+  path: Set<object>,
+  level: Level,
+): unknown[] {
+  // One read of the length, and each element by index: an own iterator is not
+  // what core walks.
+  const { length } = value;
+  const elements: unknown[] = [];
+
+  for (let index = 0; index < length; index++) {
+    const element = value[index];
+
+    if (element === undefined && level === "value") {
+      throw unspelled("undefined in an array");
+    }
+
+    elements[index] = canonicalize(element, path, level);
+  }
+
+  return elements;
 }

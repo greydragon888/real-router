@@ -667,8 +667,10 @@ describe("consumer census (#2303)", () => {
       getLifecycleApi: sorted(hits.getLifecycleApi.src),
     }).toStrictEqual({
       // ⚠ What is LEFT here: the dependency record the getter walk reads until
-      // its door goes (#2386), and the validator slot (#2388).
-      getInternals: ["dependenciesGetStore", "validator"],
+      // its door goes (#2386), the validator slot (#2388), and the codec
+      // diagnostic's reload (#2905), which must skip the path rebuild that
+      // `PluginApi.matchPath` runs under the router's options.
+      getInternals: ["dependenciesGetStore", "matchPath", "validator"],
       getPluginApi: [
         "addCheck",
         "addEventListener",
@@ -799,7 +801,7 @@ describe("consumer census (#2303)", () => {
       },
       "getPluginApi.matchPath()": {
         src: [],
-        tests: ["name", "params", "search"],
+        tests: ["name", "params", "path", "search"],
       },
       "getRoutesApi.get()": {
         src: [],
@@ -885,7 +887,6 @@ describe("consumer census (#2303)", () => {
         "isDisposed",
         "isTransitioning",
         "makeState",
-        "matchPath",
         "navigateToNotFound",
         "navigateToState",
         "port",

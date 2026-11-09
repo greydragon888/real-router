@@ -15,8 +15,9 @@ import type { Router, SearchParams } from "@real-router/core";
 //
 // Tolerance is deliberately narrow (see the "boundaries" block): only
 // string/number/boolean values (and a singleton array against its scalar, which
-// builds the same query string) compare across types. `null` / `undefined` /
-// objects keep strict semantics — they build DIFFERENT URLs (`?a` vs `?a=`).
+// builds the same query string) compare across types. `null` / `undefined`
+// keep strict semantics — they build DIFFERENT URLs (`?a` vs `?a=`) — and two
+// objects compare by `objectComparisonKey` (#2905), never equal to a scalar.
 
 describe("param value provenance (#1554)", () => {
   let active: Router | undefined;

@@ -16,7 +16,7 @@ src/
 ├── createActiveNameSelector.ts  — Shared O(1) active-name selector (Solid-style routeSelector port)
 ├── createRouteEnterGate.ts      — Route-enter guard gate: stateful decision closure (not a source)
 ├── guardLeaveListener.ts        — Route-exit guard HOF: subscribeLeave-listener wrapper (not a source)
-├── canonicalJson.ts             — Key-order-stable JSON serialization (cache keys for active-route)
+├── canonicalJson.ts             — Cache keys for active-route: the bag's keys sorted, each value spelled as core compares it
 ├── normalizeActiveOptions.ts    — DEFAULT_ACTIVE_OPTIONS + normalizeActiveOptions helper
 ├── computeSnapshot.ts           — Same-reference snapshot optimization for route nodes
 ├── stabilizeState.ts            — State ref stabilization keyed on path + url.hash + transition.reload (not exported)
@@ -39,9 +39,9 @@ Most factories return a cached instance keyed by router and, where applicable, b
 | `createActiveNameSelector` | `WeakMap<Router, selector>` | until router GC |
 | `createTransitionSource` / `createErrorSource` | none (advanced-use) | owner-driven; `destroy()` tears down |
 
-**Composite key for `createActiveRouteSource`:** `` `${routeName}|${canonicalJson(params)}|${canonicalJson(search)}|${strict}|${ignoreQueryParams}|${hashKey}` `` — six components, where `hashKey` is `hash === undefined ? "" : `#${hash}``, isolating hash-aware tab-link variants (`createActiveRouteSource.ts`). Key-order-insensitive via `canonicalJson` — `{a:1, b:2}` and `{b:2, a:1}` hit the same entry (checked per field: `params` and `search` each normalize independently).
+**Composite key for `createActiveRouteSource`:** `` `${routeName}|${canonicalJson(params)}|${canonicalJson(search)}|${strict}|${ignoreQueryParams}|${hashKey}` `` — six components, where `hashKey` is `hash === undefined ? "" : `#${hash}``, isolating hash-aware tab-link variants (`createActiveRouteSource.ts`). The bag's key order does not count — `{a:1, b:2}` and `{b:2, a:1}` hit the same entry (checked per field: `params` and `search` are keyed independently) — while a nested plain object's does, because core compares it by `JSON.stringify`.
 
-**Non-cached paths:** `createActiveRouteSource` bypasses the cache and returns a fresh source for that call in two cases — a NON-STRING route name, because the cache key coerces it and a non-string would share a slot with a well-typed name; and `canonicalJson` throwing on either the params or the search bag. Throw-triggers include `BigInt` (native `JSON.stringify`), `Map`, `Set`, `WeakMap`, `WeakSet`, `RegExp` (eager `TypeError` — these would otherwise collapse to `"{}"` and cause cache-key collisions), and circular references (path-based detector in `canonicalize()`). `Symbol`-valued fields are silently dropped (standard JSON semantics) — they do not bypass the cache.
+**Non-cached paths:** `createActiveRouteSource` bypasses the cache and returns a fresh source for that call in two cases — a NON-STRING route name, because the cache key coerces it and a non-string would share a slot with a well-typed name; and `canonicalJson` throwing on either the params or the search bag: on `BigInt` (native `JSON.stringify`), on circular references (path-based detector in `canonicalize()`), and on every value it cannot key the way core compares it, which the `canonicalJson.ts` docblock lists.
 
 **`destroy()` on cached wrappers is a no-op** — the shared source lives until the router is garbage-collected, releasing the WeakMap entry automatically. Required so that adapter code like Angular `sourceToSignal` can call `destroy()` in `DestroyRef.onDestroy` without tearing down a shared instance.
 
@@ -121,7 +121,7 @@ State reference stabilization keyed on `path` **+** `state.context.url.hash` **+
 
 ### `canonicalJson`
 
-Explicit `canonicalize()` clone that sorts object keys via byte-order comparison (`<` / `>`, locale-independent) before `JSON.stringify`. Used by `createActiveRouteSource` to build a stable cache key from the `params` and `search` arguments (each normalized independently). Throws `TypeError` on `BigInt` (standard `JSON.stringify` behaviour), `Map` / `Set` / `WeakMap` / `WeakSet` / `RegExp` (would otherwise collapse to `"{}"` and collide on cache keys), and circular references (path-based detector via `Set<object>` with `try/finally` cleanup — DAGs with shared refs serialise normally). `__proto__` is preserved as an own property (null-prototype sorted record). The caller falls back to a non-cached source on any throw.
+Explicit `canonicalize()` clone that sorts the bag's own keys via byte-order comparison (`<` / `>`, locale-independent) before `JSON.stringify`, and spells each value as core compares it; the `canonicalJson.ts` docblock states how each kind of value is spelled and which ones throw. Used by `createActiveRouteSource` to build a stable cache key from the `params` and `search` arguments (each keyed independently). Circular references throw through a path-based detector (`Set<object>` with `try/finally` cleanup — DAGs with shared refs serialise normally). `__proto__` is preserved as an own property (null-prototype record). The caller falls back to a non-cached source on any throw.
 
 ### `normalizeActiveOptions`
 

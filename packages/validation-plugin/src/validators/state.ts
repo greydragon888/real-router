@@ -6,9 +6,13 @@ import { areParamValuesEqual } from "@real-router/core/validation";
 import { isString, isParams, getTypeDescription } from "../type-guards";
 
 import type {
+  Params,
   ParamsSearch,
   RouterLogger,
   RouterValidator,
+  SearchParams,
+  SimpleState,
+  State,
 } from "@real-router/core";
 
 const atMakeState = raiser("router", "makeState");
@@ -154,8 +158,13 @@ type Channel = keyof ParamsSearch;
 /** Both channels as this diagnostic reads them: bags it did not build. */
 type Bags = Record<Channel, Readonly<Record<string, unknown>>>;
 
-/** What the round trip through a route's codec did to one key. */
-type Loss = "added" | "changed" | "dropped";
+/**
+ * What the round trip through a route's codec did to one key. A changed value
+ * the encoder prints as one piece with its reload is `undecoded`, not the value
+ * the decoder returns for that piece, or `keyless`, when two reads of one URL
+ * decode values that never compare equal.
+ */
+type Loss = "added" | "changed" | "dropped" | "undecoded" | "keyless";
 
 function isBag(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -208,30 +217,6 @@ function definedEntries(
   return new Map(entriesOf(bag).filter(([, value]) => value !== undefined));
 }
 
-/** A path slot as a URL gives it back: a number or a boolean as its string. */
-function printedSlot(value: unknown): unknown {
-  return typeof value === "number" || typeof value === "boolean"
-    ? String(value)
-    : value;
-}
-
-/**
- * What a reload hands `decodeParams` in place of the encoded channels: a URL
- * carries no params key outside the path slots, and a slot only as a string.
- */
-function reloadedFrom(encoded: Bags, pathSlots: readonly string[]): Bags {
-  const params = definedEntries(encoded.params);
-
-  return {
-    params: Object.fromEntries(
-      pathSlots
-        .filter((slot) => params.has(slot))
-        .map((slot) => [slot, printedSlot(params.get(slot))]),
-    ),
-    search: encoded.search,
-  };
-}
-
 function holdsObject(value: unknown): boolean {
   if (Array.isArray(value)) {
     return value.some((element) => holdsObject(element));
@@ -240,102 +225,271 @@ function holdsObject(value: unknown): boolean {
   return typeof value === "object" && value !== null;
 }
 
+/** What a reload of a path commits: the route's `matchPath` (#2905). */
+export type ReloadPath = (path: string) => State | undefined;
+
 /**
- * Whether a value and its round-tripped twin print alike — the rule
- * `areStatesEqual(…, false)` compares values by (#1554).
- *
- * ⚑ **An object compares by the piece the route's encoder prints for it.** A
- * URL carries an object only as that piece, so a `Date` decoded into a fresh
- * `Date` of the same instant is the same value; by identity every such codec
- * would be reported.
+ * A second read of a URL, which may fail where the first did not: it then
+ * gives nothing back.
  */
-function printsAlike(
-  given: unknown,
-  back: unknown,
-  pieces: () => readonly [unknown, unknown],
-): boolean {
-  if (areParamValuesEqual(given, back)) {
-    return true;
+function tryReload(reload: ReloadPath, path: string): State | undefined {
+  try {
+    return reload(path);
+  } catch {
+    return undefined;
   }
+}
 
-  if (!holdsObject(given) && !holdsObject(back)) {
-    return false;
-  }
+/** `PluginApi.forwardState`: the forward chain, after its door's checks (#2905). */
+export type ForwardState = (
+  routeName: string,
+  routeParams: Params,
+  routeSearch: SearchParams,
+) => SimpleState;
 
-  const [givenPiece, backPiece] = pieces();
+/** Some keys of each channel, with their values. */
+type KeysByChannel = Readonly<Record<Channel, ReadonlyMap<string, unknown>>>;
 
-  return areParamValuesEqual(givenPiece, backPiece);
+/** The keys a reload gives back and the state does not carry. */
+function addedKeys(state: Bags, back: Bags): KeysByChannel {
+  const added = (channel: Channel): Map<string, unknown> => {
+    const given = definedEntries(state[channel]);
+
+    return new Map(
+      [...definedEntries(back[channel])].filter(([key]) => !given.has(key)),
+    );
+  };
+
+  return { params: added("params"), search: added("search") };
+}
+
+/** A bag without some of its keys. */
+function withoutKeys<Bag extends object>(
+  bag: Bag,
+  keys: ReadonlyMap<string, unknown>,
+): Bag {
+  return Object.fromEntries(
+    entriesOf(bag).filter(([name]) => !keys.has(name)),
+  ) as Bag;
 }
 
 /**
- * The keys a reload of the URL a state prints does not give back as the state
- * carries them.
+ * The keys a reload adds that the forward chain gives back alike when it runs
+ * once more, over the reload without them: those are the interceptors', even
+ * where the codec adds the same value. A throw while the chain runs, or while
+ * its answer is read or compared, gives none back.
+ */
+function creditedKeys(
+  back: State,
+  forward: ForwardState,
+  added: KeysByChannel,
+): KeysByChannel {
+  if (added.params.size + added.search.size === 0) {
+    return added;
+  }
+
+  try {
+    const answer = forward(
+      back.name,
+      withoutKeys(back.params, added.params),
+      withoutKeys(back.search, added.search),
+    );
+    const givenBack = (channel: Channel): Map<string, unknown> => {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- an interceptor can answer without a query bag, and `PluginApi.forwardState` hands that back as it is
+      const carried = definedEntries(answer[channel] ?? {});
+
+      return new Map(
+        [...added[channel]].filter(
+          ([key, value]) =>
+            carried.has(key) && areParamValuesEqual(carried.get(key), value),
+        ),
+      );
+    };
+
+    return { params: givenBack("params"), search: givenBack("search") };
+  } catch {
+    return { params: new Map(), search: new Map() };
+  }
+}
+
+/** One state's round trip through a reload of its path. */
+interface RoundTrip {
+  readonly state: Bags;
+  readonly codec: RouteCodec;
+  readonly pathSlots: readonly string[];
+  readonly encoded: Bags;
+  readonly back: State;
+  /** A second reload of the same path, read once, and only when asked. */
+  readonly readAgain: () => Bags | undefined;
+  /** The keys a reload adds that are the interceptors' (`creditedKeys`). */
+  readonly credited: KeysByChannel;
+}
+
+/**
+ * Whether the encoder prints a decoded value as it printed the given one. The
+ * value is encoded in the state in place of the given one, so a key the encoder
+ * cannot print does not fail the comparison of another; an encoder that cannot
+ * print it did not get it back.
+ */
+function printsAlike(
+  trip: RoundTrip,
+  channel: Channel,
+  key: string,
+  value: unknown,
+): boolean {
+  const printed = tryCodecPass(trip.codec.encode, {
+    ...trip.state,
+    [channel]: { ...trip.state[channel], [key]: value },
+  });
+
+  return (
+    printed !== undefined &&
+    areParamValuesEqual(trip.encoded[channel][key], printed[channel][key])
+  );
+}
+
+/**
+ * `added` for a key a reload gives back and the state does not carry, unless
+ * it is the interceptors' (`creditedKeys`).
+ */
+function addedKey(
+  trip: RoundTrip,
+  channel: Channel,
+  key: string,
+): Loss | undefined {
+  return trip.credited[channel].has(key) ? undefined : "added";
+}
+
+/**
+ * What the round trip did to a key the state carries, `undefined` when a reload
+ * gives it back. When a reload returns an object that prints alike without
+ * comparing equal, the URL cannot carry the difference, and a second reload of
+ * the same path tells a value the decoder does not return from one with no key.
+ */
+function lossOf(
+  trip: RoundTrip,
+  channel: Channel,
+  key: string,
+  given: unknown,
+  value: unknown,
+): Loss | undefined {
+  if (!holdsObject(value)) {
+    return areParamValuesEqual(given, value) ? undefined : "changed";
+  }
+
+  if (!printsAlike(trip, channel, key, value)) {
+    return "changed";
+  }
+
+  if (areParamValuesEqual(given, value)) {
+    return undefined;
+  }
+
+  return areParamValuesEqual(value, trip.readAgain()?.[channel][key])
+    ? "undecoded"
+    : "keyless";
+}
+
+/** What the round trip did to the keys of one channel. */
+function channelLosses(
+  trip: RoundTrip,
+  channel: Channel,
+): [Channel, string, Loss][] {
+  const given = definedEntries(trip.state[channel]);
+  const back = definedEntries(trip.back[channel]);
+  const losses: [Channel, string, Loss][] = [];
+
+  for (const [key, value] of back) {
+    const loss = given.has(key)
+      ? lossOf(trip, channel, key, given.get(key), value)
+      : addedKey(trip, channel, key);
+
+    if (loss !== undefined) {
+      losses.push([channel, key, loss]);
+    }
+  }
+
+  for (const key of given.keys()) {
+    if (
+      !back.has(key) &&
+      (channel === "search" || trip.pathSlots.includes(key))
+    ) {
+      losses.push([channel, key, "dropped"]);
+    }
+  }
+
+  return losses;
+}
+
+/**
+ * The keys a reload of a state's path does not give back as the state carries
+ * them. The reload is the router's `matchPath` without its path rebuild, so
+ * the router's query formats parse the URL, `decodeParams` and the
+ * `forwardState` interceptors run, and the route's defaults merge, as on a
+ * real reload. A value comes back when `areParamValuesEqual` says so — the
+ * rule `areStatesEqual(…, false)` compares values by (#1554, #2905) — and an
+ * object only when the encoder also prints it as it printed the given value,
+ * because a real reload prints its URL from what it decodes
+ * (`rewritePathOnMatch`, on by default).
  *
  * ⚑ **A params key outside `pathSlots` is never reported as dropped.** It is
  * app-level data no URL carries (#1553), and the undeclared-key diagnostic
  * reports it. Every key of `state.search` is in the URL: the mode gate keeps
  * no other (#1575).
  *
- * ⚠ **The query channel reaches the decoder as `encodeParams` returned it.** A
- * reload hands over the URL's parse of it instead, and the router's
- * `queryParams` formats decide that parse: a numeric string can come back as a
- * number.
+ * ⚠ **A loss the URL's own format makes is reported as the codec's.** A value
+ * the query format does not print, such as an empty array, is dropped by the
+ * reload whichever codec the route has.
+ *
+ * ⚠ **What an interceptor does differently on a reload is reported as the
+ * codec's**, except a key the reload adds that the chain gives back from the
+ * reload without the keys it adds. A reload runs the forward chain over what
+ * the URL hands it, such as a number the query format types.
+ *
+ * ⚠ **A key an interceptor derives from one the codec adds is reported as the
+ * codec's too**: without the codec's key, the chain does not give it back.
+ *
+ * ⚠ **The interceptors run again on the reload**, once more when it adds keys,
+ * and once more when an object prints alike without comparing equal.
+ *
+ * ⚠ A path that matches no route, or another route, is not judged.
  */
 function roundTripLosses(
-  state: Bags,
+  state: State,
   codec: RouteCodec,
   pathSlots: readonly string[],
+  reload: ReloadPath,
+  forward: ForwardState,
 ): [Channel, string, Loss][] {
+  const back = reload(state.path);
+
+  if (back?.name !== state.name) {
+    return [];
+  }
+
   const encoded = codecPass(codec.encode, state);
 
   if (encoded === undefined) {
     return [];
   }
 
-  const decoded = codecPass(codec.decode, reloadedFrom(encoded, pathSlots));
+  let again: { readonly state: Bags | undefined } | undefined;
+  const readAgain = (): Bags | undefined => {
+    again ??= { state: tryReload(reload, state.path) };
 
-  if (decoded === undefined) {
-    return [];
-  }
+    return again.state;
+  };
+  const trip: RoundTrip = {
+    state,
+    codec,
+    pathSlots,
+    encoded,
+    back,
+    readAgain,
+    credited: creditedKeys(back, forward, addedKeys(state, back)),
+  };
 
-  // A decoded value is encoded in the state in place of the given one, so a
-  // key the encoder cannot print does not fail the comparison of another; an
-  // encoder that cannot print it did not get it back.
-  const piecesOf = (
-    channel: Channel,
-    key: string,
-    value: unknown,
-  ): readonly [unknown, unknown] => [
-    encoded[channel][key],
-    tryCodecPass(codec.encode, {
-      ...state,
-      [channel]: { ...state[channel], [key]: value },
-    })?.[channel][key],
-  ];
-  const losses: [Channel, string, Loss][] = [];
-
-  for (const channel of ["params", "search"] as const) {
-    const given = definedEntries(state[channel]);
-    const back = definedEntries(decoded[channel]);
-
-    for (const [key, value] of back) {
-      if (!given.has(key)) {
-        losses.push([channel, key, "added"]);
-      } else if (
-        !printsAlike(given.get(key), value, () => piecesOf(channel, key, value))
-      ) {
-        losses.push([channel, key, "changed"]);
-      }
-    }
-
-    for (const key of given.keys()) {
-      if (!back.has(key) && (channel === "search" || pathSlots.includes(key))) {
-        losses.push([channel, key, "dropped"]);
-      }
-    }
-  }
-
-  return losses;
+  return [...channelLosses(trip, "params"), ...channelLosses(trip, "search")];
 }
 
 /** What the route's codec must do about a changed or dropped key. */
@@ -357,6 +511,9 @@ function describeLoss(
   codec: RouteCodec,
 ): string {
   const head = `Route "${routeName}": its codec`;
+  const changes =
+    `${head} changes "${key}" in state.${channel}, so a link and a reload of the same URL ` +
+    `commit different values.`;
 
   switch (loss) {
     case "added": {
@@ -367,9 +524,18 @@ function describeLoss(
       );
     }
     case "changed": {
+      return `${changes} ${remedyFor(codec)}`;
+    }
+    case "undecoded": {
       return (
-        `${head} changes "${key}" in state.${channel}, so a link and a reload of the same URL ` +
-        `commit different values. ${remedyFor(codec)}`
+        `${changes} encodeParams prints both as one piece of the URL, so a link must pass ` +
+        `the value decodeParams returns for that piece.`
+      );
+    }
+    case "keyless": {
+      return (
+        `${changes} Two reloads of one URL decode values that never compare equal: give ` +
+        `the value a key — a Date, or a plain object JSON.stringify prints in full.`
       );
     }
     case "dropped": {
@@ -388,8 +554,15 @@ function describeLoss(
  * never runs it, so a link commits the caller's params and a reload of the same
  * URL commits what the decoder makes of them. The two agree only when the
  * decoder undoes `encodeParams` and adds no key. Core asks once per state a
- * committing producer builds, for a route that has a codec; this runs the
- * pair over that state and warns about each key that does not come back.
+ * committing producer builds, for a route that has a codec; this reloads the
+ * state's path and warns about each key the reload does not give back.
+ *
+ * ⚠ **A state is judged before its navigation commits.** On the navigation
+ * that removes a param an interceptor carries over from the state the router
+ * is on — persistent-params-plugin's included — the interceptors still carry
+ * its previous value: a key the codec adds with that value goes unreported,
+ * and where the URL leaves a default out, a key can be reported though a
+ * reload after the commit matches the state.
  *
  * ⚠ **The diagnostic must never be worse than its own absence.** The codecs
  * are application code, and a throw here would fail the navigation it only
@@ -401,6 +574,8 @@ function describeLoss(
  */
 export function createCodecRoundTripReporter(
   logger: RouterLogger,
+  reload: ReloadPath,
+  forward: ForwardState,
 ): ReportCodecRoundTrip {
   const reported = new Set<string>();
 
@@ -408,7 +583,7 @@ export function createCodecRoundTripReporter(
     let losses: [Channel, string, Loss][];
 
     try {
-      losses = roundTripLosses(state, codec, pathSlots);
+      losses = roundTripLosses(state, codec, pathSlots, reload, forward);
     } catch {
       return;
     }

@@ -70,7 +70,6 @@
   "e7a67e7dd764": "packages/solid/src/components/HttpStatusCode.tsx:12 -> packages/solid/README.md (93%)",
   "60fa7d2f37b7": "packages/solid/src/components/HttpStatusCode.tsx:12 -> packages/solid/README.md (88%)",
   "814a47047759": "packages/solid/src/components/HttpStatusCode.tsx:12 -> packages/solid/README.md (75%)",
-  "0576e1ea45dd": "packages/sources/src/canonicalJson.ts:19 -> packages/sources/INVARIANTS.md (65%)",
   "929e362eee18": "packages/sources/src/canonicalJson.ts:19 -> packages/sources/INVARIANTS.md (76%)",
   "6778466b0abb": "packages/sources/src/createRouteEnterGate.ts:30 -> packages/sources/INVARIANTS.md (71%)",
   "5bf5fc49102c": "packages/ssr-data-plugin/src/shared-ssr/errors.ts:52 -> packages/ssr-data-plugin/INVARIANTS.md (69%)",

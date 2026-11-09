@@ -1,14 +1,123 @@
-import { describe, it, expect } from "vitest";
+import { runInNewContext } from "node:vm";
+
+import { describe, it, expect, vi } from "vitest";
 
 import { canonicalJson } from "../../src/canonicalJson";
+
+/** A value class that keeps its state in a `#private` field. */
+class Slug {
+  readonly #text: string;
+
+  constructor(text: string) {
+    this.#text = text;
+  }
+
+  toString(): string {
+    return this.#text;
+  }
+}
+
+/** A class instance whose state is its own enumerable fields. */
+class Point {
+  constructor(
+    readonly x: number,
+    readonly y: number,
+  ) {}
+}
+
+/** A class instance with an own field and a `toString` of its own. */
+class Label {
+  constructor(readonly text: string) {}
+
+  toString(): string {
+    return this.text;
+  }
+}
+
+/** The refusal of an object other than a plain one, an array or a Date. */
+const refusal = (kind: string): string =>
+  `canonicalJson: cannot serialize ${kind} — a cache-key is built only from plain objects, arrays, Dates and JSON values: core compares any other object by its toString or by identity, not by its fields.`;
+
+/** The refusal of a value JSON drops or spells `null`. */
+const unspelled = (what: string): string =>
+  `canonicalJson: cannot serialize ${what} — JSON drops it or spells it null, so two values core tells apart would share one cache key.`;
+
+/** `[label, the value the refusal names, a bag holding it]` (#2905). */
+const UNSPELLED: [string, string, () => unknown][] = [
+  ["a function value", "a function", () => ({ v: () => 1 })],
+  ["a function field", "a function", () => ({ v: { f: () => 1 } })],
+  ["a symbol value", "a symbol", () => ({ v: Symbol("s") })],
+  ["a symbol in an array", "a symbol", () => ({ v: [Symbol("s")] })],
+  ["NaN", "NaN", () => ({ v: Number.NaN })],
+  ["Infinity in a field", "Infinity", () => ({ v: { n: Infinity } })],
+  ["-Infinity in an array", "-Infinity", () => ({ v: [-Infinity] })],
+  [
+    "undefined in an array value",
+    "undefined in an array",
+    () => ({ v: [1, undefined] }),
+  ],
+  [
+    "a hole in an array value",
+    "undefined in an array",
+    () => {
+      const holed: unknown[] = [1];
+
+      holed[2] = 2;
+
+      return { v: holed };
+    },
+  ],
+];
+
+/** `[label, the kind the refusal names, a fresh instance]`. */
+const REFUSED: [string, string, () => object][] = [
+  [
+    "a Temporal.PlainDate",
+    "PlainDate",
+    () => Temporal.PlainDate.from("2024-03-15"),
+  ],
+  ["a URL", "URL", () => new URL("https://example.test/a")],
+  ["a class holding only #private fields", "Slug", () => new Slug("a")],
+  [
+    "a class instance holding its state in own fields",
+    "Point",
+    () => new Point(1, 2),
+  ],
+  [
+    "a class with an own field and a toString of its own",
+    "Label",
+    () => new Label("a"),
+  ],
+  [
+    "an object whose prototype names no constructor",
+    "an object",
+    () => Object.create(Object.create(null) as object) as object,
+  ],
+  [
+    "a plain object from another realm",
+    "Object",
+    () => runInNewContext("({ status: 'active' })") as object,
+  ],
+  [
+    "an instance of a class whose name is empty",
+    "an object",
+    () =>
+      new (class {
+        readonly v = 1;
+      })(),
+  ],
+];
 
 describe("canonicalJson", () => {
   it("returns the same string for key-reordered objects", () => {
     expect(canonicalJson({ a: 1, b: 2 })).toBe(canonicalJson({ b: 2, a: 1 }));
   });
 
-  it("handles nested objects with reordered keys", () => {
-    expect(canonicalJson({ outer: { a: 1, b: 2 } })).toBe(
+  it("keeps the key order of an object inside the bag: core compares it by JSON.stringify (#2905)", () => {
+    expect(canonicalJson({ outer: { b: 2, a: 1 }, inner: 0 })).toBe(
+      '{"inner":0,"outer":{"b":2,"a":1}}',
+    );
+    expect(canonicalJson({ outer: { a: 1, b: 2 } })).not.toBe(
       canonicalJson({ outer: { b: 2, a: 1 } }),
     );
   });
@@ -16,6 +125,18 @@ describe("canonicalJson", () => {
   it("preserves array order", () => {
     expect(canonicalJson([1, 2, 3])).toBe("[1,2,3]");
     expect(canonicalJson([3, 2, 1])).toBe("[3,2,1]");
+  });
+
+  it("reads an array by index, as core compares it, not by its own iterator (#2905)", () => {
+    const iterated = (elements: number[]): number[] =>
+      Object.assign(elements, {
+        *[Symbol.iterator]() {
+          yield 9;
+        },
+      });
+
+    expect(canonicalJson({ v: iterated([1, 2]) })).toBe('{"v":[1,2]}');
+    expect(canonicalJson({ v: iterated([3, 4]) })).toBe('{"v":[3,4]}');
   });
 
   it("returns valid JSON for primitives", () => {
@@ -36,11 +157,65 @@ describe("canonicalJson", () => {
     );
   });
 
-  it("handles arrays containing objects — objects inside are sorted", () => {
-    expect(canonicalJson([{ a: 1, b: 2 }, { c: 3 }])).toBe(
-      canonicalJson([{ b: 2, a: 1 }, { c: 3 }]),
+  it("keeps the key order of an object inside an array (#2905)", () => {
+    expect(canonicalJson({ v: [{ b: 2, a: 1 }, { c: 3 }] })).toBe(
+      '{"v":[{"b":2,"a":1},{"c":3}]}',
     );
   });
+
+  it("spells a Date value by its time, apart from its ISO string (#2905)", () => {
+    const iso = "1970-01-02T00:00:00.000Z";
+
+    expect(canonicalJson({ d: new Date(iso) })).toBe(
+      String.raw`{"d":{"\u0000Date":86400000}}`,
+    );
+    expect(canonicalJson({ d: new Date(iso) })).not.toBe(
+      canonicalJson({ d: iso }),
+    );
+    expect(canonicalJson({ d: [new Date(iso)] })).not.toBe(
+      canonicalJson({ d: [iso] }),
+    );
+  });
+
+  it("spells a Date by its time while Date.prototype.getTime is re-pointed, as core compares it (#2905)", () => {
+    const getTime = vi.spyOn(Date.prototype, "getTime").mockReturnValue(0);
+
+    try {
+      expect(canonicalJson({ d: new Date(86_400_000) })).toBe(
+        String.raw`{"d":{"\u0000Date":86400000}}`,
+      );
+    } finally {
+      getTime.mockRestore();
+    }
+  });
+
+  it("spells a Date inside a plain object as JSON does, which is how core compares it (#2905)", () => {
+    const iso = "1970-01-02T00:00:00.000Z";
+
+    expect(canonicalJson({ v: { d: new Date(iso) } })).toBe(
+      canonicalJson({ v: { d: iso } }),
+    );
+    expect(canonicalJson({ v: { d: [new Date(iso)] } })).toBe(
+      canonicalJson({ v: { d: [iso] } }),
+    );
+  });
+
+  it("spells undefined inside a plain object's array as JSON does (#2905)", () => {
+    expect(canonicalJson({ v: { a: [undefined] } })).toBe('{"v":{"a":[null]}}');
+  });
+
+  it("registers every row of the unspelled table", () => {
+    expect(UNSPELLED).toHaveLength(9);
+  });
+
+  it.each(UNSPELLED)(
+    "throws on %s: JSON drops it or spells it null (#2905)",
+    (_label, what, bag) => {
+      expect(() => canonicalJson(bag())).toThrow(
+        new TypeError(unspelled(what)),
+      );
+    },
+  );
 
   describe("non-serializable object types (audit §5.B)", () => {
     it("throws on Map (would collapse to {} and collide on cache key)", () => {
@@ -67,10 +242,32 @@ describe("canonicalJson", () => {
       expect(() => canonicalJson({ a: new Map() })).toThrow(/cache-key/);
     });
 
-    it("Date is fine — JSON.stringify invokes Date.toJSON (ISO string)", () => {
-      const result = canonicalJson({ a: new Date("2026-05-14T00:00:00.000Z") });
+    it("registers every row of its tables", () => {
+      expect(REFUSED).toHaveLength(8);
+    });
 
-      expect(result).toBe('{"a":"2026-05-14T00:00:00.000Z"}');
+    it.each(REFUSED)(
+      "throws on an object other than a plain one, an array or a Date, naming its kind: %s (#2905)",
+      (_, kind, make) => {
+        const serialize = (): string => canonicalJson({ a: make() });
+
+        expect(serialize).toThrow(TypeError);
+        expect(serialize).toThrow(refusal(kind));
+      },
+    );
+
+    it("an empty plain object, an empty null-prototype object and an empty array still serialize (#2905)", () => {
+      expect(
+        canonicalJson({ a: {}, b: Object.create(null) as object, c: [] }),
+      ).toBe('{"a":{},"b":{},"c":[]}');
+    });
+
+    it("a Date is fine — inside a plain object JSON.stringify invokes Date.toJSON (ISO string)", () => {
+      const result = canonicalJson({
+        a: { at: new Date("2026-05-14T00:00:00.000Z") },
+      });
+
+      expect(result).toBe('{"a":{"at":"2026-05-14T00:00:00.000Z"}}');
     });
   });
 
@@ -179,12 +376,12 @@ describe("canonicalJson", () => {
       expect(() => canonicalJson({ id: 1n })).toThrow(TypeError);
     });
 
-    it("Symbol value is silently dropped (standard JSON.stringify semantics)", () => {
+    it("a Symbol value throws, and a Symbol KEY is invisible to Object.keys (#2905)", () => {
       const sym = Symbol("k");
 
-      // Symbol-valued field disappears; Symbol-keyed field is invisible to
-      // Object.keys, so it also doesn't appear in the output.
-      expect(canonicalJson({ a: sym, b: 1 })).toBe('{"b":1}');
+      expect(() => canonicalJson({ a: sym, b: 1 })).toThrow(
+        new TypeError(unspelled("a symbol")),
+      );
       expect(canonicalJson({ a: 1, [sym]: 2 })).toBe('{"a":1}');
     });
 
@@ -220,13 +417,15 @@ describe("canonicalJson", () => {
       expect(result).toBe('{"α":2,"β":1}');
     });
 
-    it("NaN / ±Infinity collapse to `null` in objects (cache-key collision pinned)", () => {
-      expect(canonicalJson({ x: Number.NaN })).toBe('{"x":null}');
-      expect(canonicalJson({ x: Number.POSITIVE_INFINITY })).toBe('{"x":null}');
-      expect(canonicalJson({ x: Number.NEGATIVE_INFINITY })).toBe('{"x":null}');
-      // Cross-collision: NaN, +Inf, -Inf all produce the same wire output.
-      expect(canonicalJson({ x: Number.NaN })).toBe(
-        canonicalJson({ x: Number.POSITIVE_INFINITY }),
+    it("NaN / ±Infinity throw rather than collapse to `null` (#2905)", () => {
+      expect(() => canonicalJson({ x: Number.NaN })).toThrow(
+        new TypeError(unspelled("NaN")),
+      );
+      expect(() => canonicalJson({ x: Number.POSITIVE_INFINITY })).toThrow(
+        new TypeError(unspelled("Infinity")),
+      );
+      expect(() => canonicalJson({ x: Number.NEGATIVE_INFINITY })).toThrow(
+        new TypeError(unspelled("-Infinity")),
       );
     });
 

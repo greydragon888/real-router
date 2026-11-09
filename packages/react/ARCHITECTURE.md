@@ -272,7 +272,7 @@ tests/
 | **useRouteNode**        | Re-renders only when node activates/deactivates; skips unrelated navigations (0 re-renders); skips sibling node navigations; root node re-renders on all changes                                                                                                     |
 | **useRouterTransition** | Sync navigation: 0 extra re-renders (no TRANSITION_START); async navigation: exactly 2 re-renders per transition (start + end); N async transitions = 2N re-renders (linear scaling); `navigateToNotFound()` causes 0 re-renders; subscription lifecycle has no listener leak across mount/unmount cycles (H12 regression)                                     |
 | **useRouter / useNavigator / useRouteUtils** | Contract: 0 re-renders on any navigation (gotcha-locked tests); identity stable across rerenders; navigator method references stable; `useRouteUtils` returns same `RouteUtils` instance across renders (WeakMap cache inside `@real-router/route-utils`, keyed on the route tree) |
-| **useIsActiveRoute**    | Reuses cached source for canonical-equal `routeParams` (key-order insensitive via `canonicalJson`); re-renders only on active-state transition |
+| **useIsActiveRoute**    | Reuses cached source for canonical-equal `routeParams` (the bag's key order ignored, via `canonicalJson`); re-renders only on active-state transition |
 | **structuralSharing**   | `BaseSource.getSnapshot()` returns same reference for path-stable navigations (no tearing) |
 
 ## Stress Test Coverage

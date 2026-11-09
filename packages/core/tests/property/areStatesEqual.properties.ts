@@ -7,7 +7,13 @@ import { getPluginApi } from "@real-router/core/api";
 import { arbState, createFixtureRouter, NUM_RUNS } from "./helpers";
 import { DEFAULT_TRANSITION } from "../helpers";
 
-import type { Params, Route, State } from "@real-router/core";
+import type {
+  Params,
+  Route,
+  SearchParams,
+  SearchParamValue,
+  State,
+} from "@real-router/core";
 
 describe("areStatesEqual Properties", () => {
   const router = createFixtureRouter();
@@ -240,6 +246,11 @@ describe("areStatesEqual Properties", () => {
   // `Route.decodeParams` states), so the property holds for a decoder that
   // undoes its `encodeParams` and adds no key, and fails for one that does not.
   // INVARIANTS areStatesEqual #8 names the conditions.
+  const printDay = (value: unknown): unknown =>
+    value instanceof Date ? value.toISOString().slice(0, 10) : value;
+  const readDay = (value: unknown): unknown =>
+    typeof value === "string" ? new Date(value) : value;
+
   const CODEC_ROUTES: Route[] = [
     {
       name: "product",
@@ -270,9 +281,46 @@ describe("areStatesEqual Properties", () => {
       }),
     },
     { name: "seam", path: "/seam/:slug" },
+    {
+      // A day in the URL, a fresh `Date` in the state: the wiki "Dates" recipe.
+      name: "day",
+      path: "/day/:day?from",
+      encodeParams: ({ params, search }) => ({
+        params: { ...params, day: printDay(params.day) } as Params,
+        search: { ...search, from: printDay(search.from) } as SearchParams,
+      }),
+      decodeParams: ({ params, search }) => ({
+        params: { ...params, day: readDay(params.day) } as Params,
+        search: { ...search, from: readDay(search.from) } as SearchParams,
+      }),
+    },
+    {
+      // JSON in the URL, a fresh plain object in the state.
+      name: "filtered",
+      path: "/filtered?filter",
+      encodeParams: ({ params, search }) => ({
+        params,
+        search: { ...search, filter: JSON.stringify(search.filter) },
+      }),
+      decodeParams: ({ params, search }) => ({
+        params,
+        search: {
+          ...search,
+          filter: JSON.parse(search.filter as string) as SearchParamValue,
+        },
+      }),
+    },
   ];
   /** Starts with a letter, so `toUpperCase()` always changes it. */
   const arbSlug = fc.stringMatching(/^[a-z][a-z0-9-]{0,7}$/);
+  /** UTC midnight: a value exactly as fine as the day its URL prints. */
+  const arbDay = fc
+    .integer({ min: 0, max: 36_524 })
+    .map((offset) => new Date(Date.UTC(2000, 0, 1 + offset)));
+  const arbFilter = fc.record({
+    status: fc.stringMatching(/^[a-z]{1,6}$/),
+    page: fc.integer({ min: 0, max: 99 }),
+  });
 
   const codecRouter = createRouter(CODEC_ROUTES);
   const codecApi = getPluginApi(codecRouter);
@@ -305,6 +353,43 @@ describe("areStatesEqual Properties", () => {
           true,
         );
       }
+    },
+  );
+
+  // A decoded object is a fresh one on every read, so the two states hold two
+  // instances of one value and compare by its key (#2905).
+  test.prop([arbDay], { numRuns: NUM_RUNS.standard })(
+    "provenance independence: a decoder that hands back a fresh Date (#2905)",
+    (value) => {
+      const fromIntent = codecApi.makeState(
+        "day",
+        { day: value } as unknown as Params,
+        { from: new Date(value) } as unknown as SearchParams,
+      );
+      const fromUrl = codecApi.matchPath(fromIntent.path);
+
+      expect(fromUrl?.params.day).toBeInstanceOf(Date);
+      expect(fromUrl?.params.day).not.toBe(value);
+      expect(codecRouter.areStatesEqual(fromIntent, fromUrl, false)).toBe(true);
+    },
+  );
+
+  test.prop([arbFilter], { numRuns: NUM_RUNS.standard })(
+    "provenance independence: a decoder that hands back a fresh plain object (#2905)",
+    (filter) => {
+      const fromIntent = codecApi.makeState("filtered", {}, {
+        filter,
+      } as unknown as SearchParams);
+      const fromUrl = codecApi.matchPath(fromIntent.path);
+
+      // `fc.record` builds a null-prototype object too, and `JSON.parse` never
+      // does: the two prototypes of a plain object share one key, so the fields
+      // are compared on copies with one prototype.
+      expect({ ...(fromUrl?.search.filter as object) }).toStrictEqual({
+        ...filter,
+      });
+      expect(fromUrl?.search.filter).not.toBe(filter);
+      expect(codecRouter.areStatesEqual(fromIntent, fromUrl, false)).toBe(true);
     },
   );
 

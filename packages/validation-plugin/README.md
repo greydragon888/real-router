@@ -39,7 +39,7 @@ Without this plugin, core has structural guards (constructor, plugin registratio
 - Argument shape checks for every public API call
 - `forwardTo` target existence, param compatibility, and cycle detection
 - Decoder/encoder async detection (sync required for `matchPath`/`buildPath`)
-- Codec round trips: a key a link and a reload of the same URL would commit differently, because a route's `decodeParams` does not undo its `encodeParams` or adds a key, is reported once per route and key
+- Codec round trips: a key a link and a reload of the same URL commit differently — a route's `decodeParams` that does not undo its `encodeParams` or adds a key — is reported once per route, channel and key, from a real reload of the state's URL
 - Guard answers: one that is neither `true` nor `false` is named with its type (core refuses it either way), and an async guard met by a synchronous check is reported as such
 - Dependency store structure validation
 - Limits consistency checks

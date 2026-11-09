@@ -49,6 +49,12 @@ const isArray = Array.isArray;
 // caller's function returned. Measured on a plain array with an own `slice`:
 // `entry.slice()` answers `["HIJACKED"]`, this answers the real elements.
 const arraySlice = Array.prototype.slice;
+// An application re-pointing one of these three after boot would change how two
+// object values compare (#2905), so they are captured for the reason the ones
+// above are.
+const NativeDate = Date;
+const dateGetTime = Date.prototype.getTime;
+const stringify = JSON.stringify;
 /**
  * The one `NavigationOptions` key core's entry door withholds from its copy
  * (#1962). Typed as `keyof NavigationOptions` rather than written as a bare
@@ -209,6 +215,113 @@ function isPrintableScalar(value: unknown): value is string | number | boolean {
   return PRINTABLE_TYPES.has(typeof value);
 }
 
+/** A non-null object. Both comparators take arrays before they ask. */
+export function isObjectValue(value: unknown): value is object {
+  return typeof value === "object" && value !== null;
+}
+
+/** A plain object's prototype: `Object.prototype`, or none at all. */
+function isPlainPrototype(proto: unknown): boolean {
+  return proto === null || proto === Object.prototype;
+}
+
+/**
+ * A field that leaves its plain object without a key: a function, a symbol, a
+ * number that is not finite, or an object other than a plain one or an array,
+ * as JSON reads it after `toJSON`. JSON drops each of them or spells it as
+ * another value.
+ *
+ * `undefined` and `-0` are not among them, so an object compares as JSON spells
+ * it: `{ a: undefined }` equals `{}`, `{ a: [undefined] }` equals
+ * `{ a: [null] }`, and `{ a: -0 }` equals `{ a: 0 }`.
+ */
+function isUnspelledField(field: unknown): boolean {
+  switch (typeof field) {
+    case "function":
+    // Stryker disable next-line ConditionalExpression: equivalent — emptied, the case falls through to the number case, and `Number.isFinite` is false for a function and a symbol, so the answer stays `true`.
+    case "symbol": {
+      return true;
+    }
+    case "number": {
+      return !Number.isFinite(field);
+    }
+    default: {
+      return (
+        isObjectValue(field) &&
+        !isArray(field) &&
+        !isPlainPrototype(getPrototypeOf(field))
+      );
+    }
+  }
+}
+
+/** A `Date`'s key: its time, read with the captured intrinsic, behind a `d`. */
+function timeKey(value: Date): string {
+  return `d${String(dateGetTime.call(value))}`;
+}
+
+/**
+ * The key an object value compares by (#2905): a `Date`, a subclass's instance
+ * included, by `getTime()`, a plain object by `JSON.stringify`, any other object
+ * by the string its `toString` returns.
+ *
+ * `undefined` when it has none: a plain object holding a field
+ * `isUnspelledField` names, a `JSON.stringify` that throws or answers nothing,
+ * and a `toString` that cannot be called, throws, answers no string or answers
+ * a default `[object …]` tag, as an inherited `Object.prototype.toString` does.
+ * Every read of the value is inside the `try`, so computing a key never throws.
+ *
+ * A `Date`'s key starts with `d` and a `toString` key with `s`, letters no JSON
+ * text starts with, so objects of two kinds never share a key.
+ *
+ * ⚠ A value finer than the piece its codec prints compares unequal to its own
+ * reload: a `Date` with a time under a day codec. Keep a value exactly as fine
+ * as its URL.
+ *
+ * A key coarser than that piece equates two URLs: a `toString`, or a `toJSON`
+ * inside a plain object. Neither shape is supported. Nor is a value from
+ * another realm: a `Date` made there compares by its `toString`, to the
+ * second, and a plain object made there by identity.
+ */
+export function objectComparisonKey(value: object): string | undefined {
+  try {
+    if (value instanceof NativeDate) {
+      return timeKey(value);
+    }
+
+    if (isPlainPrototype(getPrototypeOf(value))) {
+      // A field of an object rather than a `let`: control-flow analysis does not
+      // see the replacer's writes, and would read a `let` as always `true`.
+      const spelling = { full: true };
+      const json: string | undefined = stringify(
+        value,
+        (_key: string, field: unknown) => {
+          spelling.full &&= !isUnspelledField(field);
+
+          return field;
+        },
+      );
+
+      return spelling.full ? json : undefined;
+    }
+
+    // A `toString` that is not a function makes `Reflect.apply` throw, and the
+    // `catch` answers for it. Read live rather than captured:
+    // `app-code-call-census-2786` sees a call only through a property access.
+    const key: unknown = Reflect.apply(
+      (value as { toString: () => unknown }).toString,
+      value,
+      [],
+    );
+
+    return typeof key === "string" && !key.startsWith("[object ")
+      ? `s${key}`
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Compares two param / query values for equality **independently of where they
  * came from** (#1554).
@@ -225,9 +338,12 @@ function isPrintableScalar(value: unknown): value is string | number | boolean {
  *   `2 ≡ "2"` and `true ≡ "true"`;
  * - **arrays** compare element-wise under the same rule, and a **singleton
  *   array** compares against a bare scalar (`["1"]` and `1` both print `?a=1`);
- * - everything else (`null`, `undefined`, objects) keeps strict semantics —
- *   those print differently (`?a` vs `?a=` vs nothing at all), so tolerating
- *   them would equate genuinely different URLs.
+ * - two **objects** compare by {@link objectComparisonKey}, and two with no key
+ *   by identity: a codec decodes a fresh object for an unchanged value on every
+ *   read (#2905). An object never equals a scalar;
+ * - `null` and `undefined` keep strict semantics — they print differently
+ *   (`?a` vs `?a=` vs nothing at all), so tolerating them would equate
+ *   genuinely different URLs.
  *
  * Value normalization is deliberately NOT done: `state.search` keeps the mixed
  * domain (RFC-4 M2 / §10.14 decision (b)) and comparison is the single place
@@ -267,6 +383,17 @@ export function areParamValuesEqual(val1: unknown, val2: unknown): boolean {
 
   if (Array.isArray(val2)) {
     return val2.length === 1 && areParamValuesEqual(val1, val2[0]);
+  }
+
+  return areBareValuesEqual(val1, val2);
+}
+
+/** {@link areParamValuesEqual} for two values neither of which is an array. */
+function areBareValuesEqual(val1: unknown, val2: unknown): boolean {
+  if (isObjectValue(val1) && isObjectValue(val2)) {
+    const key = objectComparisonKey(val1);
+
+    return key !== undefined && key === objectComparisonKey(val2);
   }
 
   return (
@@ -1011,9 +1138,7 @@ export function adoptChannel<
   // for a prototype at all.
   const proto = getPrototypeOf(bag) as object | null;
 
-  return !Array.isArray(bag) && (proto === null || proto === Object.prototype)
-    ? { ...bag }
-    : bag;
+  return !Array.isArray(bag) && isPlainPrototype(proto) ? { ...bag } : bag;
 }
 
 /**

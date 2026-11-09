@@ -26,7 +26,7 @@
 |--------|---------|
 | `DEFAULT_ACTIVE_OPTIONS` | Frozen `{ strict: false, ignoreQueryParams: true }` |
 | `normalizeActiveOptions(opts?)` | Fills missing fields with defaults |
-| `canonicalJson(value)` | Key-order-stable JSON serialization (cache-key builder) |
+| `canonicalJson(value)` | Cache-key builder: the bag's keys sorted, each value spelled as core compares it (#2905) |
 
 ### Guard primitives (#1435)
 
@@ -67,7 +67,7 @@ interface RouterSource<T> {
 |---------|-------------|------------------------|
 | `createRouteSource` | not cached | Real teardown — unsubscribes from router. |
 | `createRouteNodeSource` | `(router, nodeName)` | **No-op** — shared across consumers. |
-| `createActiveRouteSource` | `(router, name, canonicalJson(params), canonicalJson(search), options)` | **No-op for cached path**; **real teardown for the non-cached paths** (a non-string route name, #1881; or BigInt / circular params). |
+| `createActiveRouteSource` | `(router, name, canonicalJson(params), canonicalJson(search), options)` | **No-op for cached path**; **real teardown for the non-cached paths** (a non-string route name, #1881; or a value `canonicalJson` refuses, which its docblock lists, #2905). |
 | `createTransitionSource` | not cached | Real teardown — unsubscribes from router events. |
 | `getTransitionSource` | `(router,)` | **No-op** — wrapped cached source. |
 | `createErrorSource` | not cached | Real teardown. |
@@ -183,7 +183,7 @@ All cached factories use `WeakMap<Router, T>` (or `WeakMap<Router, Map<key, T>>`
 1. **Router GC releases source automatically** — the WeakMap entry is weakly held by the router instance.
 2. **Cached sources are shared** — multiple consumers produce one router subscription, not N.
 3. **`destroy()` is no-op on the returned wrapper** — the underlying source survives any external destroy call.
-4. **For `createActiveRouteSource`**, `canonicalJson(params)` normalizes key order so `{a:1, b:2}` and `{b:2, a:1}` hit the same cache entry. A non-string route NAME (#1881) falls back to creating a fresh non-cached source.
+4. **For `createActiveRouteSource`**, `canonicalJson(params)` sorts the bag's keys, so `{a:1, b:2}` and `{b:2, a:1}` hit the same cache entry, and spells each value as core compares it (#2905) — the rules and their one recorded exception are the `canonicalJson.ts` docblock. A non-string route NAME (#1881) falls back to creating a fresh non-cached source.
 5. **`undefined` params ≠ `{}` params — the cache keys them apart on purpose** (`params === undefined ? "" : canonicalJson(params)`, so `undefined → ""` but `{} → "{}"`). This makes the no-params Link case (`createActiveRouteSource(router, name)`) skip a `canonicalJson` call and share one entry with `useIsActiveRoute(name)`. **Adapter contract (#776):** a no-params `<Link>` / directive MUST pass the raw `routeParams` (possibly `undefined`) here — never an `EMPTY_PARAMS` (`{}`) default — or it keys `"{}"` and opens a *second* eager subscription for the same logical question. Adapters default to `EMPTY_PARAMS` only at the navigation / `buildHref` sites that need a concrete object.
 
 ## Gotchas
@@ -242,7 +242,7 @@ src/
 ├── createActiveNameSelector.ts  — shared O(1) active-name selector (Link fast-path)
 ├── createRouteEnterGate.ts      — route-enter guard gate (stateful decision closure, #1435)
 ├── guardLeaveListener.ts        — route-exit guard HOF (subscribeLeave listener wrapper, #1435)
-├── canonicalJson.ts             — key-order-stable JSON (for cache keys)
+├── canonicalJson.ts             — cache keys: the bag's keys sorted, each value spelled as core compares it
 ├── normalizeActiveOptions.ts    — DEFAULT_ACTIVE_OPTIONS + normalizer
 ├── computeSnapshot.ts           — shared node-snapshot builder
 ├── stabilizeState.ts            — reference equality for State objects (compares `path` + `state.context.url.hash` + `state.transition.reload` — #605)
