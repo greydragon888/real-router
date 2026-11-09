@@ -182,7 +182,9 @@ Non-breaking via TypeScript contravariance — existing `({ params }) => …` lo
 
 ## Post-hydration loader skip
 
-When the application uses `hydrateRouter()` from `@real-router/ssr-utils`, the parsed server-serialized state is briefly deposited on a one-shot internal scratchpad before `start()` runs. The plugin reads this scratchpad and **reuses the server-resolved value** if `state.context.data` is already present for the same route name — skipping the redundant client-side loader call on first paint.
+When the application uses `hydrateRouter()` from `@real-router/ssr-utils`, the parsed server-serialized state is briefly deposited on a one-shot internal scratchpad before `start()` runs. The plugin reads this scratchpad and **reuses the server-resolved value** if `state.context.data` is already present and the payload describes the state being committed — its route name, `params` and `search` agree with what matching its `path` gives, value by value under core's `areParamValuesEqual` — skipping the redundant client-side loader call on first paint.
+
+A value whose type the serializer changes does not agree: JSON gives a codec's `Date` back as its ISO string, so such a route reuses the server's data only with a serializer pair that revives it — `serialize` on `serializeRouterState`, the matching `deserialize` on `hydrateRouter`, such as devalue's. See [The payload must describe the state it hydrates](https://github.com/greydragon888/real-router/wiki/ssr-data-plugin#the-payload-must-describe-the-state-it-hydrates).
 
 ```typescript
 // Server: state.context.data populated by the loader, serialized into HTML

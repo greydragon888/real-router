@@ -2831,8 +2831,9 @@ Reproduced through the public door before it was fixed: a payload whose visible
 `enumerable: false`, was accepted as describing `/users/42?tab=1` — the loader
 skipped, and server data built for another state served. The probe first used
 the STRING `"1"` where core commits the coerced `1`, and passed for the wrong
-reason; that trap is recorded in `hydration-identity-2060.test.ts`'s own header
-and was walked into anyway.
+reason; that trap was recorded in `hydration-identity-2060.test.ts`'s own header
+and was walked into anyway. It closed with #2918: the check compares values by
+core's `areParamValuesEqual`, under which `"1"` agrees with `1`.
 
 **Verified against becoming vacuous** — the failure mode of a guard whose set is
 empty by design. `scripts/check-membership-predicate.test.mjs`: six planted
