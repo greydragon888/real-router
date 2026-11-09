@@ -692,7 +692,7 @@ importers:
         version: 0.8.0(@real-router/core@0.154.0)
       '@real-router/search-schema-plugin':
         specifier: '*'
-        version: 0.7.0(@real-router/core@0.154.0)
+        version: 0.9.0(@real-router/core@0.154.0)
       rxjs:
         specifier: 7.8.2
         version: 7.8.2
@@ -1570,7 +1570,7 @@ importers:
         version: 0.8.0(@real-router/core@0.154.0)
       '@real-router/search-schema-plugin':
         specifier: '*'
-        version: 0.7.0(@real-router/core@0.154.0)
+        version: 0.9.0(@real-router/core@0.154.0)
       preact:
         specifier: ~10.29.7
         version: 10.29.8(preact-render-to-string@6.8.2)
@@ -1863,7 +1863,7 @@ importers:
         version: 0.24.4(@real-router/core@0.154.0)(preact@10.29.8)
       '@real-router/search-schema-plugin':
         specifier: '*'
-        version: 0.7.0(@real-router/core@0.154.0)
+        version: 0.9.0(@real-router/core@0.154.0)
       preact:
         specifier: ~10.29.7
         version: 10.29.8(preact-render-to-string@6.8.2)
@@ -2407,7 +2407,7 @@ importers:
         version: 0.37.4(@real-router/core@0.154.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@real-router/search-schema-plugin':
         specifier: '*'
-        version: 0.7.0(@real-router/core@0.154.0)
+        version: 0.9.0(@real-router/core@0.154.0)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -3031,7 +3031,7 @@ importers:
         version: 0.37.4(@real-router/core@0.154.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@real-router/search-schema-plugin':
         specifier: '*'
-        version: 0.7.0(@real-router/core@0.154.0)
+        version: 0.9.0(@real-router/core@0.154.0)
       react:
         specifier: ~19.3.0
         version: 19.3.1
@@ -3587,7 +3587,7 @@ importers:
         version: 0.8.0(@real-router/core@0.154.0)
       '@real-router/search-schema-plugin':
         specifier: '*'
-        version: 0.7.0(@real-router/core@0.154.0)
+        version: 0.9.0(@real-router/core@0.154.0)
       '@real-router/solid':
         specifier: '*'
         version: 0.26.5(@real-router/core@0.154.0)(solid-js@1.9.18)
@@ -3880,7 +3880,7 @@ importers:
         version: 0.154.0
       '@real-router/search-schema-plugin':
         specifier: '*'
-        version: 0.7.0(@real-router/core@0.154.0)
+        version: 0.9.0(@real-router/core@0.154.0)
       '@real-router/solid':
         specifier: '*'
         version: 0.26.5(@real-router/core@0.154.0)(solid-js@1.9.18)
@@ -4386,7 +4386,7 @@ importers:
         version: 0.8.0(@real-router/core@0.154.0)
       '@real-router/search-schema-plugin':
         specifier: '*'
-        version: 0.7.0(@real-router/core@0.154.0)
+        version: 0.9.0(@real-router/core@0.154.0)
       '@real-router/svelte':
         specifier: '*'
         version: 0.24.4(@real-router/core@0.154.0)(svelte@5.57.3(@typescript-eslint/types@8.70.1))
@@ -4729,7 +4729,7 @@ importers:
         version: 0.154.0
       '@real-router/search-schema-plugin':
         specifier: '*'
-        version: 0.7.0(@real-router/core@0.154.0)
+        version: 0.9.0(@real-router/core@0.154.0)
       '@real-router/svelte':
         specifier: '*'
         version: 0.24.4(@real-router/core@0.154.0)(svelte@5.57.3(@typescript-eslint/types@8.70.1))
@@ -5240,7 +5240,7 @@ importers:
         version: 0.8.0(@real-router/core@0.154.0)
       '@real-router/search-schema-plugin':
         specifier: '*'
-        version: 0.7.0(@real-router/core@0.154.0)
+        version: 0.9.0(@real-router/core@0.154.0)
       '@real-router/vue':
         specifier: '*'
         version: 0.25.4(@real-router/core@0.154.0)(vue@3.5.44(typescript@6.0.3))
@@ -5616,7 +5616,7 @@ importers:
         version: 0.154.0
       '@real-router/search-schema-plugin':
         specifier: '*'
-        version: 0.7.0(@real-router/core@0.154.0)
+        version: 0.9.0(@real-router/core@0.154.0)
       '@real-router/vue':
         specifier: '*'
         version: 0.25.4(@real-router/core@0.154.0)(vue@3.5.44(typescript@6.0.3))
@@ -7493,10 +7493,10 @@ packages:
       '@real-router/core': '>=0.151.0'
       react: '>=19.0.0'
 
-  '@real-router/search-schema-plugin@0.7.0':
-    resolution: {integrity: sha512-V1SuGJm9UfOd78gV8LvAS1XEOvCRhnGLovmICIM5k1B1p6qh8epAIhN6jNT0tX72E6AAUpm8Jn8kvbM+yM6lWg==}
+  '@real-router/search-schema-plugin@0.9.0':
+    resolution: {integrity: sha512-1dU9KOFqO9YqgVLuaOKY1e7+tYnBrtJ/WGcnMBO5tTGeSmAlOxfsUS94zF81Iz0nFGOnXuHpPRvh0nUQ7cNXVw==}
     peerDependencies:
-      '@real-router/core': '>=0.135.0'
+      '@real-router/core': '>=0.154.0'
 
   '@real-router/solid@0.26.5':
     resolution: {integrity: sha512-dF/4Iruwi5+sbmGPo8/qNebdv5zjIXxn5EcEdCM2dkqZFfQtaBsE9j3kj26ZM3wlYBPR2M46RF5T8GZ/GN1WjQ==}
@@ -13337,7 +13337,7 @@ snapshots:
       '@real-router/ssr-utils': 0.3.0(@real-router/core@0.154.0)
       react: 19.3.1
 
-  '@real-router/search-schema-plugin@0.7.0(@real-router/core@0.154.0)':
+  '@real-router/search-schema-plugin@0.9.0(@real-router/core@0.154.0)':
     dependencies:
       '@real-router/core': 0.154.0
 
