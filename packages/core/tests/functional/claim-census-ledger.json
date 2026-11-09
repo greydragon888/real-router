@@ -1437,6 +1437,9 @@
       "d7294177f708",
       "59a56663c359",
       "213a8f34efe0",
+      "4c8c2d4a5be8",
+      "a77b804a9545",
+      "71834f8d6889",
       "2da192c2aa4a",
       "c1f7d2149617",
       "19d2617497ed",
@@ -1448,6 +1451,7 @@
       "9477770fcfc8",
       "23d5890ca4b9",
       "e6ea953a8fa2",
+      "87ccdc3b9280",
       "1c92ecbfe848",
       "2808234f7e3f",
       "d0d6938e1044",
@@ -2147,7 +2151,8 @@
       "31329257942d"
     ],
     "packages/rsc-server-plugin/CLAUDE.md": [
-      "10c00ffeaf61",
+      "ae109f9bc4d5",
+      "2be302da3df4",
       "895fae40c2bb"
     ],
     "packages/rx/ARCHITECTURE.md": [
@@ -2171,7 +2176,9 @@
     ],
     "packages/ssr-data-plugin/CLAUDE.md": [
       "6613084bb1e8",
-      "9012c613497c",
+      "a685567f8653",
+      "25655d800304",
+      "a884f8d03bbe",
       "d1c33fc3e513",
       "5d74ef207c33"
     ],

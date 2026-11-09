@@ -369,11 +369,14 @@ Non-breaking change via TypeScript contravariance — existing `({ params }) => 
 
 The skip is keyed by the committed STATE, not by its route name: the payload's
 own `name`, `params` and `search` must agree with what matching `payload.path`
-produced (#2060). They disagree only when the payload was assembled by hand —
-`hydrateRouter`'s object source is declared `{ path: string }` and widened by a
-cast — and a payload that names another state is not this state's answer, so
-the loader runs. Silent, like a missing `context`: a throw here would land
-POST-COMMIT, the shape #1835 removed one branch over.
+produced (#2060). Each value compares by core's `areParamValuesEqual`, the rule
+`areStatesEqual` uses, so `9` agrees with `"9"` and an object value compares by
+its key (#2918). A payload assembled by hand can disagree — `hydrateRouter`'s
+object source is declared `{ path: string }` and widened by a cast — and so can
+an object value, under the condition below. A payload that names another state
+is not this state's answer, so the loader runs. Silent, like a missing
+`context`: a throw here would land POST-COMMIT, the shape #1835 removed one
+branch over.
 
 ⚠ **Contract, because no check can enforce it.** The comparison catches a
 payload that gives itself away. It cannot catch one whose envelope is
@@ -382,7 +385,17 @@ that caches payloads by route name, or an app that rewrites `path`/`params`
 from the live URL and reuses cached data. The disagreement is then entirely in
 opaque bytes. **Build the payload for the state you hydrate**; the usual
 `serializeRouterState(state)` → `hydrateRouter` round trip does so by
-construction.
+construction for a scalar, an array of them and a plain object of JSON values.
+
+⚠ **An object value whose type the serializer changes agrees only under a
+serializer pair that revives it.** JSON gives a codec's `Date` back as its ISO
+string, and an object never equals a scalar, so the client runs that route's
+loader again. Pass `serialize` to `serializeRouterState` and the matching
+`deserialize` to `hydrateRouter`, such as devalue's.
+
+⚠ **An object core has no key for, a `Set` among them, never agrees**, whatever
+carries the payload: core compares it by identity, and the client decodes its
+own. `hydration-identity-2060.test.ts` holds a row for each of these shapes.
 
 ⚑ Cost: one comparison per `hydrateRouter`, not per navigation — the skip lives
 in a `start` interceptor and the scratchpad is non-null only for that one call.

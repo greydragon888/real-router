@@ -123,11 +123,19 @@ Validation at factory time: rejects `null`, non-objects, non-function values, un
 >
 > The skip is also keyed by the committed STATE, not by its route name (#2060):
 > the payload's `name`, `params` and `search` must agree with what matching its
-> `path` produced, or the loader runs. Under the Variant-B handoff the payload
-> is the server's own `State`, so this holds by construction. ⚠ What it cannot
-> check is a `context` built for a different state behind a self-consistent
-> envelope — that stays a contract: build the payload for the state you
-> hydrate. Shared with `@real-router/ssr-data-plugin` via `shared/ssr`.
+> `path` produced, or the loader runs. Each value compares by core's
+> `areParamValuesEqual`, so an object a codec decodes compares by its key
+> (#2918). Under the Variant-B handoff the payload is the server's own `State`,
+> so this holds by construction for every value but an object core has no key
+> for, such as a `Set`: core compares that one by identity, and the client
+> decodes its own. ⚠ A payload that crossed a serializer agrees on an object
+> value only when the serializer gives it back in its own type: JSON turns a
+> `Date` into its ISO string, and only a pair that revives it — `serialize` on
+> `serializeRouterState`, `deserialize` on `hydrateRouter` — keeps it agreeing.
+> ⚠ What it cannot check is a `context` built for a different state behind a
+> self-consistent envelope — that stays a contract: build the payload for the
+> state you hydrate. Shared with `@real-router/ssr-data-plugin` via
+> `shared/ssr`.
 
 Mode is published to `state.context.ssrRscMode`. Read it via `getSsrRscMode(state)`:
 

@@ -203,7 +203,7 @@ Non-breaking via TypeScript contravariance — existing `({ params }) => …` lo
 
 ## Post-hydration loader skip
 
-When the application uses `hydrateRouter()` from `@real-router/ssr-utils`, the parsed server-serialized state is briefly deposited on a one-shot internal scratchpad before `start()` runs. The plugin reads this scratchpad and **reuses the server-resolved value** if `state.context.rsc` is already present for the same route name — skipping the redundant client-side `ReactNode` resolution on first paint.
+When the application uses `hydrateRouter()` from `@real-router/ssr-utils`, the parsed server-serialized state is briefly deposited on a one-shot internal scratchpad before `start()` runs. The plugin reads this scratchpad and **reuses the server-resolved value** if `state.context.rsc` is already present and the payload describes the state being committed — its route name, `params` and `search` agree with what matching its `path` gives, value by value under core's `areParamValuesEqual` — skipping the redundant client-side `ReactNode` resolution on first paint.
 
 In practice, RSC apps usually `excludeContext: ["rsc"]` from the JSON payload (a `ReactNode` tree contains functions/symbols and isn't JSON-serializable). In that case the scratchpad has no `rsc` namespace and the loader runs as today. The skip path matters when the bundler-specific Flight pipeline arranges to thread an already-resolved `ReactNode` through hydration.
 

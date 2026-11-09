@@ -67,6 +67,7 @@ External dependencies:
 | Dependency                        | What it provides                                                              | Used in                                |
 | --------------------------------- | ----------------------------------------------------------------------------- | -------------------------------------- |
 | `@real-router/core/api`           | `getPluginApi`                                                                | `actionFactory.ts`, `shared-ssr/createSsrLoaderPlugin.ts` |
+| `@real-router/core/validation`    | `areParamValuesEqual` (the hydration check compares values by core's rule)    | `shared-ssr/createSsrLoaderPlugin.ts`  |
 | `@real-router/ssr-utils`          | `getHydrationState` (read-only access to the hydration scratchpad)            | `shared-ssr/createSsrLoaderPlugin.ts`  |
 | `@real-router/core/types`              | `StateContext` (module augmentation target), `Plugin`, `PluginFactory`, `State` | `index.ts`, all factories              |
 | `react`                           | `ReactNode` type only (peer dep)                                              | `types.ts`, `index.ts`, `buildRscPayload.ts` |
@@ -377,7 +378,9 @@ For `rsc-server-plugin` specifically, `acquired.length` is always 2 (no `deferre
 The plugin imports only:
 
 - `@real-router/core/api` (peer)
-- `@real-router/core/types` (the subpath it augments; the manifest declares no regular dependencies at all)
+- `@real-router/core/validation` (peer, `areParamValuesEqual` in `shared-ssr`)
+- `@real-router/core/types` (the subpath it augments) and `@real-router/core` (type-only)
+- `@real-router/ssr-utils` (the one regular dependency, `getHydrationState` in `shared-ssr`)
 - `react` (peer, type-only `ReactNode` import)
 
 The Flight renderer is **never** imported. The caller chooses

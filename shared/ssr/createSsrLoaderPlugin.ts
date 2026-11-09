@@ -1,4 +1,5 @@
 import { getPluginApi } from "@real-router/core/api";
+import { areParamValuesEqual } from "@real-router/core/validation";
 import { getHydrationState } from "@real-router/ssr-utils";
 
 import { isDeferred } from "./defer.js";
@@ -169,23 +170,21 @@ const SYNTHETIC_STATE = {
 } as unknown as State;
 
 /**
- * One channel value: a primitive, or an array of them for a repeated query key.
- */
-function valuesAgree(payload: unknown, committed: unknown): boolean {
-  if (Array.isArray(committed)) {
-    return (
-      Array.isArray(payload) &&
-      payload.length === committed.length &&
-      committed.every((item, index) => payload[index] === item)
-    );
-  }
-
-  return payload === committed;
-}
-
-/**
  * Does one channel of the hydration payload describe the same channel of the
  * state being committed?
+ *
+ * ⚑ Each value compares by core's `areParamValuesEqual`, the rule
+ * `areStatesEqual` uses, so this check and core agree on what one state is
+ * (#2918): `9` agrees with `"9"`, and an object value compares by its key.
+ *
+ * ⚠ An object core has no key for, a `Set` among them, compares by identity,
+ * so it never agrees: the client decodes its own.
+ *
+ * ⚠ A value whose type the serializer changes agrees only under a serializer
+ * pair that revives it. JSON gives a `Date` back as its ISO string, and an
+ * object never equals a scalar; devalue's pair, `serialize` on
+ * `serializeRouterState` with `deserialize` on `hydrateRouter`, gives it back
+ * as a `Date`.
  *
  * ⚠ An ABSENT channel is "no keys", not a mismatch. `hydrateRouter`'s object
  * source is declared `{ path: string }` and widened by a cast, so a hand-built
@@ -226,7 +225,8 @@ function channelAgrees(
   // an inherited key too. `hydration-identity-2060` owns both claims — a row
   // per shape.
   return keys.every(
-    (key) => bagKeys.includes(key) && valuesAgree(bag[key], committed[key]),
+    (key) =>
+      bagKeys.includes(key) && areParamValuesEqual(bag[key], committed[key]),
   );
 }
 
@@ -551,6 +551,10 @@ export function createSsrLoaderPlugin<
           // entirely in opaque data. That residual is a CONTRACT, stated in
           // each plugin's CLAUDE.md: build the payload for the state you
           // hydrate.
+          //
+          // ⚠ The contract holds a condition for an object value, which
+          // `channelAgrees` states: a value whose type the serializer changes,
+          // a `Date` under JSON, agrees only under a pair that revives it.
           //
           // Silent on a mismatch, like a missing `context`: the loader runs. A
           // throw would land POST-COMMIT, the shape #1835 removed one branch
