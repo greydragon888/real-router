@@ -1,8 +1,10 @@
 /**
- * Subpath export for @real-router/validation-plugin.
+ * Plugin-facing subpath: router internals, the routing engine's surface and
+ * the rules core applies, re-exported so a plugin depends on
+ * `@real-router/core` alone and needs no second copy of a rule.
  *
- * Provides access to router internals so the plugin can install
- * ctx.validator and run retrospective validation at registration time.
+ * `getInternals` is how `@real-router/validation-plugin` installs
+ * `ctx.validator` and runs retrospective validation at registration time.
  */
 
 export type { RouterValidator } from "./types/RouterValidator";
@@ -27,8 +29,10 @@ export type { RouterInternals } from "./internals";
 export { findMisChanneledKey } from "./channels";
 
 // The value comparison `areStatesEqual` makes, re-exported for the same reason:
-// the plugin's codec diagnostic judges a round trip by the printed form this
-// rule defines (#2905), and a copy would drift from it.
+// the validation plugin's codec diagnostic judges a round trip by the printed
+// form this rule defines (#2905), the hydration check in `shared/ssr` compares
+// each payload value with the committed one by it (#2918), and a copy would
+// drift from it.
 export { areParamValuesEqual } from "./helpers";
 
 export { validateRoute } from "./engine";
