@@ -5,6 +5,130 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-11-09]
+
+### @real-router/core@0.158.0
+
+### Minor Changes
+
+- [#2917](https://github.com/greydragon888/real-router/pull/2917) [`8289e32`](https://github.com/greydragon888/real-router/commit/8289e32cbc67359a49dfa6a1bff358ea856c0265) Thanks [@greydragon888](https://github.com/greydragon888)! - Compare two object values by what they hold, not by identity ([#2905](https://github.com/greydragon888/real-router/issues/2905))
+
+  A route codec or a search schema decodes a fresh object on every read, so two matches of one URL gave states that compared unequal, and a `<Link>` built with a `Date` was never active. Core now compares two object values by a key — in `areParamValuesEqual` (`@real-router/core/validation`), and so in `areStatesEqual`, `isActiveRoute` and the choice of the segments a navigation re-enters:
+
+  - a `Date`, a subclass's instance included, by `getTime()`;
+  - a plain or null-prototype object by `JSON.stringify`, so its key order counts. One holding a field JSON drops or spells as another value — a function, a symbol, `NaN`, a `Map` — has no key, but a field holding `undefined` counts as absent;
+  - any other object by the string its `toString` returns, unless that string is a default `[object …]` tag.
+
+  A `Date` or a plain object from another realm, such as an iframe's, falls to the last rule. Two objects with no key still compare by identity, and still leave a segment unchanged. An object never equals a scalar: a `Date` is not its ISO string.
+
+  **Breaking Change:** documented behavior changes.
+
+  - `areStatesEqual` and `isActiveRoute` answer `true` where two object values share a key; they answered `false`.
+  - A navigation that changes only a keyed object a shared segment declares, such as a `Date` in `?from`, deactivates and re-activates that segment and the segments below it, and runs their guards, as a changed string does. A change between a keyed and a keyless object counts as one.
+
+  **Migration:** nothing to change for a codec that decodes the same value on every read. A segment whose `Date` changes now re-enters — its guards run and its `useRouteNode` updates — so code that forced that by hand can drop it.
+
+### @real-router/sources@0.16.0
+
+### Minor Changes
+
+- [#2917](https://github.com/greydragon888/real-router/pull/2917) [`8289e32`](https://github.com/greydragon888/real-router/commit/8289e32cbc67359a49dfa6a1bff358ea856c0265) Thanks [@greydragon888](https://github.com/greydragon888)! - `canonicalJson` keys a `Date`, a nested object and a non-JSON value as `@real-router/core` compares them ([#2905](https://github.com/greydragon888/real-router/issues/2905))
+
+  `createActiveRouteSource` keys its cache by `canonicalJson(params)` and `canonicalJson(search)`. Two links whose values core tells apart could share one key — a `Date` and its ISO string, `NaN` and `null` — and the second link then showed the first one's active state.
+
+  - A `Date` that is a bag value, or an element of an array value, is spelled by its time, apart from every string. Inside a plain object it stays its ISO string, as `JSON.stringify` spells it for core.
+  - A plain object below the bag keeps its own key order: core compares it by `JSON.stringify`. The bag's own keys are still sorted.
+
+  **Breaking Change:** `canonicalJson` throws a `TypeError` where it returned a string, on:
+
+  - a function, a symbol, `NaN` or `±Infinity`, at any depth;
+  - `undefined` or a hole in an array that is a bag value or an element of such an array;
+  - an object that is not a plain object, an array or a `Date` — a class instance, a `Temporal` value, a `URL`, an object from another realm.
+
+  `Map`, `Set`, `WeakMap`, `WeakSet`, `RegExp`, `BigInt` and cycles throw as before. `createActiveRouteSource`, and `createActiveSource` through it, catch the throw and return a fresh non-cached source whose `destroy()` works, as for `BigInt` params.
+
+  **Migration:** a direct caller of `canonicalJson` catches the `TypeError` for such values. One that parses the returned text finds `{"\u0000Date":<time>}` for a `Date` value, and a nested object's keys in their own order.
+
+### Patch Changes
+
+- Updated dependencies [[`8289e32`](https://github.com/greydragon888/real-router/commit/8289e32cbc67359a49dfa6a1bff358ea856c0265)]:
+  - @real-router/core@0.158.0
+
+### @real-router/validation-plugin@0.33.0
+
+### Minor Changes
+
+- [#2917](https://github.com/greydragon888/real-router/pull/2917) [`8289e32`](https://github.com/greydragon888/real-router/commit/8289e32cbc67359a49dfa6a1bff358ea856c0265) Thanks [@greydragon888](https://github.com/greydragon888)! - The codec round-trip diagnostic judges a real reload of the state's URL ([#2905](https://github.com/greydragon888/real-router/issues/2905))
+
+  The diagnostic ran `encodeParams` and `decodeParams` over a reload it built by hand. It now reloads the state's path through the router's own `matchPath`, without the path rebuild: the router's query formats parse the URL, `decodeParams` and the `forwardState` interceptors run, and the route's defaults and the mode gate apply, as on a real reload. A value comes back when `areParamValuesEqual` says so, and an object only when `encodeParams` also prints it as it printed the given value. Needs the `@real-router/core` release that compares object values by key.
+
+  **Breaking Change:** which keys are reported follows the real reload.
+
+  - Fixed: a default `encodeParams` leaves out of the URL is no longer reported as dropped (`its codec drops "page" from state.search`): a reload merges it back.
+  - A key the decoder fills when the URL leaves it out is reported as added, now also where the encoder writes it as `undefined` and the decoder spreads its input over a default (`{ page: 1, ...search }`).
+  - A value finer than the piece its encoder prints, such as a `Date` with a time under a day codec, is reported: `… encodeParams prints both as one piece of the URL, so a link must pass the value decodeParams returns for that piece.`
+  - A value two reloads of one URL decode unequal, such as a class instance with no key, is reported: `… Two reloads of one URL decode values that never compare equal: give the value a key — a Date, or a plain object JSON.stringify prints in full.`
+  - What the URL format loses itself, such as an empty array, is reported as the codec's.
+  - A path that matches no route or another route, and a reload that throws, are not judged.
+  - While the diagnostic runs, the `forwardState` interceptors run again — on the reload, once more when it adds keys, and once more when a reloaded object prints alike without comparing equal — and so do their side effects, search-schema-plugin's `onError` among them.
+
+  **Known limit:** the diagnostic judges a state before its navigation commits. On the navigation that removes a sticky param — persistent-params-plugin's included — the interceptors still carry its previous value: a key the codec adds with that same value goes unreported, and where the URL leaves a default out, a key can be reported though a reload after the commit matches the state.
+
+  **Migration:** nothing to change in code. A new warning names a key a link and a reload commit differently, and says what to change.
+
+### Patch Changes
+
+- Updated dependencies [[`8289e32`](https://github.com/greydragon888/real-router/commit/8289e32cbc67359a49dfa6a1bff358ea856c0265)]:
+  - @real-router/core@0.158.0
+
+### @real-router/angular@0.24.9
+
+### Patch Changes
+
+- Updated dependencies [[`8289e32`](https://github.com/greydragon888/real-router/commit/8289e32cbc67359a49dfa6a1bff358ea856c0265), [`8289e32`](https://github.com/greydragon888/real-router/commit/8289e32cbc67359a49dfa6a1bff358ea856c0265)]:
+  - @real-router/core@0.158.0
+  - @real-router/sources@0.16.0
+
+### @real-router/preact@0.24.7
+
+### Patch Changes
+
+- Updated dependencies [[`8289e32`](https://github.com/greydragon888/real-router/commit/8289e32cbc67359a49dfa6a1bff358ea856c0265), [`8289e32`](https://github.com/greydragon888/real-router/commit/8289e32cbc67359a49dfa6a1bff358ea856c0265)]:
+  - @real-router/core@0.158.0
+  - @real-router/sources@0.16.0
+
+### @real-router/react@0.37.7
+
+### Patch Changes
+
+- Updated dependencies [[`8289e32`](https://github.com/greydragon888/real-router/commit/8289e32cbc67359a49dfa6a1bff358ea856c0265), [`8289e32`](https://github.com/greydragon888/real-router/commit/8289e32cbc67359a49dfa6a1bff358ea856c0265)]:
+  - @real-router/core@0.158.0
+  - @real-router/sources@0.16.0
+
+### @real-router/solid@0.26.8
+
+### Patch Changes
+
+- Updated dependencies [[`8289e32`](https://github.com/greydragon888/real-router/commit/8289e32cbc67359a49dfa6a1bff358ea856c0265), [`8289e32`](https://github.com/greydragon888/real-router/commit/8289e32cbc67359a49dfa6a1bff358ea856c0265)]:
+  - @real-router/core@0.158.0
+  - @real-router/sources@0.16.0
+
+### @real-router/svelte@0.24.7
+
+### Patch Changes
+
+- Updated dependencies [[`8289e32`](https://github.com/greydragon888/real-router/commit/8289e32cbc67359a49dfa6a1bff358ea856c0265), [`8289e32`](https://github.com/greydragon888/real-router/commit/8289e32cbc67359a49dfa6a1bff358ea856c0265)]:
+  - @real-router/core@0.158.0
+  - @real-router/sources@0.16.0
+
+### @real-router/vue@0.25.7
+
+### Patch Changes
+
+- Updated dependencies [[`8289e32`](https://github.com/greydragon888/real-router/commit/8289e32cbc67359a49dfa6a1bff358ea856c0265), [`8289e32`](https://github.com/greydragon888/real-router/commit/8289e32cbc67359a49dfa6a1bff358ea856c0265)]:
+  - @real-router/core@0.158.0
+  - @real-router/sources@0.16.0
+
 ## [2026-11-08]
 
 ### @real-router/angular@0.24.8
