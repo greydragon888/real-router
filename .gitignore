@@ -77,6 +77,9 @@ packages/**/.eslintcache
 !/.claude/prompts/audit-rfc-probes.md
 !/.claude/prompts/benchmark-harness-audit.md
 !/.claude/prompts/boolean-flag-audit.md
+!/.claude/prompts/excerpts.py
+!/.claude/prompts/extract_report.py
+!/.claude/prompts/gen_diff.py
 !/.claude/prompts/perf-optimization-deep-analysis.md
 !/.claude/prompts/rfc-plan-contract.md
 .sisyphus
