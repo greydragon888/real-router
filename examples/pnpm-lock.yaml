@@ -20,7 +20,6 @@ overrides:
   http-proxy-agent: 7.0.2
   undici@6: '>=6.29.1 <7'
   undici@7: '>=7.30.1 <8'
-  undici@8: '>=8.12.2 <9'
   piscina: '>=5.3.2 <6.0.0'
   path-to-regexp: '>=8.4.0'
   brace-expansion@5: 5.0.12
@@ -57,7 +56,7 @@ importers:
         version: 8.70.1(eslint@10.11.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
       '@vitest/eslint-plugin':
         specifier: 1.6.27
-        version: 1.6.27(@typescript-eslint/eslint-plugin@8.70.1(@typescript-eslint/parser@8.70.1(eslint@10.11.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(eslint@10.11.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(eslint@10.11.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 1.6.27(@typescript-eslint/eslint-plugin@8.70.1(@typescript-eslint/parser@8.70.1(eslint@10.11.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(eslint@10.11.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(eslint@10.11.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       eslint:
         specifier: 10.11.0
         version: 10.11.0(jiti@2.7.0)(supports-color@10.2.2)
@@ -424,7 +423,7 @@ importers:
         version: 22.2.4(chokidar@5.0.0)
       '@angular/build':
         specifier: ~22.2.0
-        version: 22.2.3(f0764b5059b9cc96ed86a29b64d3fcab)
+        version: 22.2.3(fd4b4b3effa793b88323c288628774ec)
       '@angular/cli':
         specifier: ~22.2.0
         version: 22.2.4(@types/node@26.6.6)(chokidar@5.0.0)
@@ -479,7 +478,7 @@ importers:
         version: 22.2.4(chokidar@5.0.0)
       '@angular/build':
         specifier: ~22.2.0
-        version: 22.2.3(f0764b5059b9cc96ed86a29b64d3fcab)
+        version: 22.2.3(fd4b4b3effa793b88323c288628774ec)
       '@angular/cli':
         specifier: ~22.2.0
         version: 22.2.4(@types/node@26.6.6)(chokidar@5.0.0)
@@ -534,7 +533,7 @@ importers:
         version: 22.2.4(chokidar@5.0.0)
       '@angular/build':
         specifier: ~22.2.0
-        version: 22.2.3(f0764b5059b9cc96ed86a29b64d3fcab)
+        version: 22.2.3(fd4b4b3effa793b88323c288628774ec)
       '@angular/cli':
         specifier: ~22.2.0
         version: 22.2.4(@types/node@26.6.6)(chokidar@5.0.0)
@@ -589,7 +588,7 @@ importers:
         version: 22.2.4(chokidar@5.0.0)
       '@angular/build':
         specifier: ~22.2.0
-        version: 22.2.3(f0764b5059b9cc96ed86a29b64d3fcab)
+        version: 22.2.3(fd4b4b3effa793b88323c288628774ec)
       '@angular/cli':
         specifier: ~22.2.0
         version: 22.2.4(@types/node@26.6.6)(chokidar@5.0.0)
@@ -638,7 +637,7 @@ importers:
     devDependencies:
       '@angular/build':
         specifier: ~22.2.0
-        version: 22.2.3(f0764b5059b9cc96ed86a29b64d3fcab)
+        version: 22.2.3(fd4b4b3effa793b88323c288628774ec)
       '@angular/cli':
         specifier: ~22.2.0
         version: 22.2.4(@types/node@26.6.6)(chokidar@5.0.0)
@@ -705,10 +704,10 @@ importers:
     devDependencies:
       '@analogjs/vite-plugin-angular':
         specifier: 2.7.5
-        version: 2.7.5(@angular/build@22.2.3(f0764b5059b9cc96ed86a29b64d3fcab))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.7.5(@angular/build@22.2.3(fd4b4b3effa793b88323c288628774ec))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@analogjs/vitest-angular':
         specifier: 2.7.5
-        version: 2.7.5(@analogjs/vite-plugin-angular@2.7.5(@angular/build@22.2.3(f0764b5059b9cc96ed86a29b64d3fcab))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))(@angular-devkit/architect@0.2202.4(chokidar@5.0.0))(@angular-devkit/schematics@22.2.4(chokidar@5.0.0))(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 2.7.5(@analogjs/vite-plugin-angular@2.7.5(@angular/build@22.2.3(fd4b4b3effa793b88323c288628774ec))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))(@angular-devkit/architect@0.2202.4(chokidar@5.0.0))(@angular-devkit/schematics@22.2.4(chokidar@5.0.0))(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@angular-devkit/architect':
         specifier: ~0.2202.0
         version: 0.2202.4(chokidar@5.0.0)
@@ -717,7 +716,7 @@ importers:
         version: 22.2.4(chokidar@5.0.0)
       '@angular/build':
         specifier: ~22.2.0
-        version: 22.2.3(f0764b5059b9cc96ed86a29b64d3fcab)
+        version: 22.2.3(fd4b4b3effa793b88323c288628774ec)
       '@angular/cli':
         specifier: ~22.2.0
         version: 22.2.4(@types/node@26.6.6)(chokidar@5.0.0)
@@ -731,8 +730,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       sirv-cli:
         specifier: 3.0.1
         version: 3.0.1
@@ -744,7 +743,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/angular/dynamic-routes:
     dependencies:
@@ -775,10 +774,10 @@ importers:
     devDependencies:
       '@analogjs/vite-plugin-angular':
         specifier: 2.7.5
-        version: 2.7.5(@angular/build@22.2.3(f0764b5059b9cc96ed86a29b64d3fcab))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.7.5(@angular/build@22.2.3(fd4b4b3effa793b88323c288628774ec))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@analogjs/vitest-angular':
         specifier: 2.7.5
-        version: 2.7.5(@analogjs/vite-plugin-angular@2.7.5(@angular/build@22.2.3(f0764b5059b9cc96ed86a29b64d3fcab))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))(@angular-devkit/architect@0.2202.4(chokidar@5.0.0))(@angular-devkit/schematics@22.2.4(chokidar@5.0.0))(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 2.7.5(@analogjs/vite-plugin-angular@2.7.5(@angular/build@22.2.3(fd4b4b3effa793b88323c288628774ec))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))(@angular-devkit/architect@0.2202.4(chokidar@5.0.0))(@angular-devkit/schematics@22.2.4(chokidar@5.0.0))(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@angular-devkit/architect':
         specifier: ~0.2202.0
         version: 0.2202.4(chokidar@5.0.0)
@@ -787,7 +786,7 @@ importers:
         version: 22.2.4(chokidar@5.0.0)
       '@angular/build':
         specifier: ~22.2.0
-        version: 22.2.3(f0764b5059b9cc96ed86a29b64d3fcab)
+        version: 22.2.3(fd4b4b3effa793b88323c288628774ec)
       '@angular/cli':
         specifier: ~22.2.0
         version: 22.2.4(@types/node@26.6.6)(chokidar@5.0.0)
@@ -801,8 +800,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       sirv-cli:
         specifier: 3.0.1
         version: 3.0.1
@@ -814,7 +813,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/angular/hash-routing:
     dependencies:
@@ -845,7 +844,7 @@ importers:
     devDependencies:
       '@angular/build':
         specifier: ~22.2.0
-        version: 22.2.3(f0764b5059b9cc96ed86a29b64d3fcab)
+        version: 22.2.3(fd4b4b3effa793b88323c288628774ec)
       '@angular/cli':
         specifier: ~22.2.0
         version: 22.2.4(@types/node@26.6.6)(chokidar@5.0.0)
@@ -894,7 +893,7 @@ importers:
     devDependencies:
       '@angular/build':
         specifier: ~22.2.0
-        version: 22.2.3(f0764b5059b9cc96ed86a29b64d3fcab)
+        version: 22.2.3(fd4b4b3effa793b88323c288628774ec)
       '@angular/cli':
         specifier: ~22.2.0
         version: 22.2.4(@types/node@26.6.6)(chokidar@5.0.0)
@@ -940,10 +939,10 @@ importers:
     devDependencies:
       '@analogjs/vite-plugin-angular':
         specifier: 2.7.5
-        version: 2.7.5(@angular/build@22.2.3(f0764b5059b9cc96ed86a29b64d3fcab))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.7.5(@angular/build@22.2.3(fd4b4b3effa793b88323c288628774ec))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@analogjs/vitest-angular':
         specifier: 2.7.5
-        version: 2.7.5(@analogjs/vite-plugin-angular@2.7.5(@angular/build@22.2.3(f0764b5059b9cc96ed86a29b64d3fcab))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))(@angular-devkit/architect@0.2202.4(chokidar@5.0.0))(@angular-devkit/schematics@22.2.4(chokidar@5.0.0))(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 2.7.5(@analogjs/vite-plugin-angular@2.7.5(@angular/build@22.2.3(fd4b4b3effa793b88323c288628774ec))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))(@angular-devkit/architect@0.2202.4(chokidar@5.0.0))(@angular-devkit/schematics@22.2.4(chokidar@5.0.0))(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@angular-devkit/architect':
         specifier: ~0.2202.0
         version: 0.2202.4(chokidar@5.0.0)
@@ -952,7 +951,7 @@ importers:
         version: 22.2.4(chokidar@5.0.0)
       '@angular/build':
         specifier: ~22.2.0
-        version: 22.2.3(f0764b5059b9cc96ed86a29b64d3fcab)
+        version: 22.2.3(fd4b4b3effa793b88323c288628774ec)
       '@angular/cli':
         specifier: ~22.2.0
         version: 22.2.4(@types/node@26.6.6)(chokidar@5.0.0)
@@ -966,8 +965,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       sirv-cli:
         specifier: 3.0.1
         version: 3.0.1
@@ -979,7 +978,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/angular/persistent-params:
     dependencies:
@@ -1013,7 +1012,7 @@ importers:
     devDependencies:
       '@angular/build':
         specifier: ~22.2.0
-        version: 22.2.3(f0764b5059b9cc96ed86a29b64d3fcab)
+        version: 22.2.3(fd4b4b3effa793b88323c288628774ec)
       '@angular/cli':
         specifier: ~22.2.0
         version: 22.2.4(@types/node@26.6.6)(chokidar@5.0.0)
@@ -1077,7 +1076,7 @@ importers:
     devDependencies:
       '@angular/build':
         specifier: ~22.2.0
-        version: 22.2.3(f0764b5059b9cc96ed86a29b64d3fcab)
+        version: 22.2.3(fd4b4b3effa793b88323c288628774ec)
       '@angular/cli':
         specifier: ~22.2.0
         version: 22.2.4(@types/node@26.6.6)(chokidar@5.0.0)
@@ -1150,7 +1149,7 @@ importers:
     devDependencies:
       '@angular/build':
         specifier: ~22.2.0
-        version: 22.2.3(f0764b5059b9cc96ed86a29b64d3fcab)
+        version: 22.2.3(fd4b4b3effa793b88323c288628774ec)
       '@angular/cli':
         specifier: ~22.2.0
         version: 22.2.4(@types/node@26.6.6)(chokidar@5.0.0)
@@ -1220,7 +1219,7 @@ importers:
     devDependencies:
       '@angular/build':
         specifier: ~22.2.0
-        version: 22.2.3(f0764b5059b9cc96ed86a29b64d3fcab)
+        version: 22.2.3(fd4b4b3effa793b88323c288628774ec)
       '@angular/cli':
         specifier: ~22.2.0
         version: 22.2.4(@types/node@26.6.6)(chokidar@5.0.0)
@@ -1287,7 +1286,7 @@ importers:
     devDependencies:
       '@angular/build':
         specifier: ~22.2.0
-        version: 22.2.3(f0764b5059b9cc96ed86a29b64d3fcab)
+        version: 22.2.3(fd4b4b3effa793b88323c288628774ec)
       '@angular/cli':
         specifier: ~22.2.0
         version: 22.2.4(@types/node@26.6.6)(chokidar@5.0.0)
@@ -1457,7 +1456,7 @@ importers:
         version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/preact':
         specifier: ~3.2.4
         version: 3.2.4(preact@10.29.8)
@@ -1465,8 +1464,8 @@ importers:
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1475,7 +1474,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/preact/auth-guards:
     dependencies:
@@ -1500,7 +1499,7 @@ importers:
         version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/preact':
         specifier: ~3.2.4
         version: 3.2.4(preact@10.29.8)
@@ -1508,8 +1507,8 @@ importers:
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1518,7 +1517,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/preact/basic:
     dependencies:
@@ -1586,7 +1585,7 @@ importers:
         version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/preact':
         specifier: ~3.2.4
         version: 3.2.4(preact@10.29.8)
@@ -1594,8 +1593,8 @@ importers:
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1604,7 +1603,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/preact/data-loading:
     dependencies:
@@ -1663,7 +1662,7 @@ importers:
         version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/preact':
         specifier: ~3.2.4
         version: 3.2.4(preact@10.29.8)
@@ -1671,8 +1670,8 @@ importers:
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1681,7 +1680,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/preact/error-handling:
     dependencies:
@@ -1706,7 +1705,7 @@ importers:
         version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/preact':
         specifier: ~3.2.4
         version: 3.2.4(preact@10.29.8)
@@ -1714,8 +1713,8 @@ importers:
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1724,7 +1723,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/preact/hash-routing:
     dependencies:
@@ -1802,7 +1801,7 @@ importers:
         version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/preact':
         specifier: ~3.2.4
         version: 3.2.4(preact@10.29.8)
@@ -1810,8 +1809,8 @@ importers:
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1820,7 +1819,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/preact/persistent-params:
     dependencies:
@@ -2267,7 +2266,7 @@ importers:
         version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/react':
         specifier: ~16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -2284,8 +2283,8 @@ importers:
         specifier: 6.1.1
         version: 6.1.1(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -2294,7 +2293,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/react/auth-guards:
     dependencies:
@@ -2319,7 +2318,7 @@ importers:
         version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/react':
         specifier: ~16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -2336,8 +2335,8 @@ importers:
         specifier: 6.1.1
         version: 6.1.1(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -2346,7 +2345,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/react/basic:
     dependencies:
@@ -2423,7 +2422,7 @@ importers:
         version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/react':
         specifier: ~16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -2440,8 +2439,8 @@ importers:
         specifier: 6.1.1
         version: 6.1.1(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -2450,7 +2449,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/react/data-loading:
     dependencies:
@@ -2518,7 +2517,7 @@ importers:
         version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/react':
         specifier: ~16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -2535,8 +2534,8 @@ importers:
         specifier: 6.1.1
         version: 6.1.1(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -2545,7 +2544,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/react/error-handling:
     dependencies:
@@ -2570,7 +2569,7 @@ importers:
         version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/react':
         specifier: ~16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -2587,8 +2586,8 @@ importers:
         specifier: 6.1.1
         version: 6.1.1(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -2597,7 +2596,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/react/hash-examples/link-hash:
     dependencies:
@@ -2952,7 +2951,7 @@ importers:
         version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/react':
         specifier: ~16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -2969,8 +2968,8 @@ importers:
         specifier: 6.1.1
         version: 6.1.1(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -2979,7 +2978,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/react/persistent-params:
     dependencies:
@@ -3368,7 +3367,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/solid/animation-examples/page-animations:
     dependencies:
@@ -3396,7 +3395,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/solid/animation-examples/route-animations:
     dependencies:
@@ -3424,7 +3423,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/solid/animation-examples/view-transitions:
     dependencies:
@@ -3452,7 +3451,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/solid/async-guards:
     dependencies:
@@ -3477,13 +3476,13 @@ importers:
         version: 0.8.10(@solidjs/router@1.0.0(solid-js@1.9.18))(solid-js@1.9.18)
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -3492,10 +3491,10 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/solid/auth-guards:
     dependencies:
@@ -3520,13 +3519,13 @@ importers:
         version: 0.8.10(@solidjs/router@1.0.0(solid-js@1.9.18))(solid-js@1.9.18)
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -3535,10 +3534,10 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/solid/basic:
     dependencies:
@@ -3563,7 +3562,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/solid/combined:
     dependencies:
@@ -3606,13 +3605,13 @@ importers:
         version: 0.8.10(@solidjs/router@1.0.0(solid-js@1.9.18))(solid-js@1.9.18)
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -3621,10 +3620,10 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/solid/data-loading:
     dependencies:
@@ -3658,7 +3657,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/solid/dynamic-routes:
     dependencies:
@@ -3683,13 +3682,13 @@ importers:
         version: 0.8.10(@solidjs/router@1.0.0(solid-js@1.9.18))(solid-js@1.9.18)
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -3698,10 +3697,10 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/solid/error-handling:
     dependencies:
@@ -3726,13 +3725,13 @@ importers:
         version: 0.8.10(@solidjs/router@1.0.0(solid-js@1.9.18))(solid-js@1.9.18)
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -3741,10 +3740,10 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/solid/hash-routing:
     dependencies:
@@ -3772,7 +3771,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/solid/lazy-loading:
     dependencies:
@@ -3797,7 +3796,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/solid/nested-routes:
     dependencies:
@@ -3822,13 +3821,13 @@ importers:
         version: 0.8.10(@solidjs/router@1.0.0(solid-js@1.9.18))(solid-js@1.9.18)
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -3837,10 +3836,10 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/solid/persistent-params:
     dependencies:
@@ -3868,7 +3867,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/solid/search-schema:
     dependencies:
@@ -3902,7 +3901,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/solid/ssr-examples/ssg:
     dependencies:
@@ -3942,7 +3941,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/solid/ssr-examples/ssr:
     dependencies:
@@ -3991,7 +3990,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/solid/ssr-examples/ssr-mixed:
     dependencies:
@@ -4037,7 +4036,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/solid/ssr-examples/ssr-streaming:
     dependencies:
@@ -4080,7 +4079,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/solid/store-based-state:
     dependencies:
@@ -4105,7 +4104,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/solid/use-link-directive:
     dependencies:
@@ -4130,7 +4129,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: 2.11.14
-        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/svelte:
     dependencies:
@@ -4276,16 +4275,16 @@ importers:
         version: 7.3.1(svelte@5.57.3(@typescript-eslint/types@8.70.1))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/svelte':
         specifier: ~5.4.2
-        version: 5.4.2(svelte@5.57.3(@typescript-eslint/types@8.70.1))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 5.4.2(svelte@5.57.3(@typescript-eslint/types@8.70.1))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -4294,7 +4293,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/svelte/auth-guards:
     dependencies:
@@ -4319,16 +4318,16 @@ importers:
         version: 7.3.1(svelte@5.57.3(@typescript-eslint/types@8.70.1))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/svelte':
         specifier: ~5.4.2
-        version: 5.4.2(svelte@5.57.3(@typescript-eslint/types@8.70.1))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 5.4.2(svelte@5.57.3(@typescript-eslint/types@8.70.1))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -4337,7 +4336,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/svelte/basic:
     dependencies:
@@ -4405,16 +4404,16 @@ importers:
         version: 7.3.1(svelte@5.57.3(@typescript-eslint/types@8.70.1))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/svelte':
         specifier: ~5.4.2
-        version: 5.4.2(svelte@5.57.3(@typescript-eslint/types@8.70.1))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 5.4.2(svelte@5.57.3(@typescript-eslint/types@8.70.1))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -4423,7 +4422,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/svelte/data-loading:
     dependencies:
@@ -4482,16 +4481,16 @@ importers:
         version: 7.3.1(svelte@5.57.3(@typescript-eslint/types@8.70.1))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/svelte':
         specifier: ~5.4.2
-        version: 5.4.2(svelte@5.57.3(@typescript-eslint/types@8.70.1))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 5.4.2(svelte@5.57.3(@typescript-eslint/types@8.70.1))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -4500,7 +4499,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/svelte/error-handling:
     dependencies:
@@ -4525,16 +4524,16 @@ importers:
         version: 7.3.1(svelte@5.57.3(@typescript-eslint/types@8.70.1))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/svelte':
         specifier: ~5.4.2
-        version: 5.4.2(svelte@5.57.3(@typescript-eslint/types@8.70.1))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 5.4.2(svelte@5.57.3(@typescript-eslint/types@8.70.1))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -4543,7 +4542,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/svelte/hash-routing:
     dependencies:
@@ -4671,16 +4670,16 @@ importers:
         version: 7.3.1(svelte@5.57.3(@typescript-eslint/types@8.70.1))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/svelte':
         specifier: ~5.4.2
-        version: 5.4.2(svelte@5.57.3(@typescript-eslint/types@8.70.1))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 5.4.2(svelte@5.57.3(@typescript-eslint/types@8.70.1))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -4689,7 +4688,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   web/svelte/persistent-params:
     dependencies:
@@ -5118,7 +5117,7 @@ importers:
         version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
@@ -5129,8 +5128,8 @@ importers:
         specifier: 6.0.9
         version: 6.0.9(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))(vue@3.5.44(typescript@6.0.3))
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -5139,7 +5138,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       vue-tsc:
         specifier: 3.3.11
         version: 3.3.11(typescript@6.0.3)
@@ -5164,7 +5163,7 @@ importers:
         version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
@@ -5175,8 +5174,8 @@ importers:
         specifier: 6.0.9
         version: 6.0.9(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))(vue@3.5.44(typescript@6.0.3))
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -5185,7 +5184,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       vue-tsc:
         specifier: 3.3.11
         version: 3.3.11(typescript@6.0.3)
@@ -5256,7 +5255,7 @@ importers:
         version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
@@ -5267,8 +5266,8 @@ importers:
         specifier: 6.0.9
         version: 6.0.9(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))(vue@3.5.44(typescript@6.0.3))
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -5277,7 +5276,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       vue-tsc:
         specifier: 3.3.11
         version: 3.3.11(typescript@6.0.3)
@@ -5339,7 +5338,7 @@ importers:
         version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
@@ -5350,8 +5349,8 @@ importers:
         specifier: 6.0.9
         version: 6.0.9(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))(vue@3.5.44(typescript@6.0.3))
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -5360,7 +5359,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       vue-tsc:
         specifier: 3.3.11
         version: 3.3.11(typescript@6.0.3)
@@ -5385,7 +5384,7 @@ importers:
         version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
@@ -5396,8 +5395,8 @@ importers:
         specifier: 6.0.9
         version: 6.0.9(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))(vue@3.5.44(typescript@6.0.3))
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -5406,7 +5405,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       vue-tsc:
         specifier: 3.3.11
         version: 3.3.11(typescript@6.0.3)
@@ -5521,7 +5520,7 @@ importers:
         version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
@@ -5532,8 +5531,8 @@ importers:
         specifier: 6.0.9
         version: 6.0.9(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))(vue@3.5.44(typescript@6.0.3))
       jsdom:
-        specifier: 30.1.1
-        version: 30.1.1(@noble/hashes@2.2.0)
+        specifier: 31.0.0
+        version: 31.0.0(@noble/hashes@2.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -5542,7 +5541,7 @@ importers:
         version: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitest:
         specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       vue-tsc:
         specifier: 3.3.11
         version: 3.3.11(typescript@6.0.3)
@@ -6071,14 +6070,6 @@ packages:
       '@angular/platform-server':
         optional: true
 
-  '@asamuzakjp/css-color@7.0.0':
-    resolution: {integrity: sha512-IxddtGnnoidVSO6O/aiTueptbTThHvi2qGHu9/AWuD1J7i86Ox+jl+Y5SXcDH1RixzQlP2cjH/PjnlImZiAurQ==}
-    engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
-
-  '@asamuzakjp/dom-selector@9.2.1':
-    resolution: {integrity: sha512-NT4s3yZLjovPpliRpTvdsdzyPjqRqiCZj9MxnarBihbaY5MbAG7DWAJcrLlhmC7xKTNCXsTELcqB8YsqpLnUFQ==}
-    engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
-
   '@babel/code-frame@7.29.7':
     resolution: {integrity: sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw==}
     engines: {node: '>=6.9.0'}
@@ -6241,10 +6232,6 @@ packages:
     resolution: {integrity: sha512-c+xgSWboV2pdwXP67BUWDVRHi2BO5Q3KwxyFVs7taVTY+fsK47/L51ZXQoV9rozHJDNHvJ4v4WEsI/IlxV2l2A==}
     engines: {node: ^22.18.0 || >=24.11.0}
 
-  '@bramus/specificity@2.4.2':
-    resolution: {integrity: sha512-ctxtJ/eA+t+6q2++vj5j7FYX3nRu311q1wfYH3xjlLOsczhlhxAg2FWNUXhpGvAw3BWo1xBcvOV6/YLc2r5FJw==}
-    hasBin: true
-
   '@bufbuild/protobuf@2.15.0':
     resolution: {integrity: sha512-DAheWUkVr/SJTWCc+lg9dhY0eN4SaWlf4+bG1KzHeXbnqt0AfB/NX0Z+VunGlM1ki1B4zVvye27MpKh/svySUA==}
 
@@ -6253,42 +6240,6 @@ packages:
 
   '@cacheable/utils@2.5.0':
     resolution: {integrity: sha512-buipgOVDkkPXNR5+xBpDw7Zk2n1EvU7qBJCNUcL7rhQ//kfpOXPAvQ511Os0vpLYJ1pZnvudNytkQt2hst3wqA==}
-
-  '@csstools/color-helpers@6.1.1':
-    resolution: {integrity: sha512-gLNsunvwf3mCi5u5o46/Z/JcJMnhbHSaZ69rkgPzNM3J4s8hWwpPUQB6/tt0EDFyCiWzxANlx+2LJwpYj4zS1w==}
-    engines: {node: '>=20.19.0'}
-
-  '@csstools/css-calc@3.3.0':
-    resolution: {integrity: sha512-c5ihYsPkdG6JCkU2zTMm4+k6r7RXuGxtWYhu5DHMIiF1FHzrfmHL5so11AoFpUv/tu61xfcmT4AmKoFfMPoqdQ==}
-    engines: {node: '>=20.19.0'}
-    peerDependencies:
-      '@csstools/css-parser-algorithms': ^4.0.0
-      '@csstools/css-tokenizer': ^4.0.0
-
-  '@csstools/css-color-parser@4.2.2':
-    resolution: {integrity: sha512-3QKjR/vxyjcSXBLgb6lP0S3MGdvwbmqSsvLPbYdVORqPDc8FX1HAJ0Spk38bxaRXgvENTA47tlhhbb5Z2e8hEg==}
-    engines: {node: '>=20.19.0'}
-    peerDependencies:
-      '@csstools/css-parser-algorithms': ^4.0.0
-      '@csstools/css-tokenizer': ^4.0.0
-
-  '@csstools/css-parser-algorithms@4.0.0':
-    resolution: {integrity: sha512-+B87qS7fIG3L5h3qwJ/IFbjoVoOe/bpOdh9hAjXbvx0o8ImEmUsGXN0inFOnk2ChCFgqkkGFQ+TpM5rbhkKe4w==}
-    engines: {node: '>=20.19.0'}
-    peerDependencies:
-      '@csstools/css-tokenizer': ^4.0.0
-
-  '@csstools/css-syntax-patches-for-csstree@1.1.14':
-    resolution: {integrity: sha512-HpbVXyrofRXpHpgkNIjU/3EWR4WJvOkO3emNK/L6X/mTJU7bGUI3AkkpoTNXznQLp0KRjLHELTGeKI5dIkI9JQ==}
-    peerDependencies:
-      css-tree: ^3.2.1
-    peerDependenciesMeta:
-      css-tree:
-        optional: true
-
-  '@csstools/css-tokenizer@4.0.0':
-    resolution: {integrity: sha512-QxULHAm7cNu72w97JUNCBFODFaXpbDg+dP8b/oWFAZ2MTRppA3U00Y2L1HqaS4J6yBqxwa/Y3nMBaxVKbB/NsA==}
-    engines: {node: '>=20.19.0'}
 
   '@electron-internal/extract-zip@1.0.3':
     resolution: {integrity: sha512-OjKpjB7gohtEjZiq6nDx1egqjZJhGPN1iFOIED+NFhB/MMkXw/XRcHjh1DGXKT5z2W9eW7Jy2UKU3gpjvusFTQ==}
@@ -6553,8 +6504,8 @@ packages:
     resolution: {integrity: sha512-IkO+/KEUvwbVpiURZg+P7zF74z5Jxe0UgJxVni+RtoHQ6IZieXaO02kmadomap/q+l6bc/jdPGGqTjhuZnuz1Q==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
 
-  '@exodus/bytes@1.15.1':
-    resolution: {integrity: sha512-S6mL0yNB/Abt9Ei4tq8gDhcczc4S3+vQ4ra7vxnAf+YHC02srtqxKKZghx2Dq6p0e66THKwR6r8N6P95wEty7Q==}
+  '@exodus/bytes@1.16.0':
+    resolution: {integrity: sha512-IcpW84uEn3N7ETtNZMlxKhfl6Pec8rUNGOTBtWbK1FKhJxIFAptZyVrvVRVBimAJxJCgc3PxepxkdWWG4DVzfA==}
     engines: {node: ^20.19.0 || ^22.12.0 || >=24.0.0}
     peerDependencies:
       '@noble/hashes': ^1.8.0 || ^2.0.0
@@ -8711,12 +8662,15 @@ packages:
     engines: {node: '>=6.0.0'}
     hasBin: true
 
+  bcp-47-match@2.0.3:
+    resolution: {integrity: sha512-JtTezzbAibu8G0R9op9zb3vcWZd9JF6M0xOYGPn0fNCd7wOpRB1mU2mH9T8gaBGbAAyIIVgB2G7xG0GP98zMAQ==}
+
+  bcp-47@2.1.2:
+    resolution: {integrity: sha512-wsv86UuNFuPnVieKLyECTT+CP1WSAHeoIg5P3xu2kA9Z+7fVPoKt7dxzSeEhtJel0AI+NW3fIW3KtTKQKUCngg==}
+
   beasties@0.5.4:
     resolution: {integrity: sha512-8/lOOjT+PElYCnaUbmhgd3Uad5R1VTQ4Wg0k4rK8bX04m5WEqHNmnlLy3Q/lJ7dk25XA+72gayzc/skTfKKpcA==}
     engines: {node: '>=20.19.0'}
-
-  bidi-js@1.1.0:
-    resolution: {integrity: sha512-fX1Onk0tdVPC7obPWB5EbJ1z7NVhLq4m2xZLq2YXBkxzMXIGRpNMU88n0EPgWseKl12J7zXs7qrDxPK4sRs2fg==}
 
   bluebird@3.7.2:
     resolution: {integrity: sha512-XpNj6GDQzdfW+r2Wnn7xiSAd7TM3jzkxGXBGTtWKuSXv1xUV+azxAm8jdWZN06QTQk+2N2XB9jRDkvbmQmcRtg==}
@@ -8987,10 +8941,6 @@ packages:
     resolution: {integrity: sha512-snmjEVXy+1LnwXdxhYvTMj1d9tOh4HxkA1YmoayVBeeyR2C14Pum7fcxJIm4SswYspVy866eYNwlH6xC3/VH5g==}
     engines: {node: '>=20.19.0'}
 
-  css-tree@3.2.1:
-    resolution: {integrity: sha512-X7sjQzceUhu1u7Y/ylrRZFU2FS6LRiFVp6rKLPg23y3x3c3DOKAwuXGDp+PAGjh6CSnCjYeAul8pcT8bAl+lSA==}
-    engines: {node: ^10 || ^12.20.0 || ^14.13.0 || >=15.0.0}
-
   css-what@6.2.2:
     resolution: {integrity: sha512-u/O3vwbptzhMs3L1fQE82ZSLHQQfto5gyZzwteVIEyeaY5Fc7R4dapF/BvRoSYFeqfBk4m0V1Vafq5Pjv25wvA==}
     engines: {node: '>= 6'}
@@ -9010,9 +8960,9 @@ packages:
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
 
-  data-urls@7.0.0:
-    resolution: {integrity: sha512-23XHcCF+coGYevirZceTVD7NdJOqVn+49IHyxgszm+JIiHLoB2TkmPtsYkNWT1pvRSGkc35L6NHs0yHkN2SumA==}
-    engines: {node: ^20.19.0 || ^22.12.0 || >=24.0.0}
+  data-urls@8.0.0:
+    resolution: {integrity: sha512-JQUCCK+/CAGbGGx618PlFZMXH81Jtj7t73CHv9dd/zVWvxgGT2zLFRjnKb+Ng46GIwcy+f7f88qd4duqllK+WQ==}
+    engines: {node: ^22.14.0 || >=24.0.0}
 
   debug@4.4.3:
     resolution: {integrity: sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==}
@@ -9203,6 +9153,10 @@ packages:
 
   entities@8.0.0:
     resolution: {integrity: sha512-zwfzJecQ/Uej6tusMqwAqU/6KL2XaB2VZ2Jg54Je6ahNBGNH6Ek6g3jjNCF0fG9EWQKGZNddNjU5F1ZQn/sBnA==}
+    engines: {node: '>=20.19.0'}
+
+  entities@9.0.0:
+    resolution: {integrity: sha512-oJFNDJg3kTPwAD1cNn2+WmUq4wFoo09npc3Ydf1D7ED4smRiWrsKnaLxykrTWgyGEcusc87P5dxlAleol9kpkg==}
     engines: {node: '>=20.19.0'}
 
   env-paths@2.2.1:
@@ -9831,6 +9785,12 @@ packages:
     resolution: {integrity: sha512-0KI/607xoxSToH7GjN1FfSbLoU0+btTicjsQSWQlh/hZykN8KpmMf7uYwPW3R+akZ6R/w18ZlXSHBYXiYUPO3g==}
     engines: {node: '>= 0.10'}
 
+  is-alphabetical@2.0.1:
+    resolution: {integrity: sha512-FWyyY60MeTNyeSRpkM2Iry0G9hpr7/9kD40mD/cGQEuilcZYS4okz8SN2Q6rLCJ8gbCt6fN+rC+6tMGS99LaxQ==}
+
+  is-alphanumerical@2.0.1:
+    resolution: {integrity: sha512-hmbYhX/9MUMF5uh7tOXyK/n0ZvWpad5caBA17GsC6vyuCqaWliRG5K1qS9inmUhEMaOBIW7/whAnSwveW/LtZw==}
+
   is-arguments@1.2.0:
     resolution: {integrity: sha512-7bVbi0huj/wrIAOzb8U1aszg9kdi3KN/CyU19CTI7tAoZYEZoL9yCDXpbXN+uPsuWnP02cyug1gleqq+TU+YCA==}
     engines: {node: '>= 0.4'}
@@ -9861,6 +9821,9 @@ packages:
   is-date-object@1.1.0:
     resolution: {integrity: sha512-PwwhEakHVKTdRNVOw+/Gyh0+MzlCl4R6qKvkhuvLtPMggI1WAHt9sOwZxQLSGpUaDnrdyDsomoRgNnCfKNSXXg==}
     engines: {node: '>= 0.4'}
+
+  is-decimal@2.0.1:
+    resolution: {integrity: sha512-AAB9hiomQs5DXWcRB1rqsxGUstbRroFOPPVAomNk/3XHR5JyEZChOyTWe2oayKnsSsr/kcGqF+z6yuH6HHpN0A==}
 
   is-extglob@2.1.1:
     resolution: {integrity: sha512-SbKbANkN603Vi4jEZv49LeVJMn4yGwsbzZworEoyEiutsN3nJYdbO36zfhGJ6QEDpOZIFkDtnq5JRxmvl3jsoQ==}
@@ -10008,13 +9971,13 @@ packages:
     resolution: {integrity: sha512-eFY7Rlscvv/BpY6UsVsjKwMhu1tJO/F4U/vC9g3yeRy/JqszuO1UP6Vdq+85G+3FP6fEw/sWR8a5ftPFY86csw==}
     engines: {node: ^22.22.2 || >=24.15.0}
 
-  jsdom@30.1.1:
-    resolution: {integrity: sha512-FahmoPK5vbPc+jxV1iErMHmAZypCZ942NHF4+qqaWAuvaKKTBZxawnmAtrbGWLU7MtlxfqIP0qw6aSI+aWGtLg==}
+  jsdom@31.0.0:
+    resolution: {integrity: sha512-xAkhD9z1eyFC5+QUi9K24CaZJgdCQ2GOGLW1GdVDoQvkp/AxEH9TQ0pAplPOlIiV92hfcgnFOADZypbjgbBT6Q==}
     engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
     peerDependencies:
-      canvas: ^3.2.3
+      '@napi-rs/canvas': ^1.0.13
     peerDependenciesMeta:
-      canvas:
+      '@napi-rs/canvas':
         optional: true
 
   jsesc@3.1.0:
@@ -10233,9 +10196,6 @@ packages:
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
-
-  mdn-data@2.27.1:
-    resolution: {integrity: sha512-9Yubnt3e8A0OKwxYSXyhLymGW4sCufcLG6VdiDdUGVkPhpqLxlvP5vl1983gQjJl3tqbrM731mjaZaP68AgosQ==}
 
   mdn-data@2.34.0:
     resolution: {integrity: sha512-OgIlLv0NxJKVW4GTSAoEgpRGd4F2XCqGinK0MsMlBCCS/Zcm2/LsbercNWNA7PeMMcjl75NnI97eqyo7zkdxWA==}
@@ -10543,14 +10503,17 @@ packages:
   parse5-html-rewriting-stream@8.0.1:
     resolution: {integrity: sha512-NaRku2aMpUN1Sh1Gyk1KWUh2A7EJx2c6qYzvwsPtqhoHoaURshdrceYK3LunVCm3WHhm6FS7Vcczbvdh3/UIVw==}
 
+  parse5-parser-stream@8.1.1:
+    resolution: {integrity: sha512-hMcVbbUJcQmP8rURWUdYrT1flRiBiBVjq/RYGguJpDUgIXSqdYKlE0CxthmdMWoSlBAuL5bUBa73g0pttSy7Hw==}
+
   parse5-sax-parser@8.0.0:
     resolution: {integrity: sha512-/dQ8UzHZwnrzs3EvDj6IkKrD/jIZyTlB+8XrHJvcjNgRdmWruNdN9i9RK/JtxakmlUdPwKubKPTCqvbTgzGhrw==}
 
   parse5@7.3.0:
     resolution: {integrity: sha512-IInvU7fabl34qmi9gY8XOVxhYyMyuH2xUNpb2q8/Y+7552KlejkRvqvD19nMoUW/uQGGbqNpA6Tufu5FL5BZgw==}
 
-  parse5@8.0.1:
-    resolution: {integrity: sha512-z1e/HMG90obSGeidlli3hj7cbocou0/wa5HacvI3ASx34PecNjNQeaHNo5WIZpWofN9kgkqV1q5YvXe3F0FoPw==}
+  parse5@8.1.1:
+    resolution: {integrity: sha512-EcR/6WDcU7b2N3vQSxKALCk9lXGtUMQxXio008OEMBE0kavu/7JLfBEeFPzi43nMqVDSbEn3QCK+BMCc9zO//w==}
 
   parseurl@1.3.3:
     resolution: {integrity: sha512-CiyeOxFT/JZyN5m0z9PfXw4SCBJ6Sygz1Dpl0wqjlhDEGGBP1GnsUVEL0p63hoG1fcj3fHynXi9NYO4nWOL+qQ==}
@@ -11430,9 +11393,9 @@ packages:
     resolution: {integrity: sha512-exgYmnmL/sJpR3upZfXG5PoatXQii55xAiXGXzY+sROLZ/Y+SLcp9PgJNI9Vz37HpQ74WvDcLT8eqm+kV3FzrA==}
     engines: {node: '>=16'}
 
-  tr46@6.0.0:
-    resolution: {integrity: sha512-bLVMLPtstlZ4iMQHpFHTR7GAGj2jxi8Dg0s2h2MafAE4uSWF98FC/3MomU51iQAMf8/qDUbKWf5GxuvvVcXEhw==}
-    engines: {node: '>=20'}
+  tr46@7.0.0:
+    resolution: {integrity: sha512-BcDSDW+SIGWVOns1Zm6Yg91q9AEj7eaID0QDY9oIqJD1A8dscNwMcl9Sms2DeuWCNov1X0/oXanHGYQBSLwZsg==}
+    engines: {node: ^22.14.0 || >=24.0.0}
 
   tree-kill@1.2.2:
     resolution: {integrity: sha512-L0Orpi8qGpRG//Nd+H90vFB+3iHnue1zSSGmNOOCh1GLJ7rUKVwV2HvijphGQS2UmhUZewS9VgvxYIdgr+fG1A==}
@@ -11497,8 +11460,8 @@ packages:
     resolution: {integrity: sha512-03KrMbjIFDWQR5RNPrSw3bd1r12JpyFQl9/yxjUbJtqkjmllqC5lFjZh6ujeuJCKr8EOQvRW872Oy/az+nLYxg==}
     engines: {node: '>=20.18.1'}
 
-  undici@8.12.2:
-    resolution: {integrity: sha512-XtuDWVdqTLr3NAxm2ly9/hU6kUsJOgGh1RASzMBbsw6aWCOaQzHdW+QQDfdERjfJ2V5vL5pRPa4RetO9UfivDg==}
+  undici@8.12.4:
+    resolution: {integrity: sha512-8Mx+uNKKER2bA4AdtedkqRbwUCIJFr2nJckXRe5yrDqzePqwLP7VNcctN8/XdmDSbF7mS+jJKIszlL+vbam1VA==}
     engines: {node: '>=22.19.0'}
 
   universalify@0.1.2:
@@ -11705,12 +11668,8 @@ packages:
     resolution: {integrity: sha512-sXcNcHOC51uPGF0P/D4NVtrkjSU2fNsm9iog4ZvZJsL3rjoDAzXZhkm2MWt1y+PUdggKAYVoMAIYcs78wJ51Cw==}
     engines: {node: '>=20'}
 
-  whatwg-url@16.0.1:
-    resolution: {integrity: sha512-1to4zXBxmXHV3IiSSEInrreIlu02vUOvrhxJJH5vcxYTBDAx51cqZiKdyTxlecdKNSjj8EcxGBxNf6Vg+945gw==}
-    engines: {node: ^20.19.0 || ^22.12.0 || >=24.0.0}
-
-  whatwg-url@17.1.1:
-    resolution: {integrity: sha512-ohjk1mdUebJVadRt3bAhQhx8lSnISq+GDttK79LFl8EHQkAPvzwctoasC4hs8tBt6kLAncBWWyq1N52qEfKvDw==}
+  whatwg-url@17.3.0:
+    resolution: {integrity: sha512-KwOAJrpf+GTgBvcBQJcP38sMF0DsQKdwtG+TxM2pW44P6E5k0hDbWrDmyuJDIF0Uef0aQq0ZoJs+5oI+k8ddhg==}
     engines: {node: ^22.14.0 || >=24.0.0}
 
   which-boxed-primitive@1.1.1:
@@ -11875,25 +11834,25 @@ snapshots:
       '@jridgewell/gen-mapping': 0.3.13
       '@jridgewell/trace-mapping': 0.3.31
 
-  '@analogjs/vite-plugin-angular@2.7.5(@angular/build@22.2.3(f0764b5059b9cc96ed86a29b64d3fcab))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))':
+  '@analogjs/vite-plugin-angular@2.7.5(@angular/build@22.2.3(fd4b4b3effa793b88323c288628774ec))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))':
     dependencies:
       magic-string: 0.30.21
       obug: 2.1.4
       oxc-parser: 0.121.0(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
       tinyglobby: 0.2.17
     optionalDependencies:
-      '@angular/build': 22.2.3(f0764b5059b9cc96ed86a29b64d3fcab)
+      '@angular/build': 22.2.3(fd4b4b3effa793b88323c288628774ec)
       vite: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
     transitivePeerDependencies:
       - '@emnapi/core'
       - '@emnapi/runtime'
 
-  '@analogjs/vitest-angular@2.7.5(@analogjs/vite-plugin-angular@2.7.5(@angular/build@22.2.3(f0764b5059b9cc96ed86a29b64d3fcab))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))(@angular-devkit/architect@0.2202.4(chokidar@5.0.0))(@angular-devkit/schematics@22.2.4(chokidar@5.0.0))(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))':
+  '@analogjs/vitest-angular@2.7.5(@analogjs/vite-plugin-angular@2.7.5(@angular/build@22.2.3(fd4b4b3effa793b88323c288628774ec))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))(@angular-devkit/architect@0.2202.4(chokidar@5.0.0))(@angular-devkit/schematics@22.2.4(chokidar@5.0.0))(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))':
     dependencies:
-      '@analogjs/vite-plugin-angular': 2.7.5(@angular/build@22.2.3(f0764b5059b9cc96ed86a29b64d3fcab))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+      '@analogjs/vite-plugin-angular': 2.7.5(@angular/build@22.2.3(fd4b4b3effa793b88323c288628774ec))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@angular-devkit/architect': 0.2202.4(chokidar@5.0.0)
       '@angular-devkit/schematics': 22.2.4(chokidar@5.0.0)
-      vitest: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+      vitest: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   '@angular-devkit/architect@0.2202.3(chokidar@5.0.0)':
     dependencies:
@@ -11941,7 +11900,7 @@ snapshots:
     transitivePeerDependencies:
       - chokidar
 
-  '@angular/build@22.2.3(f0764b5059b9cc96ed86a29b64d3fcab)':
+  '@angular/build@22.2.3(fd4b4b3effa793b88323c288628774ec)':
     dependencies:
       '@ampproject/remapping': 2.3.0
       '@angular-devkit/architect': 0.2202.3(chokidar@5.0.0)
@@ -11985,7 +11944,7 @@ snapshots:
       ng-packagr: 22.1.1(@angular/compiler-cli@22.2.3(@angular/compiler@22.2.3)(typescript@6.0.3))(tslib@2.8.1)(typescript@6.0.3)
       postcss: 8.5.31
       rollup: 4.63.2
-      vitest: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+      vitest: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
     transitivePeerDependencies:
       - '@types/node'
       - '@vitejs/devtools'
@@ -12092,21 +12051,6 @@ snapshots:
       tslib: 2.8.1
     optionalDependencies:
       '@angular/platform-server': 22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/compiler@22.2.3)(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(@angular/platform-browser@22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)))(rxjs@7.8.2)
-
-  '@asamuzakjp/css-color@7.0.0':
-    dependencies:
-      '@csstools/css-calc': 3.3.0(@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.0))(@csstools/css-tokenizer@4.0.0)
-      '@csstools/css-color-parser': 4.2.2(@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.0))(@csstools/css-tokenizer@4.0.0)
-      '@csstools/css-parser-algorithms': 4.0.0(@csstools/css-tokenizer@4.0.0)
-      '@csstools/css-tokenizer': 4.0.0
-      lru-cache: 11.5.3
-
-  '@asamuzakjp/dom-selector@9.2.1':
-    dependencies:
-      bidi-js: 1.1.0
-      css-tree: 3.2.1
-      is-potential-custom-element-name: 1.0.1
-      lru-cache: 11.5.3
 
   '@babel/code-frame@7.29.7':
     dependencies:
@@ -12343,10 +12287,6 @@ snapshots:
       '@babel/helper-string-parser': 8.0.6
       '@babel/helper-validator-identifier': 8.0.6
 
-  '@bramus/specificity@2.4.2':
-    dependencies:
-      css-tree: 3.2.1
-
   '@bufbuild/protobuf@2.15.0': {}
 
   '@cacheable/memory@2.2.0':
@@ -12360,30 +12300,6 @@ snapshots:
     dependencies:
       hashery: 1.5.1
       keyv: 5.6.0
-
-  '@csstools/color-helpers@6.1.1': {}
-
-  '@csstools/css-calc@3.3.0(@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.0))(@csstools/css-tokenizer@4.0.0)':
-    dependencies:
-      '@csstools/css-parser-algorithms': 4.0.0(@csstools/css-tokenizer@4.0.0)
-      '@csstools/css-tokenizer': 4.0.0
-
-  '@csstools/css-color-parser@4.2.2(@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.0))(@csstools/css-tokenizer@4.0.0)':
-    dependencies:
-      '@csstools/color-helpers': 6.1.1
-      '@csstools/css-calc': 3.3.0(@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.0))(@csstools/css-tokenizer@4.0.0)
-      '@csstools/css-parser-algorithms': 4.0.0(@csstools/css-tokenizer@4.0.0)
-      '@csstools/css-tokenizer': 4.0.0
-
-  '@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.0)':
-    dependencies:
-      '@csstools/css-tokenizer': 4.0.0
-
-  '@csstools/css-syntax-patches-for-csstree@1.1.14(css-tree@3.2.1)':
-    optionalDependencies:
-      css-tree: 3.2.1
-
-  '@csstools/css-tokenizer@4.0.0': {}
 
   '@electron-internal/extract-zip@1.0.3': {}
 
@@ -12619,7 +12535,7 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
-  '@exodus/bytes@1.15.1(@noble/hashes@2.2.0)':
+  '@exodus/bytes@1.16.0(@noble/hashes@2.2.0)':
     optionalDependencies:
       '@noble/hashes': 2.2.0
 
@@ -13731,7 +13647,7 @@ snapshots:
       lz-string: 1.5.0
       pretty-format: 27.5.1
 
-  '@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))':
+  '@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))':
     dependencies:
       '@adobe/css-tools': 4.5.0
       '@testing-library/dom': 10.4.1
@@ -13741,7 +13657,7 @@ snapshots:
       picocolors: 1.1.1
       redent: 3.0.0
     optionalDependencies:
-      vitest: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+      vitest: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   '@testing-library/preact@3.2.4(preact@10.29.8)':
     dependencies:
@@ -13762,14 +13678,14 @@ snapshots:
     dependencies:
       svelte: 5.57.3(@typescript-eslint/types@8.70.1)
 
-  '@testing-library/svelte@5.4.2(svelte@5.57.3(@typescript-eslint/types@8.70.1))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))':
+  '@testing-library/svelte@5.4.2(svelte@5.57.3(@typescript-eslint/types@8.70.1))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))':
     dependencies:
       '@testing-library/dom': 10.4.1
       '@testing-library/svelte-core': 1.1.3(svelte@5.57.3(@typescript-eslint/types@8.70.1))
       svelte: 5.57.3(@typescript-eslint/types@8.70.1)
     optionalDependencies:
       vite: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
-      vitest: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+      vitest: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
   '@testing-library/user-event@14.6.1(@testing-library/dom@10.4.1)':
     dependencies:
@@ -14102,7 +14018,7 @@ snapshots:
       vite: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vue: 3.5.44(typescript@6.0.3)
 
-  '@vitest/eslint-plugin@1.6.27(@typescript-eslint/eslint-plugin@8.70.1(@typescript-eslint/parser@8.70.1(eslint@10.11.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(eslint@10.11.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(eslint@10.11.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))':
+  '@vitest/eslint-plugin@1.6.27(@typescript-eslint/eslint-plugin@8.70.1(@typescript-eslint/parser@8.70.1(eslint@10.11.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(eslint@10.11.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(eslint@10.11.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))':
     dependencies:
       '@typescript-eslint/scope-manager': 8.70.1
       '@typescript-eslint/utils': 8.70.1(eslint@10.11.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
@@ -14110,7 +14026,7 @@ snapshots:
     optionalDependencies:
       '@typescript-eslint/eslint-plugin': 8.70.1(@typescript-eslint/parser@8.70.1(eslint@10.11.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(eslint@10.11.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
       typescript: 6.0.3
-      vitest: 5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+      vitest: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
     transitivePeerDependencies:
       - supports-color
 
@@ -14404,6 +14320,14 @@ snapshots:
 
   baseline-browser-mapping@2.11.20: {}
 
+  bcp-47-match@2.0.3: {}
+
+  bcp-47@2.1.2:
+    dependencies:
+      is-alphabetical: 2.0.1
+      is-alphanumerical: 2.0.1
+      is-decimal: 2.0.1
+
   beasties@0.5.4:
     dependencies:
       css-select: 7.0.0
@@ -14415,10 +14339,6 @@ snapshots:
       postcss: 8.5.31
       postcss-media-query-parser: 0.2.3
       postcss-safe-parser: 7.0.1(postcss@8.5.31)
-
-  bidi-js@1.1.0:
-    dependencies:
-      require-from-string: 2.0.2
 
   bluebird@3.7.2: {}
 
@@ -14698,11 +14618,6 @@ snapshots:
       domutils: 4.0.2
       nth-check: 3.0.1
 
-  css-tree@3.2.1:
-    dependencies:
-      mdn-data: 2.27.1
-      source-map-js: 1.2.2
-
   css-what@6.2.2: {}
 
   css-what@8.0.0: {}
@@ -14713,10 +14628,10 @@ snapshots:
 
   csstype@3.2.3: {}
 
-  data-urls@7.0.0(@noble/hashes@2.2.0):
+  data-urls@8.0.0(@noble/hashes@2.2.0):
     dependencies:
       whatwg-mimetype: 5.0.0
-      whatwg-url: 16.0.1(@noble/hashes@2.2.0)
+      whatwg-url: 17.3.0(@noble/hashes@2.2.0)
     transitivePeerDependencies:
       - '@noble/hashes'
 
@@ -14948,6 +14863,8 @@ snapshots:
   entities@7.0.1: {}
 
   entities@8.0.0: {}
+
+  entities@9.0.0: {}
 
   env-paths@2.2.1: {}
 
@@ -15574,7 +15491,7 @@ snapshots:
 
   html-encoding-sniffer@7.0.0(@noble/hashes@2.2.0):
     dependencies:
-      '@exodus/bytes': 1.15.1(@noble/hashes@2.2.0)
+      '@exodus/bytes': 1.16.0(@noble/hashes@2.2.0)
     transitivePeerDependencies:
       - '@noble/hashes'
 
@@ -15715,6 +15632,13 @@ snapshots:
 
   ipaddr.js@1.9.1: {}
 
+  is-alphabetical@2.0.1: {}
+
+  is-alphanumerical@2.0.1:
+    dependencies:
+      is-alphabetical: 2.0.1
+      is-decimal: 2.0.1
+
   is-arguments@1.2.0:
     dependencies:
       call-bound: 1.0.4
@@ -15749,6 +15673,8 @@ snapshots:
     dependencies:
       call-bound: 1.0.4
       has-tostringtag: 1.0.2
+
+  is-decimal@2.0.1: {}
 
   is-extglob@2.1.1: {}
 
@@ -15885,27 +15811,25 @@ snapshots:
       '@types/estree': 1.0.9
       '@types/node': 26.6.6
 
-  jsdom@30.1.1(@noble/hashes@2.2.0):
+  jsdom@31.0.0(@noble/hashes@2.2.0):
     dependencies:
-      '@asamuzakjp/css-color': 7.0.0
-      '@asamuzakjp/dom-selector': 9.2.1
-      '@bramus/specificity': 2.4.2
-      '@csstools/css-syntax-patches-for-csstree': 1.1.14(css-tree@3.2.1)
-      '@exodus/bytes': 1.15.1(@noble/hashes@2.2.0)
-      css-tree: 3.2.1
-      data-urls: 7.0.0(@noble/hashes@2.2.0)
+      '@exodus/bytes': 1.16.0(@noble/hashes@2.2.0)
+      bcp-47: 2.1.2
+      bcp-47-match: 2.0.3
+      data-urls: 8.0.0(@noble/hashes@2.2.0)
       decimal.js: 10.6.0
       html-encoding-sniffer: 7.0.0(@noble/hashes@2.2.0)
       is-potential-custom-element-name: 1.0.1
       lru-cache: 11.5.3
-      parse5: 8.0.1
+      parse5: 8.1.1
+      parse5-parser-stream: 8.1.1
       saxes: 6.0.0
       tough-cookie: 6.0.2
-      undici: 8.12.2
+      undici: 8.12.4
       w3c-xmlserializer: 6.0.0
       webidl-conversions: 8.0.1
       whatwg-mimetype: 5.0.0
-      whatwg-url: 17.1.1(@noble/hashes@2.2.0)
+      whatwg-url: 17.3.0(@noble/hashes@2.2.0)
       xml-name-validator: 5.0.0
     transitivePeerDependencies:
       - '@noble/hashes'
@@ -16113,8 +16037,6 @@ snapshots:
     optional: true
 
   math-intrinsics@1.1.0: {}
-
-  mdn-data@2.27.1: {}
 
   mdn-data@2.34.0: {}
 
@@ -16458,20 +16380,24 @@ snapshots:
   parse5-html-rewriting-stream@8.0.1:
     dependencies:
       entities: 8.0.0
-      parse5: 8.0.1
+      parse5: 8.1.1
       parse5-sax-parser: 8.0.0
+
+  parse5-parser-stream@8.1.1:
+    dependencies:
+      parse5: 8.1.1
 
   parse5-sax-parser@8.0.0:
     dependencies:
-      parse5: 8.0.1
+      parse5: 8.1.1
 
   parse5@7.3.0:
     dependencies:
       entities: 6.0.1
 
-  parse5@8.0.1:
+  parse5@8.1.1:
     dependencies:
-      entities: 8.0.0
+      entities: 9.0.0
 
   parseurl@1.3.3: {}
 
@@ -17388,7 +17314,7 @@ snapshots:
     dependencies:
       tldts: 7.4.9
 
-  tr46@6.0.0:
+  tr46@7.0.0:
     dependencies:
       punycode: 2.3.1
 
@@ -17449,7 +17375,7 @@ snapshots:
   undici@7.30.1:
     optional: true
 
-  undici@8.12.2: {}
+  undici@8.12.4: {}
 
   universalify@0.1.2: {}
 
@@ -17514,7 +17440,7 @@ snapshots:
 
   verkit@0.3.2: {}
 
-  vite-plugin-solid@2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)):
+  vite-plugin-solid@2.11.14(@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))))(solid-js@1.9.18)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)):
     dependencies:
       '@babel/core': 7.29.7(supports-color@10.2.2)
       '@types/babel__core': 7.20.5
@@ -17525,7 +17451,7 @@ snapshots:
       vite: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
       vitefu: 1.1.3(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
     optionalDependencies:
-      '@testing-library/jest-dom': 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
+      '@testing-library/jest-dom': 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
     transitivePeerDependencies:
       - supports-color
 
@@ -17561,7 +17487,7 @@ snapshots:
     optionalDependencies:
       vite: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
 
-  vitest@5.1.0(@types/node@26.6.6)(jsdom@30.1.1(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)):
+  vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/mocker': 5.1.0(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
@@ -17579,7 +17505,7 @@ snapshots:
       why-is-node-running: 3.2.1
     optionalDependencies:
       '@types/node': 26.6.6
-      jsdom: 30.1.1(@noble/hashes@2.2.0)
+      jsdom: 31.0.0(@noble/hashes@2.2.0)
     transitivePeerDependencies:
       - msw
 
@@ -17645,18 +17571,10 @@ snapshots:
 
   whatwg-mimetype@5.0.0: {}
 
-  whatwg-url@16.0.1(@noble/hashes@2.2.0):
+  whatwg-url@17.3.0(@noble/hashes@2.2.0):
     dependencies:
-      '@exodus/bytes': 1.15.1(@noble/hashes@2.2.0)
-      tr46: 6.0.0
-      webidl-conversions: 8.0.1
-    transitivePeerDependencies:
-      - '@noble/hashes'
-
-  whatwg-url@17.1.1(@noble/hashes@2.2.0):
-    dependencies:
-      '@exodus/bytes': 1.15.1(@noble/hashes@2.2.0)
-      tr46: 6.0.0
+      '@exodus/bytes': 1.16.0(@noble/hashes@2.2.0)
+      tr46: 7.0.0
       webidl-conversions: 8.0.1
     transitivePeerDependencies:
       - '@noble/hashes'

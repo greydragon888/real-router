@@ -12965,6 +12965,8 @@ Two edges outside their range are the entry's purpose, and their comments say so
 
 ## undici: the root provides danger's peer, the examples floor each major (#2605, 2026-09-27)
 
+> **Updated (2026-11-11).** The examples floor 6.x and 7.x only. jsdom 31 declares `undici: ^8.12.3`, above 8.12.2, the release that fixes the 8.x line, and `lint:overrides` failed `undici@8: '>=8.12.2 <9'` as dead and below: the entry rewrote jsdom's range and held it on 8.12.2, below the range jsdom declares. Without it jsdom takes 8.12.4.
+
 > **Updated (2026-10-24).** The examples floor 8.x too, at `undici@8: '>=8.12.2 <9'`. Three advisories, GHSA-xjj6-f33q-929c among them, reach 8.11.2, which jsdom's `^8.10.2` admits, so jsdom's range no longer starts above the 8.x fix. The root still carries no undici entry, and `pnpm update undici` moves its copies.
 
 > ⚠ Superseded on 2026-09-28 for the root: the devDependency is gone, and
@@ -13550,6 +13552,8 @@ After the change every consumer still re-keys `bundle`, `lint`, `test` and `type
 **Solution.** The fifteen files are deleted and the ten rules removed. A compile run that emits such a file again shows it in `git status`, where it gets deleted rather than hashed.
 
 ## undici leaves 7.29.0 for GHSA-3wwx-pv8p-q78v (2026-09-29)
+
+> **Updated (2026-11-11).** 8.x has no floor again: jsdom 31's `^8.12.3` starts above the fixed 8.x release. See "undici: the root provides danger's peer, the examples floor each major".
 
 > **Updated (2026-10-24).** The floors are `'>=6.29.1 <7'` and `'>=7.30.1 <8'`, and 8.x has one too: jsdom's `^8.10.2` no longer starts at a fixed 8.x release. See "undici: the root provides danger's peer, the examples floor each major".
 

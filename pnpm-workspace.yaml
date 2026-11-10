@@ -52,7 +52,7 @@ overrides:
   ajv@8: ~8.20.0
   # undici has no entry here. danger 14 declares it both as a dependency and as
   # an optional peer; `.pnpmfile.mjs` drops the peer declaration, so danger
-  # installs a 7.x of its own. jsdom 30 takes 8.x on its own range.
+  # installs a 7.x of its own. jsdom 31 takes 8.x on its own range.
   #
   # ReDoS in brace-expansion (GHSA-3jxr-9vmj-r5cp, High). One major line, @5, is in the tree via
   # minimatch 11 — pinned to its patched release. EXACT (not '>=') because the
