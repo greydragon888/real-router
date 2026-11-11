@@ -166,7 +166,7 @@ export class SearchSchemaPlugin {
     const channel = {
       ...omitKeys(result.params, pathParams),
       ...result.search,
-    } as Params;
+    };
 
     const verdict = this.#validate(schema, result.name, channel);
 
@@ -303,7 +303,7 @@ export class SearchSchemaPlugin {
     // survives that subtraction is undeclared path-channel data, and pouring it
     // into the query channel would be this plugin re-creating a repair core
     // does not perform.
-    const defaults = (route?.defaultSearch ?? {}) as Params;
+    const defaults = route?.defaultSearch ?? {};
     const repaired = { ...pickKeys(defaults, invalidKeys), ...stripped };
     const revalidation = this.#runSchema(schema, routeName, repaired);
 
@@ -382,7 +382,7 @@ export class SearchSchemaPlugin {
       }
     }
 
-    return { ...result, params, search: search as SearchParams };
+    return { ...result, params, search };
   }
 
   /**

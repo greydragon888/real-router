@@ -6,7 +6,7 @@ import { getPluginApi } from "@real-router/core/api";
 
 import { NUM_RUNS } from "./helpers";
 
-import type { Route, Router, State } from "@real-router/core";
+import type { Route, Router, SearchParamValue, State } from "@real-router/core";
 
 /**
  * RFC-4 M2 (#1548) + `defaultSearch` (#1549) — the STRUCTURAL anti-masker.
@@ -163,7 +163,8 @@ function definedSearchAsStrings(state: State): Record<string, string> {
   const out: Record<string, string> = {};
 
   for (const key of Object.keys(state.search)) {
-    const value = state.search[key];
+    // Every route here, and both decoders, put URL values in `search`.
+    const value = state.search[key] as SearchParamValue | undefined;
 
     if (value !== undefined) {
       out[key] = String(value);

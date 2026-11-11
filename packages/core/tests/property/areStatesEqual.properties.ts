@@ -276,7 +276,7 @@ describe("areStatesEqual Properties", () => {
       name: "lossy",
       path: "/lossy/:slug",
       decodeParams: ({ params, search }) => ({
-        params: { ...params, slug: (params.slug as string).toUpperCase() },
+        params: { ...params, slug: params.slug.toUpperCase() },
         search,
       }),
     },
@@ -363,8 +363,8 @@ describe("areStatesEqual Properties", () => {
     (value) => {
       const fromIntent = codecApi.makeState(
         "day",
-        { day: value } as unknown as Params,
-        { from: new Date(value) } as unknown as SearchParams,
+        { day: value },
+        { from: new Date(value) },
       );
       const fromUrl = codecApi.matchPath(fromIntent.path);
 
@@ -377,9 +377,13 @@ describe("areStatesEqual Properties", () => {
   test.prop([arbFilter], { numRuns: NUM_RUNS.standard })(
     "provenance independence: a decoder that hands back a fresh plain object (#2905)",
     (filter) => {
-      const fromIntent = codecApi.makeState("filtered", {}, {
-        filter,
-      } as unknown as SearchParams);
+      const fromIntent = codecApi.makeState(
+        "filtered",
+        {},
+        {
+          filter,
+        },
+      );
       const fromUrl = codecApi.matchPath(fromIntent.path);
 
       // `fc.record` builds a null-prototype object too, and `JSON.parse` never

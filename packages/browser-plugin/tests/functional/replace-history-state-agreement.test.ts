@@ -7,7 +7,7 @@ import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createMockedBrowser, noop } from "../helpers/testUtils";
 
 import type { Browser } from "../../src/browser-env";
-import type { Router } from "@real-router/core";
+import type { Router, SearchParamValue } from "@real-router/core";
 
 /**
  * `replaceHistoryState` writes a record and a URL in the same call — they have
@@ -145,7 +145,7 @@ describe("replaceHistoryState — the record and the URL agree (#1585)", () => {
           ...forwarded,
           search: {
             ...forwarded.search,
-            sort: `${String(forwarded.search.sort ?? "")}!`,
+            sort: `${String((forwarded.search.sort as SearchParamValue | undefined) ?? "")}!`,
           },
         };
       },

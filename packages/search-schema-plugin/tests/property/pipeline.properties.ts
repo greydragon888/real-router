@@ -167,7 +167,7 @@ const arbValidatedParams = fc.dictionary(
   fc.constantFrom(...VALIDATED_KEYS),
   arbParamValue,
   { minKeys: 1, maxKeys: VALIDATED_KEYS.length },
-) as fc.Arbitrary<SearchParams>;
+);
 
 const arbExtraParams = fc.dictionary(
   fc.constantFrom(...EXTRA_KEYS),
@@ -287,7 +287,7 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
             // or, when that query fails too, its value as decoded.
             for (const [key, value] of Object.entries(validParams)) {
               expect(state?.search[key]).toBe(
-                outcome === "passes" ? String(value).toUpperCase() : value,
+                outcome === "passes" ? value.toUpperCase() : value,
               );
             }
 

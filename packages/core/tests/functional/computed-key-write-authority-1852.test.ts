@@ -248,7 +248,7 @@ const REASONS: Record<string, string> = {
     AUTHORED_FIELDS,
   "namespaces/RoutesNamespace/routesStore.ts · Object.assign(store.config, …) #2":
     AUTHORED_FIELDS,
-  "namespaces/RoutesNamespace/routesStore.ts · config.decoders[fullName] = (channels: ParamsSearch): ParamsSearch =>":
+  "namespaces/RoutesNamespace/routesStore.ts · config.decoders[fullName] = (channels: UrlChannels): ParamsSearch =>":
     NULL_PROTO,
   "namespaces/RoutesNamespace/routesStore.ts · config.defaultParams[fullName] = copyOwnData(":
     NULL_PROTO,
@@ -269,7 +269,7 @@ const REASONS: Record<string, string> = {
   "namespaces/RoutesNamespace/routesStore.ts · map[name] = value": NULL_PROTO,
   "namespaces/RoutesNamespace/routesStore.ts · routeCustomFields[fullName] = freeze(customFields)":
     NULL_PROTO,
-  "namespaces/RoutesNamespace/routesStore.ts · store.config.decoders[name] = (channels: ParamsSearch): ParamsSearch =>":
+  "namespaces/RoutesNamespace/routesStore.ts · store.config.decoders[name] = (channels: UrlChannels): ParamsSearch =>":
     NULL_PROTO,
   "namespaces/RoutesNamespace/routesStore.ts · store.config.encoders[name] = (channels: ParamsSearch): ParamsSearch =>":
     NULL_PROTO,

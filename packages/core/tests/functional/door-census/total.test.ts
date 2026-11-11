@@ -384,9 +384,11 @@ describe("door total (#2303)", () => {
     EventToNameMap: "type-map",
     EventToPluginMap: "type-map",
     StateContext: "open-record",
-    // The two channels a codec is handed and returns — the door is the
-    // `Route.decodeParams` / `encodeParams` slot, already counted.
+    // The channels a codec is handed and returns, `UrlChannels` being what
+    // `decodeParams` is handed — the door is the `Route.decodeParams` /
+    // `encodeParams` slot, already counted.
     ParamsSearch: "callback contract",
+    UrlChannels: "callback contract",
     // Plugin shapes core or the plugin BUILDS and publishes on `state.context`;
     // an application reads them, and the handout axis owns what that costs.
     BrowserContext: "output",
@@ -987,7 +989,8 @@ describe("door total (#2303)", () => {
     InterceptableMethodMap: "callback — `InterceptorFn`",
     CheckPositionMap: "callback — `CheckFn`",
     DiagnosticEventMap: "callback — a diagnostic handler",
-    ParamsSearch: "callback — a route's `encodeParams` / `decodeParams`",
+    ParamsSearch: "callback — a route's `encodeParams`",
+    UrlChannels: "callback — a route's `decodeParams`",
     PreloadTarget: "callback — `PreloadFn`",
     RouterError: "callback — `onError`, `fallback`, `Plugin.onTransitionError`",
     StandardSchemaV1Issue: "callback — `SearchSchemaPluginOptions.onError`",

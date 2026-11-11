@@ -43,7 +43,9 @@ function SidebarStore(): JSX.Element {
   return (
     <div class="card">
       <strong>Sidebar (useRouteStore → search.page)</strong>
-      <p>Page: {state.route?.search.page ?? "default"}</p>
+      <p>
+        Page: {(state.route?.search.page as string | undefined) ?? "default"}
+      </p>
       <p style={{ "font-size": "13px", color: "#888" }}>
         Effect count: {count()}
       </p>

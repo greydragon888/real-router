@@ -772,7 +772,7 @@ describe("consumer census (#2303)", () => {
       "getNavigator.getState()": { src: [], tests: ["name"] },
       "getPluginApi.buildNavigationState()": {
         src: ["name", "params", "path", "search"],
-        tests: ["name"],
+        tests: ["name", "path"],
       },
       "getPluginApi.claimContextNamespace()": {
         src: ["release", "write"],
@@ -780,7 +780,7 @@ describe("consumer census (#2303)", () => {
       },
       "getPluginApi.forwardState()": {
         src: ["name", "params", "search"],
-        tests: ["name", "search"],
+        tests: ["name", "params", "search"],
       },
       "getPluginApi.getDependencyKeys()": { src: ["length"], tests: [] },
       "getPluginApi.getOptions()": {

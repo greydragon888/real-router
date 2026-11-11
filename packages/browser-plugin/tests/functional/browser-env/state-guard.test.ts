@@ -194,9 +194,10 @@ describe("isStateStrict (shared/browser-env twin)", () => {
       expect(isStateStrict(validState({ a: null, b: undefined }))).toBe(true);
     });
 
-    it("rejects nested class instances (slow path)", () => {
-      expect(isStateStrict(validState({ a: { b: new Date() } }))).toBe(false);
+    it("rejects nested class instances other than a Date (slow path, #2834)", () => {
+      expect(isStateStrict(validState({ a: { b: new Map() } }))).toBe(false);
       expect(isStateStrict(validState({ items: [new Map()] }))).toBe(false);
+      expect(isStateStrict(validState({ a: { b: new Date() } }))).toBe(true);
     });
 
     it("rejects params with NaN / Infinity (flat and nested)", () => {

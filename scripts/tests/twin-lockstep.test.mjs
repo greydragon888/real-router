@@ -77,6 +77,8 @@ const LOCKSTEP = [
       "getPrototypeOf",
       "objectValues",
       "hasOwn",
+      "NativeDate",
+      "dateGetTime",
     ],
     // Members of the right-hand file that deliberately have NO twin. Each needs
     // a written reason: this list is the only way a member escapes comparison,

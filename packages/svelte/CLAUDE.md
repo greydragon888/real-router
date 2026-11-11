@@ -452,7 +452,7 @@ type RouteParams = { id: string } & Params;
 
 const { route } = useRoute<RouteParams>();
 const id = route.current.params.id; // typed as string — path channel
-const q = route.current.search.q; // SearchParamValue | undefined — query channel
+const q = route.current.search.q; // ParamValue — query channel
 ```
 
 ### useRouteNode Semantics

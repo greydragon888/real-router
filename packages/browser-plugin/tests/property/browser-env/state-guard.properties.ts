@@ -106,8 +106,13 @@ describe("isStateStrict properties (shared/browser-env twin)", () => {
 
     // Class instance → rejected.
     expect(
-      isStateStrict({ name: "home", path: "/", params: { d: new Date() } }),
+      isStateStrict({ name: "home", path: "/", params: { m: new Map() } }),
     ).toBe(false);
+
+    // A Date is a value, not a class instance to refuse (#2834).
+    expect(
+      isStateStrict({ name: "home", path: "/", params: { d: new Date() } }),
+    ).toBe(true);
   });
 
   test.prop([validRouteName, validPath, validParams, fc.integer()], {

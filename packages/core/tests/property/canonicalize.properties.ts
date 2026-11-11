@@ -97,7 +97,7 @@ describe("canonicalize (pure) — properties", () => {
 
       for (const routeDefaults of [defaults, undefinedDefaults]) {
         const canonical = canonicalize(
-          makePort(routeDefaults, routeDefaults as SearchParams),
+          makePort(routeDefaults, routeDefaults),
           name,
           callerBag,
           callerBag,

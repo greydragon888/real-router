@@ -128,18 +128,13 @@ export interface NavigationTarget<
 }
 
 /**
- * The two navigation channels a per-route codec operates on (RFC-4 M2 / #1548):
- * `params` is the path channel, `search` the query channel. Used as **both** the
- * input and the output of {@link Route.encodeParams} / {@link Route.decodeParams}
- * — a codec transforms whichever channel(s) it owns and returns the other channel
- * unchanged (it must be passed through explicitly).
+ * The two navigation channels (RFC-4 M2 / #1548): `params` is the path channel,
+ * `search` the query channel. With the default arguments it is the STATE side
+ * of a per-route codec (#2834): what {@link Route.decodeParams} returns and what
+ * {@link Route.encodeParams} receives and returns. A codec transforms the
+ * channel(s) it owns and passes the other through.
  *
- * @remarks
- * v1 ran the whole (path + query) bag through both callbacks, so a query value
- * reached `decodeParams`. This two-channel shape preserves that reach: the query
- * arrives in `search` rather than merged into `params`. Value semantics are
- * unchanged — only the storage location differs (M2 keeps query parsing/printing
- * exactly as v1).
+ * The URL side is {@link UrlChannels}, what `decodeParams` receives.
  */
 export interface ParamsSearch<
   P extends Params = Params,
@@ -150,11 +145,30 @@ export interface ParamsSearch<
 }
 
 /**
+ * The URL side of a per-route codec (#2834): what {@link Route.decodeParams}
+ * receives. Path slots are the strings the matcher captured; query values are
+ * typed by the parser.
+ *
+ * `encodeParams` returns into the URL and is still typed {@link ParamsSearch}:
+ * an encoder hands on a channel it does not own — `search` as it came, or
+ * `{ ...search }` with nothing after it — and that channel holds state values,
+ * so a URL-typed return would refuse the encoder. The wiki's Dates recipe,
+ * which `codec-state-values-2834.test.ts` type-checks, hands on `params`.
+ */
+export type UrlChannels = ParamsSearch<
+  Record<string, string>,
+  Record<string, SearchParamValue | undefined>
+>;
+
+/**
  * Parsed shape produced by `serializeRouterState()` (`@real-router/ssr-utils`,
  * after `JSON.parse`). Identical to {@link State} minus `transition`
  * (per-navigation `TransitionMeta` is meaningless after hydration; the client
  * builds its own on commit). Defined here, not in `ssr-utils`, because the
  * shape is core's own `State`; `ssr-utils` re-exports it.
+ *
+ * ⚠ Under the default `JSON.parse`, a `Date` in a channel comes back as its ISO
+ * string, and an Invalid Date as `null`.
  */
 export type SerializedRouterState<P extends Params = Params> = Omit<
   State<P>,
@@ -179,39 +193,52 @@ export interface RouterError extends Error {
   toJSON: () => Record<string, unknown>;
 }
 
+/**
+ * A value a state channel carries (#2834): a JSON primitive, a `Date`, a plain
+ * object of state values, an array of any of those, or `undefined`. An array
+ * holds no `undefined`, which JSON would print as `null`. It is what
+ * {@link State.params} and {@link State.search} hold, what `navigate` and route
+ * defaults take, and what a route's `decodeParams` may return.
+ *
+ * Core compares these by value — a `Date` by its time, a plain object by its
+ * JSON (`areParamValuesEqual`) — and `@real-router/sources`' `canonicalJson`
+ * builds a cache key from them and refuses any other object.
+ *
+ * A URL holds less: a path slot is a string and a query value a
+ * {@link SearchParamValue}. A route codec converts between the two; without
+ * one, a `Date` or an object does not survive the trip through the URL.
+ */
+export type ParamValue = ParamLeaf | ParamLeaf[] | undefined;
+
+/**
+ * A {@link ParamValue} that is neither an array nor `undefined`.
+ *
+ * ⚠ One array level, not a recursive `ParamValue[]`: the recursive form fails
+ * core's type-check with TS2589.
+ */
+type ParamLeaf = string | number | boolean | null | Date | Params;
+
+/** The path channel, {@link State.params}: path slots and app-level data. */
 export interface Params {
-  [key: string]:
-    | string
-    | string[]
-    | number
-    | number[]
-    | boolean
-    | boolean[]
-    | Params
-    | Params[]
-    | Record<string, string | number | boolean>
-    | null
-    | undefined;
+  [key: string]: ParamValue;
 }
 
 /**
- * Query-parameter primitive values. Mirrors the engine's `QueryParamPrimitive`
- * (`engine/search-params/types.ts`) — the value form is identical to v1's query
- * half (the union produced across `queryParamsMode` formats).
+ * A primitive query value as the URL parser types it. Mirrors the engine's
+ * `QueryParamPrimitive` (`engine/search-params/types.ts`).
  */
 export type SearchParamPrimitive = string | number | boolean | null;
 
 /**
- * A single query-parameter value — a primitive or an array of primitives.
+ * A single query value as the URL parser types it — a primitive or an array of
+ * primitives. It is what `decodeParams` receives ({@link UrlChannels}); the
+ * state side carries a {@link ParamValue}.
  */
 export type SearchParamValue = SearchParamPrimitive | SearchParamPrimitive[];
 
 /**
- * Query-parameter bag carried by {@link State.search} — the query channel,
- * split out of the former single `params` bag in M2 (RFC-4 M2 / #1548). Only
- * the storage location changes vs v1; value semantics (modes, `queryParamsMode`,
- * ternary arrays) are unchanged. Structurally matches the engine's internal
- * `SearchParams` (`engine/search-params/types.ts`), so match results flow into
- * `State.search` without conversion.
+ * The query channel, {@link State.search} (RFC-4 M2 / #1548). Its values are
+ * state values (#2834); what the URL parser produces for it is a
+ * {@link SearchParamValue}, which is one.
  */
-export type SearchParams = Record<string, SearchParamValue | undefined>;
+export type SearchParams = Record<string, ParamValue>;

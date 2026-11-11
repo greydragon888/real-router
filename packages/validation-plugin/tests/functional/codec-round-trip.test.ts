@@ -9,10 +9,12 @@ import { validationPlugin } from "../../src";
 
 import type {
   Params,
+  ParamValue,
   ParamsSearch,
   Route,
   Router,
   SearchParams,
+  SearchParamValue,
   SimpleState,
   State,
 } from "@real-router/core";
@@ -44,6 +46,17 @@ type RouterOptions = NonNullable<Parameters<typeof createRouter>[1]>;
 
 /** A route's `encodeParams` or `decodeParams`, for one shared by several routes. */
 type Codec = (channels: ParamsSearch) => ParamsSearch;
+
+/**
+ * A query value, printed by an encoder below. `ParamValue` admits a plain
+ * object, which `String` prints as `[object Object]`; these encoders are handed
+ * strings and numbers, so the value is narrowed first.
+ */
+function printed(value: ParamValue): string {
+  const urlValue = value as SearchParamValue;
+
+  return String(urlValue);
+}
 
 function logged(routes: Route[], options: RouterOptions = {}): Fixture {
   const warnings: (readonly [string, string])[] = [];
@@ -114,7 +127,7 @@ const TAGS: Route = {
   name: "tags",
   path: "/tags/:tag?also",
   decodeParams: ({ params, search }) => ({
-    params: { ...params, tag: (params.tag as string).toLowerCase() },
+    params: { ...params, tag: params.tag.toLowerCase() },
     search: {
       ...search,
       also: Array.isArray(search.also)
@@ -176,7 +189,7 @@ const FEED: Route = {
     params,
     search: {
       ...search,
-      page: search.page === undefined ? undefined : String(search.page),
+      page: search.page === undefined ? undefined : printed(search.page),
     },
   }),
   decodeParams: ({ params, search }) => ({
@@ -274,7 +287,7 @@ const QUERY: Route = {
   name: "query",
   path: "/query?q",
   encodeParams: ({ search }) =>
-    oneChannel({ search: { ...search, q: String(search.q).trim() } }),
+    oneChannel({ search: { ...search, q: printed(search.q).trim() } }),
 };
 
 /** A decoder that returns only the channel it trims, which the plugin refuses on a reload (#2896). */
@@ -309,7 +322,7 @@ const EVENTS: Route = {
       ...search,
       from:
         typeof search.from === "string" ? new Date(search.from) : search.from,
-    } as SearchParams,
+    },
   }),
 };
 
@@ -335,7 +348,7 @@ const SHIFTED: Route = {
         typeof search.from === "string"
           ? new Date(Date.parse(search.from) - DAY)
           : search.from,
-    } as SearchParams,
+    },
   }),
 };
 
@@ -436,7 +449,7 @@ const ZONED: Route = {
         typeof search.at === "string"
           ? new Date(search.at.replace(/@.*/u, ""))
           : search.at,
-    } as SearchParams,
+    },
   }),
 };
 
@@ -536,7 +549,7 @@ const NOTED: Route = {
     search: {
       ...search,
       at: typeof search.at === "string" ? new Date(search.at) : search.at,
-    } as SearchParams,
+    },
   }),
 };
 
@@ -553,7 +566,7 @@ const WRAPPED: Route = {
   }),
   decodeParams: ({ params, search }) => ({
     params,
-    search: { ...search, page: { n: search.page } } as unknown as SearchParams,
+    search: { ...search, page: { n: search.page } },
   }),
 };
 
@@ -622,7 +635,7 @@ const SPAN: Route = {
       ...search,
       from: new Date(String(search.from)),
       to: new Date(String(search.to)),
-    } as unknown as SearchParams,
+    },
   }),
 };
 
@@ -677,7 +690,7 @@ const SHOUTED: Route = {
   path: "/shouted?q&lang",
   encodeParams: ({ params, search }) => ({
     params,
-    search: { ...search, q: String(search.q).toUpperCase() },
+    search: { ...search, q: printed(search.q).toUpperCase() },
   }),
   decodeParams: ({ params, search }) => ({
     params,
@@ -707,7 +720,7 @@ const TAGGED_LIST: Route = {
         typeof search.filter === "string"
           ? { tags: search.filter.split(",") }
           : { list: [] },
-    } as unknown as SearchParams,
+    },
   }),
 };
 
@@ -720,7 +733,7 @@ const ROUNDED: Route = {
   path: "/rounded?n",
   encodeParams: ({ params, search }) => ({
     params,
-    search: { ...search, n: String(search.n) },
+    search: { ...search, n: printed(search.n) },
   }),
   decodeParams: ({ params, search }) => ({
     params,

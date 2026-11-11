@@ -290,6 +290,7 @@ describe("reachability census (#2303)", () => {
       "Options",
       "Params",
       "ParamsSearch",
+      "ParamValue",
       "Plugin",
       "PluginApi",
       "PluginFactory",
@@ -326,6 +327,7 @@ describe("reachability census (#2303)", () => {
       "TreeChangedUpdate",
       "TreeStructuralPatch",
       "Unsubscribe",
+      "UrlChannels",
     ]);
   });
 
