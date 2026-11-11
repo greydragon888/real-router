@@ -557,14 +557,7 @@ pnpm lint:unused      # Check for unused code (knip)
 
 ### Windows: enable symlinks
 
-The repo uses git-tracked symlinks to share source files across packages (`src/dom-utils` in the framework adapters, `src/browser-env` in the URL plugins and `src/shared-ssr` in the SSR loader plugins, each pointing into `shared/` — see [IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md) for the rationale). Unix/macOS/Linux contributors need no extra setup. Windows contributors need a one-time configuration:
-
-```bash
-# 1. Enable symlink support in git (one-time, global)
-git config --global core.symlinks true
-```
-
-Additionally, enable [Developer Mode](https://learn.microsoft.com/en-us/windows/apps/get-started/developer-mode-features-and-debugging) in Windows Settings, or run git from an elevated shell. After enabling both, re-clone the repo (or run `git checkout` on an existing clone) to materialize the symlinks. Without this, `pnpm install`, `pnpm build`, and `pnpm test` fail with "file not found" errors for paths under those symlinked directories.
+The packages share sources through git symlinks, and on Windows git checks them out as plain text files unless symlink support is on. [CONTRIBUTING.md](CONTRIBUTING.md#windows-enable-symlinks) has the setup, for a new clone and for an existing one.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for full development setup, coding standards, and PR guidelines.
 

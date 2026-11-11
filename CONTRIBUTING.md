@@ -21,6 +21,26 @@ Instances of abusive, harassing, or otherwise unacceptable behavior may be repor
 This Code of Conduct is adapted from the Contributor Covenant, version 1.0.0, available from [http://contributor-covenant.org/version/1/0/0/](http://contributor-covenant.org/version/1/0/0/)
 
 
+## Development setup
+
+### Windows: enable symlinks
+
+`src/dom-utils` in the framework adapters, `src/browser-env` in the URL plugins and `src/shared-ssr` in the SSR loader plugins are git symlinks into `shared/`. Unless symlink support is on, git checks each of them out as a small text file holding the link's target; `pnpm type-check` and `pnpm build` then fail with errors such as `TS2307: Cannot find module './browser-env'`.
+
+Creating a symlink on Windows takes [Developer Mode](https://learn.microsoft.com/en-us/windows/advanced-settings/developer-mode) or an elevated shell. With either, clone with symlinks on:
+
+```sh
+git clone -c core.symlinks=true https://github.com/greydragon888/real-router.git
+```
+
+A clone made without symlink support keeps `core.symlinks=false` in its own `.git/config`, where `git clone` writes it, and that value overrides `git config --global`. To repair such a clone, turn the setting on in the clone and check the symlinks out again; every other file stays as it is. In Git Bash, with Developer Mode on or the shell elevated:
+
+```sh
+git config core.symlinks true
+git ls-files -s | grep '^120000' | cut -f2 | xargs git checkout --
+```
+
+
 ## Pull requests
 
 ### CI server
