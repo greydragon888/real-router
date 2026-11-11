@@ -1,5 +1,28 @@
 # @real-router/hash-plugin
 
+## 0.18.0
+
+### Minor Changes
+
+- [#2942](https://github.com/greydragon888/real-router/pull/2942) [`bf8f55c`](https://github.com/greydragon888/real-router/commit/bf8f55ca3c320fb7c31eeaf96aae2e41e9375897) Thanks [@greydragon888](https://github.com/greydragon888)! - Restore a `history.state` entry holding a `Date` as it was recorded ([#2834](https://github.com/greydragon888/real-router/issues/2834))
+
+  `isState` no longer refuses a `Date` in an entry's `params` or `search`: it is a
+  state value in `@real-router/core`'s types. It still refuses a `Date` made in
+  another realm — an iframe's, say — an object that only looks like a `Date` (one
+  built on `Date.prototype`, or a `Proxy` over a `Date`) and every other class
+  instance; an instance of an `Array` subclass is walked as an array, as before.
+
+  **Breaking Change:** Back and Forward restore such an entry as it was recorded
+  instead of matching its URL again, so the route's `decodeParams` does not run
+  for it. The structured clone `history.pushState` makes keeps a `Date`'s time,
+  but a subclass's instance — a date-fns `UTCDate`, say — comes back as a plain
+  `Date`: where the subclass matters, convert the value where you read it.
+
+### Patch Changes
+
+- Updated dependencies [[`bf8f55c`](https://github.com/greydragon888/real-router/commit/bf8f55ca3c320fb7c31eeaf96aae2e41e9375897)]:
+  - @real-router/core@0.159.0
+
 ## 0.17.0
 
 ### Minor Changes

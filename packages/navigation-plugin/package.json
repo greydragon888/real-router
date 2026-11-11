@@ -56,6 +56,6 @@
     "jsdom": "31.0.0"
   },
   "peerDependencies": {
-    "@real-router/core": "workspace:>=0.158.0"
+    "@real-router/core": "workspace:>=0.159.0"
   }
 }

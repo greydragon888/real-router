@@ -1,5 +1,13 @@
 # router-benchmarks
 
+## 0.3.188
+
+### Patch Changes
+
+- Updated dependencies [[`bf8f55c`](https://github.com/greydragon888/real-router/commit/bf8f55ca3c320fb7c31eeaf96aae2e41e9375897), [`bf8f55c`](https://github.com/greydragon888/real-router/commit/bf8f55ca3c320fb7c31eeaf96aae2e41e9375897)]:
+  - @real-router/core@0.159.0
+  - @real-router/search-schema-plugin@0.9.1
+
 ## 0.3.187
 
 ### Patch Changes
