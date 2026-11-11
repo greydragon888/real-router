@@ -15829,3 +15829,52 @@ Each restores an entry keyed by `hashFiles` of its own `action.yml`, and of `val
 **Why the override stays.** `@sonar/scan` pins an exact 1.4.0 through 5.0.2, the root's 5.0.1 among them, and 5.1.0 pins 1.4.3. The override goes when the root moves to 5.1.0 or later, a scanner bump this entry does not make.
 
 **Measured.** `lint:audit` finds no issue in the five lockfiles, and `lint:overrides`, `lint:dedupe`, `lint:deps` and `lint:config-sync` pass.
+
+## `twin-lockstep` reads both twins with the TypeScript parser (#2940, 2026-11-11)
+
+**Problem.** `scripts/tests/twin-lockstep.test.mjs` holds the state-guard closure identical between validation-plugin and `shared/browser-env/state-guard.ts` (#1522), and its text scanner read a twin only in the shapes the two files are written in today. `extractFunction` walked from `function NAME(` to the brace that closes the first `{`, so in a function with a destructured parameter it compared the pattern and not the body; `extractConstant` stopped at the first `;`; the coverage cell found members with `/(^|\n)(export )?(function|const) ([A-Z_a-z]\w*)/` in the right-hand file alone. After a legal refactor of both twins — a destructured parameter (S7), an arrow const (S6), a destructured capture (S4) — a drift in one twin passed green, in S6 and S4 once the registry was edited the way the guard's own "Update the LOCKSTEP registry" message directed. The scanner also took a comment for code when the comment moved code: on the fixture of the new cells, a block comment inside an expression and a line comment that makes prettier break a call each read as `drift visitContainer`.
+
+**Solution.**
+
+- `declarationsOf` parses each file with `ts.createSourceFile` and places every top-level statement. A function, a `const`/`let`/`var` statement with the names of any binding pattern, a class, an interface and a type alias are declarations; an import binds names; any other statement — an enum, a namespace, `export { … }`, an expression statement, a nameless default export — is reported as `unplaceable`.
+- `tokensOf` reads a statement off the tree: each node as its kind and a closing mark, each leaf as its text. No comment or JSDoc reaches it. Left out as well: the statement's `export`, which the twins differ in by design, and what prettier changes with layout — a trailing separator, the `|` before the first member of a union it breaks, and parentheses whose meaning the tree holds. A pair around an optional chain is compared, since `(a?.b).c` and `a?.b.c` have the same kinds and nesting.
+- The registry lists the compared names in one `members` list, each with an optional `left` and `right`. The coverage cell reads every file of both sides and asks back each declaration the registry neither compares nor exempts; an exemption is refused for a name both sides declare or import.
+- `lockstepFindings(entry, sources)` is a pure function over texts. The cells run it on a miniature of the pair held in memory: the shapes of the probe with a control, one cell per declaration form, prettier's layouts of a comment-only edit, the parentheses that change code, the forms the reader refuses, the exemption rules and the files of each side.
+
+```js
+// Before
+functions: ["isPlainContainer", /* … */ { name: "isRouteName", left: "…/routes.ts" }],
+constants: [{ name: "FULL_ROUTE_PATTERN", left: "…/router-error.ts" }, /* … */ "hasOwn"],
+exempt: { isOptionalBag: "…", isStateStrict: "…" },
+// After
+members: ["getPrototypeOf", /* … */ "SubtreeExit", /* … */ { name: "isRouteName", left: "…/routes.ts" }],
+exempt: { isOptionalBag, isStateStrict, RestorableEntry, HAS_NON_WHITESPACE, createRouterError },
+```
+
+The real pair gains five entries: `SubtreeExit`, a class both twins declare and nothing compared, joins `members`; `RestorableEntry` (an interface of the shared twin) and `HAS_NON_WHITESPACE` and `createRouterError` (validation-plugin's `router-error.ts`) join `exempt`. The pair floors (100 normalized lines, 10 declared members) and the per-member line minimum go: they caught a scanner that truncated a member, and the reader takes a statement whole.
+
+**Why.**
+
+- **The parser, not a better scanner.** Each blind spot was a shape the scanner did not know, and fixing them one at a time adds a shape per fix. The parser knows every shape; the reader decides only which statements are declarations, and one it does not place is red.
+- **The tree, not the text.** A comment is trivia and whitespace is in no token, so neither can differ between the twins. What prettier adds or drops when a comment makes it break a line — a trailing comma, a type member's `;`, a union's leading `|`, the parentheses around a broken `return` or the conditional body of an arrow — is left out, and the kinds and nesting keep what parentheses decide: `(a + b) * c` nests differently from `a + b * c`, and `() => ({})` differs from `() => {}` only in the kind of the body. The comment cell's layouts are prettier's fixed points under the repository's configuration. The TypeScript printer is no shortcut: it prints an object literal broken over lines on lines of its own, and keeps prettier's parentheses around a `return`.
+- **One list.** The reader finds a member by name, whatever its form, so `functions` and `constants` had nothing left to tell apart, and the S6 edit — moving a member to `constants` — cannot be written.
+- **Both sides, and no exemption for a twin.** With the members of one file read, the dropped `hasOwn` of S4 was asked back by nobody. With both sides read it is asked back from both, and the exemption offered for a one-sided declaration is refused while the other side declares or imports the name. A member's own `right` follows a move of the shared twin into a file of its own, so the "not declared" message names an edit that keeps the member compared.
+
+**Measured.**
+
+- The probe of #2940 on a copy of the files the guard reads at `31907c999`, its `dropHasOwn` anchor adapted to the list #2834 extended:
+
+  | row                                                       | scanner         | reader                                              |
+  | --------------------------------------------------------- | --------------- | --------------------------------------------------- |
+  | control: a drift in today's function form                 | red             | red                                                 |
+  | S7 in both twins                                          | green           | red — `WalkState` is asked back                     |
+  | S7, and a drift in state-guard                            | green           | red                                                 |
+  | S6 in both twins                                          | red — not found | green                                               |
+  | S6, moved to `constants`                                  | green           | green — no `constants`: the edit reorders `members` |
+  | S6, moved, and a drift in state-guard                     | green           | red                                                 |
+  | S4 in both twins                                          | red — not found | green                                               |
+  | S4, the entry dropped                                     | green           | red — `hasOwn` is asked back                        |
+  | S4, dropped, validation-plugin reads `Object.hasOwn` live | green           | red                                                 |
+
+- The same shapes as cells, run on the scanner moved unchanged into the pure function: 9 of 11 fail. The two that pass, the control and S6 moved to `constants` without a drift, assert what the scanner already did. On the reader every remaining cell passes; the two that move a member to `constants` have no list to edit, and a cell that moves `hasOwn` to `exempt` takes their place — refused, since both twins declare it.
+- 49 mutants of the reader, applied by a load hook with the file untouched, each fail at least one cell: a declaration form or binding skipped (11), comments compared (3), the members of one side or one file (7), an unplaced statement skipped (8), and the reader's other rules (20). A rewrite that changes nothing leaves all 36 cells green.
