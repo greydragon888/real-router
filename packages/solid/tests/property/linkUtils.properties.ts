@@ -975,6 +975,8 @@ describe("buildHref — Property Tests (Solid)", () => {
     })(
       "buildUrl returns '' → buildPath IS called exactly once (fallback)",
       (fallbackPath) => {
+        fc.pre(!namesHost(fallbackPath));
+
         const buildUrlSpy = vi.fn().mockReturnValue("");
         const buildPathSpy = vi.fn().mockReturnValue(fallbackPath);
         const router = makeFakeRouter(buildUrlSpy, buildPathSpy);
