@@ -4,10 +4,12 @@
  * The five reactive utilities (createRouteAnnouncer, createScrollRestoration,
  * createDirectionTracker, createViewTransitions, createScrollSpy) each register
  * resources that OUTLIVE the returned instance unless `destroy()` releases them:
- * `router.subscribe` / `router.subscribeLeave` registrations, global
- * `pagehide` / `popstate` listeners, and IntersectionObserver / MutationObserver
- * instances. A create→destroy cycle that forgets one teardown leaks one resource
- * per cycle into a long-lived router / global.
+ * `router.subscribe` / `router.subscribeLeave` registrations, plugin-API event
+ * listeners (`getPluginApi(router).addEventListener`), global `pagehide` /
+ * `popstate` listeners, and IntersectionObserver / MutationObserver instances.
+ * A create→destroy cycle that forgets one teardown leaks one resource per cycle
+ * into a long-lived router / global. Timers, rAF handles and DOM nodes are not
+ * counted.
  *
  * Discriminating design (NOT a heap snapshot — instances from a create→destroy
  * loop are unreferenced and GC-reclaimed regardless of whether destroy() ran, so
@@ -19,7 +21,9 @@
  *
  * The ≥1000× gap is the proven discriminating power. To re-validate: delete an
  * `unsubscribe()` / `removeEventListener` / `disconnect()` call from any utility's
- * `destroy()` and the matching assertion fails with the leaked count.
+ * `destroy()` and the matching assertion fails with the leaked count — except in
+ * scroll-spy's debouncer and cooldown, whose timers and `scrollend` listener only
+ * an intersection or a hash navigation creates.
  */
 import { createRouter } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
@@ -34,6 +38,39 @@ import {
 } from "../../../src/dom-utils";
 
 import type { PluginFactory, Router } from "@real-router/core";
+
+// Plugin-API listeners are counted at the module export: the API object is
+// frozen and shared per router (#1805), so it cannot be wrapped in place.
+const { pluginCounts } = vi.hoisted(() => ({
+  pluginCounts: new WeakMap<object, { plugin: number }>(),
+}));
+
+vi.mock(import("@real-router/core/api"), async (importOriginal) => {
+  const actual = await importOriginal();
+
+  const getPluginApi: typeof actual.getPluginApi = (router) => {
+    const api = actual.getPluginApi(router);
+    const live = pluginCounts.get(router);
+
+    if (live === undefined) {
+      return api;
+    }
+
+    const addEventListener: typeof api.addEventListener = (eventName, cb) => {
+      live.plugin += 1;
+      const off = api.addEventListener(eventName, cb);
+
+      return () => {
+        live.plugin -= 1;
+        off();
+      };
+    };
+
+    return { ...api, addEventListener };
+  };
+
+  return { ...actual, getPluginApi };
+});
 
 const ROUTES = [
   { name: "home", path: "/" },
@@ -54,9 +91,18 @@ const urlContextPlugin: PluginFactory = (router) => {
   };
 };
 
-/** Wrap subscribe/subscribeLeave to track live (subscribed-but-not-released). */
-function instrumentRouter(router: Router): { sub: number; leave: number } {
-  const live = { sub: 0, leave: 0 };
+/**
+ * Track the live (registered-but-not-released) `subscribe` / `subscribeLeave`
+ * registrations and plugin-API listeners of `router`.
+ */
+function instrumentRouter(router: Router): {
+  sub: number;
+  leave: number;
+  plugin: number;
+} {
+  const live = { sub: 0, leave: 0, plugin: 0 };
+
+  pluginCounts.set(router, live);
 
   const realSubscribe = router.subscribe.bind(router);
 
@@ -133,7 +179,7 @@ describe("dom-utils reactive lifecycle — create→destroy leaks no resources",
     router.stop();
   });
 
-  it(`createScrollRestoration: ${CYCLES} cycles release subscribe + pagehide listener`, async () => {
+  it(`createScrollRestoration: ${CYCLES} cycles release subscribe + pagehide and popstate listeners`, async () => {
     const router = createRouter(ROUTES);
 
     await router.start("/");
@@ -146,11 +192,12 @@ describe("dom-utils reactive lifecycle — create→destroy leaks no resources",
 
     expect(live.sub).toBe(0);
     expect(liveListeners.get("pagehide") ?? 0).toBe(0);
+    expect(liveListeners.get("popstate") ?? 0).toBe(0);
 
     router.stop();
   });
 
-  it(`createDirectionTracker: ${CYCLES} cycles release subscribeLeave + popstate listener`, async () => {
+  it(`createDirectionTracker: ${CYCLES} cycles release subscribeLeave, plugin-API listeners + popstate listener`, async () => {
     const router = createRouter(ROUTES);
 
     await router.start("/");
@@ -162,6 +209,7 @@ describe("dom-utils reactive lifecycle — create→destroy leaks no resources",
     }
 
     expect(live.leave).toBe(0);
+    expect(live.plugin).toBe(0);
     expect(liveListeners.get("popstate") ?? 0).toBe(0);
 
     router.stop();
@@ -202,7 +250,7 @@ describe("dom-utils reactive lifecycle — create→destroy leaks no resources",
     vi.unstubAllGlobals();
   });
 
-  it(`createScrollSpy: ${CYCLES} cycles disconnect every Intersection/Mutation observer`, async () => {
+  it(`createScrollSpy: ${CYCLES} cycles before and after start release router.subscribe + every Intersection/Mutation observer`, async () => {
     let liveObservers = 0;
 
     class CountingObserver {
@@ -238,6 +286,17 @@ describe("dom-utils reactive lifecycle — create→destroy leaks no resources",
     const router = createRouter(ROUTES);
 
     router.usePlugin(urlContextPlugin);
+
+    const live = instrumentRouter(router);
+
+    // Before start() the URL-plugin detector waits for the first state on a
+    // one-shot router.subscribe, which destroy() releases.
+    for (let i = 0; i < CYCLES; i += 1) {
+      createScrollSpy(router, { selector: "[id]" }).destroy();
+    }
+
+    expect(live.sub).toBe(0);
+
     await router.start("/");
 
     const anchor = document.createElement("section");
@@ -245,15 +304,11 @@ describe("dom-utils reactive lifecycle — create→destroy leaks no resources",
     anchor.id = "anchor";
     document.body.append(anchor);
 
-    const live = instrumentRouter(router);
-
     for (let i = 0; i < CYCLES; i += 1) {
       createScrollSpy(router, { selector: "[id]" }).destroy();
     }
 
     expect(liveObservers).toBe(0);
-    // The one-shot detection subscribe + transition-source subscriptions are
-    // all released too.
     expect(live.sub).toBe(0);
     expect(live.leave).toBe(0);
 
