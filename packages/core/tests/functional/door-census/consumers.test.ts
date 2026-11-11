@@ -66,18 +66,137 @@ describe("consumer census (#2303)", () => {
     ["src/types/router.ts", "Navigator"],
   ];
 
-  /** A type that cannot carry members, so nothing is one level down from it. */
-  const FLAT = new Set([
-    ts.SyntaxKind.StringKeyword,
-    ts.SyntaxKind.NumberKeyword,
-    ts.SyntaxKind.BooleanKeyword,
-    ts.SyntaxKind.VoidKeyword,
-    ts.SyntaxKind.UndefinedKeyword,
-    ts.SyntaxKind.NeverKeyword,
-    ts.SyntaxKind.SymbolKeyword,
-    ts.SyntaxKind.AnyKeyword,
-    ts.SyntaxKind.UnknownKeyword,
-  ]);
+  /**
+   * Every file outside core that could reach a surface — the scope BOTH walks
+   * below read, so the idiom census and the typed census can never disagree
+   * about what they looked at.
+   */
+  const consumerFiles = (): string[] =>
+    [
+      ...globSync("packages/*/src/**/*.{ts,tsx}", { cwd: ROOT }),
+      ...globSync("packages/*/tests/**/*.{ts,tsx}", { cwd: ROOT }),
+      ...globSync("shared/**/*.ts", { cwd: ROOT }),
+    ].filter((f) => !f.startsWith("packages/core/"));
+
+  const CONSUMER_PATHS = consumerFiles().map((f) => path.join(ROOT, f));
+
+  /**
+   * One program for both questions this file asks the checker: what each
+   * member of a surface hands back, and what each receiver in a consumer IS.
+   */
+  const program = ts.createProgram(
+    [
+      ...CONSUMER_PATHS,
+      ...new Set(
+        SURFACE_DECL.map(([file]) => path.join(ROOT, "packages/core", file)),
+      ),
+    ],
+    {
+      ...ts.parseJsonConfigFileContent(
+        ts.readConfigFile(path.join(ROOT, "tsconfig.json"), ts.sys.readFile)
+          .config,
+        ts.sys,
+        ROOT,
+      ).options,
+      noEmit: true,
+      skipLibCheck: true,
+      jsx: ts.JsxEmit.Preserve,
+    },
+  );
+  const checker = program.getTypeChecker();
+
+  /** A type whose values carry no members of their own. */
+  const NOTHING_DOWN =
+    ts.TypeFlags.StringLike |
+    ts.TypeFlags.NumberLike |
+    ts.TypeFlags.BigIntLike |
+    ts.TypeFlags.BooleanLike |
+    ts.TypeFlags.EnumLike |
+    ts.TypeFlags.ESSymbolLike |
+    ts.TypeFlags.VoidLike |
+    ts.TypeFlags.Null |
+    ts.TypeFlags.Never |
+    ts.TypeFlags.Any |
+    ts.TypeFlags.Unknown;
+
+  /** A function with no members of its own, such as `Unsubscribe`. */
+  const isPlainFunction = (type: ts.Type): boolean =>
+    type.getCallSignatures().length > 0 && type.getProperties().length === 0;
+
+  /**
+   * What a member hands back: its return value if it is a function, its own
+   * value otherwise.
+   */
+  const downOf = (type: ts.Type): ts.Type[] =>
+    (type.isUnion() ? type.types : [type]).flatMap((part) =>
+      isPlainFunction(part)
+        ? part.getCallSignatures().map((signature) => signature.getReturnType())
+        : [part],
+    );
+
+  /**
+   * Can a value of this type carry members of its own?
+   *
+   * ⚑ **The checker answers, not the declaration's syntax** — the rule
+   * `typedScan` states below: "what IS this value", not "how was it written".
+   * `readonly string[]` is a `TypeOperator` node around the `ArrayType` one,
+   * so a test of the node answers for one spelling at a time (#2575).
+   *
+   * ⚠ **An ARRAY answers no, and so does a plain function.** The next access
+   * off an array is `length` or `map`, which is `Array.prototype`, and the
+   * next one off a function is `bind` or `call`, which is
+   * `Function.prototype` — neither is a door. The cell "the census walks into
+   * no member that hands back an array" holds the first rule against every
+   * member.
+   */
+  const carries = (type: ts.Type): boolean => {
+    if (type.isUnion()) {
+      return type.types.some((one) => carries(one));
+    }
+
+    return (
+      (type.flags & NOTHING_DOWN) === 0 &&
+      !checker.isArrayLikeType(type) &&
+      !isPlainFunction(type)
+    );
+  };
+
+  interface SurfaceMember {
+    surface: string;
+    name: string;
+    type: ts.Type;
+  }
+
+  /** Every member of every surface, as the checker types it. */
+  const surfaceMembers = (): SurfaceMember[] => {
+    const out: SurfaceMember[] = [];
+
+    for (const [file, iface] of SURFACE_DECL) {
+      const visit = (node: ts.Node): void => {
+        if (ts.isInterfaceDeclaration(node) && node.name.text === iface) {
+          const declared = checker.getDeclaredTypeOfSymbol(
+            checker.getSymbolAtLocation(node.name)!,
+          );
+
+          for (const member of checker.getPropertiesOfType(declared)) {
+            out.push({
+              surface: iface,
+              name: member.getName(),
+              type: checker.getTypeOfSymbol(member),
+            });
+          }
+        }
+
+        ts.forEachChild(node, visit);
+      };
+
+      visit(program.getSourceFile(path.join(ROOT, "packages/core", file))!);
+    }
+
+    return out;
+  };
+
+  const MEMBERS = surfaceMembers();
 
   /**
    * Members whose value can carry members of its own — the set the census walks
@@ -94,122 +213,26 @@ describe("consumer census (#2303)", () => {
    * `ctx.validator.options.validateOptions(…)` — happens on exactly that slot. The declaration is what decides; the value on an
    * unconfigured router is not evidence.
    */
-  /**
-   * Type aliases whose right-hand side is a FUNCTION — derived, because a member
-   * handing one back has nothing one level down. `addEventListener` returns
-   * `Unsubscribe`, and without this the walk counts
-   * `ctx.addEventListener.bind(ctx)` as a reach into a door.
-   */
-  const functionAliases = (): Set<string> => {
-    const out = new Set<string>();
-
-    for (const file of globSync("src/types/*.ts", {
-      cwd: path.join(ROOT, "packages/core"),
-    })) {
-      const source = ts.createSourceFile(
-        file,
-        readFileSync(path.join(ROOT, "packages/core", file), "utf8"),
-        ts.ScriptTarget.Latest,
-        true,
-        ts.ScriptKind.TS,
-      );
-
-      const visit = (node: ts.Node): void => {
-        if (
-          ts.isTypeAliasDeclaration(node) &&
-          ts.isFunctionTypeNode(node.type)
-        ) {
-          out.add(node.name.text);
-        }
-
-        ts.forEachChild(node, visit);
-      };
-
-      visit(source);
-    }
-
-    return out;
-  };
+  const RETURNS_OBJECT = new Set(
+    MEMBERS.filter(({ type }) =>
+      downOf(type).some((value) => carries(value)),
+    ).map(({ name }) => name),
+  );
 
   /**
-   * Can a value of this type carry members of its own?
-   *
-   * ⚠ **An ARRAY answers no, and that is a classification rather than a live
-   * filter.** It removes exactly one member — `RouterInternals.routerExtensions`
-   * (`{ keys: string[] }[]`) — which #2343 item 4 names among the six the old
-   * hand list hid. Measured: deleting this arm leaves every cell GREEN, because
-   * nothing outside core reaches into that array today. It is kept for the shape
-   * the function arm below was added for: the next access off an array is
-   * `length` or `map`, which is `Array.prototype`, not a door.
+   * Members that hand back an array, however its type is spelled — the
+   * question of the array cell below, asked without `carries()`.
    */
-  const carries = (
-    type: ts.TypeNode | undefined,
-    flatAliases: ReadonlySet<string>,
-  ): boolean => {
-    if (!type) {
-      return false;
-    }
+  const ARRAY_VALUED = MEMBERS.filter(({ type }) => {
+    const values = downOf(type)
+      .map((value) => checker.getNonNullableType(value))
+      .filter((value) => (value.flags & ts.TypeFlags.Never) === 0);
 
-    if (ts.isFunctionTypeNode(type)) {
-      return carries(type.type, flatAliases);
-    }
-
-    if (ts.isUnionTypeNode(type)) {
-      return type.types.some((one) => carries(one, flatAliases));
-    }
-
-    if (ts.isArrayTypeNode(type) || ts.isLiteralTypeNode(type)) {
-      return false;
-    }
-
-    if (
-      ts.isTypeReferenceNode(type) &&
-      ts.isIdentifier(type.typeName) &&
-      flatAliases.has(type.typeName.text)
-    ) {
-      return false;
-    }
-
-    return !FLAT.has(type.kind);
-  };
-
-  const objectValuedMembers = (): Set<string> => {
-    const out = new Set<string>();
-    const flatAliases = functionAliases();
-
-    for (const [file, iface] of SURFACE_DECL) {
-      const source = ts.createSourceFile(
-        file,
-        readFileSync(path.join(ROOT, "packages/core", file), "utf8"),
-        ts.ScriptTarget.Latest,
-        true,
-        ts.ScriptKind.TS,
-      );
-
-      const visit = (node: ts.Node): void => {
-        if (ts.isInterfaceDeclaration(node) && node.name.text === iface) {
-          for (const member of node.members) {
-            const declared =
-              ts.isPropertySignature(member) || ts.isMethodSignature(member)
-                ? member.type
-                : undefined;
-
-            if (member.name && carries(declared, flatAliases)) {
-              out.add(member.name.getText());
-            }
-          }
-        }
-
-        ts.forEachChild(node, visit);
-      };
-
-      visit(source);
-    }
-
-    return out;
-  };
-
-  const RETURNS_OBJECT = objectValuedMembers();
+    return (
+      values.length > 0 &&
+      values.every((value) => checker.isArrayLikeType(value))
+    );
+  });
 
   interface Reached {
     src: Set<string>;
@@ -255,18 +278,6 @@ describe("consumer census (#2303)", () => {
     src: number;
     tests: number;
   }
-
-  /**
-   * Every file outside core that could reach a surface — the scope BOTH walks
-   * below read, so the idiom census and the typed census can never disagree
-   * about what they looked at.
-   */
-  const consumerFiles = (): string[] =>
-    [
-      ...globSync("packages/*/src/**/*.{ts,tsx}", { cwd: ROOT }),
-      ...globSync("packages/*/tests/**/*.{ts,tsx}", { cwd: ROOT }),
-      ...globSync("shared/**/*.ts", { cwd: ROOT }),
-    ].filter((f) => !f.startsWith("packages/core/"));
 
   function scan(): {
     hits: Record<string, Reached>;
@@ -536,19 +547,6 @@ describe("consumer census (#2303)", () => {
     opaque: string[];
   } => {
     const memberNames = new Set(Object.values(LIVE).flat());
-    const paths = consumerFiles().map((f) => path.join(ROOT, f));
-    const config = ts.readConfigFile(
-      path.join(ROOT, "tsconfig.json"),
-      ts.sys.readFile,
-    );
-    const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, ROOT);
-    const program = ts.createProgram(paths, {
-      ...parsed.options,
-      noEmit: true,
-      skipLibCheck: true,
-      jsx: ts.JsxEmit.Preserve,
-    });
-    const checker = program.getTypeChecker();
 
     const reach: Record<string, Reached> = {};
 
@@ -592,7 +590,7 @@ describe("consumer census (#2303)", () => {
     let accesses = 0;
     const opaque: string[] = [];
 
-    for (const file of paths) {
+    for (const file of CONSUMER_PATHS) {
       const source = program.getSourceFile(file);
 
       if (!source) {
@@ -782,7 +780,6 @@ describe("consumer census (#2303)", () => {
         src: ["name", "params", "search"],
         tests: ["name", "params", "search"],
       },
-      "getPluginApi.getDependencyKeys()": { src: ["length"], tests: [] },
       "getPluginApi.getOptions()": {
         src: ["allowNotFound", "defaultRoute", "limits"],
         tests: ["queryParams"],
@@ -790,10 +787,6 @@ describe("consumer census (#2303)", () => {
       "getPluginApi.getResolvedLimits()": {
         src: ["maxDependencies"],
         tests: [],
-      },
-      "getPluginApi.getUrlParams()": {
-        src: [],
-        tests: ["filter", "length", "map"],
       },
       "getPluginApi.makeState()": {
         src: [],
@@ -808,6 +801,28 @@ describe("consumer census (#2303)", () => {
         tests: ["defaultParams", "forwardTo", "path"],
       },
     });
+  });
+
+  it("the census walks into no member that hands back an array (#2575)", () => {
+    const keys = (members: SurfaceMember[]): string[] =>
+      members.map(({ surface, name }) => `${surface}.${name}`);
+
+    // ⚑ `carries()`'s array rule, held against every member as the checker
+    // types it. A walked member that hands back an array records `length` or
+    // `map` as reach one level down, in a row that reads as a door.
+    expect(
+      keys(ARRAY_VALUED.filter(({ name }) => RETURNS_OBJECT.has(name))),
+    ).toStrictEqual([]);
+
+    // Positive control, one per spelling the surfaces use: a property that IS
+    // a `T[]`, and a function handing back a `readonly T[]`, which
+    // `ts.isArrayTypeNode` does not see.
+    expect(keys(ARRAY_VALUED)).toStrictEqual(
+      expect.arrayContaining([
+        "RouterInternals.routerExtensions",
+        "PluginApi.getDependencyKeys",
+      ]),
+    );
   });
 
   it("nothing outside core reaches into port() — on either level", () => {
