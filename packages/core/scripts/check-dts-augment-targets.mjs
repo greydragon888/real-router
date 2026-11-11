@@ -66,10 +66,12 @@ const walk = (dir) => {
 };
 walk(join(pkgRoot, "dist"));
 
-const entrySet = new Set(ENTRY_FILES);
+// Both sides are `join()` output: `relative()` separates with "\" on Windows,
+// and ENTRY_FILES are written with "/".
+const entryPaths = new Set(ENTRY_FILES.map((entry) => join(pkgRoot, entry)));
 for (const file of dtsFiles) {
+  if (entryPaths.has(file)) continue;
   const rel = relative(pkgRoot, file);
-  if (entrySet.has(rel)) continue;
   const text = readFileSync(file, "utf8");
   for (const name of AUGMENT_TARGETS) {
     if (declarationRe(name).test(text)) {
