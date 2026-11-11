@@ -9,7 +9,7 @@ overrides:
   vite-plugin-solid>@babel/core: '>=7.29.6 <8'
   '@codspeed/core>axios': '>=1.18.0'
   qs: '>=6.16.1'
-  '@sonar/scan>node-forge': ~1.4.1
+  '@sonar/scan>node-forge': ~1.4.3
   minimatch@9: ~11.0.3
   minimatch@10: ~11.0.3
   glob@13: ~14.0.3
@@ -5735,8 +5735,8 @@ packages:
     resolution: {integrity: sha512-Z3lTE9pLaJF47NyMhd4ww1yFTAP8YhYI8SleJiHzM46Fgpm5cnNzSl9XfzFNqbaz+VlJrIj3fXQ4DeN1Rjm6cw==}
     engines: {node: '>=18'}
 
-  node-forge@1.4.2:
-    resolution: {integrity: sha512-rRtAR5XLJ8gCKd9du4qrKAsgCG1ObGP4gLeNJMa4vYSeq4bmBMOJk5IHkrviBV0q7uoAJlVd8HEQYQSVUb4FGQ==}
+  node-forge@1.4.3:
+    resolution: {integrity: sha512-P6wzfh6t70avmV8FrVEAd/36sOPJQ+hkaJVX1Laap9J/77m7M0eyozDvc8SwnDf4P7MP94gwbAAo0rg3YVXT+g==}
     engines: {node: '>= 6.13.0'}
 
   node-gyp-build-optional-packages@5.2.2:
@@ -9404,7 +9404,7 @@ snapshots:
       axios: 1.20.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       commander: 15.0.0
       hpagent: 1.2.0
-      node-forge: 1.4.2
+      node-forge: 1.4.3
       properties-file: 5.0.7
       proxy-from-env: 2.1.0
       semver: 7.8.5
@@ -11922,7 +11922,7 @@ snapshots:
       emojilib: 2.4.0
       skin-tone: 2.0.0
 
-  node-forge@1.4.2: {}
+  node-forge@1.4.3: {}
 
   node-gyp-build-optional-packages@5.2.2:
     dependencies:

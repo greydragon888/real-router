@@ -15536,6 +15536,8 @@ The strict date parse is a commit of its own after this one, and a revert of thi
 
 ## `lint:audit` goes red on advisories of one evening: three packages move, two enter the allowlist (2026-10-31)
 
+> **Updated (2026-11-11).** The node-forge override's floor rises to `~1.4.3`, for four advisories on 1.4.2: "`lint:audit` goes red on node-forge 1.4.2: the override's floor rises to 1.4.3", at the end of this file.
+
 > **Updated (2026-10-31).** The two allowlist entries left the same day, and the override this entry rules out turned out to work: "minimatch and glob take the majors that fix them".
 
 **Problem.** `lint:audit` failed in `Repo Lints` and in pre-push with no commit behind it. On `3fcff6308` it reported 23 findings from 15 advisories that GitHub published on 2026-10-30 between 22:59Z and 23:10Z: 11 on `node-forge` 1.4.0, and one each on `follow-redirects` 1.16.1, `joi` 18.2.9, `glob` 13.0.6 and `minimatch` 3.1.5, 5.1.9, 9.0.9 and 10.2.6. The same run listed GHSA-qwgh-2vcv-g2f7 under `has unused ignores:`.
@@ -15808,3 +15810,22 @@ Measured after the fix on the stand, in all three engines: Back 700 → 2200; th
 Each restores an entry keyed by `hashFiles` of its own `action.yml`, and of `vale-styles/VERSION` for Vale, so a new pin is a new entry. It downloads the release only when no restored file matches the pinned sha256, checks the sha256, installs, and after a miss saves the entry. The two install steps of `ci.yml` call them, and so does the new workflow `ci-tool-cache.yml`, which runs on master on a push that changes the files a key hashes or the workflow itself, every Monday, and on dispatch. Dependabot's github-actions entry lists `/.github/actions/*` in place of the setup action's directory, so the `actions/cache` pins of the new actions are bumped too. `verify.test.mjs` reads the osv-scanner action's steps as it reads the setup action's: they run before the skip machinery's.
 
 **Why.** With master's entry in place, a pull request's install reads no release. A release outage still reaches CI through a pin change — the pull request that makes it, and `ci-tool-cache.yml` after its merge — and through an entry the cache dropped, until the Monday run saves it again. That run also keeps both entries read: GitHub evicts an entry no run has read for seven days. The writer is a workflow of its own, not a job of `post-merge.yml`: the success of Post-Merge Build starts `changesets.yml`, and a job there would tie a release to a download. The two downloads are small, 57.5 MB for the osv-scanner binary and 11.7 MB for the Vale archive (`curl -sIL` on the v2.6.0 and v3.20.0 assets), where the uv cache Repo Lints keeps off would hold ~570 MB of semgrep. An entry holds only bytes a run checked: a restored file is held to the pinned sha256 like a download, and a file that fails it is never saved. A pull request writes only its own merge ref, which no other pull request reads.
+
+## `lint:audit` goes red on node-forge 1.4.2: the override's floor rises to 1.4.3 (2026-11-11)
+
+**Problem.** Pre-push `lint:audit` refused a push that changes no lockfile. osv-scanner found `node-forge` 1.4.2 in the root `pnpm-lock.yaml` under four advisories, all fixed in 1.4.3: GHSA-6889-vf6x-f3g5 (CVSS 3.7), GHSA-6cv4-p8m7-4r25, GHSA-j8rw-jp99-435v and GHSA-w4xr-hqv8-ch44 (5.9 each). The version came through `'@sonar/scan>node-forge': ~1.4.1`, the override "`lint:audit` goes red on advisories of one evening" added.
+
+**Solution.** The override's floor rises to the fixed release, and the lockfile resolves `node-forge` 1.4.3; no other entry of the lockfile moves.
+
+```yaml
+# Before
+'@sonar/scan>node-forge': ~1.4.1
+# After
+'@sonar/scan>node-forge': ~1.4.3
+```
+
+**Why the floor rises.** Under `~1.4.1` the locked 1.4.2 still satisfies the override, so an install keeps it. A floor at the fixed release makes the lockfile move, and keeps a later resolution from moving it back to an affected release.
+
+**Why the override stays.** `@sonar/scan` pins an exact 1.4.0 through 5.0.2, the root's 5.0.1 among them, and 5.1.0 pins 1.4.3. The override goes when the root moves to 5.1.0 or later, a scanner bump this entry does not make.
+
+**Measured.** `lint:audit` finds no issue in the five lockfiles, and `lint:overrides`, `lint:dedupe`, `lint:deps` and `lint:config-sync` pass.

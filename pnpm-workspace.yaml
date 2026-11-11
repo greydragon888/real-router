@@ -33,10 +33,12 @@ overrides:
   # @real-router/* package. typed-rest-client pins an exact 6.15.1, an affected
   # release, so this floor overrides that pin on purpose.
   qs: '>=6.16.1'
-  # GHSA-86w9-cpqp-85rv and the node-forge advisories of 2026-10-30, all fixed in
-  # 1.4.1. @sonar/scan pins an exact 1.4.0, through 5.0.2, its latest, so this
-  # overrides that pin on purpose. Drop it when @sonar/scan takes 1.4.1 or later.
-  '@sonar/scan>node-forge': ~1.4.1
+  # GHSA-86w9-cpqp-85rv and the node-forge advisories of 2026-10-30 are fixed in
+  # 1.4.1; GHSA-6889-vf6x-f3g5, GHSA-6cv4-p8m7-4r25, GHSA-j8rw-jp99-435v and
+  # GHSA-w4xr-hqv8-ch44 in 1.4.3. @sonar/scan pins an exact 1.4.0 through 5.0.2,
+  # the root's 5.0.1 among them, so this overrides that pin on purpose. 5.1.0
+  # pins 1.4.3: drop this when the root moves to it.
+  '@sonar/scan>node-forge': ~1.4.3
   # GHSA-g3hv-75wg-m249 and GHSA-3g3m-2fjr-6pw4 are fixed in minimatch 11.0.1 and
   # glob 14.0.2 alone, a major above what the parents declare. minimatch 11 removes
   # `makeRe`: of every parent in the three workspaces only eslint-plugin-import-x
