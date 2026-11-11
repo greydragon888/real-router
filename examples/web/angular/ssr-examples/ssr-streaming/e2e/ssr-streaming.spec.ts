@@ -1,6 +1,50 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+/**
+ * Records the URL of every `/chunk-*` script whose body contains `marker`.
+ * A body read waits for the load to finish and then costs one more round
+ * trip, so `toBeVisible` can resolve first: a list read straight after it
+ * can be `[]` for a chunk that has already run (#2937). The returned reader
+ * awaits every read begun so far before it answers.
+ */
+function trackChunkLoads(page: Page, marker: string): () => Promise<string[]> {
+  const urls: string[] = [];
+  const reads: Promise<void>[] = [];
+
+  page.on("response", (resp) => {
+    if (
+      resp.request().resourceType() !== "script" ||
+      !/\/chunk-/.test(resp.url())
+    ) {
+      return;
+    }
+
+    const read = resp.text().then((body) => {
+      if (body.includes(marker)) {
+        urls.push(resp.url());
+      }
+    });
+
+    // Handled here, so a read still pending when the page closes is not an
+    // unhandled rejection; a reader that awaits it still rejects.
+    read.catch(() => undefined);
+    reads.push(read);
+  });
+
+  return async () => {
+    await Promise.all(reads);
+
+    return [...urls];
+  };
+}
 
 test.describe("Streaming SSR Example (Angular)", () => {
+  // A `page.route` handler still running when a test ends rejects once the
+  // context closes, and fails whichever test the worker is running by then.
+  test.afterEach(async ({ page }) => {
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  });
+
   test("critical content visible immediately on commit", async ({ page }) => {
     const startedAt = Date.now();
 
@@ -349,25 +393,7 @@ test.describe("Streaming SSR Example (Angular)", () => {
     // the chunk DOES get loaded eventually (prefetch + hydrate work) and that
     // the resolved component is visible — which proves the trigger pair is
     // wired correctly.
-    const specChunkLoads: { url: string; ts: number }[] = [];
-    const startedAt = Date.now();
-
-    page.on("response", async (resp) => {
-      if (
-        resp.request().resourceType() === "script" &&
-        /\/chunk-/.test(resp.url())
-      ) {
-        try {
-          const body = await resp.text();
-
-          if (body.includes("spec-sheet")) {
-            specChunkLoads.push({ url: resp.url(), ts: Date.now() - startedAt });
-          }
-        } catch {
-          /* ignore aborted */
-        }
-      }
-    });
+    const specChunkLoads = trackChunkLoads(page, "spec-sheet");
 
     await page.goto("/products/1");
 
@@ -375,7 +401,7 @@ test.describe("Streaming SSR Example (Angular)", () => {
     await expect(page.getByTestId("spec-weight")).toHaveText("1.2 kg");
     await expect(page.getByTestId("spec-warranty")).toHaveText("2 years");
 
-    expect(specChunkLoads.length).toBeGreaterThan(0);
+    expect((await specChunkLoads()).length).toBeGreaterThan(0);
   });
 
   test("@defer placeholder taxonomy: spec-fallback ships server-side, gets replaced after hydrate", async ({
@@ -442,24 +468,7 @@ test.describe("Streaming SSR Example (Angular)", () => {
     // Placeholder is a button. The chunk is fetched and the qa-section
     // component is hydrated only after the click — cheaper than (on hover)
     // for content the user is unlikely to read on every visit.
-    const qaChunkLoads: string[] = [];
-
-    page.on("response", async (resp) => {
-      if (
-        resp.request().resourceType() === "script" &&
-        /\/chunk-/.test(resp.url())
-      ) {
-        try {
-          const body = await resp.text();
-
-          if (body.includes("qa-section")) {
-            qaChunkLoads.push(resp.url());
-          }
-        } catch {
-          /* aborted */
-        }
-      }
-    });
+    const qaChunkLoads = trackChunkLoads(page, "qa-section");
 
     await page.goto("/products/1");
 
@@ -467,14 +476,14 @@ test.describe("Streaming SSR Example (Angular)", () => {
     await expect(page.getByTestId("qa-section")).toHaveCount(0);
 
     await page.waitForLoadState("networkidle");
-    expect(qaChunkLoads).toEqual([]);
+    expect(await qaChunkLoads()).toEqual([]);
 
     await page.getByTestId("qa-trigger").click();
 
     await expect(page.getByTestId("qa-section")).toBeVisible({
       timeout: 5000,
     });
-    expect(qaChunkLoads.length).toBeGreaterThan(0);
+    expect((await qaChunkLoads()).length).toBeGreaterThan(0);
   });
 
   test("@defer (when signal): tech details chunk loads only after the toggle signal flips to true", async ({
@@ -483,31 +492,14 @@ test.describe("Streaming SSR Example (Angular)", () => {
     // Predicate-based @defer is unique to Angular — the chunk loads + the
     // component hydrates only when the bound expression evaluates truthy.
     // Here a button toggles a signal; the @defer block reacts.
-    const techChunkLoads: string[] = [];
-
-    page.on("response", async (resp) => {
-      if (
-        resp.request().resourceType() === "script" &&
-        /\/chunk-/.test(resp.url())
-      ) {
-        try {
-          const body = await resp.text();
-
-          if (body.includes("tech-details")) {
-            techChunkLoads.push(resp.url());
-          }
-        } catch {
-          /* aborted */
-        }
-      }
-    });
+    const techChunkLoads = trackChunkLoads(page, "tech-details");
 
     await page.goto("/products/1");
 
     await expect(page.getByTestId("tech-fallback")).toBeVisible();
     await expect(page.getByTestId("tech-details")).toHaveCount(0);
     await page.waitForLoadState("networkidle");
-    expect(techChunkLoads).toEqual([]);
+    expect(await techChunkLoads()).toEqual([]);
 
     await page.getByTestId("tech-toggle").click();
 
@@ -515,7 +507,7 @@ test.describe("Streaming SSR Example (Angular)", () => {
       timeout: 5000,
     });
     await expect(page.getByTestId("tech-protocol")).toHaveText("USB-C 2.0");
-    expect(techChunkLoads.length).toBeGreaterThan(0);
+    expect((await techChunkLoads()).length).toBeGreaterThan(0);
 
     // (when expr) is a ONE-SHOT trigger in Angular: once the predicate has
     // fired, the chunk is loaded and the component stays mounted even if

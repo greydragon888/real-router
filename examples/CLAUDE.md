@@ -178,6 +178,8 @@ The glob `web/*/*/*` in `examples/pnpm-workspace.yaml` registers subgrouped pack
 - Navigating to current route → `SAME_STATES`, not `TRANSITION_CANCELLED`
 - Nested routes need nested `<RouteView nodeName="parent">`, not `segment="parent.child"`
 - `viewTransitions` prop is a no-op in browsers without `document.startViewTransition` — do not assert VT pseudo-elements in e2e without a feature-detect (or gate the assertion on `typeof document.startViewTransition === "function"`)
+- A `page.on("response")` listener that awaits `resp.text()` can finish after the assertion that reads its result — keep the reads and await them before asserting, as `trackChunkLoads` in `web/angular/ssr-examples/ssr-streaming/e2e/` does
+- A `page.route` handler still running when a test ends can throw once the context closes (`Response has been disposed`), and the error fails whichever test the worker is running by then — unroute with `{ behavior: "ignoreErrors" }` in `afterEach`, as the same spec does
 
 ## Playwright Config
 
