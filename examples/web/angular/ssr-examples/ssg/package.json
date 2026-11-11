@@ -25,7 +25,7 @@
     "@real-router/ssr-utils": "*",
     "express": "5.3.0",
     "rxjs": "7.8.2",
-    "tslib": "2.8.1"
+    "tslib": "2.9.1"
   },
   "devDependencies": {
     "@angular/build": "~22.2.0",
