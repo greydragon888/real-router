@@ -1,5 +1,16 @@
 # @real-router/search-schema-plugin
 
+## 0.9.1
+
+### Patch Changes
+
+- [#2942](https://github.com/greydragon888/real-router/pull/2942) [`bf8f55c`](https://github.com/greydragon888/real-router/commit/bf8f55ca3c320fb7c31eeaf96aae2e41e9375897) Thanks [@greydragon888](https://github.com/greydragon888)! - Drop the casts `@real-router/core`'s state types make redundant ([#2834](https://github.com/greydragon888/real-router/issues/2834))
+
+  No runtime change in this package.
+
+- Updated dependencies [[`bf8f55c`](https://github.com/greydragon888/real-router/commit/bf8f55ca3c320fb7c31eeaf96aae2e41e9375897)]:
+  - @real-router/core@0.159.0
+
 ## 0.9.0
 
 ### Minor Changes

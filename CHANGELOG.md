@@ -5,6 +5,142 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-11-11]
+
+### @real-router/browser-plugin@0.28.0
+
+### Minor Changes
+
+- [#2942](https://github.com/greydragon888/real-router/pull/2942) [`bf8f55c`](https://github.com/greydragon888/real-router/commit/bf8f55ca3c320fb7c31eeaf96aae2e41e9375897) Thanks [@greydragon888](https://github.com/greydragon888)! - Restore a `history.state` entry holding a `Date` as it was recorded ([#2834](https://github.com/greydragon888/real-router/issues/2834))
+
+  `isState` no longer refuses a `Date` in an entry's `params` or `search`: it is a
+  state value in `@real-router/core`'s types. It still refuses a `Date` made in
+  another realm — an iframe's, say — an object that only looks like a `Date` (one
+  built on `Date.prototype`, or a `Proxy` over a `Date`) and every other class
+  instance; an instance of an `Array` subclass is walked as an array, as before.
+
+  **Breaking Change:** Back and Forward restore such an entry as it was recorded
+  instead of matching its URL again, so the route's `decodeParams` does not run
+  for it. The structured clone `history.pushState` makes keeps a `Date`'s time,
+  but a subclass's instance — a date-fns `UTCDate`, say — comes back as a plain
+  `Date`: where the subclass matters, convert the value where you read it.
+
+### Patch Changes
+
+- Updated dependencies [[`bf8f55c`](https://github.com/greydragon888/real-router/commit/bf8f55ca3c320fb7c31eeaf96aae2e41e9375897)]:
+  - @real-router/core@0.159.0
+
+### @real-router/core@0.159.0
+
+### Minor Changes
+
+- [#2942](https://github.com/greydragon888/real-router/pull/2942) [`bf8f55c`](https://github.com/greydragon888/real-router/commit/bf8f55ca3c320fb7c31eeaf96aae2e41e9375897) Thanks [@greydragon888](https://github.com/greydragon888)! - Type a route codec's two sides apart: the state side carries application values such as a `Date` ([#2834](https://github.com/greydragon888/real-router/issues/2834))
+
+  A route's `decodeParams` may return what the application uses — a `Date`, a
+  plain object, an array of those — and the state side is typed for it.
+  `State.params`, `State.search` and the doors that take a state-side bag
+  (`navigate`, `buildPath`, `makeState`, `buildNavigationState`, `canNavigateTo`,
+  `isActiveRoute` and a `<Link>`'s `routeParams` and `routeSearch` among them)
+  carry the new `ParamValue`. `decodeParams` receives the new `UrlChannels` —
+  path slots as the strings the matcher captured, query values as the parser
+  typed them (`SearchParamValue`) — and `encodeParams` receives and returns
+  `ParamsSearch`, the state side.
+
+  Runtime behaviour is unchanged. Without a route codec, a `Date` or a plain
+  object prints as its JSON text in a path slot and as its `String()` in a query
+  value, a reload reads back a string, and inside a query array it throws a
+  `TypeError`.
+
+  **Breaking Change:** code typed against the old shapes may stop compiling.
+
+  - A channel value you read — `state.search.q`, `state.params.day` — is a
+    `ParamValue`: narrow it (`typeof`, `instanceof Date`, `Array.isArray`) or cast
+    it where it reaches a narrower slot, such as a JSX child or a
+    `SearchParamValue` parameter.
+  - A route's `decodeParams` takes URL values. Call it with path slots as strings
+    (`{ params: { id: "7" }, search: {} }`), not with a committed state's
+    channels, and type a variable that holds it
+    `(channels: UrlChannels) => ParamsSearch`: one typed
+    `(channels: ParamsSearch) => ParamsSearch` no longer accepts it. Inside a
+    decoder a path slot is a `string`, so comparing it with a number no longer
+    compiles, and a decoder that wrote into its argument returns a new object
+    instead. A decoder typed `(channels: ParamsSearch) => ParamsSearch` still
+    assigns to a route.
+  - A path-slot cast in a decoder (`params.id as string`) is now reported by
+    `@typescript-eslint/no-unnecessary-type-assertion`, and `String(search.q)` in
+    an encoder by `@typescript-eslint/no-base-to-string`.
+
+### @real-router/hash-plugin@0.18.0
+
+### Minor Changes
+
+- [#2942](https://github.com/greydragon888/real-router/pull/2942) [`bf8f55c`](https://github.com/greydragon888/real-router/commit/bf8f55ca3c320fb7c31eeaf96aae2e41e9375897) Thanks [@greydragon888](https://github.com/greydragon888)! - Restore a `history.state` entry holding a `Date` as it was recorded ([#2834](https://github.com/greydragon888/real-router/issues/2834))
+
+  `isState` no longer refuses a `Date` in an entry's `params` or `search`: it is a
+  state value in `@real-router/core`'s types. It still refuses a `Date` made in
+  another realm — an iframe's, say — an object that only looks like a `Date` (one
+  built on `Date.prototype`, or a `Proxy` over a `Date`) and every other class
+  instance; an instance of an `Array` subclass is walked as an array, as before.
+
+  **Breaking Change:** Back and Forward restore such an entry as it was recorded
+  instead of matching its URL again, so the route's `decodeParams` does not run
+  for it. The structured clone `history.pushState` makes keeps a `Date`'s time,
+  but a subclass's instance — a date-fns `UTCDate`, say — comes back as a plain
+  `Date`: where the subclass matters, convert the value where you read it.
+
+### Patch Changes
+
+- Updated dependencies [[`bf8f55c`](https://github.com/greydragon888/real-router/commit/bf8f55ca3c320fb7c31eeaf96aae2e41e9375897)]:
+  - @real-router/core@0.159.0
+
+### @real-router/persistent-params-plugin@0.7.1
+
+### Patch Changes
+
+- [#2942](https://github.com/greydragon888/real-router/pull/2942) [`bf8f55c`](https://github.com/greydragon888/real-router/commit/bf8f55ca3c320fb7c31eeaf96aae2e41e9375897) Thanks [@greydragon888](https://github.com/greydragon888)! - Drop the casts `@real-router/core`'s state types make redundant ([#2834](https://github.com/greydragon888/real-router/issues/2834))
+
+  No runtime change in this package.
+
+- Updated dependencies [[`bf8f55c`](https://github.com/greydragon888/real-router/commit/bf8f55ca3c320fb7c31eeaf96aae2e41e9375897)]:
+  - @real-router/core@0.159.0
+
+### @real-router/search-schema-plugin@0.9.1
+
+### Patch Changes
+
+- [#2942](https://github.com/greydragon888/real-router/pull/2942) [`bf8f55c`](https://github.com/greydragon888/real-router/commit/bf8f55ca3c320fb7c31eeaf96aae2e41e9375897) Thanks [@greydragon888](https://github.com/greydragon888)! - Drop the casts `@real-router/core`'s state types make redundant ([#2834](https://github.com/greydragon888/real-router/issues/2834))
+
+  No runtime change in this package.
+
+- Updated dependencies [[`bf8f55c`](https://github.com/greydragon888/real-router/commit/bf8f55ca3c320fb7c31eeaf96aae2e41e9375897)]:
+  - @real-router/core@0.159.0
+
+### @real-router/validation-plugin@0.33.1
+
+### Patch Changes
+
+- [#2942](https://github.com/greydragon888/real-router/pull/2942) [`bf8f55c`](https://github.com/greydragon888/real-router/commit/bf8f55ca3c320fb7c31eeaf96aae2e41e9375897) Thanks [@greydragon888](https://github.com/greydragon888)! - Accept a `Date` in `params` ([#2834](https://github.com/greydragon888/real-router/issues/2834))
+
+  A `Date` is a state value in `@real-router/core`'s types, and the plugin no
+  longer refuses one anywhere in `params`, a subclass's instance and an Invalid
+  Date included: `navigate`, `buildPath`, `makeState`, and `start()` through a
+  decoder that returns a `Date`, accept it as bare core does. The plugin still
+  refuses a `Date` made in another realm — an iframe's, a `vm` context's — an
+  object that only looks like a `Date` (one built on `Date.prototype`, or a
+  `Proxy` over a `Date`) and every other class instance; an instance of an
+  `Array` subclass is walked as an array, as before.
+
+  - On a route without a codec, a `Date` in a path slot now commits without a
+    warning: it prints as its JSON text (`/day/%222024-03-15T00:00:00.000Z%22`, an
+    Invalid Date as `/day/null`), and a reload reads back a string. Give such a
+    route a `decodeParams` / `encodeParams` pair.
+  - The codec round-trip warning now reaches a `Date` in `params`: a codec that
+    prints less than the value holds, such as a day codec on a `Date` with a time,
+    is reported as changing the key.
+
+- Updated dependencies [[`bf8f55c`](https://github.com/greydragon888/real-router/commit/bf8f55ca3c320fb7c31eeaf96aae2e41e9375897)]:
+  - @real-router/core@0.159.0
+
 ## [2026-11-09]
 
 ### @real-router/rsc-server-plugin@0.5.1
