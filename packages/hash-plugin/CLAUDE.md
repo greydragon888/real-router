@@ -142,10 +142,13 @@ an entry written by an older version of the app. The plugin validates it via
 it does not hold up. Four things that guard does (#1837 / #1838):
 
 - **Both restored channels are screened by VALUE**, with one validator. A
-  function, Symbol, BigInt, cycle or class instance is refused in `search`
-  exactly as it is in `params`, so none of them reaches the frozen
-  `state.search`. The query domain is untouched — a repeated key still restores
-  as an array, a bare `?flag` as `null`.
+  function, Symbol, BigInt, cycle or class instance other than a `Date` or an
+  `Array` is refused in `search` exactly as it is in `params`, so none of them
+  reaches the frozen `state.search`. The query domain is untouched — a repeated
+  key still restores as an array, a bare `?flag` as `null`. A `Date` is a state
+  value (#2834), restored as the entry's structured clone holds it: its time
+  kept, a subclass's instance as a plain `Date`, and the route's `decodeParams`
+  not run.
 - **It answers, it does not throw.** The entry may carry accessors or be a
   `get`-trapping Proxy; every read sits inside a boundary, so an unreadable
   payload is simply not restorable instead of surfacing as a critical error.

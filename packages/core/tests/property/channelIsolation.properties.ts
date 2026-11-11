@@ -98,7 +98,7 @@ describe("channel isolation — params and search meet only in the URL", () => {
 
   /** Same literal, the other channel's type. */
   const searchOf = (names: (string | undefined)[]): SearchParams =>
-    bagOf(names) as SearchParams;
+    bagOf(names);
 
   /**
    * Every producer that builds a `State` from an intent, read through the

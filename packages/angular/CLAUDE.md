@@ -338,7 +338,7 @@ type RouteParams = { slug: string } & Params;
 
 const route = injectRoute<RouteParams>();
 const slug = route.routeState().route.params.slug; // typed as string
-const q = route.routeState().route.search.q; // query channel — SearchParamValue | undefined, not generic-typed
+const q = route.routeState().route.search.q; // query channel — ParamValue, not generic-typed
 ```
 
 ### RouteView uses `routeNode` alias for `nodeName` input

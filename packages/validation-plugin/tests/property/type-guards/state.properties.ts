@@ -99,16 +99,18 @@ describe("State Type Guards Properties", () => {
     // ===================================================================
     // INV: isState delegates structural params validation to isParams — it
     // must reject cyclic / class-instance params and accept shared-reference
-    // (diamond) params exactly as isParams does, since params reaching isState
-    // (e.g. user-supplied navigation params) may carry such structures.
+    // (diamond) params and Dates, since params reaching isState (e.g.
+    // user-supplied navigation params) may carry such structures. Each draw
+    // carries its verdict: isState is built on isParams here, so agreement
+    // between the two alone would hold for any verdict.
     // ===================================================================
     test.prop([structuralParamsArbitrary], { numRuns: 10_000 })(
-      "isState follows isParams for structural params (cycles, diamonds, instances)",
-      (params) => {
+      "isState and isParams give each structural shape its verdict (cycles, diamonds, instances, Dates)",
+      ([params, valid]) => {
         const state = { name: "home", path: "/", params };
 
-        // With a valid name and path, isState reduces to isParams(params).
-        expect(isState(state)).toBe(isParams(params));
+        expect(isParams(params)).toBe(valid);
+        expect(isState(state)).toBe(valid);
       },
     );
   });

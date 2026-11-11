@@ -55,6 +55,7 @@ import type {
   SearchParams,
   State,
   Route,
+  UrlChannels,
 } from "../../types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 
@@ -534,9 +535,9 @@ export class RoutesNamespace<
     // slot shows `params` clean and clears nothing — it never builds the shape.
     const params = withoutUnsafeKey(routeState.params);
     // The matcher always carries a search bag (a frozen `{}` when empty) but types
-    // its values as `unknown`; narrow it to the query channel once here so the
-    // codec / forwardState / rebuild uses it without per-site casts.
-    const search = withoutUnsafeKey(routeState.search as SearchParams);
+    // its values as `unknown`; narrow it to the parser's value type once here so
+    // the codec / forwardState / rebuild uses it without per-site casts.
+    const search = withoutUnsafeKey(routeState.search as UrlChannels["search"]);
 
     // Two-channel decode (RFC-4 M2 / #1548, §4): the route codec sees BOTH the
     // path params AND the parsed query — `decodeParams({ params, search })` →
@@ -1210,7 +1211,7 @@ export class RoutesNamespace<
     // about the flag.
     if (
       !ignoreQueryParams &&
-      !paramsMatch(canonical.query as Params, activeState.search as Params)
+      !paramsMatch(canonical.query, activeState.search)
     ) {
       return false;
     }

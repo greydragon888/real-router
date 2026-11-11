@@ -16,7 +16,10 @@ import { browserPluginFactory, isState } from "@real-router/browser-plugin";
  * a raw read in core mostly degrades toward refusal or a wrong-but-loud
  * outcome, while a raw read HERE flips the guard's verdict to **"valid"** for
  * input it exists to reject. Same convention, different severity — which is why
- * these three are pinned by behaviour and not only by the scan.
+ * these reads are pinned by behaviour and not only by the scan. The two `Date`
+ * reads are outside the scan. A raw read that leaves its capture unread fails
+ * `type-check` (TS6133), and behaviour pins the rest: a raw `getTime` admits an
+ * object built on `Date.prototype`, a raw `Date` refuses a real one.
  *
  * ⚠ Honest framing: an attacker who can re-point `Object.getPrototypeOf` already
  * has script execution, so this is not a security boundary. It is robustness
@@ -31,11 +34,15 @@ describe("shared/browser-env decides with captured intrinsics (#1971)", () => {
   const realGetPrototypeOf = Object.getPrototypeOf;
   const realValues = Object.values;
   const realKeys = Object.keys;
+  const RealDate = Date;
+  const realGetTime = Date.prototype.getTime;
 
   afterEach(() => {
     Object.getPrototypeOf = realGetPrototypeOf;
     Object.values = realValues;
     Object.keys = realKeys;
+    globalThis.Date = RealDate;
+    RealDate.prototype.getTime = realGetTime;
     // The premise cell below loads the module afresh under a shim; leaving that
     // copy in the registry would hand it to whatever imports next.
     vi.resetModules();
@@ -47,8 +54,8 @@ describe("shared/browser-env decides with captured intrinsics (#1971)", () => {
     path: "/users",
   });
 
-  it("refuses a Date in params even when getPrototypeOf is re-pointed", () => {
-    const entry = entryWith({ when: new Date() });
+  it("refuses a Map in params even when getPrototypeOf is re-pointed", () => {
+    const entry = entryWith({ when: new Map() });
 
     // CONTROL — the guard genuinely refuses this shape, so the cell below
     // measures the intrinsic and not a guard that never worked.
@@ -57,7 +64,7 @@ describe("shared/browser-env decides with captured intrinsics (#1971)", () => {
     Object.getPrototypeOf = (() => null) as typeof Object.getPrototypeOf;
 
     // Every object now looks like a plain container, so `isPlainContainer`
-    // waves a class instance through and the Date lands in `state.params`.
+    // waves a class instance through and the Map lands in `state.params`.
     expect(isState(entry)).toBe(false);
   });
 
@@ -72,6 +79,32 @@ describe("shared/browser-env decides with captured intrinsics (#1971)", () => {
     // With no children pushed onto the work-stack the walk inspects nothing
     // below the top level, so the function is never seen.
     expect(isState(entry)).toBe(false);
+  });
+
+  it("refuses an object on Date.prototype even when getTime is re-pointed", () => {
+    const entry = entryWith({ when: Object.create(Date.prototype) as object });
+
+    // CONTROL — refused for real before the shim.
+    expect(isState(entry)).toBe(false);
+
+    RealDate.prototype.getTime = () => 0;
+
+    // `instanceof Date` admits the object, and a `getTime` that answers for it
+    // no longer throws, so nothing tells it from a Date.
+    expect(isState(entry)).toBe(false);
+  });
+
+  it("accepts a Date even when the Date constructor is re-pointed", () => {
+    const entry = entryWith({ when: new RealDate(0) });
+
+    // CONTROL — admitted for real before the shim.
+    expect(isState(entry)).toBe(true);
+
+    globalThis.Date = class ShimDate extends RealDate {} as DateConstructor;
+
+    // The Date was made by the boot-time constructor, so it is not an instance
+    // of the one installed now.
+    expect(isState(entry)).toBe(true);
   });
 
   it("refuses a '..' base even when keys is re-pointed", () => {
@@ -93,8 +126,8 @@ describe("shared/browser-env decides with captured intrinsics (#1971)", () => {
     // The cells above pin what capture BUYS. This one pins WHY it is there, and
     // it is the only arm that produces the outcome the docblock describes: the
     // shim has to be installed AHEAD of the module's load, so the capture takes
-    // the lie. Re-pointing after boot — the three cells above — is exactly the
-    // window capture closed.
+    // the lie. Re-pointing after boot — the cells above — is exactly the window
+    // capture closed.
     //
     // ⚑ Executable form of the doctrine's own caveat: capture narrows the
     // window to "before this module loads" and does not close it (#1798).
@@ -125,14 +158,20 @@ describe("shared/browser-env decides with captured intrinsics (#1971)", () => {
   });
 
   it("CONTROL — the shims are genuinely installed and reached", () => {
-    // Without this the three cells above could pass by the shim silently
+    // Without this the cells above could pass by the shim silently
     // failing to take effect, which is indistinguishable from a fix.
     Object.getPrototypeOf = (() => null) as typeof Object.getPrototypeOf;
     Object.values = (() => []) as typeof Object.values;
     Object.keys = () => [];
+    RealDate.prototype.getTime = () => 0;
+    globalThis.Date = class ShimDate extends RealDate {} as DateConstructor;
 
     expect(Object.getPrototypeOf({})).toBeNull();
     expect(Object.values({ a: 1 })).toStrictEqual([]);
     expect(Object.keys({ a: 1 })).toStrictEqual([]);
+    expect(
+      RealDate.prototype.getTime.call(Object.create(RealDate.prototype)),
+    ).toBe(0);
+    expect(new RealDate(0)).not.toBeInstanceOf(Date);
   });
 });

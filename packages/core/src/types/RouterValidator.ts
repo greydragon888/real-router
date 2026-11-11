@@ -11,7 +11,7 @@
  * rather than the container it was read from (#2382).
  */
 
-import type { ParamsSearch, State } from "./base";
+import type { ParamsSearch, State, UrlChannels } from "./base";
 
 export interface RouterValidator {
   /**
@@ -208,7 +208,7 @@ export interface RouterValidator {
       state: State,
       codec: {
         readonly encode: ((channels: ParamsSearch) => ParamsSearch) | undefined;
-        readonly decode: ((channels: ParamsSearch) => ParamsSearch) | undefined;
+        readonly decode: ((channels: UrlChannels) => ParamsSearch) | undefined;
       },
       pathSlots: readonly string[],
     ) => void;

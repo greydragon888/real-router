@@ -1,3 +1,5 @@
+import { runInNewContext } from "node:vm";
+
 import { fc } from "@fast-check/vitest";
 
 import type { NavigationOptions, Params, State } from "@real-router/core";
@@ -398,7 +400,12 @@ const anyLeafArbitrary = fc.oneof(
   fc.constant(Symbol("leaf")),
   fc.bigInt(),
   fc.constant(0).map(() => new Date()),
+  fc.constant(0).map(() => new (class extends Date {})()),
   fc.constant(0).map(() => new Map()),
+  // Objects that only look like a Date (#2834): no time inside, or another realm.
+  fc.constant(0).map(() => Object.create(Date.prototype) as object),
+  fc.constant(0).map(() => new Proxy(new Date(), {})),
+  fc.constant(0).map(() => runInNewContext("new Date(0)") as object),
 );
 
 /** Arbitrary nested data value: leaves, arrays, and plain objects, mixed validity. */
@@ -493,6 +500,8 @@ const validLeafArbitrary = fc.oneof(
   fc.boolean(),
   fc.constant(null),
   fc.constant(undefined),
+  // A Date is a value whatever its time, an invalid one included (#2834).
+  fc.constantFrom(0, 1_710_460_800_000, Number.NaN).map((t) => new Date(t)),
 );
 
 /** Arbitrary nested data value with ONLY valid leaves (no invalid leaf anywhere). */
@@ -532,9 +541,9 @@ export const richInvalidParamsArbitrary: fc.Arbitrary<unknown> = fc.oneof(
 
     return o;
   }),
-  // Class instance nested as a value
+  // Class instance other than a Date nested as a value
   fc.oneof(
-    fc.constant(0).map(() => ({ d: new Date() })),
+    fc.constant(0).map(() => ({ s: new Set() })),
     fc.constant(0).map(() => ({ m: new Map() })),
     fc.constant(0).map(() => ({ r: /re/ })),
   ),
@@ -554,22 +563,31 @@ export const richInvalidParamsArbitrary: fc.Arbitrary<unknown> = fc.oneof(
   fc.array(fc.integer(), { maxLength: 4 }),
 );
 
-/** Params VALUES exercising the structural paths through `isState`/`isStateStrict`. */
-export const structuralParamsArbitrary: fc.Arbitrary<unknown> = fc.oneof(
+/**
+ * Params VALUES exercising the structural paths through `isState`/`isStateStrict`,
+ * each paired with the verdict it must get.
+ */
+export const structuralParamsArbitrary: fc.Arbitrary<
+  readonly [params: unknown, valid: boolean]
+> = fc.oneof(
   // Valid nested params
-  fc.dictionary(safeKeyArbitrary, validDataValue, { maxKeys: 4 }),
-  // Diamond (shared reference, not a cycle) → valid
-  validContainerSubtree.map((sub) => ({ a: sub, b: sub })),
-  // Self-referencing cycle → invalid
+  fc
+    .dictionary(safeKeyArbitrary, validDataValue, { maxKeys: 4 })
+    .map((params) => [params, true] as const),
+  // Diamond (shared reference, not a cycle)
+  validContainerSubtree.map((sub) => [{ a: sub, b: sub }, true] as const),
+  // Self-referencing cycle
   fc.constant(0).map(() => {
     const o: Record<string, unknown> = {};
 
     o.self = o;
 
-    return o;
+    return [o, false] as const;
   }),
-  // Class instance nested → invalid
-  fc.constant(0).map(() => ({ d: new Date() })),
+  // Class instance nested
+  fc.constant(0).map(() => [{ m: new Map() }, false] as const),
+  // A Date nested (#2834)
+  fc.constant(0).map(() => [{ d: new Date() }, true] as const),
 );
 
 /**
@@ -577,10 +595,11 @@ export const structuralParamsArbitrary: fc.Arbitrary<unknown> = fc.oneof(
  * RECURSIVE implementation (the production guard is iterative), used as a
  * differential oracle. A value is plain-serializable iff it is a plain object
  * whose entire tree contains only primitives (finite numbers, strings, booleans),
- * `null`/`undefined`, arrays, and plain objects — no functions, symbols, bigints,
- * `NaN`/`Infinity`, or class instances, and no cycle on the current DFS path.
- * Shared references off the path (diamonds) are accepted. Used only in tests, on
- * bounded-depth generated input, so the recursion is safe.
+ * `null`/`undefined`, this realm's `Date`s (#2834), arrays, and plain objects —
+ * no functions, symbols, bigints, `NaN`/`Infinity`, or other class instances,
+ * and no cycle on the current DFS path. Shared references off the path
+ * (diamonds) are accepted. Used only in tests, on bounded-depth generated input,
+ * so the recursion is safe.
  */
 export function isPlainSerializable(value: unknown): boolean {
   const isPlainObjectValue = (v: unknown): v is object => {
@@ -620,6 +639,13 @@ export function isPlainSerializable(value: unknown): boolean {
     }
 
     const obj = v;
+
+    if (obj instanceof Date) {
+      // A value, never a container, if it holds a date: the `[[DateValue]]`
+      // slot, which `Object.prototype.toString` reads; `instanceof` keeps it to
+      // this realm. Production asks `getTime` instead, so the two decide apart.
+      return Object.prototype.toString.call(obj) === "[object Date]";
+    }
 
     if (onPath.has(obj)) {
       return false; // back-edge to a container on the current path → cycle

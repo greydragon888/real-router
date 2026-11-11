@@ -44,23 +44,23 @@ function cyclicBag(): Record<string, unknown> {
 
 describe("#1837 — the query channel is screened like the path channel", () => {
   it("refuses every value shape that cannot survive a history write", () => {
-    // ⚑ ONE assertion over a signature, not six `it`s: a shape that stopped
+    // ⚑ ONE assertion over a signature, not five `it`s: a shape that stopped
     // being constructed would otherwise pass by running nothing.
     const verdicts = [
       ["function", { tab: (): number => 1 }],
       ["symbol", { tab: Symbol("s") }],
       ["bigint", { tab: 10n }],
       ["cycle", cyclicBag()],
-      ["Date instance", { tab: new Date() }],
       ["Map instance", { tab: new Map() }],
     ].map(([label, search]) => [label, isStateStrict({ ...BASE, search })]);
 
+    // A `Date` survives a history write and is a state value (#2834):
+    // `state-guard-date-2834.test.ts` owns its cell.
     expect(verdicts).toStrictEqual([
       ["function", false],
       ["symbol", false],
       ["bigint", false],
       ["cycle", false],
-      ["Date instance", false],
       ["Map instance", false],
     ]);
   });

@@ -11,6 +11,7 @@ import type {
   SearchParams,
   State,
   GuardFnFactory,
+  UrlChannels,
 } from "../../types";
 import type { RouterValidator } from "../../types/RouterValidator";
 
@@ -107,7 +108,7 @@ export interface RoutesDependencies<
  */
 export interface RouteConfig {
   /** Custom param decoders per route */
-  decoders: Record<string, (channels: ParamsSearch) => ParamsSearch>;
+  decoders: Record<string, (channels: UrlChannels) => ParamsSearch>;
 
   /** Custom param encoders per route */
   encoders: Record<string, (channels: ParamsSearch) => ParamsSearch>;

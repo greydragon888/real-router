@@ -56,9 +56,9 @@ describe("Params Type Guards", () => {
         expect(isParams({ fn: noop })).toBe(false);
       });
 
-      it("rejects objects with Date instances", () => {
-        expect(isParams({ date: new Date() })).toBe(false);
-        expect(isParams({ created: new Date("2024-01-01") })).toBe(false);
+      it("accepts objects with Date instances — a Date is a value (#2834)", () => {
+        expect(isParams({ date: new Date() })).toBe(true);
+        expect(isParams({ created: new Date("2024-01-01") })).toBe(true);
       });
 
       it("rejects objects with RegExp instances", () => {
@@ -162,10 +162,9 @@ describe("Params Type Guards", () => {
         expect(isParams({ scores: [100, null, 85, null] })).toBe(true); // sparse data
       });
 
-      it("rejects arrays with Date instances (kills 'if (true)' mutant at line 55)", () => {
-        // If isPlainObject check is mutated to 'if (true)', Date would incorrectly pass
-        expect(isParams({ dates: [new Date()] })).toBe(false);
-        expect(isParams({ mixed: [1, "test", new Date()] })).toBe(false);
+      it("accepts arrays with Date instances (#2834)", () => {
+        expect(isParams({ dates: [new Date()] })).toBe(true);
+        expect(isParams({ mixed: [1, "test", new Date()] })).toBe(true);
       });
 
       it("rejects arrays with RegExp instances (kills 'if (true)' mutant at line 55)", () => {
@@ -215,10 +214,9 @@ describe("Params Type Guards", () => {
         ).toBe(true);
       });
 
-      it("rejects nested Date instances (kills 'if (true)' mutant at line 64)", () => {
-        // If isPlainObject check is mutated to 'if (true)', Date would incorrectly pass
-        expect(isParams({ created: new Date() })).toBe(false);
-        expect(isParams({ timestamp: new Date("2024-01-01") })).toBe(false);
+      it("accepts nested Date instances (#2834)", () => {
+        expect(isParams({ range: { from: new Date() } })).toBe(true);
+        expect(isParams({ log: [{ at: new Date("2024-01-01") }] })).toBe(true);
       });
 
       it("rejects nested RegExp instances (kills 'if (true)' mutant at line 64)", () => {

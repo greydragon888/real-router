@@ -659,7 +659,7 @@ describe("core/routes/routePath/matchPath", () => {
         path: "/user/:id",
         decodeParams: ({ params, search }) => ({
           params: {
-            id: Number.parseInt(params.id as string, 10),
+            id: Number.parseInt(params.id, 10),
             originalId: params.id,
           },
           search,

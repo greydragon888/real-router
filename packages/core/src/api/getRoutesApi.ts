@@ -54,6 +54,7 @@ import type {
   State,
   TransitionMeta,
   TreeChangedEvent,
+  UrlChannels,
   TreeStructuralPatch,
   GuardFnFactory,
   Route,
@@ -429,7 +430,7 @@ function buildStructuralPatch<
   forwardTo?: string | ForwardToCallback<Dependencies> | null | undefined;
   defaultParams?: Params | null | undefined;
   defaultSearch?: SearchParams | null | undefined;
-  decodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
+  decodeParams?: ((channels: UrlChannels) => ParamsSearch) | null | undefined;
   encodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
 }): Readonly<TreeStructuralPatch<Dependencies>> {
   const patch: TreeStructuralPatch<Dependencies> = {};

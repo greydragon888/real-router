@@ -135,7 +135,7 @@ describe("isActiveRoute — what the flag reaches (#1978)", () => {
         a.localeCompare(b),
       ),
     ).toStrictEqual([
-      "!paramsMatch(canonical.query as Params, activeState.search as Params)",
+      "!paramsMatch(canonical.query, activeState.search)",
       "recordsShallowEqual(pending.search, activeState.search)",
     ]);
   });

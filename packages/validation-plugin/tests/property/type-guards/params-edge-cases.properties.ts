@@ -336,7 +336,6 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
     test.prop(
       [
         fc.oneof(
-          fc.constant(0).map(() => new Date()),
           fc.constant(0).map(() => new Map()),
           fc.constant(0).map(() => new Set()),
           fc.constant(0).map(() => /regex/),
@@ -345,6 +344,22 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
       { numRuns: 5000 },
     )("isParams rejects class instances as nested values", (instance) => {
       expect(isParams({ field: instance })).toBe(false);
+    });
+
+    // A Date is the one class instance that is a value (#2834): accepted at
+    // every nested position, whatever its time or its subclass.
+    test.prop(
+      [
+        fc.oneof(
+          fc.integer({ min: -8.64e15, max: 8.64e15 }).map((t) => new Date(t)),
+          fc.constant(0).map(() => new Date(Number.NaN)),
+          fc.constant(0).map(() => new (class extends Date {})()),
+        ),
+      ],
+      { numRuns: 5000 },
+    )("isParams accepts a Date as a nested value", (date) => {
+      expect(isParams({ field: date })).toBe(true);
+      expect(isParams({ field: [date, { at: date }] })).toBe(true);
     });
 
     test.prop(

@@ -6,7 +6,13 @@ import { getInternals } from "@real-router/core/validation";
 
 import { installSpyValidator } from "../../helpers/spyValidator";
 
-import type { ParamsSearch, Route, Router, State } from "@real-router/core";
+import type {
+  ParamsSearch,
+  Route,
+  Router,
+  State,
+  UrlChannels,
+} from "@real-router/core";
 
 /**
  * The codec diagnostic's sink (#2905). `navigate` never runs a route's
@@ -40,7 +46,7 @@ const ROUTES: Route[] = [
   { name: "old", path: "/old/:slug", forwardTo: "cars" },
 ];
 
-const CHANNELS: ParamsSearch = { params: { slug: "BMW" }, search: {} };
+const CHANNELS: UrlChannels = { params: { slug: "BMW" }, search: {} };
 
 /** What a route is: the commit adds `transition` to a copy of the built state. */
 const routingOf = ({ name, params, search, path }: State) => ({

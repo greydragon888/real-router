@@ -311,6 +311,8 @@ const routes: Route<{ authService: AuthService }>[] = [
     path: "/product/:id",
     // Codecs are two-channel: receive `{ params, search }`, return `{ params,
     // search }` — transform the channel you own, pass the other through.
+    // `decodeParams` receives the URL's values (a path slot is a string) and
+    // returns state values; `encodeParams` receives those.
     // Within `params`, too: it holds every slot of the URL, a parent route's
     // and the root path's included, so convert `id` and spread the rest.
     // Only the URL side runs `decodeParams`: `navigate` and `buildPath` take
@@ -343,6 +345,7 @@ const routes: Route<{ authService: AuthService }>[] = [
 | `number`                     | `/users/42`                             | `?q=42`                                              | `42` (number, via `numberFormat: "auto"`)                 |
 | `boolean`                    | `/users/true`                           | `?q=true` / `?q=false` (via `booleanFormat: "auto"`) | `true` / `false`                                          |
 | `0`, `false` (falsy-defined) | Coerced to string                       | Preserved (not stripped)                             | Preserved                                                 |
+| `Date`, plain object         | Its JSON text, quotes included          | Its `String()` (`[object Object]` for an object); inside an array, a `TypeError` | The value itself — a reload of that URL reads back a string, so such a value needs a route codec |
 
 **`undefined` is stripped at the core boundary.** This is an explicit public contract, not an implementation detail. Plugins that add `undefined` values via `addInterceptor("forwardState")` also have them scrubbed before URL and state.
 

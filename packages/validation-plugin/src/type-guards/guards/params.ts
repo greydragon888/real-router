@@ -5,14 +5,18 @@ import type { Params } from "@real-router/core";
 /**
  * Intrinsics captured at module load (#1971).
  *
- * ⚑ All three DECIDE, and this file's verdict is what they decide — so read off
- * the live global they are the guard's weakest point, not its input. Measured by
- * re-pointing each AFTER boot, all three FAIL OPEN: the guard starts accepting
- * what it exists to refuse.
+ * ⚑ All of them DECIDE, and this file's verdict is what they decide — so read
+ * off the live global they are the guard's weakest point, not its input.
+ * Measured by re-pointing each AFTER boot, the first four FAIL OPEN: the guard
+ * starts accepting what it exists to refuse.
  *
- *     Object.getPrototypeOf -> null   a Date instance is ACCEPTED into params
- *     Object.values         -> []     a nested function is ACCEPTED
- *     Object.hasOwn         -> false  the own-key filter is skipped
+ *     Object.getPrototypeOf  -> null     a Map instance is ACCEPTED into params
+ *     Object.values          -> []       a nested function is ACCEPTED
+ *     Object.hasOwn          -> false    the own-key filter is skipped
+ *     Date.prototype.getTime -> () => 0  an object on Date.prototype is ACCEPTED
+ *
+ * `NativeDate` decides which class instance is a `Date` (#2834); re-pointed, it
+ * refuses a `Date` the boot-time constructor made.
  *
  * That is a sharper profile than core's raw reads, which mostly degrade toward
  * refusal or a wrong-but-loud outcome.
@@ -27,6 +31,8 @@ import type { Params } from "@real-router/core";
 const getPrototypeOf = Object.getPrototypeOf;
 const objectValues = Object.values;
 const hasOwn = Object.hasOwn;
+const NativeDate = Date;
+const dateGetTime = Date.prototype.getTime;
 
 /**
  * Is `value` an array, or a plain object (`Object.prototype` / `null` prototype)?
@@ -92,11 +98,13 @@ class SubtreeExit {
 
 /**
  * Inspects one container popped from the work-stack. Rejects cycles (a back-edge
- * to a container still on the current DFS path) and class instances; skips
- * already-validated shared references; otherwise marks the container on-path and
- * queues its children plus a {@link SubtreeExit} marker.
+ * to a container still on the current DFS path) and class instances other than
+ * an array or this realm's `Date`, which is a value (#2834); skips
+ * already-validated shared references; otherwise marks the container on-path
+ * and queues its children plus a {@link SubtreeExit} marker.
  *
- * @returns false only when the container is invalid (cycle or class instance)
+ * @returns false when the container is invalid (cycle or class instance); an
+ * object that only looks like a `Date` throws, which `isParams` reads as false
  * @internal
  */
 function visitContainer(
@@ -114,7 +122,16 @@ function visitContainer(
   }
 
   if (!isPlainContainer(value)) {
-    return false; // instance of a class
+    if (!(value instanceof NativeDate)) {
+      return false; // instance of a class
+    }
+
+    // A Date is a value with nothing to walk, a subclass's instance included.
+    // `getTime` throws on an object without a date inside — one built on
+    // `Date.prototype`, a Proxy over a Date — and the throw ends the walk.
+    dateGetTime.call(value);
+
+    return true;
   }
 
   onPath.add(value);
@@ -213,8 +230,9 @@ function isPrimitiveValue(value: unknown): boolean {
 
 /**
  * Type guard for Params object.
- * Validates that all values are serializable (primitives, arrays, nested arrays, or nested objects).
- * Rejects circular references, functions, symbols, and class instances.
+ * Validates that all values are serializable (primitives, `Date`s, arrays, nested arrays, or nested objects).
+ * Rejects circular references, functions, symbols, bigints, non-finite numbers, and class instances
+ * other than an array or this realm's `Date`.
  * Allows null/undefined anywhere (objects and arrays).
  *
  * Performance optimization: Uses two-phase validation.
@@ -234,10 +252,11 @@ function isPrimitiveValue(value: unknown): boolean {
  * isParams({ users: [{ id: 1 }, { id: 2 }] }); // true (slow path)
  * isParams({ scores: [100, null, 85] }); // true (slow path)
  * isParams({ a: shared, b: shared }); // true (shared reference / diamond, not a cycle)
+ * isParams({ date: new Date() }); // true (a Date is a value)
  *
  * // Invalid
  * isParams({ fn: () => {} }); // false (function)
- * isParams({ date: new Date() }); // false (class instance)
+ * isParams({ map: new Map() }); // false (class instance)
  * isParams({ self: circularRef }); // false (circular reference)
  * isParams(null); // false (not an object)
  * isParams([]); // false (array, not object)

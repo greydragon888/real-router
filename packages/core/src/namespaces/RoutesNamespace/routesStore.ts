@@ -42,6 +42,7 @@ import type {
   RouterLogger,
   GuardFnFactory,
   Route,
+  UrlChannels,
 } from "../../types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 
@@ -503,7 +504,7 @@ function registerSingleRouteHandlers<Dependencies extends DefaultDependencies>(
   }
 
   if (decode) {
-    config.decoders[fullName] = (channels: ParamsSearch): ParamsSearch =>
+    config.decoders[fullName] = (channels: UrlChannels): ParamsSearch =>
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime fallback if a user-provided decoder violates its `{ params, search }` return type
       decode(channels) ?? channels;
   }
@@ -1193,7 +1194,7 @@ export function commitRouteUpdate<Dependencies extends DefaultDependencies>(
   forwardTo?: string | ForwardToCallback<Dependencies> | null | undefined;
   defaultParams?: Params | null | undefined;
   defaultSearch?: SearchParams | null | undefined;
-  decodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
+  decodeParams?: ((channels: UrlChannels) => ParamsSearch) | null | undefined;
   encodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
 } {
   const {
@@ -1499,8 +1500,7 @@ function commitScalarConfig<
   updates: {
     defaultParams?: Params | null | undefined;
     defaultSearch?: SearchParams | null | undefined;
-    decodeParams?:
-      ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
+    decodeParams?: ((channels: UrlChannels) => ParamsSearch) | null | undefined;
     encodeParams?:
       ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
   },
@@ -1514,7 +1514,7 @@ function commitScalarConfig<
     } else {
       const decoder = updates.decodeParams;
 
-      store.config.decoders[name] = (channels: ParamsSearch): ParamsSearch =>
+      store.config.decoders[name] = (channels: UrlChannels): ParamsSearch =>
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime fallback if user-provided decoder violates its `{ params, search }` return type
         decoder(channels) ?? channels;
     }

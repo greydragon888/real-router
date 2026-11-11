@@ -107,7 +107,7 @@ export class PersistentParamsPlugin {
   // permanent removal is committed in #onTransitionSuccess against the state that
   // actually committed.
   #forwardStateSearch(search: SearchParams, params: Params): SearchParams {
-    const safeSearch = extractOwnParams(search as unknown as Params);
+    const safeSearch = extractOwnParams(search);
     const safeParams = extractOwnParams(params);
 
     // The path bag keeps its historical treatment — EVERY key is validated, the
@@ -144,7 +144,7 @@ export class PersistentParamsPlugin {
       }
     }
 
-    return merged as unknown as SearchParams;
+    return merged;
   }
 
   #onTransitionSuccess(toState: State): void {

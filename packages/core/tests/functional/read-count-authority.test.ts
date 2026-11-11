@@ -20,7 +20,7 @@ import {
   driftingBag,
 } from "../helpers/hostileBags";
 
-import type { State } from "@real-router/core/types";
+import type { SearchParamValue, State } from "@real-router/core/types";
 
 /**
  * How many times does core read a key of an object the CALLER owns?
@@ -1575,7 +1575,7 @@ describe("how many times core reads the ROUTE's own default (#1847)", () => {
       expect(
         Object.keys(state.search).length === 0
           ? ""
-          : `tab=${String(state.search.tab)}`,
+          : `tab=${String(state.search.tab as SearchParamValue)}`,
         `state.search must be what state.path shows (drift from read ${String(from)}); log ${log.join(",")}`,
       ).toBe(shown);
 

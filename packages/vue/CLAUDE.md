@@ -378,7 +378,7 @@ const { route } = useRoute<{ id: string }>();
 const id = route.value.params.id; // typed as string
 
 // Query-string fields (e.g. ?q=&sort=) live on the untyped search channel:
-const q = route.value.search.q; // SearchParamValue | undefined
+const q = route.value.search.q; // ParamValue — any state value
 ```
 
 ### useRouteNode Semantics

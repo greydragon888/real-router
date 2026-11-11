@@ -1792,7 +1792,8 @@ describe("@real-router/lifecycle-plugin", () => {
             name: "list",
             path: "/list?q",
             onNavigate: () => (toState, _fromState, signal) => {
-              const query = String(toState.search.q);
+              // `q` is a string on both navigations below.
+              const query = toState.search.q as string;
 
               wait(query === "slow" ? 30 : 1, signal).then(
                 () => {

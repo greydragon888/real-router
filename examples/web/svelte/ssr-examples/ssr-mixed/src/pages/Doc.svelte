@@ -24,7 +24,7 @@
     handle = setTimeout(() => {
       clientData = {
         id: params.id,
-        format: String(search.format),
+        format: search.format as string,
         body: `(client) PDF placeholder for ${params.id}`,
       };
     }, 50);

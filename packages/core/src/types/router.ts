@@ -14,6 +14,7 @@ import type {
   SearchParams,
   RouterError,
   Unsubscribe,
+  UrlChannels,
 } from "./base";
 // Augment-target interfaces are declared lexically in the entry (#1540); the
 // type-only cycle with the barrel is deliberate — see the note in ./index.
@@ -508,17 +509,19 @@ export interface Route<
   children?: Route<Dependencies>[];
   /**
    * Encodes the state channels to URL channels before path building (RFC-4 M2 /
-   * #1548). Receives `{ params, search }` and returns `{ params, search }` —
-   * transform whichever channel you own and pass the other through. The path
-   * slots are built from the returned `params`, the query string from the
-   * returned `search`.
+   * #1548). Receives `{ params, search }` holding state values and returns
+   * `{ params, search }` — transform whichever channel you own and pass the
+   * other through. The path slots are built from the returned `params`, the
+   * query string from the returned `search`.
    */
   encodeParams?: (channels: ParamsSearch) => ParamsSearch;
   /**
    * Decodes the matched URL channels to state channels (RFC-4 M2 / #1548).
-   * Receives `{ params, search }` (path params + parsed query) and returns
-   * `{ params, search }`. Runs inside `matchPath`, **before** any search-schema
-   * plugin validation — the v1 transformation order (engine codec → plugin).
+   * Receives {@link UrlChannels} — path slots as strings, query values as the
+   * parser typed them — and returns `{ params, search }` holding state values,
+   * such as a `Date` (#2834). Runs inside `matchPath`, **before** any
+   * search-schema plugin validation — the v1 transformation order (engine
+   * codec → plugin).
    *
    * Only the URL side runs it: `navigate`, `buildPath` and `makeState` take
    * params in the form it returns. So it must undo `encodeParams` and add no
@@ -528,7 +531,7 @@ export interface Route<
    * `@real-router/validation-plugin` runs the pair on each state a navigation
    * commits and warns about a key that does not come back.
    */
-  decodeParams?: (channels: ParamsSearch) => ParamsSearch;
+  decodeParams?: (channels: UrlChannels) => ParamsSearch;
   /**
    * Default **path** parameters for this route (and arbitrary app-level
    * defaults). Merged into `state.params`; missing path params are filled from
@@ -623,7 +626,7 @@ export interface RouteConfigUpdate<
   /** Set to null to remove defaultSearch (RFC-4 M2 / #1548) */
   defaultSearch?: SearchParams | null;
   /** Set to null to remove decoder */
-  decodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null;
+  decodeParams?: ((channels: UrlChannels) => ParamsSearch) | null;
   /** Set to null to remove encoder */
   encodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null;
   /** Set to null to remove canActivate */

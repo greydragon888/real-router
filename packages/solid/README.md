@@ -84,7 +84,7 @@ type RouteParams = { id: string } & Params;
 function UserView() {
   const routeState = useRoute<RouteParams>();
   const id = routeState().route.params.id; // typed as string (path channel)
-  const sort = routeState().route.search.sort; // query channel — not narrowed by the generic
+  const sort = routeState().route.search.sort as string | undefined; // query channel — not narrowed by the generic
   return <p>User {id}, sort {sort}</p>;
 }
 ```
