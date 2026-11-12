@@ -603,18 +603,32 @@ matcher.
 
 ### Adding New Methods
 
-**Facade methods:** validator → namespace instance method → facade method that
-calls `ctx.validator?.ns.fn()` and delegates → bind in the constructor if it
-touches private fields.
+**Facade methods:** namespace instance method → facade method that delegates →
+bind in the constructor if it touches private fields.
 
-**Standalone API methods:** validator → module-private CRUD function in
-`api/get*Api.ts` → method on the returned object → reach internals via
-`getInternals(router)`.
+**Standalone API methods:** module-private CRUD function in `api/get*Api.ts` →
+method on the returned object → reach internals via `getInternals(router)`.
 
-**Adding validation:** call `ctx.validator?.ns.validateXxxArgs(...)`, add the
-method to `RouterValidator`, implement it in `@real-router/validation-plugin`'s
-`src/validators/<namespace>.ts`, and wire it in that package's
-`validationPlugin.ts`.
+**Adding validation** never adds a member to `RouterValidator` or a call to one,
+wherever in core it goes: the calls core still makes are #2388's to convert, and
+that issue removes the interface. A refusal goes on the check channel and a
+report on the diagnostic channel; a consultation that does both is split
+between them. Whether a refusal belongs to core rather than to the plugin is
+decided under _Who refuses — core or the analyser_ above.
+
+- **A refusal is a check at a named position.** Declare the argument tuple in
+  `CheckPositionMap` (`src/types/api.ts`) and the key in `POSITION`
+  (`src/internals.ts`) — `satisfies` fails type-check until both carry it — and
+  call `runChecks(ctx.checks, POSITION["<door>:<slot>"], …)` where core judges
+  the value. The map's entries say what each slot means.
+- **A report is a diagnostic kind.** Declare it in `DiagnosticEventMap` and
+  `DIAGNOSTIC`, in the same files, and raise it with
+  `EventBusNamespace.emitDiagnostic`. Each kind takes its own key; the map's
+  docblock says why.
+- **The plugin** implements the leaf in `@real-router/validation-plugin`'s
+  `src/validators/<namespace>.ts` and registers it in that package's
+  `validationPlugin.ts` with `api.addCheck` or `api.subscribeDiagnostic`,
+  calling the returned remover in `teardown`.
 
 **Message prefixes:** name the facade call the message comes from, not the class
 raising it — `[router.buildPath]`, or bare `[router]` where several doors reach

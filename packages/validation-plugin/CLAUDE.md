@@ -317,5 +317,5 @@ cross without replaying it.
 ## See Also
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Source structure, data flow, design decisions
-- [packages/core/CLAUDE.md](../core/CLAUDE.md) — How core calls `ctx.validator?.ns.fn()`
+- [packages/core/CLAUDE.md](../core/CLAUDE.md) — How core asks this plugin to refuse or report: check positions and diagnostic kinds
 - [packages/core/src/types/RouterValidator.ts](../core/src/types/RouterValidator.ts) — Full interface definition
