@@ -98,7 +98,15 @@ export interface RouterValidator {
    * Plugin validation methods
    */
   plugins: {
-    validatePluginLimit: (count: number, limits: unknown) => void;
+    /**
+     * ⚑ `newCount` is how many plugins the call would register, so a batch is
+     * judged whole before its first factory runs (#2413).
+     */
+    validatePluginLimit: (
+      currentCount: number,
+      newCount: number,
+      limits: unknown,
+    ) => void;
     validateNoDuplicatePlugins: (
       factory: unknown,
       factories: unknown[],

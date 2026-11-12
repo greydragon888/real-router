@@ -1333,8 +1333,10 @@ export class Router<
 
     const ctx = getInternals(this);
 
+    // A factory repeated in one batch is registered once, so it takes one slot.
     ctx.validator?.plugins.validatePluginLimit(
       this.#plugins.count(),
+      new Set(filtered).size,
       this.#limits,
     );
     for (const plugin of filtered) {
