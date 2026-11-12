@@ -1,5 +1,24 @@
 # @real-router/validation-plugin
 
+## 0.33.2
+
+### Patch Changes
+
+- [#2950](https://github.com/greydragon888/real-router/pull/2950) [`a13eaed`](https://github.com/greydragon888/real-router/commit/a13eaede88e5ddf9ce304bcaa65216c266a89f9d) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse a `usePlugin` batch that would pass `maxPlugins` ([#2413](https://github.com/greydragon888/real-router/issues/2413))
+
+  The limit counted every call as one plugin, so `usePlugin(a, b, c, d)` on a router
+  at `maxPlugins: 3` registered all four. A call is now counted by the distinct
+  factories it carries — a factory repeated in it counts once — and a batch past the
+  limit throws the same `RangeError` a single registration does, naming what the
+  batch would add (`Current: 1, Attempting to add: 4.`), before any of its factories
+  runs. `maxPlugins: 0` still means no limit.
+
+  The count comes from `@real-router/core`'s new `validatePluginLimit` signature, so
+  this release needs the core release that ships with it.
+
+- Updated dependencies [[`a13eaed`](https://github.com/greydragon888/real-router/commit/a13eaede88e5ddf9ce304bcaa65216c266a89f9d)]:
+  - @real-router/core@0.161.0
+
 ## 0.33.1
 
 ### Patch Changes
