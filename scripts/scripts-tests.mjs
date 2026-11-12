@@ -77,6 +77,7 @@ export const TOOLING = new Set([
   "dependabot-cooldown",
   "dependabot-updates",
   "fixture-isolation",
+  "overrides-plan",
   "pre-push-guard",
   "release-workflow",
   "run-repo-scans",

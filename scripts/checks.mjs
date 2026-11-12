@@ -227,12 +227,13 @@ export const CHECKS = [
     why: "installs cross-router-bench/, a workspace of its own, then ESLint over it and the census of what its config reaches",
   },
   {
-    // Pre-push alone. A finding here is drift, not a vulnerability: lint:audit
-    // holds those in pre-push and CI. In CI every pull request would pay for
-    // installing the workspaces of their own, to judge dependency changes few
-    // of them carry. Its script installs them first, as lint:cross-router
-    // installs cross-router-bench: the ranges it reads are in each
-    // workspace's node_modules. ⚠ That install
+    // Not in the ci stage, which Repo Lints runs on every pull request: CI
+    // runs it in its own job, on a pull request that changes a lockfile or a
+    // pnpm-workspace.yaml of any workspace, the diff a Dependabot bump makes
+    // without meeting pre-push. A pull request that changes neither does not
+    // install the workspaces of their own to judge it. Its script installs
+    // them first, as lint:cross-router installs cross-router-bench: the
+    // ranges it reads are in each workspace's node_modules. ⚠ That install
     // puts examples that `scripts/checkout-tarballs.mjs` set up from this
     // checkout's tarballs back on the npm versions, and at
     // `--config.modules-cache-max-age=0` removes the tarballs' directories,
@@ -240,6 +241,7 @@ export const CHECKS = [
     id: "lint:overrides",
     run: ["pnpm", "lint:overrides"],
     stages: ["pre-push"],
+    ciBy: ["ci.yml#overrides-lint"],
     why: "each workspace's overrides narrow a range they rewrite, admit no version below a parent's minimum, and name edges the tree has (scripts/overrides.mjs)",
   },
   {

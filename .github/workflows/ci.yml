@@ -49,6 +49,7 @@ jobs:
       benchmarks_lint_filter: ${{ steps.benchmarks_lint.outputs.benchmarks_lint_filter }} # explicit --filter set for benchmarks-lint; empty when no change reaches the benchmarks from outside
       benchmarks_lint_reasons: ${{ steps.benchmarks_lint.outputs.benchmarks_lint_reasons }}
       cross_router: ${{ steps.cross_router.outputs.changed }} # 'true' when the PR edits cross-router-bench
+      overrides: ${{ steps.overrides.outputs.changed }} # 'true' when the PR changes a lockfile or a pnpm-workspace.yaml of any workspace
       no_source: ${{ steps.source.outputs.no_source }} # 'true' when the diff holds no code a check could read
     steps:
       - name: Checkout
@@ -171,6 +172,24 @@ jobs:
           set -euo pipefail
           EDITED=$(git diff --name-only HEAD^1 HEAD -- cross-router-bench)
           if [ -n "$EDITED" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The overrides check reads each workspace's `pnpm-workspace.yaml` and
+      # the tree its lockfile installs: it runs when the PR changes one of the
+      # two in any workspace, the root among them. A `:(glob)` pathspec, whose
+      # `**/` also matches the top level. Same base as above, and `git diff` on
+      # its own line.
+      - name: Plan the overrides check
+        id: overrides
+        if: steps.changes.outputs.should_run == 'true'
+        run: |
+          set -euo pipefail
+          CHANGED=$(git diff --name-only HEAD^1 HEAD -- ':(glob)**/pnpm-lock.yaml' ':(glob)**/pnpm-workspace.yaml')
+          if [ -n "$CHANGED" ]; then
+            printf '%s\n' "$CHANGED"
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
@@ -1040,6 +1059,33 @@ jobs:
         run: pnpm lint:cross-router
 
   # ============================================
+  # OVERRIDES LINT: `lint:overrides` judges each workspace's `overrides`
+  # against the ranges its installed tree declares. A dependency bump can make
+  # an override dead or leave its floor under a parent's minimum without
+  # touching the override, and a Dependabot PR meets no pre-push, which runs
+  # the same script on every push. It runs when the PR changes a lockfile or a
+  # `pnpm-workspace.yaml` of any workspace. The setup action installs the root
+  # workspace, and the script installs the examples and cross-router-bench
+  # before the check reads them.
+  # ============================================
+  overrides-lint:
+    name: Overrides lint
+    runs-on: ubuntu-latest
+    needs: [check]
+    if: needs.check.outputs.overrides == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup (pnpm + Node + install)
+        uses: ./.github/actions/setup
+
+      - name: Judge the overrides
+        run: pnpm lint:overrides
+
+  # ============================================
   # DOWNSTREAM: Smoke, Coverage, Bundle Size
   # ============================================
 
@@ -1737,7 +1783,7 @@ jobs:
     # "CI Result" (`gh api repos/greydragon888/real-router/rules/branches/master`
     # lists every required context). So a red quality gate blocks the merge
     # without its ~90s scan sitting on this job's critical path.
-    needs: [check, pipeline-leaf, base-bundle, base-test, base-lint, base-coverage, base-properties, pipeline-sharded, repo-lints, smoke, coverage, actionlint, prose-lint, examples-build, benchmarks-lint, cross-router-lint]
+    needs: [check, pipeline-leaf, base-bundle, base-test, base-lint, base-coverage, base-properties, pipeline-sharded, repo-lints, smoke, coverage, actionlint, prose-lint, examples-build, benchmarks-lint, cross-router-lint, overrides-lint]
     if: always()
     steps:
       - name: Determine result
@@ -1829,7 +1875,8 @@ jobs:
           EXAMPLES="${{ needs.examples-build.result }}"
           BENCHMARKS_LINT="${{ needs.benchmarks-lint.result }}"
           CROSS_ROUTER_LINT="${{ needs.cross-router-lint.result }}"
-          echo "plan=$PLAN mode=$MODE leaf=$LEAF base_bundle=$BASE_BUNDLE base_test=$BASE_TEST base_lint=$BASE_LINT base_cov=$BASE_COV base_props=$BASE_PROPS sharded=$SHARDED smoke=$SMOKE coverage=$COVERAGE examples=$EXAMPLES benchmarks_lint=$BENCHMARKS_LINT cross_router_lint=$CROSS_ROUTER_LINT"
+          OVERRIDES_LINT="${{ needs.overrides-lint.result }}"
+          echo "plan=$PLAN mode=$MODE leaf=$LEAF base_bundle=$BASE_BUNDLE base_test=$BASE_TEST base_lint=$BASE_LINT base_cov=$BASE_COV base_props=$BASE_PROPS sharded=$SHARDED smoke=$SMOKE coverage=$COVERAGE examples=$EXAMPLES benchmarks_lint=$BENCHMARKS_LINT cross_router_lint=$CROSS_ROUTER_LINT overrides_lint=$OVERRIDES_LINT"
 
           # Defensive belt-and-suspenders on the shard-plan output: the aggregate
           # and the check-result guard above already exit on any `check` result
@@ -1864,8 +1911,10 @@ jobs:
           # example, which most PRs do not. When it DOES run, a failure is hard.
           # benchmarks-lint likewise: it runs only when a PR edits the
           # benchmarks or a change reaches them from outside;
-          # cross-router-lint only when the PR edits cross-router-bench.
-          if [[ "$PATH_OK" == "1" ]] && ok "$SMOKE" && ok "$COVERAGE" && ok "$EXAMPLES" && ok "$BENCHMARKS_LINT" && ok "$CROSS_ROUTER_LINT"; then
+          # cross-router-lint only when the PR edits cross-router-bench;
+          # overrides-lint only when it changes a lockfile or a
+          # pnpm-workspace.yaml.
+          if [[ "$PATH_OK" == "1" ]] && ok "$SMOKE" && ok "$COVERAGE" && ok "$EXAMPLES" && ok "$BENCHMARKS_LINT" && ok "$CROSS_ROUTER_LINT" && ok "$OVERRIDES_LINT"; then
             echo "✅ All checks passed"
             exit 0
           fi

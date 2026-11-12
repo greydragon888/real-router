@@ -15022,6 +15022,8 @@ Not measured: whether 12.9.0, which moves an optional peer to the version alread
 
 > **Updated (2026-11-08).** The script's installs prune each store to its lockfile, and a `name@version` whose directories declare different dependencies is refused — see "Follow-up (2026-11-08)" at the end of this entry.
 
+> **Updated (2026-11-12).** CI runs the check too, in a job of its own, on a pull request that changes a lockfile or a `pnpm-workspace.yaml` of any workspace — see "Follow-up (2026-11-12)" at the end of this entry.
+
 **Problem.** Nothing read the `overrides` of the three workspaces but `pnpm install`, and `lint:audit` judges only the result (#2646). Each class the issue names had happened and was found by hand: an entry nothing needs, a floor below the version a parent declares, an entry wider than its edge. The issue judged "still needed" by resolving without the entry, and since pnpm 12.7.0 removing an override re-resolves its targets ("pnpm 12.11.2, and each lockfile deduplicated by it"). That verdict moved with npm: on 12.11.2, `postcss` in all three workspaces and `rollup` in the examples read as needed only because newer releases had appeared, 8.5.29 and 4.63.6.
 
 **Solution.** `pnpm lint:overrides` runs `scripts/check-overrides.mjs`, with the rules in `scripts/overrides.mjs`. It reads every workspace whose `pnpm-workspace.yaml` git tracks, the root among them, and judges each key over the edges the key rewrites:
@@ -15045,6 +15047,8 @@ The first run found 45 of 62 keys. Rule 3 of the issue, "a key whose target only
 Each changed value carries its comment along, and the bench's `picomatch@4` comment, which still described a lift of 4.0.5, names the version the Angular pair pins.
 
 It runs in pre-push alone, by the owner's decision. A finding is drift, not a vulnerability, and `lint:audit` holds those in pre-push and CI. In CI every pull request would pay for installing the examples, 18 to 39 s in the `Examples (affected)` job, and the bench, about 13 s with its setup, to judge dependency changes few of them carry.
+
+> **Updated (2026-11-12).** Pre-push and CI. The `Overrides lint` job of `ci.yml` runs `pnpm lint:overrides` on a pull request that changes a `pnpm-lock.yaml` or a `pnpm-workspace.yaml` of any workspace, and `CI Result` fails on its failure. A pull request that changes neither pays for one `git diff` in `check`. The job needs `check` alone, as Repo Lints does. Its steps, as measured on GitHub runners in other jobs, are a setup action of 10 to 25 s with a root install of 2.7 s, the examples' install of about 9 s and the bench's of 2.4 s, against 89 to 148 s of Repo Lints on the same pull requests. The job's own run is not measured yet. "Follow-up (2026-11-12)" at the end of this entry has the measurements.
 
 **Why — measured.**
 
@@ -15079,6 +15083,33 @@ It runs in pre-push alone, by the owner's decision. A finding is drift, not a vu
 - The new cell of `scripts/tests/check-overrides.test.mjs` fails on `b89d6301a`'s `scripts/overrides.mjs` ("Missing expected exception"), and so do seven of eight mutants of the new code: never refusing, refusing every second directory, leaving out each of the three fields, comparing the JSON text, and counting an empty field as a different one. The eighth names the two directories in the order the listing returns them, and survives: the listing here returns the release's directory first, and the sort keeps the message independent of it.
 - The peer sets have the cell alone. Pruned, none of the three stores holds a `name@version` in two directories: one package of the root lockfile has two peer sets, `@napi-rs/wasm-runtime@1.1.6`, and pnpm skips it on macOS.
 - The flag costs 0.2–0.3 s with nothing to prune: of three interleaved pairs of the two installs and the check, the one with it took 0.17 to 0.30 s longer. It gives up what pnpm keeps the directories for, a faster install when a lockfile names them again: the next `use-checkout` creates them again.
+
+### Follow-up (2026-11-12) — CI runs it on a pull request that changes a lockfile (#2934)
+
+**Problem.** A Dependabot pull request never meets pre-push, where alone the check ran. A bump that moves a parent's range past an override merged with `CI Result` green, and the next push of any branch based on that `master` failed pre-push on a commit its author did not write. Twice: #2771, express 5.3.0 in `/examples`, left the examples' `body-parser` dead, since express declares `^2.3.0` (fixed in `67849d68d`); #2932, the bench group, left the bench's `postcss` floor under the `^8.5.30` that vite 8.3.5 declares (fixed in `6f58de07f`). The issue counts 28 of 88 pull requests merged since 2026-10-13 that changed a `pnpm-lock.yaml` or a `pnpm-workspace.yaml`, 27 of them Dependabot's.
+
+**Solution.**
+
+- A job of its own, `Overrides lint`: the setup action installs the root workspace, and `pnpm lint:overrides` installs the examples and the bench before the check reads all three.
+- The step "Plan the overrides check" of `check` answers `overrides`. It is `true` when `git diff --name-only HEAD^1 HEAD` lists a `pnpm-lock.yaml` or a `pnpm-workspace.yaml` at any depth, through the pathspecs `':(glob)**/pnpm-lock.yaml'` and `':(glob)**/pnpm-workspace.yaml'`. Without `:(glob)`, `**/pnpm-lock.yaml` does not match the top-level file, so a bump of the root workspace would skip the job.
+- `CI Result` needs the job and reads its result as `Cross-router lint`'s: a failure fails the gate, a skip passes it.
+- `scripts/checks.mjs` names the job in the check's `ciBy`, which `checks-registry.test.mjs` holds to the job's line. `scripts/tests/overrides-plan.test.mjs` holds the step's output and the job's `if:`, holds that a lockfile alone is code to `should_run`, on which the step itself runs, and runs the step's text under bash in repositories of its own: each lockfile and `pnpm-workspace.yaml` at the top level and below it, near-miss names, a `git diff` that fails, and the step without `:(glob)` as the control.
+
+Two other places were weighed. The ci stage of Repo Lints would put the installs into the job that is the critical path of a Dependabot pull request, 148 s on #2932 beside 67 s of `Cross-router lint`. Skipping the check there on other pull requests would also need a context fed by a new output of `check`. `Cross-router lint` and `Examples (affected)` each run on a trigger of their own, a root lockfile reaches neither, and the check refuses a workspace with overrides that is not installed.
+
+**Why — measured.**
+
+- The step as written answers `true` on the merges of #2932 (`cross-router-bench/pnpm-lock.yaml`), #2771 and #2927 (`examples/pnpm-lock.yaml`), #2919 (`pnpm-lock.yaml`), and on `ea3f42b28`, three `pnpm-workspace.yaml`, one two levels down. It answers `false` on #2937, #2922 and `85044d18d`, which change neither. With the plain `**/pnpm-lock.yaml` it answers `false` on #2919.
+- The job's commands in detached worktrees, a root `pnpm install --frozen-lockfile` and then `pnpm lint:overrides`:
+  - `af9ce111c`: exit 1, `cross-router-bench: postcss: >=8.5.28`, "below — the lowest version it admits, 8.5.28, is under ^8.5.30, the range vite@8.3.5 declares for postcss";
+  - `6f58de07f`: exit 0, "60 key(s) in 3 workspace(s) break no rule; 3 finding(s) accepted";
+  - `bd3771e89`, #2771's merge: exit 1, `examples: body-parser: >=2.3.0`, "dead — it narrows none of the 1 edge(s) it rewrites: express@5.3.0 declares ^2.3.0";
+  - `67849d68d`: exit 0;
+  - `95c0bb767`, the base of this change: exit 0.
+- A runner installs other platform packages than a Mac, and the check reads what is installed. By each lockfile's `os`, `cpu` and `libc`, darwin-arm64 installs packages that linux-x64-glibc does not and the other way round: 21 and 21 in the root, 15 and 14 in the examples, 13 and 11 in the bench. Each is a native binary with no dependency in its lockfile, so no edge the check reads differs.
+- Cost, from the steps of the CI runs on #2771 (2026-10-19), #2929 and #2932 (2026-11-09): a setup action takes 10 to 25 s, and its root install 2.7 s after a 184 MB restore of the store (`Examples (affected)` on #2929). The bench's install takes 2.4 s (`Cross-router lint` on #2932), and the examples' install, with this checkout's tarballs, about 9 s (`Examples (affected)` on #2929). Repo Lints took 89 to 148 s on the three. On this machine with a warm store, the root install in a new worktree takes 3.4 to 4.3 s, and `pnpm lint:overrides` 5.9 to 6.3 s.
+- Not measured: the job's own run on GitHub. `ci.yml` runs on pull requests alone, and this change lands on `master` without one.
+- Mutants: each of 7 in the wiring fails `ci-gate-completeness.test.mjs` or `checks-registry.test.mjs`: the job out of the gate's `needs`, its result unread, the `ciBy` removed or naming another job, another command in the job, the table row removed, a forbidden skip. Each of 10 in the step and its wiring fails `overrides-plan.test.mjs`: no `:(glob)`, top-level names only, either file kind alone, the answer under another name, the test inverted, a failure read as no change, the job reading another output, the output read from another step, the step gated on the opposite answer.
 
 ## A new workspace's obligations are a checklist in CLAUDE.md (2026-10-13)
 

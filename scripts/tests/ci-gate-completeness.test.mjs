@@ -538,6 +538,7 @@ const SKIP_FORBIDDEN = {
   "examples-build": "never",
   "benchmarks-lint": "never",
   "cross-router-lint": "never",
+  "overrides-lint": "never",
 };
 
 const SKIP_RULES = {
@@ -1638,13 +1639,17 @@ test("the closed reading is a rule of forms: blocks swapped, a new job in today'
     STEP.run.indexOf("# check must have SUCCEEDED"),
   );
   const swapped = STEP.run.replace(prose + repoLints, () => repoLints + prose);
-  const lastResult =
-    'CROSS_ROUTER_LINT="${{ needs.cross-router-lint.result }}"\n';
-  const lastOk = 'ok "$CROSS_ROUTER_LINT"; then';
+  const lastResult = 'OVERRIDES_LINT="${{ needs.overrides-lint.result }}"\n';
+  const lastOk = 'ok "$OVERRIDES_LINT"; then';
   const newJob = inserted(
     lastResult,
     'NEW_JOB="${{ needs.new-job.result }}"',
-  ).replace(lastOk, () => 'ok "$CROSS_ROUTER_LINT" && ok "$NEW_JOB"; then');
+  ).replace(lastOk, () => 'ok "$OVERRIDES_LINT" && ok "$NEW_JOB"; then');
+
+  assert.ok(
+    newJob.includes('ok "$NEW_JOB"; then'),
+    `the last ok() of the verdict is no longer ${lastOk}`,
+  );
   const setAgain = after(
     'X="a"\nif [[ "$NEEDS" == "x" ]]; then X="b"; fi\n[[ "$NEEDS" == "y" ]] && X="c"\nf() { X="d"; }\nf\necho "$X"',
   );
