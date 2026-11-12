@@ -90,7 +90,8 @@ out is one. An incompatible change is any of these, inside a bug task too:
   narrowed;
 - a required member added to an interface a consumer implements, a plugin's
   validator included;
-- documented behavior changed.
+- documented behavior changed: a released README, wiki or INVARIANTS sentence,
+  read as written, that the change makes false.
 
 An incompatible change says what the consumer changes — see the Breaking Change
 example below. `pnpm lint:changeset` refuses a `patch` whose description labels
