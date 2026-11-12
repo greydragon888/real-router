@@ -508,12 +508,11 @@ paths at all, so the commit would change nothing on every call. And the
 in-flight gate already refuses the path-half change everywhere except on an idle
 router, which is the only shape that reaches this at all.
 
-⚠ **A test that stubbed a member of these surfaces belongs on
-`getInternals(router)`** — but not uniformly, and the three classes are derived by
-`plugin-api-stub-seam-authority-1805.test.ts`: a member that CALLS `ctx.<name>()`
-is intercepted whenever the spy stands; one that ALIASES it captures the reference
-when the cached surface is BUILT, so a spy installed afterwards is missed; and one
-that composes locally has no seam at all.
+⚠ **A test does not stub a member of these surfaces, and does not move the stub
+one layer down onto `getInternals(router)` either (#2486).** It drives the public
+surface and asserts what the router did. The door is a test's subject only where
+the door itself is the question: `plugin-api-stub-seam-authority-1805.test.ts`,
+for one, derives what a spy there would intercept, and moves with the door (#2386).
 
 ### areStatesEqual ignores query params by default
 

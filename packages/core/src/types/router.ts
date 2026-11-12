@@ -49,12 +49,11 @@ export interface LoggerConfig {
  * consume.
  *
  * Core stores a concrete instance on `RouterInternals.logger` (built from
- * `options.logger` in the `Router` constructor); plugins and other consumers
- * reach that same per-instance logger via `getInternals(router).logger` —
- * `PluginApi` carries no `logger` member of its own. The
+ * `options.logger` in the `Router` constructor); a plugin reaches it through
+ * `PluginApi.logger`, a frozen view that delegates every call to it. The
  * concrete `RouterLogger` class lives in core's `utils/logger` — this
  * interface is the shared contract, so nothing outside core needs to import the
- * class (or depend on the former standalone `@real-router/logger` package).
+ * class.
  */
 export interface RouterLogger {
   log: (context: string, message: string, ...args: unknown[]) => void;
