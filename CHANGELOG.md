@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-11-12]
+
+### @real-router/core@0.160.0
+
+### Minor Changes
+
+- [#2944](https://github.com/greydragon888/real-router/pull/2944) [`025aaad`](https://github.com/greydragon888/real-router/commit/025aaada133afe37d379d09ce81dc19d08cc63d9) Thanks [@greydragon888](https://github.com/greydragon888)! - Derive `ErrorCodeKeys` and `ErrorCodeValues` from `ErrorCodeToValueMap`, so they cover every code in `errorCodes` ([#2363](https://github.com/greydragon888/real-router/issues/2363))
+
+  `ErrorCodeKeys` lacked `WRONG_CHANNEL`, and `ErrorCodeValues` lacked
+  `NOT_STOPPED`, `REENTRANT_NAVIGATION`, `REENTRANT_TREE_MUTATION` and
+  `WRONG_CHANNEL`. So `errorCodes` was not assignable to the exported `ErrorCodes`
+  type, and `const code: ErrorCodeValues = errorCodes.WRONG_CHANNEL` did not
+  compile. Both unions are now the keys and the values of `ErrorCodeToValueMap`.
+
+  **Breaking Change:** a `Record` keyed by either union, or an exhaustive `switch`
+  over one, now has to cover the codes above.
+
+- [#2944](https://github.com/greydragon888/real-router/pull/2944) [`025aaad`](https://github.com/greydragon888/real-router/commit/025aaada133afe37d379d09ce81dc19d08cc63d9) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `errorCodes.NO_START_PATH_OR_STATE`, a code core never raises ([#2363](https://github.com/greydragon888/real-router/issues/2363))
+
+  The code leaves `errorCodes`, `ErrorCodeToValueMap`, `ErrorCodeKeys` and
+  `ErrorCodeValues`. Nothing produces it: `start()` takes a path, and called
+  without one — with no URL plugin to supply it — it rejects with
+  `TypeError: [router.start] path must be a string, got undefined`, an error that
+  carries no `code`.
+
+  **Breaking Change:** a reference to `errorCodes.NO_START_PATH_OR_STATE` no
+  longer compiles. Delete the branch that matches it — it never runs. An error you
+  build yourself as `new RouterError("NO_START_PATH_OR_STATE")` now keeps that
+  message when `setCode()` changes its code, as any non-standard code does.
+
 ## [2026-11-11]
 
 ### @real-router/browser-plugin@0.28.0
