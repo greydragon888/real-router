@@ -43,7 +43,7 @@ $ARGUMENTS
 
 ## Шаг 3 — Пуш
 
-1. `pnpm --dir <wt> lint:security` — на закоммиченном фиксе.
+1. `pnpm --dir <wt> lint:security` — на закоммиченном фиксе: без коммитов ветки скан отвечает «No branch delta» с кодом 0, а в pre-push он идёт только после сборки.
 2. `git -C <wt> push -u origin HEAD > <log> 2>&1; echo "exit=$?" >> <log>` — в фоне: pre-push — полная сборка и колонка линтеров. Вердикт — строка `exit=` в логе и `git ls-remote --heads origin <branch>`, а не статус фоновой задачи. Обрыв SSH и упавший тест, к ветке не относящийся, — по `/create-pr` Фаза 4 п. 2.
 3. Падение pre-push настоящее: чини новым коммитом через шаг 1 и пушь снова. Pre-push собирает `dist` в worktree: перед следующими тестами там — `rm -rf packages/*/dist && pnpm install`.
 
