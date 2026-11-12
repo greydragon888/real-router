@@ -1,5 +1,21 @@
 # @real-router/core
 
+## 0.161.0
+
+### Minor Changes
+
+- [#2950](https://github.com/greydragon888/real-router/pull/2950) [`a13eaed`](https://github.com/greydragon888/real-router/commit/a13eaede88e5ddf9ce304bcaa65216c266a89f9d) Thanks [@greydragon888](https://github.com/greydragon888)! - `RouterValidator.plugins.validatePluginLimit` takes the number of plugins a call would register ([#2413](https://github.com/greydragon888/real-router/issues/2413))
+
+  The signature is now `(currentCount, newCount, limits)`. `usePlugin` passes the
+  number of distinct factories in the call as `newCount` — a factory repeated in one
+  call is registered once, and `false`, `null` and `undefined` entries are skipped —
+  so the validator judges a batch whole, before its first factory runs.
+
+  An implementation of `RouterValidator` written for `(count, limits)` now receives
+  `newCount` where it read `limits`: take the new second parameter. Upgrade
+  `@real-router/validation-plugin` together with core — its validator implements the
+  new signature.
+
 ## 0.160.0
 
 ### Minor Changes
