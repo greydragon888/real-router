@@ -152,8 +152,6 @@ describe("router.start() - lifecycle events", () => {
       });
     });
 
-    // "NO_START_PATH_OR_STATE should emit TRANSITION_ERROR" tests removed in Task 6 — start() now requires path
-
     describe("CANNOT_ACTIVATE should emit TRANSITION_ERROR", () => {
       it("should emit TRANSITION_ERROR when guard blocks transition", async () => {
         const transitionErrorListener = vi.fn();
@@ -271,8 +269,6 @@ describe("router.start() - lifecycle events", () => {
         expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
       });
 
-      // NO_START_PATH_OR_STATE test removed in Task 6 — start() now requires path
-
       it("should have consistent event signature (toState, fromState, error) for CANNOT_ACTIVATE", async () => {
         const transitionErrorListener = vi.fn();
 
@@ -330,8 +326,6 @@ describe("router.start() - lifecycle events", () => {
         expect(transitionSuccessListener).not.toHaveBeenCalled();
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
       });
-
-      // NO_START_PATH_OR_STATE test removed in Task 6 — start() now requires path
 
       it("should NOT emit TRANSITION_SUCCESS for CANNOT_ACTIVATE", async () => {
         const transitionSuccessListener = vi.fn();
