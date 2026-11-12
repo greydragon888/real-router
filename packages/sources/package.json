@@ -55,7 +55,7 @@
     "@real-router/route-utils": "workspace:^"
   },
   "peerDependencies": {
-    "@real-router/core": "workspace:>=0.159.0"
+    "@real-router/core": "workspace:>=0.160.0"
   },
   "devDependencies": {
     "@real-router/core": "workspace:^"
