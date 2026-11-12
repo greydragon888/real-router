@@ -35,43 +35,6 @@ export type EventsKeys =
   | "TRANSITION_ERROR";
 
 /**
- * Error code values
- */
-export type ErrorCodeValues =
-  | "NOT_STARTED"
-  | "NO_START_PATH_OR_STATE"
-  | "ALREADY_STARTED"
-  | "ROUTE_NOT_FOUND"
-  | "SAME_STATES"
-  | "CANNOT_DEACTIVATE"
-  | "CANNOT_ACTIVATE"
-  | "TRANSITION_ERR"
-  | "CANCELLED"
-  | "DISPOSED"
-  | "PLUGIN_CONFLICT"
-  | "CONTEXT_NAMESPACE_ALREADY_CLAIMED";
-
-/**
- * Error code keys
- */
-export type ErrorCodeKeys =
-  | "ROUTER_NOT_STARTED"
-  | "NO_START_PATH_OR_STATE"
-  | "ROUTER_ALREADY_STARTED"
-  | "ROUTE_NOT_FOUND"
-  | "SAME_STATES"
-  | "CANNOT_DEACTIVATE"
-  | "CANNOT_ACTIVATE"
-  | "TRANSITION_ERR"
-  | "ROUTER_NOT_STOPPED"
-  | "TRANSITION_CANCELLED"
-  | "ROUTER_DISPOSED"
-  | "PLUGIN_CONFLICT"
-  | "CONTEXT_NAMESPACE_ALREADY_CLAIMED"
-  | "REENTRANT_NAVIGATION"
-  | "REENTRANT_TREE_MUTATION";
-
-/**
  * Mapping of event keys to plugin methods
  */
 export interface EventToPluginMap {
@@ -106,11 +69,12 @@ export type EventMethodMap = {
 };
 
 /**
- * Mapping of error code keys to their values
+ * Mapping of error code keys to their values — the one declaration of the
+ * error-code vocabulary. `ErrorCodeKeys` and `ErrorCodeValues` are derived
+ * from it, and the `errorCodes` literal is held to it by `satisfies`.
  */
 export interface ErrorCodeToValueMap {
   readonly ROUTER_NOT_STARTED: "NOT_STARTED";
-  readonly NO_START_PATH_OR_STATE: "NO_START_PATH_OR_STATE";
   readonly ROUTER_ALREADY_STARTED: "ALREADY_STARTED";
   readonly ROUTE_NOT_FOUND: "ROUTE_NOT_FOUND";
   readonly SAME_STATES: "SAME_STATES";
@@ -126,3 +90,13 @@ export interface ErrorCodeToValueMap {
   readonly REENTRANT_TREE_MUTATION: "REENTRANT_TREE_MUTATION";
   readonly WRONG_CHANNEL: "WRONG_CHANNEL";
 }
+
+/**
+ * Error code keys — the keys of `ErrorCodeToValueMap`.
+ */
+export type ErrorCodeKeys = keyof ErrorCodeToValueMap;
+
+/**
+ * Error code values — the values of `ErrorCodeToValueMap`.
+ */
+export type ErrorCodeValues = ErrorCodeToValueMap[ErrorCodeKeys];

@@ -304,7 +304,6 @@ describe("RouterError Message Formatting Properties", () => {
     it("all standard error codes have informative messages", () => {
       const codes: ErrorCodeKeys[] = [
         "ROUTER_NOT_STARTED",
-        "NO_START_PATH_OR_STATE",
         "ROUTER_ALREADY_STARTED",
         "ROUTE_NOT_FOUND",
         "SAME_STATES",

@@ -11,30 +11,6 @@ describe("RouterError Constants Properties", () => {
       expect(Array.isArray(errorCodes)).toBe(false);
     });
 
-    it("errorCodes contains all required codes", () => {
-      const requiredCodes = [
-        "ROUTER_NOT_STARTED",
-        "NO_START_PATH_OR_STATE",
-        "ROUTER_ALREADY_STARTED",
-        "ROUTE_NOT_FOUND",
-        "SAME_STATES",
-        "CANNOT_DEACTIVATE",
-        "CANNOT_ACTIVATE",
-        "TRANSITION_ERR",
-        "TRANSITION_CANCELLED",
-        "ROUTER_DISPOSED",
-        "PLUGIN_CONFLICT",
-        "CONTEXT_NAMESPACE_ALREADY_CLAIMED",
-      ];
-
-      for (const code of requiredCodes) {
-        expect(errorCodes).toHaveProperty(code);
-        expect(typeof errorCodes[code as keyof typeof errorCodes]).toBe(
-          "string",
-        );
-      }
-    });
-
     it("all errorCodes values are unique", () => {
       const values = Object.values(errorCodes);
       const uniqueValues = new Set(values);
@@ -173,22 +149,12 @@ describe("RouterError Constants Properties", () => {
   });
 
   describe("errorCodes backward compatibility", () => {
-    it("errorCodes contains exact number of codes", () => {
-      // If this number changes, it may break backward compatibility.
-      // 16 since ROUTER_NOT_STOPPED was added (clear() refuses while a state is
-      // committed, #1612); 15 was the count from WRONG_CHANNEL (always-on
-      // channel guard, #1572); 14 from REENTRANT_TREE_MUTATION (#1032).
-      const expectedCount = 16;
-      const actualCount = Object.keys(errorCodes).length;
-
-      expect(actualCount).toBe(expectedCount);
-    });
-
-    it("errorCodes has expected values", () => {
-      // These values must not change for backward compatibility
-      const expectedMapping = {
+    it("errorCodes holds exactly the published keys and values", () => {
+      // The whole table: a code added, removed or renamed fails here, and so
+      // does a changed value. The values are public API — a consumer matches
+      // `err.code` against them.
+      expect(errorCodes).toStrictEqual({
         ROUTER_NOT_STARTED: "NOT_STARTED",
-        NO_START_PATH_OR_STATE: "NO_START_PATH_OR_STATE",
         ROUTER_ALREADY_STARTED: "ALREADY_STARTED",
         ROUTE_NOT_FOUND: "ROUTE_NOT_FOUND",
         SAME_STATES: "SAME_STATES",
@@ -199,12 +165,11 @@ describe("RouterError Constants Properties", () => {
         ROUTER_DISPOSED: "DISPOSED",
         PLUGIN_CONFLICT: "PLUGIN_CONFLICT",
         CONTEXT_NAMESPACE_ALREADY_CLAIMED: "CONTEXT_NAMESPACE_ALREADY_CLAIMED",
+        REENTRANT_NAVIGATION: "REENTRANT_NAVIGATION",
+        REENTRANT_TREE_MUTATION: "REENTRANT_TREE_MUTATION",
+        ROUTER_NOT_STOPPED: "NOT_STOPPED",
         WRONG_CHANNEL: "WRONG_CHANNEL",
-      };
-
-      for (const [key, expectedValue] of Object.entries(expectedMapping)) {
-        expect(errorCodes[key as keyof typeof errorCodes]).toBe(expectedValue);
-      }
+      });
     });
   });
 });

@@ -23,10 +23,13 @@ export type ErrorCodes = Record<ErrorCodeKeys, ErrorCodeValues>;
  * Error codes for router operations.
  * Used to identify specific failure scenarios in navigation and lifecycle.
  * Frozen to prevent accidental modifications.
+ *
+ * ⚑ `satisfies` is not redundant with the annotation: the annotation alone
+ * admits a key `ErrorCodeToValueMap` does not declare, and `satisfies`
+ * refuses it, so the literal and the map cannot hold different keys.
  */
 export const errorCodes: ErrorCodeToValueMap = Object.freeze({
   ROUTER_NOT_STARTED: "NOT_STARTED", // navigate() called before start()
-  NO_START_PATH_OR_STATE: "NO_START_PATH_OR_STATE", // start() without initial route
   ROUTER_ALREADY_STARTED: "ALREADY_STARTED", // start() called twice
   ROUTE_NOT_FOUND: "ROUTE_NOT_FOUND", // Navigation to non-existent route
   SAME_STATES: "SAME_STATES", // Navigate to current route without reload
@@ -41,7 +44,7 @@ export const errorCodes: ErrorCodeToValueMap = Object.freeze({
   REENTRANT_TREE_MUTATION: "REENTRANT_TREE_MUTATION", // a tree mutator — route-CRUD or setRootPath (#1751) — called synchronously from inside a subscribeChanges handler (banned — use await/async/queueMicrotask)
   ROUTER_NOT_STOPPED: "NOT_STOPPED", // clear() called while a state is committed — tear down with stop() first, or swap the tree with replace() (#1612)
   WRONG_CHANNEL: "WRONG_CHANNEL", // a declared query key was supplied in the path channel (`params`) instead of `search` (#1572)
-});
+} satisfies ErrorCodeToValueMap);
 
 /**
  * General router constants.
