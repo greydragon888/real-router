@@ -15,17 +15,19 @@ const config = mergeConfig(
   }),
 );
 
-// browser-plugin owns the aggregated 100%
-// coverage of the whole shared/browser-env tree. The white-box unit tests that used
-// to live in the shared test node now live under tests/{functional,property}/
-// browser-env/; browser-plugin's coverage gates the symlinked shared files.
-// `allowExternal` admits the external symlink target; the include names
-// browser-plugin's OWN src root-relative, which leaves out the core src the plugin's
-// tests execute (via the internal-source condition) but do not fully cover. The
-// literal `**/shared/browser-env/**` form is grepped by
-// scripts/check-coverage-scope.mjs to identify browser-plugin as the browser-env
-// owner.
+// browser-plugin measures the whole shared/browser-env tree; its white-box tests
+// live under tests/{functional,property}/browser-env/. `allowExternal` admits
+// files outside the package root. `src/**/*.ts` names the plugin's own sources
+// and leaves out the core files its tests execute (via the internal-source
+// condition) but do not fully cover. The shared entry starts at the package
+// root, because Vitest globs `include` from there to report a file no test
+// loads (IMPLEMENTATION_NOTES "An owner reports the shared files no test
+// loads"). scripts/check-coverage-scope.mjs identifies the browser-env owner by
+// the `../../shared/browser-env/` entry.
 config.test.coverage.allowExternal = true;
-config.test.coverage.include = ["src/**/*.ts", "**/shared/browser-env/**/*.ts"];
+config.test.coverage.include = [
+  "src/**/*.ts",
+  "../../shared/browser-env/**/*.ts",
+];
 
 export default config;

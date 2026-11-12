@@ -5,9 +5,9 @@
 //
 // ⚠ It exists because that check was VACUOUS for two of the three dirs (#1838).
 // It asked `configText.includes("**/shared/<dir>/")` over the whole file, and
-// every owner config spells that exact glob in a COMMENT — deliberately, because
-// the comment explains that the literal form is grepped by the script. So the
-// guard was reading the sentence that describes the include.
+// every owner config spelled that exact glob in a COMMENT — deliberately, because
+// the comment explained that the literal form was grepped by the script. So the
+// guard was reading the sentence that described the include.
 //
 // Measured on `browser-plugin` before the fix: delete the real
 // `coverage.include` entry, keep the comment, and `lint:coverage-scope` exits 0
@@ -84,25 +84,26 @@ test("the premise holds — owners DO spell the glob in prose", () => {
 });
 
 test("a glob mentioned ONLY in a comment does not make an owner", () => {
-  // The defect, as a fixture: the exact shape every owner config has, minus the
-  // include entry.
+  // The defect, as a fixture: an owner config whose shared entry survives only
+  // in its comment.
   const commentOnly = `
-    // The literal \`**/shared/dom-utils/**\` form is grepped by
-    // scripts/check-coverage-scope.mjs to identify react as the dom-utils owner.
+    // react measures the whole shared/dom-utils tree through
+    // "../../shared/dom-utils/**/*.ts".
     config.test.coverage.allowExternal = true;
-    config.test.coverage.include = ["packages/react/src/**/*.ts"];
+    config.test.coverage.include = ["src/**/*.ts", "src/**/*.tsx"];
   `;
 
   assert.equal(declaresSharedOwner(commentOnly, "dom-utils"), false);
   assert.deepEqual(coverageIncludeEntries(commentOnly), [
-    "packages/react/src/**/*.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
   ]);
 });
 
 test("`allowExternal` in a comment alone does not make an owner either", () => {
   const commentedFlag = `
     // allowExternal is set by the base config
-    config.test.coverage.include = ["**/shared/dom-utils/**/*.ts"];
+    config.test.coverage.include = ["../../shared/dom-utils/**/*.ts"];
   `;
 
   assert.equal(declaresSharedOwner(commentedFlag, "dom-utils"), false);
@@ -130,16 +131,24 @@ const ROLE_EXCLUDE = [
 /**
  * Vitest's reading of each package's config, from the package's directory, as
  * `vitest run` reads it there: the config it finds, and the coverage options
- * that config sets, with what vitest adds. It writes them to the file its
- * first argument names, so nothing a plugin prints can garble them.
+ * that config sets, with what vitest adds. Vitest's coverage provider then
+ * names the files the report takes: those it globs from `include` when no test
+ * loads them (`getUntestedFiles`), and those of the listed code files it admits
+ * when a test loads one (`isIncluded`). The provider gets a reports directory
+ * of its own, which it empties, and `cleanAfterRun` releases the lock it takes
+ * in the system's temporary directory. The script writes its answers to the
+ * file its first argument names, so nothing a plugin prints can garble them.
  */
 const RESOLVE = `
-  import { writeFileSync } from "node:fs";
-  import { join } from "node:path";
-  import { resolveConfig } from "vitest/node";
+  import { readFileSync, writeFileSync } from "node:fs";
+  import { join, relative } from "node:path";
+  import { createVitest, resolveConfig } from "vitest/node";
 
-  const [out, ...names] = process.argv.slice(1);
+  const [out, reports, list, ...names] = process.argv.slice(1);
   const root = process.cwd();
+  const code = JSON.parse(readFileSync(list, "utf8")).map((file) =>
+    join(root, file),
+  );
   const resolved = {};
 
   for (const name of names) {
@@ -148,6 +157,26 @@ const RESOLVE = `
     process.chdir(dir);
     const viteConfig = await resolveConfig({ root: dir, watch: false });
     const coverage = viteConfig.test.coverage;
+    const vitest = await createVitest({
+      root: dir,
+      watch: false,
+      coverage: { reportsDirectory: join(reports, name) },
+    });
+    let untested;
+    let admitted;
+
+    try {
+      const provider = await vitest.createCoverageProvider();
+
+      try {
+        untested = await provider.getUntestedFiles([]);
+        admitted = code.filter((file) => provider.isIncluded(file));
+      } finally {
+        await provider.cleanAfterRun();
+      }
+    } finally {
+      await vitest.close();
+    }
 
     resolved[name] = {
       configFile: viteConfig.configFile,
@@ -157,6 +186,8 @@ const RESOLVE = `
       include: coverage.include,
       reportsDirectory: coverage.reportsDirectory,
       thresholds: coverage.thresholds,
+      untested: untested.map((file) => relative(root, file)).sort(),
+      admitted: admitted.map((file) => relative(root, file)).sort(),
     };
   }
   writeFileSync(out, JSON.stringify(resolved));
@@ -181,35 +212,75 @@ function codeFiles(dir) {
     );
 }
 
-test("every package's coverage options resolve by role, and isPhantom reads its thresholds as vitest does", () => {
-  // A name in `exclude`, or an `include` that narrows by name, leaves out a
-  // file with code in that package — a name in the base list does it in all of
-  // them at once (#1838). Each tracked code file of a package is held to its
-  // `include` as vitest matches a file: by the glob, from the package's
-  // directory. An owner — `allowExternal`, to measure its `shared/<dir>` — has
-  // that dir outside the package, and its entry reaches it with a `**/`.
+/** The shared dirs a package's `include` entries name. */
+const sharedDirsOf = (options) =>
+  options.include
+    .map((entry) => /(?:^|\/)shared\/([a-z-]+)\//.exec(entry)?.[1])
+    .filter((dir) => dir !== undefined);
+
+let resolution;
+
+/**
+ * Each package's resolution, run once for the cells that read it: the names
+ * of the packages with a `vitest.config.mts`, and per name what `RESOLVE`
+ * answers, with the code files of every package's `src` and of every shared
+ * dir as the files `isIncluded` is asked about.
+ */
+function resolvePackages() {
+  if (resolution !== undefined) return resolution;
+
   const names = readdirSync(join(ROOT, "packages"))
     .filter((name) =>
       existsSync(join(ROOT, "packages", name, "vitest.config.mts")),
     )
     .sort();
+  const code = [
+    ...codeFiles("packages").filter((path) =>
+      /^packages\/[^/]+\/src\//.test(path),
+    ),
+    ...codeFiles("shared"),
+  ];
   const scratch = mkdtempSync(join(tmpdir(), "coverage-resolve-"));
-  let resolved;
 
   try {
     const out = join(scratch, "resolved.json");
+    const list = join(scratch, "code.json");
+
+    writeFileSync(list, JSON.stringify(code));
     const run = spawnSync(
       process.execPath,
-      ["--input-type=module", "-e", RESOLVE, out, ...names],
+      [
+        "--input-type=module",
+        "-e",
+        RESOLVE,
+        out,
+        join(scratch, "reports"),
+        list,
+        ...names,
+      ],
       { cwd: ROOT, encoding: "utf8", timeout: 120_000 },
     );
 
     assert.equal(run.status, 0, run.error?.message ?? run.stderr);
-    resolved = JSON.parse(readFileSync(out, "utf8"));
+    resolution = {
+      code,
+      names,
+      resolved: JSON.parse(readFileSync(out, "utf8")),
+    };
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
 
+  return resolution;
+}
+
+test("every package's coverage options resolve by role, and isPhantom reads its thresholds as vitest does", () => {
+  // A name in `exclude`, or an `include` that narrows by name, leaves out a
+  // file with code in that package — a name in the base list does it in all of
+  // them at once (#1838). This cell holds the options; the next one, the files
+  // they take. An owner — `allowExternal`, to measure its `shared/<dir>` —
+  // names that dir in an `include` entry.
+  const { names, resolved } = resolvePackages();
   const metrics = ["branches", "functions", "lines", "statements"];
 
   assert.deepEqual(Object.keys(resolved), names);
@@ -221,17 +292,6 @@ test("every package's coverage options resolve by role, and isPhantom reads its 
           .filter((entry) => entry.isSymbolicLink())
           .map((entry) => `src/${entry.name}/**`)
       : [];
-    const owned = options.include
-      .map((entry) => /^\*\*\/shared\/([a-z-]+)\//.exec(entry)?.[1])
-      .filter((dir) => dir !== undefined);
-    const files = [
-      ...codeFiles(`packages/${name}/src`).map((path) =>
-        path.slice(`packages/${name}/`.length),
-      ),
-      ...owned.flatMap((dir) => codeFiles(`shared/${dir}`)),
-    ];
-    const included = (file) =>
-      options.include.some((entry) => matchesGlob(file, entry));
 
     assert.equal(
       options.configFile,
@@ -254,13 +314,9 @@ test("every package's coverage options resolve by role, and isPhantom reads its 
     );
     assert.equal(
       options.allowExternal,
-      owned.length > 0,
+      sharedDirsOf(options).length > 0,
       `${name}: an owner owns a shared dir`,
     );
-    assert.ok(files.length > 0, `${name}: no code file to hold`);
-    for (const file of files) {
-      assert.ok(included(file), `${name}: ${file} is outside coverage.include`);
-    }
     assert.equal(
       isPhantom(ROOT, name),
       metrics.some((metric) => options.thresholds[metric] < 100),
@@ -278,6 +334,47 @@ test("every package's coverage options resolve by role, and isPhantom reads its 
   }
 });
 
+test("every package's report takes its own code files and its shared dir's, whether a test loads them or not (#2694)", () => {
+  // Vitest's coverage provider answers, so the `include` forms are held to the
+  // matching of the vitest installed. A file no test loads enters the report
+  // only through the glob of `include` from the package's directory, and a
+  // form that reaches no file from there leaves it out with the run at 100 %.
+  // A file a test loads enters through its path, and an owner's tests load
+  // files of core and sources too.
+  const { code, names, resolved } = resolvePackages();
+  let shared = 0;
+
+  for (const name of names) {
+    const options = resolved[name];
+    const files = [
+      ...codeFiles(`packages/${name}/src`),
+      ...sharedDirsOf(options).flatMap((dir) => codeFiles(`shared/${dir}`)),
+    ].sort();
+
+    assert.ok(files.length > 0, `${name}: no code file to hold`);
+    assert.deepEqual(
+      options.untested,
+      files,
+      `${name}: the files its report takes when no test loads them`,
+    );
+    assert.deepEqual(
+      options.admitted,
+      files,
+      `${name}: the listed code files its report admits when a test loads them`,
+    );
+    shared += files.filter((file) => file.startsWith("shared/")).length;
+  }
+  // Both halves discriminate: owners hold shared files, and the list asked
+  // about holds files that every package's report refuses.
+  assert.ok(shared > 0, "no owner holds a shared file");
+  for (const name of names) {
+    assert.ok(
+      code.length > resolved[name].admitted.length,
+      `${name}: no listed file to refuse`,
+    );
+  }
+});
+
 test("the parser reads the ARRAY, not the file", () => {
   // ⚠ The four cells below pin defensive terms that no other assertion reaches.
   // Mutation-checked: removing any of them left the rest of this file green.
@@ -286,9 +383,9 @@ test("the parser reads the ARRAY, not the file", () => {
   // the scan returns literals from the whole file, which is a weaker rerun of
   // the very defect this module exists to fix — a mention, not an entry.
   const elsewhere = `
-    const somewhereElse = ["**/shared/dom-utils/**/*.ts"];
+    const somewhereElse = ["../../shared/dom-utils/**/*.ts"];
     config.test.coverage.allowExternal = true;
-    config.test.coverage.include = ["packages/react/src/**/*.ts"];
+    config.test.coverage.include = ["src/**/*.ts"];
   `;
 
   assert.equal(declaresSharedOwner(elsewhere, "dom-utils"), false);
@@ -296,7 +393,7 @@ test("the parser reads the ARRAY, not the file", () => {
   // (2) No `coverage.include` at all. Without the `-1` guard the bracket search
   // starts at 0 and picks the first array in the file, whatever it is.
   const noInclude = `
-    const unrelated = ["**/shared/dom-utils/**/*.ts"];
+    const unrelated = ["../../shared/dom-utils/**/*.ts"];
     config.test.coverage.allowExternal = true;
   `;
 
@@ -312,7 +409,7 @@ test("the parser reads the ARRAY, not the file", () => {
   // (4) A literal inside a call is not an entry: of `[...base.filter(…), "x"]`
   // the filtered-out pattern stays out.
   const filtered = `config.test.coverage.include = [
-    ...config.test.coverage.include.filter((p) => p !== "**/shared/dom-utils/**/*.ts"),
+    ...config.test.coverage.include.filter((p) => p !== "../../shared/dom-utils/**/*.ts"),
     "src/**/*.ts",
   ];`;
 

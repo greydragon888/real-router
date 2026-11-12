@@ -4,10 +4,10 @@
 //
 // ⚠ It exists as a separate module for a reason worth keeping: the check it
 // replaces was `configText.includes("**/shared/<dir>/")` over the WHOLE file,
-// comments included — and every owner config spells that exact glob in prose,
-// deliberately, because a comment there explains that the literal form is
+// comments included — and every owner config spelled that exact glob in prose,
+// deliberately, because a comment there explained that the literal form was
 // grepped by this very script. So the guard was reading the sentence that
-// describes the include rather than the include. Measured on `browser-plugin`:
+// described the include rather than the include. Measured on `browser-plugin`:
 // deleting the real `coverage.include` entry and keeping the comment left
 // `lint:coverage-scope` at exit 0 while the package's own coverage run went from
 // 16 files to 2 with zero `shared/*` rows.

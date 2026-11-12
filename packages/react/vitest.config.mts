@@ -16,20 +16,20 @@ const config = mergeConfig(
   }),
 );
 
-// react owns the aggregated 100% coverage
-// of the whole shared/dom-utils tree. The white-box unit tests that used to live in
-// the shared test node now live under tests/{functional,property,stress}/dom-utils/;
-// react's coverage gates the symlinked shared files. `allowExternal` admits the
-// external symlink target; the include names react's OWN src root-relative, which
-// leaves out the core/sources src that react's tests execute (via the
-// internal-source condition) but do not fully cover. The literal
-// `**/shared/dom-utils/**` form is grepped by scripts/check-coverage-scope.mjs to
-// identify react as the dom-utils owner.
+// react measures the whole shared/dom-utils tree; its white-box tests live under
+// tests/{functional,property,stress}/dom-utils/. `allowExternal` admits files
+// outside the package root. The `src/**` entries name react's own sources and
+// leave out the core and sources files its tests execute (via the
+// internal-source condition) but do not fully cover. The shared entry starts at
+// the package root, because Vitest globs `include` from there to report a file
+// no test loads (IMPLEMENTATION_NOTES "An owner reports the shared files no test
+// loads"). scripts/check-coverage-scope.mjs identifies the dom-utils owner by
+// the `../../shared/dom-utils/` entry.
 config.test.coverage.allowExternal = true;
 config.test.coverage.include = [
   "src/**/*.ts",
   "src/**/*.tsx",
-  "**/shared/dom-utils/**/*.ts",
+  "../../shared/dom-utils/**/*.ts",
 ];
 
 export default config;

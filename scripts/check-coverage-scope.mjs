@@ -142,14 +142,14 @@ const ownerConfigs = packages
   }));
 
 // #1065/#1086: shared sources have no test node of their own — each shared dir
-// is measured by a CONSUMER package's vitest.config.mts (allowExternal + a
-// "**/shared/<dir>/**" include), so its measuring owner is found among the
-// ownerConfigs (package configs) collected above.
+// is measured by a CONSUMER package's vitest.config.mts (allowExternal + an
+// include entry under shared/<dir>/), so its measuring owner is found among
+// the ownerConfigs (package configs) collected above.
 for (const dir of sharedDirs) {
   // ⚠ Match the `coverage.include` ENTRY, not the file text (#1838). The
   // previous form asked `c.text.includes("**/shared/<dir>/")` over the whole
-  // file — and every owner config spells that exact glob in a COMMENT, on
-  // purpose, because the comment explains that the literal form is grepped by
+  // file — and every owner config spelled that exact glob in a COMMENT, on
+  // purpose, because the comment explained that the literal form was grepped by
   // this script. So the guard was reading the sentence describing the include.
   // Measured on `browser-plugin`: delete the real include, keep the comment, and
   // this script exited 0 while the package's own coverage run went from 16 files
@@ -157,7 +157,7 @@ for (const dir of sharedDirs) {
   const owner = ownerConfigs.find((c) => declaresSharedOwner(c.text, dir));
   if (!owner) {
     errors.push(
-      `shared/${dir}: no measuring owner — no packages/*/vitest.config.mts sets coverage.allowExternal with a "**/shared/${dir}/**" include (see #809; without an owner this dir is measured nowhere)`,
+      `shared/${dir}: no measuring owner — no packages/*/vitest.config.mts sets coverage.allowExternal with an include entry under shared/${dir}/ (see #809; without an owner this dir is measured nowhere)`,
     );
   }
 

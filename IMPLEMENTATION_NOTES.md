@@ -2619,6 +2619,8 @@ test set. Coverage is unaffected — it comes from the lcov `reportPaths`, and t
 
 ### Shared sources are owner-measured at 100% (#809)
 
+> **Updated (2026-11-12).** An owner's include is its own `src/**` ("Vitest 5: three coverage reports shrink at 100 %, and a nested `??` becomes a branch") and `../../shared/<dir>/**/*.ts`, which reports a shared file no test loads: "An owner reports the shared files no test loads".
+
 > **Updated (2026-10-07).** Check 2b keeps only the owner: `sonar.coverage.exclusions` is generated from the package walk and holds no `shared/` entry: "Coverage leaves files out by role, and Sonar's coverage exclusions are generated".
 
 > **Updated (2026-10-04).** Check 2b no longer asks for a `codecov.yml` component path per shared dir: "Codecov has no components".
@@ -14759,6 +14761,8 @@ Three rounds of review of the fix found the same order of the text in two more p
 
 ## Coverage leaves files out by role, and Sonar's coverage exclusions are generated (2026-10-07)
 
+> **Updated (2026-11-12).** The gap below is closed, and the cell that held each package's files to its `include` asks vitest's coverage provider instead: "An owner reports the shared files no test loads".
+
 > **Updated (2026-10-08).** `isPhantom` and the region's renderer live in `scripts/coverage-exclusions.mjs`, and the cells of `isPhantom` in `scripts/tests/coverage-exclusions.test.mjs`.
 
 **Problem.** Three lists said which files coverage leaves out, and each named files. Vitest's `coverage.exclude` in `vitest.config.unit.mts` held `**/index.ts`, `**/constants.ts`, `**/types/**`, four more names and ten paths that match no file; `sonar.coverage.exclusions` held fifteen name patterns before its package entries; `codecov.yml` had an `ignore` of its own. A name says nothing about code: the path matcher's `registration/index.ts` registers every route and was measured by no tool, and `**/index.ts` in the base list left the three `shared/*/index.ts` measured nowhere until the owner configs narrowed it. Check 2 of `check-coverage-scope.mjs` held only the package entries of Sonar's list to the tree.
@@ -15710,6 +15714,8 @@ Without a `dist`, core's dry run passes with 5737 tests, the 5740 of a hand excl
 
 ## Vitest 5: three coverage reports shrink at 100 %, and a nested `??` becomes a branch (2026-10-31)
 
+> **Updated (2026-11-12).** The gap closed for an owner's `src/` alone: a file no test loads in its `shared/<dir>` stayed out of the report, and the test held the shared entries as a loaded file is matched, until "An owner reports the shared files no test loads".
+
 **Problem.** `vitest`, `@vitest/ui` and `@vitest/coverage-v8` move from 4.1.12 to 5.0.5 as one, by hand: Dependabot's `ignore` holds the major, because the three peer each other's exact version. The install needs nothing. Strict peers pass, the tree holds one `vitest`, and no override moves, so what breaks is what a test count does not show. With the bump alone, 22 of 23 packages report their v4 test count, and the failures are of three kinds.
 
 | package             | v4                  | v5, bump alone         | shown by               |
@@ -15927,3 +15933,38 @@ The real pair gains five entries: `SubtreeExit`, a class both twins declare and 
 - #2398: the narrowed fix chooses how the one predicate reads a function, and that choice alone can change what each shape gets. A cell pinning the shapes would hold the choice in place, so none is written.
 - #2578: the #2577 delivery removes the shape. A repair of `getUrlParams` for tables that are about to stop registering would be thrown away with them.
 - #2580: the one candidate, a registration refusal of a childless top-level `""` / `"?x"` route beside `"/"`, was not measured, and the shapes it would refuse are ones no application declares.
+
+## An owner reports the shared files no test loads (#2694, 2026-11-12)
+
+**Problem.** The three owners of a `shared/<dir>` — `react`, `browser-plugin` and `ssr-data-plugin` — reported only the shared files their tests load. Vitest takes a file no test loads into the report by globbing `coverage.include` with the package's directory as `cwd` (`getUntestedFilesByRoot` of `vitest` 5.1), and from `packages/<owner>` the `**/shared/<dir>/**/*.ts` entry reaches no file. A file a test loads is matched by path, and its absolute path matches that entry, so every shared file a test reached was reported. A planted function with an `if`, in each `shared/<dir>`, left all three runs at exit 0 and 100 % with no lcov record for it, and `shared/browser-env/types.ts`, which no test loads, had none either. In an owner's `src/` the same file failed the thresholds ("Vitest 5: three coverage reports shrink at 100 %, and a nested `??` becomes a branch").
+
+The cell that held an owner's files matched each entry with `matchesGlob` of `node:path`, as a loaded file is matched, so it passed the form the glob could not use.
+
+**Solution.**
+
+- Each owner's shared entry starts at the package root, a glob vitest 5.0.4 takes outside the root ([vitest#11513](https://github.com/vitest-dev/vitest/pull/11513)):
+
+```ts
+// Before
+config.test.coverage.include = ["src/**/*.ts", "**/shared/browser-env/**/*.ts"];
+
+// After
+config.test.coverage.include = [
+  "src/**/*.ts",
+  "../../shared/browser-env/**/*.ts",
+];
+```
+
+- The cell "every package's report takes its own code files and its shared dir's, whether a test loads them or not (#2694)" of `check-coverage-scope.test.mjs` asks vitest's coverage provider for each package: `getUntestedFiles([])` names the files the report takes when no test loads them, and `isIncluded`, asked about the code files of every package's `src` and every shared dir, names those it takes when a test loads one. Both must equal the package's tracked code files, and an owner's shared dir's with them.
+- The cell "every package's coverage options resolve by role, …" keeps the options and no longer matches files.
+- `createCoverageProvider` takes a lock for the reports directory, a file in the system's temporary directory, and `cleanAfterRun` releases it; `vitest.close()` leaves it, one file per package and run.
+- ⚠ The cell gives each provider a scratch reports directory: `createCoverageProvider` empties the one it gets once the lock is taken, so with the package's own `./coverage` the cell would delete the report a finished run left there, and a run in progress would hold the lock and fail the cell.
+
+**Why the provider, not a reading of the globs.** The gap lies between two matchings: the glob that finds a file no test loads and the path match of a file a test loads. A reading that reproduces one of them passes a form the other refuses, as the `matchesGlob` reading did. The provider is the code `vitest run` executes, so a vitest version that changes either matching changes the cell's answer with it. `vitest/node` declares each method it calls: `createCoverageProvider` of `Vitest`, and `getUntestedFiles`, `isIncluded` and `cleanAfterRun` of `BaseCoverageProvider`, which the v8 provider extends.
+
+**Measured** (vitest 5.1.0, on `abcbccd8a`):
+
+- The probe in each `shared/<dir>` now fails all three runs, at 99.67, 99.57 and 99.14 % of lines, each with an lcov record; before, all three exited 0. A probe in each owner's `src/` failed them before the change too.
+- Without probes the three pass, and lines, branches and functions equal the run before: 931/557/179, 703/400/161 and 346/211/59. `browser-plugin` gains `shared/browser-env/types.ts`, a record with no line. No file of another package enters a report.
+- The provider answers for the 23 packages in 2.6 s, 1.7 s of it angular's. Before the change it named no shared file untested for the three owners, while `isIncluded` took 7, 19 and 9; after, both name the same files, and for every package they are its tracked code files. `createVitest` for svelte writes `_svelte_metadata.json` into `packages/svelte/.vitest-cache/`, as svelte's own test run does; git ignores the directory, and no turbo input names it.
+- 8 of 8 mutants fail a cell. react's entry back to `**/shared/dom-utils/**` fails the half of `getUntestedFiles` alone, and `**/packages/core/src/**` added to `ssr-data-plugin` the half of `isIncluded` alone. `browser-plugin`'s own entry in the Vitest 4 form `packages/browser-plugin/src/**`, `../core/src/**` added to `ssr-data-plugin`, `browser-plugin`'s shared entry widened to `../../shared/**`, react without `allowExternal` or without `src/**/*.tsx`, and `allowExternal` on route-utils fail too.

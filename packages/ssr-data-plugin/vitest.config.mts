@@ -14,16 +14,16 @@ const config = mergeConfig(
   }),
 );
 
-// This package is the coverage owner of shared/ssr.
-// Unlike shared/dom-utils and shared/browser-env, shared/ssr has no dedicated
-// owner package (both consumers have their own src), so the measurement rides
-// on this consumer: v8 resolves the `src/shared-ssr` symlink to its
-// `shared/ssr` realpath, which the base `src/**` include drops —
-// without this block the shared sources were measured nowhere.
-// `allowExternal: true` keeps files outside the package root, and the include
-// names this package's own src root-relative, which leaves out the workspace
-// packages its tests load (core among them).
+// This package measures the whole shared/ssr tree, which rsc-server-plugin
+// links too. v8 reports the `src/shared-ssr` symlink by its `shared/ssr`
+// realpath, outside the package root: `allowExternal` admits it. `src/**/*.ts`
+// names this package's own sources and leaves out the workspace packages its
+// tests load (core among them). The shared entry starts at the package root,
+// because Vitest globs `include` from there to report a file no test loads
+// (IMPLEMENTATION_NOTES "An owner reports the shared files no test loads").
+// scripts/check-coverage-scope.mjs identifies the ssr owner by the
+// `../../shared/ssr/` entry.
 config.test.coverage.allowExternal = true;
-config.test.coverage.include = ["src/**/*.ts", "**/shared/ssr/**/*.ts"];
+config.test.coverage.include = ["src/**/*.ts", "../../shared/ssr/**/*.ts"];
 
 export default config;
