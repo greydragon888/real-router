@@ -7,7 +7,7 @@ import { readContextHash } from "./internal/readContextHash.js";
 import { normalizeActiveOptions } from "./normalizeActiveOptions.js";
 
 import type { ActiveRouteSourceOptions, RouterSource } from "./types.js";
-import type { Params, Router, SearchParams } from "@real-router/core";
+import type { Params, Router, SearchParams, State } from "@real-router/core";
 
 const activeSourceCache = new WeakMap<
   Router,
@@ -212,23 +212,36 @@ function buildActiveRouteSource(
     hash,
   );
 
+  // The router state the flag was last computed against while disconnected,
+  // `null` from each disconnect on. The flag also reads the route tree, the
+  // dependencies a `forwardTo` reads and the state's context, none of which
+  // moves the state object, so the first read after a disconnect recomputes and
+  // a read repeated without a navigation does not.
+  let computedFor: State | undefined | null = router.getState();
   let routerUnsubscribe: (() => void) | undefined;
 
   const disconnect = (): void => {
     const unsub = routerUnsubscribe;
 
     routerUnsubscribe = undefined;
+    computedFor = null;
     unsub?.();
   };
 
   const source = new BaseSource(initialValue, {
-    onFirstSubscribe: () => {
-      // Reconcile before connecting: while disconnected (zero listeners) the
-      // source missed navigations, so the active boolean may be stale.
-      // Recompute against the current router state and notify the just-added
-      // listener — BaseSource registers it before onFirstSubscribe. Mirrors the
-      // reconnect reconcile of createRouteNodeSource / createRouteSource (#765).
-      const reconciled = computeActive(
+    // While disconnected (zero listeners) the source sees no navigation: a read
+    // in that window and the first subscribe recompute the flag, unless
+    // `computedFor` says it is current.
+    reconcile: (current) => {
+      const state = router.getState();
+
+      if (state === computedFor) {
+        return current;
+      }
+
+      computedFor = state;
+
+      return computeActive(
         router,
         routeName,
         params,
@@ -237,11 +250,8 @@ function buildActiveRouteSource(
         ignoreQueryParams,
         hash,
       );
-
-      if (!Object.is(source.getSnapshot(), reconciled)) {
-        source.updateSnapshot(reconciled);
-      }
-
+    },
+    onFirstSubscribe: () => {
       // Lazy connection (#766): subscribe on the FIRST listener, disconnect on
       // the LAST (onLastUnsubscribe). Previously this source subscribed eagerly
       // at construction with a no-op destroy on the cached wrapper, so every

@@ -103,7 +103,7 @@ describe("createActiveRouteSources", () => {
       },
     );
 
-    // Lazy source tracks navigations only while subscribed (#766).
+    // Connected, so the router listener takes each navigation.
     source.subscribe(() => {});
 
     await router.navigate("users.view", { id: "1" });
@@ -333,9 +333,9 @@ describe("createActiveRouteSources", () => {
     // Navigate into the "users" subtree while the source has ZERO listeners.
     await router.navigate("users.view", { id: "1" });
 
-    // Re-subscribe: onFirstSubscribe reconciles the boolean to the current
-    // router state (true) instead of replaying the stale `false`, and notifies
-    // the just-added listener.
+    // Re-subscribe: the catch-up that follows the connect sets the boolean to
+    // the current router state (true) instead of replaying the stale `false`,
+    // and notifies the just-added listener.
     const listener = vi.fn();
     const unsub2 = source.subscribe(listener);
 
@@ -485,7 +485,7 @@ describe("createActiveRouteSources", () => {
 
       const source = createActiveRouteSource(r, "settings");
 
-      // Lazy source tracks navigations only while subscribed (#766).
+      // Connected, so the router listener takes each navigation.
       source.subscribe(() => {});
 
       expect(source.getSnapshot()).toBe(true);

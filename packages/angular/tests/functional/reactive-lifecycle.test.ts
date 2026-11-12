@@ -77,8 +77,8 @@ describe("reactive lifecycle (#778)", () => {
     // Navigate WITHIN the "users" node while no consumer is subscribed.
     void router.navigate("users.view", { id: "42" });
 
-    // Scope 2 — a fresh consumer reconnects: onFirstSubscribe reconciles the
-    // node snapshot to the current router state, so the signal is fresh.
+    // Scope 2 — a fresh consumer reconnects: its first read finds the node
+    // source disconnected and answers from the router, so the signal is fresh.
     const scope2 = createEnvironmentInjector([], parent);
     let node2!: ReturnType<typeof injectRouteNode>;
 

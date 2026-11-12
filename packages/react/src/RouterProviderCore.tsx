@@ -36,12 +36,12 @@ export const RouterProviderCore: FC<RouterProviderCoreProps> = ({
   // Activity note (#765): that same first-listener/last-listener contract means
   // a Provider mounted UNDER a React <Activity> / keepAlive boundary drops its
   // subscription while hidden, so a navigation that lands during the hidden
-  // window is not observed live. createRouteSource RECONCILES on re-subscribe —
-  // when the first listener re-attaches on re-show it re-reads router.getState()
-  // — so the re-shown Provider renders the CURRENT route, not a stale snapshot.
+  // window is not observed live. createRouteSource answers a read made with no
+  // listener from router.getState() (#2909), so the re-shown Provider's first
+  // render reads the CURRENT route, not a stale snapshot.
   // Mounting RouterProvider at the app root (above any Activity boundary) stays
   // the recommended composition: it keeps the subscription live throughout
-  // instead of relying on the reconnect catch-up. See the "RouterProvider under
+  // instead of relying on the catch-up. See the "RouterProvider under
   // <Activity>" gotcha in CLAUDE.md and the P1 regression in
   // tests/integration/reactive-lifecycle.test.tsx.
   const store = useMemo(() => createRouteSource(router), [router]);

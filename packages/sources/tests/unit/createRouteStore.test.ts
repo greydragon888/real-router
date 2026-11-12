@@ -148,14 +148,14 @@ describe("createRouteSources", () => {
     const source = createRouteSource(router);
     const listener = vi.fn();
 
-    // Navigate while the lazy source has ZERO listeners (never connected) — the
-    // snapshot is stale until the catch-up reconcile on first subscribe.
+    // Navigate while the lazy source has ZERO listeners (never connected) and
+    // nothing reads it — the stored snapshot lags until the first subscribe.
     await router.navigate("users");
 
     source.subscribe(listener);
 
-    // onFirstSubscribe reconciles route to the current state; the listener
-    // (added before onFirstSubscribe by BaseSource) observes the catch-up.
+    // The first subscribe catches the route up to the current state; the
+    // listener, registered before the catch-up, observes it.
     // previousRoute is undefined — a catch-up is a snap, not an observed nav.
     expect(source.getSnapshot().route?.name).toBe("users");
     expect(source.getSnapshot().previousRoute).toBeUndefined();
@@ -172,6 +172,33 @@ describe("createRouteSources", () => {
     await router.navigate("admin");
 
     expect(listener).not.toHaveBeenCalled();
+  });
+
+  // Core's emitter calls every listener registered when an announcement began,
+  // so a source destroyed by an earlier listener still receives this one — and
+  // must not take it.
+  it("destroy during an announcement: the source ignores the rest of it", async () => {
+    const source = createRouteSource(router);
+    const subscribe = router.subscribe.bind(router);
+    let reached = 0;
+
+    router.subscribe(() => {
+      source.destroy();
+    });
+    // Counts the source's own router listener, which the announcement must
+    // reach after destroy() for the cell to ask its question.
+    vi.spyOn(router, "subscribe").mockImplementation((listener) =>
+      subscribe((state) => {
+        reached++;
+        listener(state);
+      }),
+    );
+    source.subscribe(() => {});
+
+    await router.navigate("admin");
+
+    expect(reached).toBe(1);
+    expect(source.getSnapshot().route?.name).toBe("home");
   });
 
   it("multiple subscribers: router.subscribe called only once", async () => {

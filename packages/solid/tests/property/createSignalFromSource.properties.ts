@@ -11,8 +11,8 @@
  * - **Re-sync after subscribe (lazy reconciliation):** if the source's
  *   `getSnapshot` value changes between signal init and `subscribe` returning
  *   AND Solid's default `===` equality considers them distinct, the bridge
- *   must re-read once. Lazy cached sources reconcile in `onFirstSubscribe`
- *   without notifying — the bridge must compensate via `setValue(sync)` after
+ *   must re-read once. A source that changes inside `subscribe()` without
+ *   notifying is that case — the bridge compensates via `setValue(sync)` after
  *   `subscribe(...)` returns.
  * - **Each emit propagates to the accessor** at most one settle step later.
  * - **Default `===` equality is preserved** — re-emit of the SAME reference
@@ -50,11 +50,11 @@ describe("createSignalFromSource — Property Tests (Solid)", () => {
   });
 
   describe("Invariant 2: re-sync after subscribe (lazy reconciliation)", () => {
-    // Lazy cached sources can reconcile their snapshot inside
-    // `onFirstSubscribe` without notifying the just-added listener. The
-    // bridge calls `setValue(sync)` AFTER `subscribe(...)` to catch that
-    // exact window: simulate it by changing the snapshot inside the
-    // `subscribe` callback (before it returns).
+    // A source can change its snapshot inside `subscribe()` without
+    // notifying the listener it was handed. The bridge calls `setValue(sync)`
+    // AFTER `subscribe(...)` to catch that exact window: simulate it by
+    // changing the snapshot inside the `subscribe` callback (before it
+    // returns).
     test.prop([arbExtendedPrimitive, arbExtendedPrimitive], {
       numRuns: NUM_RUNS.thorough,
     })(

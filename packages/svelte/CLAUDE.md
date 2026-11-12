@@ -332,7 +332,7 @@ Files with the `.svelte.ts` extension use Runes (`$state`, `$derived`, `$effect`
 
 ### createSubscriber Is Lazy
 
-`createReactiveSource` uses `createSubscriber`, which only subscribes to the external source when `.current` is read inside a reactive context (a template, `$derived`, or `$effect`). Reading `.current` outside a reactive context still returns the current snapshot but doesn't register a subscription:
+`createReactiveSource` uses `createSubscriber`, which only subscribes to the external source when `.current` is read inside a reactive context (a template, `$derived`, or `$effect`). Reading `.current` outside a reactive context still returns the router's current state — a lazy source with no listener answers its read from the router ([#2909](https://github.com/greydragon888/real-router/issues/2909)) — but doesn't register a subscription, so nothing re-runs when the route changes:
 
 ```svelte
 <script lang="ts">
@@ -357,9 +357,9 @@ The laziness cuts both ways. When **every** `.current` reader disappears at once
 subscriber unwinds and the underlying `createRouteSource` disconnects from the
 router. A navigation that happens _while hidden_ (a post-login deep-link
 redirect, a restored route) fires while the source has no readers; when the gate
-re-opens, the first `.current` read re-subscribes and the source **reconciles** —
-`onFirstSubscribe` runs `stabilizeState` against the current router state, catches
-up the missed navigation, and the reader sees the **current** route (not a stale
+re-opens, the first `.current` read re-subscribes and the source **catches up**
+the missed navigation — a read with no listener and the first subscribe both
+answer from the router — so the reader sees the **current** route (not a stale
 pre-navigation snapshot). Unlike React (needs `<Activity>`) or Solid (needs a
 lifted-source composition), Svelte reaches this hide/show cycle with an ordinary
 `{#if}` around the readers — the widest reachability in the adapter series, and a
@@ -368,9 +368,11 @@ realistic auth-flow pattern.
 The subscription simply drops whenever **no** reader is mounted — a single live
 `RouteView`, a `useRoute()` consumer, or a template `{route.current}` anywhere
 keeps it connected. The catch-up on re-show is the `@real-router/sources`
-reconcile ([#765](https://github.com/greydragon888/real-router/issues/765)),
-pinned by `tests/functional/reactive-lifecycle.test.ts` (P1: "a {#if}-gated
-route.current reader is fresh after off → navigate → on").
+catch-up ([#765](https://github.com/greydragon888/real-router/issues/765),
+[#2909](https://github.com/greydragon888/real-router/issues/2909)), pinned by
+`tests/functional/reactive-lifecycle.test.ts` (P1: "a {#if}-gated
+route.current reader is fresh after off → navigate → on"); a `.current` read
+outside a reactive context, by `tests/functional/untracked-read-2909.test.ts`.
 
 ### Snippet Names Must Be Valid JS Identifiers
 

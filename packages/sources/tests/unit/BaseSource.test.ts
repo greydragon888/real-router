@@ -82,6 +82,17 @@ describe("BaseSource — subscribe order", () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
+  it("an unsubscribe called after destroy() runs no onLastUnsubscribe", () => {
+    const onLastUnsubscribe = vi.fn();
+    const source = new BaseSource<number>(0, { onLastUnsubscribe });
+    const unsubscribe = source.subscribe(() => {});
+
+    source.destroy();
+    unsubscribe();
+
+    expect(onLastUnsubscribe).not.toHaveBeenCalled();
+  });
+
   it("destroy() invokes onDestroy exactly once", () => {
     const onDestroy = vi.fn();
     const source = new BaseSource<number>(0, { onDestroy });
@@ -174,5 +185,136 @@ describe("BaseSource — subscribe order", () => {
     // state, and re-firing when listeners are empty is by design.)
     expect(survivor).toHaveBeenCalledTimes(1);
     expect(dropped).not.toHaveBeenCalled();
+  });
+});
+
+describe("BaseSource — reconcile (#2909)", () => {
+  it("a read with no listener returns reconcile(stored) and stores it", () => {
+    const reconcile = vi.fn((current: number) => current + 1);
+    const source = new BaseSource<number>(0, { reconcile });
+
+    expect(source.getSnapshot()).toBe(1);
+    expect(source.getSnapshot()).toBe(2);
+    expect(reconcile.mock.calls).toStrictEqual([[0], [1]]);
+  });
+
+  it("a read while a listener is registered does not reconcile", () => {
+    const reconcile = vi.fn((current: number) => current);
+    const source = new BaseSource<number>(0, { reconcile });
+
+    source.subscribe(() => {});
+    reconcile.mockClear();
+
+    expect(source.getSnapshot()).toBe(0);
+    expect(reconcile).not.toHaveBeenCalled();
+  });
+
+  it("a read after destroy() returns the stored snapshot without reconciling", () => {
+    const reconcile = vi.fn(() => 1);
+    const source = new BaseSource<number>(0, { reconcile });
+
+    source.destroy();
+
+    expect(source.getSnapshot()).toBe(0);
+    expect(reconcile).not.toHaveBeenCalled();
+  });
+
+  it("the first subscribe connects, then reconciles and notifies its listener", () => {
+    const order: string[] = [];
+    const source = new BaseSource<number>(0, {
+      reconcile: () => {
+        order.push("reconcile");
+
+        return 1;
+      },
+      onFirstSubscribe: () => {
+        order.push("onFirstSubscribe");
+      },
+    });
+
+    source.subscribe(() => {
+      order.push(`listener ${String(source.getSnapshot())}`);
+    });
+
+    expect(order).toStrictEqual([
+      "onFirstSubscribe",
+      "reconcile",
+      "listener 1",
+    ]);
+  });
+
+  it("the first subscribe notifies nobody when reconcile returns the stored snapshot", () => {
+    const listener = vi.fn();
+    const source = new BaseSource<number>(0, {
+      reconcile: (current) => current,
+    });
+
+    source.subscribe(listener);
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("compares the reconciled snapshot with Object.is, as useSyncExternalStore does", () => {
+    const listener = vi.fn();
+    const source = new BaseSource<number>(Number.NaN, {
+      reconcile: () => Number.NaN,
+    });
+
+    source.subscribe(listener);
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("only the first subscribe reconciles", () => {
+    const reconcile = vi.fn((current: number) => current);
+    const source = new BaseSource<number>(0, { reconcile });
+
+    source.subscribe(() => {});
+    source.subscribe(() => {});
+
+    expect(reconcile).toHaveBeenCalledTimes(1);
+  });
+
+  it("a connect that throws takes its listener back, so the next subscribe connects again", () => {
+    const refusal = new Error("refused");
+    const onFirstSubscribe = vi.fn((): void => {
+      throw refusal;
+    });
+    const reconcile = vi.fn((current: number) => current);
+    const source = new BaseSource<number>(0, { reconcile, onFirstSubscribe });
+
+    expect(() => source.subscribe(() => {})).toThrow(refusal);
+
+    source.getSnapshot();
+
+    expect(reconcile).toHaveBeenCalledTimes(1);
+
+    onFirstSubscribe.mockImplementation(() => {});
+    source.subscribe(() => {});
+
+    expect(onFirstSubscribe).toHaveBeenCalledTimes(2);
+  });
+
+  it("a catch-up that throws takes its listener back and disconnects, so the next subscribe connects again", () => {
+    const refusal = new Error("refused");
+    const reconcile = vi.fn<(current: number) => number>(() => {
+      throw refusal;
+    });
+    const onFirstSubscribe = vi.fn();
+    const onLastUnsubscribe = vi.fn();
+    const source = new BaseSource<number>(0, {
+      reconcile,
+      onFirstSubscribe,
+      onLastUnsubscribe,
+    });
+
+    expect(() => source.subscribe(() => {})).toThrow(refusal);
+    expect(onFirstSubscribe).toHaveBeenCalledTimes(1);
+    expect(onLastUnsubscribe).toHaveBeenCalledTimes(1);
+
+    reconcile.mockImplementation((current) => current);
+    source.subscribe(() => {});
+
+    expect(onFirstSubscribe).toHaveBeenCalledTimes(2);
   });
 });

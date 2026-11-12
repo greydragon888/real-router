@@ -219,7 +219,7 @@ describe("createDismissableError — invariants", () => {
 
       // Without the catch-up, getSnapshot() returns { error: null, version: 0 }.
       expect(source.getSnapshot().error).not.toBeNull();
-      // The listener (added before onFirstSubscribe) receives the reconcile.
+      // The listener, registered before the catch-up, receives it.
       expect(listener).toHaveBeenCalled();
 
       unsub();

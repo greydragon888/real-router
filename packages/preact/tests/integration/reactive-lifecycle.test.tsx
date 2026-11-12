@@ -69,10 +69,8 @@ describe("reactive lifecycle (#778)", () => {
 
   // P1 — a nested node consumer that unmounts, misses a navigation while
   // disconnected, then remounts must reconcile to the current node state. This
-  // is `createRouteNodeSource`'s reconnect reconcile + BaseSource subscribe
-  // order (listener added before onFirstSubscribe) + the uSES polyfill working
-  // end to end — the exact chain the sources "BaseSource subscribe order"
-  // invariant exists for.
+  // is `createRouteNodeSource`'s catch-up for a read made with no listener
+  // (#2909) + the uSES polyfill working end to end.
   it("P1: a useRouteNode consumer that remounts after a missed navigation is fresh", async () => {
     await router.start("/users/list");
 
@@ -103,8 +101,8 @@ describe("reactive lifecycle (#778)", () => {
       await router.navigate("users.view", { id: "42" });
     });
 
-    // Remount the consumer — onFirstSubscribe reconciles to the current node
-    // state and the just-added listener catches it: the snapshot is fresh.
+    // Remount the consumer — the polyfill's first read, made before it
+    // subscribes, answers from the router: the snapshot is fresh.
     rerender(<Tree show />);
 
     expect(screen.getByTestId("node").textContent).toBe("users.view");

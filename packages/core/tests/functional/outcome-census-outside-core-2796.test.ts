@@ -1479,6 +1479,7 @@ const LEDGER: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   },
   "packages/sources/src/createActiveRouteSource.ts": {
     "<module> › slot:activeSourceCache": NO,
+    "buildActiveRouteSource › slot:computedFor": NO,
     "buildActiveRouteSource › slot:routerUnsubscribe": NO,
     "createActiveRouteSource › slot:cached": NO,
     "createActiveRouteSource › slot:key": NO,
@@ -1500,12 +1501,14 @@ const LEDGER: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   },
   "packages/sources/src/createRouteNodeSource.ts": {
     "<module> › slot:nodeSourceCache": NO,
+    "buildRouteNodeSource › slot:computedFor": NO,
     "buildRouteNodeSource › slot:routerUnsubscribe": NO,
     "createRouteNodeSource › slot:cached": NO,
     "createRouteNodeSource › slot:perRouter": NO,
     "onFirstSubscribe › sign:subscribe": NO,
   },
   "packages/sources/src/createRouteSource.ts": {
+    "createRouteSource › slot:computedFor": NO,
     "createRouteSource › slot:routerUnsubscribe": NO,
     "onFirstSubscribe › sign:subscribe": NO,
   },

@@ -23,9 +23,10 @@ describe("reactive lifecycle (#778)", () => {
   // #765 manifestation in Solid: a publicly-lifted `createRouteSource` bridged
   // through `createSignalFromSource` inside a `<Show>`. When `show` flips off the
   // bridge's owner is disposed → unsubscribe → the lifted source disconnects; a
-  // navigation that lands "off" was stale on re-show before #765. With the
-  // reconnect reconcile (createRouteSource onFirstSubscribe) the re-subscribed
-  // bridge sees the current route.
+  // navigation that lands "off" was stale on re-show before #765. A
+  // disconnected createRouteSource answers a read from the router and catches
+  // up on the re-subscribe (#765, #2909), so the re-created bridge sees the
+  // current route.
   it("P1: a lifted createRouteSource bridged inside <Show> is fresh after off → navigate → on", async () => {
     router = createTestRouterWithADefaultRouter();
 

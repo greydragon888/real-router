@@ -1,4 +1,5 @@
 import { BaseSource } from "./BaseSource";
+import { catchUpSnapshot } from "./computeSnapshot.js";
 import { stabilizeState } from "./stabilizeState.js";
 
 import type { RouteSnapshot, RouterSource } from "./types.js";
@@ -21,43 +22,41 @@ export function createRouteSource(router: Router): RouterSource<RouteSnapshot> {
     unsub?.();
   };
 
+  // The router state the snapshot was last computed against — by the router
+  // listener on every announcement, by `reconcile` while disconnected. While it
+  // is still the router's state, the snapshot is current.
+  let computedFor = router.getState();
+
   const source = new BaseSource<RouteSnapshot>(
     {
-      route: router.getState(),
+      route: computedFor,
       previousRoute: undefined,
     },
     {
-      onFirstSubscribe: () => {
-        // Reconcile the route with the current router state before connecting.
-        // While this source had zero listeners it was disconnected
-        // (onLastUnsubscribe below), so a navigation in that window was missed —
-        // the just-added listener would otherwise observe a stale route (#765).
-        // BaseSource registered the listener before this callback, so the
-        // updateSnapshot below reaches it.
-        //
-        // Emit ONLY when the route actually changed: a hide/show (Activity)
-        // cycle with no navigation in between must not fire a spurious
-        // re-render, and its still-valid `previousRoute` must survive. When a
-        // navigation WAS caught up, `previousRoute` resets to `undefined`: the
-        // catch-up is a snap to the current state, not an observed navigation,
-        // and the true previous route cannot be reconstructed outside a live
-        // subscribe payload (parity of intent with createRouteNodeSource, whose
-        // reconnect reconcile likewise drops previousRoute on catch-up).
-        const current = source.getSnapshot();
-        const reconciledRoute = stabilizeState(
-          current.route,
-          router.getState(),
-        );
+      // While this source has no listener it holds no router subscription
+      // (onLastUnsubscribe below), so a navigation in that window is missed —
+      // a `RouterProvider` under `<Activity>` hide → navigate → show reads
+      // through this catch-up (#765, #2909).
+      reconcile: (current) => {
+        const state = router.getState();
 
-        if (reconciledRoute !== current.route) {
-          source.updateSnapshot({
-            route: reconciledRoute,
-            previousRoute: undefined,
-          });
+        if (state === computedFor) {
+          return current;
         }
 
+        computedFor = state;
+
+        return catchUpSnapshot(current, state);
+      },
+      onFirstSubscribe: () => {
         routerUnsubscribe = router.subscribe((next) => {
+          // Read before recording `next.route`: core also calls this listener
+          // for an announcement that began before the last unsubscribe, when a
+          // read reconciles and records the router's state itself.
           const prev = source.getSnapshot();
+
+          computedFor = next.route;
+
           const newRoute = stabilizeState(prev.route, next.route);
           const newPreviousRoute = stabilizeState(
             prev.previousRoute,

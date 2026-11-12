@@ -141,9 +141,9 @@ export const arbNavigationSeq: fc.Arbitrary<NavigationAction[]> = fc
 export const arbListenerCount = fc.integer({ min: 1, max: 10 });
 
 // Covers the full options surface, including the hash-aware branch (#532).
-// `hash` is intentionally absent most of the time (skewed 4:1) so the
-// majority of runs continue to exercise pure route-name semantics. The
-// key is built conditionally because `ActiveRouteSourceOptions.hash` uses
+// `fc.option` with `freq: 4` draws `undefined` one time in four, so most runs
+// carry a `hash`. The key is built conditionally because
+// `ActiveRouteSourceOptions.hash` uses
 // `exactOptionalPropertyTypes: true` — `{ hash: undefined }` would not
 // type-check.
 const arbActiveOptionsBase = fc.record(

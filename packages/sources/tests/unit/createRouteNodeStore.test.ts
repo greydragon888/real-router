@@ -275,20 +275,29 @@ describe("createRouteNodeSources", () => {
     expect(source.getSnapshot()).toBe(snapshotAfterFirstForce);
   });
 
-  it("onFirstSubscribe reconciles snapshot when router state changed since creation", async () => {
+  it("a read before the first subscribe answers from the router, and the subscribe notifies nobody (#2909)", async () => {
     const source = createRouteNodeSource(router, "users");
 
     expect(source.getSnapshot().route).toBeUndefined();
 
     await router.navigate("users");
 
-    // Snapshot is still stale — onFirstSubscribe hasn't run yet.
-    expect(source.getSnapshot().route).toBeUndefined();
+    expect(source.getSnapshot().route?.name).toBe("users");
 
-    // Capture snapshot before AND inside the listener: the listener fires
-    // synchronously within subscribe() iff onFirstSubscribe's reconciliation
-    // calls updateSnapshot. Without that flush, this listener would never
-    // fire here (no router event between subscribe and assertion).
+    const listener = vi.fn();
+
+    source.subscribe(listener);
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("a first subscribe with no read before it catches up and notifies its listener", async () => {
+    const source = createRouteNodeSource(router, "users");
+
+    await router.navigate("users");
+
+    // No read: the snapshot the source holds is still the one from creation,
+    // so the catch-up inside subscribe() changes it and tells the listener.
     const listener = vi.fn();
 
     source.subscribe(listener);
