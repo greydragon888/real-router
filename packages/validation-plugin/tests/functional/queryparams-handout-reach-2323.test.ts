@@ -1,6 +1,5 @@
 import { createRouter } from "@real-router/core";
 import { cloneRouter, getPluginApi } from "@real-router/core/api";
-import { getInternals } from "@real-router/core/validation";
 import { describe, expect, it } from "vitest";
 
 import { validationPlugin } from "@real-router/validation-plugin";
@@ -23,8 +22,8 @@ import type { Router } from "@real-router/core";
  *
  * ⚠ **The declared key set is DERIVED, never listed.** Core's snapshot IS the
  * set of names core reads, so the cells below compare the caller's bag against
- * `routeGetStore().matcherOptions.queryParams` rather than against four
- * literals. A fifth declared format changes both sides at once.
+ * the names a construction is SEEN to read rather than against four literals.
+ * A fifth declared format changes both sides at once.
  *
  * ⚠ **A clone is silent, deliberately.** `cloneRouter` builds from the base's
  * resolved strategies, so the caller's unknown key is not in the clone's copy
@@ -51,23 +50,33 @@ function handoutNames(router: Router): string[] {
 }
 
 /**
- * The names core itself read — its snapshot IS the declared set.
+ * The names of `bag` core reads while it builds a router — the set its
+ * snapshot keeps.
  *
- * ⚠ The throw is the anti-vacuum: an absent snapshot would make every
- * difference below trivially equal to the handout and say nothing about which
- * side carries the typo.
+ * ⚑ Observed, not looked up: every key is offered behind a getter, and a name
+ * core reads is a name whose getter ran.
+ *
+ * ⚠ The cells require at least one name back: a probe that observes nothing
+ * would leave every key outside the set, the typo among them.
  */
-function declaredNames(router: Router): string[] {
-  const snapshot =
-    getInternals(router).routeGetStore().matcherOptions?.queryParams;
+function declaredNames(bag: Record<string, unknown>): string[] {
+  const read = new Set<string>();
+  const observed = {};
 
-  if (snapshot === undefined) {
-    throw new Error("core stored no queryParams snapshot to compare against");
+  for (const [key, value] of Object.entries(bag)) {
+    Object.defineProperty(observed, key, {
+      enumerable: true,
+      get: () => {
+        read.add(key);
+
+        return value;
+      },
+    });
   }
 
-  return Object.keys(snapshot).toSorted((left, right) =>
-    left.localeCompare(right),
-  );
+  createRouter(ROUTES, { queryParams: observed }).dispose();
+
+  return [...read].toSorted((left, right) => left.localeCompare(right));
 }
 
 describe("the analyser's reach into queryParams (#2323)", () => {
@@ -93,7 +102,7 @@ describe("the analyser's reach into queryParams (#2323)", () => {
 
   it("the reported key is one the handout carries and core's snapshot does not", () => {
     const router = createRouter(ROUTES, { queryParams: callerBag() });
-    const declared = declaredNames(router);
+    const declared = declaredNames(callerBag());
 
     expect(declared.length).toBeGreaterThan(0);
 
@@ -106,8 +115,10 @@ describe("the analyser's reach into queryParams (#2323)", () => {
     const clone = cloneRouter(
       createRouter(ROUTES, { queryParams: callerBag() }),
     );
+    const declared = declaredNames(callerBag());
 
-    expect(handoutNames(clone)).toStrictEqual(declaredNames(clone));
+    expect(declared.length).toBeGreaterThan(0);
+    expect(handoutNames(clone)).toStrictEqual(declared);
 
     expect(() => {
       install(clone);

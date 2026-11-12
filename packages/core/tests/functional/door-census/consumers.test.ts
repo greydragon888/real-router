@@ -762,11 +762,7 @@ describe("consumer census (#2303)", () => {
         src: ["dependencies"],
         tests: [],
       },
-      "getInternals.routeGetStore()": {
-        src: [],
-        tests: ["matcherOptions"],
-      },
-      "getInternals.validator": { src: ["options"], tests: ["dependencies"] },
+      "getInternals.validator": { src: ["options"], tests: [] },
       "getNavigator.getState()": { src: [], tests: ["name"] },
       "getPluginApi.buildNavigationState()": {
         src: ["name", "params", "path", "search"],
@@ -879,6 +875,7 @@ describe("consumer census (#2303)", () => {
       // at all. What this column buys is the denominator for any future "nobody
       // reaches for it" argument.
       getInternals: [
+        "addEventListener",
         "buildPathResolved",
         "buildStateResolved",
         "checks",
@@ -890,6 +887,10 @@ describe("consumer census (#2303)", () => {
         // `logger` in slice 2, `getCloneState` and `getOptions` in #2486. The
         // internals members are now dead weight, which is the state the door's
         // removal clears.
+        //
+        // ⚑ `addEventListener`, `logger` and `routeGetStore` lost their last
+        // reach from a test outside core in #2486: those tests read a public
+        // door or what the router reports instead.
         "getAdoptedOrigins",
         "getCloneState",
         "getDeclaredQueryNames",
@@ -901,11 +902,13 @@ describe("consumer census (#2303)", () => {
         "interceptors",
         "isDisposed",
         "isTransitioning",
+        "logger",
         "makeState",
         "navigateToNotFound",
         "navigateToState",
         "port",
         "revalidateToNotFound",
+        "routeGetStore",
         "routerExtensions",
         "setRootPath",
         "start",

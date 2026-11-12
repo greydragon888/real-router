@@ -286,8 +286,8 @@ export function getPluginApi<
     // lands and every consumer sees it.
     //
     // ⚑ It DELEGATES rather than copies, so a spy installed on the internals
-    // logger afterwards is still seen. `validator-boundary-authority-2322`'s
-    // `spyOn(…, "warn")` cells are the check.
+    // logger afterwards is still seen. The "the view DELEGATES" cell of
+    // `getPluginApi.test.ts` is the check.
     logger: freeze<RouterLogger>({
       log: (context, message, ...args) => {
         ctx.logger.log(context, message, ...args);

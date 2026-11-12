@@ -1,6 +1,5 @@
 import { createRouter } from "@real-router/core";
 import { getRoutesApi } from "@real-router/core/api";
-import { getInternals } from "@real-router/core/validation";
 import { describe, expect, it } from "vitest";
 
 import { validationPlugin } from "@real-router/validation-plugin";
@@ -15,23 +14,18 @@ import { validationPlugin } from "@real-router/validation-plugin";
  * while the caller's own value is sitting in the store, inspectable.
  *
  * ⚠ "Unreachable" is DERIVED, never asserted from a list. Core drops a falsy
- * structural field before anything is stored, and a codec or guard slot holds
- * core's own function, never the caller's — so the value this plugin would have
- * to judge does not exist by the time it installs, because it installs through
+ * structural field before anything is stored, and a codec slot holds core's
+ * own function, never the caller's — so the value this plugin would have to
+ * judge does not exist by the time it installs, because it installs through
  * `usePlugin`, i.e. after construction.
  */
 describe("structural-field coverage, classified per cell (#1787)", () => {
-  /** The five fields core keeps in a `config` slot, and the slot's name. */
-  const CONFIG_SLOT = {
-    forwardTo: "forwardFnMap",
-    defaultParams: "defaultParams",
-    defaultSearch: "defaultSearch",
-    decodeParams: "decoders",
-    encodeParams: "encoders",
-  } as const;
-
   const FIELDS = [
-    ...(Object.keys(CONFIG_SLOT) as (keyof typeof CONFIG_SLOT)[]),
+    "forwardTo",
+    "defaultParams",
+    "defaultSearch",
+    "decodeParams",
+    "encodeParams",
     "canActivate",
     "canDeactivate",
   ] as const;
@@ -161,6 +155,10 @@ describe("structural-field coverage, classified per cell (#1787)", () => {
   /**
    * Did the caller's value survive into a place this plugin can READ AND JUDGE?
    *
+   * ⚑ The place is `getRoutesApi(router).get`, the door the retrospective pass
+   * reads every registered route from — so a value it hands back is one the
+   * plugin judges, and one it does not hand back is out of the plugin's reach.
+   *
    * ⚠ Not "is it the same object". It was spelled `Object.is` until core
    * adopted the route-config bags (#2172), and identity was an accurate proxy
    * only while the store held the caller's literal. A frozen copy with the same
@@ -172,24 +170,13 @@ describe("structural-field coverage, classified per cell (#1787)", () => {
    * assert something core does not promise.
    */
   const inspectable = (field: string, value: unknown): boolean => {
-    if (!(field in CONFIG_SLOT)) {
-      // The guard slots hold a COMPILED function, never the factory the caller
-      // passed — same laundering as the codecs, one store over.
-      return false;
-    }
-
     try {
       const router = createRouter([
         { name: "x", path: "/x", [field]: value },
       ] as never);
-      const config = (
-        getInternals(router) as never as {
-          routeGetStore: () => {
-            config: Record<string, Record<string, unknown>>;
-          };
-        }
-      ).routeGetStore().config;
-      const stored = config[CONFIG_SLOT[field as keyof typeof CONFIG_SLOT]].x;
+      const stored = (
+        getRoutesApi(router).get("x") as Record<string, unknown> | undefined
+      )?.[field];
 
       router.dispose();
 
@@ -258,6 +245,11 @@ describe("structural-field coverage, classified per cell (#1787)", () => {
 
     expect(inspectable("decodeParams", callback)).toBe(false);
     expect(inspectable("forwardTo", callback)).toBe(true);
+
+    // … a guard slot is one of those: it hands back the caller's factory, so a
+    // guard cell is out of reach only when its value never arrived …
+    expect(inspectable("canActivate", () => () => true)).toBe(true);
+    expect(inspectable("canActivate", 0)).toBe(false);
 
     // … and a truthy bag ARRIVES, as core's own frozen copy of it since
     // #2172, which is what makes the rest of this table a statement about

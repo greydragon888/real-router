@@ -1,6 +1,5 @@
 import { createRouter, RouterError } from "@real-router/core";
-import { getRoutesApi } from "@real-router/core/api";
-import { getInternals } from "@real-router/core/validation";
+import { getDependenciesApi, getRoutesApi } from "@real-router/core/api";
 import { describe, it, expect, afterEach } from "vitest";
 
 import { validationPlugin } from "@real-router/validation-plugin";
@@ -57,20 +56,29 @@ describe("validationPlugin — lifecycle integration", () => {
     );
   });
 
-  it("teardown clears validator — unsubscribe sets ctx.validator to null", async () => {
+  it("teardown releases the validator — its doors answer as bare core, and the router takes a new install", async () => {
     router = createRouter([{ name: "home", path: "/home" }], {
       defaultRoute: "home",
     });
-    const ctx = getInternals(router);
     const unsubscribe = router.usePlugin(validationPlugin());
+    // `getDependency` consults the validator itself rather than a registered
+    // check, so it answers for the slot the teardown releases.
+    const readMissing = () =>
+      getDependenciesApi(router).get("missing-dep" as never);
 
     await router.start("/home");
 
-    expect(ctx.validator).not.toBeNull();
+    expect(readMissing).toThrow(ReferenceError);
 
     unsubscribe();
 
-    expect(ctx.validator).toBeNull();
+    expect(readMissing()).toBeUndefined();
+
+    // A held slot refuses the next install as VALIDATION_PLUGIN_ALREADY_INSTALLED.
+    router.stop();
+
+    expect(() => router.usePlugin(validationPlugin())).not.toThrow();
+    expect(readMissing).toThrow(ReferenceError);
   });
 
   it("teardown clears validator — validation no longer active after unsubscribe", async () => {
@@ -94,22 +102,27 @@ describe("validationPlugin — lifecycle integration", () => {
     expect(() => rawAfter.navigate(123)).not.toThrow();
   });
 
-  it("retrospective rollback — a retrospective failure leaves ctx.validator null (#1351 repoint)", () => {
-    // Was triggered by a duplicate name; #1351 now rejects those at construction
-    // (bare core), so this uses a dotted name (#1194) — a retrospective-only
-    // rejection that still drives the rollback path.
+  it("retrospective rollback — a retrospective failure leaves no validation active (#1351 repoint)", () => {
     router = createRouter([
       // A dangling `forwardTo` is a RETROSPECTIVE-only failure: bare core
-      // accepts it, the plugin rejects it on registration. The dotted name that
-      // used to stand here stopped working as a trigger at #1763, when core
-      // began refusing that spelling itself — the rollback under test is about
-      // the failure, not about which rule produced it.
+      // accepts it, the plugin rejects it on registration — the rollback under
+      // test is about the failure, not about which rule produced it.
       { name: "a", path: "/a", forwardTo: "ghost" },
     ]);
-    const ctx = getInternals(router);
 
-    expect(() => router.usePlugin(validationPlugin())).toThrow();
-    expect(ctx.validator).toBeNull();
+    expect(() => router.usePlugin(validationPlugin())).toThrow(/ghost/);
+
+    // `getDependency` consults the validator itself, so it answers for the slot
+    // the failed install wrote and must have released.
+    expect(
+      getDependenciesApi(router).get("missing-dep" as never),
+    ).toBeUndefined();
+
+    // Repaired, the router takes the install: a slot left held would refuse it
+    // as VALIDATION_PLUGIN_ALREADY_INSTALLED.
+    getRoutesApi(router).add({ name: "ghost", path: "/ghost" });
+
+    expect(() => router.usePlugin(validationPlugin())).not.toThrow();
   });
 
   it("throwIfInternalRoute wrapper — remove internal route throws Error", () => {
@@ -133,33 +146,26 @@ describe("validationPlugin — lifecycle integration", () => {
     }).toThrow();
   });
 
-  it("validateDependencyExists — missing dependency throws ReferenceError", () => {
-    router = createRouter([{ name: "home", path: "/home" }]);
-    router.usePlugin(validationPlugin());
-    const ctx = getInternals(router);
+  it("validateDependencyExists — getDependency refuses a name nothing resolved, and only that", () => {
+    const r = createRouter<{ "present-dep": number }>(
+      [{ name: "home", path: "/home" }],
+      {},
+      { "present-dep": 0 },
+    );
 
-    expect(() => {
-      if (!ctx.validator) {
-        throw new Error("validator not set");
-      }
+    r.usePlugin(validationPlugin());
 
-      // ⚑ The VALUE core read, not the store (#2382): `undefined` is what
-      // `readDependency` hands back for a name nothing resolved.
-      ctx.validator.dependencies.validateDependencyExists(
-        "missing-dep",
-        undefined,
-      );
-    }).toThrow(ReferenceError);
+    const deps = getDependenciesApi(r);
 
-    // Control: a name that DID resolve must pass, so the arm above is not
-    // green for want of a value it could never receive.
-    expect(() => {
-      if (!ctx.validator) {
-        throw new Error("validator not set");
-      }
+    // ⚑ The VALUE core read decides, not the store (#2382): `undefined` is
+    // what `readDependency` hands back for a name nothing resolved.
+    expect(() => deps.get("missing-dep" as never)).toThrow(ReferenceError);
 
-      ctx.validator.dependencies.validateDependencyExists("present-dep", 0);
-    }).not.toThrow();
+    // Control: a name that DID resolve passes with a falsy value, so the arm
+    // above is not green for a check that refuses every falsy answer.
+    expect(deps.get("present-dep")).toBe(0);
+
+    r.stop();
   });
 
   it("areStatesEqual with valid boolean ignoreQP — covers FALSE branch of !isBoolean check", async () => {

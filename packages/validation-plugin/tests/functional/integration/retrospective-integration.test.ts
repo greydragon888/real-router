@@ -1,5 +1,5 @@
 import { createRouter } from "@real-router/core";
-import { getInternals } from "@real-router/core/validation";
+import { getDependenciesApi, getRoutesApi } from "@real-router/core/api";
 import { describe, it, expect, afterEach } from "vitest";
 
 import { validationPlugin } from "@real-router/validation-plugin";
@@ -66,22 +66,27 @@ describe("retrospective validation — triggered at usePlugin() time", () => {
     ).toThrow(/Duplicate route "section" in batch/);
   });
 
-  it("rollback confirmed — after retrospective failure ctx.validator is null", () => {
-    // Vehicle repointed dup-name → dotted-name (#1194): bare core accepts it at
-    // construction (#1351 only rejects duplicates), the plugin rejects it
-    // retrospectively, so the rollback path is still exercised.
+  it("rollback confirmed — after a retrospective failure no validation is active", () => {
     router = createRouter([
       // A dangling `forwardTo` is a RETROSPECTIVE-only failure: bare core
-      // accepts it, the plugin rejects it on registration. The dotted name that
-      // used to stand here stopped working as a trigger at #1763, when core
-      // began refusing that spelling itself — the rollback under test is about
-      // the failure, not about which rule produced it.
+      // accepts it, the plugin rejects it on registration — the rollback under
+      // test is about the failure, not about which rule produced it.
       { name: "a", path: "/a", forwardTo: "ghost" },
     ]);
-    const ctx = getInternals(router);
 
-    expect(() => router.usePlugin(validationPlugin())).toThrow();
-    expect(ctx.validator).toBeNull();
+    expect(() => router.usePlugin(validationPlugin())).toThrow(/ghost/);
+
+    // `getDependency` consults the validator itself, so it answers for the slot
+    // the failed install wrote and must have released.
+    expect(
+      getDependenciesApi(router).get("missing-dep" as never),
+    ).toBeUndefined();
+
+    // Repaired, the router takes the install: a slot left held would refuse it
+    // as VALIDATION_PLUGIN_ALREADY_INSTALLED.
+    getRoutesApi(router).add({ name: "ghost", path: "/ghost" });
+
+    expect(() => router.usePlugin(validationPlugin())).not.toThrow();
   });
 
   it("router with decoders passes retrospective", () => {

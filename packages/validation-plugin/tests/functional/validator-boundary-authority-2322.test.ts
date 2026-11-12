@@ -15,13 +15,12 @@ import {
   getPluginApi,
   getRoutesApi,
 } from "@real-router/core/api";
-import { getInternals } from "@real-router/core/validation";
 import * as ts from "typescript";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { validationPlugin } from "@real-router/validation-plugin";
 
-import type { Router } from "@real-router/core";
+import type { LoggerConfig, Router } from "@real-router/core";
 
 /**
  * Where core consults this plugin, and what reds when it stops acting (#2322).
@@ -798,14 +797,58 @@ describe("what nothing else held (#2322)", () => {
     { name: "b", path: "/b" },
   ];
 
-  const make = (withPlugin: boolean): Router => {
-    const router = createRouter([...ROUTES], { allowNotFound: true });
+  /** One reported warning: what the logger received, arguments included. */
+  type Warning = readonly [
+    channel: string,
+    message: string,
+    ...args: unknown[],
+  ];
+
+  const make = (withPlugin: boolean, logger?: LoggerConfig): Router => {
+    const router = createRouter([...ROUTES], {
+      allowNotFound: true,
+      ...(logger && { logger }),
+    });
 
     if (withPlugin) {
       router.usePlugin(validationPlugin());
     }
 
     return router;
+  };
+
+  /**
+   * The warnings a router reports, through the sink an application configures.
+   *
+   * ⚑ `LoggerConfig.callback`, not a spy on the router's logger: `level: "none"`
+   * keeps the console silent while `callbackIgnoresLevel` still hands the sink
+   * every message, so a cell reads what the router REPORTED.
+   */
+  const warningSink = () => {
+    const warnings: Warning[] = [];
+    const logger: LoggerConfig = {
+      level: "none",
+      callbackIgnoresLevel: true,
+      callback: (level, channel, message, ...args) => {
+        if (level === "warn") {
+          warnings.push([channel, message, ...args]);
+        }
+      },
+    };
+
+    return { logger, warnings };
+  };
+
+  /** What the sink receives while `run` runs, and nothing it received before. */
+  const warnedDuring = (
+    sink: ReturnType<typeof warningSink>,
+    run: () => void,
+  ): Warning[] => {
+    const before = sink.warnings.length;
+
+    run();
+
+    return sink.warnings.slice(before);
   };
 
   const refusalOf = (run: (router: Router) => unknown, withPlugin: boolean) => {
@@ -819,55 +862,45 @@ describe("what nothing else held (#2322)", () => {
   };
 
   it("warnBatchOverwrite — setDependencies says which keys it replaced", () => {
-    const router = make(true);
-    const warn = vi
-      .spyOn(getInternals(router).logger, "warn")
-      .mockImplementation(() => undefined);
+    const overwrites = (withPlugin: boolean): string[] => {
+      const sink = warningSink();
+      const router = make(withPlugin, sink.logger);
 
-    getDependenciesApi(router).setAll({ x: 1 });
-    getDependenciesApi(router).setAll({ x: 2 });
+      return warnedDuring(sink, () => {
+        getDependenciesApi(router).setAll({ x: 1 });
+        getDependenciesApi(router).setAll({ x: 2 });
+      }).map((warning) => warning.join(" "));
+    };
 
-    expect(warn.mock.calls.map((call) => call.join(" "))).toStrictEqual([
+    expect(overwrites(true)).toStrictEqual([
       "router.setDependencies Overwritten: x",
     ]);
-
-    const bareRouter = make(false);
-    const bareWarn = vi
-      .spyOn(getInternals(bareRouter).logger, "warn")
-      .mockImplementation(() => undefined);
-
-    getDependenciesApi(bareRouter).setAll({ x: 1 });
-    getDependenciesApi(bareRouter).setAll({ x: 2 });
-
-    expect(bareWarn.mock.calls).toStrictEqual([]);
+    expect(overwrites(false)).toStrictEqual([]);
   });
 
   /**
-   * What the router warns while `register` runs, one message a call; the
+   * What the router warns while `register` runs, one message a warning; the
    * channel is not the subject here.
    */
-  const warningsOf = (router: Router, register: () => void): unknown[] => {
-    const warn = vi
-      .spyOn(getInternals(router).logger, "warn")
-      .mockImplementation(() => undefined);
-
-    register();
-
-    return warn.mock.calls.map(([, message]) => message);
-  };
+  const warningsOf = (
+    sink: ReturnType<typeof warningSink>,
+    register: () => void,
+  ): string[] => warnedDuring(sink, register).map(([, message]) => message);
 
   it("lifecycle.validateCountThresholds — a growing guard registry is named as it grows", () => {
     // `maxLifecycleHandlers: 10` puts the warning at the second guard.
     const run = (withPlugin: boolean): unknown[] => {
+      const sink = warningSink();
       const router = createRouter([...ROUTES], {
         limits: { maxLifecycleHandlers: 10 },
+        logger: sink.logger,
       });
 
       if (withPlugin) {
         router.usePlugin(validationPlugin());
       }
 
-      return warningsOf(router, () => {
+      return warningsOf(sink, () => {
         getLifecycleApi(router).addActivateGuard("a", () => () => true);
         getLifecycleApi(router).addActivateGuard("b", () => () => true);
       });
@@ -882,13 +915,17 @@ describe("what nothing else held (#2322)", () => {
   it("plugins.validateCountThresholds — a growing plugin list is named as it grows", () => {
     // `maxPlugins: 10` puts the warning at the second plugin, this one counted.
     const run = (withPlugin: boolean): unknown[] => {
-      const router = createRouter([...ROUTES], { limits: { maxPlugins: 10 } });
+      const sink = warningSink();
+      const router = createRouter([...ROUTES], {
+        limits: { maxPlugins: 10 },
+        logger: sink.logger,
+      });
 
       if (withPlugin) {
         router.usePlugin(validationPlugin());
       }
 
-      return warningsOf(router, () => {
+      return warningsOf(sink, () => {
         router.usePlugin(() => ({}));
         router.usePlugin(() => ({}));
       });

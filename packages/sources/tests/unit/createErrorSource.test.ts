@@ -1,6 +1,5 @@
-import { createRouter, errorCodes } from "@real-router/core";
-import { getLifecycleApi } from "@real-router/core/api";
-import { getInternals } from "@real-router/core/validation";
+import { createRouter, errorCodes, events } from "@real-router/core";
+import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { createErrorSource, getErrorSource, primeErrorSource } from "../../src";
@@ -283,46 +282,68 @@ describe("createErrorSource", () => {
     }).not.toThrow();
   });
 
-  it("unwinds already-registered listeners when addEventListener throws mid-registration (#1440)", () => {
-    // The emitter's on() throws on a duplicate listener (`EventEmitter.ts`) or
-    // at the maxListeners cap — i.e. api.addEventListener CAN throw. If it throws
-    // on the 2nd of the factory's two registrations, the 1st (TRANSITION_ERROR)
-    // listener is already live: without an unwind it leaks and pins the router,
-    // and unsubs never gets assigned so the half-wired source is undestroyable
-    // (TDZ). Simulate the throw and assert the registered listener is unwound.
-    // The stub sits one layer DOWN: `getPluginApi(router)` is frozen (#1805),
-    // and its `addEventListener` delegates to this one, so the source under test
-    // still reaches the spy. `originalAdd` binds the SAME layer — binding the
-    // frozen surface's member instead would re-enter the spy.
-    const ctx = getInternals(router);
-    const originalAdd = ctx.addEventListener.bind(ctx);
-    const registeredUnsubs: (() => void)[] = [];
-    let calls = 0;
+  describe("a registration refused mid-way is unwound (#1440)", () => {
+    // The emitter refuses a registration at the `maxListeners` cap, so
+    // `api.addEventListener` CAN throw. If the factory's 2nd registration is
+    // refused, the 1st listener is already live: without an unwind it leaks
+    // and pins the router, and unsubs never gets assigned so the half-wired
+    // source is undestroyable (TDZ).
+    // A cap of one listener per event refuses the factory's registration on an
+    // event the test has already taken — a real refusal, from the emitter.
+    // The other event's slot is the witness: free after the unwind, still
+    // taken by a leaked listener. Refusing each event in turn covers the one
+    // the factory registers second, whatever the order is.
+    const SOURCE_EVENTS = [events.TRANSITION_ERROR, events.TRANSITION_SUCCESS];
 
-    const spy = vi
-      .spyOn(ctx, "addEventListener")
-      .mockImplementation((event, cb) => {
-        calls += 1;
-
-        if (calls === 2) {
-          throw new Error("addEventListener boom");
-        }
-
-        const unsub = vi.fn(originalAdd(event, cb));
-
-        registeredUnsubs.push(unsub);
-
-        return unsub;
+    const cappedRouter = async (): Promise<Router> => {
+      const capped = createRouter([{ name: "home", path: "/" }], {
+        limits: { maxListeners: 1 },
       });
 
-    expect(() => createErrorSource(router)).toThrow(/boom/);
+      await capped.start("/");
 
-    // The one already-registered listener must have been unsubscribed during
-    // the unwind — not left live.
-    expect(registeredUnsubs).toHaveLength(1);
-    expect(registeredUnsubs[0]).toHaveBeenCalledTimes(1);
+      return capped;
+    };
 
-    spy.mockRestore();
+    it.each(SOURCE_EVENTS)(
+      "refused on %s, it leaves no listener behind",
+      async (refused) => {
+        const capped = await cappedRouter();
+        const api = getPluginApi(capped);
+
+        api.addEventListener(refused, () => undefined);
+
+        expect(() => createErrorSource(capped)).toThrow(
+          `Listener limit (1) reached for "${refused}"`,
+        );
+
+        for (const event of SOURCE_EVENTS.filter(
+          (other) => other !== refused,
+        )) {
+          expect(() =>
+            api.addEventListener(event, () => undefined),
+          ).not.toThrow();
+        }
+
+        capped.stop();
+      },
+    );
+
+    it("CONTROL — with nothing taken, the source holds the slot of both its events", async () => {
+      // Without this the cells above would pass for a source that registers on
+      // neither event, leaving both slots free with nothing unwound.
+      const capped = await cappedRouter();
+
+      expect(() => createErrorSource(capped)).not.toThrow();
+
+      for (const event of SOURCE_EVENTS) {
+        expect(() =>
+          getPluginApi(capped).addEventListener(event, () => undefined),
+        ).toThrow(`Listener limit (1) reached for "${event}"`);
+      }
+
+      capped.stop();
+    });
   });
 });
 

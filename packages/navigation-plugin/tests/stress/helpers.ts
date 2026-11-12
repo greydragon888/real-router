@@ -6,7 +6,7 @@ import { MockNavigation } from "../helpers/mockNavigation";
 import { createMockNavigationBrowser } from "../helpers/testUtils";
 
 import type { NavigationBrowser } from "../../src/types";
-import type { Router, Unsubscribe } from "@real-router/core";
+import type { Route, Router, Unsubscribe } from "@real-router/core";
 
 export const noop = (): void => undefined;
 
@@ -35,11 +35,12 @@ export function createStressRouter(options?: {
   base?: string;
   allowNotFound?: boolean;
   defaultRoute?: string;
+  routes?: Route[];
 }): StressRouterResult {
   const mockNav = new MockNavigation("http://localhost/");
   const browser = createMockNavigationBrowser(mockNav);
 
-  const router = createRouter(routeConfig, {
+  const router = createRouter(options?.routes ?? routeConfig, {
     defaultRoute: options?.defaultRoute ?? "home",
     allowNotFound: options?.allowNotFound ?? true,
   });

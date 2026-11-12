@@ -1,6 +1,5 @@
 import { createRouter, events } from "@real-router/core";
 import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
-import { getInternals } from "@real-router/core/validation";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { createTransitionSource } from "../../src";
@@ -276,46 +275,74 @@ describe("createTransitionSource", () => {
     expect(source.getSnapshot().isTransitioning).toBe(false);
   });
 
-  it("unwinds already-registered listeners when addEventListener throws mid-registration (#1440)", () => {
+  describe("a registration refused mid-way is unwound (#1440)", () => {
     // Same partial-registration hazard as createErrorSource: the factory
-    // registers 5 listeners; a throw on the 3rd (the emitter rejecting a
-    // duplicate listener / hitting its maxListeners cap) must unwind the first
-    // 2 instead of leaking them and stranding the undestroyable half-wired
-    // source (unsubs TDZ).
-    // The stub sits one layer DOWN: `getPluginApi(router)` is frozen (#1805),
-    // and its `addEventListener` delegates to this one, so the source under test
-    // still reaches the spy. `originalAdd` binds the SAME layer — binding the
-    // frozen surface's member instead would re-enter the spy.
-    const ctx = getInternals(router);
-    const originalAdd = ctx.addEventListener.bind(ctx);
-    const registeredUnsubs: (() => void)[] = [];
-    let calls = 0;
+    // registers 5 listeners, and a refusal on any of them must unwind the ones
+    // already registered instead of leaking them and stranding the
+    // undestroyable half-wired source (unsubs TDZ).
+    // A cap of one listener per event refuses the factory's registration on an
+    // event the test has already taken — a real refusal, from the emitter.
+    // Every other event's slot is the witness: free after the unwind, still
+    // taken by a leaked listener. Refusing each event in turn covers the last
+    // one the factory registers, where all four before it must be unwound,
+    // whatever the order is.
+    const SOURCE_EVENTS = [
+      events.TRANSITION_START,
+      events.TRANSITION_LEAVE_APPROVE,
+      events.TRANSITION_SUCCESS,
+      events.TRANSITION_ERROR,
+      events.TRANSITION_CANCEL,
+    ];
 
-    const spy = vi
-      .spyOn(ctx, "addEventListener")
-      .mockImplementation((event, cb) => {
-        calls += 1;
-
-        if (calls === 3) {
-          throw new Error("addEventListener boom");
-        }
-
-        const unsub = vi.fn(originalAdd(event, cb));
-
-        registeredUnsubs.push(unsub);
-
-        return unsub;
+    const cappedRouter = async (): Promise<Router> => {
+      const capped = createRouter([{ name: "home", path: "/" }], {
+        limits: { maxListeners: 1 },
       });
 
-    expect(() => createTransitionSource(router)).toThrow(/boom/);
+      await capped.start("/");
 
-    // Both already-registered listeners must have been unsubscribed during the
-    // unwind — not left live.
-    expect(registeredUnsubs).toHaveLength(2);
-    expect(registeredUnsubs[0]).toHaveBeenCalledTimes(1);
-    expect(registeredUnsubs[1]).toHaveBeenCalledTimes(1);
+      return capped;
+    };
 
-    spy.mockRestore();
+    it.each(SOURCE_EVENTS)(
+      "refused on %s, it leaves no listener behind",
+      async (refused) => {
+        const capped = await cappedRouter();
+        const api = getPluginApi(capped);
+
+        api.addEventListener(refused, () => undefined);
+
+        expect(() => createTransitionSource(capped)).toThrow(
+          `Listener limit (1) reached for "${refused}"`,
+        );
+
+        for (const event of SOURCE_EVENTS.filter(
+          (other) => other !== refused,
+        )) {
+          expect(() =>
+            api.addEventListener(event, () => undefined),
+          ).not.toThrow();
+        }
+
+        capped.stop();
+      },
+    );
+
+    it("CONTROL — with nothing taken, the source holds the slot of every one of its events", async () => {
+      // Without this the cells above would pass for a source that registers on
+      // none of these events, leaving every slot free with nothing unwound.
+      const capped = await cappedRouter();
+
+      expect(() => createTransitionSource(capped)).not.toThrow();
+
+      for (const event of SOURCE_EVENTS) {
+        expect(() =>
+          getPluginApi(capped).addEventListener(event, () => undefined),
+        ).toThrow(`Listener limit (1) reached for "${event}"`);
+      }
+
+      capped.stop();
+    });
   });
 
   it("concurrent navigation: updates toRoute to new target", async () => {

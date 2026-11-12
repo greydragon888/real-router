@@ -1,6 +1,5 @@
-import { createRouter, UNKNOWN_ROUTE } from "@real-router/core";
-import { getLifecycleApi } from "@real-router/core/api";
-import { getInternals } from "@real-router/core/validation";
+import { createRouter, events, UNKNOWN_ROUTE } from "@real-router/core";
+import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { navigationPluginFactory } from "../../src";
@@ -443,19 +442,43 @@ describe("Navigation Plugin — Navigate", () => {
     });
 
     it("passes signal from navigate event to router", async () => {
-      const navigateToStateSpy = vi.spyOn(
-        getInternals(router),
-        "navigateToState",
+      // The browser aborts a navigation whose transition is running: a guard
+      // holds it, and a download aborts the event without starting a
+      // navigation the router takes (#2724). Only the event's signal links the
+      // two — without it the guard answers and the router lands.
+      getLifecycleApi(router).addActivateGuard(
+        "users.list",
+        () => () =>
+          new Promise<boolean>((resolve) => {
+            setTimeout(() => {
+              resolve(true);
+            }, 20);
+          }),
       );
+
+      const api = getPluginApi(router);
+      const cancelled: string[] = [];
+      // ⚠ The download waits for the transition to start: a navigation aborted
+      // before then starts none, so there is no cancel to report.
+      const started = new Promise<void>((resolve) => {
+        api.addEventListener(events.TRANSITION_START, () => {
+          resolve();
+        });
+      });
+
+      api.addEventListener(events.TRANSITION_CANCEL, (toState) => {
+        cancelled.push(toState.name);
+      });
 
       const { finished } = mockNav.navigate("http://localhost/users/list");
 
-      await finished;
+      await started;
+      mockNav.download("http://localhost/files/report.txt");
+      await finished.catch(() => undefined);
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-      expect(navigateToStateSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "users.list" }),
-        expect.objectContaining({ signal: expect.any(AbortSignal) }),
-      );
+      expect(cancelled).toStrictEqual(["users.list"]);
+      expect(router.getState()?.name).toBe("index");
     });
 
     it("handles navigate event with base path", async () => {
