@@ -48,8 +48,8 @@ Changeset пишет только этот скил: его вызывают ч�
 ## Правила
 
 - Описание на **английском**, безличный тон ("Add feature", не "I added")
-- Путь: `.changeset/<имя>.md` — описательное kebab-case имя по README (`middleware-unsubscribe-fix.md`, `novalidate-feature.md`)
-- Один пакет на файл и ссылка `#NN` на PR/issue — `.changeset/check-changeset.mjs` отвергает changeset без них
+- Путь: `.changeset/<имя>.md` — описательное kebab-case имя по README
+- Один пакет на файл и ссылка `#NN` на PR/issue — `.changeset/check-changeset.mjs` отвергает changeset без них; после записи прогони его и `bash scripts/check-prose.sh <файл>`: changeset входит в корпус `lint:prose`, который pre-push проверяет последним
 - Changeset нужен только правке кода в `packages/*/src/` и `shared/<dir>/`. Сборка, упаковка (`files`, `exports`, зависимости в `package.json`), CI, тесты, комментарии, JSDoc и доки идут в master без него — правило инфраструктуры корневого `CLAUDE.md`
 - Текст — краткий и ёмкий: что меняется для консьюмера и что ему сделать
 - Ломающее изменение — напиши, что консьюмеру поменять
