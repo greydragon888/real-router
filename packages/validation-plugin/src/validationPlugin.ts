@@ -297,10 +297,10 @@ function buildValidatorObject(
       },
     },
     plugins: {
-      validatePluginLimit(count, limits) {
+      validatePluginLimit(currentCount, newCount, limits) {
         validatePluginLimit(
-          count,
-          1,
+          currentCount,
+          newCount,
           (limits as { maxPlugins?: number } | undefined)?.maxPlugins,
         );
       },
