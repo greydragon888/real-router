@@ -50,8 +50,8 @@ export function injectRoute<
   // same class the `RouteView` outlet swap hits. The route source notifies
   // synchronously from `router.navigate()` (OUTSIDE Angular CD), so a local
   // `detectChanges()` on the consuming component commits it in-task instead.
-  // `createRouteSource` is cached per router (a shared subscription, not a new
-  // source); `subscribe` fires on navigations only (not initial), so no
+  // `createRouteSource` gives this call a source of its own (destroyed below);
+  // `subscribe` fires on navigations only (not initial), so no
   // in-CD re-entrancy on setup. Optional CDR: `injectRoute` in a non-component
   // (environment) injector keeps its original deferred behaviour. `@angular/router`
   // cannot match this — its route bindings flow through `@Input`/CD.
