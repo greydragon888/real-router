@@ -70,7 +70,7 @@ describe("boolean tracking", () => {
         options,
       );
 
-      // Lazy source tracks navigations only while subscribed (#766).
+      // Connected, so the router listener takes each navigation.
       source.subscribe(() => {});
 
       await executeNavigations(router, navigations).catch(() => undefined);
@@ -262,7 +262,7 @@ describe("areRoutesRelated filter", () => {
         options,
       );
 
-      // Lazy source tracks navigations only while subscribed (#766).
+      // Connected, so the router listener takes each navigation.
       source.subscribe(() => {});
 
       for (const nav of navigations) {
@@ -637,8 +637,9 @@ describe("lazy connection (#766)", () => {
       // Navigate to a "users.*" descendant while the source has ZERO listeners.
       await router.navigate(childRoute, ...channelsForRoute(childRoute));
 
-      // Re-subscribe: onFirstSubscribe reconciles the active boolean to the
-      // current router state (true) instead of replaying the stale `false`.
+      // Re-subscribe: the catch-up that follows the connect sets the active
+      // boolean to the current router state (true) instead of replaying the
+      // stale `false`.
       const listener = vi.fn();
       const unsub2 = source.subscribe(listener);
 

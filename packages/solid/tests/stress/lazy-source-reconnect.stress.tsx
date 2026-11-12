@@ -14,16 +14,14 @@ import type { JSX } from "solid-js";
  *
  * Concern: cached `createRouteNodeSource(router, name)` is lazy — it
  * disconnects from the router when its last listener unsubscribes, and
- * reconciles its snapshot in `onFirstSubscribe` when a new listener
- * arrives. The Solid bridge `createSignalFromSource` issues
- * `setValue(sync)` AFTER `subscribe(...)` to catch that internal
- * reconcile (otherwise the just-added listener never learns about it).
+ * catches its snapshot up on a read made with no listener and on the
+ * next subscribe (#765, #2909). The Solid bridge `createSignalFromSource`
+ * reads at creation and again, via `setValue(sync)`, after
+ * `subscribe(...)`.
  *
  * Race surface: rapid mount → unmount → mount-one-tick-later
- * (Activity-like remount) — if `setValue(sync)` ever lands on a
- * disposed owner, the new accessor reports stale snapshot. This stress
- * covers 100+ such cycles to ensure the post-subscribe re-read always
- * lands correctly.
+ * (Activity-like remount). This stress covers 100+ such cycles to ensure
+ * the new accessor reports the current snapshot every time.
  */
 
 describe("LSR1 — createSignalFromSource lazy reconnect race (§7.2 G1)", () => {
@@ -54,9 +52,8 @@ describe("LSR1 — createSignalFromSource lazy reconnect race (§7.2 G1)", () =>
 
       await router.navigate(target, i % 2 === 0 ? { id: String(i) } : {});
 
-      // Remount — the cached source reconciles its snapshot in
-      // `onFirstSubscribe`; the new bridge instance must pick up the
-      // change via `setValue(sync)` after subscribe.
+      // Remount — the new bridge instance reads the disconnected cached
+      // source, which answers from the router.
       const { result: result2, cleanup: cleanup2 } = renderHook(
         () => useRouteNode("users"),
         {
@@ -67,8 +64,7 @@ describe("LSR1 — createSignalFromSource lazy reconnect race (§7.2 G1)", () =>
       );
 
       // The fresh accessor MUST observe the latest snapshot — the route
-      // we just navigated to. If `setValue(sync)` raced with dispose,
-      // result2 would report the prior name.
+      // we just navigated to.
       expect(result2().route?.name).toBe(target);
 
       observed.push(result2().route?.name);

@@ -476,19 +476,20 @@ When `keepAlive` is enabled (on `<RouteView>` or on an individual `<RouteView.Ma
 
 ### `<KeepAlive>` deactivated subtrees stay fresh — immune to #765
 
-Vue is the **only** adapter where a sleeping (deactivated) subtree is _outside_
-the reconnect-staleness window. `useRefFromSource` bridges via `shallowRef` +
+Vue is the **only** adapter where a sleeping (deactivated) subtree keeps its
+router subscription. `useRefFromSource` bridges via `shallowRef` +
 `onScopeDispose`; under native `<KeepAlive>` a deactivated component keeps its
 **effect scope alive** (Vue disposes scopes on `unmount`, not on deactivate). The
 bridge subscription therefore stays connected to the router while the subtree
 sleeps — a navigation during deactivation is applied to the `shallowRef` as
-usual, and re-activating shows the **fresh** state with no dependence on source
-reconcile.
+usual, and re-activating shows the **fresh** state with no dependence on the
+source's catch-up.
 
-Contrast: React `<Activity>` detaches effects on hide and so _opens_ the stale
-window ([#765](https://github.com/greydragon888/real-router/issues/765)); Solid
-and Svelte have no keepAlive analogue. This is a real, guaranteed advantage of
-the Vue adapter — with one cost worth knowing: the **bridge-ref** subscriptions of
+Contrast: React `<Activity>` detaches effects on hide, so a source whose only
+listeners sleep there disconnects, and the re-shown subtree reads its catch-up
+([#765](https://github.com/greydragon888/real-router/issues/765),
+[#2909](https://github.com/greydragon888/real-router/issues/2909)); Solid and
+Svelte have no keepAlive analogue. The cost of staying connected: the **bridge-ref** subscriptions of
 sleeping subtrees keep firing (bounded by the number of `<KeepAlive>`d nodes), so
 kept-alive components are not "paused" with respect to router **state** updates —
 that is exactly what keeps the sleeping subtree fresh.

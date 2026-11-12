@@ -560,12 +560,14 @@ hidden subtree**, dropping that subscription. If the Provider itself sits
 _under_ an `<Activity>` (or keepAlive) boundary, a `hide → router.navigate(...)
 → show` sequence does not observe the navigation while hidden.
 
-`createRouteSource` **reconciles on re-subscribe**
-([#765](https://github.com/greydragon888/real-router/issues/765)): when the
-first listener re-attaches on re-show, the source re-reads `router.getState()`,
-so the re-shown Provider renders the **current** route, not the stale one. The
-`hide → navigate → show` path is locked by the P1 regression in
-`tests/integration/reactive-lifecycle.test.tsx`.
+`createRouteSource` answers a read made with **no listener** from
+`router.getState()` ([#2909](https://github.com/greydragon888/real-router/issues/2909)),
+and its first subscribe catches up too
+([#765](https://github.com/greydragon888/real-router/issues/765)), so the
+re-shown Provider's first render already reads the **current** route — no
+render of the stale one happens. The `hide → navigate → show` path is locked by
+the P1 regression in `tests/integration/reactive-lifecycle.test.tsx`, and its
+first render by `tests/integration/remount-after-navigation-2909.test.tsx`.
 
 ```tsx
 // Reconciles correctly, but mounting at the root is still the cleaner default:
@@ -576,7 +578,7 @@ so the re-shown Provider renders the **current** route, not the stale one. The
 </Activity>
 
 // RECOMMENDED — Provider at the root, above any boundary. The subscription
-// stays live the whole time (no reliance on the reconnect catch-up), and
+// stays live the whole time (no reliance on the catch-up), and
 // keepAlive on an individual RouteView.Match is unaffected either way.
 <RouterProvider router={router}>
   <Activity mode={mode}>
@@ -586,10 +588,11 @@ so the re-shown Provider renders the **current** route, not the stale one. The
 ```
 
 Most apps already mount `RouterProvider` at the root, so this is a style note
-rather than a correctness concern. A related mount-side effect: on the
-reconnect catch-up the reconciled snapshot carries `previousRoute: undefined`,
+rather than a correctness concern. A related mount-side effect: the catch-up
+of a missed navigation carries `previousRoute: undefined`,
 and `useRouteEnter` deliberately **skips** its handler rather than fire it with
-an undefined `previousRoute` — see the PC2 regression in the same file (#1218).
+an undefined `previousRoute` — see the PC2 regression in
+`tests/integration/reactive-lifecycle.test.tsx` (#1218).
 
 ### Ink entry constraints
 

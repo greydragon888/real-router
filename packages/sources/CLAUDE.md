@@ -146,9 +146,11 @@ Only notifies a listener when the `routeName`-specific active status actually fl
 
 ## Lazy vs Eager Subscription
 
-- `createRouteSource`, `createRouteNodeSource`, `createActiveRouteSource` — **lazy**: subscribe to router on first listener, unsubscribe when all removed (onFirstSubscribe/onLastUnsubscribe in `BaseSource`).
+- `createRouteSource`, `createRouteNodeSource`, `createActiveRouteSource` — **lazy**: subscribe to router on first listener, unsubscribe when all removed (onFirstSubscribe/onLastUnsubscribe in `BaseSource`). `createDismissableError` is lazy the same way over the eager `getErrorSource`.
 - `createTransitionSource` / `getTransitionSource` — **eager**: subscribes immediately (must track `TRANSITION_START`).
 - `createErrorSource` / `getErrorSource` — **eager**: subscribes immediately (must track `TRANSITION_ERROR`).
+
+The lazy sources above pass `reconcile` to `BaseSource`. A read made while one has no listener — before the first subscribe, or between the last unsubscribe and the next subscribe — returns the snapshot reconciled with the router, and the first subscribe runs the same catch-up once connected (#2909). The route and node sources catch up through `catchUpSnapshot`: the router's own state object, with `previousRoute: undefined`. A read repeated without a change returns the snapshot it returned before — `computedFor` (the router state last computed against) in the route, node and active sources, the error and its version in `createDismissableError`.
 
 ## Notification flow and framework commit timing
 
@@ -221,7 +223,7 @@ Hash-plugin runtime does not claim the `"url"` namespace → `state.context.url 
 
 ### BaseSource subscribe order
 
-`BaseSource.subscribe` adds the listener to `#listeners` **before** calling `onFirstSubscribe`. Critical for `useSyncExternalStore` adapters: if reconcile inside `onFirstSubscribe` triggers `updateSnapshot`, the just-added listener receives the notification. Without this order, the post-reconnection snapshot would be missed on re-mount (e.g. Preact RouteView nested remount).
+`BaseSource.subscribe` adds the listener to `#listeners` **before** `onFirstSubscribe` and the catch-up, so a snapshot they change reaches it: a subscriber that did not read first is notified of the catch-up. The catch-up runs after `onFirstSubscribe`, on a connected source, and notifies only a changed snapshot (`Object.is`). A first subscribe that throws — in the connect or in the catch-up — is undone as an unsubscribe and rethrown, so the source stays disconnected and its reads keep reconciling.
 
 ### Partial-registration safety — eager transition / error sources (#1440)
 
@@ -244,7 +246,7 @@ src/
 ├── guardLeaveListener.ts        — route-exit guard HOF (subscribeLeave listener wrapper, #1435)
 ├── canonicalJson.ts             — cache keys: the bag's keys sorted, each value spelled as core compares it
 ├── normalizeActiveOptions.ts    — DEFAULT_ACTIVE_OPTIONS + normalizer
-├── computeSnapshot.ts           — shared node-snapshot builder
+├── computeSnapshot.ts           — shared node-snapshot builder, `nodeRoute`, and `catchUpSnapshot` (the route/node catch-up)
 ├── stabilizeState.ts            — reference equality for State objects (compares `path` + `state.context.url.hash` + `state.transition.reload` — #605)
 ├── types.ts                     — RouterSource<T>, snapshot types
 └── index.ts                     — public exports

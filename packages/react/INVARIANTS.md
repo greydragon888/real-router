@@ -143,10 +143,16 @@ not generated inputs.
 
 | Probe | Locks                                                                                                               | Issue                                                                                                                             |
 | ----- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| P1    | `RouterProvider` under `<Activity>` is fresh after hide → navigate → show (`createRouteSource` reconnect reconcile) | [#765](https://github.com/greydragon888/real-router/issues/765)                                                                   |
+| P1    | `RouterProvider` under `<Activity>` is fresh after hide → navigate → show (`createRouteSource` catch-up)            | [#765](https://github.com/greydragon888/real-router/issues/765)                                                                   |
 | P2    | A `RouterErrorBoundary` mounted AFTER a navigation error still shows the fallback (eager error-source priming)      | [#765](https://github.com/greydragon888/real-router/issues/765) / [#778](https://github.com/greydragon888/real-router/issues/778) |
 | P3    | N unique-params `<Link>` release their router subscriptions on unmount (lazy source connection)                     | [#766](https://github.com/greydragon888/real-router/issues/766)                                                                   |
 | PC2   | `useRouteEnter` skips its handler after an `<Activity>` catch-up reconcile leaves `previousRoute` undefined         | [#1218](https://github.com/greydragon888/real-router/issues/1218)                                                                 |
+
+`tests/integration/remount-after-navigation-2909.test.tsx` locks the FIRST
+render after a remount at zero subscribers (#2909): a remounted `RouteView`, a
+page boundary reset by the route, a remounted `RouterErrorBoundary` and a
+`RouterProvider` under `<Activity>` render no state from before the navigation
+they missed — `useSyncExternalStore` reads during render, before it subscribes.
 
 The `useRouteEnter` mount-side `!previousRoute` guard (#1218) is additionally
 covered by a functional regression (PC1) in

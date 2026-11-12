@@ -79,13 +79,15 @@ Cached factories (`createRouteNodeSource`, `createActiveRouteSource`, `getTransi
 
 Non-cached factories (`createRouteSource`, `createTransitionSource`, `createErrorSource`) return a fresh instance every call with real teardown on `destroy()` — use when you need an isolated source.
 
-All route-state sources (`createRouteSource`, `createRouteNodeSource`, `createActiveRouteSource`) deduplicate via `stabilizeState`: same-path non-reload transitions preserve the snapshot reference and skip listener notifications. Reload navigations bypass dedup. See [INVARIANTS.md](./INVARIANTS.md) #6.
+The route-state sources (`createRouteSource`, `createRouteNodeSource`, `createActiveRouteSource`) deduplicate the navigations a connected source takes. The route and node sources run `route` and `previousRoute` through `stabilizeState`: when neither changes path or hash on a non-reload navigation, the snapshot keeps its reference and no listener is notified. The active source notifies only a flip. Reload navigations bypass dedup. See [INVARIANTS.md](./INVARIANTS.md) #6. A navigation the source missed while it had no listener is caught up instead (below).
 
 ### Lazy vs Eager Subscription
 
-- `createRouteSource`, `createRouteNodeSource`, `createActiveRouteSource` — **lazy**: subscribe to the router on first listener, unsubscribe when all removed
+- `createRouteSource`, `createRouteNodeSource`, `createActiveRouteSource` — **lazy**: subscribe to the router on first listener, unsubscribe when all removed. `createDismissableError` is lazy the same way over the eager `getErrorSource`
 - `createTransitionSource` / `getTransitionSource` — **eager**: subscribes immediately (needs to track `TRANSITION_START`)
 - `createErrorSource` / `getErrorSource` — **eager**: subscribes immediately (needs to track `TRANSITION_ERROR`)
+
+A lazy source with no listener still answers `getSnapshot()` from the router. A read before the first subscribe, or between the last unsubscribe and the next subscribe — the read `useSyncExternalStore` makes during render, before it subscribes, is one — shows the router's current state (a node source: while the node is active), the active flag on it, or the current error. A navigation the route and node sources missed shows up as the router's own state object with `previousRoute: undefined`. A subscribe right after such a read notifies nobody; one without a read before it catches up and notifies once when the snapshot changed.
 
 ### `createActiveRouteSource` Options
 
@@ -175,7 +177,7 @@ source.subscribe(() => {
 });
 ```
 
-**Priming for boundaries that mount late.** `getErrorSource` is eager (subscribes on creation), but a `RouterErrorBoundary` that creates its source lazily on mount can miss an error that fired _before_ it mounted (a lazy app shell, a failed boot navigation). Adapters call `primeErrorSource(router)` at `RouterProvider` mount so the per-router error source exists from that point and the boundary catches up on first subscribe (#778). It is a safe no-op on a router-like with no internals (test stub / `Object.create` clone):
+**Priming for boundaries that mount late.** `getErrorSource` is eager (subscribes on creation), but a `RouterErrorBoundary` that creates its source lazily on mount can miss an error that fired _before_ it mounted (a lazy app shell, a failed boot navigation). Adapters call `primeErrorSource(router)` at `RouterProvider` mount so the per-router error source exists from that point and the boundary catches up on its first read (#778, #2909). It is a safe no-op on a router-like with no internals (test stub / `Object.create` clone):
 
 ```typescript
 import { primeErrorSource } from "@real-router/sources";

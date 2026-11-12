@@ -53,7 +53,9 @@ The `BaseSource` invokes `onFirstSubscribe` when the first listener attaches and
 
 Because the subscription is driven by listener count, a mount/unmount/remount cycle doesn't leave a dangling subscription. Compatible with React's `useSyncExternalStore` and Strict Mode.
 
-All three lazy sources (`createRouteSource`, `createRouteNodeSource`, `createActiveRouteSource`) reconcile their snapshot with the current router state on each reconnection — this handles Activity hide/show cycles where the source was disconnected and missed navigation events. The eager `createDismissableError` wrapper likewise catches up on first subscribe, so an error that fired before the wrapper's first subscriber is still surfaced.
+These three sources and `createDismissableError` pass `reconcile` to `BaseSource`, which runs it on a read made while the source has no listener and, once `onFirstSubscribe` has connected the source, for its first listener. A source that missed navigations while disconnected — an Activity hide/show, a remount, a read outside a reactive context — therefore answers its first read with the router's current state, not with the snapshot it held at disconnect. `createDismissableError` works the same way over the eager error source: an error raised while it has no listener reaches the read and the first subscribe.
+
+The route and node sources catch up through `catchUpSnapshot`: the route becomes the router's own state object and `previousRoute` becomes `undefined`. The route, node and active sources record the router state their snapshot was last computed against (`computedFor`), so a read repeated without a navigation returns the same snapshot.
 
 ### 2. Eager-Connection (`createTransitionSource` / `getTransitionSource`, `createErrorSource` / `getErrorSource`)
 
@@ -65,7 +67,8 @@ For the non-cached `create*` variants, call `source.destroy()` to remove the rou
 
 ## BaseSource semantics
 
-- `subscribe(listener)` — adds to `#listeners` **before** calling `onFirstSubscribe`. Critical: if the `onFirstSubscribe` reconciliation triggers `updateSnapshot`, the just-added listener receives the notification. Without this order, adapters like Preact `useSyncExternalStore` polyfill would miss the post-reconnection snapshot on re-mount.
+- `subscribe(listener)` — adds to `#listeners` **before** `onFirstSubscribe` and the catch-up, so a snapshot they change reaches the just-added listener. The catch-up (`reconcile`, when the source has one) runs after `onFirstSubscribe`, on a connected source, and notifies only when it changes the snapshot (`Object.is`). A first subscribe that throws, in the connect or in the catch-up, is undone as an unsubscribe and rethrown.
+- `getSnapshot()` — with `reconcile`, no listener and not destroyed, stores and returns `reconcile(stored)`; otherwise returns the stored snapshot, so a connected source answers from what it was told.
 - `destroy()` — idempotent. Sets `#destroyed = true`, calls `onDestroy`, clears listeners. For cached-wrapper sources, the wrapper overrides `destroy()` with a no-op so external calls do not tear down the shared instance.
 
 ## Filtering & Dedup Pipeline
@@ -115,6 +118,8 @@ Manages a `Set` of listener functions. Exposes `subscribe`, `getSnapshot`, `upda
 
 Determines whether a node is active for a given route and builds the `{ route, previousRoute }` snapshot with `stabilizeState`-based reference preservation. Returns the input snapshot by reference if neither field changed — the common case for navigations that don't touch the node.
 
+`nodeRoute(state, nodeName)` is the route a node source shows on a router state: `state` while the node is active (the root `""` always is), otherwise `undefined`. `catchUpSnapshot(current, route)` is the catch-up the route and node sources share: `current` when it already shows `route` with no `previousRoute`, otherwise `{ route, previousRoute: undefined }`.
+
 ### `stabilizeState`
 
 State reference stabilization keyed on `path` **+** `state.context.url.hash` **+** `state.transition.reload`. When all three match, returns `prev`; otherwise returns `next`. Reload navigations always bypass dedup (`next.transition.reload === true` returns `next` even on path-equal navs). Hash differences also surface as a fresh render so tab-style UIs (`/settings#profile` → `/settings#billing`) re-render. O(1) comparisons. Used by `computeSnapshot`, `createRouteSource`, and `createTransitionSource`.
@@ -134,6 +139,7 @@ Composition over `getErrorSource`. Wraps the per-router error source with an add
 - `error` (and `toRoute`/`fromRoute`) are exposed as `null` when `underlying.version <= dismissedVersion`.
 - `resetError()` captures current underlying `version` into `dismissedVersion`, then calls `updateSnapshot` to notify all subscribers. Passed inside the snapshot (not as a separate export) so that framework reactive bridges propagate it naturally.
 - The wrapper is eager-lazy: the internal `BaseSource` subscribes to `getErrorSource` in `onFirstSubscribe` and disconnects in `onLastUnsubscribe`. No external `destroy()` needed.
+- While it has no listener, a read reconciles with the error source: a new error, or the same error object with a new version, reaches it.
 
 Consolidates the dismissal state pattern that was duplicated across all 6 adapter `RouterErrorBoundary` components.
 

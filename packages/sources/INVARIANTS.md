@@ -120,7 +120,7 @@
 | --- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | No router subscription before first subscribe                               | Creating an active-route source does not subscribe to the router until the first listener is added.                                                                                                                 |
 | 2   | Connects on first listener, disconnects on last, reconnects on re-subscribe | The router subscription is established on the first listener, torn down when the last detaches, and re-established when a new listener attaches after a full unsubscribe — verified by spy call count.                |
-| 3   | Active state changed while disconnected is reconciled on re-subscribe        | After a full unsubscribe, a navigation that flips the tracked route's active status while the source has zero listeners, then re-subscribe: `getSnapshot()` reflects the current boolean — `onFirstSubscribe` reconciles, not the stale pre-disconnect value. |
+| 3   | Active state changed while disconnected is reconciled on re-subscribe        | After a full unsubscribe, a navigation that flips the tracked route's active status while the source has zero listeners, then re-subscribe: `getSnapshot()` reflects the current boolean — the catch-up after the connect recomputes it, not the stale pre-disconnect value. |
 
 ## createActiveRouteSource — Destroy
 
@@ -268,7 +268,7 @@
 | 4   | Subscribers fire only on state-relevant actions                                 | Listener call count is at least the number of (error events + first reset after each error) — purely cosmetic operations don't notify.   |
 | 5   | `createDismissableError(router)` is per-router cached                           | Repeated calls return the same instance for the same router.                                                                              |
 | 6   | `resetError()` no-op-guard: extra resets after dismissal do not notify          | When `currentVersion <= dismissedVersion`, `resetError()` short-circuits without bumping listener notifications — only the first reset after each fresh error fires the listener. |
-| 7   | Error before first subscribe is caught up on subscribe (#765.2)                 | An error event that fires while the wrapper has zero subscribers is surfaced on first subscribe: `getSnapshot()` returns the error (not `{ error: null, version: 0 }`) and the listener added before `onFirstSubscribe` receives the reconcile — closing the reconnect-staleness gap. |
+| 7   | Error before first subscribe is caught up on subscribe (#765.2)                 | An error event that fires while the wrapper has zero subscribers is surfaced on first subscribe: `getSnapshot()` returns the error (not `{ error: null, version: 0 }`) and the listener, registered before the catch-up, receives it — closing the reconnect-staleness gap. |
 
 ---
 
@@ -334,6 +334,20 @@
 
 ---
 
+## Lazy sources — a read with no listener (#2909)
+
+One row per lazy source of the package root — `createRouteNodeSource`, `createRouteSource`, `createActiveRouteSource`, `createActiveSource`, `createDismissableError` — driven through navigations made while it has no listener (`presubscribeRead.properties.ts`).
+
+| #   | Invariant                                                                       | Description                                                                                                                              |
+| --- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Every function the package root exports is classified                          | Each one is a row or carries the reason the question does not apply to it; a new function export fails the census until it is classified. |
+| 2   | Every reason for not being a row holds                                          | Checked by execution: an "eager" factory takes the only listener slot of a router with `maxListeners: 1` at construction; the function behind any other reason, given a router, returns nothing with a `getSnapshot` or refuses it. |
+| 3   | Some generated runs leave the held snapshot stale                               | Per row, a fixed sample of the generators' runs reaches a navigation the snapshot held at disconnect does not show: the generators the properties draw from can make the held snapshot stale. |
+| 4   | The read shows the router, keeps one reference, and the subscribe after it notifies nobody | After navigations made with no listener, `getSnapshot()` matches the router (the row's oracle), a repeated read returns the same snapshot, and a subscribe right after it notifies nobody. |
+| 5   | With nothing missed, the read keeps the snapshot                                | After navigations the source took while connected and a disconnect, the read shows the router; a source that takes every announcement returns the snapshot it held. |
+
+---
+
 ## Test Files
 
 | File                                                       | Invariants | Category                                                                                                     |
@@ -351,3 +365,4 @@
 | `tests/property/createDismissableError.properties.ts`      | 7          | `createDismissableError` version monotonicity, reset semantics, idempotency, listener fidelity, cache identity, `resetError` no-op-guard, catch-up on first subscribe (#765.2) |
 | `tests/property/createActiveNameSelector.properties.ts`    | 15         | `createActiveNameSelector` cache identity, oracle alignment, per-name listener isolation, reconnection, destroy, `.`-boundary prefix-match, subscription sharing (one router.subscribe for N names), last-unsubscribe disconnect, pre-subscribe fallback path, listener-exception isolation (#767 §4.3), stale-generation no-orphan (#1206) |
 | `tests/property/baseSource.properties.ts`                  | 3          | `BaseSource` subscribe-order (listener added BEFORE `onFirstSubscribe`), `onFirstSubscribe` once-per-cycle, listener exception isolation in `notify()` (1000 runs/test) |
+| `tests/property/presubscribeRead.properties.ts`            | 13         | Lazy sources read with no listener (#2909): export census, executable reasons for the rest, a stale floor per row, and per row (5 rows) the read-shows-the-router and nothing-missed properties |

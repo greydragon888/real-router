@@ -1,5 +1,9 @@
 import { BaseSource } from "./BaseSource";
-import { computeSnapshot } from "./computeSnapshot.js";
+import {
+  catchUpSnapshot,
+  computeSnapshot,
+  nodeRoute,
+} from "./computeSnapshot.js";
 import { noopDestroy } from "./internal/noopDestroy.js";
 
 import type { RouteNodeSnapshot, RouterSource } from "./types.js";
@@ -77,45 +81,50 @@ function buildRouteNodeSource(
     unsub?.();
   };
 
+  // The router state the snapshot was last computed against — by the router
+  // listener once an announcement passes `shouldUpdate`, by `reconcile` while
+  // disconnected. An announcement the filter drops leaves it behind, so the
+  // next disconnected read recomputes.
+  let computedFor = router.getState();
+
   const source = new BaseSource<RouteNodeSnapshot>(
     computeSnapshot(initialSnapshot, router, nodeName),
     {
-      onFirstSubscribe: () => {
-        // Reconcile snapshot with current router state before connecting.
-        // Covers reconnection after Activity hide/show cycles where the
-        // source was disconnected and missed navigation events.
-        const reconciled = computeSnapshot(
-          source.getSnapshot(),
-          router,
-          nodeName,
-        );
+      // Without listeners the source holds no router subscription, so a remount
+      // after a navigation it did not see — an error boundary that showed its
+      // fallback, an Activity hide/show — reads through this catch-up.
+      reconcile: (current) => {
+        const state = router.getState();
 
-        if (!Object.is(reconciled, source.getSnapshot())) {
-          source.updateSnapshot(reconciled);
+        if (state === computedFor) {
+          return current;
         }
 
-        // Connect to router on first subscription
+        computedFor = state;
+
+        return catchUpSnapshot(current, nodeRoute(state, nodeName));
+      },
+      onFirstSubscribe: () => {
         routerUnsubscribe = router.subscribe((next) => {
           if (!shouldUpdate(next.route, next.previousRoute)) {
             return;
           }
 
-          const newSnapshot = computeSnapshot(
-            source.getSnapshot(),
-            router,
-            nodeName,
-            next,
-          );
+          // One read, before recording `next.route`: core also calls this
+          // listener for an announcement that began before the last
+          // unsubscribe, when a read reconciles and records the router's state
+          // itself.
+          const current = source.getSnapshot();
 
-          // computeSnapshot returns the SAME currentSnapshot reference when
-          // both route and previousRoute stabilize to prev — guard against
-          // emitting redundant updates to listeners (matters for signal-
-          // based adapters that re-run effects on every set).
-          /* v8 ignore next 3 -- @preserve: structurally unreachable after #605
-             — reload navs always return fresh refs via stabilizeState, and
-             within-node non-reload navs short-circuit at shouldUpdate. Guard
-             kept for defensive correctness against future stabilizer changes. */
-          if (Object.is(source.getSnapshot(), newSnapshot)) {
+          computedFor = next.route;
+
+          const newSnapshot = computeSnapshot(current, router, nodeName, next);
+
+          // computeSnapshot returns the snapshot held when both route and
+          // previousRoute stabilize to it, as they do for the root node on a
+          // same-path navigation without reload: no update is emitted, which
+          // matters for signal-based adapters that re-run effects on every set.
+          if (Object.is(current, newSnapshot)) {
             return;
           }
 

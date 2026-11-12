@@ -86,7 +86,8 @@ export function renderWithRouter(
   const navigator = getNavigator(router);
   const source = createRouteSource(router);
 
-  // Eagerly subscribe so getSnapshot() returns latest values
+  // Eagerly subscribe so the snapshot follows every announcement,
+  // previousRoute included
   const unsub = source.subscribe(() => {});
 
   const context = new Map<string, unknown>([

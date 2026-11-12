@@ -335,9 +335,9 @@ describe("subscribe order (listener added before onFirstSubscribe)", () => {
       // must observe any updateSnapshot that onFirstSubscribe triggers. This
       // test exercises the INITIAL-snapshot path — the source is created after
       // the nav, so the first subscribe seeds the connection without changing
-      // the snapshot. The reconcile-on-reconnect path (where onFirstSubscribe
-      // DOES updateSnapshot and the just-added listener must catch it) is
-      // covered by the "reconnect reconcile (#765)" describe.
+      // the snapshot. The catch-up path (where the first subscribe DOES
+      // updateSnapshot and the just-added listener must catch it) is covered
+      // by the "reconnect reconcile (#765)" describe.
       const router = await createStartedRouter();
 
       // Prime the router to a non-initial state so reconnect has something

@@ -15,12 +15,11 @@ import type { RouterSource } from "@real-router/sources";
  * **Ownership**: calls `onCleanup` — must be called inside a reactive owner
  * (component body or `createRoot`). Same contract as `createSignalFromSource`.
  *
- * **Lazy-source re-sync**: after `source.subscribe()`, a cached lazy source
- * may reconcile its snapshot in `onFirstSubscribe`. The listener is not
- * notified for that internal update, so we re-read immediately after
- * subscribing (`setState(reconcile(source.getSnapshot()))`) — mirrors the
- * same pattern in `createSignalFromSource`. `reconcile` is a no-op when the
- * snapshot is structurally unchanged, so there is no spurious reactivity cost.
+ * **Re-read after subscribe**: a defensive re-read
+ * (`setState(reconcile(source.getSnapshot()))`) mirrors the one in
+ * `createSignalFromSource`. A snapshot the subscribe changes also reaches the
+ * listener, and Solid's `reconcile` is a no-op when the snapshot is
+ * structurally unchanged, so there is no spurious reactivity cost.
  */
 export function createStoreFromSource<T extends object>(
   source: RouterSource<T>,
@@ -48,10 +47,9 @@ export function createStoreFromSource<T extends object>(
     setState(reconcile(nextSnapshot));
   });
 
-  // Re-read after subscribe: lazy sources reconcile their snapshot in
-  // onFirstSubscribe (when reused after disconnect via cache). The listener
-  // is not notified for that internal update, so we must reconcile manually.
-  // Guarded by the same reference check so a no-op stays free.
+  // Re-read after subscribe, as createSignalFromSource does: a defensive no-op
+  // when the listener already took the snapshot, guarded by the same reference
+  // check.
   const afterSubscribe = source.getSnapshot();
 
   if (afterSubscribe !== lastSnapshot) {

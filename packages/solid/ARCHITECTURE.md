@@ -112,7 +112,8 @@ Solid has no `useSyncExternalStore`. The bridge in `src/createSignalFromSource.t
 
 1. `createSignal(source.getSnapshot())` — initial value from store
 2. `source.subscribe(callback)` — calls `setValue(() => source.getSnapshot())` on store change
-3. `onCleanup(unsubscribe)` — cleans up when the reactive owner disposes
+3. `setValue(() => source.getSnapshot())` once `subscribe` returns — catches a source that changes inside `subscribe()` without notifying; for the sources of `@real-router/sources` it is a no-op
+4. `onCleanup(unsubscribe)` — cleans up when the reactive owner disposes
 
 This is the idiomatic Solid pattern for bridging external subscriptions into the reactive graph. No tearing concerns — Solid has no concurrent rendering.
 
@@ -171,7 +172,7 @@ All caches live inside `@real-router/sources` — no local WeakMaps in this adap
 | `RouterErrorBoundary`     | `createDismissableError(router)`                       | `(router)` — integrated dismissal state                          |
 | Link (slow path)          | `createActiveRouteSource(router, name, params, search, opts)`  | `(router, name, canonicalJson(params), canonicalJson(search), strict, ignoreQueryParams)` — the bag's key order ignored |
 
-Routers are WeakMap keys, so per-router state is released automatically when the router is GC'd — no explicit teardown needed. Lazy sources disconnect from the router when their last listener unsubscribes; upon re-subscription, they reconcile their snapshot so signals never observe stale values (enforced by `createSignalFromSource` re-reading `getSnapshot()` after subscribe).
+Routers are WeakMap keys, so per-router state is released automatically when the router is GC'd — no explicit teardown needed. Lazy sources disconnect from the router when their last listener unsubscribes; a read made while they have no listener answers from the router, and their first subscribe catches up and notifies a change, so signals never observe stale values. `createSignalFromSource`'s re-read after subscribe is a defensive no-op for them.
 
 ## Component Architecture
 

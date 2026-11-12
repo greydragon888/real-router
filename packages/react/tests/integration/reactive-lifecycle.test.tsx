@@ -35,8 +35,9 @@ describe("reactive lifecycle (#778)", () => {
   // #765 manifestation in React: a RouterProvider mounted UNDER an <Activity>
   // boundary. Hiding detaches effects → useSyncExternalStore unsubscribes →
   // createRouteSource disconnects; a navigation that lands while hidden was
-  // stale on re-show before #765. With the reconnect reconcile (createRouteSource
-  // onFirstSubscribe) the re-subscribed Provider reads the current route.
+  // stale on re-show before #765. A disconnected createRouteSource answers a
+  // read from the router and catches up on the re-subscribe (#765, #2909), so
+  // the re-shown Provider reads the current route.
   it("P1: RouterProvider under <Activity> is fresh after hide → navigate → show", async () => {
     const RouteName = (): React.JSX.Element => {
       const { route } = useRoute();
