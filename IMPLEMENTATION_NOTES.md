@@ -15968,3 +15968,13 @@ config.test.coverage.include = [
 - Without probes the three pass, and lines, branches and functions equal the run before: 931/557/179, 703/400/161 and 346/211/59. `browser-plugin` gains `shared/browser-env/types.ts`, a record with no line. No file of another package enters a report.
 - The provider answers for the 23 packages in 2.6 s, 1.7 s of it angular's. Before the change it named no shared file untested for the three owners, while `isIncluded` took 7, 19 and 9; after, both name the same files, and for every package they are its tracked code files. `createVitest` for svelte writes `_svelte_metadata.json` into `packages/svelte/.vitest-cache/`, as svelte's own test run does; git ignores the directory, and no turbo input names it.
 - 8 of 8 mutants fail a cell. react's entry back to `**/shared/dom-utils/**` fails the half of `getUntestedFiles` alone, and `**/packages/core/src/**` added to `ssr-data-plugin` the half of `isIncluded` alone. `browser-plugin`'s own entry in the Vitest 4 form `packages/browser-plugin/src/**`, `../core/src/**` added to `ssr-data-plugin`, `browser-plugin`'s shared entry widened to `../../shared/**`, react without `allowExternal` or without `src/**/*.tsx`, and `allowExternal` on route-utils fail too.
+
+## `test:stress` hashes every `stress/` directory under `tests/` (2026-11-12)
+
+**Problem.** The task's input `tests/stress/**/*.{ts,tsx}` left out `packages/core/tests/engine/stress/`, which core's `vitest.config.stress.mts` includes: 13 of the 47 files that config runs were outside the hash of `@real-router/core#test:stress`, so an edit to one of them replayed the last pass from cache.
+
+**Solution.** The input is `tests/**/stress/**/*.{ts,tsx}`: a `stress/` directory at any depth under a package's `tests/` enters the hash.
+
+**Measured** (`turbo run test:stress --dry=json`): core's inputs grow from 46 to 59 files, the 13 of `tests/engine/stress/`; the inputs of the other 24 packages are unchanged. Over the 51 package configs of `test`, `test:properties` and `test:stress` that name an `include`, every file a config includes is in its task's hash.
+
+⚠ No check holds this: a stress config that includes a directory not named `stress/` reopens the gap.

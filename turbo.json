@@ -52,7 +52,7 @@
       "dependsOn": ["test:properties", "test", "type-check"],
       "outputs": [],
       "inputs": [
-        "tests/stress/**/*.{ts,tsx}",
+        "tests/**/stress/**/*.{ts,tsx}",
         "vitest.config.stress.*",
         "../../vitest.setup.mts",
         "../../scripts/lib/cell-read-budget.*",
