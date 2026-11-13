@@ -414,8 +414,10 @@ of them read exactly once, which is the CORRECT shape for an injected dependency
 and `RoutesStore` has no unread member at all. What separates an accreting entity
 from a large one is the absence of a refusal.
 
-**The two that accreted are the two that had no rule.** `RouterInternals` has
-none — its members land by default rather than by decision (#2339) — and
+**The two that accreted are the two that had no rule.** `RouterInternals`'
+members landed by default rather than by decision (#2339); its rule is
+`tests/functional/router-internals-shrinks-2387.test.ts` — the bag takes no new
+member, and a door gets a new capability through the store that carries it.
 `PluginApi`'s is the section above. A declared VOCABULARY is the same shape and
 fails the same way — #2362 and #2363 are values a public type promises and
 nothing produces.
