@@ -819,9 +819,13 @@ function wiringRoots(core: CoreFacts, graph: PluginGraph): Root[] {
   return roots;
 }
 
-/** Roots from `addCheck("<door>:<slot>", cb)`. */
-function positionRoots(graph: PluginGraph): Root[] {
+/** Roots from `addCheck("<door>:<slot>", cb)`, and the positions they name. */
+function positionRoots(graph: PluginGraph): {
+  readonly roots: Root[];
+  readonly positions: ReadonlySet<string>;
+} {
   const roots: Root[] = [];
+  const positions = new Set<string>();
 
   for (const source of graph.files) {
     const visit = (node: ts.Node): void => {
@@ -838,6 +842,8 @@ function positionRoots(graph: PluginGraph): Root[] {
         if (text !== undefined && callback !== undefined) {
           const [door] = text.split(":", 1);
 
+          positions.add(text);
+
           for (const seed of calledFrom(callback, graph.checker)) {
             roots.push({ seed, doors: new Set([door]) });
           }
@@ -850,7 +856,7 @@ function positionRoots(graph: PluginGraph): Root[] {
     visit(source);
   }
 
-  return roots;
+  return { roots, positions };
 }
 
 function closure(
@@ -900,6 +906,8 @@ interface Census {
   readonly noDoor: Finding[];
   readonly hardcodedShared: Finding[];
   readonly otherHeads: Map<string, number>;
+  /** Every position an `addCheck` in the tree names. */
+  readonly positions: ReadonlySet<string>;
   judged: number;
   interpolated: number;
 }
@@ -955,8 +963,9 @@ function judge(
 function census(root: string = PLUGIN_SRC): Census {
   const core = readCoreOnce();
   const graph = readPlugin(root);
+  const fromPositions = positionRoots(graph);
   const reach = closure(
-    [...wiringRoots(core, graph), ...positionRoots(graph)],
+    [...wiringRoots(core, graph), ...fromPositions.roots],
     graph.fns,
   );
   const out: Census = {
@@ -964,6 +973,7 @@ function census(root: string = PLUGIN_SRC): Census {
     noDoor: [],
     hardcodedShared: [],
     otherHeads: new Map(),
+    positions: fromPositions.positions,
     judged: 0,
     interpolated: 0,
   };
@@ -1025,7 +1035,10 @@ describe("a message names a door that can reach it (#2457)", () => {
     const core = readCoreOnce();
 
     expect(core.vocabulary.size).toBeGreaterThan(20);
-    expect(core.consulted.size).toBeGreaterThan(25);
+    // ⚑ A SUM, because converting a refusal (#2388) moves it: core stops
+    // consulting the member and the plugin registers at a position instead, so
+    // `consulted` alone falls as that work succeeds.
+    expect(core.consulted.size + found.positions.size).toBeGreaterThan(25);
     // ⚠ Both count the PRE-raiser form, and step 7 of #2487 converts this package.
     // When they fall, the answer is not a lower number: a floor on a count the
     // design drives toward zero reds on the work succeeding, and lowering it by

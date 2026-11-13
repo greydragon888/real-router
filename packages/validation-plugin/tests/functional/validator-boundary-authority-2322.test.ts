@@ -42,12 +42,18 @@ import type { LoggerConfig, Router } from "@real-router/core";
  * them, so the row points a reader at the nearest authority rather than at a
  * list that churns whenever a neighbouring test is added.
  *
+ * ⚑ **The plugin's registrations are a second table, owned the same way.** Core
+ * reaches a check or a diagnostic through a channel rather than a member, so
+ * {@link OWNER} never meets one. {@link REGISTRATION_OWNER} keys each call a
+ * registration's callback makes as a statement, `<position> › <callee>`, and
+ * each row names a file that went red with that one call removed.
+ *
  * ⚠ **A no-op that reds NOTHING has two causes, and they are not the same.**
- * Either the effect is genuinely unheld, or core refuses the same input first
- * with the same wording, so the copy can never be observed — the shape #2307
- * found for the four `queryParams` format lists and deleted. A row of the first
- * kind is {@link SELF}, held by a cell in the third describe below; a row of the
- * second is {@link MIRRORED}.
+ * Either the effect is genuinely unheld, or core refuses the same input with
+ * the same wording, so the copy can never be observed — the shape #2307 found
+ * for the four `queryParams` format lists and deleted. A row of the first kind
+ * is {@link SELF}, held by a cell in the describe "what nothing else held"
+ * below; a row of the second is {@link MIRRORED}.
  *
  * ⚠ **A row names a file that reds on BEHAVIOUR.**
  * `prefix-reachability-authority-2457` reads core's source for the doors a
@@ -76,6 +82,8 @@ const CORE_TSCONFIG = path.resolve(
   "../../../core/tsconfig.src.json",
 );
 const HERE = __dirname;
+const PLUGIN_SRC = path.resolve(__dirname, "../../src");
+const PLUGIN_TSCONFIG = path.resolve(__dirname, "../../tsconfig.src.json");
 
 /**
  * Core refuses the same input with the same wording, so no cell can tell the
@@ -86,9 +94,12 @@ const HERE = __dirname;
  * than driving the door; what no cell can catch is the copy being REMOVED,
  * because core then prints the same string.
  */
-const MIRRORED = "mirrored — core refuses first, same wording";
+const MIRRORED = "mirrored — core refuses the same input, same wording";
 
-/** Held by the third describe in THIS file, because nothing else held it. */
+/**
+ * Held by the describe "what nothing else held" in THIS file, because nothing
+ * else held it.
+ */
 const SELF = "validator-boundary-authority-2322.test.ts";
 
 /**
@@ -141,6 +152,59 @@ const OWNER: Record<string, string> = {
   "state.validateMakeStateArgs": "plugin-api.validation.test.ts",
 };
 
+/**
+ * One file that reds when that call is removed from its registration's
+ * callback, or {@link MIRRORED} when nothing can. Keyed `<position> › <callee>`
+ * by {@link registrations}.
+ */
+const REGISTRATION_OWNER: Record<string, string> = {
+  "PLUGIN_AFTER_START › warnPluginAfterStart": "plugin-api.validation.test.ts",
+  "addActivateGuard:entry › validateHandler": "lifecycle.validation.test.ts",
+  "addActivateGuard:entry › validateRouteName": "lifecycle.validation.test.ts",
+  "addDeactivateGuard:entry › validateHandler": SELF,
+  "addDeactivateGuard:entry › validateRouteName":
+    "lifecycle.validation.test.ts",
+  "addRoute:batch › checkRouteBatch": "routes.validation.test.ts",
+  "buildNavigationState:state › validateSearch":
+    "both-channels-authority-1972.test.ts",
+  "buildNavigationState:state › validateStateBuilderArgs":
+    "plugin-api.validation.test.ts",
+  "buildPath:params › validateNavigateParams":
+    "check-channel-consumer-2388.test.ts",
+  "buildPathResolved:params › validateNavigateParams":
+    "check-channel-consumer-2388.test.ts",
+  "canNavigateTo:entry › validateNavigateParamsShape": SELF,
+  "canNavigateTo:entry › validateRouteName": "route-name-doors.test.ts",
+  "canNavigateTo:entry › validateSearch":
+    "both-channels-authority-1972.test.ts",
+  "canNavigateTo:params › validateNavigateParams":
+    "predicate-totality-2245.test.ts",
+  "forwardState:entry › validateSearch": "both-channels-authority-1972.test.ts",
+  "forwardState:entry › validateStateBuilderArgs":
+    "plugin-api.validation.test.ts",
+  "getRoute:entry › validateRouteName": "routes.validation.test.ts",
+  "hasRoute:entry › validateRouteName": "routes.validation.test.ts",
+  "navigate:entry › validateNavigateArgs": "navigation.validation.test.ts",
+  "navigate:entry › validateNavigateParamsShape": SELF,
+  "navigate:entry › validateNavigationOptions": "navigation.validation.test.ts",
+  "navigate:entry › validateSearch": "both-channels-authority-1972.test.ts",
+  "navigate:params › validateNavigateParams": "navigation.validation.test.ts",
+  "removeActivateGuard:entry › validateRouteName":
+    "check-channel-consumer-2388.test.ts",
+  "removeDeactivateGuard:entry › validateRouteName":
+    "check-channel-consumer-2388.test.ts",
+  "removeRoute:entry › throwIfInternalRoute": MIRRORED,
+  "removeRoute:entry › validateRemoveRouteArgs":
+    "route-door-prefix-2399.test.ts",
+  "replaceRoutes:batch › checkRouteBatch": "replace-whole-table-2562.test.ts",
+  "updateRoute:entry › throwIfInternalRoute": MIRRORED,
+  "updateRoute:entry › validateUpdateRoute": "routes.validation.test.ts",
+  "updateRoute:entry › validateUpdateRouteBasicArgs":
+    "route-door-prefix-2399.test.ts",
+  "updateRoute:entry › validateUpdateRoutePropertyTypes":
+    "routes.validation.test.ts",
+};
+
 interface Census {
   /**
    * Every call whose callee is a property access the checker resolves to a
@@ -167,13 +231,14 @@ interface Census {
 }
 
 /**
- * A program over `root` compiled as core compiles: with the options of core's
- * `tsconfig.src.json`, and so its lib and its `types`. A receiver typed through
- * `Readonly<…>` or `NonNullable<…>` resolves only with the lib.
+ * A program over `root` compiled as a package compiles — core unless `tsconfig`
+ * names another: with the options of its `tsconfig.src.json`, and so its lib
+ * and its `types`. A receiver typed through `Readonly<…>` or `NonNullable<…>`
+ * resolves only with the lib.
  */
-function programOf(root: string): ts.Program {
+function programOf(root: string, tsconfig: string = CORE_TSCONFIG): ts.Program {
   const config = ts.getParsedCommandLineOfConfigFile(
-    CORE_TSCONFIG,
+    tsconfig,
     {},
     {
       ...ts.sys,
@@ -186,7 +251,7 @@ function programOf(root: string): ts.Program {
   );
 
   if (config === undefined) {
-    throw new Error(`${CORE_TSCONFIG} did not parse`);
+    throw new Error(`${tsconfig} did not parse`);
   }
 
   return ts.createProgram(
@@ -419,8 +484,263 @@ function consultations(root: string = CORE_SRC): Census {
   };
 }
 
-/** The census of a synthetic tree, each file given as its lines. */
-function censusOf(files: Readonly<Record<string, readonly string[]>>): Census {
+/** The members a plugin registers a check or a diagnostic through. */
+const CHANNELS: ReadonlySet<string> = new Set([
+  "addCheck",
+  "subscribeDiagnostic",
+]);
+
+interface Registrations {
+  /**
+   * Each call a registration's callback makes as a statement, keyed
+   * `<position> › <callee>`, in source order. A registration is a call whose
+   * signature the checker resolves to a channel's declaration.
+   */
+  readonly leaves: readonly string[];
+  /**
+   * Every other reference to a channel — handed on, applied through `.call`,
+   * destructured. The walk cannot say what such a reference registers, so it
+   * lists it rather than skipping it.
+   */
+  readonly unread: readonly {
+    readonly name: string;
+    readonly file: string;
+    readonly line: number;
+  }[];
+  /** What the compiler reports on the tree, as for {@link Census}. */
+  readonly diagnostics: readonly string[];
+}
+
+/**
+ * The signature each channel is declared with in the tree's own sources: a
+ * method signature, or the function type of a property signature.
+ *
+ * ⚠ Refused, not dropped: a channel declared nowhere, or in another shape,
+ * leaves its calls resolving to nothing — which reads as a plugin that
+ * registers nothing.
+ *
+ * ⚠ A namesake declared as a signature reads as a channel. Its calls then
+ * key rows the table lacks, so it reds rather than hides.
+ */
+function channelsOf(program: ts.Program): ReadonlyMap<ts.Node, string> {
+  const channels = new Map<ts.Node, string>();
+
+  for (const source of program.getSourceFiles()) {
+    if (source.isDeclarationFile) {
+      continue;
+    }
+
+    const visit = (node: ts.Node): void => {
+      if (
+        (ts.isPropertySignature(node) || ts.isMethodSignature(node)) &&
+        ts.isIdentifier(node.name) &&
+        CHANNELS.has(node.name.text)
+      ) {
+        const signature = ts.isPropertySignature(node) ? node.type : node;
+
+        if (
+          signature === undefined ||
+          !(ts.isFunctionTypeNode(signature) || ts.isMethodSignature(signature))
+        ) {
+          throw new Error(
+            `A channel of another shape: ${node.getText(source)}`,
+          );
+        }
+
+        channels.set(signature, node.name.text);
+      }
+
+      ts.forEachChild(node, visit);
+    };
+
+    visit(source);
+  }
+
+  const declared = new Set(channels.values());
+  const missing = [...CHANNELS].filter((name) => !declared.has(name));
+
+  if (missing.length > 0) {
+    throw new Error(`No declaration of ${missing.join(", ")}`);
+  }
+
+  return channels;
+}
+
+/** Whether `node` holds a call, a `new` or a tagged template. */
+const callsAnything = (node: ts.Node): boolean =>
+  ts.isCallExpression(node) ||
+  ts.isNewExpression(node) ||
+  ts.isTaggedTemplateExpression(node) ||
+  (ts.forEachChild(node, callsAnything) ?? false);
+
+/**
+ * The calls a registration's callback makes as statements, each keyed by the
+ * registration's position or kind.
+ *
+ * ⚠ A binding that calls nothing is skipped, because it judges nothing. Every
+ * other statement is refused: a branch or a binding that calls would hide a
+ * call the table must own.
+ */
+function leavesOf(
+  registration: ts.CallExpression,
+  source: ts.SourceFile,
+): string[] {
+  // ⚠ Indexed access is typed as present and IS undefined for a call with
+  // fewer arguments, so the cast is a guard rather than noise.
+  const [key, callback] = registration.arguments as readonly (
+    ts.Expression | undefined
+  )[];
+  // ⚠ Not `file:line`: `line-anchor-authority` reads that shape as a citation
+  // of our code, and the controls below pin this text.
+  const at = `line ${
+    source.getLineAndCharacterOfPosition(registration.getStart(source)).line + 1
+  } of ${path.basename(source.fileName)}`;
+
+  if (key === undefined || !ts.isStringLiteralLike(key)) {
+    throw new Error(`A registration whose key is not a literal, at ${at}`);
+  }
+
+  if (
+    callback === undefined ||
+    !(ts.isArrowFunction(callback) || ts.isFunctionExpression(callback))
+  ) {
+    throw new Error(
+      `A registration whose callback is not written inline, at ${at}`,
+    );
+  }
+
+  const statements: readonly ts.Node[] = ts.isBlock(callback.body)
+    ? callback.body.statements
+    : [callback.body];
+  const leaves: string[] = [];
+
+  for (const statement of statements) {
+    const expression = ts.isExpressionStatement(statement)
+      ? statement.expression
+      : statement;
+
+    if (ts.isCallExpression(expression)) {
+      leaves.push(`${key.text} › ${expression.expression.getText(source)}`);
+    } else if (!ts.isVariableStatement(statement) || callsAnything(statement)) {
+      throw new Error(
+        `A statement of another shape in ${key.text}: ${
+          statement.getText(source).split("\n", 1)[0]
+        }`,
+      );
+    }
+  }
+
+  return leaves;
+}
+
+/**
+ * Each call this plugin's registrations make, found by the channel the checker
+ * resolves a call's signature to — so the callee's spelling does not decide
+ * which calls are registrations.
+ *
+ * ⚠ Refused, not dropped: a key not written as a literal, a callback not
+ * written inline, a statement {@link leavesOf} cannot read, a key reached
+ * twice. A walk that skipped them would agree with a table missing their rows.
+ */
+function registrations(
+  root: string = PLUGIN_SRC,
+  tsconfig: string = PLUGIN_TSCONFIG,
+): Registrations {
+  const program = programOf(root, tsconfig);
+  const checker = program.getTypeChecker();
+  const channels = channelsOf(program);
+  const leaves: string[] = [];
+  const unread: { name: string; file: string; line: number }[] = [];
+
+  // A symbol names a channel when a declaration of it holds a channel's
+  // signature; a mapped type's property keeps the declaration it maps.
+  const channelOf = (symbol: ts.Symbol | undefined): string | undefined =>
+    symbol?.declarations
+      ?.map((declaration) =>
+        channels.get(
+          ts.isPropertySignature(declaration)
+            ? (declaration.type ?? declaration)
+            : declaration,
+        ),
+      )
+      .find((name) => name !== undefined);
+
+  const isCallee = (node: ts.Node): boolean =>
+    ts.isCallExpression(node.parent) && node.parent.expression === node;
+
+  for (const source of program.getSourceFiles()) {
+    const file = path.relative(root, source.fileName);
+
+    // Only this plugin's files register; core's are read for their types.
+    if (file.startsWith("..") || source.isDeclarationFile) {
+      continue;
+    }
+
+    const lineOf = (node: ts.Node): number =>
+      source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+
+    const visit = (node: ts.Node): void => {
+      if (ts.isCallExpression(node)) {
+        const declaration = checker.getResolvedSignature(node)?.declaration;
+
+        if (declaration !== undefined && channels.has(declaration)) {
+          leaves.push(...leavesOf(node, source));
+        }
+      }
+
+      let named: string | undefined;
+
+      if (ts.isPropertyAccessExpression(node) && !isCallee(node)) {
+        named = channelOf(checker.getSymbolAtLocation(node.name));
+      } else if (ts.isElementAccessExpression(node) && !isCallee(node)) {
+        named = channelOf(checker.getSymbolAtLocation(node.argumentExpression));
+      } else if (
+        ts.isBindingElement(node) &&
+        ts.isObjectBindingPattern(node.parent)
+      ) {
+        const property = node.propertyName ?? node.name;
+
+        named = ts.isIdentifier(property)
+          ? channelOf(
+              checker.getTypeAtLocation(node.parent).getProperty(property.text),
+            )
+          : undefined;
+      }
+
+      if (named !== undefined) {
+        unread.push({ name: named, file, line: lineOf(node) });
+      }
+
+      ts.forEachChild(node, visit);
+    };
+
+    visit(source);
+  }
+
+  const repeated = leaves.filter(
+    (leaf, index) => leaves.indexOf(leaf) !== index,
+  );
+
+  if (repeated.length > 0) {
+    throw new Error(`A call keyed twice: ${repeated.join(", ")}`);
+  }
+
+  return {
+    leaves,
+    unread,
+    diagnostics: ts
+      .getPreEmitDiagnostics(program)
+      .map(({ messageText }) =>
+        ts.flattenDiagnosticMessageText(messageText, " "),
+      ),
+  };
+}
+
+/** A synthetic tree, each file given as its lines. */
+type Tree = Readonly<Record<string, readonly string[]>>;
+
+/** What `read` derives from a synthetic tree, written to a fresh directory. */
+function inTree<T>(files: Tree, read: (root: string) => T): T {
   const directory = mkdtempSync(path.join(tmpdir(), "boundary-2322-"));
 
   try {
@@ -435,16 +755,27 @@ function censusOf(files: Readonly<Record<string, readonly string[]>>): Census {
       writeFileSync(path.join(directory, name), [...lines, ""].join("\n"));
     }
 
-    return consultations(directory);
+    return read(directory);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
 }
 
-/** The message `censusOf` refuses a synthetic tree with, or `"NO REFUSAL"`. */
-function refusalOf(files: Readonly<Record<string, readonly string[]>>): string {
+/** The census of a synthetic tree. */
+const censusOf = (files: Tree): Census =>
+  inTree(files, (root) => consultations(root));
+
+/** The registrations of a synthetic tree, compiled with this plugin's options. */
+const registrationsOf = (files: Tree): Registrations =>
+  inTree(files, (root) => registrations(root));
+
+/** The message `read` refuses a synthetic tree with, or `"NO REFUSAL"`. */
+function refusalOf(
+  files: Tree,
+  read: (root: string) => unknown = (root) => consultations(root),
+): string {
   try {
-    censusOf(files);
+    inTree(files, read);
 
     return "NO REFUSAL";
   } catch (error) {
@@ -454,6 +785,22 @@ function refusalOf(files: Readonly<Record<string, readonly string[]>>): string {
 
 const sorted = (names: Iterable<string>): string[] =>
   [...names].toSorted((left, right) => left.localeCompare(right));
+
+/** The files a table cites, each once, sorted. */
+const citedBy = (table: Readonly<Record<string, string>>): string[] =>
+  sorted(new Set(Object.values(table).filter((owner) => owner !== MIRRORED)));
+
+/** The files a table cites that this directory does not hold. */
+const absentFrom = (table: Readonly<Record<string, string>>): string[] =>
+  citedBy(table).filter((file) => !existsSync(path.join(HERE, file)));
+
+/** The keys a table records as {@link MIRRORED}, sorted. */
+const mirroredIn = (table: Readonly<Record<string, string>>): string[] =>
+  sorted(
+    Object.entries(table)
+      .filter(([, owner]) => owner === MIRRORED)
+      .map(([key]) => key),
+  );
 
 describe("each consultation the walk derives from core is classified (#2322)", () => {
   const census = consultations();
@@ -717,28 +1064,16 @@ describe("each consultation the walk derives from core is classified (#2322)", (
   });
 
   it("every authority a row cites exists", () => {
-    const cited = sorted(
-      new Set(Object.values(OWNER).filter((owner) => owner !== MIRRORED)),
-    );
+    expect(citedBy(OWNER).length).toBeGreaterThan(0);
 
-    expect(cited.length).toBeGreaterThan(0);
-
-    expect(
-      cited.filter((file) => !existsSync(path.join(HERE, file))),
-    ).toStrictEqual([]);
+    expect(absentFrom(OWNER)).toStrictEqual([]);
   });
 
   it("the copies nothing can observe are exactly these", () => {
     // ⚠ EXACT, not a floor. A row leaving this set is someone deciding the copy
     // became observable — or that it should go, the way #2307 retired four
     // lists once measurement showed core refusing first.
-    expect(
-      sorted(
-        Object.entries(OWNER)
-          .filter(([, owner]) => owner === MIRRORED)
-          .map(([key]) => key),
-      ),
-    ).toStrictEqual(["eventBus.validateListenerArgs"]);
+    expect(mirroredIn(OWNER)).toStrictEqual(["eventBus.validateListenerArgs"]);
   });
 
   it("CONTROL — the walk reaches core and sees a consultation made twice", () => {
@@ -746,6 +1081,219 @@ describe("each consultation the walk derives from core is classified (#2322)", (
     // one that collapsed every site into one key would hide the file spread.
     expect(derived).toContain("routes.validateBuildPathArgs");
     expect(sites.length).toBeGreaterThan(derived.size);
+  });
+});
+
+describe("each call a registration of this plugin makes is classified (#2388)", () => {
+  const census = registrations();
+  const derived = new Set(census.leaves);
+
+  it("every reference to a channel the walk finds in this plugin is a registration", () => {
+    // A reference the walk lists is a registration it cannot key, so it reds
+    // here until the walk learns the form.
+    expect(census.unread).toStrictEqual([]);
+  });
+
+  it("the compiler types every receiver in this plugin's tree", () => {
+    // A call on a receiver without a type resolves to no channel, so the walk
+    // would read a registration as some other call.
+    expect(census.diagnostics).toStrictEqual([]);
+  });
+
+  // ⚑ Each call's signature is resolved through the checker, so a registration
+  // is found however its callee is spelled — a property, an element access, a
+  // member of a mapped type, a destructured local — and a namesake on an
+  // object literal is not one. The destructuring itself, a `.call` and a
+  // channel handed on are listed. A binding that calls nothing is skipped.
+  const spellings = registrationsOf({
+    "PluginApi.ts": [
+      "export interface PluginApi {",
+      "  addCheck: (position: string, check: (value: unknown) => void) => () => void;",
+      "  subscribeDiagnostic(kind: string, handler: (value: unknown) => void): () => void;",
+      "}",
+    ],
+    "plugin.ts": [
+      'import type { PluginApi } from "./PluginApi";',
+      "",
+      "declare const api: PluginApi;",
+      'declare const narrowed: Pick<PluginApi, "addCheck">;',
+      "declare const helpers: { leaf: (value: unknown) => void };",
+      "declare function first(value: unknown): void;",
+      "declare function second(value: unknown): void;",
+      "declare function consume(value: unknown): void;",
+      "",
+      'api.addCheck("block:entry", (value) => {',
+      "  first(value);",
+      "  second(value);",
+      "});",
+      'api["addCheck"]("element:entry", (value) => first(value));',
+      'narrowed.addCheck("mapped:entry", (value) => {',
+      "  helpers.leaf(value);",
+      "});",
+      'api.subscribeDiagnostic("METHOD", function (value) {',
+      "  const text = value as string;",
+      "  first(text);",
+      "});",
+      "const { subscribeDiagnostic } = api;",
+      'subscribeDiagnostic("ALIASED", (value) => {',
+      "  first(value);",
+      "});",
+      'api.addCheck.call(api, "called:entry", () => {});',
+      "consume(api.addCheck);",
+      "const namesake = {",
+      "  addCheck: (position: string, check: () => void): void => {",
+      "    void position;",
+      "    check();",
+      "  },",
+      "};",
+      'namesake.addCheck("namesake:entry", () => {',
+      "  first(1);",
+      "});",
+    ],
+  });
+
+  it("CONTROL — the walk keys each spelling of a registration, and lists what it cannot key", () => {
+    expect(spellings.leaves).toStrictEqual([
+      "block:entry › first",
+      "block:entry › second",
+      "element:entry › first",
+      "mapped:entry › helpers.leaf",
+      "METHOD › first",
+      "ALIASED › first",
+    ]);
+    expect(spellings.unread).toStrictEqual([
+      { name: "subscribeDiagnostic", file: "plugin.ts", line: 22 },
+      { name: "addCheck", file: "plugin.ts", line: 26 },
+      { name: "addCheck", file: "plugin.ts", line: 27 },
+    ]);
+    expect(spellings.diagnostics).toStrictEqual([]);
+  });
+
+  const channel = [
+    "export interface PluginApi {",
+    "  addCheck: (position: string, check: (value: unknown) => void) => () => void;",
+    "  subscribeDiagnostic: (kind: string, handler: (value: unknown) => void) => () => void;",
+    "}",
+  ];
+  const registering = (...lines: readonly string[]): Tree => ({
+    "PluginApi.ts": channel,
+    "plugin.ts": [
+      'import type { PluginApi } from "./PluginApi";',
+      "",
+      "declare const api: PluginApi;",
+      "declare function first(value: unknown): void;",
+      ...lines,
+    ],
+  });
+  const read = (root: string): Registrations => registrations(root);
+  const refused = {
+    nonLiteral: refusalOf(
+      registering(
+        "declare const position: string;",
+        "api.addCheck(position, (value) => {",
+        "  first(value);",
+        "});",
+      ),
+      read,
+    ),
+    byReference: refusalOf(
+      registering('api.addCheck("reference:entry", first);'),
+      read,
+    ),
+    branch: refusalOf(
+      registering(
+        'api.addCheck("branch:entry", (value) => {',
+        "  if (value) {",
+        "    first(value);",
+        "  }",
+        "});",
+      ),
+      read,
+    ),
+    callingBinding: refusalOf(
+      registering(
+        'api.addCheck("binding:entry", (value) => {',
+        "  const text = String(value);",
+        "  first(text);",
+        "});",
+      ),
+      read,
+    ),
+    twice: refusalOf(
+      registering(
+        'api.addCheck("twice:entry", (value) => {',
+        "  first(value);",
+        "  first(value);",
+        "});",
+      ),
+      read,
+    ),
+    noChannel: refusalOf({ "plugin.ts": ["export {};"] }, read),
+    otherShape: refusalOf(
+      {
+        "PluginApi.ts": [
+          "export interface PluginApi {",
+          "  addCheck: Check;",
+          "  subscribeDiagnostic: Check;",
+          "}",
+          "type Check = (key: string, callback: () => void) => () => void;",
+        ],
+      },
+      read,
+    ),
+  };
+
+  it("CONTROL — a registration the walk cannot read is refused, not read as empty", () => {
+    expect(refused.nonLiteral).toBe(
+      "A registration whose key is not a literal, at line 6 of plugin.ts",
+    );
+    expect(refused.byReference).toBe(
+      "A registration whose callback is not written inline, at line 5 of plugin.ts",
+    );
+    expect(refused.branch).toBe(
+      "A statement of another shape in branch:entry: if (value) {",
+    );
+    expect(refused.callingBinding).toBe(
+      "A statement of another shape in binding:entry: const text = String(value);",
+    );
+    expect(refused.twice).toBe("A call keyed twice: twice:entry › first");
+    expect(refused.noChannel).toBe(
+      "No declaration of addCheck, subscribeDiagnostic",
+    );
+    expect(refused.otherShape).toContain("A channel of another shape");
+  });
+
+  it("the declared table covers the derived set, in both directions", () => {
+    // ⚑ The ratchet of the member table, for the other door into the plugin:
+    // a call a registration starts making reds here until someone removes it,
+    // runs this package's suite and records what held it, and a call it stops
+    // making reds here until its row goes.
+    expect(sorted(Object.keys(REGISTRATION_OWNER))).toStrictEqual(
+      sorted(derived),
+    );
+  });
+
+  it("every authority a row cites exists", () => {
+    expect(citedBy(REGISTRATION_OWNER).length).toBeGreaterThan(0);
+
+    expect(absentFrom(REGISTRATION_OWNER)).toStrictEqual([]);
+  });
+
+  it("the copies nothing can observe are exactly these", () => {
+    // ⚠ EXACT, as for the member table. Both are the reserved prefix (#1047):
+    // core's backstop refuses it at the same door, with the same wording, on
+    // the statement after the check.
+    expect(mirroredIn(REGISTRATION_OWNER)).toStrictEqual([
+      "removeRoute:entry › throwIfInternalRoute",
+      "updateRoute:entry › throwIfInternalRoute",
+    ]);
+  });
+
+  it("CONTROL — the walk reaches this plugin, through both channels and past a callback's first call", () => {
+    // A walk that matched nothing would agree with an empty table, and one that
+    // stopped at a callback's first call would hide the calls after it.
+    expect(derived).toContain("PLUGIN_AFTER_START › warnPluginAfterStart");
+    expect(derived).toContain("navigate:entry › validateNavigationOptions");
   });
 });
 
@@ -790,8 +1338,9 @@ describe("what nothing else held (#2322)", () => {
   // consultation core already covers, which is exactly what the sweep had to
   // separate out — and it is what makes no-oping the method red this file.
   //
-  // `throwIfInternalRouteInArray` and `validateParentOption` reach core through
-  // `addCheck` rather than a member, so the walk above does not key them.
+  // `throwIfInternalRouteInArray` and `validateParentOption` run inside
+  // `checkRouteBatch`, the call both batch registrations key, so no row of
+  // either table names them.
   const ROUTES = [
     { name: "a", path: "/a/:id" },
     { name: "b", path: "/b" },
@@ -860,6 +1409,34 @@ describe("what nothing else held (#2322)", () => {
       return (error as Error).message;
     }
   };
+
+  /**
+   * A class INSTANCE whose string reads and `ownKeys` land in `reads`. A wrong
+   * shape is what the shape check refuses; the accessor is on the prototype,
+   * which is what makes it the wrong shape.
+   */
+  const watchedInstance = (reads: string[]): object =>
+    new Proxy(
+      Object.create({
+        get id(): string {
+          return "7";
+        },
+      }) as object,
+      {
+        get(target, key, receiver) {
+          if (typeof key === "string") {
+            reads.push(`get:${key}`);
+          }
+
+          return Reflect.get(target, key, receiver) as unknown;
+        },
+        ownKeys(target) {
+          reads.push("ownKeys");
+
+          return Reflect.ownKeys(target);
+        },
+      },
+    );
 
   it("warnBatchOverwrite — setDependencies says which keys it replaced", () => {
     const overwrites = (withPlugin: boolean): string[] => {
@@ -946,34 +1523,62 @@ describe("what nothing else held (#2322)", () => {
     // code that a wrong-shape argument should never have reached.
     const reads: string[] = [];
 
-    // A class INSTANCE, because a wrong shape is what the consultation refuses;
-    // the accessor is on the prototype, which is what makes it the wrong shape.
-    const instance = Object.create({
-      get id(): string {
-        return "7";
-      },
-    }) as object;
-
-    const watched = new Proxy(instance, {
-      get(target, key, receiver) {
-        if (typeof key === "string") {
-          reads.push(`get:${key}`);
-        }
-
-        return Reflect.get(target, key, receiver) as unknown;
-      },
-      ownKeys(target) {
-        reads.push("ownKeys");
-
-        return Reflect.ownKeys(target);
-      },
-    });
-
-    expect(() => make(true).buildPath("a", watched as never)).toThrow(
-      "params must be a plain object",
-    );
+    expect(() =>
+      make(true).buildPath("a", watchedInstance(reads) as never),
+    ).toThrow("params must be a plain object");
 
     expect(reads).toStrictEqual(["get:constructor"]);
+  });
+
+  /** A door whose entry check judges the shape, asked about one bag. */
+  const askBag = {
+    // Not `async`: the refusal is synchronous, and an async wrapper would turn
+    // it into a rejection the plugin arm below could not see thrown.
+    navigate: (router: Router, bag: object): unknown =>
+      router.navigate("a", bag as never).catch(() => undefined),
+    canNavigateTo: (router: Router, bag: object): unknown =>
+      router.canNavigateTo("a", bag as never),
+  };
+
+  it.each(["navigate", "canNavigateTo"] as const)(
+    "validateNavigateParamsShape — %s refuses BEFORE the caller's bag is walked",
+    async (door) => {
+      // ⚑ The cell above, at the doors whose entry check judges the shape: the
+      // wording is the same with the check removed, and the order is what the
+      // check alone decides. Started, because a stopped router's `navigate`
+      // rejects before it reads the bag.
+      const reads: string[] = [];
+      const bareReads: string[] = [];
+      const router = make(true);
+      const bare = make(false);
+
+      await router.start("/b");
+      await bare.start("/b");
+
+      expect(() => askBag[door](router, watchedInstance(reads))).toThrow(
+        "params must be a plain object",
+      );
+
+      expect(reads).toStrictEqual(["get:constructor"]);
+
+      await askBag[door](bare, watchedInstance(bareReads));
+
+      expect(bareReads).toContain("ownKeys");
+    },
+  );
+
+  it("validateHandler — addDeactivateGuard names a handler that is neither a boolean nor a factory", () => {
+    const run = (router: Router): unknown => {
+      getLifecycleApi(router).addDeactivateGuard("a", 123 as never);
+
+      return undefined;
+    };
+
+    expect(refusalOf(run, true)).toBe(
+      "[router.addDeactivateGuard] Handler must be a boolean or factory function, got number",
+    );
+
+    expect(refusalOf(run, false)).toBe("factory is not a function");
   });
 
   it("throwIfInternalRouteInArray — replaceRoutes names the door the caller called", () => {
