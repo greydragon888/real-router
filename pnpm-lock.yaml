@@ -42,8 +42,8 @@ importers:
         specifier: 3.0.3
         version: 3.0.3
       '@codspeed/tinybench-plugin':
-        specifier: 6.1.0
-        version: 6.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(tinybench@6.2.0)
+        specifier: 6.1.1
+        version: 6.1.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(tinybench@6.2.0)
       '@commitlint/cli':
         specifier: 21.2.3
         version: 21.2.3(@types/node@26.6.6)(typescript@6.0.3)
@@ -271,8 +271,8 @@ importers:
         specifier: ~22.2.0
         version: 22.2.0(@angular/compiler@22.2.0)(typescript@6.0.3)
       '@codspeed/tinybench-plugin':
-        specifier: 6.1.0
-        version: 6.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(tinybench@6.2.0)
+        specifier: 6.1.1
+        version: 6.1.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(tinybench@6.2.0)
       '@real-router/persistent-params-plugin':
         specifier: workspace:^
         version: link:../packages/persistent-params-plugin
@@ -1300,11 +1300,11 @@ packages:
     resolution: {integrity: sha512-y7/yvZ2TPAnR9+jnc00klvNNLkJiXFFrQA/hlLCcxA9a2A4zQIOimyFQ9XfwYKiGD1fb5GY8vbKIIgO8d5Tb2A==}
     engines: {node: '>= 20.12.0'}
 
-  '@codspeed/core@6.1.0':
-    resolution: {integrity: sha512-lxFkexeuf6iOWUZmgCeuGSVgk0fKBbtnCVd3w3UWi3627/4t55FhA046LhFLzedCQUi6183s99DnM3/6TRjzHQ==}
+  '@codspeed/core@6.1.1':
+    resolution: {integrity: sha512-Lz9xqyeoHI2T7QoLjcJGFrKzyOJKzJM8/2kNRiCcMsqeLzntFpMXHj1No4efraWmdAG+6+7DZmKodrjh+9H6ng==}
 
-  '@codspeed/tinybench-plugin@6.1.0':
-    resolution: {integrity: sha512-R34+lpwSyCll2CpHSFaVDJq7uHWexlUpSq+FheiaI9qzKb5BNN3z/WNGwFPMcEXO5xpUfjg7qepO83aGuwcSyg==}
+  '@codspeed/tinybench-plugin@6.1.1':
+    resolution: {integrity: sha512-CigpPDyMLQ8eOm2SVn8Z6/52PxcEwTy2stDNiATzeXU5UN+VnIdF573X3gatgCmfSq2T0mTJYSAuqBIdlqYv8w==}
     peerDependencies:
       tinybench: '>=4.0.1'
 
@@ -7979,7 +7979,7 @@ snapshots:
       fast-wrap-ansi: 0.2.2
       sisteransi: 1.0.5
 
-  '@codspeed/core@6.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)':
+  '@codspeed/core@6.1.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)':
     dependencies:
       axios: 1.20.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       form-data: 4.0.6
@@ -7989,9 +7989,9 @@ snapshots:
       - debug
       - supports-color
 
-  '@codspeed/tinybench-plugin@6.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(tinybench@6.2.0)':
+  '@codspeed/tinybench-plugin@6.1.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(tinybench@6.2.0)':
     dependencies:
-      '@codspeed/core': 6.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
+      '@codspeed/core': 6.1.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       tinybench: 6.2.0
     transitivePeerDependencies:
       - debug
