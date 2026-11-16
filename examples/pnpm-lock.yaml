@@ -1313,10 +1313,10 @@ importers:
     dependencies:
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.4(@real-router/core@0.154.0)(preact@10.29.8)
+        version: 0.24.4(@real-router/core@0.154.0)(preact@11.2.0)
       preact:
-        specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.8.2)
+        specifier: ~11.2.0
+        version: 11.2.0(preact-render-to-string@6.8.2)
 
   web/preact/animation-examples/motion-animations:
     dependencies:
@@ -1328,20 +1328,20 @@ importers:
         version: 0.154.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.4(@real-router/core@0.154.0)(preact@10.29.8)
+        version: 0.24.4(@real-router/core@0.154.0)(preact@11.2.0)
       motion:
         specifier: 14.9.0
         version: 14.9.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       preact:
-        specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.8.2)
+        specifier: ~11.2.0
+        version: 11.2.0(preact-render-to-string@6.8.2)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.6
-        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@11.2.0)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1359,17 +1359,17 @@ importers:
         version: 0.154.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.4(@real-router/core@0.154.0)(preact@10.29.8)
+        version: 0.24.4(@real-router/core@0.154.0)(preact@11.2.0)
       preact:
-        specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.8.2)
+        specifier: ~11.2.0
+        version: 11.2.0(preact-render-to-string@6.8.2)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.6
-        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@11.2.0)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1387,17 +1387,17 @@ importers:
         version: 0.154.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.4(@real-router/core@0.154.0)(preact@10.29.8)
+        version: 0.24.4(@real-router/core@0.154.0)(preact@11.2.0)
       preact:
-        specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.8.2)
+        specifier: ~11.2.0
+        version: 11.2.0(preact-render-to-string@6.8.2)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.6
-        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@11.2.0)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1415,17 +1415,17 @@ importers:
         version: 0.154.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.4(@real-router/core@0.154.0)(preact@10.29.8)
+        version: 0.24.4(@real-router/core@0.154.0)(preact@11.2.0)
       preact:
-        specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.8.2)
+        specifier: ~11.2.0
+        version: 11.2.0(preact-render-to-string@6.8.2)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.6
-        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@11.2.0)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1443,23 +1443,23 @@ importers:
         version: 0.154.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.4(@real-router/core@0.154.0)(preact@10.29.8)
+        version: 0.24.4(@real-router/core@0.154.0)(preact@11.2.0)
       preact:
-        specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.8.2)
+        specifier: ~11.2.0
+        version: 11.2.0(preact-render-to-string@6.8.2)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.6
-        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@11.2.0)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~7.0.1
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/preact':
         specifier: ~3.2.4
-        version: 3.2.4(preact@10.29.8)
+        version: 3.2.4(preact@11.2.0)
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
@@ -1486,23 +1486,23 @@ importers:
         version: 0.154.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.4(@real-router/core@0.154.0)(preact@10.29.8)
+        version: 0.24.4(@real-router/core@0.154.0)(preact@11.2.0)
       preact:
-        specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.8.2)
+        specifier: ~11.2.0
+        version: 11.2.0(preact-render-to-string@6.8.2)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.6
-        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@11.2.0)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~7.0.1
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/preact':
         specifier: ~3.2.4
-        version: 3.2.4(preact@10.29.8)
+        version: 3.2.4(preact@11.2.0)
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
@@ -1529,14 +1529,14 @@ importers:
         version: 0.154.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.4(@real-router/core@0.154.0)(preact@10.29.8)
+        version: 0.24.4(@real-router/core@0.154.0)(preact@11.2.0)
       preact:
-        specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.8.2)
+        specifier: ~11.2.0
+        version: 11.2.0(preact-render-to-string@6.8.2)
     devDependencies:
       '@preact/preset-vite':
         specifier: 2.10.6
-        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@11.2.0)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1563,7 +1563,7 @@ importers:
         version: 0.7.0(@real-router/core@0.154.0)
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.4(@real-router/core@0.154.0)(preact@10.29.8)
+        version: 0.24.4(@real-router/core@0.154.0)(preact@11.2.0)
       '@real-router/preload-plugin':
         specifier: '*'
         version: 0.8.0(@real-router/core@0.154.0)
@@ -1571,8 +1571,8 @@ importers:
         specifier: '*'
         version: 0.9.0(@real-router/core@0.154.0)
       preact:
-        specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.8.2)
+        specifier: ~11.2.0
+        version: 11.2.0(preact-render-to-string@6.8.2)
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -1582,13 +1582,13 @@ importers:
         version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.6
-        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@11.2.0)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~7.0.1
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/preact':
         specifier: ~3.2.4
-        version: 3.2.4(preact@10.29.8)
+        version: 3.2.4(preact@11.2.0)
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
@@ -1618,20 +1618,20 @@ importers:
         version: 0.9.0(@real-router/core@0.154.0)
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.4(@real-router/core@0.154.0)(preact@10.29.8)
+        version: 0.24.4(@real-router/core@0.154.0)(preact@11.2.0)
       '@real-router/preload-plugin':
         specifier: '*'
         version: 0.8.0(@real-router/core@0.154.0)
       preact:
-        specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.8.2)
+        specifier: ~11.2.0
+        version: 11.2.0(preact-render-to-string@6.8.2)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.6
-        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@11.2.0)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1649,23 +1649,23 @@ importers:
         version: 0.154.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.4(@real-router/core@0.154.0)(preact@10.29.8)
+        version: 0.24.4(@real-router/core@0.154.0)(preact@11.2.0)
       preact:
-        specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.8.2)
+        specifier: ~11.2.0
+        version: 11.2.0(preact-render-to-string@6.8.2)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.6
-        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@11.2.0)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~7.0.1
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/preact':
         specifier: ~3.2.4
-        version: 3.2.4(preact@10.29.8)
+        version: 3.2.4(preact@11.2.0)
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
@@ -1692,23 +1692,23 @@ importers:
         version: 0.154.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.4(@real-router/core@0.154.0)(preact@10.29.8)
+        version: 0.24.4(@real-router/core@0.154.0)(preact@11.2.0)
       preact:
-        specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.8.2)
+        specifier: ~11.2.0
+        version: 11.2.0(preact-render-to-string@6.8.2)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.6
-        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@11.2.0)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~7.0.1
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/preact':
         specifier: ~3.2.4
-        version: 3.2.4(preact@10.29.8)
+        version: 3.2.4(preact@11.2.0)
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
@@ -1735,17 +1735,17 @@ importers:
         version: 0.16.3(@real-router/core@0.154.0)
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.4(@real-router/core@0.154.0)(preact@10.29.8)
+        version: 0.24.4(@real-router/core@0.154.0)(preact@11.2.0)
       preact:
-        specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.8.2)
+        specifier: ~11.2.0
+        version: 11.2.0(preact-render-to-string@6.8.2)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.6
-        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@11.2.0)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1763,14 +1763,14 @@ importers:
         version: 0.154.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.4(@real-router/core@0.154.0)(preact@10.29.8)
+        version: 0.24.4(@real-router/core@0.154.0)(preact@11.2.0)
       preact:
-        specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.8.2)
+        specifier: ~11.2.0
+        version: 11.2.0(preact-render-to-string@6.8.2)
     devDependencies:
       '@preact/preset-vite':
         specifier: 2.10.6
-        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@11.2.0)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1788,23 +1788,23 @@ importers:
         version: 0.154.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.4(@real-router/core@0.154.0)(preact@10.29.8)
+        version: 0.24.4(@real-router/core@0.154.0)(preact@11.2.0)
       preact:
-        specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.8.2)
+        specifier: ~11.2.0
+        version: 11.2.0(preact-render-to-string@6.8.2)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.6
-        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@11.2.0)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~7.0.1
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)))
       '@testing-library/preact':
         specifier: ~3.2.4
-        version: 3.2.4(preact@10.29.8)
+        version: 3.2.4(preact@11.2.0)
       '@testing-library/user-event':
         specifier: ~14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
@@ -1834,14 +1834,14 @@ importers:
         version: 0.7.0(@real-router/core@0.154.0)
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.4(@real-router/core@0.154.0)(preact@10.29.8)
+        version: 0.24.4(@real-router/core@0.154.0)(preact@11.2.0)
       preact:
-        specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.8.2)
+        specifier: ~11.2.0
+        version: 11.2.0(preact-render-to-string@6.8.2)
     devDependencies:
       '@preact/preset-vite':
         specifier: 2.10.6
-        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@11.2.0)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1859,13 +1859,13 @@ importers:
         version: 0.154.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.4(@real-router/core@0.154.0)(preact@10.29.8)
+        version: 0.24.4(@real-router/core@0.154.0)(preact@11.2.0)
       '@real-router/search-schema-plugin':
         specifier: '*'
         version: 0.9.0(@real-router/core@0.154.0)
       preact:
-        specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.8.2)
+        specifier: ~11.2.0
+        version: 11.2.0(preact-render-to-string@6.8.2)
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -1875,7 +1875,7 @@ importers:
         version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.6
-        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@11.2.0)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1893,7 +1893,7 @@ importers:
         version: 0.154.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.4(@real-router/core@0.154.0)(preact@10.29.8)
+        version: 0.24.4(@real-router/core@0.154.0)(preact@11.2.0)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.7.0(@real-router/core@0.154.0)
@@ -1901,18 +1901,18 @@ importers:
         specifier: '*'
         version: 0.3.0(@real-router/core@0.154.0)
       preact:
-        specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.8.2)
+        specifier: ~11.2.0
+        version: 11.2.0(preact-render-to-string@6.8.2)
       preact-render-to-string:
         specifier: ~6.8.1
-        version: 6.8.2(preact@10.29.8)
+        version: 6.8.2(preact@11.2.0)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.6
-        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@11.2.0)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@types/node':
         specifier: 26.6.6
         version: 26.6.6
@@ -1936,7 +1936,7 @@ importers:
         version: 0.154.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.4(@real-router/core@0.154.0)(preact@10.29.8)
+        version: 0.24.4(@real-router/core@0.154.0)(preact@11.2.0)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.7.0(@real-router/core@0.154.0)
@@ -1947,18 +1947,18 @@ importers:
         specifier: 5.3.0
         version: 5.3.0(supports-color@10.2.2)
       preact:
-        specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.8.2)
+        specifier: ~11.2.0
+        version: 11.2.0(preact-render-to-string@6.8.2)
       preact-render-to-string:
         specifier: ~6.8.1
-        version: 6.8.2(preact@10.29.8)
+        version: 6.8.2(preact@11.2.0)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.6
-        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@11.2.0)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
@@ -1985,7 +1985,7 @@ importers:
         version: 0.154.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.4(@real-router/core@0.154.0)(preact@10.29.8)
+        version: 0.24.4(@real-router/core@0.154.0)(preact@11.2.0)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.7.0(@real-router/core@0.154.0)
@@ -1996,18 +1996,18 @@ importers:
         specifier: 5.3.0
         version: 5.3.0(supports-color@10.2.2)
       preact:
-        specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.8.2)
+        specifier: ~11.2.0
+        version: 11.2.0(preact-render-to-string@6.8.2)
       preact-render-to-string:
         specifier: ~6.8.1
-        version: 6.8.2(preact@10.29.8)
+        version: 6.8.2(preact@11.2.0)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.6
-        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@11.2.0)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
@@ -2031,7 +2031,7 @@ importers:
         version: 0.154.0
       '@real-router/preact':
         specifier: '*'
-        version: 0.24.4(@real-router/core@0.154.0)(preact@10.29.8)
+        version: 0.24.4(@real-router/core@0.154.0)(preact@11.2.0)
       '@real-router/ssr-data-plugin':
         specifier: '*'
         version: 0.7.0(@real-router/core@0.154.0)
@@ -2042,18 +2042,18 @@ importers:
         specifier: 5.3.0
         version: 5.3.0(supports-color@10.2.2)
       preact:
-        specifier: ~10.29.7
-        version: 10.29.8(preact-render-to-string@6.8.2)
+        specifier: ~11.2.0
+        version: 11.2.0(preact-render-to-string@6.8.2)
       preact-render-to-string:
         specifier: ~6.8.1
-        version: 6.8.2(preact@10.29.8)
+        version: 6.8.2(preact@11.2.0)
     devDependencies:
       '@playwright/test':
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.6
-        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@11.2.0)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
@@ -10643,10 +10643,10 @@ packages:
     peerDependencies:
       preact: '>=10 || >= 11.0.0-0'
 
-  preact@10.29.8:
-    resolution: {integrity: sha512-ej2aVZ+vZ8WO7tvlQWRM9N63A0KzF9q4mWJfDUHgYaIofWY9hu74QdnQrjoPMmZi2/nZ5gN0bJCQF49xQqx09Q==}
+  preact@11.2.0:
+    resolution: {integrity: sha512-/HfHI/7N84e6GrWBJ3J280z3mLaRJiDcSvj/A+y/4AbLnND/1UlGHe1sR6oYuTGwId0nP7dqDU9OnLxMPZ7xBg==}
     peerDependencies:
-      preact-render-to-string: '>=5'
+      preact-render-to-string: '>=6.7.0'
     peerDependenciesMeta:
       preact-render-to-string:
         optional: true
@@ -13142,12 +13142,12 @@ snapshots:
 
   '@polka/url@1.0.0-next.29': {}
 
-  '@preact/preset-vite@2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.8)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))':
+  '@preact/preset-vite@2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@11.2.0)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))':
     dependencies:
       '@babel/core': 7.29.7(supports-color@10.2.2)
       '@babel/plugin-transform-react-jsx': 7.28.6(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2)
       '@babel/plugin-transform-react-jsx-development': 7.27.1(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2)
-      '@prefresh/vite': 2.4.12(preact@10.29.8)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
+      '@prefresh/vite': 2.4.12(preact@11.2.0)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
       '@rollup/pluginutils': 5.4.0(rollup@4.63.2)
       babel-plugin-transform-hook-names: 1.0.2(@babel/core@7.29.7(supports-color@10.2.2))
       debug: 4.4.3(supports-color@10.2.2)
@@ -13163,20 +13163,20 @@ snapshots:
 
   '@prefresh/babel-plugin@0.5.3': {}
 
-  '@prefresh/core@1.5.9(preact@10.29.8)':
+  '@prefresh/core@1.5.9(preact@11.2.0)':
     dependencies:
-      preact: 10.29.8(preact-render-to-string@6.8.2)
+      preact: 11.2.0(preact-render-to-string@6.8.2)
 
   '@prefresh/utils@1.2.1': {}
 
-  '@prefresh/vite@2.4.12(preact@10.29.8)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))':
+  '@prefresh/vite@2.4.12(preact@11.2.0)(supports-color@10.2.2)(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))':
     dependencies:
       '@babel/core': 7.29.7(supports-color@10.2.2)
       '@prefresh/babel-plugin': 0.5.3
-      '@prefresh/core': 1.5.9(preact@10.29.8)
+      '@prefresh/core': 1.5.9(preact@11.2.0)
       '@prefresh/utils': 1.2.1
       '@rollup/pluginutils': 4.2.1
-      preact: 10.29.8(preact-render-to-string@6.8.2)
+      preact: 11.2.0(preact-render-to-string@6.8.2)
       vite: 8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0)
     transitivePeerDependencies:
       - supports-color
@@ -13220,12 +13220,12 @@ snapshots:
     dependencies:
       '@real-router/core': 0.154.0
 
-  '@real-router/preact@0.24.4(@real-router/core@0.154.0)(preact@10.29.8)':
+  '@real-router/preact@0.24.4(@real-router/core@0.154.0)(preact@11.2.0)':
     dependencies:
       '@real-router/core': 0.154.0
       '@real-router/route-utils': 0.4.0(@real-router/core@0.154.0)
       '@real-router/sources': 0.15.1(@real-router/core@0.154.0)
-      preact: 10.29.8(preact-render-to-string@6.8.2)
+      preact: 11.2.0(preact-render-to-string@6.8.2)
 
   '@real-router/preload-plugin@0.8.0(@real-router/core@0.154.0)':
     dependencies:
@@ -13659,10 +13659,10 @@ snapshots:
     optionalDependencies:
       vitest: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.2.0))(vite@8.3.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(tsx@4.23.15)(yaml@2.9.0))
 
-  '@testing-library/preact@3.2.4(preact@10.29.8)':
+  '@testing-library/preact@3.2.4(preact@11.2.0)':
     dependencies:
       '@testing-library/dom': 8.20.1
-      preact: 10.29.8(preact-render-to-string@6.8.2)
+      preact: 11.2.0(preact-render-to-string@6.8.2)
 
   '@testing-library/react@16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:
@@ -16496,13 +16496,13 @@ snapshots:
       commander: 9.5.0
     optional: true
 
-  preact-render-to-string@6.8.2(preact@10.29.8):
+  preact-render-to-string@6.8.2(preact@11.2.0):
     dependencies:
-      preact: 10.29.8(preact-render-to-string@6.8.2)
+      preact: 11.2.0(preact-render-to-string@6.8.2)
 
-  preact@10.29.8(preact-render-to-string@6.8.2):
+  preact@11.2.0(preact-render-to-string@6.8.2):
     optionalDependencies:
-      preact-render-to-string: 6.8.2(preact@10.29.8)
+      preact-render-to-string: 6.8.2(preact@11.2.0)
 
   prelude-ls@1.2.1: {}
 
