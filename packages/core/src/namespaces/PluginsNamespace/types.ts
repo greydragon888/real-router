@@ -8,9 +8,9 @@ import type {
   Unsubscribe,
   EventMethodMap,
   PluginFactory,
+  CheckPositionMap,
   DiagnosticEventMap,
 } from "../../types";
-import type { RouterValidator } from "../../types/RouterValidator";
 
 export interface PluginsDependencies<
   Dependencies extends DefaultDependencies = DefaultDependencies,
@@ -27,12 +27,14 @@ export interface PluginsDependencies<
 
   compileFactory: (factory: PluginFactory<Dependencies>) => Plugin;
 
-  /**
-   * Returns the opt-in DX validator, or `null` when no validation-plugin is
-   * installed. A plain deps field (#1331) — internals are registered before
-   * wiring, so `getInternals(router)` never throws and no try/catch is needed.
-   */
-  getValidator: () => RouterValidator | null;
+  /** Whether the router is disposed — asked before each factory and after its start. */
+  isDisposed: () => boolean;
+
+  /** Runs the checks registered at a position (#2388); a check may only throw. */
+  runChecks: <P extends keyof CheckPositionMap>(
+    position: P,
+    ...args: CheckPositionMap[P]
+  ) => void;
 
   /**
    * Reports an internal DIAGNOSTIC (#2388). Core states what happened; whether

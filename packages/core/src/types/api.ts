@@ -20,6 +20,7 @@ import type {
   DefaultDependencies,
   GuardFnFactory,
   Plugin,
+  PluginFactory,
   Route,
   RouteConfigUpdate,
   RouterLogger,
@@ -106,6 +107,25 @@ export type DiagnosticEventMap = {
    * core asked about, so a symbol arrives as the symbol.
    */
   REMOVE_DEPENDENCY_MISSING: [name: string | symbol];
+
+  /**
+   * `usePlugin` is about to start a call's factories: the plugins the router
+   * holds plus every factory the call carries, a repeated one counted each time
+   * it appears. Raised once per call, before the first factory runs.
+   */
+  USE_PLUGIN_COUNT: [count: number];
+
+  /**
+   * A factory the call has already carried once. It is registered once, and
+   * the kind is raised for each repetition, before the first factory runs.
+   */
+  USE_PLUGIN_DUPLICATE_IN_BATCH: [];
+
+  /**
+   * The object a factory returned holds a value that is not a function under
+   * the hook `methodName`, so core skips that hook.
+   */
+  USE_PLUGIN_HOOK_NOT_FUNCTION: [methodName: string];
 };
 
 /**
@@ -308,6 +328,36 @@ export interface CheckPositionMap {
 
   /** `cloneRouter`'s override bag, as the caller passed it. */
   "cloneRouter:entry": [dependencies: DefaultDependencies | undefined];
+
+  /**
+   * The count `usePlugin` judges before the call's first factory runs: the
+   * plugins the router holds, the distinct factories the call carries — one the
+   * call repeats takes one slot — and the resolved limit. Asked once per call,
+   * so a batch is judged whole (#2413).
+   */
+  "usePlugin:count": [
+    currentCount: number,
+    newCount: number,
+    maxPlugins: number,
+  ];
+
+  /**
+   * Each factory the call carries, in the caller's order, and the factories the
+   * router held when the call began. Asked after `usePlugin:count`, before the
+   * first factory runs.
+   */
+  /* eslint-disable @typescript-eslint/no-explicit-any -- a factory is `PluginFactory<Dependencies>` at the call site and this map is not generic */
+  "usePlugin:entry": [
+    factory: PluginFactory<any>,
+    registered: readonly PluginFactory<any>[],
+  ];
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+
+  /**
+   * The object a factory returned, after core's own shape check and before core
+   * freezes it and wires its hooks.
+   */
+  "usePlugin:plugin": [plugin: Plugin];
 }
 
 /**

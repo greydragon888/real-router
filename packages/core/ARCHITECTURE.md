@@ -169,8 +169,8 @@ buildPath(route: string, params?: Params, search?: SearchParams): string {
 }
 ```
 
-The validator is namespaced by concern (`routes`, `navigation`, `state`,
-`lifecycle`, `dependencies`, `plugins`, `options`, `eventBus`).
+The validator is namespaced by concern; `src/types/RouterValidator.ts` declares
+the namespaces.
 
 **Lifecycle:** registered before `router.start()` — throws
 `VALIDATION_PLUGIN_AFTER_START` otherwise; installs the validator and runs a
@@ -226,7 +226,7 @@ function wireNamespaces(ns: NamespaceBag) {
   wireLimits(ns); // eventBus gets the listener caps
   wireRouteLifecycle(ns, compileFactory, getValidator); // guard registry
   wireRoutes(ns); // routes get guard registration + state accessors
-  wirePlugins(ns, compileFactory, getValidator); // plugins get addEventListener + canNavigate
+  wirePlugins(ns, compileFactory); // plugins get addEventListener, canNavigate and both channels
   wireNavigation(ns); // navigation gets state, routes, eventBus, ...
   wireRouterLifecycle(ns); // start/stop get navigate, matchPath, ...
   wireState(ns); // state gets defaultParams, buildPath, getUrlParams, getQueryParams

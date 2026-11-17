@@ -255,29 +255,6 @@ function buildValidatorObject(
         validateResolvedDefaultRoute(routeName, lookup);
       },
     },
-    plugins: {
-      validatePluginLimit(currentCount, newCount, limits) {
-        validatePluginLimit(
-          currentCount,
-          newCount,
-          (limits as { maxPlugins?: number } | undefined)?.maxPlugins,
-        );
-      },
-      validateNoDuplicatePlugins,
-      validatePluginKeys,
-      validateCountThresholds(count) {
-        const maxPlugins =
-          api.getOptions().limits?.maxPlugins ?? CORE_LIMIT_DEFAULTS.maxPlugins;
-
-        validatePluginCountThresholds(count, maxPlugins, api.logger);
-      },
-      warnBatchDuplicates() {
-        warnBatchDuplicates(api.logger);
-      },
-      warnPluginMethodType(methodName) {
-        warnPluginMethodType(methodName, api.logger);
-      },
-    },
     lifecycle: {
       validateHandlerLimit(count, methodName) {
         const maxHandlers =
@@ -856,6 +833,27 @@ export function validationPlugin<
       },
     );
 
+    const removeUsePluginCountCheck = api.addCheck(
+      "usePlugin:count",
+      (currentCount, newCount, maxPlugins) => {
+        validatePluginLimit(currentCount, newCount, maxPlugins);
+      },
+    );
+
+    const removeUsePluginEntryCheck = api.addCheck(
+      "usePlugin:entry",
+      (factory, registered) => {
+        validateNoDuplicatePlugins(factory, registered);
+      },
+    );
+
+    const removeUsePluginPluginCheck = api.addCheck(
+      "usePlugin:plugin",
+      (plugin) => {
+        validatePluginKeys(plugin);
+      },
+    );
+
     // ⚠ A DIAGNOSTIC, not a check, and the channel is the difference rather
     // than the style: this one cannot refuse the registration it describes —
     // the plugin is already installed by the time core reports.
@@ -908,6 +906,31 @@ export function validationPlugin<
       "REMOVE_DEPENDENCY_MISSING",
       (name) => {
         warnRemoveNonExistent(name, api.logger);
+      },
+    );
+
+    const removeUsePluginCountDiagnostic = api.subscribeDiagnostic(
+      "USE_PLUGIN_COUNT",
+      (count) => {
+        validatePluginCountThresholds(
+          count,
+          api.getOptions().limits?.maxPlugins ?? CORE_LIMIT_DEFAULTS.maxPlugins,
+          api.logger,
+        );
+      },
+    );
+
+    const removeUsePluginDuplicateDiagnostic = api.subscribeDiagnostic(
+      "USE_PLUGIN_DUPLICATE_IN_BATCH",
+      () => {
+        warnBatchDuplicates(api.logger);
+      },
+    );
+
+    const removeUsePluginHookDiagnostic = api.subscribeDiagnostic(
+      "USE_PLUGIN_HOOK_NOT_FUNCTION",
+      (methodName) => {
+        warnPluginMethodType(methodName, api.logger);
       },
     );
 
@@ -967,6 +990,12 @@ export function validationPlugin<
 
         removeCloneRouterEntryCheck();
 
+        removeUsePluginCountCheck();
+
+        removeUsePluginEntryCheck();
+
+        removeUsePluginPluginCheck();
+
         removePluginAfterStartDiagnostic();
 
         removeSetDependencyCountDiagnostic();
@@ -978,6 +1007,12 @@ export function validationPlugin<
         removeSetDependenciesOverwriteDiagnostic();
 
         removeRemoveDependencyMissingDiagnostic();
+
+        removeUsePluginCountDiagnostic();
+
+        removeUsePluginDuplicateDiagnostic();
+
+        removeUsePluginHookDiagnostic();
 
         removeInterceptor();
 

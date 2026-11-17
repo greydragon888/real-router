@@ -30,13 +30,6 @@ const MEMBERS = [
   "options.validateOptions",
   "options.validateResolvedDefaultRoute",
 
-  "plugins.validatePluginLimit",
-  "plugins.validateNoDuplicatePlugins",
-  "plugins.validatePluginKeys",
-  "plugins.validateCountThresholds",
-  "plugins.warnBatchDuplicates",
-  "plugins.warnPluginMethodType",
-
   "lifecycle.validateHandlerLimit",
   "lifecycle.validateCountThresholds",
   "lifecycle.warnOverwrite",

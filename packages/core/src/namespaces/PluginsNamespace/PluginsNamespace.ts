@@ -1,8 +1,8 @@
 // packages/core/src/namespaces/PluginsNamespace/PluginsNamespace.ts
 
 import { EVENTS_MAP, EVENT_METHOD_NAMES, LOGGER_CONTEXT } from "./constants";
-import { validatePlugin } from "./validators";
-import { DIAGNOSTIC } from "../../internals";
+import { validateNotDisposed, validatePlugin } from "./validators";
+import { DIAGNOSTIC, POSITION } from "../../internals";
 
 import type { PluginsDependencies } from "./types";
 import type {
@@ -38,6 +38,10 @@ export class PluginsNamespace<
     validatePlugin(plugin);
   }
 
+  static validateNotDisposed(isDisposed: boolean): void {
+    validateNotDisposed(isDisposed);
+  }
+
   // =========================================================================
   // Dependency injection
   // =========================================================================
@@ -51,10 +55,9 @@ export class PluginsNamespace<
   // =========================================================================
 
   /**
-   * Returns the number of registered plugins.
-   * Used by facade for limit validation.
+   * Returns the number of registered plugins — the count the facade hands
+   * `usePlugin:count`.
    */
-  /* v8 ignore next 3 -- @preserve: only called via validator interface (ctx.validator?.plugins.validatePluginLimit), not reachable without validation plugin */
   count(): number {
     return this.#plugins.size;
   }
@@ -67,10 +70,10 @@ export class PluginsNamespace<
    * @param factories - Already validated by facade
    */
   use(...factories: PluginFactory<Dependencies>[]): Unsubscribe {
-    // Emit warnings for count thresholds (not validation, just warnings)
-    this.#deps
-      .getValidator()
-      ?.plugins.validateCountThresholds(this.#plugins.size + factories.length);
+    this.#deps.emitDiagnostic(
+      DIAGNOSTIC.USE_PLUGIN_COUNT,
+      this.#plugins.size + factories.length,
+    );
 
     // Fast path for single plugin (common case)
     if (factories.length === 1) {
@@ -210,7 +213,7 @@ export class PluginsNamespace<
 
     for (const plugin of plugins) {
       if (seenInBatch.has(plugin)) {
-        this.#deps.getValidator()?.plugins.warnBatchDuplicates(plugins);
+        this.#deps.emitDiagnostic(DIAGNOSTIC.USE_PLUGIN_DUPLICATE_IN_BATCH);
       } else {
         seenInBatch.add(plugin);
       }
@@ -220,10 +223,14 @@ export class PluginsNamespace<
   }
 
   #startPlugin(pluginFactory: PluginFactory<Dependencies>): Unsubscribe {
+    // Asked again here, not only at the facade: see `validateNotDisposed`.
+    // A batch that meets a disposed router rolls back like any failed factory.
+    PluginsNamespace.validateNotDisposed(this.#deps.isDisposed());
+
     const appliedPlugin = this.#deps.compileFactory(pluginFactory);
 
     PluginsNamespace.validatePlugin(appliedPlugin);
-    this.#deps.getValidator()?.plugins.validatePluginKeys(appliedPlugin);
+    this.#deps.runChecks(POSITION["usePlugin:plugin"], appliedPlugin);
 
     freeze(appliedPlugin);
 
@@ -248,13 +255,15 @@ export class PluginsNamespace<
             );
           }
         } else {
-          this.#deps.getValidator()?.plugins.warnPluginMethodType(methodName);
+          this.#deps.emitDiagnostic(
+            DIAGNOSTIC.USE_PLUGIN_HOOK_NOT_FUNCTION,
+            methodName,
+          );
         }
       }
     }
 
-    // Return composite cleanup function
-    return () => {
+    const cleanup: Unsubscribe = () => {
       for (const removeListener of removeEventListeners) {
         removeListener();
       }
@@ -263,5 +272,20 @@ export class PluginsNamespace<
         appliedPlugin.teardown();
       }
     };
+
+    // Asked once more after the last application code of the start: nothing
+    // has registered this plugin yet, so a `dispose()` from in here never
+    // reached it, and it is torn down before the refusal.
+    if (this.#deps.isDisposed()) {
+      try {
+        cleanup();
+      } catch (error) {
+        this.#deps.logger.error(LOGGER_CONTEXT, "Cleanup error:", error);
+      }
+    }
+
+    PluginsNamespace.validateNotDisposed(this.#deps.isDisposed());
+
+    return cleanup;
   }
 }

@@ -844,6 +844,7 @@
       "59c67f294b86",
       "2622bb8b9f3c",
       "f8e3a3338f7a",
+      "1a875978da67",
       "54cbd2ff90d2",
       "76ab0b2903c5",
       "00cf20bf6aaa",
@@ -976,7 +977,6 @@
       "a3344185c6b9",
       "1ac644d1e3c1",
       "c6efb2c9e1be",
-      "8cd103b56405",
       "6e7cc71923f5"
     ],
     "packages/core/src/types/tree-changed.ts": [
@@ -2223,7 +2223,7 @@
       "8deaa71710f2"
     ],
     "packages/validation-plugin/CLAUDE.md": [
-      "404d4e44c5c0",
+      "46ac7eb435f9",
       "12e61264c5e2",
       "4319712a7f6e",
       "6cbab15f70ad",
@@ -2242,18 +2242,20 @@
       "c343645e6019",
       "1fbca30c319c",
       "9694f202351f",
-      "54421934db50",
+      "1b148cedcfc9",
+      "82c34ee36c78",
+      "a177a79fe999",
       "1ad52f45ff00",
       "592e1eb0b1ae",
       "13113acd12d4",
       "f610c7255a78",
       "fe046344a5cf",
       "dc007e60f534",
-      "d7e87330e139",
+      "e68091d164a6",
       "4b882f0ccf5f",
       "6af4c1e40bb5",
       "36a6e111996b",
-      "a82719f6430e",
+      "d055d143ca1c",
       "6c43793526e7"
     ],
     "packages/vue/CLAUDE.md": [

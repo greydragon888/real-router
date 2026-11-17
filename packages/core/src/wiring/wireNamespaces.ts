@@ -2,7 +2,7 @@
 
 import { assertShippedChannelCorrect } from "../channels";
 import { readDependency } from "../dependenciesStore";
-import { getInternals } from "../internals";
+import { getInternals, runChecks } from "../internals";
 import { COMMIT_PERMIT_TOKEN } from "../namespaces/NavigationNamespace";
 import {
   resolveQueryParamsMode,
@@ -81,9 +81,9 @@ export function wireNamespaces<Dependencies extends DefaultDependencies>(
   // member reads through `ns.*` at CALL time, so no wiring order is baked in.
   const port = createRouteResolver(ns);
 
-  // Shared by RouteLifecycle and Plugins — one allocation. Internals are
-  // registered before wiring (#1331), so this never throws; returns null until
-  // validation-plugin installs the validator.
+  // Shared by RouteLifecycle, Routes and the event bus — one allocation.
+  // Internals are registered before wiring (#1331), so this never throws;
+  // returns null until validation-plugin installs the validator.
   const getValidator = (): RouterValidator | null =>
     getInternals(ns.router).validator;
 
@@ -91,7 +91,7 @@ export function wireNamespaces<Dependencies extends DefaultDependencies>(
   wireEventBus(ns, getValidator);
   wireRouteLifecycle(ns, compileFactory, getValidator);
   wireRoutes(ns, port, getValidator, getDependency);
-  wirePlugins(ns, compileFactory, getValidator);
+  wirePlugins(ns, compileFactory);
   wireNavigation(ns, port, getDependency);
   wireRouterLifecycle(ns);
   wireState(ns, port);
@@ -175,7 +175,6 @@ function wireRoutes<Dependencies extends DefaultDependencies>(
 function wirePlugins<Dependencies extends DefaultDependencies>(
   ns: NamespaceBag<Dependencies>,
   compileFactory: CompileFactory<Dependencies>,
-  getValidator: () => RouterValidator | null,
 ): void {
   const deps: PluginsDependencies<Dependencies> = {
     logger: getInternals(ns.router).logger,
@@ -184,7 +183,10 @@ function wirePlugins<Dependencies extends DefaultDependencies>(
       ns.eventBus.addEventListener(eventName, cb, "usePlugin"),
     canNavigate: () => ns.eventBus.canBeginTransition(),
     compileFactory,
-    getValidator,
+    isDisposed: () => ns.eventBus.isDisposed(),
+    runChecks: (position, ...args) => {
+      runChecks(getInternals(ns.router).checks, position, ...args);
+    },
     emitDiagnostic: (key, ...args) => {
       ns.eventBus.emitDiagnostic(key, ...args);
     },
