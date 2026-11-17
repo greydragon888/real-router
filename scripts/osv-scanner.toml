@@ -23,22 +23,6 @@ reason = "glib 0.18.5 VariantStrIter unsoundness (RUSTSEC-2024-0429). Transitive
 id = "GHSA-pqg4-j6r4-53mv"  # shell-quote quote() command injection through a line terminator after a comment token
 reason = "Fixed in shell-quote 1.11.0, outside the exact 1.9.0 concurrently 10.0.5 pins; concurrently has no newer release. Only path: concurrently 10.0.5 (devDependency of examples/desktop/electron/*), which calls quote() only under --passthrough-arguments, and the examples' dev scripts do not pass it. examples/ is never published."
 
-# deepmerge has no fixed release: every version from 4.2.0 through 4.3.1, the
-# latest, is affected. It arrives in the three lockfiles through two build
-# plugins, each at its latest release: @rollup/plugin-node-resolve 16.0.3 (a
-# devDependency of @real-router/solid) and @sveltejs/vite-plugin-svelte 7.3.1
-# (devDependencies of @real-router/svelte, the benchmarks, the Svelte examples
-# and cross-router-bench). The advisory needs a source object that holds an own
-# `__proto__` key, as `JSON.parse` of attacker input produces. The rollup plugin
-# merges only its own module-level `defaults`; vite-plugin-svelte merges its
-# defaults with svelte.config.js and the plugin's inline options, which the
-# developer writes. Neither runs in a published package. Drop it when deepmerge
-# ships a fix or both plugins stop depending on it — ask api.osv.dev per version.
-
-[[IgnoredVulns]]
-id = "GHSA-gcqx-w48m-w2h4"  # deepmerge mergeObject() prototype poisoning of the returned object
-reason = "No fixed deepmerge release (<= 4.3.1, the latest). Paths: @rollup/plugin-node-resolve 16.0.3 and @sveltejs/vite-plugin-svelte 7.3.1, both latest, build and test tooling in the root, examples/ and cross-router-bench; none published. The rollup plugin merges only its own constant defaults; vite-plugin-svelte merges its defaults with svelte.config.js and inline plugin options, written by the developer, so no merged source carries an attacker's own __proto__ key."
-
 # NOTE (2026-09-10): ten entries stood here — RUSTSEC-2024-0411 through -0420,
 # the gtk-rs unmaintained-crate advisories (gdk, gtk, atk, their -sys crates and
 # gtk3-macros). They are gone, and the way they left is worth one paragraph
@@ -82,6 +66,10 @@ reason = "Transitive via Tauri 2.x, desktop examples only."
 [[IgnoredVulns]]
 id = "RUSTSEC-2025-0100"  # unic-ucd-ident unmaintained
 reason = "Transitive via Tauri 2.x, desktop examples only."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0543"  # chrono unmaintained
+reason = "Transitive via Tauri 2.x (tauri-utils -> serde_with), desktop examples only."
 
 # quick-xml DoS advisories — real CVEs with CVSS scores (unlike the
 # unmaintained-crate entries above). RUSTSEC-only (no GHSA alias), so not in
