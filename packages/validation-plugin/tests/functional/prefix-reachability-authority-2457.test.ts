@@ -244,12 +244,11 @@ function add<K, V>(map: Map<K, Set<V>>, key: K, value: V): void {
 /**
  * The members `RouterValidator` declares, each as `namespace.member`.
  *
- * ⚠ Qualified, because a member name is not unique across namespaces:
- * `validateCountThresholds` belongs to three of them, and core consults each one
- * from its own doors (#2545).
+ * ⚠ Qualified, because a member name need not be unique across namespaces, and
+ * core consults each one from its own doors (#2545).
  */
-function contractMembers(): Set<string> {
-  const source = parse(path.join(CORE_SRC, "types/RouterValidator.ts"));
+function contractMembers(root: string): Set<string> {
+  const source = parse(path.join(root, "types/RouterValidator.ts"));
   const members = new Set<string>();
 
   const visit = (node: ts.Node): void => {
@@ -380,8 +379,8 @@ function recordConsultation(
  * a prefix core prints, a door string core hands a validator, a public method of
  * the facade, and a member of what a `get*Api` factory returns.
  */
-function readCore(): CoreFacts {
-  const contract = contractMembers();
+function readCore(root: string = CORE_SRC): CoreFacts {
+  const contract = contractMembers(root);
   const facts = {
     consulted: new Map<string, Set<string>>(),
     passed: new Map<string, Set<string>>(),
@@ -389,7 +388,7 @@ function readCore(): CoreFacts {
   };
   const vocabulary = new Set<string>();
 
-  for (const file of globSync(`${CORE_SRC}/**/*.ts`)) {
+  for (const file of globSync(`${root}/**/*.ts`)) {
     const source = parse(file);
 
     const visit = (node: ts.Node): void => {
@@ -960,8 +959,9 @@ function judge(
   }
 }
 
-function census(root: string = PLUGIN_SRC): Census {
-  const core = readCoreOnce();
+/** `coreRoot` replaces core's `src` with a tree a control writes. */
+function census(root: string = PLUGIN_SRC, coreRoot?: string): Census {
+  const core = coreRoot === undefined ? readCoreOnce() : readCore(coreRoot);
   const graph = readPlugin(root);
   const fromPositions = positionRoots(graph);
   const reach = closure(
@@ -1199,17 +1199,50 @@ describe("a message names a door that can reach it (#2457)", () => {
   });
 
   it("CONTROL — one member name in two namespaces: each keeps the doors that consult it (#2545)", () => {
-    // `validateCountThresholds` is a member of `plugins`, `lifecycle` and
-    // `eventBus`, and core consults each one from its own doors. Keyed by the bare
-    // name, the consultations pool their doors, and a head wired only to the
-    // plugins member passes with a door that only the event bus consults. The
-    // event bus entry is an arrow: of the shapes `wiringSeed` reads, the one the
-    // real table does not use.
+    // The core tree below declares `validateCountThresholds` in two namespaces
+    // and consults each from its own door. Keyed by the bare name, the
+    // consultations pool their doors, and a head wired only to the plugins
+    // member passes with a door that only the event bus consults. The event bus
+    // entry is an arrow: of the shapes `wiringSeed` reads, the one the real
+    // table does not use.
     const directory = mkdtempSync(path.join(tmpdir(), "prefix-2457-member-"));
+    const core = path.join(directory, "core");
+    const plugin = path.join(directory, "plugin");
 
     try {
+      mkdirSync(path.join(core, "types"), { recursive: true });
+      mkdirSync(plugin);
       writeFileSync(
-        path.join(directory, "validationPlugin.ts"),
+        path.join(core, "types", "RouterValidator.ts"),
+        [
+          "export interface RouterValidator {",
+          "  plugins: { validateCountThresholds: (count: number) => void };",
+          "  eventBus: { validateCountThresholds: (count: number) => void };",
+          "}",
+          "",
+        ].join("\n"),
+      );
+      writeFileSync(
+        path.join(core, "Router.ts"),
+        [
+          'import type { RouterValidator } from "./types/RouterValidator";',
+          "",
+          "export class Router {",
+          "  validator: RouterValidator | null = null;",
+          "",
+          "  usePlugin(): void {",
+          "    this.validator?.plugins.validateCountThresholds(1);",
+          "  }",
+          "",
+          "  subscribe(): void {",
+          "    this.validator?.eventBus.validateCountThresholds(1);",
+          "  }",
+          "}",
+          "",
+        ].join("\n"),
+      );
+      writeFileSync(
+        path.join(plugin, "validationPlugin.ts"),
         [
           "export function buildValidatorObject() {",
           "  return {",
@@ -1229,7 +1262,7 @@ describe("a message names a door that can reach it (#2457)", () => {
         ].join("\n"),
       );
 
-      const seen = census(directory);
+      const seen = census(plugin, core);
 
       expect(seen.wrongDoor).toStrictEqual([
         {

@@ -1020,7 +1020,7 @@ export class EventBusNamespace {
 
   /**
    * Injects the lazy validator accessor (wireNamespaces), mirroring
-   * `PluginsNamespace` / `RouteLifecycleNamespace`. The closure reads the live
+   * `RouteLifecycleNamespace`. The closure reads the live
    * `RouterInternals.validator`, so a validation-plugin registered AFTER wiring
    * is still observed on the next `subscribe` / `addEventListener`.
    */

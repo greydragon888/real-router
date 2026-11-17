@@ -10,12 +10,17 @@ import {
 import { createTestRouter } from "../helpers";
 import { consultationsOn, installSpyValidator } from "../helpers/spyValidator";
 
-import type { RouterValidator, PluginFactory, Router } from "@real-router/core";
+import type {
+  Plugin,
+  PluginFactory,
+  RouterValidator,
+  Router,
+} from "@real-router/core";
 
 /**
- * Validator CALL-SITE contract — facade (Router.ts) + the two namespaces that
- * read the validator through a getter (`PluginsNamespace`,
- * `RouteLifecycleNamespace`). Companion to api/validatorContract.test.ts.
+ * Validator CALL-SITE contract — the facade (Router.ts), and
+ * `RouteLifecycleNamespace` and `EventBusNamespace`, which read the validator
+ * through a getter. Companion to api/validatorContract.test.ts.
  *
  * The getter is wired as `() => getInternals(router).validator`
  * (wireNamespaces), so installing a spy validator after construction is
@@ -114,33 +119,27 @@ describe("core/validator call-site contract (facade + namespaces)", () => {
   });
 
   // ===========================================================================
-  // PluginsNamespace warns (validatePluginKeys / warnBatchDuplicates /
-  // warnPluginAfterStart / warnPluginMethodType)
+  // usePlugin refuses and reports on its positions and kinds; what they
+  // receive is `plugin-channels-2388.test.ts`'s. What it still consults is a
+  // hook's listener threshold, on the event bus.
   // ===========================================================================
   describe("PluginsNamespace", () => {
-    it("usePlugin: validates plugin keys", () => {
-      const plugin: PluginFactory = () => ({});
+    it("usePlugin consults the validator only for the listener threshold of a hook (#2388)", () => {
+      const repeated: PluginFactory = () => ({});
 
-      router.usePlugin(plugin);
+      vi.clearAllMocks();
 
-      expect(validator.plugins.validatePluginKeys).toHaveBeenCalledTimes(1);
-    });
+      router.usePlugin(() => ({ teardown: vi.fn() }));
+      router.usePlugin(repeated, repeated);
+      router.usePlugin(() => ({ onStart: "skipped" }) as unknown as Plugin);
 
-    it("usePlugin: a duplicate within the batch warns once", () => {
-      const plugin: PluginFactory = () => ({});
+      expect(consultationsOn(validator)).toStrictEqual([]);
 
-      router.usePlugin(plugin, plugin);
+      router.usePlugin(() => ({ onStop: vi.fn() }));
 
-      expect(validator.plugins.warnBatchDuplicates).toHaveBeenCalledTimes(1);
-    });
-
-    it("usePlugin: distinct plugins do NOT trigger batch-duplicate warning", () => {
-      router.usePlugin(
-        () => ({}),
-        () => ({}),
-      );
-
-      expect(validator.plugins.warnBatchDuplicates).not.toHaveBeenCalled();
+      expect(consultationsOn(validator)).toStrictEqual([
+        "eventBus.validateCountThresholds",
+      ]);
     });
 
     it("usePlugin after start REPORTS the missed onStart, on the diagnostic channel (#2388)", async () => {
@@ -185,19 +184,6 @@ describe("core/validator call-site contract (facade + namespaces)", () => {
       }));
 
       expect(seen).toStrictEqual([]);
-    });
-
-    it("usePlugin: a non-function lifecycle method warns ('onStart')", () => {
-      router.usePlugin(
-        () =>
-          ({
-            onStart: "not a function",
-          }) as unknown as ReturnType<PluginFactory>,
-      );
-
-      expect(validator.plugins.warnPluginMethodType).toHaveBeenCalledWith(
-        "onStart",
-      );
     });
   });
 

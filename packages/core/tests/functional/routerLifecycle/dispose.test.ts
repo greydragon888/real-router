@@ -606,6 +606,19 @@ describe("dispose", () => {
       } catch (error: any) {
         expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
       }
+
+      // A call that carries no factory meets only the facade's question.
+      for (const skipped of [[], [false, null]] as const) {
+        let code: unknown = "no throw";
+
+        try {
+          boundUsePlugin(...skipped);
+        } catch (error: any) {
+          code = error.code;
+        }
+
+        expect(code).toBe(errorCodes.ROUTER_DISPOSED);
+      }
     });
   });
 

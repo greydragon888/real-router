@@ -25,10 +25,9 @@ import type { DependenciesApi } from "@real-router/core/api";
  * copy is not.
  *
  * ⚠ **Published subgraphs are subtracted, not single objects.** `getTree()`
- * returns `store.tree` itself, whose `children` Maps are in the universe too, and
- * `getResolvedLimits()` returns `store.limits`, which
- * `plugins.validatePluginLimit` receives. Subtracting only the roots would red
- * both.
+ * returns `store.tree` itself, whose `children` Maps are in the universe too;
+ * subtracting only the root would leave them. `getResolvedLimits()` returns
+ * `store.limits`, published the same way.
  *
  * ⚠ **Judged AT CALL TIME, against the stores as they are then.** `replace()`
  * rebuilds the matcher and the tree, so a universe built after the doors ran
@@ -167,8 +166,6 @@ async function exerciseDoors(router: Router): Promise<void> {
   routes.has("shop.child");
 
   getLifecycleApi(router).addActivateGuard("shop", () => () => true);
-  // Reaches `plugins.validatePluginLimit`, which receives the resolved limits.
-  router.usePlugin(() => ({}));
 
   await router.start("/");
   await router.navigate("shop.child");
@@ -217,10 +214,9 @@ describe("the validator takes facts, not containers (#2382)", () => {
     // ⚠ The members #2388 converts leave this channel: their arguments reach a
     // check or a diagnostic kind, and no authority judges THOSE for
     // reachability. What stays here is the channel that still exists.
-    const unexercised = [
-      "options.validateResolvedDefaultRoute",
-      "plugins.validatePluginLimit",
-    ].filter((method) => !methods.has(method));
+    const unexercised = ["options.validateResolvedDefaultRoute"].filter(
+      (method) => !methods.has(method),
+    );
 
     expect(unexercised).toStrictEqual([]);
   });

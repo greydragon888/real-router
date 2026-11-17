@@ -119,7 +119,7 @@ describe("the check channel (#2388)", () => {
       getPluginApi(router).addCheck("buildPath:entry", () => undefined),
     ).toThrow(
       new TypeError(
-        '[router.addCheck] Invalid position: "buildPath:entry". Must be one of: buildPath:params, buildPathResolved:params, canNavigateTo:entry, canNavigateTo:params, navigate:entry, navigate:params, addRoute:batch, replaceRoutes:batch, removeRoute:entry, updateRoute:entry, hasRoute:entry, getRoute:entry, forwardState:entry, buildNavigationState:state, addActivateGuard:entry, addDeactivateGuard:entry, removeActivateGuard:entry, removeDeactivateGuard:entry, getDependency:entry, getDependency:value, setDependency:entry, setDependency:count, setDependencies:entry, setDependencies:count, removeDependency:entry, hasDependency:entry, cloneRouter:entry',
+        '[router.addCheck] Invalid position: "buildPath:entry". Must be one of: buildPath:params, buildPathResolved:params, canNavigateTo:entry, canNavigateTo:params, navigate:entry, navigate:params, addRoute:batch, replaceRoutes:batch, removeRoute:entry, updateRoute:entry, hasRoute:entry, getRoute:entry, forwardState:entry, buildNavigationState:state, addActivateGuard:entry, addDeactivateGuard:entry, removeActivateGuard:entry, removeDeactivateGuard:entry, getDependency:entry, getDependency:value, setDependency:entry, setDependency:count, setDependencies:entry, setDependencies:count, removeDependency:entry, hasDependency:entry, cloneRouter:entry, usePlugin:count, usePlugin:entry, usePlugin:plugin',
       ),
     );
   });
@@ -140,7 +140,7 @@ describe("the check channel (#2388)", () => {
       getPluginApi(router).addCheck(hostile, () => undefined),
     ).toThrow(
       new TypeError(
-        "[router.addCheck] Invalid position: object. Must be one of: buildPath:params, buildPathResolved:params, canNavigateTo:entry, canNavigateTo:params, navigate:entry, navigate:params, addRoute:batch, replaceRoutes:batch, removeRoute:entry, updateRoute:entry, hasRoute:entry, getRoute:entry, forwardState:entry, buildNavigationState:state, addActivateGuard:entry, addDeactivateGuard:entry, removeActivateGuard:entry, removeDeactivateGuard:entry, getDependency:entry, getDependency:value, setDependency:entry, setDependency:count, setDependencies:entry, setDependencies:count, removeDependency:entry, hasDependency:entry, cloneRouter:entry",
+        "[router.addCheck] Invalid position: object. Must be one of: buildPath:params, buildPathResolved:params, canNavigateTo:entry, canNavigateTo:params, navigate:entry, navigate:params, addRoute:batch, replaceRoutes:batch, removeRoute:entry, updateRoute:entry, hasRoute:entry, getRoute:entry, forwardState:entry, buildNavigationState:state, addActivateGuard:entry, addDeactivateGuard:entry, removeActivateGuard:entry, removeDeactivateGuard:entry, getDependency:entry, getDependency:value, setDependency:entry, setDependency:count, setDependencies:entry, setDependencies:count, removeDependency:entry, hasDependency:entry, cloneRouter:entry, usePlugin:count, usePlugin:entry, usePlugin:plugin",
       ),
     );
   });

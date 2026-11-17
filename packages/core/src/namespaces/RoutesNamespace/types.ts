@@ -30,7 +30,7 @@ export interface RoutesDependencies<
   /**
    * The opt-in validator, resolved PER CALL — `null` until `validation-plugin`
    * installs one, and `null` again after its teardown. The same shared closure
-   * EventBus / RouteLifecycle / Plugins receive; this namespace needs it for the
+   * EventBus and RouteLifecycle receive; this namespace needs it for the
    * one boundary on it where USER code hands back a value core then builds a
    * state from (a route's `decodeParams`).
    */

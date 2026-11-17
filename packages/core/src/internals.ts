@@ -516,6 +516,9 @@ export const DIAGNOSTIC = {
   SET_DEPENDENCY_OVERWRITE: "SET_DEPENDENCY_OVERWRITE",
   SET_DEPENDENCIES_OVERWRITE: "SET_DEPENDENCIES_OVERWRITE",
   REMOVE_DEPENDENCY_MISSING: "REMOVE_DEPENDENCY_MISSING",
+  USE_PLUGIN_COUNT: "USE_PLUGIN_COUNT",
+  USE_PLUGIN_DUPLICATE_IN_BATCH: "USE_PLUGIN_DUPLICATE_IN_BATCH",
+  USE_PLUGIN_HOOK_NOT_FUNCTION: "USE_PLUGIN_HOOK_NOT_FUNCTION",
 } as const satisfies {
   [K in keyof DiagnosticEventMap]: DiagnosticEventMap[K] extends readonly [
     unknown?,
@@ -565,6 +568,9 @@ export const POSITION = {
   "removeDependency:entry": "removeDependency:entry",
   "hasDependency:entry": "hasDependency:entry",
   "cloneRouter:entry": "cloneRouter:entry",
+  "usePlugin:count": "usePlugin:count",
+  "usePlugin:entry": "usePlugin:entry",
+  "usePlugin:plugin": "usePlugin:plugin",
 } as const satisfies { [K in keyof CheckPositionMap]: K };
 
 /**

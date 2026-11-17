@@ -1699,7 +1699,7 @@ const PLACES = new Map([
     "counted:default-prep",
   ],
   [
-    "namespaces/PluginsNamespace/PluginsNamespace.ts › #startPlugin › call:Plugin.teardown",
+    "namespaces/PluginsNamespace/PluginsNamespace.ts › cleanup › call:Plugin.teardown",
     DISPOSED,
   ],
   [`${RLN} › #checkGuardSync › call:GuardFn`, INHERITS],
@@ -1792,7 +1792,7 @@ const B1_ROWS: readonly [string, string][] = [
   ["N4 B1 B7 B9 R3 R5 R7", "types/RouterValidator.ts › RouterValidator"],
   ["B8", `${EBN} › emitRouterStart`],
   ["S2 S3 S4", `${EBN} › emitRouterStop`],
-  ["S6", "namespaces/PluginsNamespace/PluginsNamespace.ts › #startPlugin"],
+  ["S6", "namespaces/PluginsNamespace/PluginsNamespace.ts › cleanup"],
   ["F2 R8", `${RLN} › #checkGuardSync`],
   ["R1", "internals.ts › runChecks"],
   ["R4", "wiring/wireNamespaces.ts › createCompileFactory"],

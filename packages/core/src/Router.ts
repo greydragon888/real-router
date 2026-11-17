@@ -30,6 +30,7 @@ import {
   createInterceptable,
   createTernaryInterceptable,
   getInternals,
+  hasChecks,
   POSITION,
   registerInternals,
   runChecks,
@@ -93,7 +94,6 @@ import type { Limits, RouterEventMap } from "./types/internal";
 /** One binding per door this module refuses behind (#2487). */
 const atNavigateToNotFound = raiser("router", "navigateToNotFound");
 
-const atUsePlugin = raiser("router", "usePlugin");
 const atStart = raiser("router", "start");
 const atRouter = raiser("router");
 
@@ -1334,15 +1334,10 @@ export class Router<
   ): Unsubscribe {
     // Post-dispose guard, mirroring #946 for subscribe/subscribeLeave. A
     // reference captured before dispose() (`const up = router.usePlugin`)
-    // bypasses the #markDisposed method swap, so the swap alone is not enough:
-    // without this, the factory would run on a disposed router (real side
-    // effects), listeners would land in the cleared emitter, and teardown would
-    // never fire — a silent zombie plugin (#1196).
-    if (this.#eventBus.isDisposed()) {
-      throw atUsePlugin.code(
-        errorCodes.ROUTER_DISPOSED,
-      )`cannot install a plugin on a disposed router — dispose() is terminal`;
-    }
+    // bypasses the #markDisposed method swap (#1196). The namespace asks again
+    // before each factory; this question is the one a call that carries no
+    // factory meets, which would otherwise return a no-op unsubscribe.
+    PluginsNamespace.validateNotDisposed(this.#eventBus.isDisposed());
 
     const filtered = plugins.filter(Boolean) as PluginFactory<Dependencies>[];
 
@@ -1350,23 +1345,27 @@ export class Router<
       return () => {};
     }
 
-    const ctx = getInternals(this);
+    const { checks } = getInternals(this);
 
-    // A factory repeated in one batch is registered once, so it takes one slot.
-    ctx.validator?.plugins.validatePluginLimit(
-      this.#plugins.count(),
-      new Set(filtered).size,
-      this.#limits,
-    );
-    for (const plugin of filtered) {
-      // `getAll()` sits inside the optional-chain argument on purpose: with no
-      // validator installed (production default) the `?.` short-circuits and the
-      // array is never allocated. Hoisting it out would either allocate on the
-      // no-validator hot path or push the dev-only branch out of coverage.
-      ctx.validator?.plugins.validateNoDuplicatePlugins(
-        plugin,
-        this.#plugins.getAll(),
+    // ⚑ Each argument is computed only for a check standing at its position,
+    // so bare core allocates neither the distinct set nor the registered list.
+    if (hasChecks(checks, POSITION["usePlugin:count"])) {
+      runChecks(
+        checks,
+        POSITION["usePlugin:count"],
+        this.#plugins.count(),
+        // A factory the call repeats is registered once, so it takes one slot.
+        new Set(filtered).size,
+        this.#limits.maxPlugins,
       );
+    }
+
+    if (hasChecks(checks, POSITION["usePlugin:entry"])) {
+      const registered = this.#plugins.getAll();
+
+      for (const plugin of filtered) {
+        runChecks(checks, POSITION["usePlugin:entry"], plugin, registered);
+      }
     }
 
     return this.#plugins.use(...filtered);

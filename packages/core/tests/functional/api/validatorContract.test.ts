@@ -51,7 +51,7 @@ describe("core/validator call-site contract", () => {
   // getDependenciesApi and cloneRouter
   // ===========================================================================
   describe("getDependenciesApi", () => {
-    it("the dependency doors and cloneRouter consult the validator for nothing (#2388)", () => {
+    it("the dependency doors and cloneRouter consult the base router's validator for nothing (#2388)", () => {
       // Their refusals are checks and their reports are diagnostic kinds;
       // `dependencies/dependency-channels-2388.test.ts` owns what each position
       // and kind receives, and when.

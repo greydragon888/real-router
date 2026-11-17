@@ -228,7 +228,7 @@ describe("plugin API validation — with validationPlugin", () => {
   });
 });
 
-describe("plugins.validatePluginKeys", () => {
+describe("usePlugin:plugin — validatePluginKeys", () => {
   let router: Router;
 
   beforeEach(() => {
@@ -256,7 +256,7 @@ describe("plugins.validatePluginKeys", () => {
   });
 });
 
-describe("plugins.warnBatchDuplicates — validationPlugin.ts line 157", () => {
+describe("USE_PLUGIN_DUPLICATE_IN_BATCH — warnBatchDuplicates", () => {
   let router: Router;
 
   beforeEach(() => {
@@ -280,7 +280,7 @@ describe("plugins.warnBatchDuplicates — validationPlugin.ts line 157", () => {
   });
 });
 
-describe("plugins.warnPluginMethodType", () => {
+describe("USE_PLUGIN_HOOK_NOT_FUNCTION — warnPluginMethodType", () => {
   let router: Router;
 
   beforeEach(() => {
@@ -305,7 +305,7 @@ describe("plugins.warnPluginMethodType", () => {
   });
 });
 
-describe("plugins.warnPluginAfterStart", () => {
+describe("PLUGIN_AFTER_START — warnPluginAfterStart", () => {
   let router: Router;
 
   afterEach(() => {
@@ -329,7 +329,7 @@ describe("plugins.warnPluginAfterStart", () => {
   });
 });
 
-describe("plugins.validatePluginKeys — onTransitionLeaveApprove", () => {
+describe("usePlugin:plugin — validatePluginKeys, onTransitionLeaveApprove", () => {
   let router: Router;
 
   beforeEach(() => {

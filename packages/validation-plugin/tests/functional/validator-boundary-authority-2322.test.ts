@@ -123,12 +123,6 @@ const OWNER: Record<string, string> = {
   "navigation.validateStartArgs": "router-methods.validation.test.ts",
   "options.validateResolvedDefaultRoute":
     "integration/retrospective-integration.test.ts",
-  "plugins.validateCountThresholds": SELF,
-  "plugins.validateNoDuplicatePlugins": "integration/plugin-lifecycle.test.ts",
-  "plugins.validatePluginKeys": "plugin-api.validation.test.ts",
-  "plugins.validatePluginLimit": "limits.test.ts",
-  "plugins.warnBatchDuplicates": "plugin-api.validation.test.ts",
-  "plugins.warnPluginMethodType": "plugin-api.validation.test.ts",
   "routes.validateBuildPathArgs": "router-methods.validation.test.ts",
   "routes.validateIsActiveRouteArgs": "predicate-totality-2245.test.ts",
   "routes.validateMatchPathArgs": SELF,
@@ -159,6 +153,11 @@ const REGISTRATION_OWNER: Record<string, string> = {
     "dependency-channels-consumer-2388.test.ts",
   "SET_DEPENDENCY_OVERWRITE › warnDepsOverwrite":
     "dependencies-reentrancy-1859.test.ts",
+  "USE_PLUGIN_COUNT › validatePluginCountThresholds": SELF,
+  "USE_PLUGIN_DUPLICATE_IN_BATCH › warnBatchDuplicates":
+    "plugin-api.validation.test.ts",
+  "USE_PLUGIN_HOOK_NOT_FUNCTION › warnPluginMethodType":
+    "plugin-api.validation.test.ts",
   "addActivateGuard:entry › validateHandler": "lifecycle.validation.test.ts",
   "addActivateGuard:entry › validateRouteName": "lifecycle.validation.test.ts",
   "addDeactivateGuard:entry › validateHandler": SELF,
@@ -220,6 +219,10 @@ const REGISTRATION_OWNER: Record<string, string> = {
     "route-door-prefix-2399.test.ts",
   "updateRoute:entry › validateUpdateRoutePropertyTypes":
     "routes.validation.test.ts",
+  "usePlugin:count › validatePluginLimit": "limits.test.ts",
+  "usePlugin:entry › validateNoDuplicatePlugins":
+    "integration/plugin-lifecycle.test.ts",
+  "usePlugin:plugin › validatePluginKeys": "plugin-api.validation.test.ts",
 };
 
 interface Census {
@@ -1551,7 +1554,7 @@ describe("what nothing else held (#2322)", () => {
     expect(run(false)).toStrictEqual([]);
   });
 
-  it("plugins.validateCountThresholds — a growing plugin list is named as it grows", () => {
+  it("validatePluginCountThresholds — a growing plugin list is named as it grows", () => {
     // `maxPlugins: 10` puts the warning at the second plugin, this one counted.
     const run = (withPlugin: boolean): unknown[] => {
       const sink = warningSink();
