@@ -1363,7 +1363,6 @@ const KINDS = new Map([
   ["internals.ts › RouterInternals.checks", T_CHECKS],
   ["internals.ts › RouterInternals.interceptors", T_INTERCEPTORS],
   ["internals.ts › RouterInternals.subscribeDiagnostic.handler", T_DIAGNOSTIC],
-  ["internals.ts › RouterInternals.treeChanged.subscribe.handler", T_TREE],
   ["types/api.ts › CheckFn", T_CHECKS],
   // `claimContextNamespace` hands the claim OUT; core calls its own methods.
   ["types/api.ts › ContextNamespaceClaim.release", UNCALLED],
@@ -1505,6 +1504,7 @@ const HOPS = new Map([
     "its matcher is the route table's",
   ],
   [`${RS} › compilePendingGuards()`, "its compiler is core's"],
+  [`${RS} › TreeChangedChannel`, "the channel `Router` builds over its bus"],
   [`${RS} › walkRouteNames()`, "its visitor is a closure of core's"],
   [
     "namespaces/RoutesNamespace/types.ts › RouteConfig",

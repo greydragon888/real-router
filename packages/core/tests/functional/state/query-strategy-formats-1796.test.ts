@@ -1500,15 +1500,15 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     }
   });
 
-  it("the published store hands out ONE sealed data slot, and eight siblings are destructive", () => {
+  it("the published store seals its option snapshot and its three references, and six route-state slots are destructive", () => {
     // ⚑ The cell above closes `store.matcherOptions` — "the freeze closed one
     // level and the hole was one level out". This asks where the sequence
     // actually stops. `routeGetStore()` is on the `RouterInternals` contract
     // published at `@real-router/core/validation`, and it hands out the store
-    // OBJECT, so the level beyond the slot is its fourteen siblings. Measured:
-    // one of them refuses a write for the same reason `matcherOptions` does,
-    // one refuses only because it is an accessor with no setter, and EIGHT are
-    // replaceable and then break the router through its ordinary public API.
+    // OBJECT, so the level beyond the slot is every sibling slot. A slot counts
+    // as sealed when it refuses a write of its own value, and as destructive
+    // when, replaced with `undefined`, it breaks the router through its
+    // ordinary public API.
     //
     // ⚠ Pinned as the CURRENT boundary, not as desirable — the `emptyIsShared`
     // contract. Sealing another slot reds `sealed` and is a deliberate change;
@@ -1580,10 +1580,17 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     }
 
     expect({ slots: slots.length, sealed, destructive }).toStrictEqual({
-      slots: 16,
+      slots: 17,
       // `definitions` is an accessor with no setter — sealed by shape, not by a
-      // decision; `matcherOptions` is the one sealed ON PURPOSE.
-      sealed: ["definitions", "matcherOptions"],
+      // decision. `matcherOptions` is sealed ON PURPOSE, and so are the three
+      // references the doors reach (#2952); the destructive six are route state.
+      sealed: [
+        "definitions",
+        "matcherOptions",
+        "depsStore",
+        "lifecycleNamespace",
+        "treeChanged",
+      ],
       destructive: [
         "config",
         "tree",
@@ -1591,8 +1598,6 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
         "urlParamsCache",
         "queryParamsCache",
         "rootPath",
-        "depsStore",
-        "lifecycleNamespace",
       ],
     });
   });

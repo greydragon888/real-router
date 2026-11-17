@@ -34,16 +34,6 @@ const GUARD = "throwIfReentrantTreeMutation";
 const byName = (a: string, b: string): number => a.localeCompare(b);
 
 /**
- * `RoutesStore` deliberately carries two cross-namespace references that are
- * assigned once during wiring and are not route data — see the store-pattern
- * note in `packages/core/CLAUDE.md`. Writing them is not a tree mutation, and
- * counting them would seed the taint with `setDependencies`, a method name
- * every namespace has: the whole wiring layer would go tainted and the scan
- * would report half the router as a door.
- */
-const WIRING_FIELDS = new Set(["depsStore", "lifecycleNamespace"]);
-
-/**
  * Doors that reach a store write and deliberately carry no reentrancy guard.
  * Strict equality — a stale entry is as much a defect as a missing guard.
  */
@@ -163,9 +153,7 @@ const isStoreTarget = (node: ts.Expression): boolean => {
     return false;
   }
 
-  const field = firstField(node);
-
-  return field !== undefined && !WIRING_FIELDS.has(field);
+  return firstField(node) !== undefined;
 };
 
 /**
@@ -408,7 +396,6 @@ describe("§ #1751: every store-mutating API door carries the reentrancy ban", (
         "  store.matcher.hasRoute(n);", // 8 — READ, must miss
         "  // applyRootPath rebuilds store.tree", // 9 — comment, must miss
         "  other.tree = t;", // 10 — not the store, must miss
-        "  store.depsStore = d;", // 11 — wiring reference, must miss
         "}",
       ].join("\n"),
     );
@@ -486,7 +473,7 @@ describe("§ #1751: every store-mutating API door carries the reentrancy ban", (
         "    ctx.setRootPath(t);", // reaches the store, no guard
         "  },",
         "  guarded: (t) => {",
-        "    throwIfReentrantTreeMutation(ctx.treeChanged.isEmitting);",
+        "    throwIfReentrantTreeMutation(ctx.routeGetStore().treeChanged.isEmitting);",
         "    ctx.setRootPath(t);", // reaches the store, guarded
         "  },",
         "};",

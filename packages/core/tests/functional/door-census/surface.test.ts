@@ -75,7 +75,6 @@ describe("surface census (#2303)", () => {
     "start",
     "subscribeDiagnostic",
     "systemCommit",
-    "treeChanged",
     "validator",
   ];
 
@@ -309,7 +308,7 @@ describe("surface census (#2303)", () => {
       getCloneState: row(() => i.getCloneState() as unknown as object),
     }).toStrictEqual({
       port: { n: 11, frozen: false, cached: true },
-      routeGetStore: { n: 16, frozen: false, cached: true },
+      routeGetStore: { n: 17, frozen: false, cached: true },
       dependenciesGetStore: { n: 2, frozen: false, cached: true },
       getTree: { n: 9, frozen: true, cached: true },
       getOptions: { n: 10, frozen: true, cached: true },

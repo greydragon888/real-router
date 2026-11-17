@@ -14,7 +14,12 @@ import {
   urlParamsOf,
   printedQueryParamsFor,
 } from "./helpers";
-import { createRoutesStore, applyRootPath, resetStore } from "./routesStore";
+import {
+  createRoutesStore,
+  applyRootPath,
+  resetStore,
+  sealReference,
+} from "./routesStore";
 import {
   assertChannelCorrect,
   assertShippedChannelCorrect,
@@ -36,7 +41,7 @@ import {
 import { raiser } from "../../RouterError";
 import { getTransitionPath } from "../../transitionPath";
 
-import type { RoutesStore } from "./routesStore";
+import type { RoutesStore, TreeChangedChannel } from "./routesStore";
 import type { RoutesDependencies } from "./types";
 import type {
   CreateMatcherOptions,
@@ -181,8 +186,14 @@ export class RoutesNamespace<
     routes: Route<Dependencies>[],
     matcherOptions: CreateMatcherOptions | undefined,
     logger: RouterLogger,
+    treeChanged: TreeChangedChannel,
   ) {
-    this.#store = createRoutesStore(routes, matcherOptions, logger);
+    this.#store = createRoutesStore(
+      routes,
+      matcherOptions,
+      logger,
+      treeChanged,
+    );
   }
 
   /**
@@ -262,14 +273,15 @@ export class RoutesNamespace<
   }
 
   /**
-   * Sets dependencies. Pure assignment — no side effects (#1331).
+   * Installs the dependencies and seals the slot (#2952). Nothing else runs
+   * here (#1331).
    *
    * The pending canActivate/canDeactivate factories from initial routes are
    * flushed separately by {@link flushPendingGuards}, called once wiring is
    * complete, so the order of the wire-* calls is unconstrained.
    */
   setDependencies(deps: RoutesDependencies<Dependencies>): void {
-    this.#store.depsStore = deps;
+    sealReference(this.#store, "depsStore", deps);
   }
 
   /**
@@ -299,13 +311,12 @@ export class RoutesNamespace<
   }
 
   /**
-   * Sets the lifecycle namespace reference.
+   * Installs the lifecycle namespace and seals the slot (#2952).
    */
   setLifecycleNamespace(
     namespace: RouteLifecycleNamespace<Dependencies> | undefined,
   ): void {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    this.#store.lifecycleNamespace = namespace!;
+    sealReference(this.#store, "lifecycleNamespace", namespace);
   }
 
   // =========================================================================

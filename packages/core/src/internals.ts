@@ -24,7 +24,6 @@ import type {
   SearchParams,
   SimpleState,
   State,
-  TreeChangedEvent,
   Unsubscribe,
   EventMethodMap,
   InterceptableMethodMap,
@@ -128,13 +127,6 @@ export interface RouterInternals<
   ) => Unsubscribe;
 
   /**
-   * Route-tree mutation channel — internal access for the `getRoutesApi`
-   * wrapper. A dedicated bridge is required because the public
-   * `addEventListener<E extends EventName>` structurally rejects
-   * `"TREE_CHANGED"` (it is not in the public `EventName` union), is strict on
-   * duplicates, and exposes neither `emit` nor `listenerCount`.
-   */
-  /**
    * Subscribes to one internal DIAGNOSTIC kind (#2388). The wiring path for
    * `PluginApi.subscribeDiagnostic`; core itself never listens.
    */
@@ -142,19 +134,6 @@ export interface RouterInternals<
     key: K,
     handler: (...args: DiagnosticEventMap[K]) => void,
   ) => Unsubscribe;
-
-  readonly treeChanged: {
-    readonly emit: (event: TreeChangedEvent) => void;
-    readonly subscribe: (
-      handler: (event: TreeChangedEvent) => void,
-    ) => Unsubscribe;
-    readonly listenerCount: () => number;
-    /**
-     * True while a `TREE_CHANGED` emit is on the stack — `getRoutesApi` reads it
-     * to reject reentrant route-CRUD from a `subscribeChanges` handler (#1032).
-     */
-    readonly isEmitting: () => boolean;
-  };
 
   /**
    * The navigation pipeline's read-model, for entry points that live on this

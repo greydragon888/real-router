@@ -130,14 +130,14 @@ Three kinds of module make up the router, and where a file sits says which kind 
 | **store**     | a per-router record — an interface plus functions, never a class                                                            | beside its owner: `namespaces/RoutesNamespace/routesStore.ts` (owned by `RoutesNamespace`), `dependenciesStore.ts` (owned by the router) | `RouterInternals` — `routeGetStore()`, `dependenciesGetStore()`                                                                 |
 | **door**      | a standalone API function: `getRoutesApi`, `getDependenciesApi`, `getLifecycleApi`, `getPluginApi`, `cloneRouter`           | `api/` — the `@real-router/core/api` entry                                                                                               | the application and plugins; a door reaches router state only through `getInternals`                                            |
 
-`RoutesStore` also carries the references its doors need — `src/namespaces/RoutesNamespace/CLAUDE.md` owns why. `DependenciesStore` carries none.
+`RoutesStore` also carries the references its doors need, each in a slot sealed where it arrives, so a write through `routeGetStore()` cannot replace one — `src/namespaces/RoutesNamespace/CLAUDE.md` owns why. `DependenciesStore` carries none.
 
 A door holds the mutation logic only it needs, so that logic ships in the `/api` entry rather than the main one. What a door and the facade both need lives below both — `internals.ts`, `guards.ts`, a store module — because nothing else in `src/` imports from `api/`. **Lint-enforced** by an `import-x/no-restricted-paths` zone in `packages/core/eslint.config.mjs`; the zone resolves paths rather than matching specifiers, so `src/types/api.ts`, which shares the name, is not caught by it.
 
 ### Dependency Injection
 
 Namespaces are constructed independently and wired by `wireNamespaces()`.
-`setDependencies()` is a **pure assignment**, so the `wire*` call order is
+`setDependencies()` **calls into no namespace**, so the `wire*` call order is
 arbitrary.
 
 **Initial-route guard factories flush last** — `flushPendingGuards()` is the final

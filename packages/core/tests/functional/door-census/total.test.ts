@@ -1144,13 +1144,13 @@ describe("door total (#2303)", () => {
       "plugin augmentations": 15,
       "plugin factory params": 14,
       "provider props": 6,
-      "surface members": 86,
+      "surface members": 85,
     });
   });
 
   it("the total", () => {
     // ⚠ The bucket table above is what a reader diffs; this line exists so the
     // headline is a test rather than a sentence somebody wrote down once.
-    expect(union.size).toBe(297);
+    expect(union.size).toBe(296);
   });
 });

@@ -405,8 +405,8 @@ in shipped source carrying eight members or more was checked for members the
 declaring package never uses — the mechanical form of "it landed because someone
 else needed it". The majority came back clean, and the clean ones all have a
 construction that can say no: a dependency bag admits nothing without a call site
-that reads it, a store admits only state its namespace owns, a validator method
-needs a door to guard.
+that reads it, a store admits only state its namespace owns and references its
+doors read, a validator method needs a door to guard.
 
 ⚠ **Size is not the signal, and neither is a member with one reader.** Both were
 tried and both failed: `NavigationDependencies` carries 29 members with over half
