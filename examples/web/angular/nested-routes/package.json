@@ -22,19 +22,19 @@
     "tslib": "2.9.1"
   },
   "devDependencies": {
-    "@analogjs/vite-plugin-angular": "2.7.5",
-    "@analogjs/vitest-angular": "2.7.5",
+    "@analogjs/vite-plugin-angular": "2.9.6",
+    "@analogjs/vitest-angular": "2.9.6",
     "@angular-devkit/architect": "~0.2202.0",
     "@angular-devkit/schematics": "~22.2.0",
     "@angular/build": "~22.2.0",
     "@angular/cli": "~22.2.0",
     "@angular/compiler": "~22.2.0",
     "@angular/compiler-cli": "~22.2.0",
-    "@playwright/test": "1.63.0",
+    "@playwright/test": "1.65.0",
     "jsdom": "31.0.0",
     "sirv-cli": "3.0.1",
     "typescript": "6.0.3",
-    "vite": "8.3.3",
+    "vite": "8.3.6",
     "vitest": "5.1.0"
   }
 }
