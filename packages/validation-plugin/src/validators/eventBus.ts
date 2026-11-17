@@ -1,44 +1,8 @@
 // packages/validation-plugin/src/validators/eventBus.ts
 
-import { events } from "@real-router/core";
-import { raiser } from "@real-router/core/utils";
-
 import { computeThresholds, CORE_LIMIT_DEFAULTS } from "../helpers";
 
-import type {
-  EventMethodMap,
-  EventName,
-  Plugin,
-  RouterLogger,
-} from "@real-router/core";
-
-const atAddEventListener = raiser("router", "addEventListener");
-
-// Derived from the constant core declares them in (#1888) — core enforces
-// membership at `addEventListener` itself, so a hand-written second list here
-// would be a copy that can drift from the emitter it describes.
-const objectValues = Object.values;
-
-const validEventNames = new Set<EventName>(
-  objectValues(events) as readonly EventName[],
-);
-
-export function validateEventName(eventName: unknown): void {
-  if (!validEventNames.has(eventName as EventName)) {
-    throw atAddEventListener.type`Invalid event name: ${String(eventName)}. Must be one of: $start, $stop, $$start, $$leaveApprove, $$cancel, $$success, $$error`;
-  }
-}
-
-export function validateListenerArgs<E extends EventName>(
-  eventName: E,
-  cb: Plugin[EventMethodMap[E]],
-): void {
-  validateEventName(eventName);
-
-  if (typeof cb !== "function") {
-    throw atAddEventListener.type`callback must be a function, got ${typeof cb}`;
-  }
-}
+import type { RouterLogger } from "@real-router/core";
 
 /**
  * Proactive warn@20% / error@50% threshold for the per-event listener counter
@@ -78,8 +42,3 @@ export function validateListenerCountThresholds(
     );
   }
 }
-
-// Re-exported so the rest of the plugin keeps naming them here (#1879). They are
-// core's: a hand-written copy accepts the event set core had when it was typed,
-// which is the type-level half of the drift #1888 closed at runtime.
-export { type EventMethodMap, type EventName } from "@real-router/core";

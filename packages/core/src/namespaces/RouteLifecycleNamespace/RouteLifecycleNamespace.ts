@@ -1,5 +1,6 @@
 // packages/core/src/namespaces/RouteLifecycleNamespace/RouteLifecycleNamespace.ts
 
+import { DIAGNOSTIC, POSITION } from "../../internals";
 import { raiser } from "../../RouterError";
 
 import type { RouteLifecycleDependencies } from "./types";
@@ -31,6 +32,24 @@ function booleanToFactory<Dependencies extends DefaultDependencies>(
 ): GuardFnFactory<Dependencies> {
   return value ? TRUE_FACTORY : FALSE_FACTORY;
 }
+
+/**
+ * Where a registration of each guard type is judged and reported (#2388). The
+ * messages of a type name its `canActivate` / `canDeactivate` door, so each
+ * type has its own position and kinds.
+ */
+const CHANNELS = {
+  activate: {
+    count: POSITION["canActivate:count"],
+    counted: DIAGNOSTIC.CAN_ACTIVATE_COUNT,
+    overwritten: DIAGNOSTIC.CAN_ACTIVATE_OVERWRITE,
+  },
+  deactivate: {
+    count: POSITION["canDeactivate:count"],
+    counted: DIAGNOSTIC.CAN_DEACTIVATE_COUNT,
+    overwritten: DIAGNOSTIC.CAN_DEACTIVATE_OVERWRITE,
+  },
+} as const;
 
 /**
  * Puts a slot back the way it was: re-seat the previous entry, or delete the
@@ -173,17 +192,18 @@ export class RouteLifecycleNamespace<
   /**
    * Pre-flights the #961 handler-limit `RangeError` into the route-CRUD PREPARE
    * phase (#1046). `#registerHandler`'s per-slot limit check throws AFTER the
-   * tree/config swap, so `add`/`replace`/`update` tore post-commit when the
-   * validator was installed and the per-type count was at `maxLifecycleHandlers`.
-   * Running the same check here — before any store mutation — restores atomicity
-   * (#951/#956/#698): a batch that would exceed the limit aborts before a single
-   * write.
+   * tree/config swap, so `add`/`replace`/`update` would tear post-commit when a
+   * check stands at the type's count position and the count is at its limit.
+   * Asking the same position here — before any store mutation — keeps them
+   * atomic (#951/#956/#698): a batch that would exceed the limit aborts before a
+   * single write.
    *
    * Only NEW slots count (an overwrite leaves the union count unchanged, mirroring
    * `#registerHandler`). For `replace` (`clearsDefinition = true`) the definition
    * guards are about to be cleared, so the projection runs against the surviving
    * EXTERNAL guards only — exactly the post-clear state the install loop sees.
-   * Plugin-gated: a no-op without the validator (the limit is opt-in).
+   * A no-op for a type with no check at its count position (the limit is
+   * opt-in), so bare core walks no name.
    *
    * @param activateNames - route names a `canActivate` would be registered for
    * @param deactivateNames - route names a `canDeactivate` would be registered for
@@ -194,53 +214,8 @@ export class RouteLifecycleNamespace<
     deactivateNames: Iterable<string>,
     clearsDefinition: boolean,
   ): void {
-    const validator = this.#deps.getValidator();
-
-    if (!validator) {
-      return;
-    }
-
-    const check = (
-      type: "activate" | "deactivate",
-      names: Iterable<string>,
-      methodName: string,
-    ): void => {
-      const { definition, external } = this.#getFactoryMaps(type);
-
-      // A name already holding a guard of this type is an overwrite (no new
-      // slot, mirroring `#registerHandler`). After a definition-clear (replace)
-      // only EXTERNAL guards survive, so the existing-name check — and the base
-      // count below — run against `external` alone, matching the post-clear
-      // install state the loop sees.
-      let newSlots = 0;
-
-      for (const name of names) {
-        const isExisting = clearsDefinition
-          ? external.has(name)
-          : definition.has(name) || external.has(name);
-
-        if (!isExisting) {
-          newSlots++;
-        }
-      }
-
-      if (newSlots === 0) {
-        return;
-      }
-
-      // The install loop throws when a new-slot registration observes
-      // `count >= max`. Starting from `base` and adding `newSlots` new names,
-      // the highest pre-register count it reaches is `base + newSlots - 1` —
-      // replicate that worst case so the pre-flight throws iff the loop would.
-      const base = clearsDefinition
-        ? external.size
-        : this.getHandlerCount(type);
-
-      validator.lifecycle.validateHandlerLimit(base + newSlots - 1, methodName);
-    };
-
-    check("activate", activateNames, "canActivate");
-    check("deactivate", deactivateNames, "canDeactivate");
+    this.#preflightSlots("activate", activateNames, clearsDefinition);
+    this.#preflightSlots("deactivate", deactivateNames, clearsDefinition);
   }
 
   // =========================================================================
@@ -519,7 +494,7 @@ export class RouteLifecycleNamespace<
 
   /**
    * `methodName` is the door the caller typed; it names a throwing guard's log
-   * and the validator's async-guard warning (#2821).
+   * and travels with the synchronous ask's diagnostics (#2821).
    */
   canNavigateTo(
     toDeactivate: string[],
@@ -596,16 +571,63 @@ export class RouteLifecycleNamespace<
   // =========================================================================
 
   /**
+   * One type's half of {@link preflightHandlerLimit}: the highest count the
+   * install of `names` will reach, asked of the type's count position.
+   */
+  #preflightSlots(
+    type: "activate" | "deactivate",
+    names: Iterable<string>,
+    clearsDefinition: boolean,
+  ): void {
+    const position = CHANNELS[type].count;
+
+    if (!this.#deps.hasChecks(position)) {
+      return;
+    }
+
+    const { definition, external } = this.#getFactoryMaps(type);
+
+    // A name already holding a guard of this type is an overwrite (no new
+    // slot, mirroring `#registerHandler`). After a definition-clear (replace)
+    // only EXTERNAL guards survive, so the existing-name check — and the base
+    // count below — run against `external` alone, matching the post-clear
+    // install state the loop sees.
+    let newSlots = 0;
+
+    for (const name of names) {
+      const isExisting = clearsDefinition
+        ? external.has(name)
+        : definition.has(name) || external.has(name);
+
+      if (!isExisting) {
+        newSlots++;
+      }
+    }
+
+    if (newSlots === 0) {
+      return;
+    }
+
+    // The install loop asks the position once per new slot, with the count
+    // before it. Starting from `base` and adding `newSlots` new names, the
+    // highest count it asks is `base + newSlots - 1`, so a check that refuses
+    // every count from its limit up — the plugin's does — refuses here exactly
+    // when the loop would.
+    const base = clearsDefinition ? external.size : this.getHandlerCount(type);
+
+    this.#deps.runChecks(position, base + newSlots - 1);
+  }
+
+  /**
    * Routes a registration into the origin-specific factory Map and updates the
    * compiled function under EXTERNAL-WINS (#1174): the just-added factory becomes
    * the compiled guard unless it is a definition registered while an external
    * guard is already live (then external stays effective; the definition is still
    * stored for a later `clearDefinitionGuards()`). Within one origin the most
    * recent add overwrites.
-   * Emits overwrite / threshold warnings symmetric with the pre-refactor
-   * single-Map behaviour: any prior entry for the slot — same origin or
-   * cross-origin — counts as an overwrite for the warning surface; only a
-   * brand-new slot (no entry in either Map) increments the threshold check.
+   * Any prior entry for the slot — same origin or cross-origin — is reported as
+   * an overwrite; only a brand-new slot (no entry in either Map) is counted,
+   * judged against the limit and reported.
    */
   #registerHandler(
     type: "activate" | "deactivate",
@@ -627,28 +649,27 @@ export class RouteLifecycleNamespace<
       ? factoryMaps.external
       : factoryMaps.definition;
 
+    const channels = CHANNELS[type];
     const isOverwrite = targetMap.has(name) || otherMap.has(name);
 
     if (isOverwrite) {
-      this.#deps
-        .getValidator()
-        ?.lifecycle.warnOverwrite(name, type, methodName);
-    } else {
+      this.#deps.emitDiagnostic(channels.overwritten, name);
+    } else if (
+      this.#deps.hasChecks(channels.count) ||
+      this.#deps.diagnosticListenerCount(channels.counted) > 0
+    ) {
       // Single enforcement choke point for EVERY registration path: programmatic
       // (getLifecycleApi) and route-config (getRoutesApi.add/update, where
-      // isFromDefinition=true). The hard limit throws here so route-config guards
-      // are bounded exactly like programmatic ones (#961); the approaching-limit
-      // warning follows. Only new slots count toward the limit — an overwrite
-      // leaves the count unchanged. `getHandlerCount` is read once and only when
-      // the validator is installed (opt-in), so the no-plugin path stays free.
-      const validator = this.#deps.getValidator();
+      // isFromDefinition=true). The limit is judged here so route-config guards
+      // are bounded exactly like programmatic ones (#961); the count report
+      // follows. Only new slots count toward the limit — an overwrite leaves the
+      // count unchanged. `getHandlerCount` is read once and only for a check at
+      // the count position or a listener of the count kind, so bare core
+      // computes no count.
+      const count = this.getHandlerCount(type);
 
-      if (validator) {
-        const count = this.getHandlerCount(type);
-
-        validator.lifecycle.validateHandlerLimit(count, methodName);
-        validator.lifecycle.validateCountThresholds(count + 1, methodName);
-      }
+      this.#deps.runChecks(channels.count, count);
+      this.#deps.emitDiagnostic(channels.counted, count + 1);
     }
 
     const factory =
@@ -817,9 +838,9 @@ export class RouteLifecycleNamespace<
   /**
    * Shared implementation for synchronous guard checks.
    * Only `true` allows (#2823); every other answer is `false`. A thenable cannot
-   * be waited for here, so its promise is consumed, and the validator is told
-   * which of the two it met: a thenable, or an answer that is neither a boolean
-   * nor a thenable.
+   * be waited for here, so its promise is consumed, and a diagnostic says which
+   * of the two it met: a thenable, or an answer that is neither a boolean nor a
+   * thenable.
    * Catches exceptions and treats them as navigation-blocking (`false`).
    *
    * @param functions - Map of compiled guard functions to look up
@@ -850,12 +871,10 @@ export class RouteLifecycleNamespace<
 
       // The walk's own test for a thenable (`adoptThenable` in `guardPhase.ts`),
       // read inside the guard's error channel for the same reason: a `then`
-      // that throws is the guard failing. The diagnostics sit inside it too: a
-      // diagnostic is not a verdict, so one that throws — a validator without
-      // the member — is logged below like a crashed guard, and the ask still
-      // answers `false`.
+      // that throws is the guard failing. A diagnostic is not a verdict: the
+      // emitter isolates a handler that throws and logs it through its
+      // `onListenerError`, so the ask answers `false` either way.
       const then = (answer as { then?: unknown } | null | undefined)?.then;
-      const validator = this.#deps.getValidator();
 
       if (typeof then === "function") {
         // An async guard's promise is application code's, and this check cannot
@@ -863,9 +882,18 @@ export class RouteLifecycleNamespace<
         // rejection (#2797); a thenable from another realm is adopted (#2251).
         void Promise.resolve(answer).catch(() => undefined);
 
-        validator?.lifecycle.warnAsyncGuardSync(name, methodName);
+        this.#deps.emitDiagnostic(
+          DIAGNOSTIC.SYNC_GUARD_THENABLE,
+          name,
+          methodName,
+        );
       } else {
-        validator?.lifecycle.warnNonBooleanGuardSync(name, answer, methodName);
+        this.#deps.emitDiagnostic(
+          DIAGNOSTIC.SYNC_GUARD_NON_BOOLEAN,
+          name,
+          answer,
+          methodName,
+        );
       }
 
       return false;
@@ -874,8 +902,8 @@ export class RouteLifecycleNamespace<
       // surfaces the same throw via `handleGuardError` → TRANSITION_ERROR; a
       // synchronous ask hands the guard's error to no caller, so core logs it
       // directly. This is an OPERATIONAL signal (the guard crashed — distinct
-      // from the opt-in validator DX warnings above for which the validator is
-      // the right home): the navigation is still treated as blocked (`false`).
+      // from the opt-in diagnostics above, which a plugin chooses to print):
+      // the navigation is still treated as blocked (`false`).
       this.#deps.logger.warn(
         `router.${methodName}`,
         `Guard for "${name}" threw — treated as navigation-blocking (returned false)`,

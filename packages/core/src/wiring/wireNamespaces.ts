@@ -2,7 +2,7 @@
 
 import { assertShippedChannelCorrect } from "../channels";
 import { readDependency } from "../dependenciesStore";
-import { getInternals, runChecks } from "../internals";
+import { DIAGNOSTIC, getInternals, hasChecks, runChecks } from "../internals";
 import { COMMIT_PERMIT_TOKEN } from "../namespaces/NavigationNamespace";
 import {
   resolveQueryParamsMode,
@@ -81,15 +81,13 @@ export function wireNamespaces<Dependencies extends DefaultDependencies>(
   // member reads through `ns.*` at CALL time, so no wiring order is baked in.
   const port = createRouteResolver(ns);
 
-  // Shared by RouteLifecycle, Routes and the event bus — one allocation.
-  // Internals are registered before wiring (#1331), so this never throws;
-  // returns null until validation-plugin installs the validator.
+  // Read by Routes. Internals are registered before wiring (#1331), so this
+  // never throws; returns null until validation-plugin installs the validator.
   const getValidator = (): RouterValidator | null =>
     getInternals(ns.router).validator;
 
   wireLimits(ns);
-  wireEventBus(ns, getValidator);
-  wireRouteLifecycle(ns, compileFactory, getValidator);
+  wireRouteLifecycle(ns, compileFactory);
   wireRoutes(ns, port, getValidator, getDependency);
   wirePlugins(ns, compileFactory);
   wireNavigation(ns, port, getDependency);
@@ -118,27 +116,22 @@ function wireLimits<Dependencies extends DefaultDependencies>(
   });
 }
 
-/**
- * Hands EventBusNamespace the shared lazy validator accessor so `subscribe` /
- * `addEventListener` can run the opt-in listener-count threshold (#1188) — the
- * emitter-side parallel to the plugins / lifecycle / dependencies counters.
- */
-function wireEventBus<Dependencies extends DefaultDependencies>(
-  ns: NamespaceBag<Dependencies>,
-  getValidator: () => RouterValidator | null,
-): void {
-  ns.eventBus.setValidatorAccessor(getValidator);
-}
-
 function wireRouteLifecycle<Dependencies extends DefaultDependencies>(
   ns: NamespaceBag<Dependencies>,
   compileFactory: CompileFactory<Dependencies>,
-  getValidator: () => RouterValidator | null,
 ): void {
   const deps: RouteLifecycleDependencies<Dependencies> = {
     logger: getInternals(ns.router).logger,
     compileFactory,
-    getValidator,
+    runChecks: (position, ...args) => {
+      runChecks(getInternals(ns.router).checks, position, ...args);
+    },
+    hasChecks: (position) =>
+      hasChecks(getInternals(ns.router).checks, position),
+    emitDiagnostic: (key, ...args) => {
+      ns.eventBus.emitDiagnostic(key, ...args);
+    },
+    diagnosticListenerCount: (key) => ns.eventBus.diagnosticListenerCount(key),
   };
 
   ns.routeLifecycle.setDependencies(deps);
@@ -451,10 +444,7 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     isStarting: () => ns.eventBus.isStarting(),
     getLifecycleFunctions: () => ns.routeLifecycle.getFunctions(),
     warnNonBooleanGuard: (name, answer) => {
-      getInternals(ns.router).validator?.lifecycle.warnNonBooleanGuard(
-        name,
-        answer,
-      );
+      ns.eventBus.emitDiagnostic(DIAGNOSTIC.GUARD_NON_BOOLEAN, name, answer);
     },
     // Deactivation half only — the 404 has no route to activate (#1643). Only
     // `navigateToNotFound` asks, so its guard's log names it (#2821).

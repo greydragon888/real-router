@@ -632,6 +632,9 @@ function replaceRoutes<
   store.lifecycleNamespace!.clearDefinitionGuards();
   adoptRouteArtifacts(store, artifacts, compiledGuards);
 
+  // ⚑ Again, between the write and the announcement, as in `add` (#1859).
+  throwIfDisposed(ctx.isDisposed);
+
   // ⚑ The window OPENS here (#1758 / #1759) — before the emit, because the
   // emit is its FIRST actor. Everything until the commit runs application code
   // the router cannot see into (a `subscribeChanges` handler, the route's
@@ -935,6 +938,14 @@ export function getRoutesApi<
 
       addRoutes(store, batch, parentName, ctx.logger);
 
+      // ⚑ Again, between the write and the announcement (#1859). The batch
+      // check, the guard checks and reports and the guard factories run
+      // application code, and this stops the call reporting success on a
+      // router that code disposed. It stays above the announcement: a change
+      // listener may dispose too (INVARIANTS `subscribeChanges` #3), and the
+      // call completes then.
+      throwIfDisposed(ctx.isDisposed);
+
       // Built from the post-commit store (O-1), only when someone is listening.
       //
       // ⚑ From the SNAPSHOT, never from `routeArray` (#1931): the caller's array
@@ -1044,6 +1055,9 @@ export function getRoutesApi<
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
       const lifecycle = store.lifecycleNamespace!;
       const structural = commitRouteUpdate(store, lifecycle, name, updates);
+
+      // ⚑ Again, between the write and the announcement: see `add`.
+      throwIfDisposed(ctx.isDisposed);
 
       // Conditional emit: structural fields only. A guard-only or empty patch
       // produces no event (O-7 + empty-patch rule).

@@ -58,32 +58,6 @@ export interface RouterValidator {
   };
 
   /**
-   * Lifecycle guard validation methods
-   */
-  lifecycle: {
-    validateHandlerLimit: (count: number, methodName: string) => void;
-    validateCountThresholds: (count: number, methodName: string) => void;
-    warnOverwrite: (name: string, type: string, methodName: string) => void;
-    warnAsyncGuardSync: (name: string, methodName: string) => void;
-    /**
-     * The synchronous ask met an answer that is neither a boolean nor a
-     * thenable; `methodName` is the one `warnAsyncGuardSync` receives for the
-     * same ask (#2823).
-     */
-    warnNonBooleanGuardSync: (
-      name: string,
-      answer: unknown,
-      methodName: string,
-    ) => void;
-    /**
-     * A transition met an answer, or the value a thenable settled on, that is
-     * not a boolean. Several calls start a transition, so no door is named
-     * (#2823).
-     */
-    warnNonBooleanGuard: (name: string, answer: unknown) => void;
-  };
-
-  /**
    * Navigation validation methods
    */
   navigation: {
@@ -159,18 +133,6 @@ export interface RouterValidator {
         readonly decode: ((channels: UrlChannels) => ParamsSearch) | undefined;
       },
       pathSlots: readonly string[],
-    ) => void;
-  };
-
-  /**
-   * Event bus validation methods
-   */
-  eventBus: {
-    validateListenerArgs: (name: unknown, cb: unknown) => void;
-    validateCountThresholds: (
-      count: number,
-      eventName: string,
-      methodName: string,
     ) => void;
   };
 }

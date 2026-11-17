@@ -25,10 +25,7 @@ import {
   warnBatchOverwrite,
   warnRemoveNonExistent,
 } from "./validators/dependencies";
-import {
-  validateListenerArgs,
-  validateListenerCountThresholds,
-} from "./validators/eventBus";
+import { validateListenerCountThresholds } from "./validators/eventBus";
 import { nameInTable } from "./validators/forwardTo";
 import {
   validateHandler,
@@ -97,7 +94,6 @@ import {
   validateMakeStateArgs,
 } from "./validators/state";
 
-import type { EventName, EventMethodMap } from "./validators/eventBus";
 import type { RouteLookup } from "./validators/forwardTo";
 import type { ReloadPath } from "./validators/state";
 import type {
@@ -107,7 +103,6 @@ import type {
   RouterValidator,
   Route,
   RoutesApi,
-  Plugin,
 } from "@real-router/core";
 import type { RouteTree } from "@real-router/core/validation";
 
@@ -255,39 +250,6 @@ function buildValidatorObject(
         validateResolvedDefaultRoute(routeName, lookup);
       },
     },
-    lifecycle: {
-      validateHandlerLimit(count, methodName) {
-        const maxHandlers =
-          api.getOptions().limits?.maxLifecycleHandlers ??
-          CORE_LIMIT_DEFAULTS.maxLifecycleHandlers;
-
-        validateHandlerLimit(count, methodName, maxHandlers);
-      },
-      validateCountThresholds(count, methodName) {
-        const maxHandlers =
-          api.getOptions().limits?.maxLifecycleHandlers ??
-          CORE_LIMIT_DEFAULTS.maxLifecycleHandlers;
-
-        validateLifecycleCountThresholds(
-          count,
-          methodName,
-          maxHandlers,
-          api.logger,
-        );
-      },
-      warnOverwrite(name, type, methodName) {
-        warnLifecycleOverwrite(name, type, methodName, api.logger);
-      },
-      warnAsyncGuardSync(name, methodName) {
-        warnAsyncGuardSync(name, methodName, api.logger);
-      },
-      warnNonBooleanGuardSync(name, answer, methodName) {
-        warnNonBooleanGuardSync(name, answer, methodName, api.logger);
-      },
-      warnNonBooleanGuard(name, answer) {
-        warnNonBooleanGuard(name, answer, api.logger);
-      },
-    },
     navigation: {
       validateNavigateToDefaultArgs(opts) {
         validateNavigateToDefaultArgs(opts);
@@ -342,27 +304,6 @@ function buildValidatorObject(
             throw atAreStatesEqual.type`Invalid state2.search: ${getTypeDescription(s2.search)}. Expected a plain object.`;
           }
         }
-      },
-    },
-    eventBus: {
-      validateListenerArgs(name, cb) {
-        validateListenerArgs<EventName>(
-          name as EventName,
-          cb as Plugin[EventMethodMap[EventName]],
-        );
-      },
-      validateCountThresholds(count, eventName, methodName) {
-        const maxListeners =
-          api.getOptions().limits?.maxListeners ??
-          CORE_LIMIT_DEFAULTS.maxListeners;
-
-        validateListenerCountThresholds(
-          count,
-          eventName,
-          methodName,
-          api.logger,
-          maxListeners,
-        );
       },
     },
   };
@@ -934,6 +875,108 @@ export function validationPlugin<
       },
     );
 
+    // ⚑ One position and two kinds per guard type: the messages name the
+    // type's `canActivate` / `canDeactivate` door, and core asks the count
+    // position before it raises the count kind.
+    const removeCanActivateCountCheck = api.addCheck(
+      "canActivate:count",
+      (currentCount) => {
+        validateHandlerLimit(
+          currentCount,
+          "canActivate",
+          api.getOptions().limits?.maxLifecycleHandlers ??
+            CORE_LIMIT_DEFAULTS.maxLifecycleHandlers,
+        );
+      },
+    );
+
+    const removeCanDeactivateCountCheck = api.addCheck(
+      "canDeactivate:count",
+      (currentCount) => {
+        validateHandlerLimit(
+          currentCount,
+          "canDeactivate",
+          api.getOptions().limits?.maxLifecycleHandlers ??
+            CORE_LIMIT_DEFAULTS.maxLifecycleHandlers,
+        );
+      },
+    );
+
+    const removeCanActivateCountDiagnostic = api.subscribeDiagnostic(
+      "CAN_ACTIVATE_COUNT",
+      (count) => {
+        validateLifecycleCountThresholds(
+          count,
+          "canActivate",
+          api.getOptions().limits?.maxLifecycleHandlers ??
+            CORE_LIMIT_DEFAULTS.maxLifecycleHandlers,
+          api.logger,
+        );
+      },
+    );
+
+    const removeCanDeactivateCountDiagnostic = api.subscribeDiagnostic(
+      "CAN_DEACTIVATE_COUNT",
+      (count) => {
+        validateLifecycleCountThresholds(
+          count,
+          "canDeactivate",
+          api.getOptions().limits?.maxLifecycleHandlers ??
+            CORE_LIMIT_DEFAULTS.maxLifecycleHandlers,
+          api.logger,
+        );
+      },
+    );
+
+    const removeCanActivateOverwriteDiagnostic = api.subscribeDiagnostic(
+      "CAN_ACTIVATE_OVERWRITE",
+      (name) => {
+        warnLifecycleOverwrite(name, "activate", "canActivate", api.logger);
+      },
+    );
+
+    const removeCanDeactivateOverwriteDiagnostic = api.subscribeDiagnostic(
+      "CAN_DEACTIVATE_OVERWRITE",
+      (name) => {
+        warnLifecycleOverwrite(name, "deactivate", "canDeactivate", api.logger);
+      },
+    );
+
+    const removeSyncGuardThenableDiagnostic = api.subscribeDiagnostic(
+      "SYNC_GUARD_THENABLE",
+      (name, methodName) => {
+        warnAsyncGuardSync(name, methodName, api.logger);
+      },
+    );
+
+    const removeSyncGuardNonBooleanDiagnostic = api.subscribeDiagnostic(
+      "SYNC_GUARD_NON_BOOLEAN",
+      (name, answer, methodName) => {
+        warnNonBooleanGuardSync(name, answer, methodName, api.logger);
+      },
+    );
+
+    const removeGuardNonBooleanDiagnostic = api.subscribeDiagnostic(
+      "GUARD_NON_BOOLEAN",
+      (name, answer) => {
+        warnNonBooleanGuard(name, answer, api.logger);
+      },
+    );
+
+    const removeListenerCountDiagnostic = api.subscribeDiagnostic(
+      "LISTENER_COUNT",
+      (count, eventName, methodName) => {
+        validateListenerCountThresholds(
+          count,
+          eventName,
+          methodName,
+          api.logger,
+          api.getOptions().limits?.maxListeners ??
+            CORE_LIMIT_DEFAULTS.maxListeners,
+        );
+      },
+    );
+
     return {
       teardown() {
         removeParamsCheck();
@@ -1013,6 +1056,26 @@ export function validationPlugin<
         removeUsePluginDuplicateDiagnostic();
 
         removeUsePluginHookDiagnostic();
+
+        removeCanActivateCountCheck();
+
+        removeCanDeactivateCountCheck();
+
+        removeCanActivateCountDiagnostic();
+
+        removeCanDeactivateCountDiagnostic();
+
+        removeCanActivateOverwriteDiagnostic();
+
+        removeCanDeactivateOverwriteDiagnostic();
+
+        removeSyncGuardThenableDiagnostic();
+
+        removeSyncGuardNonBooleanDiagnostic();
+
+        removeGuardNonBooleanDiagnostic();
+
+        removeListenerCountDiagnostic();
 
         removeInterceptor();
 

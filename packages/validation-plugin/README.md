@@ -152,7 +152,7 @@ If the retrospective pass fails, the plugin rolls back cleanly. The router is le
 | Lifecycle     | Guard/hook handler type, count vs `maxLifecycleHandlers`; a guard answering neither `true` nor `false`; an async guard in a synchronous check                                                |
 | Navigation    | `navigate` args, `navigateToDefault` args, `NavigationOptions` shape, `params` validation (navigate, buildPath, canNavigateTo), `start` path validation, a `defaultParams` / `defaultSearch` bag mutated after `createRouter()` |
 | State         | `makeState` args, `areStatesEqual` args                                                                                                                                                      |
-| Event bus     | Event name format, listener args                                                                                                                                                             |
+| Event bus     | Listener count vs `maxListeners` — a `warn` at 20 % and an `error` at 50 % on `subscribe`, `addEventListener` and a plugin's hooks                                                          |
 | Retrospective | Existing route tree integrity, `forwardTo` consistency, decoder/encoder types, dependency store structure, limits consistency, static `defaultRoute` resolves to a registered route         |
 
 ## Error Messages

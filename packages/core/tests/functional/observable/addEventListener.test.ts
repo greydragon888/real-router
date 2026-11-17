@@ -526,10 +526,16 @@ describe("core/observable/addEventListener", () => {
       ).toThrow(TypeError);
     });
 
+    // The full text, prefix included: bare core is the only layer that refuses
+    // the callback, with the plugin installed or not (#2388).
     it("names the argument and what it got", () => {
       expect(() =>
         raw().addEventListener(events.TRANSITION_SUCCESS, 42),
-      ).toThrow(/callback must be a function, got number/);
+      ).toThrow(
+        new TypeError(
+          "[router.addEventListener] callback must be a function, got number",
+        ),
+      );
     });
 
     // CONTROL — the door still accepts what it is for.

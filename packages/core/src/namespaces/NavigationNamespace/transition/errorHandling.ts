@@ -294,7 +294,7 @@ export function wrapSyncError(
 /**
  * Settle a guard's Promise into the pipeline's terms: anything but `true` and a
  * rejection both become the phase's `RouterError`. The rule is the synchronous
- * step's (#2823), and so is the report of a non-boolean value to the validator.
+ * step's (#2823), and so is the report of a non-boolean value, `GUARD_NON_BOOLEAN`.
  *
  * Lives here rather than with the interpreter because that IS this module's
  * concern — turning a guard's refusal into the right error (#1607). The

@@ -1460,10 +1460,6 @@ const HOPS = new Map([
   ["internals.ts › throwIfDisposed()", "its predicate reads core's own state"],
   [`${EBN} › bridgeSignal()`, "the bridge's own closures"],
   [
-    `${EBN} › EventBusNamespace.#getValidator`,
-    "the accessor `wireNamespaces` installs",
-  ],
-  [
     "namespaces/NavigationNamespace/transition/errorHandling.ts › resolveAsyncGuard().warnNonBooleanGuard",
     "the report a dependency bag carries, a closure `wireNamespaces` fills",
   ],

@@ -12,10 +12,6 @@ import {
   warnRemoveNonExistent,
 } from "../../src/validators/dependencies";
 import {
-  validateEventName,
-  validateListenerArgs,
-} from "../../src/validators/eventBus";
-import {
   validateHandlerLimit,
   validateLifecycleCountThresholds,
   warnOverwrite as warnLifecycleOverwrite,
@@ -283,62 +279,6 @@ describe("state validators", () => {
     it("accepts valid args", () => {
       expect(() => {
         validateMakeStateArgs("home", {}, "/home");
-      }).not.toThrow();
-    });
-  });
-});
-
-describe("eventBus validators", () => {
-  describe("validateEventName", () => {
-    it("throws for invalid event name", () => {
-      expect(() => {
-        validateEventName("invalid");
-      }).toThrow(/Invalid event name/);
-    });
-
-    it("accepts valid event names", () => {
-      expect(() => {
-        validateEventName("$start");
-      }).not.toThrow();
-      expect(() => {
-        validateEventName("$stop");
-      }).not.toThrow();
-      expect(() => {
-        validateEventName("$$start");
-      }).not.toThrow();
-      expect(() => {
-        validateEventName("$$cancel");
-      }).not.toThrow();
-      expect(() => {
-        validateEventName("$$success");
-      }).not.toThrow();
-      expect(() => {
-        validateEventName("$$error");
-      }).not.toThrow();
-    });
-  });
-
-  describe("validateListenerArgs", () => {
-    it("throws for invalid event name", () => {
-      const raw = validateListenerArgs as unknown as (
-        event: unknown,
-        cb: unknown,
-      ) => void;
-
-      expect(() => {
-        raw("invalid", () => {});
-      }).toThrow();
-    });
-
-    it("throws TypeError for non-function callback", () => {
-      expect(() => {
-        validateListenerArgs("$start", "not-fn" as never);
-      }).toThrow(TypeError);
-    });
-
-    it("accepts valid args", () => {
-      expect(() => {
-        validateListenerArgs("$start", () => {});
       }).not.toThrow();
     });
   });
