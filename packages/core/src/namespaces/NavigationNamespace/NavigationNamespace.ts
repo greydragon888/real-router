@@ -58,8 +58,8 @@ export class NavigationNamespace {
   setDependencies(deps: NavigationDependencies): void {
     this.#deps = deps;
     // Built once here rather than per call: the closure needs THIS router's
-    // logger, so it cannot be static, and `setDependencies` is a pure
-    // assignment that runs exactly once at wiring (#1331).
+    // logger, so it cannot be static, and `setDependencies` runs exactly once,
+    // at wiring (#1331).
     this.#onSuppressed = (error: unknown): void => {
       if (isExpectedRejection(error)) {
         return;

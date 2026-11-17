@@ -42,6 +42,8 @@ import type {
   RouterLogger,
   GuardFnFactory,
   Route,
+  TreeChangedEvent,
+  Unsubscribe,
   UrlChannels,
 } from "../../types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
@@ -88,6 +90,27 @@ const fromEntries = Object.fromEntries;
 // =============================================================================
 // Interfaces
 // =============================================================================
+
+/**
+ * The tree-change channel the routes doors raise and subscribe through.
+ * `Router` builds it over its event bus and hands it in with the store.
+ *
+ * A bridge of its own, because the public `addEventListener` cannot carry it:
+ * `"TREE_CHANGED"` is not in the `EventName` union, a duplicate listener throws
+ * there, and it exposes neither `emit` nor `listenerCount`.
+ */
+export interface TreeChangedChannel {
+  readonly emit: (event: TreeChangedEvent) => void;
+  readonly subscribe: (
+    handler: (event: TreeChangedEvent) => void,
+  ) => Unsubscribe;
+  readonly listenerCount: () => number;
+  /**
+   * True while a `TREE_CHANGED` emit is on the stack — the routes doors read it
+   * to reject reentrant route-CRUD from a `subscribeChanges` handler (#1032).
+   */
+  readonly isEmitting: () => boolean;
+}
 
 export interface RoutesStore<
   Dependencies extends DefaultDependencies = DefaultDependencies,
@@ -163,8 +186,14 @@ export interface RoutesStore<
   routeCustomFields: Record<string, Record<string, unknown>>;
   rootPath: string;
   readonly matcherOptions: CreateMatcherOptions | undefined;
-  depsStore: RoutesDependencies<Dependencies> | undefined;
-  lifecycleNamespace: RouteLifecycleNamespace<Dependencies> | undefined;
+  // ⚑ The references the doors reach. Each slot is sealed where it arrives —
+  // `treeChanged` in `createRoutesStore`, the other two at wiring through
+  // `sealReference` — so replacing one through `routeGetStore()` is refused
+  // instead of re-pointing a door (#2952).
+  readonly depsStore: RoutesDependencies<Dependencies> | undefined;
+  readonly lifecycleNamespace:
+    RouteLifecycleNamespace<Dependencies> | undefined;
+  readonly treeChanged: TreeChangedChannel;
   readonly pendingCanActivate: Map<string, GuardFnFactory<Dependencies>>;
   readonly pendingCanDeactivate: Map<string, GuardFnFactory<Dependencies>>;
 }
@@ -1574,11 +1603,12 @@ export function createRoutesStore<
   routes: Route<Dependencies>[],
   matcherOptions: CreateMatcherOptions | undefined,
   logger: RouterLogger,
+  treeChanged: TreeChangedChannel,
 ): RoutesStore<Dependencies> {
   // Initial routes are a standalone set at rootPath "" — same build the
   // prepare-then-commit `replace` path uses. Guards land in the pending maps,
   // flushed by `flushPendingGuards()` at the end of the Router constructor
-  // (#1331); `setDependencies` itself is a pure assignment.
+  // (#1331); `setDependencies` itself only installs the bag.
   //
   // Reject the silent-corruption cases BEFORE building, giving the constructor
   // parity with `add()` / `replace()` — the third and last route-population
@@ -1622,6 +1652,7 @@ export function createRoutesStore<
     matcherOptions,
     depsStore: undefined,
     lifecycleNamespace: undefined,
+    treeChanged: freeze(treeChanged),
     revalidating: false,
     pendingCanActivate: artifacts.pendingCanActivate,
     pendingCanDeactivate: artifacts.pendingCanDeactivate,
@@ -1641,14 +1672,14 @@ export function createRoutesStore<
   // reproduced verbatim through the very surface the freeze cites as its reason.
   // Nothing assigns this slot at runtime; the matcher is rebuilt around it.
   //
-  // ⚠ State the level you closed, and only that one. This shape repeated three
-  // times on the way here — snapshot, container, slot — and it does NOT stop
-  // here: `routeGetStore()` hands out the whole store, of which EIGHT slots are
-  // destructive when replaced (`matcher`, `tree`, `config`, both caches,
-  // `rootPath`, `depsStore`, `lifecycleNamespace`). Only this one is sealed,
-  // because only this one was made load-bearing by the snapshot work; the others
-  // corrupt loudly or silently on their own terms. Whether the store should be
-  // handed to plugins writable at all is the larger question, tracked separately.
+  // ⚠ State the level you closed, and only that one. `routeGetStore()` hands
+  // out the whole store. Sealed are this slot and the slots of the three
+  // references the doors reach — `treeChanged` below, the other two by
+  // `sealReference` at wiring (#2952). Of the objects behind those, only the
+  // channel is frozen: a write into the dependency bag or the lifecycle
+  // namespace is not refused. Route state stays writable, and
+  // `query-strategy-formats-1796.test.ts` owns which of its slots break the
+  // router when replaced.
   //
   // ⚠ `writable: false` only THROWS in strict mode. A sloppy-mode consumer's
   // write is silently ignored instead — the value is still protected, the
@@ -1657,6 +1688,22 @@ export function createRoutesStore<
     writable: false,
     configurable: false,
   });
+  defineProperty(store, "treeChanged", {
+    writable: false,
+    configurable: false,
+  });
 
   return store;
+}
+
+/** Installs a reference that arrives at wiring and seals its slot (#2952). */
+export function sealReference<
+  Dependencies extends DefaultDependencies,
+  K extends "depsStore" | "lifecycleNamespace",
+>(
+  store: RoutesStore<Dependencies>,
+  key: K,
+  value: RoutesStore<Dependencies>[K],
+): void {
+  defineProperty(store, key, { value, writable: false, configurable: false });
 }

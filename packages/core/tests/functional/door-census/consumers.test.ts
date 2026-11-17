@@ -914,7 +914,6 @@ describe("consumer census (#2303)", () => {
         "start",
         "subscribeDiagnostic",
         "systemCommit",
-        "treeChanged",
       ],
       // ⚑ Both plugin-facing surfaces come back EMPTY: no member of
       // `getPluginApi` or of `getRoutesApi` is untouched by shipped code and

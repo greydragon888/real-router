@@ -35,7 +35,6 @@ const MEMBERS = [
   "getAdoptedOrigins",
   "addEventListener",
   "subscribeDiagnostic",
-  "treeChanged",
   "port",
   "emitTransitionError",
   "navigateToNotFound",

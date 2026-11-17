@@ -151,7 +151,7 @@ export function getPluginApi<
       // every route name survives a `setRootPath` and every PATH moves, so the
       // committed `state.path` stops belonging to `state.name` (#1758).
       throwIfReentrantTreeMutation(
-        ctx.treeChanged.isEmitting,
+        ctx.routeGetStore().treeChanged.isEmitting,
         () => ctx.routeGetStore().revalidating,
       );
 
@@ -205,7 +205,9 @@ export function getPluginApi<
       // consumers to ignore it. The refusal above returns before this line, so a
       // gated change announces nothing either.
       if (previous !== rootPath) {
-        ctx.treeChanged.emit({ op: "rootPath", previous, next: rootPath });
+        ctx
+          .routeGetStore()
+          .treeChanged.emit({ op: "rootPath", previous, next: rootPath });
       }
 
       return true;

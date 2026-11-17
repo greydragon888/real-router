@@ -4,4 +4,4 @@ export { RoutesNamespace } from "./RoutesNamespace";
 
 export type { RouteConfig, RoutesDependencies } from "./types";
 
-export type { RoutesStore } from "./routesStore";
+export type { RoutesStore, TreeChangedChannel } from "./routesStore";

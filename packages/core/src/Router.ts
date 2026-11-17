@@ -68,6 +68,7 @@ import { wireNamespaces } from "./wiring";
 
 import type { DependenciesStore } from "./dependenciesStore";
 import type { RouterInternals } from "./internals";
+import type { TreeChangedChannel } from "./namespaces/RoutesNamespace";
 import type {
   AdoptedOrigins,
   DefaultDependencies,
@@ -286,10 +287,23 @@ export class Router<
       this.#limits,
     );
     this.#state = new StateNamespace();
+    // The routes doors' tree-change channel. The store that carries it is built
+    // before the bus, so each arrow reads `#eventBus` when called; no door can
+    // reach the store before `registerInternals`, which runs after the bus.
+    const treeChanged: TreeChangedChannel = {
+      emit: (event) => {
+        this.#eventBus.emitTreeChanged(event);
+      },
+      subscribe: (handler) => this.#eventBus.subscribeTreeChanged(handler),
+      listenerCount: () => this.#eventBus.treeChangedListenerCount(),
+      isEmitting: () => this.#eventBus.isEmittingTreeChanged(),
+    };
+
     this.#routes = new RoutesNamespace<Dependencies>(
       routeBatch,
       deriveMatcherOptions(this.#options.get()),
       logger,
+      treeChanged,
     );
     this.#routeLifecycle = new RouteLifecycleNamespace<Dependencies>();
     this.#plugins = new PluginsNamespace<Dependencies>();
@@ -678,14 +692,6 @@ export class Router<
       },
       subscribeDiagnostic: (key, handler) =>
         this.#eventBus.subscribeDiagnostic(key, handler),
-      treeChanged: {
-        emit: (event) => {
-          this.#eventBus.emitTreeChanged(event);
-        },
-        subscribe: (handler) => this.#eventBus.subscribeTreeChanged(handler),
-        listenerCount: () => this.#eventBus.treeChangedListenerCount(),
-        isEmitting: () => this.#eventBus.isEmittingTreeChanged(),
-      },
       emitTransitionError: (error) => {
         // Channel (b): a REPORT to observers, not a machine failure. It comes
         // from a plugin, at a moment core does not control, so it must never

@@ -312,10 +312,16 @@ no ownership benefit.
 ## The store is a transport, not inert data
 
 **Store pattern:** `RoutesStore` and `DependenciesStore` are data-holder
-interfaces, not classes. `RoutesStore` deliberately carries cross-namespace
-references set during wiring, so the standalone CRUD helpers reach the lifecycle
-namespace without threading a parameter through every helper. It is the api/
-layer's transport channel, not inert data.
+interfaces, not classes. `RoutesStore` deliberately carries the references its
+doors reach — the lifecycle namespace and the dependency bag, installed at
+wiring, and the tree-change channel, which `Router` hands in with the store —
+so the standalone CRUD helpers reach them without threading a parameter through
+every helper. It is the api/ layer's transport channel, not inert data.
+
+**Each reference's slot is sealed where it arrives**, so replacing one through
+`routeGetStore()` is refused instead of re-pointing a door. The comment in
+`createRoutesStore` says which of the objects behind the slots is frozen, and
+`tests/functional/routes-store-references-2952.test.ts` pins the refusal.
 
 ## See Also
 

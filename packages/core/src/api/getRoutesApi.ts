@@ -905,18 +905,18 @@ export function getRoutesApi<
 
   const store = ctx.routeGetStore();
 
-  // Single cast site: the channel is typed with default Dependencies on
-  // RouterInternals (RouterEventMap is non-generic), but payloads are built
-  // with this api's Dependencies. The runtime shape is identical.
+  // Single cast site: `TreeChangedChannel` is typed with default Dependencies
+  // (RouterEventMap is non-generic), but payloads are built with this api's
+  // Dependencies. The runtime shape is identical.
   const emitChange = (event: TreeChangedEvent<Dependencies>): void => {
-    ctx.treeChanged.emit(event as TreeChangedEvent);
+    store.treeChanged.emit(event as TreeChangedEvent);
   };
 
   const api: RoutesApi<Dependencies> = {
     add: (routes, options) => {
       throwIfDisposed(ctx.isDisposed);
       throwIfReentrantTreeMutation(
-        ctx.treeChanged.isEmitting,
+        store.treeChanged.isEmitting,
         () => store.revalidating,
       );
 
@@ -941,7 +941,7 @@ export function getRoutesApi<
       // is application code's, and everything between the snapshot and this line
       // — guard factories compiled inside `adoptRouteArtifacts` among them — can
       // change what a second read of it answers.
-      if (ctx.treeChanged.listenerCount() > 0) {
+      if (store.treeChanged.listenerCount() > 0) {
         const added = collectAddedRoutes(batch, parentName, store);
 
         emitChange(
@@ -955,7 +955,7 @@ export function getRoutesApi<
     remove: (name) => {
       throwIfDisposed(ctx.isDisposed);
       throwIfReentrantTreeMutation(
-        ctx.treeChanged.isEmitting,
+        store.treeChanged.isEmitting,
         () => store.revalidating,
       );
 
@@ -974,7 +974,7 @@ export function getRoutesApi<
         return;
       }
 
-      const wantSubtree = ctx.treeChanged.listenerCount() > 0;
+      const wantSubtree = store.treeChanged.listenerCount() > 0;
       // The payload is built INSIDE, between the splice and the commits — the
       // one moment the removed-name set, the old tree and the config coexist
       // (#1757). `undefined` means the name is not a route at all.
@@ -1004,7 +1004,7 @@ export function getRoutesApi<
     update: (name, updates) => {
       throwIfDisposed(ctx.isDisposed);
       throwIfReentrantTreeMutation(
-        ctx.treeChanged.isEmitting,
+        store.treeChanged.isEmitting,
         () => store.revalidating,
       );
 
@@ -1047,7 +1047,7 @@ export function getRoutesApi<
 
       // Conditional emit: structural fields only. A guard-only or empty patch
       // produces no event (O-7 + empty-patch rule).
-      if (ctx.treeChanged.listenerCount() > 0) {
+      if (store.treeChanged.listenerCount() > 0) {
         const patch = buildStructuralPatch<Dependencies>(structural);
 
         if (objectKeys(patch).length > 0) {
@@ -1059,7 +1059,7 @@ export function getRoutesApi<
     clear: () => {
       throwIfDisposed(ctx.isDisposed);
       throwIfReentrantTreeMutation(
-        ctx.treeChanged.isEmitting,
+        store.treeChanged.isEmitting,
         () => store.revalidating,
       );
 
@@ -1104,7 +1104,7 @@ export function getRoutesApi<
       // Snapshot the routes BEFORE the reset empties them. Emitted whenever
       // there is a listener — even for an empty clear (O-4).
       const removed =
-        ctx.treeChanged.listenerCount() > 0
+        store.treeChanged.listenerCount() > 0
           ? freeze([...collectFlatRoutes(store, () => true).values()])
           : undefined;
 
@@ -1132,7 +1132,7 @@ export function getRoutesApi<
     replace: (routes) => {
       throwIfDisposed(ctx.isDisposed);
       throwIfReentrantTreeMutation(
-        ctx.treeChanged.isEmitting,
+        store.treeChanged.isEmitting,
         () => store.revalidating,
       );
 
@@ -1156,7 +1156,7 @@ export function getRoutesApi<
       // The flat removed/added diff is O(N) — compute it only when someone is
       // listening (Decision 3.B). Snapshot the old tree BEFORE the swap.
       const before =
-        ctx.treeChanged.listenerCount() > 0
+        store.treeChanged.listenerCount() > 0
           ? collectFlatRoutes(store, () => true)
           : undefined;
 
@@ -1179,7 +1179,7 @@ export function getRoutesApi<
     subscribeChanges: (handler) => {
       assertTreeChangeListener(handler);
 
-      return ctx.treeChanged.subscribe(handler);
+      return store.treeChanged.subscribe(handler);
     },
   };
 
