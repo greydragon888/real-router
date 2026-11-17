@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-11-17]
+
+### @real-router/core@0.162.0
+
+### Minor Changes
+
+- [#2968](https://github.com/greydragon888/real-router/pull/2968) [`39cafb9`](https://github.com/greydragon888/real-router/commit/39cafb91e25d4bd1e62e57505c1ba2d97c02e992) Thanks [@greydragon888](https://github.com/greydragon888)! - Move the tree-change channel from `RouterInternals` onto the routes store, and seal the references the store carries for its doors ([#2952](https://github.com/greydragon888/real-router/issues/2952))
+
+  **Breaking Change:** only for code that reaches core's internals through `getInternals` from `@real-router/core/validation`.
+
+  - `RouterInternals` no longer has `treeChanged`. Subscribe to route-tree changes through `getRoutesApi(router).subscribeChanges(handler)`. Emitting on the channel, counting its listeners and asking whether it is emitting have no public replacement.
+  - The store that `routeGetStore()` returns carries the channel as `treeChanged`. Its `treeChanged`, `depsStore` and `lifecycleNamespace` slots refuse an assignment, a redefinition and a `delete`; in strict mode each refusal is a `TypeError`. The channel object is frozen, and the three slots are `readonly` in the type `routeGetStore()` returns.
+
+  `subscribeChanges`, its payloads and the `REENTRANT_TREE_MUTATION` ban are unchanged.
+
 ## [2026-11-12]
 
 ### @real-router/core@0.161.0
