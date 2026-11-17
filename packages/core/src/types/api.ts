@@ -54,6 +54,61 @@ export interface InterceptableMethodMap {
 }
 
 /**
+ * The DIAGNOSTIC half of #2388 — what core reports rather than refuses.
+ *
+ * ⚑ **Internal keys, the shape `TREE_CHANGED` established.** They ride the same
+ * `EventEmitter` — so this is the mechanism core already has, not a third one —
+ * and are deliberately absent from the public `EventName` union, the `events.*`
+ * registry and the `Plugin` interface. `PluginApi.subscribeDiagnostic` is the
+ * only door.
+ *
+ * ⚠ **One key per diagnostic KIND, never one shared key.** `EventEmitter.emit`
+ * coalesces a re-entrant emit of an in-flight event NAME and drops it silently
+ * (#1033), and a listener here reaches the application's own
+ * `LoggerConfig.callback`, from which another diagnostic is raisable. Under one
+ * shared key that second diagnostic is lost.
+ *
+ * ⚠ **At most four arguments per kind.** `DIAGNOSTIC` in `internals.ts` fails to
+ * compile on a longer tuple: the emitter passes four after the name, and the
+ * generic spread that reaches it is not measured by the compiler.
+ */
+// eslint-disable-next-line @typescript-eslint/consistent-type-definitions -- must be `type`: `RouterEventMap` intersects it against a `Record<string, unknown[]>` constraint, which an interface does not satisfy
+export type DiagnosticEventMap = {
+  PLUGIN_AFTER_START: [methodName: string];
+
+  /**
+   * `setDependency` is adding a key: the count the record holds before the
+   * write, and the limit. Raised once per new key, after the
+   * `setDependency:count` checks pass.
+   */
+  SET_DEPENDENCY_COUNT: [currentCount: number, maxDependencies: number];
+
+  /**
+   * The same report from `setDependencies`, once per key the batch adds; the
+   * count grows as the walk writes.
+   */
+  SET_DEPENDENCIES_COUNT: [currentCount: number, maxDependencies: number];
+
+  /**
+   * `setDependency` is replacing a held value with a different one, before
+   * the write — `NaN` over `NaN` is no change.
+   */
+  SET_DEPENDENCY_OVERWRITE: [name: string];
+
+  /**
+   * The keys `setDependencies` replaced, in walk order. Raised once, after the
+   * walk, and only when there is one.
+   */
+  SET_DEPENDENCIES_OVERWRITE: [keys: readonly string[]];
+
+  /**
+   * `removeDependency` named a key the record does not hold. The name is the key
+   * core asked about, so a symbol arrives as the symbol.
+   */
+  REMOVE_DEPENDENCY_MISSING: [name: string | symbol];
+};
+
+/**
  * Every position at which core asks whether anyone OBJECTS, and the values it
  * hands the question (#2388).
  *
@@ -82,26 +137,6 @@ export interface InterceptableMethodMap {
  * ⚠ The map's VALUE is the argument tuple, so a check registered at a position
  * is typed by what that position judges rather than by the door's signature.
  */
-/**
- * The DIAGNOSTIC half of #2388 — what core reports rather than refuses.
- *
- * ⚑ **Internal keys, the shape `TREE_CHANGED` established.** They ride the same
- * `EventEmitter` — so this is the mechanism core already has, not a third one —
- * and are deliberately absent from the public `EventName` union, the `events.*`
- * registry and the `Plugin` interface. `PluginApi.subscribeDiagnostic` is the
- * only door.
- *
- * ⚠ **One key per diagnostic KIND, never one shared key.** `EventEmitter.emit`
- * coalesces a re-entrant emit of an in-flight event NAME and drops it silently
- * (#1033), and a listener here reaches the application's own
- * `LoggerConfig.callback`, from which another diagnostic is raisable. Under one
- * shared key that second diagnostic is lost.
- */
-// eslint-disable-next-line @typescript-eslint/consistent-type-definitions -- must be `type`: `RouterEventMap` intersects it against a `Record<string, unknown[]>` constraint, which an interface does not satisfy
-export type DiagnosticEventMap = {
-  PLUGIN_AFTER_START: [methodName: string];
-};
-
 export interface CheckPositionMap {
   /**
    * The bag core adopted from the caller's, and prints the path from (#2134).
@@ -235,6 +270,44 @@ export interface CheckPositionMap {
 
   /** `removeDeactivateGuard`'s argument. */
   "removeDeactivateGuard:entry": [name: string];
+
+  /** `getDependency`'s argument, as the caller spelled it. */
+  "getDependency:entry": [name: PropertyKey];
+
+  /**
+   * The value `getDependency` read for the name, judged before it is returned —
+   * the value, not the record it came from (#2382).
+   */
+  "getDependency:value": [name: PropertyKey, value: unknown];
+
+  /** `setDependency`'s two arguments, as the caller spelled them. */
+  "setDependency:entry": [name: string, value: unknown];
+
+  /**
+   * The key count `setDependency` judges before it adds a key — `Object.keys`
+   * of the record — and the resolved limit.
+   *
+   * ⚠ Reached for a NEW key only: an overwrite leaves the count unchanged.
+   */
+  "setDependency:count": [currentCount: number, maxDependencies: number];
+
+  /** `setDependencies`' bag, as the caller passed it, before core walks it. */
+  "setDependencies:entry": [deps: DefaultDependencies];
+
+  /**
+   * The same count for `setDependencies`, once per key the batch adds; it grows
+   * as the walk writes.
+   */
+  "setDependencies:count": [currentCount: number, maxDependencies: number];
+
+  /** `removeDependency`'s argument. */
+  "removeDependency:entry": [name: PropertyKey];
+
+  /** `hasDependency`'s argument. */
+  "hasDependency:entry": [name: PropertyKey];
+
+  /** `cloneRouter`'s override bag, as the caller passed it. */
+  "cloneRouter:entry": [dependencies: DefaultDependencies | undefined];
 }
 
 /**
@@ -517,18 +590,6 @@ export interface PluginApi {
   ) => Unsubscribe;
 
   /**
-   * Registers a REFUSAL at a named position (#2388).
-   *
-   * The check runs where core chose, receives what that position judges, and may
-   * throw. It cannot replace an argument, skip the call, or change an answer —
-   * for those there is {@link addInterceptor}, and the two seams it carries are
-   * the ones with shipped consumers that genuinely replace.
-   *
-   * ⚠ Checks at one position run in registration order, and the FIRST throw
-   * wins: core does not collect refusals, because the caller gets one error and
-   * a second check's opinion about a value already refused is not actionable.
-   */
-  /**
    * Subscribes to one internal DIAGNOSTIC kind (#2388) — what core REPORTS
    * rather than refuses.
    *
@@ -545,6 +606,18 @@ export interface PluginApi {
     handler: (...args: DiagnosticEventMap[K]) => void,
   ) => Unsubscribe;
 
+  /**
+   * Registers a REFUSAL at a named position (#2388).
+   *
+   * The check runs where core chose, receives what that position judges, and may
+   * throw. It cannot replace an argument, skip the call, or change an answer —
+   * for those there is {@link addInterceptor}, and the two seams it carries are
+   * the ones with shipped consumers that genuinely replace.
+   *
+   * ⚠ Checks at one position run in registration order, and the FIRST throw
+   * wins: core does not collect refusals, because the caller gets one error and
+   * a second check's opinion about a value already refused is not actionable.
+   */
   addCheck: <P extends keyof CheckPositionMap>(
     position: P,
     check: CheckFn<P>,

@@ -14,11 +14,12 @@ import {
 import { DefaultsMutationWatch } from "./validators/defaultsMutation";
 import {
   validateDependencyName,
-  validateSetDependencyArgs as validateSetDependencyArgsRaw,
+  validateSetDependencyArgs,
   validateDependenciesObject,
   validateDependencyBatchLimit,
-  validateDependencyExists as validateDependencyExistsRaw,
-  validateDependencyCount,
+  validateDependencyExists,
+  validateDependencyLimit,
+  reportDependencyCount,
   validateCloneArgs,
   warnOverwrite as warnDepsOverwrite,
   warnBatchOverwrite,
@@ -252,48 +253,6 @@ function buildValidatorObject(
       validateOptions,
       validateResolvedDefaultRoute(routeName) {
         validateResolvedDefaultRoute(routeName, lookup);
-      },
-    },
-    dependencies: {
-      validateDependencyName,
-      validateSetDependencyArgs(_name, _value, _caller) {
-        validateSetDependencyArgsRaw(_name);
-      },
-      validateDependenciesObject(deps, methodName) {
-        validateDependenciesObject(deps, methodName);
-
-        // ⚑ The limit, asked here rather than from inside the ingest loop
-        // (#2253). This is core's only pre-flight call on the whole bag, so it
-        // is the one position where a refusal can precede every write. The
-        // shape check above runs first: a bag that is not a plain object, or
-        // carries a getter, is refused for what it IS before it is measured.
-        validateDependencyBatchLimit(
-          deps,
-          api.getDependencyKeys(),
-          api.getResolvedLimits().maxDependencies,
-          methodName,
-        );
-      },
-      validateDependencyExists(name, value) {
-        validateDependencyExistsRaw(value, name);
-      },
-      validateDependencyCount(currentCount, maxDependencies, methodName) {
-        validateDependencyCount(
-          currentCount,
-          maxDependencies,
-          methodName,
-          api.logger,
-        );
-      },
-      validateCloneArgs,
-      warnOverwrite(name, methodName) {
-        warnDepsOverwrite(name, methodName, api.logger);
-      },
-      warnBatchOverwrite(keys, methodName) {
-        warnBatchOverwrite(keys, methodName, api.logger);
-      },
-      warnRemoveNonExistent(name) {
-        warnRemoveNonExistent(name, api.logger);
       },
     },
     plugins: {
@@ -815,6 +774,88 @@ export function validationPlugin<
       },
     );
 
+    const removeGetDependencyEntryCheck = api.addCheck(
+      "getDependency:entry",
+      (name) => {
+        validateDependencyName(name, "getDependency");
+      },
+    );
+
+    const removeGetDependencyValueCheck = api.addCheck(
+      "getDependency:value",
+      (name, value) => {
+        validateDependencyExists(value, name);
+      },
+    );
+
+    const removeSetDependencyEntryCheck = api.addCheck(
+      "setDependency:entry",
+      (name) => {
+        validateSetDependencyArgs(name);
+      },
+    );
+
+    // ⚑ The limit half of the count. Its thresholds are a diagnostic of the
+    // same count, registered below, and core asks this position first.
+    const removeSetDependencyCountCheck = api.addCheck(
+      "setDependency:count",
+      (currentCount, maxDependencies) => {
+        validateDependencyLimit(currentCount, maxDependencies, "setDependency");
+      },
+    );
+
+    const removeSetDependenciesEntryCheck = api.addCheck(
+      "setDependencies:entry",
+      (deps) => {
+        validateDependenciesObject(deps, "setDependencies");
+        // ⚑ The limit, asked here rather than from inside the ingest loop
+        // (#2253). Core asks this position once, before it writes a key, so a
+        // refusal here leaves the record as it was. The shape check above runs
+        // first: a bag that is not a plain object, or carries a getter, is
+        // refused for what it IS before it is measured.
+        validateDependencyBatchLimit(
+          deps,
+          api.getDependencyKeys(),
+          api.getResolvedLimits().maxDependencies,
+          "setDependencies",
+        );
+      },
+    );
+
+    // ⚠ Behind the batch limit above, this refusal fires only when the record
+    // or the bag changes between that limit and core's walk.
+    const removeSetDependenciesCountCheck = api.addCheck(
+      "setDependencies:count",
+      (currentCount, maxDependencies) => {
+        validateDependencyLimit(
+          currentCount,
+          maxDependencies,
+          "setDependencies",
+        );
+      },
+    );
+
+    const removeRemoveDependencyEntryCheck = api.addCheck(
+      "removeDependency:entry",
+      (name) => {
+        validateDependencyName(name, "removeDependency");
+      },
+    );
+
+    const removeHasDependencyEntryCheck = api.addCheck(
+      "hasDependency:entry",
+      (name) => {
+        validateDependencyName(name, "hasDependency");
+      },
+    );
+
+    const removeCloneRouterEntryCheck = api.addCheck(
+      "cloneRouter:entry",
+      (dependencies) => {
+        validateCloneArgs(dependencies);
+      },
+    );
+
     // ⚠ A DIAGNOSTIC, not a check, and the channel is the difference rather
     // than the style: this one cannot refuse the registration it describes —
     // the plugin is already installed by the time core reports.
@@ -822,6 +863,51 @@ export function validationPlugin<
       "PLUGIN_AFTER_START",
       (methodName) => {
         warnPluginAfterStart(methodName, api.logger);
+      },
+    );
+
+    const removeSetDependencyCountDiagnostic = api.subscribeDiagnostic(
+      "SET_DEPENDENCY_COUNT",
+      (currentCount, maxDependencies) => {
+        reportDependencyCount(
+          currentCount,
+          maxDependencies,
+          "setDependency",
+          api.logger,
+        );
+      },
+    );
+
+    const removeSetDependenciesCountDiagnostic = api.subscribeDiagnostic(
+      "SET_DEPENDENCIES_COUNT",
+      (currentCount, maxDependencies) => {
+        reportDependencyCount(
+          currentCount,
+          maxDependencies,
+          "setDependencies",
+          api.logger,
+        );
+      },
+    );
+
+    const removeSetDependencyOverwriteDiagnostic = api.subscribeDiagnostic(
+      "SET_DEPENDENCY_OVERWRITE",
+      (name) => {
+        warnDepsOverwrite(name, "setDependency", api.logger);
+      },
+    );
+
+    const removeSetDependenciesOverwriteDiagnostic = api.subscribeDiagnostic(
+      "SET_DEPENDENCIES_OVERWRITE",
+      (keys) => {
+        warnBatchOverwrite(keys, "setDependencies", api.logger);
+      },
+    );
+
+    const removeRemoveDependencyMissingDiagnostic = api.subscribeDiagnostic(
+      "REMOVE_DEPENDENCY_MISSING",
+      (name) => {
+        warnRemoveNonExistent(name, api.logger);
       },
     );
 
@@ -863,7 +949,35 @@ export function validationPlugin<
 
         removeRemoveDeactivateGuardCheck();
 
+        removeGetDependencyEntryCheck();
+
+        removeGetDependencyValueCheck();
+
+        removeSetDependencyEntryCheck();
+
+        removeSetDependencyCountCheck();
+
+        removeSetDependenciesEntryCheck();
+
+        removeSetDependenciesCountCheck();
+
+        removeRemoveDependencyEntryCheck();
+
+        removeHasDependencyEntryCheck();
+
+        removeCloneRouterEntryCheck();
+
         removePluginAfterStartDiagnostic();
+
+        removeSetDependencyCountDiagnostic();
+
+        removeSetDependenciesCountDiagnostic();
+
+        removeSetDependencyOverwriteDiagnostic();
+
+        removeSetDependenciesOverwriteDiagnostic();
+
+        removeRemoveDependencyMissingDiagnostic();
 
         removeInterceptor();
 

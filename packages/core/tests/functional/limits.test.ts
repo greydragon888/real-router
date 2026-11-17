@@ -116,8 +116,9 @@ describe("core/limits (integration via public API)", () => {
 
       const deps = getDependenciesApi(router);
 
-      // Set many dependencies at once via setDependencies - should not throw
-      // This covers validateDependencyCount with maxDependencies === 0
+      // Bare core judges no count — the limit is the validation plugin's, at
+      // the count positions — so 0 is accepted and changes nothing at either
+      // door.
       const manyDeps: Record<string, number> = {};
 
       for (let i = 0; i < 150; i++) {
@@ -128,7 +129,7 @@ describe("core/limits (integration via public API)", () => {
         deps.setAll(manyDeps);
       }).not.toThrow();
 
-      // Also test set to cover #checkDependencyCount early return
+      // The single-key door too.
       expect(() => {
         deps.set("extraDep", 999);
       }).not.toThrow();

@@ -1,6 +1,7 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import {
+  cloneRouter,
   getDependenciesApi,
   getLifecycleApi,
   getPluginApi,
@@ -47,187 +48,28 @@ describe("core/validator call-site contract", () => {
   });
 
   // ===========================================================================
-  // getDependenciesApi  (kills isNewKey / isChanging / bothAreNaN /
-  // overwrittenKeys logic + "setDependency"/"setDependencies"/"getDependency"/
-  // "removeDependency"/"hasDependency" caller strings)
+  // getDependenciesApi and cloneRouter
   // ===========================================================================
   describe("getDependenciesApi", () => {
-    let deps: AnyDepsApi;
+    it("the dependency doors and cloneRouter consult the validator for nothing (#2388)", () => {
+      // Their refusals are checks and their reports are diagnostic kinds;
+      // `dependencies/dependency-channels-2388.test.ts` owns what each position
+      // and kind receives, and when.
+      const deps = getDependenciesApi(router) as unknown as AnyDepsApi;
 
-    beforeEach(() => {
-      deps = getDependenciesApi(router) as unknown as AnyDepsApi;
-    });
+      vi.clearAllMocks();
 
-    it("set: validates args with caller 'setDependency'", () => {
-      deps.set("a", 1);
-
-      expect(
-        validator.dependencies.validateSetDependencyArgs,
-      ).toHaveBeenCalledWith("a", 1, "setDependency");
-    });
-
-    it("set: new key checks count ('setDependency'), does NOT warn overwrite", () => {
-      deps.set("fresh", 1);
-
-      // ⚑ The two NUMBERS core reads, not the store (#2382) — and the count is
-      // the PRE-write one, which is what makes the limit refuse the write that
-      // would exceed it rather than the one after.
-      expect(
-        validator.dependencies.validateDependencyCount,
-      ).toHaveBeenCalledWith(0, 100, "setDependency");
-      expect(validator.dependencies.warnOverwrite).not.toHaveBeenCalled();
-    });
-
-    it("set: overwrite with a CHANGED value warns once ('setDependency'), no recount", () => {
-      deps.set("k", 1); // new key → validateDependencyCount
-      // eslint-disable-next-line sonarjs/no-element-overwrite -- deliberate overwrite: re-setting the same key is the behavior under test
-      deps.set("k", 2); // overwrite, changed → warnOverwrite
-
-      expect(validator.dependencies.warnOverwrite).toHaveBeenCalledWith(
-        "k",
-        "setDependency",
-      );
-      // exactly once: the new-key write must NOT warn (kills isNewKey inversion)
-      expect(validator.dependencies.warnOverwrite).toHaveBeenCalledTimes(1);
-      // count checked only for the new key, not the overwrite
-      expect(
-        validator.dependencies.validateDependencyCount,
-      ).toHaveBeenCalledTimes(1);
-    });
-
-    it("set: overwrite with the SAME value does NOT warn (isChanging === false)", () => {
-      deps.set("s", 5);
-      // eslint-disable-next-line sonarjs/no-element-overwrite -- deliberate same-value overwrite is the behavior under test
-      deps.set("s", 5);
-
-      expect(validator.dependencies.warnOverwrite).not.toHaveBeenCalled();
-    });
-
-    it("set: NaN-over-NaN does NOT warn (bothAreNaN), but a real change DOES", () => {
-      deps.set("n", Number.NaN);
-      // eslint-disable-next-line sonarjs/no-element-overwrite -- deliberate NaN-over-NaN overwrite is the behavior under test
-      deps.set("n", Number.NaN);
-
-      expect(validator.dependencies.warnOverwrite).not.toHaveBeenCalled();
-
-      // proves the suppression is NaN-specific, not a blanket "never warn"
-      deps.set("n", 1);
-
-      expect(validator.dependencies.warnOverwrite).toHaveBeenCalledWith(
-        "n",
-        "setDependency",
-      );
-    });
-
-    it("set: undefined value is a no-op write but still validates args", () => {
-      deps.set("u", undefined);
-
-      expect(
-        validator.dependencies.validateSetDependencyArgs,
-      ).toHaveBeenCalledWith("u", undefined, "setDependency");
-      expect(deps.has("u")).toBe(false);
-    });
-
-    it("setAll: validates object, counts each new key ('setDependencies')", () => {
-      deps.setAll({ a: 1, b: 2 });
-
-      expect(
-        validator.dependencies.validateDependenciesObject,
-      ).toHaveBeenCalledWith({ a: 1, b: 2 }, "setDependencies");
-      // Once per new key, and the count GROWS between them: the walk writes
-      // each key before the next is judged.
-      expect(
-        validator.dependencies.validateDependencyCount,
-      ).toHaveBeenNthCalledWith(1, 0, 100, "setDependencies");
-      expect(
-        validator.dependencies.validateDependencyCount,
-      ).toHaveBeenNthCalledWith(2, 1, 100, "setDependencies");
-      expect(validator.dependencies.warnBatchOverwrite).not.toHaveBeenCalled();
-    });
-
-    it("setAll: collects ONLY overwritten keys for warnBatchOverwrite('setDependencies')", () => {
-      deps.set("a", 1); // pre-existing
-      deps.setAll({ a: 9, c: 3 }); // a overwritten, c new
-
-      expect(validator.dependencies.warnBatchOverwrite).toHaveBeenCalledWith(
-        ["a"],
-        "setDependencies",
-      );
-    });
-
-    it("setAll: no overwrites → warnBatchOverwrite NOT called (length > 0 guard)", () => {
-      deps.setAll({ x: 1, y: 2 });
-
-      expect(validator.dependencies.warnBatchOverwrite).not.toHaveBeenCalled();
-    });
-
-    it("setAll: undefined values are skipped (no count, no overwrite-collection)", () => {
-      deps.set("keep", 1);
-      // fresh spies so only the setAll() call below is measured
-      const fresh = installSpyValidator(router);
-
-      deps.setAll({ keep: undefined, brandNew: 2 });
-
-      // 'keep' is undefined → skipped: not collected as an overwrite
-      expect(fresh.dependencies.warnBatchOverwrite).not.toHaveBeenCalled();
-      // only 'brandNew' is a real new key, counted under "setDependencies"
-      expect(fresh.dependencies.validateDependencyCount).toHaveBeenCalledTimes(
-        1,
-      );
-      expect(fresh.dependencies.validateDependencyCount).toHaveBeenCalledWith(
-        1,
-        100,
-        "setDependencies",
-      );
-      // 'keep' kept its old value, 'brandNew' written
-      expect(deps.get("keep")).toBe(1);
-      expect(deps.get("brandNew")).toBe(2);
-    });
-
-    it("get: validates name ('getDependency') then existence", () => {
-      deps.set("g", 1);
-      deps.get("g");
-
-      expect(
-        validator.dependencies.validateDependencyName,
-      ).toHaveBeenCalledWith("g", "getDependency");
-      // ⚑ The VALUE core read, not the store (#2382): the same one `get` returns.
-      expect(
-        validator.dependencies.validateDependencyExists,
-      ).toHaveBeenCalledWith("g", 1);
-    });
-
-    it("remove: validates name ('removeDependency')", () => {
-      deps.set("r", 1);
-      deps.remove("r");
-
-      expect(
-        validator.dependencies.validateDependencyName,
-      ).toHaveBeenCalledWith("r", "removeDependency");
-    });
-
-    it("remove: removing a NON-existent key warns; removing an existing one does NOT", () => {
+      deps.set("k", 1);
+      // eslint-disable-next-line sonarjs/no-element-overwrite -- deliberate overwrite: the overwrite arm is one of the sites under test
+      deps.set("k", 2);
+      deps.setAll({ k: 3, other: 4 });
+      deps.get("k");
+      deps.has("k");
       deps.remove("ghost");
+      deps.remove("k");
+      cloneRouter(router, { cloned: 1 }).dispose();
 
-      expect(validator.dependencies.warnRemoveNonExistent).toHaveBeenCalledWith(
-        "ghost",
-      );
-
-      deps.set("real", 1);
-      deps.remove("real");
-
-      // still only the ghost warned (kills the !hasOwn inversion)
-      expect(
-        validator.dependencies.warnRemoveNonExistent,
-      ).toHaveBeenCalledTimes(1);
-    });
-
-    it("has: validates name ('hasDependency')", () => {
-      deps.has("h");
-
-      expect(
-        validator.dependencies.validateDependencyName,
-      ).toHaveBeenCalledWith("h", "hasDependency");
+      expect(consultationsOn(validator)).toStrictEqual([]);
     });
   });
 

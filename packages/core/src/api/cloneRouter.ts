@@ -1,7 +1,7 @@
 import { errorCodes } from "../constants";
 import { routeTreeToDefinitions } from "../engine";
 import { ingestDependencies } from "../guards";
-import { getInternals } from "../internals";
+import { POSITION, getInternals, runChecks } from "../internals";
 import { getLifecycleApi } from "./getLifecycleApi";
 import { assignConfigEntries } from "../namespaces/RoutesNamespace/helpers";
 import { adoptForwardState } from "../namespaces/RoutesNamespace/routesStore";
@@ -122,14 +122,17 @@ export function cloneRouter<
   opts?: CloneOptions,
 ): RouterClass<Dependencies> {
   const ctx = getInternals(router);
+  const refuseDisposed = (): void => {
+    if (ctx.isDisposed()) {
+      throw atCloneRouter.code(
+        errorCodes.ROUTER_DISPOSED,
+      )`cannot clone a disposed router — dispose() is terminal`;
+    }
+  };
 
-  if (ctx.isDisposed()) {
-    throw atCloneRouter.code(
-      errorCodes.ROUTER_DISPOSED,
-    )`cannot clone a disposed router — dispose() is terminal`;
-  }
+  refuseDisposed();
 
-  ctx.validator?.dependencies.validateCloneArgs(dependencies);
+  runChecks(ctx.checks, POSITION["cloneRouter:entry"], dependencies);
 
   // Get source store directly
   const sourceStore = ctx.routeGetStore();
@@ -194,6 +197,12 @@ export function cloneRouter<
   const clonedLoggerConfig: Partial<LoggerConfig> = loggerOverride
     ? { ...loggerConfig, ...loggerOverride }
     : loggerConfig;
+
+  // ⚑ Again, before the clone is built (#1859). The entry check, the walk of the
+  // override bag and the reads of `opts` above all run application code, and a
+  // teardown in any of them would leave the clone built from the torn-down
+  // router.
+  refuseDisposed();
 
   // ⚑ The base's KEY, not its raw option (#1877). `urlParamsEncoding` is
   // supported input — a `toString`-backed value is legal — and building the

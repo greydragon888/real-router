@@ -1837,9 +1837,9 @@ describe("how many times an exported free function reads a name (#1882)", () => 
  * from"*. This API family was the one that did not.
  *
  * ⚑ The same file already applies that discipline one level up: `setDependency`
- * captures `store.dependencies` ONCE (#1859) because a validator warning can
- * reach application code that replaces it. The reference was pinned; the key was
- * not.
+ * captures `store.dependencies` ONCE (#1859) because its count check and
+ * reports can run application code that replaces it. The reference was pinned;
+ * the key was not.
  */
 describe("how many times a dependency NAME is coerced (#1843)", () => {
   /** A name whose `toString` yields `answers[i]` on read i. */
@@ -1990,8 +1990,9 @@ describe("how many times a dependency NAME is coerced (#1843)", () => {
     expect(deps.get(token as never)).toBe(42);
     // Unchanged and pre-existing: `getAll` SPREADS the store, and a spread
     // carries own enumerable symbols, so the token comes back. What does not
-    // see it is `objectKeys` — `validateDependencyCount` never counts a symbol
-    // dependency against the limit. Neither fact is this fix's business; the
+    // see it is `objectKeys`, so the count a check at `setDependency:count`
+    // receives never includes a symbol dependency. Neither fact is this fix's
+    // business; the
     // cell records them so the exemption is measured rather than assumed.
     expect(deps.getAll()).toStrictEqual({ alpha: 1, [token]: 42 });
 

@@ -24,6 +24,7 @@ import {
   validateDependencyName,
   validateSetDependencyArgs,
   validateDependenciesObject,
+  validateDependencyLimit,
 } from "../../src/validators/dependencies";
 import {
   validateEventName,
@@ -654,6 +655,40 @@ describe("validateDependenciesObject — property-based", () => {
   });
 });
 
+describe("validateDependencyLimit — property-based", () => {
+  test.prop(
+    [fc.integer({ min: 0, max: 9999 }), fc.integer({ min: 1, max: 1000 })],
+    { numRuns: NUM_RUNS.standard },
+  )("count within limit never throws", (current, headroom) => {
+    expect(() => {
+      validateDependencyLimit(current, current + headroom, "setDependency");
+    }).not.toThrow();
+  });
+
+  test.prop(
+    [fc.integer({ min: 1, max: 10_000 }), fc.integer({ min: 0, max: 1000 })],
+    { numRuns: NUM_RUNS.standard },
+  )("count meeting limit always throws RangeError", (max, excess) => {
+    expect(() => {
+      validateDependencyLimit(max + excess, max, "setDependency");
+    }).toThrow(RangeError);
+  });
+
+  // The property above meets the boundary only when it draws `excess = 0`;
+  // this cell meets it on every run.
+  test("a count exactly at the limit throws RangeError", () => {
+    expect(() => {
+      validateDependencyLimit(5, 5, "setDependency");
+    }).toThrow(RangeError);
+  });
+
+  test("maxDependencies=0 disables limit (never throws)", () => {
+    expect(() => {
+      validateDependencyLimit(9999, 0, "setDependency");
+    }).not.toThrow();
+  });
+});
+
 // =============================================================================
 // Options namespace — validateLimitValue
 // =============================================================================
@@ -701,7 +736,7 @@ describe("validateLimitValue — property-based", () => {
 //
 // Class-guard for the false-rejection pair (#1224 / #1225): the opt-in
 // validation layer must never reject a state bare core accepts. The live
-// limiter (`validateDependencyCount`) counts BEFORE the insert, so a store may
+// limiter (`validateDependencyLimit`) counts BEFORE the insert, so a store may
 // legally REACH exactly maxDependencies — the retrospective pass must accept
 // that boundary and reject only a store that STRICTLY exceeds it.
 describe("validateLimitsConsistency — dependency-count boundary (#1225)", () => {

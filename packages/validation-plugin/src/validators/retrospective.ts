@@ -391,7 +391,7 @@ export function validateLimitsConsistency(
       ? maxDepsFromOptions
       : resolvedMaxDependencies;
 
-  // `>`, not `>=` (#1225): the live limiter (`validateDependencyCount`) counts
+  // `>`, not `>=` (#1225): the live limiter (`validateDependencyLimit`) counts
   // BEFORE the insert, so a store may legally REACH exactly maxDependencies. This
   // retrospective pass checks committed STATE (re-run on usePlugin AND every
   // cloneRouter), so it must accept an at-limit store and reject only one that

@@ -77,8 +77,9 @@ and never throws.
   and uses that key for the check, the old-value read, the diagnostic and the
   write. No gate on any of them, and a **symbol** name is exempt from the
   coercion entirely — a symbol IS a property key, so nothing drifts. This family
-  HAS a validator seam: `validateDependencyName` refuses a non-string at zero
-  coercions.
+  HAS a check at the `:entry` position of each door that takes a name, where
+  `@real-router/validation-plugin` refuses a non-string name before the door
+  coerces it.
 
 ⚠ Do not restate any of this as "every entry point that takes a route name". It
 was written that way once, from a sweep that was never enumerated, and three doors
@@ -317,6 +318,8 @@ doors reach — the lifecycle namespace and the dependency bag, installed at
 wiring, and the tree-change channel, which `Router` hands in with the store —
 so the standalone CRUD helpers reach them without threading a parameter through
 every helper. It is the api/ layer's transport channel, not inert data.
+`DependenciesStore` carries one reference too, the object its doors report
+through.
 
 **Each reference's slot is sealed where it arrives**, so replacing one through
 `routeGetStore()` is refused instead of re-pointing a door. The comment in

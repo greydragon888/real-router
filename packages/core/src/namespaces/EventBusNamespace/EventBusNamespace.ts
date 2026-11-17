@@ -469,6 +469,10 @@ export class EventBusNamespace {
     return this.#emitter.listenerCount(TREE_CHANGED);
   }
 
+  diagnosticListenerCount(key: keyof DiagnosticEventMap): number {
+    return this.#emitter.listenerCount(key);
+  }
+
   sendStart(): void {
     this.#fsm.send(routerEvents.START);
   }

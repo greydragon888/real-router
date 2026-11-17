@@ -404,7 +404,7 @@ describe("core/limits — with validationPlugin", () => {
   });
 
   // #1225 — a store that legally REACHED maxDependencies (the live limiter
-  // `validateDependencyCount` counts BEFORE the insert, so exactly maxDeps is
+  // `validateDependencyLimit` counts BEFORE the insert, so exactly maxDeps is
   // reachable) must not be rejected by the retrospective pass, which re-runs on
   // every usePlugin AND every cloneRouter() → i.e. on every SSR per-request clone.
   describe("dependency count at exactly maxDependencies (#1225)", () => {

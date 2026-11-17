@@ -4,7 +4,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { computeThresholds } from "../../src/helpers";
 import {
   validateDependencyBatchLimit,
-  validateDependencyCount,
+  validateDependencyLimit,
+  reportDependencyCount,
   validateCloneArgs,
   warnOverwrite as warnDepOverwrite,
   warnBatchOverwrite,
@@ -436,54 +437,78 @@ describe("Phase 2 dependency validators", () => {
     vi.restoreAllMocks();
   });
 
-  describe("validateDependencyCount", () => {
+  // ⚑ One count, two leaves: core asks the count position, where the limit
+  // refuses, and then raises the count kind, where the thresholds are logged.
+  describe("validateDependencyLimit", () => {
     it("returns early when maxDependencies is 0 (unlimited)", () => {
       expect(() => {
-        validateDependencyCount(999, 0, "test", testLogger);
+        validateDependencyLimit(999, 0, "test");
       }).not.toThrow();
-      expect(warnSpy).not.toHaveBeenCalled();
-      expect(errorSpy).not.toHaveBeenCalled();
     });
 
     it("throws when currentCount >= maxDependencies", () => {
       expect(() => {
-        validateDependencyCount(100, 100, "setDependency", testLogger);
-      }).toThrow("Dependency limit exceeded");
+        validateDependencyLimit(100, 100, "setDependency");
+      }).toThrow(
+        "[router.setDependency] Dependency limit exceeded (100). Current: 100.",
+      );
       expect(() => {
-        validateDependencyCount(105, 100, "setDependency", testLogger);
+        validateDependencyLimit(105, 100, "setDependency");
       }).toThrow("Dependency limit exceeded");
     });
 
+    it("does not throw below the limit, on a threshold included", () => {
+      expect(() => {
+        validateDependencyLimit(99, 100, "setDependency");
+        validateDependencyLimit(50, 100, "setDependency");
+        validateDependencyLimit(20, 100, "setDependency");
+      }).not.toThrow();
+    });
+  });
+
+  describe("reportDependencyCount", () => {
+    it("returns early when maxDependencies is 0 (unlimited)", () => {
+      reportDependencyCount(0, 0, "test", testLogger);
+
+      expect(warnSpy).not.toHaveBeenCalled();
+      expect(errorSpy).not.toHaveBeenCalled();
+    });
+
     it("calls logger.error when currentCount === error threshold", () => {
-      validateDependencyCount(50, 100, "setDependency", testLogger);
+      reportDependencyCount(50, 100, "setDependency", testLogger);
 
       expect(errorSpy).toHaveBeenCalledWith(
         "router.setDependency",
         expect.stringContaining("50 dependencies"),
       );
+      expect(warnSpy).not.toHaveBeenCalled();
     });
 
     it("calls logger.warn when currentCount === warn threshold", () => {
-      validateDependencyCount(20, 100, "setDependency", testLogger);
+      reportDependencyCount(20, 100, "setDependency", testLogger);
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.setDependency",
         expect.stringContaining("20 dependencies"),
       );
+      expect(errorSpy).not.toHaveBeenCalled();
     });
 
-    it("does nothing below thresholds", () => {
-      validateDependencyCount(5, 100, "setDependency", testLogger);
+    it("does nothing below thresholds, and does not throw at the limit", () => {
+      expect(() => {
+        reportDependencyCount(5, 100, "setDependency", testLogger);
+        reportDependencyCount(100, 100, "setDependency", testLogger);
+      }).not.toThrow();
 
       expect(warnSpy).not.toHaveBeenCalled();
       expect(errorSpy).not.toHaveBeenCalled();
     });
 
-    // ⚑ The "limits absent" arm is GONE with the store parameter (#2382). The
-    // limit arrives resolved by core's `createLimits`, so the plugin carries no
-    // default of its own to fall back to — and the default itself is pinned
-    // end-to-end by `limits.test.ts` › "should enforce default maxDependencies
-    // limit (100)", which asks the public door rather than this function.
+    // ⚑ No "limits absent" arm (#2382): the limit arrives resolved by core's
+    // `createLimits`, so the plugin carries no default of its own to fall back
+    // to — and the default itself is pinned end-to-end by `limits.test.ts` ›
+    // "should enforce default maxDependencies limit (100)", which asks the
+    // public door rather than this function.
   });
 
   describe("validateDependencyBatchLimit", () => {

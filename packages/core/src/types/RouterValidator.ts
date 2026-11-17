@@ -58,43 +58,6 @@ export interface RouterValidator {
   };
 
   /**
-   * Dependencies validation methods
-   */
-  dependencies: {
-    validateDependencyName: (name: unknown, caller: string) => void;
-    validateSetDependencyArgs: (
-      name: unknown,
-      value: unknown,
-      caller: string,
-    ) => void;
-    validateDependenciesObject: (deps: unknown, caller: string) => void;
-    /**
-     * ⚑ Takes the VALUE core read, not the store that holds it (#2382). The
-     * question is whether the name resolved to anything, and core has the answer
-     * one line earlier: `readDependency` performs exactly that lookup.
-     */
-    validateDependencyExists: (name: string, value: unknown) => void;
-    /**
-     * ⚑ Takes the two NUMBERS it judges, not the store that holds them (#2382).
-     * `maxDependencies` arrives already resolved by `createLimits`, which takes
-     * this path out of the default-drift #1879 names.
-     *
-     * ⚠ Both arguments sit inside the optional chain on purpose: with no
-     * validator installed the `?.` short-circuits the whole chain, arguments
-     * included, so the key count is never walked.
-     */
-    validateDependencyCount: (
-      currentCount: number,
-      maxDependencies: number,
-      methodName: string,
-    ) => void;
-    validateCloneArgs: (dependencies: unknown) => void;
-    warnOverwrite: (name: string, methodName: string) => void;
-    warnBatchOverwrite: (keys: string[], methodName: string) => void;
-    warnRemoveNonExistent: (name: unknown) => void;
-  };
-
-  /**
    * Plugin validation methods
    */
   plugins: {

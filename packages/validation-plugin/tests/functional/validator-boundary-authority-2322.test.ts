@@ -107,15 +107,6 @@ const SELF = "validator-boundary-authority-2322.test.ts";
  * {@link MIRRORED} when nothing can.
  */
 const OWNER: Record<string, string> = {
-  "dependencies.validateCloneArgs": "dependencies.validation.test.ts",
-  "dependencies.validateDependenciesObject": "plain-bag-mirror-2282.test.ts",
-  "dependencies.validateDependencyCount": "limits.test.ts",
-  "dependencies.validateDependencyExists": "dependencies.validation.test.ts",
-  "dependencies.validateDependencyName": "dependencies.validation.test.ts",
-  "dependencies.validateSetDependencyArgs": "dependencies.validation.test.ts",
-  "dependencies.warnBatchOverwrite": SELF,
-  "dependencies.warnOverwrite": "dependencies-reentrancy-1859.test.ts",
-  "dependencies.warnRemoveNonExistent": "dependencies.validation.test.ts",
   "eventBus.validateCountThresholds": "limits.test.ts",
   "eventBus.validateListenerArgs": MIRRORED,
   "lifecycle.validateCountThresholds": SELF,
@@ -159,6 +150,15 @@ const OWNER: Record<string, string> = {
  */
 const REGISTRATION_OWNER: Record<string, string> = {
   "PLUGIN_AFTER_START › warnPluginAfterStart": "plugin-api.validation.test.ts",
+  "REMOVE_DEPENDENCY_MISSING › warnRemoveNonExistent":
+    "dependencies.validation.test.ts",
+  "SET_DEPENDENCIES_COUNT › reportDependencyCount":
+    "dependency-channels-consumer-2388.test.ts",
+  "SET_DEPENDENCIES_OVERWRITE › warnBatchOverwrite": SELF,
+  "SET_DEPENDENCY_COUNT › reportDependencyCount":
+    "dependency-channels-consumer-2388.test.ts",
+  "SET_DEPENDENCY_OVERWRITE › warnDepsOverwrite":
+    "dependencies-reentrancy-1859.test.ts",
   "addActivateGuard:entry › validateHandler": "lifecycle.validation.test.ts",
   "addActivateGuard:entry › validateRouteName": "lifecycle.validation.test.ts",
   "addDeactivateGuard:entry › validateHandler": SELF,
@@ -179,10 +179,17 @@ const REGISTRATION_OWNER: Record<string, string> = {
     "both-channels-authority-1972.test.ts",
   "canNavigateTo:params › validateNavigateParams":
     "predicate-totality-2245.test.ts",
+  "cloneRouter:entry › validateCloneArgs": "dependencies.validation.test.ts",
   "forwardState:entry › validateSearch": "both-channels-authority-1972.test.ts",
   "forwardState:entry › validateStateBuilderArgs":
     "plugin-api.validation.test.ts",
+  "getDependency:entry › validateDependencyName":
+    "dependencies.validation.test.ts",
+  "getDependency:value › validateDependencyExists":
+    "dependencies.validation.test.ts",
   "getRoute:entry › validateRouteName": "routes.validation.test.ts",
+  "hasDependency:entry › validateDependencyName":
+    "dependencies.validation.test.ts",
   "hasRoute:entry › validateRouteName": "routes.validation.test.ts",
   "navigate:entry › validateNavigateArgs": "navigation.validation.test.ts",
   "navigate:entry › validateNavigateParamsShape": SELF,
@@ -193,10 +200,20 @@ const REGISTRATION_OWNER: Record<string, string> = {
     "check-channel-consumer-2388.test.ts",
   "removeDeactivateGuard:entry › validateRouteName":
     "check-channel-consumer-2388.test.ts",
+  "removeDependency:entry › validateDependencyName":
+    "dependencies.validation.test.ts",
   "removeRoute:entry › throwIfInternalRoute": MIRRORED,
   "removeRoute:entry › validateRemoveRouteArgs":
     "route-door-prefix-2399.test.ts",
   "replaceRoutes:batch › checkRouteBatch": "replace-whole-table-2562.test.ts",
+  "setDependencies:count › validateDependencyLimit": SELF,
+  "setDependencies:entry › validateDependenciesObject":
+    "plain-bag-mirror-2282.test.ts",
+  "setDependencies:entry › validateDependencyBatchLimit":
+    "setall-atomic-limit-2253.test.ts",
+  "setDependency:count › validateDependencyLimit": "limits.test.ts",
+  "setDependency:entry › validateSetDependencyArgs":
+    "dependencies.validation.test.ts",
   "updateRoute:entry › throwIfInternalRoute": MIRRORED,
   "updateRoute:entry › validateUpdateRoute": "routes.validation.test.ts",
   "updateRoute:entry › validateUpdateRouteBasicArgs":
@@ -1453,6 +1470,51 @@ describe("what nothing else held (#2322)", () => {
       "router.setDependencies Overwritten: x",
     ]);
     expect(overwrites(false)).toStrictEqual([]);
+  });
+
+  it("validateDependencyLimit — setDependencies refuses at the count position a key its batch limit was not shown", () => {
+    // ⚑ `validateDependencyBatchLimit` refuses, before core writes a key, every
+    // bag whose keys would cross the limit. So the refusal at
+    // `setDependencies:count` fires only when the record or the bag changes
+    // between that limit and core's walk: here a `Proxy` whose `ownKeys`
+    // answers one key longer on each call. The input is exotic.
+    const refusal = (withPlugin: boolean): string => {
+      const keys = ["k0", "k1", "k2"];
+      let calls = 0;
+      const bag = new Proxy(
+        { k0: 0, k1: 1, k2: 2 },
+        {
+          ownKeys: () => {
+            calls += 1;
+
+            return keys.slice(0, calls);
+          },
+        },
+      );
+      const router = createRouter([...ROUTES], {
+        limits: { maxDependencies: 2 },
+        logger: warningSink().logger,
+      });
+
+      if (withPlugin) {
+        router.usePlugin(validationPlugin());
+      }
+
+      try {
+        getDependenciesApi(router).setAll(bag);
+
+        return "NO THROW";
+      } catch (error) {
+        return (error as Error).message;
+      } finally {
+        router.dispose();
+      }
+    };
+
+    expect(refusal(true)).toBe(
+      "[router.setDependencies] Dependency limit exceeded (2). Current: 2.",
+    );
+    expect(refusal(false)).toBe("NO THROW");
   });
 
   /**

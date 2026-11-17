@@ -93,8 +93,8 @@ export function validateDependenciesObject(
 /**
  * The batch form of the limit, run BEFORE the ingest pass (#2253).
  *
- * ⚑ {@link validateDependencyCount} asks about the store as it stands, and the
- * ingest loop calls it once per NEW key — so the key that trips the limit
+ * ⚑ {@link validateDependencyLimit} asks about the store as it stands, and the
+ * ingest loop asks it once per NEW key — so the key that trips the limit
  * arrives after its predecessors are already stored, and a caught `RangeError`
  * describes a call that moved the store. This one answers the same question for
  * the whole batch, from the pre-flight position, so the refusal is atomic.
@@ -148,14 +148,40 @@ export function validateDependencyBatchLimit(
 
 export function validateDependencyExists(
   value: unknown,
-  dependencyName: string,
+  dependencyName: PropertyKey,
 ): asserts value is NonNullable<unknown> {
   if (value === undefined) {
     throw atGetDependency.ref`dependency "${dependencyName}" not found`;
   }
 }
 
-export function validateDependencyCount(
+/**
+ * The per-key limit: a NEW key at the limit is refused. Registered at the count
+ * positions; {@link reportDependencyCount} is the same count's report half.
+ */
+export function validateDependencyLimit(
+  currentCount: number,
+  maxDependencies: number,
+  methodName: string,
+): void {
+  if (maxDependencies === 0) {
+    return;
+  }
+
+  if (currentCount >= maxDependencies) {
+    const at = raiser("router", methodName);
+
+    throw at.range`Dependency limit exceeded (${maxDependencies}). Current: ${currentCount}.`;
+  }
+}
+
+/**
+ * The advisory thresholds of the same count, logged as the record grows.
+ *
+ * ⚠ It never meets a count at the limit: core asks the count position first,
+ * and {@link validateDependencyLimit} refuses there.
+ */
+export function reportDependencyCount(
   currentCount: number,
   maxDependencies: number,
   methodName: string,
@@ -167,11 +193,6 @@ export function validateDependencyCount(
 
   const { warn, error } = computeThresholds(maxDependencies);
 
-  if (currentCount >= maxDependencies) {
-    const at = raiser("router", methodName);
-
-    throw at.range`Dependency limit exceeded (${maxDependencies}). Current: ${currentCount}.`;
-  }
   if (currentCount === error) {
     logger.error(
       `router.${methodName}`,
@@ -214,7 +235,7 @@ export function warnOverwrite(
 }
 
 export function warnBatchOverwrite(
-  keys: string[],
+  keys: readonly string[],
   methodName: string,
   logger: RouterLogger,
 ): void {

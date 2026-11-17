@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { createRouter } from "@real-router/core";
-import { getDependenciesApi } from "@real-router/core/api";
+import { createRouter, errorCodes } from "@real-router/core";
+import {
+  cloneRouter,
+  getDependenciesApi,
+  getPluginApi,
+} from "@real-router/core/api";
 
 /**
  * #1859 — the write paths re-read `store.dependencies` on every access, and
@@ -12,21 +16,22 @@ import { getDependenciesApi } from "@real-router/core/api";
  * it, while `getAll()` kept answering with the leak.
  *
  * ⚑ There are TWO user-code windows per key, not one, and that is why the fix is
- * a captured target rather than a disposal probe: reading `deps[key]` runs an
- * accessor if the caller supplied one, and `validateDependencyCount` /
- * `warnOverwrite` reach `logger.warn` → the application's `LoggerConfig.callback`.
- * A probe between them closes the first and leaves the second wide open — the
- * callback route reproduced the leak in full on a bag with no accessors at all.
+ * a captured target rather than a disposal probe: reading `deps[key]` runs a
+ * `get` trap if the caller handed in a `Proxy` (an own accessor is refused
+ * before it is read, below), and the count check and the reports run
+ * application code — a check or a diagnostic handler directly, and through the
+ * logger the application's `LoggerConfig.callback`. A probe between them closes
+ * the first and leaves the second wide open — the callback route reproduced the
+ * leak in full on a bag with no accessors at all.
  */
 const ROUTES = [{ name: "a", path: "/a" }];
 
 /**
- * ⚠ The VALIDATOR window — `validateDependencyCount` / `warnOverwrite` reaching
- * `logger.callback` — is exercised in `@real-router/validation-plugin`'s own
- * suite, not here. It needs the plugin installed, and reaching it from core
- * would mean injecting through `src/internals`, which functional tests are
- * forbidden from importing. See
- * `validation-plugin/tests/functional/dependencies-reentrancy-1859.test.ts`.
+ * ⚠ The REPORT window is core's own code, reached here through
+ * `PluginApi.subscribeDiagnostic`; the describe `a report that tears the
+ * router down lands nothing` drives it. `@real-router/validation-plugin`'s
+ * `dependencies-reentrancy-1859.test.ts` drives the same window through the
+ * logger callback its reports reach.
  */
 const attempt = (fn: () => unknown): string => {
   try {
@@ -49,11 +54,9 @@ describe("a teardown from inside the call cannot land a write (#1859)", () => {
    * it could not land a write.
    *
    * ⚠ The class is not closed, and the fix that closed this window is not the fix
-   * for it. The VALIDATOR window — `validateDependencyCount` / `warnOverwrite`
-   * reaching `logger.callback` — needs no accessor at all and is still live; the
-   * captured target is what holds it, and it is exercised in
-   * `validation-plugin/tests/functional/dependencies-reentrancy-1859.test.ts`
-   * (green, measured, at the time this narrowed).
+   * for it. The REPORT window needs no accessor at all and is still live; the
+   * captured target is what holds it, and the describe `a report that tears the
+   * router down lands nothing` exercises it.
    */
   it("setAll: the accessor window is refused, so nothing can tear down inside it", () => {
     const router = createRouter(ROUTES, {}, { boot: "B" } as never);
@@ -147,6 +150,279 @@ describe("a teardown from inside the call cannot land a write (#1859)", () => {
 
     expect(Object.keys(api.getAll())).toStrictEqual(["a", "b", "c"]);
 
+    router.dispose();
+  });
+});
+
+/** The CODE when there is one: these rows are about `ROUTER_DISPOSED`. */
+const codeOf = (fn: () => unknown): string => {
+  try {
+    fn();
+
+    return "ok";
+  } catch (error) {
+    return (error as { code?: string }).code ?? (error as Error).message;
+  }
+};
+
+type Deps = Record<string, unknown>;
+
+const make = (initial: Deps) => {
+  const router = createRouter<Deps>(ROUTES, {}, initial);
+
+  return { router, deps: getDependenciesApi(router) };
+};
+
+describe("a report that tears the router down lands nothing (#1859)", () => {
+  // ⚑ The report runs between the door's reads and its write, and a handler
+  // is application code. The door writes into the record it captured before
+  // the report, which the teardown discarded. `remove` stores nothing, and
+  // refuses after its delete.
+  it("set: an overwrite report that disposes", () => {
+    const { router, deps } = make({ boot: "B" });
+    const retained = { big: "PAYLOAD" };
+
+    getPluginApi(router).subscribeDiagnostic("SET_DEPENDENCY_OVERWRITE", () => {
+      router.dispose();
+    });
+
+    expect(
+      codeOf(() => {
+        deps.set("boot", retained);
+      }),
+    ).toBe(errorCodes.ROUTER_DISPOSED);
+    expect(Object.values(deps.getAll())).not.toContain(retained);
+    expect(Object.keys(deps.getAll())).toStrictEqual([]);
+  });
+
+  it("setAll: a count report that disposes", () => {
+    const { router, deps } = make({ boot: "B" });
+    const retained = { big: "PAYLOAD" };
+    let disposed = false;
+
+    getPluginApi(router).subscribeDiagnostic("SET_DEPENDENCIES_COUNT", () => {
+      if (!disposed) {
+        disposed = true;
+        router.dispose();
+      }
+    });
+
+    expect(
+      codeOf(() => {
+        deps.setAll({ leak: retained, second: 2 });
+      }),
+    ).toBe(errorCodes.ROUTER_DISPOSED);
+    expect(Object.values(deps.getAll())).not.toContain(retained);
+    expect(Object.keys(deps.getAll())).toStrictEqual([]);
+  });
+
+  it("CONTROL — the same reports on handlers that do not dispose", () => {
+    const { router, deps } = make({ boot: "B" });
+    const heard: string[] = [];
+    const api = getPluginApi(router);
+
+    api.subscribeDiagnostic("SET_DEPENDENCY_OVERWRITE", () => {
+      heard.push("overwrite");
+    });
+    api.subscribeDiagnostic("SET_DEPENDENCIES_COUNT", () => {
+      heard.push("count");
+    });
+
+    deps.set("boot", "NEW");
+    deps.setAll({ x: 1 });
+
+    expect(heard).toStrictEqual(["overwrite", "count"]);
+    expect(deps.getAll()).toStrictEqual({ boot: "NEW", x: 1 });
+
+    router.dispose();
+  });
+
+  it("remove: a missing-key report that disposes", () => {
+    const { router, deps } = make({ boot: "B" });
+
+    getPluginApi(router).subscribeDiagnostic(
+      "REMOVE_DEPENDENCY_MISSING",
+      () => {
+        router.dispose();
+      },
+    );
+
+    expect(
+      codeOf(() => {
+        deps.remove("ghost");
+      }),
+    ).toBe(errorCodes.ROUTER_DISPOSED);
+  });
+});
+
+describe("an entry check that disposes or resets the router (#1859)", () => {
+  // ⚑ A check may only refuse, so these break its contract. `set` and `setAll`
+  // ask again after the check, before they take the record: a disposed router
+  // ends the call before anything is written, and after a reset the fresh
+  // record is the one the rest of the call writes into. `remove` asks after its
+  // delete.
+  it("set: a disposing check ends the call before the write", () => {
+    const { router, deps } = make({ boot: "B" });
+    const retained = { big: "PAYLOAD" };
+
+    getPluginApi(router).addCheck("setDependency:entry", () => {
+      router.dispose();
+    });
+
+    expect(
+      codeOf(() => {
+        deps.set("leak", retained);
+      }),
+    ).toBe(errorCodes.ROUTER_DISPOSED);
+    expect(Object.keys(deps.getAll())).toStrictEqual([]);
+  });
+
+  it("setAll: a disposing check ends the call before the write", () => {
+    const { router, deps } = make({ boot: "B" });
+    const retained = { big: "PAYLOAD" };
+
+    getPluginApi(router).addCheck("setDependencies:entry", () => {
+      router.dispose();
+    });
+
+    expect(
+      codeOf(() => {
+        deps.setAll({ leak: retained });
+      }),
+    ).toBe(errorCodes.ROUTER_DISPOSED);
+    expect(Object.keys(deps.getAll())).toStrictEqual([]);
+  });
+
+  it("set: a resetting check leaves the call as reset() and then the write", () => {
+    const { router, deps } = make({ boot: "B" });
+    const retained = { big: "PAYLOAD" };
+
+    getPluginApi(router).addCheck("setDependency:entry", () => {
+      deps.reset();
+    });
+
+    expect(
+      codeOf(() => {
+        deps.set("leak", retained);
+      }),
+    ).toBe("ok");
+    expect(deps.getAll()).toStrictEqual({ leak: retained });
+
+    router.dispose();
+  });
+
+  it("setAll: a resetting check leaves the call as reset() and then the write", () => {
+    const { router, deps } = make({ boot: "B" });
+    const retained = { big: "PAYLOAD" };
+
+    getPluginApi(router).addCheck("setDependencies:entry", () => {
+      deps.reset();
+    });
+
+    expect(
+      codeOf(() => {
+        deps.setAll({ leak: retained });
+      }),
+    ).toBe("ok");
+    expect(deps.getAll()).toStrictEqual({ leak: retained });
+
+    router.dispose();
+  });
+
+  it("remove: a disposing check makes the call refuse", () => {
+    const { router, deps } = make({ boot: "B" });
+
+    getPluginApi(router).addCheck("removeDependency:entry", () => {
+      router.dispose();
+    });
+
+    expect(
+      codeOf(() => {
+        deps.remove("boot");
+      }),
+    ).toBe(errorCodes.ROUTER_DISPOSED);
+  });
+});
+
+describe("cloneRouter refuses a base torn down during the call (#1859)", () => {
+  // ⚑ `cloneRouter` writes into no record of the base. It asks again whether the
+  // base is alive after the last application code it runs before building the
+  // clone, so each of these windows ends in the same refusal.
+  it("a check at its entry position", () => {
+    const { router } = make({ boot: "B" });
+
+    getPluginApi(router).addCheck("cloneRouter:entry", () => {
+      router.dispose();
+    });
+
+    expect(
+      codeOf(() => {
+        cloneRouter(router);
+      }),
+    ).toBe(errorCodes.ROUTER_DISPOSED);
+  });
+
+  it("a Proxy override bag whose trap disposes the base", () => {
+    const { router } = make({ boot: "B" });
+    const override = new Proxy<Deps>(
+      { extra: 1 },
+      {
+        ownKeys(target) {
+          router.dispose();
+
+          return Reflect.ownKeys(target);
+        },
+      },
+    );
+
+    expect(
+      codeOf(() => {
+        cloneRouter(router, override);
+      }),
+    ).toBe(errorCodes.ROUTER_DISPOSED);
+  });
+
+  it("an opts getter that disposes the base", () => {
+    const { router } = make({ boot: "B" });
+    const opts = {
+      get logger() {
+        router.dispose();
+
+        return {};
+      },
+    };
+
+    expect(
+      codeOf(() => {
+        cloneRouter(router, undefined, opts);
+      }),
+    ).toBe(errorCodes.ROUTER_DISPOSED);
+  });
+
+  it("a base disposed before the call is refused before its override bag is judged", () => {
+    const { router } = make({ boot: "B" });
+
+    router.dispose();
+
+    expect(
+      codeOf(() => {
+        cloneRouter(router, "not a bag" as never);
+      }),
+    ).toBe(errorCodes.ROUTER_DISPOSED);
+  });
+
+  it("CONTROL — the same arguments on a base nobody disposes give a clone", () => {
+    const { router } = make({ boot: "B" });
+    const clone = cloneRouter(router, new Proxy<Deps>({ extra: 1 }, {}), {
+      logger: {},
+    });
+
+    expect(getDependenciesApi(clone).getAll()).toStrictEqual({
+      boot: "B",
+      extra: 1,
+    });
+
+    clone.dispose();
     router.dispose();
   });
 });

@@ -66,7 +66,10 @@ import { EventEmitter } from "./utils/event-emitter";
 import { RouterLogger } from "./utils/logger";
 import { wireNamespaces } from "./wiring";
 
-import type { DependenciesStore } from "./dependenciesStore";
+import type {
+  DependenciesStore,
+  DependencyDiagnostics,
+} from "./dependenciesStore";
 import type { RouterInternals } from "./internals";
 import type { TreeChangedChannel } from "./namespaces/RoutesNamespace";
 import type {
@@ -282,9 +285,19 @@ export class Router<
     this.#options = new OptionsNamespace(adoptedOptions);
     this.#limits = createLimits(adoptedOptions.limits);
     this.#limitKeys = snapshotLimitKeys(adoptedOptions.limits);
+    // The dependency doors' reports, built before the bus like `treeChanged`
+    // below and for the same reason: each arrow reads `#eventBus` when called.
+    const dependencyDiagnostics: DependencyDiagnostics = {
+      emit: (key, ...args) => {
+        this.#eventBus.emitDiagnostic(key, ...args);
+      },
+      listenerCount: (key) => this.#eventBus.diagnosticListenerCount(key),
+    };
+
     this.#dependenciesStore = createDependenciesStore<Dependencies>(
       dependencies,
       this.#limits,
+      dependencyDiagnostics,
     );
     this.#state = new StateNamespace();
     // The routes doors' tree-change channel. The store that carries it is built
