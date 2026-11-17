@@ -497,6 +497,37 @@ export const SEAM = {
 } as const satisfies { [K in keyof InterceptableMethodMap]: K };
 
 /**
+ * The runtime half of the diagnostic channel (#2388) — the same
+ * pair-with-the-type construction {@link SEAM} and {@link POSITION} use.
+ *
+ * ⚑ A key added to {@link DiagnosticEventMap} and not here fails this object to
+ * compile, and a value drifting from its key is an error rather than a silent
+ * alias.
+ *
+ * ⚠ So does a kind whose tuple can hold more than four arguments: five
+ * elements, five optional ones, or a rest element. `EventEmitter.emit` passes
+ * four after the name, and `EventBusNamespace.emitDiagnostic` reaches it through
+ * a generic spread whose length the compiler does not check.
+ */
+export const DIAGNOSTIC = {
+  PLUGIN_AFTER_START: "PLUGIN_AFTER_START",
+  SET_DEPENDENCY_COUNT: "SET_DEPENDENCY_COUNT",
+  SET_DEPENDENCIES_COUNT: "SET_DEPENDENCIES_COUNT",
+  SET_DEPENDENCY_OVERWRITE: "SET_DEPENDENCY_OVERWRITE",
+  SET_DEPENDENCIES_OVERWRITE: "SET_DEPENDENCIES_OVERWRITE",
+  REMOVE_DEPENDENCY_MISSING: "REMOVE_DEPENDENCY_MISSING",
+} as const satisfies {
+  [K in keyof DiagnosticEventMap]: DiagnosticEventMap[K] extends readonly [
+    unknown?,
+    unknown?,
+    unknown?,
+    unknown?,
+  ]
+    ? K
+    : never;
+};
+
+/**
  * The runtime half of the check channel (#2388) — the same pair-with-the-type
  * construction {@link SEAM} uses, for the same reason.
  *
@@ -506,18 +537,6 @@ export const SEAM = {
  * The call sites below read a PROPERTY of this object rather than spelling a
  * literal, so the set that decides is the set that acts.
  */
-/**
- * The runtime half of the diagnostic channel (#2388) — the same
- * pair-with-the-type construction {@link SEAM} and {@link POSITION} use.
- *
- * ⚑ A key added to {@link DiagnosticEventMap} and not here fails this object to
- * compile, and a value drifting from its key is an error rather than a silent
- * alias.
- */
-export const DIAGNOSTIC = {
-  PLUGIN_AFTER_START: "PLUGIN_AFTER_START",
-} as const satisfies { [K in keyof DiagnosticEventMap]: K };
-
 export const POSITION = {
   "buildPath:params": "buildPath:params",
   "buildPathResolved:params": "buildPathResolved:params",
@@ -537,6 +556,15 @@ export const POSITION = {
   "addDeactivateGuard:entry": "addDeactivateGuard:entry",
   "removeActivateGuard:entry": "removeActivateGuard:entry",
   "removeDeactivateGuard:entry": "removeDeactivateGuard:entry",
+  "getDependency:entry": "getDependency:entry",
+  "getDependency:value": "getDependency:value",
+  "setDependency:entry": "setDependency:entry",
+  "setDependency:count": "setDependency:count",
+  "setDependencies:entry": "setDependencies:entry",
+  "setDependencies:count": "setDependencies:count",
+  "removeDependency:entry": "removeDependency:entry",
+  "hasDependency:entry": "hasDependency:entry",
+  "cloneRouter:entry": "cloneRouter:entry",
 } as const satisfies { [K in keyof CheckPositionMap]: K };
 
 /**
@@ -575,6 +603,20 @@ export function runChecks<P extends keyof CheckPositionMap>(
   for (let i = 0; i < atEntry && i < registered.length; i++) {
     registered[i](...args);
   }
+}
+
+/**
+ * Does any check stand at `position`? A door asks before it computes what the
+ * position judges, so bare core computes nothing (#2388).
+ *
+ * ⚠ Not `checks.has(position)`: removing the last check leaves an empty list
+ * under the key, and `has` keeps answering `true`.
+ */
+export function hasChecks(
+  checks: ReadonlyMap<string, readonly unknown[]>,
+  position: keyof CheckPositionMap,
+): boolean {
+  return (checks.get(position)?.length ?? 0) > 0;
 }
 
 /**

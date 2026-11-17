@@ -309,7 +309,7 @@ describe("surface census (#2303)", () => {
     }).toStrictEqual({
       port: { n: 11, frozen: false, cached: true },
       routeGetStore: { n: 17, frozen: false, cached: true },
-      dependenciesGetStore: { n: 2, frozen: false, cached: true },
+      dependenciesGetStore: { n: 3, frozen: false, cached: true },
       getTree: { n: 9, frozen: true, cached: true },
       getOptions: { n: 10, frozen: true, cached: true },
       getCloneState: { n: 6, frozen: false, cached: false },

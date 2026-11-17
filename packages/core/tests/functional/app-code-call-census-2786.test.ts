@@ -1423,6 +1423,10 @@ const HOPS = new Map([
     "its reporter is a closure of core's",
   ],
   [
+    "dependenciesStore.ts › DependencyDiagnostics",
+    "the reports `Router` builds over its bus",
+  ],
+  [
     "engine/path-matcher/encoding.ts",
     "the encoders `urlParamsEncoding` selects by name",
   ],

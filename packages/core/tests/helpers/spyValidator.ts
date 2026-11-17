@@ -14,8 +14,7 @@ import type { Router } from "@real-router/core/types";
  * `ctx.validator?.ns.method(arg, "caller")` call-site short-circuit to
  * `undefined` in the core suite — line coverage stays at 100 % while the
  * mutation tester reports the `"caller"` strings and the surrounding decision
- * logic (isNewKey / isChanging / bothAreNaN / isOverwrite / option-guards) as
- * survived/uncovered.
+ * logic (isOverwrite / option-guards) as survived/uncovered.
  *
  * Installing this spy validator exercises those branches WITHOUT depending on
  * the validation-plugin package (which would create a dependency cycle:
@@ -27,7 +26,7 @@ import type { Router } from "@real-router/core/types";
  * Lazily materialised via nested Proxies so the helper never has to enumerate
  * the ~50 methods of `RouterValidator` (which would rot as the interface grows).
  * Each accessed method returns a STABLE `vi.fn()` (cached per name), so
- * `expect(v.dependencies.warnOverwrite).toHaveBeenCalledWith(...)` works.
+ * `expect(v.routes.validateBuildPathArgs).toHaveBeenCalledWith(...)` works.
  */
 /**
  * The spies each validator materialised, by namespace — the side channel

@@ -1,11 +1,42 @@
 import { ingestDependencies } from "./guards";
 import { dropUnsafeKey } from "./helpers";
 
-import type { DefaultDependencies } from "./types";
+import type { DefaultDependencies, DiagnosticEventMap } from "./types";
 import type { Limits } from "./types/internal";
 
-/** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
+/** Captured like the deciding seven, but these BUILD the guarantee (#2072). */
 const objectCreate = Object.create;
+const freeze = Object.freeze;
+
+/** Captured for the reason `routesStore.ts` gives for its own copy (#1971). */
+const defineProperty = Object.defineProperty;
+
+/** The diagnostic kinds the dependency doors raise (#2388). */
+export type DependencyDiagnosticKind =
+  | "SET_DEPENDENCY_COUNT"
+  | "SET_DEPENDENCIES_COUNT"
+  | "SET_DEPENDENCY_OVERWRITE"
+  | "SET_DEPENDENCIES_OVERWRITE"
+  | "REMOVE_DEPENDENCY_MISSING";
+
+/**
+ * What the dependency doors report through. `Router` builds it over its event
+ * bus and hands it in with the store.
+ *
+ * ⚑ Narrow on purpose: its type admits the dependency kinds and no other,
+ * and it subscribes nothing.
+ */
+export interface DependencyDiagnostics {
+  readonly emit: <K extends DependencyDiagnosticKind>(
+    key: K,
+    ...args: DiagnosticEventMap[K]
+  ) => void;
+  /**
+   * How many handlers a kind has. A door computes what a report carries only
+   * when this or a check at the matching position says someone reads it.
+   */
+  readonly listenerCount: (key: DependencyDiagnosticKind) => number;
+}
 
 /**
  * The router's dependency record — plain data the router owns itself, with no
@@ -21,6 +52,10 @@ export interface DependenciesStore<
 > {
   dependencies: Partial<Dependencies>;
   limits: Limits;
+  // ⚑ The one reference the doors reach. Its slot is sealed in
+  // `createDependenciesStore`, so replacing it through `dependenciesGetStore()`
+  // is refused instead of re-pointing a door's reports.
+  readonly diagnostics: DependencyDiagnostics;
 }
 
 /**
@@ -121,6 +156,7 @@ export function createDependenciesStore<
 >(
   initialDependencies: Partial<Dependencies>,
   limits: Limits,
+  diagnostics: DependencyDiagnostics,
 ): DependenciesStore<Dependencies> {
   const dependencies = objectCreate(null) as Partial<Dependencies>;
 
@@ -154,8 +190,23 @@ export function createDependenciesStore<
     storeDependency(target, key, value);
   });
 
-  return {
+  const store: DependenciesStore<Dependencies> = {
     dependencies,
     limits,
+    diagnostics: freeze(diagnostics),
   };
+
+  // ⚑ The slot and the object behind it, both. `dependenciesGetStore()` hands
+  // out the live store, so without the seal a write there re-points every
+  // door's reports. `dependencies` and `limits` are data, not references, and
+  // stay as they are.
+  //
+  // ⚠ `writable: false` only THROWS in strict mode; a sloppy-mode write is
+  // ignored instead.
+  defineProperty(store, "diagnostics", {
+    writable: false,
+    configurable: false,
+  });
+
+  return store;
 }

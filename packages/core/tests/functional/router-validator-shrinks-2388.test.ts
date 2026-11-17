@@ -30,16 +30,6 @@ const MEMBERS = [
   "options.validateOptions",
   "options.validateResolvedDefaultRoute",
 
-  "dependencies.validateDependencyName",
-  "dependencies.validateSetDependencyArgs",
-  "dependencies.validateDependenciesObject",
-  "dependencies.validateDependencyExists",
-  "dependencies.validateDependencyCount",
-  "dependencies.validateCloneArgs",
-  "dependencies.warnOverwrite",
-  "dependencies.warnBatchOverwrite",
-  "dependencies.warnRemoveNonExistent",
-
   "plugins.validatePluginLimit",
   "plugins.validateNoDuplicatePlugins",
   "plugins.validatePluginKeys",

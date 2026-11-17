@@ -207,7 +207,7 @@ describe("dependencies validation — with validationPlugin", () => {
   });
 });
 
-describe("dependencies.validateDependencyCount — threshold logging", () => {
+describe("SET_DEPENDENCY_COUNT — threshold logging", () => {
   it("logs warn at 20% threshold when adding a new dependency", () => {
     type NumDeps = Record<string, number>;
     const r = createRouter<NumDeps>([], { limits: { maxDependencies: 100 } });
@@ -235,7 +235,7 @@ describe("dependencies.validateDependencyCount — threshold logging", () => {
   });
 });
 
-describe("dependencies.validateCloneArgs", () => {
+describe("cloneRouter:entry — validateCloneArgs", () => {
   let router: Router;
 
   beforeEach(() => {
@@ -279,7 +279,7 @@ describe("dependencies.validateCloneArgs", () => {
   });
 });
 
-describe("dependencies.warnRemoveNonExistent", () => {
+describe("REMOVE_DEPENDENCY_MISSING — warnRemoveNonExistent", () => {
   it("warns when removing a non-existent dependency", () => {
     interface TestDeps {
       foo?: number;
