@@ -1,5 +1,30 @@
 # @real-router/validation-plugin
 
+## 0.34.0
+
+### Minor Changes
+
+- [#2971](https://github.com/greydragon888/real-router/pull/2971) [`96a8bb0`](https://github.com/greydragon888/real-router/commit/96a8bb03392d5ecff9865400b2ac7711a0f0e4f7) Thanks [@greydragon888](https://github.com/greydragon888)! - The dependency and `cloneRouter` validation is registered as checks and diagnostics ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  Each refusal of `getDependenciesApi` and `cloneRouter` is a check at its door's
+  position, and each warning a subscription to its diagnostic kind, all removed on
+  `teardown`. Each refusal and warning keeps its message and logger channel, and
+  the refusals keep their order.
+
+  The re-exported `RouterValidator` type loses its `dependencies` namespace; code
+  typed against it registers checks and diagnostics instead, as
+  `@real-router/core` describes.
+
+  ⚑ **The dependency count is split in two.** The limit refuses at
+  `setDependency:count` / `setDependencies:count`, and the `warn` / `error`
+  thresholds are logged from `SET_DEPENDENCY_COUNT` / `SET_DEPENDENCIES_COUNT`.
+  Core asks the position first, so a write refused at the limit logs nothing.
+
+### Patch Changes
+
+- Updated dependencies [[`96a8bb0`](https://github.com/greydragon888/real-router/commit/96a8bb03392d5ecff9865400b2ac7711a0f0e4f7)]:
+  - @real-router/core@0.163.0
+
 ## 0.33.2
 
 ### Patch Changes

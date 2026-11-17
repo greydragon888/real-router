@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-11-17]
 
+### @real-router/core@0.163.0
+
+### Minor Changes
+
+- [#2971](https://github.com/greydragon888/real-router/pull/2971) [`96a8bb0`](https://github.com/greydragon888/real-router/commit/96a8bb03392d5ecff9865400b2ac7711a0f0e4f7) Thanks [@greydragon888](https://github.com/greydragon888)! - `getDependenciesApi` and `cloneRouter` stop consulting the validator ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  Nine new check positions: `getDependency:entry`, `getDependency:value`,
+  `setDependency:entry`, `setDependency:count`, `setDependencies:entry`,
+  `setDependencies:count`, `removeDependency:entry`, `hasDependency:entry` and
+  `cloneRouter:entry`. Five new diagnostic kinds: `SET_DEPENDENCY_COUNT`,
+  `SET_DEPENDENCIES_COUNT`, `SET_DEPENDENCY_OVERWRITE`,
+  `SET_DEPENDENCIES_OVERWRITE` and `REMOVE_DEPENDENCY_MISSING`.
+
+  `RouterValidator` loses its `dependencies` namespace: core has no consultation
+  left for it. A validator of your own registers checks at these positions with
+  `PluginApi.addCheck`, and subscribes to these kinds with
+  `PluginApi.subscribeDiagnostic`, instead.
+
+  ⚑ **A count position is asked about a NEW key only**, with the number of keys
+  the record held before the write and `limits.maxDependencies`. The count kind
+  follows with the same two numbers once the checks there pass, so a refused write
+  reports nothing.
+
+  ⚠ **A report handler that throws no longer escapes the door.** On `set`,
+  `setAll` and `remove`, the router logs the throw through `logger.error`, and the
+  call completes as if the handler had returned. Previously a throwing overwrite
+  or missing-key report of the validator escaped all three: `set` before the
+  write, `setAll` after every key was written. Only a synchronous throw is
+  isolated; the rejected promise of an `async` handler is not ([#2836](https://github.com/greydragon888/real-router/issues/2836)).
+
+  Bare core reads the record's keys only for a consumer: a check at the count
+  position, or a handler of the count or overwrite kind.
+
+### @real-router/validation-plugin@0.34.0
+
+### Minor Changes
+
+- [#2971](https://github.com/greydragon888/real-router/pull/2971) [`96a8bb0`](https://github.com/greydragon888/real-router/commit/96a8bb03392d5ecff9865400b2ac7711a0f0e4f7) Thanks [@greydragon888](https://github.com/greydragon888)! - The dependency and `cloneRouter` validation is registered as checks and diagnostics ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  Each refusal of `getDependenciesApi` and `cloneRouter` is a check at its door's
+  position, and each warning a subscription to its diagnostic kind, all removed on
+  `teardown`. Each refusal and warning keeps its message and logger channel, and
+  the refusals keep their order.
+
+  The re-exported `RouterValidator` type loses its `dependencies` namespace; code
+  typed against it registers checks and diagnostics instead, as
+  `@real-router/core` describes.
+
+  ⚑ **The dependency count is split in two.** The limit refuses at
+  `setDependency:count` / `setDependencies:count`, and the `warn` / `error`
+  thresholds are logged from `SET_DEPENDENCY_COUNT` / `SET_DEPENDENCIES_COUNT`.
+  Core asks the position first, so a write refused at the limit logs nothing.
+
+### Patch Changes
+
+- Updated dependencies [[`96a8bb0`](https://github.com/greydragon888/real-router/commit/96a8bb03392d5ecff9865400b2ac7711a0f0e4f7)]:
+  - @real-router/core@0.163.0
+
+
 ### @real-router/core@0.162.0
 
 ### Minor Changes
