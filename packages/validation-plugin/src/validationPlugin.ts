@@ -98,6 +98,7 @@ import type { RouteLookup } from "./validators/forwardTo";
 import type { ReloadPath } from "./validators/state";
 import type {
   DefaultDependencies,
+  NavigationOptions,
   PluginApi,
   PluginFactory,
   RouterValidator,
@@ -109,6 +110,9 @@ import type { RouteTree } from "@real-router/core/validation";
 const atValidationPlugin = raiser("validation-plugin");
 const atAddRoute = raiser("router", "addRoute");
 const atAreStatesEqual = raiser("router", "areStatesEqual");
+
+/** The options a door judges for a call that passed none. */
+const EMPTY_OPTIONS: NavigationOptions = Object.freeze({});
 
 /**
  * A `search` that `areStatesEqual(…, false)` can compare: an object that is
@@ -211,8 +215,6 @@ function readRoutes<Dependencies extends DefaultDependencies>(
 
 function buildValidatorObject(
   api: PluginApi,
-  lookup: RouteLookup,
-  defaultsWatch: DefaultsMutationWatch,
   reloadPath: ReloadPath,
 ): RouterValidator {
   // One de-dup cache per validator object, i.e. per registration, i.e. per router
@@ -242,32 +244,10 @@ function buildValidatorObject(
       validateRouteName(name, caller) {
         validateRouteName(name, caller);
       },
-      validateSetRootPathArgs,
-    },
-    options: {
-      validateOptions,
-      validateResolvedDefaultRoute(routeName) {
-        validateResolvedDefaultRoute(routeName, lookup);
-      },
     },
     navigation: {
-      validateNavigateToDefaultArgs(opts) {
-        validateNavigateToDefaultArgs(opts);
-        // ⚑ HERE, and not on every navigation. No door READS the watched bags
-        // after construction — core runs on the copy adoption took (#2171) — so
-        // the question is where a stale one would have CHANGED the outcome, and
-        // this is the only door where those slots take effect. Measured: with a
-        // counting getter on the bag, `start`, `navigate` and `buildPath` add
-        // zero reads, and `buildPath` refuses a missing param rather than filling
-        // it from the option. An application that never calls this is never
-        // charged for the check.
-        defaultsWatch.check(api.logger);
-      },
-      validateNavigateToStateArgs,
-      validateNavigationOptions,
       validateParamsShape: validateNavigateParamsShape,
       validateSearch,
-      validateStartArgs,
     },
     state: {
       validateMakeStateArgs,
@@ -353,8 +333,8 @@ export function validationPlugin<
     // RouterInternals.validator is now mutable — direct assignment works
     const defaultsWatch = new DefaultsMutationWatch();
 
-    // ⚠ BEFORE the validator goes live, so the first `navigateToDefault` after
-    // this line already has a baseline to compare against.
+    // ⚠ BEFORE the `NAVIGATE_TO_DEFAULT` subscription below, so its first
+    // report already has a baseline to compare against.
     defaultsWatch.watch(api.getAdoptedOrigins());
 
     // The codec diagnostic's reload (#2905) does not rebuild the path: the
@@ -376,12 +356,7 @@ export function validationPlugin<
     // write and on release (#2059 / #1929) — here only the release half is
     // reachable, and the write half waits for the slot to go away.
     const lookup = createRouteLookup(api);
-    const ownValidator = buildValidatorObject(
-      api,
-      lookup,
-      defaultsWatch,
-      reloadPath,
-    );
+    const ownValidator = buildValidatorObject(api, reloadPath);
     // One branch, shared by the error path below and by `teardown`: both ask
     // the same question, so they share the site rather than each growing an
     // arm the other's test has to reach.
@@ -412,10 +387,7 @@ export function validationPlugin<
         api.getDependencyKeys().length,
         limits.maxDependencies,
       );
-      ctx.validator.options.validateOptions(
-        options,
-        "constructor (retrospective)",
-      );
+      validateOptions(options, "constructor (retrospective)");
 
       if (typeof options.defaultRoute === "string") {
         validateConfiguredDefaultRoute(options.defaultRoute, lookup);
@@ -977,6 +949,67 @@ export function validationPlugin<
       },
     );
 
+    // ⚑ An omitted bag is judged as the empty one core runs on, and a `null`
+    // one as itself, which this door refuses.
+    const removeNavigateToStateEntryCheck = api.addCheck(
+      "navigateToState:entry",
+      (state, options) => {
+        validateNavigateToStateArgs(state);
+        validateNavigationOptions(
+          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- the declared type admits no `null`, and `??` would admit a JavaScript caller's
+          options === undefined ? EMPTY_OPTIONS : options,
+          "navigateToState",
+        );
+      },
+    );
+
+    const removeSetRootPathEntryCheck = api.addCheck(
+      "setRootPath:entry",
+      (rootPath) => {
+        validateSetRootPathArgs(rootPath);
+      },
+    );
+
+    // ⚑ The bag's type first, then its fields. The first refuses `null`, so
+    // the `??` below substitutes the empty bag core runs on for an omitted one
+    // alone.
+    const removeNavigateToDefaultEntryCheck = api.addCheck(
+      "navigateToDefault:entry",
+      (options) => {
+        validateNavigateToDefaultArgs(options);
+        validateNavigationOptions(
+          options ?? EMPTY_OPTIONS,
+          "navigateToDefault",
+        );
+      },
+    );
+
+    const removeNavigateToDefaultRouteCheck = api.addCheck(
+      "navigateToDefault:route",
+      (routeName) => {
+        validateResolvedDefaultRoute(routeName, lookup);
+      },
+    );
+
+    const removeStartEntryCheck = api.addCheck("start:entry", (path) => {
+      validateStartArgs(path);
+    });
+
+    // ⚑ HERE, and not on every navigation. No door READS the watched bags
+    // after construction — core runs on the copy adoption took (#2171) — so
+    // the question is where a stale one would have CHANGED the outcome, and
+    // `navigateToDefault` is the only door where those slots take effect.
+    // Measured: with a counting getter on the bag, `start`, `navigate` and
+    // `buildPath` add zero reads, and `buildPath` refuses a missing param
+    // rather than filling it from the option. An application that never calls
+    // `navigateToDefault` is never charged for the check.
+    const removeNavigateToDefaultDiagnostic = api.subscribeDiagnostic(
+      "NAVIGATE_TO_DEFAULT",
+      () => {
+        defaultsWatch.check(api.logger);
+      },
+    );
+
     return {
       teardown() {
         removeParamsCheck();
@@ -1076,6 +1109,18 @@ export function validationPlugin<
         removeGuardNonBooleanDiagnostic();
 
         removeListenerCountDiagnostic();
+
+        removeNavigateToStateEntryCheck();
+
+        removeSetRootPathEntryCheck();
+
+        removeNavigateToDefaultEntryCheck();
+
+        removeNavigateToDefaultRouteCheck();
+
+        removeStartEntryCheck();
+
+        removeNavigateToDefaultDiagnostic();
 
         removeInterceptor();
 

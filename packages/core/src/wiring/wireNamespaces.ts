@@ -2,7 +2,13 @@
 
 import { assertShippedChannelCorrect } from "../channels";
 import { readDependency } from "../dependenciesStore";
-import { DIAGNOSTIC, getInternals, hasChecks, runChecks } from "../internals";
+import {
+  DIAGNOSTIC,
+  getInternals,
+  hasChecks,
+  POSITION,
+  runChecks,
+} from "../internals";
 import { COMMIT_PERMIT_TOKEN } from "../namespaces/NavigationNamespace";
 import {
   resolveQueryParamsMode,
@@ -398,7 +404,7 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
       const search = resolveOption(options.defaultSearch, getDependencyByName);
 
       if (typeof options.defaultRoute === "function") {
-        ctx.validator?.options.validateResolvedDefaultRoute(route);
+        runChecks(ctx.checks, POSITION["navigateToDefault:route"], route);
       }
 
       return { route, params, search };

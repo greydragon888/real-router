@@ -172,8 +172,6 @@ async function exerciseDoors(router: Router): Promise<void> {
   router.buildPath("shop.child");
   router.isActiveRoute("shop");
   router.canNavigateTo("home");
-  // A CALLBACK `defaultRoute` is what reaches `validateResolvedDefaultRoute`.
-  await router.navigateToDefault();
 
   cloneRouter(router).dispose();
   routes.replace([
@@ -185,13 +183,10 @@ async function exerciseDoors(router: Router): Promise<void> {
 }
 
 function createDoorRouter(): Router {
-  return createRouter(
-    [
-      { name: "home", path: "/" },
-      { name: "shop", path: "/shop" },
-    ],
-    { defaultRoute: () => "home" },
-  );
+  return createRouter([
+    { name: "home", path: "/" },
+    { name: "shop", path: "/shop" },
+  ]);
 }
 
 describe("the validator takes facts, not containers (#2382)", () => {
@@ -213,10 +208,17 @@ describe("the validator takes facts, not containers (#2382)", () => {
 
     // ⚠ The members #2388 converts leave this channel: their arguments reach a
     // check or a diagnostic kind, and no authority judges THOSE for
-    // reachability. What stays here is the channel that still exists.
-    const unexercised = ["options.validateResolvedDefaultRoute"].filter(
-      (method) => !methods.has(method),
-    );
+    // reachability. The list is every member these doors still reach, and a
+    // conversion takes its member's row with it.
+    const unexercised = [
+      "navigation.validateParamsShape",
+      "navigation.validateSearch",
+      "routes.validateBuildPathArgs",
+      "routes.validateIsActiveRouteArgs",
+      "routes.validateMatchPathArgs",
+      "routes.validateRouteName",
+      "routes.validateStateBuilderArgs",
+    ].filter((method) => !methods.has(method));
 
     expect(unexercised).toStrictEqual([]);
   });

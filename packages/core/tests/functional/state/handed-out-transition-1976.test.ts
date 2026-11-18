@@ -42,11 +42,21 @@ const DOORS = [
  * hand nothing BACK — each named, with why, so the set below stays a closed
  * claim rather than a filter that quietly grows.
  *
- * These are payload FIELDS of `subscribe` / `subscribeLeave`, i.e. states the
- * router passes IN. They are `pending-target-authority`'s subject, and covering
- * them here would duplicate that matrix rather than extend this one.
+ * `route`, `previousRoute` and `nextRoute` are payload FIELDS of `subscribe` /
+ * `subscribeLeave`, i.e. states the router passes IN. They are
+ * `pending-target-authority`'s subject, and covering them here would duplicate
+ * that matrix rather than extend this one.
+ *
+ * `"navigateToState:entry"` is a check position: its entry is the argument list
+ * core passes IN to a check, and a check hands nothing back. It keeps its
+ * quotes because both scans read a key as it is written.
  */
-const NOT_DOORS = new Set(["route", "previousRoute", "nextRoute"]);
+const NOT_DOORS = new Set([
+  "route",
+  "previousRoute",
+  "nextRoute",
+  '"navigateToState:entry"',
+]);
 
 /**
  * The declarations a public door has to be added to. A member that appears on
@@ -497,11 +507,12 @@ describe("every door hands back a State carrying transition (#1976)", () => {
     ).toStrictEqual(SURFACE_FILES.toSorted((a, b) => a.localeCompare(b)));
 
     // And the exclusion list, the one hand-written part left: each name it
-    // drops must belong ONLY to a subscribe payload.
+    // drops must belong ONLY to a subscribe payload or to the check positions.
     expect(owners).toStrictEqual({
       route: ["SubscribeState", "LeaveState"],
       previousRoute: ["SubscribeState"],
       nextRoute: ["LeaveState"],
+      '"navigateToState:entry"': ["CheckPositionMap"],
     });
   });
 

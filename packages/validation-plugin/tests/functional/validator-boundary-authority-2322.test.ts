@@ -107,19 +107,12 @@ const SELF = "validator-boundary-authority-2322.test.ts";
  * {@link MIRRORED} when nothing can.
  */
 const OWNER: Record<string, string> = {
-  "navigation.validateNavigateToDefaultArgs": "defaults-mutation-2148.test.ts",
-  "navigation.validateNavigateToStateArgs": "navigation.validation.test.ts",
-  "navigation.validateNavigationOptions": "navigation.validation.test.ts",
   "navigation.validateParamsShape": SELF,
   "navigation.validateSearch": "both-channels-authority-1972.test.ts",
-  "navigation.validateStartArgs": "router-methods.validation.test.ts",
-  "options.validateResolvedDefaultRoute":
-    "integration/retrospective-integration.test.ts",
   "routes.validateBuildPathArgs": "router-methods.validation.test.ts",
   "routes.validateIsActiveRouteArgs": "predicate-totality-2245.test.ts",
   "routes.validateMatchPathArgs": SELF,
   "routes.validateRouteName": "route-name-doors.test.ts",
-  "routes.validateSetRootPathArgs": "routes.validation.test.ts",
   "routes.validateShouldUpdateNodeArgs": "router-methods.validation.test.ts",
   "routes.validateStateBuilderArgs": "plugin-api.validation.test.ts",
   "state.reportCodecRoundTrip": "codec-round-trip.test.ts",
@@ -154,6 +147,7 @@ const REGISTRATION_OWNER: Record<string, string> = {
   "GUARD_NON_BOOLEAN › warnNonBooleanGuard":
     "guard-answer-diagnostic-2823.test.ts",
   "LISTENER_COUNT › validateListenerCountThresholds": "limits.test.ts",
+  "NAVIGATE_TO_DEFAULT › defaultsWatch.check": "defaults-mutation-2148.test.ts",
   "SYNC_GUARD_NON_BOOLEAN › warnNonBooleanGuardSync":
     "guard-answer-diagnostic-2823.test.ts",
   "SYNC_GUARD_THENABLE › warnAsyncGuardSync": "lifecycle.validation.test.ts",
@@ -202,6 +196,16 @@ const REGISTRATION_OWNER: Record<string, string> = {
   "navigate:entry › validateNavigationOptions": "navigation.validation.test.ts",
   "navigate:entry › validateSearch": "both-channels-authority-1972.test.ts",
   "navigate:params › validateNavigateParams": "navigation.validation.test.ts",
+  "navigateToDefault:entry › validateNavigateToDefaultArgs":
+    "navigation-channels-consumer-2388.test.ts",
+  "navigateToDefault:entry › validateNavigationOptions":
+    "navigation.validation.test.ts",
+  "navigateToDefault:route › validateResolvedDefaultRoute":
+    "integration/retrospective-integration.test.ts",
+  "navigateToState:entry › validateNavigateToStateArgs":
+    "navigation.validation.test.ts",
+  "navigateToState:entry › validateNavigationOptions":
+    "navigation.validation.test.ts",
   "removeActivateGuard:entry › validateRouteName":
     "check-channel-consumer-2388.test.ts",
   "removeDeactivateGuard:entry › validateRouteName":
@@ -220,6 +224,8 @@ const REGISTRATION_OWNER: Record<string, string> = {
   "setDependency:count › validateDependencyLimit": "limits.test.ts",
   "setDependency:entry › validateSetDependencyArgs":
     "dependencies.validation.test.ts",
+  "setRootPath:entry › validateSetRootPathArgs": "routes.validation.test.ts",
+  "start:entry › validateStartArgs": "router-methods.validation.test.ts",
   "updateRoute:entry › throwIfInternalRoute": MIRRORED,
   "updateRoute:entry › validateUpdateRoute": "routes.validation.test.ts",
   "updateRoute:entry › validateUpdateRouteBasicArgs":

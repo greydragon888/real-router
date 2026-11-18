@@ -209,9 +209,9 @@ describe("consumer census (#2303)", () => {
    * anything.
    *
    * ⚠ **`null` on a bare router is not "flat".** `validator` is empty until a
-   * plugin fills it, and the shipped reach this census exists to find —
-   * `ctx.validator.options.validateOptions(…)` — happens on exactly that slot. The declaration is what decides; the value on an
-   * unconfigured router is not evidence.
+   * plugin fills it, and a reach into its namespaces would happen on exactly
+   * that slot. The declaration is what decides; the value on an unconfigured
+   * router is not evidence.
    */
   const RETURNS_OBJECT = new Set(
     MEMBERS.filter(({ type }) =>
@@ -279,15 +279,17 @@ describe("consumer census (#2303)", () => {
     tests: number;
   }
 
-  function scan(): {
+  function scan(
+    files: readonly string[] = consumerFiles(),
+    read: (relativePath: string) => string = (relativePath) =>
+      readFileSync(path.join(ROOT, relativePath), "utf8"),
+  ): {
     hits: Record<string, Reached>;
     second: Record<string, Reached>;
     calls: Record<string, Called>;
     files: number;
     readers: number;
   } {
-    const files = consumerFiles();
-
     const hits: Record<string, Reached> = {};
     const calls: Record<string, Called> = {};
 
@@ -307,7 +309,7 @@ describe("consumer census (#2303)", () => {
     let readers = 0;
 
     for (const relativePath of files) {
-      const text = readFileSync(path.join(ROOT, relativePath), "utf8");
+      const text = read(relativePath);
 
       if (
         Object.keys(FACTORY_BY_TYPE).every((t) => !text.includes(t)) &&
@@ -440,7 +442,7 @@ describe("consumer census (#2303)", () => {
           secondBucket(aliasDown.get(target.text)!)[bucket].add(node.name.text);
         }
 
-        // chained through a PROPERTY: `ctx.validator.options`. The key keeps the
+        // chained through a PROPERTY: `ctx.logger.warn`. The key keeps the
         // shape — `<factory>.<member>` without parentheses — because a property
         // and a call are different doors even when they hand back the same kind
         // of object.
@@ -762,7 +764,6 @@ describe("consumer census (#2303)", () => {
         src: ["dependencies"],
         tests: [],
       },
-      "getInternals.validator": { src: ["options"], tests: [] },
       "getNavigator.getState()": { src: [], tests: ["name"] },
       "getPluginApi.buildNavigationState()": {
         src: ["name", "params", "path", "search"],
@@ -796,6 +797,24 @@ describe("consumer census (#2303)", () => {
         src: [],
         tests: ["defaultParams", "forwardTo", "path"],
       },
+    });
+  });
+
+  it("CONTROL — a reach chained through a PROPERTY gets a row of its own", () => {
+    // ⚑ No file on the tree reaches through a property-valued member, so the
+    // cell above holds no row of that shape, and a walk that stopped keying
+    // `<factory>.<member>` would leave it green. A purpose-built file is where
+    // the shape exists.
+    const synthetic = scan(["packages/synthetic/src/reach.ts"], () =>
+      [
+        'import { getInternals } from "@real-router/core/validation";',
+        "",
+        'getInternals(router).logger.warn("x");',
+      ].join("\n"),
+    );
+
+    expect(synthetic.second).toStrictEqual({
+      "getInternals.logger": { src: new Set(["warn"]), tests: new Set() },
     });
   });
 

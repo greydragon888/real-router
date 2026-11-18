@@ -99,7 +99,7 @@ describe("core/validator call-site contract", () => {
 
   // ===========================================================================
   // getPluginApi  (kills "buildState"/"forwardState"/"buildNavigationState"
-  // caller strings + the `options !== undefined` guard on navigateToState)
+  // caller strings)
   // ===========================================================================
   describe("getPluginApi", () => {
     let plugin: ReturnType<typeof getPluginApi>;
@@ -119,20 +119,17 @@ describe("core/validator call-site contract", () => {
       expect(consultationsOn(validator)).toStrictEqual([]);
     });
 
-    it("navigateToState: validates options ('navigateToState') ONLY when options provided", () => {
+    it("navigateToState consults the validator for nothing (#2388)", () => {
+      // Its refusals are a check at `navigateToState:entry`, and what that
+      // position receives is `navigation-channels-2388.test.ts`'s.
       const state = plugin.makeState("home", {}, undefined, "/home");
 
+      vi.clearAllMocks();
+
       plugin.navigateToState(state).catch(() => {});
-
-      expect(
-        validator.navigation.validateNavigationOptions,
-      ).not.toHaveBeenCalled();
-
       plugin.navigateToState(state, { replace: true }).catch(() => {});
 
-      expect(
-        validator.navigation.validateNavigationOptions,
-      ).toHaveBeenCalledWith({ replace: true }, "navigateToState");
+      expect(consultationsOn(validator)).toStrictEqual([]);
     });
   });
 

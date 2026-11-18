@@ -527,6 +527,7 @@ export const DIAGNOSTIC = {
   SYNC_GUARD_NON_BOOLEAN: "SYNC_GUARD_NON_BOOLEAN",
   GUARD_NON_BOOLEAN: "GUARD_NON_BOOLEAN",
   LISTENER_COUNT: "LISTENER_COUNT",
+  NAVIGATE_TO_DEFAULT: "NAVIGATE_TO_DEFAULT",
 } as const satisfies {
   [K in keyof DiagnosticEventMap]: DiagnosticEventMap[K] extends readonly [
     unknown?,
@@ -581,6 +582,11 @@ export const POSITION = {
   "usePlugin:plugin": "usePlugin:plugin",
   "canActivate:count": "canActivate:count",
   "canDeactivate:count": "canDeactivate:count",
+  "navigateToState:entry": "navigateToState:entry",
+  "setRootPath:entry": "setRootPath:entry",
+  "navigateToDefault:entry": "navigateToDefault:entry",
+  "navigateToDefault:route": "navigateToDefault:route",
+  "start:entry": "start:entry",
 } as const satisfies { [K in keyof CheckPositionMap]: K };
 
 /**

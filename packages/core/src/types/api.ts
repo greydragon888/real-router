@@ -173,6 +173,12 @@ export type DiagnosticEventMap = {
    * registration.
    */
   LISTENER_COUNT: [count: number, eventName: string, methodName: string];
+
+  /**
+   * A `navigateToDefault` call passed its `navigateToDefault:entry` checks and
+   * is about to resolve the configured defaults. Raised once per such call.
+   */
+  NAVIGATE_TO_DEFAULT: [];
 };
 
 /**
@@ -419,6 +425,39 @@ export interface CheckPositionMap {
 
   /** The same count for `canDeactivate` guards. */
   "canDeactivate:count": [currentCount: number];
+
+  /**
+   * `navigateToState`'s two arguments, as the caller passed them.
+   *
+   * ⚠ `options` is `undefined` when the caller passed none: this door does not
+   * substitute core's empty options before the position.
+   */
+  "navigateToState:entry": [
+    state: State,
+    options: NavigationOptions | undefined,
+  ];
+
+  /** `setRootPath`'s argument. */
+  "setRootPath:entry": [rootPath: string];
+
+  /**
+   * `navigateToDefault`'s argument, as the caller passed it — `undefined` when
+   * there is none.
+   */
+  "navigateToDefault:entry": [options: NavigationOptions | undefined];
+
+  /**
+   * The route name a `defaultRoute` CALLBACK returned, once core has resolved
+   * all three defaults and before it judges the name itself. A `defaultRoute`
+   * given as a string is not asked here.
+   */
+  "navigateToDefault:route": [routeName: string];
+
+  /**
+   * `start`'s path, before the `start` interceptor chain runs — `undefined`
+   * when the caller passed none, for an interceptor to supply.
+   */
+  "start:entry": [path: string | undefined];
 }
 
 /**

@@ -32,38 +32,13 @@ export interface RouterValidator {
       params: unknown,
       caller: string,
     ) => void;
-    /**
-     * ⚑ Takes no store (#2382). The analyser reads the three facts it judges
-     * from `PluginApi`: the path slots and the ONE-HOP forward map come back as
-     * frozen values, and the tree is the published one `getTree()` already hands
-     * out — no container travels that the curated surface does not.
-     */
-    /** Reads the same three facts from `PluginApi` as `validateRoutes` (#2382). */
-    /**
-     * ⚑ Takes no tree (#2382): the analyser reads it from `PluginApi.getTree()`,
-     * which hands out the same object — the tree is published already, so
-     * passing it as an argument added a second address and nothing else.
-     */
     validateRouteName: (name: unknown, caller: string) => void;
-    validateSetRootPathArgs: (rootPath: unknown) => void;
-  };
-
-  /**
-   * Options validation methods
-   */
-  options: {
-    validateOptions: (options: unknown, methodName: string) => void;
-    /** Reads the tree from `PluginApi.getTree()`, like `validateParentOption` (#2382). */
-    validateResolvedDefaultRoute: (routeName: unknown) => void;
   };
 
   /**
    * Navigation validation methods
    */
   navigation: {
-    validateNavigateToDefaultArgs: (options: unknown) => void;
-    validateNavigateToStateArgs: (state: unknown) => void;
-    validateNavigationOptions: (options: unknown, caller: string) => void;
     /**
      * The path bag's SHAPE, on the object the caller still owns (#2134).
      *
@@ -80,7 +55,6 @@ export interface RouterValidator {
      * answer is right.
      */
     validateSearch: (search: unknown, methodName: string) => void;
-    validateStartArgs: (path: unknown) => void;
   };
 
   /**
