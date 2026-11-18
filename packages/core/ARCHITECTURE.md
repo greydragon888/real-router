@@ -184,8 +184,8 @@ re-exports `validateRoute`, the path reader `buildParamMeta` and the
 directly. A guard test in the plugin blocks a `route-tree` import.
 
 **Validation runs on the RAW argument, before interceptors** — which is why
-`validateStartArgs` deliberately permits `undefined`: a browser-plugin
-interceptor fills the path in downstream.
+the plugin's check at `start:entry` deliberately permits `undefined`: a
+browser-plugin interceptor fills the path in downstream.
 
 ### WeakMap Internals Registry
 

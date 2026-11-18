@@ -25,17 +25,9 @@ const MEMBERS = [
   "routes.validateShouldUpdateNodeArgs",
   "routes.validateStateBuilderArgs",
   "routes.validateRouteName",
-  "routes.validateSetRootPathArgs",
 
-  "options.validateOptions",
-  "options.validateResolvedDefaultRoute",
-
-  "navigation.validateNavigateToDefaultArgs",
-  "navigation.validateNavigateToStateArgs",
-  "navigation.validateNavigationOptions",
   "navigation.validateParamsShape",
   "navigation.validateSearch",
-  "navigation.validateStartArgs",
 
   "state.validateMakeStateArgs",
   "state.validateAreStatesEqualArgs",

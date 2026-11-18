@@ -62,11 +62,11 @@ router.usePlugin(validationPlugin())
     │       ├── retroV.validateForwardToTargetsStore(forwardMap, lookup)
     │       ├── retroV.validateDependenciesStructure(dependencies, limits)
     │       ├── retroV.validateLimitsConsistency(options, dependencyCount, maxDependencies)
-    │       ├── validator.options.validateOptions(options)
+    │       ├── validateOptions(options, "constructor (retrospective)")
     │       │       └── cross-field: warnListeners ≤ maxListeners, callbackIgnoresLevel requires callback
-    │       └── retroV.validateResolvedDefaultRoute(options.defaultRoute, lookup)  ← string defaultRoute only
-    │               (callback defaultRoute is validated at runtime via ctx.validator?.options.validateResolvedDefaultRoute,
-    │                called from core's resolveDefault() on each navigateToDefault() / start() fallback)
+    │       └── retroV.validateConfiguredDefaultRoute(options.defaultRoute, lookup)  ← string defaultRoute only
+    │               (a callback defaultRoute is judged by the check at navigateToDefault:route,
+    │                which core asks in resolveDefault() on each navigateToDefault())
     │
     │   On error: ctx.validator = null  ← rollback, then re-throw
     │

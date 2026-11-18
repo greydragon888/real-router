@@ -95,16 +95,21 @@ describe("core/validator call-site contract (facade + namespaces)", () => {
       ]);
     });
 
-    it("navigateToDefault: validates options with caller 'navigateToDefault'", async () => {
+    it("navigateToDefault: the facade consults nothing, and the pipeline below is its own layer (#2388)", async () => {
+      // Its refusals are checks at `navigateToDefault:entry` and
+      // `navigateToDefault:route`, and its report a diagnostic kind; what each
+      // receives is `navigation-channels-2388.test.ts`'s.
       await router.start("/home");
+      vi.clearAllMocks();
 
-      // defaultRoute === "home" === current state → rejects SAME_STATES; the
-      // validator runs before the navigation, so swallow the rejection.
+      // defaultRoute === "home" === current state → rejects SAME_STATES.
       await router.navigateToDefault().catch(() => {});
 
-      expect(
-        validator.navigation.validateNavigationOptions,
-      ).toHaveBeenCalledWith(expect.anything(), "navigateToDefault");
+      // ⚑ The remainder is `navigate`'s: the default navigation builds its
+      // target state through the same pipeline.
+      expect(consultationsOn(validator)).toStrictEqual([
+        "routes.validateStateBuilderArgs",
+      ]);
     });
   });
 

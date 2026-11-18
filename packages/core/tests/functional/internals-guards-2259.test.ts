@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { createRouter, errorCodes, events } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 import { getInternals } from "@real-router/core/validation";
 
 import { installSpyValidator } from "../helpers/spyValidator";
@@ -96,6 +97,38 @@ describe("the internals adapters run the guards (#2259)", () => {
     });
   });
 
+  describe("on the check channel, through the internal door (#2388)", () => {
+    it("setRootPath asks its entry position", () => {
+      const seen: unknown[][] = [];
+
+      getPluginApi(router).addCheck("setRootPath:entry", (...args) => {
+        seen.push(args);
+      });
+
+      getInternals(router).setRootPath("/base");
+
+      expect(seen).toStrictEqual([["/base"]]);
+    });
+
+    it("navigateToState asks its entry position, with the options as the caller passed them", async () => {
+      const seen: unknown[][] = [];
+      const ctx = getInternals(router);
+      const state = ctx.makeState("u", { id: "7" }, {}, "/u/7");
+
+      getPluginApi(router).addCheck("navigateToState:entry", (...args) => {
+        seen.push(args);
+      });
+
+      await ctx.navigateToState(state, { reload: true }).catch(() => undefined);
+      await ctx.navigateToState(state).catch(() => undefined);
+
+      expect(seen).toStrictEqual([
+        [state, { reload: true }],
+        [state, undefined],
+      ]);
+    });
+  });
+
   describe("validator-gated, through the internal door", () => {
     it("matchPath consults the validator", () => {
       const validator = installSpyValidator(router);
@@ -104,16 +137,6 @@ describe("the internals adapters run the guards (#2259)", () => {
       ctx.matchPath("/p", ctx.getOptions());
 
       expect(validator.routes.validateMatchPathArgs).toHaveBeenCalledWith("/p");
-    });
-
-    it("setRootPath consults the validator", () => {
-      const validator = installSpyValidator(router);
-
-      getInternals(router).setRootPath("/base");
-
-      expect(validator.routes.validateSetRootPathArgs).toHaveBeenCalledWith(
-        "/base",
-      );
     });
 
     it("navigateToState refuses a disposed router before touching the state", () => {
@@ -129,21 +152,6 @@ describe("the internals adapters run the guards (#2259)", () => {
       expect(() => ctx.navigateToState(state)).toThrow(
         expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }),
       );
-    });
-
-    it("navigateToState consults the validator, options included", async () => {
-      const validator = installSpyValidator(router);
-      const ctx = getInternals(router);
-      const state = ctx.makeState("u", { id: "7" }, {}, "/u/7");
-
-      await ctx.navigateToState(state, { reload: true }).catch(() => undefined);
-
-      expect(
-        validator.navigation.validateNavigateToStateArgs,
-      ).toHaveBeenCalled();
-      expect(
-        validator.navigation.validateNavigationOptions,
-      ).toHaveBeenCalledWith({ reload: true }, "navigateToState");
     });
 
     it("makeState consults the validator on the bag core adopted, not the caller's", () => {

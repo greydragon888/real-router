@@ -162,7 +162,7 @@ describe("validation-plugin — representative validation tests", () => {
   });
 });
 
-describe("options.validateOptions — retrospective call", () => {
+describe("validateOptions — retrospective call", () => {
   afterEach(() => {
     router.stop();
   });

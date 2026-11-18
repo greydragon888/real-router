@@ -29,6 +29,7 @@ import { adoptChannel, withoutUnsafeKey } from "./helpers";
 import {
   createInterceptable,
   createTernaryInterceptable,
+  DIAGNOSTIC,
   getInternals,
   hasChecks,
   POSITION,
@@ -754,14 +755,7 @@ export class Router<
         // but the safety now belongs to the namespace that creates the promise,
         // so this closure only owes callers the Promise shape.
         throwIfDisposed(internals.isDisposed);
-        internals.validator?.navigation.validateNavigateToStateArgs(state);
-
-        if (navOpts !== undefined) {
-          internals.validator?.navigation.validateNavigationOptions(
-            navOpts,
-            "navigateToState",
-          );
-        }
+        runChecks(checksMap, POSITION["navigateToState:entry"], state, navOpts);
 
         this.#assertNotReentrant();
 
@@ -772,7 +766,7 @@ export class Router<
       interceptors: interceptorsMap,
       checks: checksMap,
       setRootPath: (rootPath) => {
-        internals.validator?.routes.validateSetRootPathArgs(rootPath);
+        runChecks(checksMap, POSITION["setRootPath:entry"], rootPath);
         this.#routes.setRootPath(rootPath);
       },
       getRootPath: () => this.#routes.getStore().rootPath,
@@ -1496,16 +1490,19 @@ export class Router<
 
     const ctx = getInternals(this);
 
-    ctx.validator?.navigation.validateNavigateToDefaultArgs(options);
+    runChecks(ctx.checks, POSITION["navigateToDefault:entry"], options);
 
-    const opts = options ?? EMPTY_OPTS;
+    // ⚑ After the entry checks, so a call they refuse reports nothing.
+    this.#eventBus.emitDiagnostic(DIAGNOSTIC.NAVIGATE_TO_DEFAULT);
 
-    ctx.validator?.navigation.validateNavigationOptions(
-      opts,
-      "navigateToDefault",
+    // ⚑ The checks and the report's handlers run application code — the
+    // logger callback among it — so a router disposed there refuses this call
+    // with `ROUTER_DISPOSED` before the navigation starts.
+    throwIfDisposed(ctx.isDisposed);
+
+    return Router.#asPromise(
+      this.#navigation.navigateToDefault(options ?? EMPTY_OPTS),
     );
-
-    return Router.#asPromise(this.#navigation.navigateToDefault(opts));
   }
 
   navigateToNotFound(path?: string): State {
@@ -1575,7 +1572,9 @@ export class Router<
     // rejection it gets everywhere else.
     this.#assertNotReentrant();
 
-    getInternals(this).validator?.navigation.validateStartArgs(startPath);
+    // ⚑ Before the interceptor chain, which may supply the path: a check here
+    // refuses synchronously, and the always-on guard after the chain rejects.
+    runChecks(getInternals(this).checks, POSITION["start:entry"], startPath);
 
     // FSM bookkeeping is split across the facade and RouterLifecycleNamespace by
     // design, NOT a missed consolidation (#940): `sendStart()` runs HERE, before

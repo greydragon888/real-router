@@ -622,6 +622,21 @@ describe("dispose", () => {
     });
   });
 
+  // ⚑ The facade asks whether the router is alive after its entry checks and
+  // report, and a reference bound before dispose() reaches that question too.
+  describe("a bound navigateToDefault() reference throws ROUTER_DISPOSED after dispose() (#2388)", () => {
+    it("throws synchronously, as the swapped facade does", async () => {
+      await router.start("/home");
+      const boundNavigateToDefault = router.navigateToDefault.bind(router);
+
+      router.dispose();
+
+      expect(() => boundNavigateToDefault()).toThrow(
+        expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }),
+      );
+    });
+  });
+
   describe("guardAgainstDisposed — mutating methods throw after dispose()", () => {
     beforeEach(() => {
       router.dispose();
