@@ -7,6 +7,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-11-18]
 
+### @real-router/core@0.166.0
+
+### Minor Changes
+
+- [#2983](https://github.com/greydragon888/real-router/pull/2983) [`1a85574`](https://github.com/greydragon888/real-router/commit/1a85574fa572d751f2e8342ed6d0c9d3b44f8b45) Thanks [@greydragon888](https://github.com/greydragon888)! - `navigateToState`, `setRootPath`, `navigateToDefault` and `start` refuse and report through checks and diagnostics ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  Five new check positions: `navigateToState:entry`, `setRootPath:entry`,
+  `navigateToDefault:entry` and `start:entry` receive the caller's arguments,
+  `undefined` for an omitted one, and `navigateToDefault:route` receives the name
+  a `defaultRoute` callback returned. One new diagnostic kind:
+  `NAVIGATE_TO_DEFAULT`.
+
+  `RouterValidator` loses its `options` namespace, `routes.validateSetRootPathArgs`
+  and four `navigation` members: `validateNavigateToDefaultArgs`,
+  `validateNavigateToStateArgs`, `validateNavigationOptions` and
+  `validateStartArgs`. Core never called `options.validateOptions`
+  ([#2367](https://github.com/greydragon888/real-router/issues/2367)). A
+  validator of your own registers checks at these positions with
+  `PluginApi.addCheck`, and subscribes to the kind with
+  `PluginApi.subscribeDiagnostic`, instead.
+
+  ⚑ **`start:entry` is asked before the `start` interceptor chain**, so a check
+  there sees `undefined` when the caller passed no path, and its refusal throws
+  synchronously. `navigateToDefault:route` is asked only when `defaultRoute` is a
+  callback, once core has resolved all three defaults.
+
+  ⚑ **`NAVIGATE_TO_DEFAULT` is raised after the `navigateToDefault:entry` checks
+  pass** and before core resolves the defaults, so a call those checks refuse
+  reports nothing.
+
+  ⚠ **A report handler that throws no longer escapes `navigateToDefault`.** The
+  router logs the throw through `logger.error`, and the navigation runs.
+  Previously a throwing report of the validator — the warning about a defaults
+  bag mutated after `createRouter()` — made `navigateToDefault` throw before the
+  navigation. Only a synchronous throw is isolated; the rejected promise of an
+  `async` handler is not
+  ([#2836](https://github.com/greydragon888/real-router/issues/2836)).
+
+  ⚠ **A router disposed by a check at `navigateToDefault:entry`, a handler of
+  `NAVIGATE_TO_DEFAULT` or the logger callback behind it makes
+  `navigateToDefault` throw `ROUTER_DISPOSED`.** Previously a logger callback
+  that disposed the router on the validator's warning left the navigation to
+  start on the disposed router, and the call rejected with `ROUTER_NOT_STARTED`.
+
+  ⚠ **A `navigateToDefault` reference bound before `dispose()` throws
+  `ROUTER_DISPOSED` when called after it**, as `router.navigateToDefault` does,
+  instead of rejecting with `ROUTER_NOT_STARTED`.
+
+### @real-router/validation-plugin@0.37.0
+
+### Minor Changes
+
+- [#2983](https://github.com/greydragon888/real-router/pull/2983) [`1a85574`](https://github.com/greydragon888/real-router/commit/1a85574fa572d751f2e8342ed6d0c9d3b44f8b45) Thanks [@greydragon888](https://github.com/greydragon888)! - The validation of `navigateToState`, `setRootPath`, `navigateToDefault` and `start` moves onto checks and a diagnostic ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  The argument refusals of the four doors are checks at their `:entry`
+  positions, the refusal of an unknown route name a `defaultRoute` callback
+  returns is a check at `navigateToDefault:route`, and the warning about a
+  `defaultParams` / `defaultSearch` bag mutated after `createRouter()` is a
+  subscription to `NAVIGATE_TO_DEFAULT`, all removed on `teardown`. Each refusal
+  and report keeps its message and logger channel.
+
+  The re-exported `RouterValidator` type loses its `options` namespace,
+  `routes.validateSetRootPathArgs` and four `navigation` members; code typed
+  against it registers checks and diagnostics instead, as `@real-router/core`
+  describes.
+
+  ⚑ **The warning follows the entry refusals.** A `navigateToDefault` call whose
+  options carry a field the plugin refuses — `{ replace: "yes" }`, say — no
+  longer logs the warning about a mutated defaults bag before it throws; the
+  warning comes on the first call that passes. A name a `defaultRoute` callback returns is refused
+  after the warning, as before.
+
+### Patch Changes
+
+- Updated dependencies [[`1a85574`](https://github.com/greydragon888/real-router/commit/1a85574fa572d751f2e8342ed6d0c9d3b44f8b45)]:
+  - @real-router/core@0.166.0
+
+
 ### @real-router/core@0.165.0
 
 ### Minor Changes
