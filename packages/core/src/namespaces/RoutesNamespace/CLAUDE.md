@@ -57,8 +57,7 @@ and never throws.
   route-CRUD.
 - ⚑ **`getPluginApi().addEventListener` is the fifth door of the same shape**,
   and its predicate is MEMBERSHIP rather than a type check: the valid set is
-  closed and `events` declares it, so core derives the seven from that constant
-  and `@real-router/validation-plugin` derives its own set from the same one.
+  closed and `events` declares it, so core derives the seven from that constant.
   That closes the typo a route-name type check cannot, which is why the two
   doors do NOT share a backstop.
 - ⚑ **A read-count instrument is the wrong tool for this family** — these doors

@@ -30,13 +30,6 @@ const MEMBERS = [
   "options.validateOptions",
   "options.validateResolvedDefaultRoute",
 
-  "lifecycle.validateHandlerLimit",
-  "lifecycle.validateCountThresholds",
-  "lifecycle.warnOverwrite",
-  "lifecycle.warnAsyncGuardSync",
-  "lifecycle.warnNonBooleanGuardSync",
-  "lifecycle.warnNonBooleanGuard",
-
   "navigation.validateNavigateToDefaultArgs",
   "navigation.validateNavigateToStateArgs",
   "navigation.validateNavigationOptions",
@@ -49,9 +42,6 @@ const MEMBERS = [
   "state.reportDroppedQueryKey",
   "state.reportUndeclaredParamKey",
   "state.reportCodecRoundTrip",
-
-  "eventBus.validateListenerArgs",
-  "eventBus.validateCountThresholds",
 ];
 
 const FILE = path.resolve(__dirname, "../../src/types/RouterValidator.ts");

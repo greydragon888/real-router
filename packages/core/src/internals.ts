@@ -519,6 +519,14 @@ export const DIAGNOSTIC = {
   USE_PLUGIN_COUNT: "USE_PLUGIN_COUNT",
   USE_PLUGIN_DUPLICATE_IN_BATCH: "USE_PLUGIN_DUPLICATE_IN_BATCH",
   USE_PLUGIN_HOOK_NOT_FUNCTION: "USE_PLUGIN_HOOK_NOT_FUNCTION",
+  CAN_ACTIVATE_COUNT: "CAN_ACTIVATE_COUNT",
+  CAN_DEACTIVATE_COUNT: "CAN_DEACTIVATE_COUNT",
+  CAN_ACTIVATE_OVERWRITE: "CAN_ACTIVATE_OVERWRITE",
+  CAN_DEACTIVATE_OVERWRITE: "CAN_DEACTIVATE_OVERWRITE",
+  SYNC_GUARD_THENABLE: "SYNC_GUARD_THENABLE",
+  SYNC_GUARD_NON_BOOLEAN: "SYNC_GUARD_NON_BOOLEAN",
+  GUARD_NON_BOOLEAN: "GUARD_NON_BOOLEAN",
+  LISTENER_COUNT: "LISTENER_COUNT",
 } as const satisfies {
   [K in keyof DiagnosticEventMap]: DiagnosticEventMap[K] extends readonly [
     unknown?,
@@ -571,6 +579,8 @@ export const POSITION = {
   "usePlugin:count": "usePlugin:count",
   "usePlugin:entry": "usePlugin:entry",
   "usePlugin:plugin": "usePlugin:plugin",
+  "canActivate:count": "canActivate:count",
+  "canDeactivate:count": "canDeactivate:count",
 } as const satisfies { [K in keyof CheckPositionMap]: K };
 
 /**

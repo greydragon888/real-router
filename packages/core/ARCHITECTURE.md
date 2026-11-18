@@ -222,9 +222,9 @@ Namespaces are constructed independently, then wired via **dependency-bundle inj
 // wireNamespaces.ts
 function wireNamespaces(ns: NamespaceBag) {
   const compileFactory = createCompileFactory(ns); // shared by guards + plugins
-  const getValidator = () => getInternals(ns.router).validator; // shared, never throws
+  const getValidator = () => getInternals(ns.router).validator; // read by routes, never throws
   wireLimits(ns); // eventBus gets the listener caps
-  wireRouteLifecycle(ns, compileFactory, getValidator); // guard registry
+  wireRouteLifecycle(ns, compileFactory); // guard registry, both channels
   wireRoutes(ns); // routes get guard registration + state accessors
   wirePlugins(ns, compileFactory); // plugins get addEventListener, canNavigate and both channels
   wireNavigation(ns); // navigation gets state, routes, eventBus, ...

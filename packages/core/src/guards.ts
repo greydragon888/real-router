@@ -103,8 +103,8 @@ const VALID_EVENT_NAMES: ReadonlySet<string> = new Set(objectValues(events));
  * valid set is CLOSED and core declares it, so membership is the predicate and
  * it closes the typo too.
  *
- * The wording mirrors `@real-router/validation-plugin`'s `validateEventName`
- * byte for byte, so the no-plugin error matches the with-plugin one.
+ * Core is the only tier that refuses it, so the message is the same with
+ * `@real-router/validation-plugin` installed and without it.
  */
 export function assertEventNameIsValid(eventName: unknown): void {
   if (!VALID_EVENT_NAMES.has(eventName as string)) {
@@ -149,9 +149,8 @@ export function assertEventNameIsValid(eventName: unknown): void {
  * reported success and never works. Refusing here turns a permanent per-emit log
  * into one error at the line that caused it.
  *
- * The wording mirrors `@real-router/validation-plugin`'s `validateListenerArgs`
- * byte for byte, the same convention the event-name half follows, and
- * `bare-core-message-parity.test.ts` pins the pair.
+ * Core is the only tier that refuses it, as for the event name.
+ * `observable/addEventListener.test.ts` holds the full message.
  */
 export function assertListenerIsFunction(cb: unknown): void {
   if (typeof cb !== "function") {

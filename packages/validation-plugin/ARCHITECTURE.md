@@ -21,14 +21,14 @@ src/
     ├── dependencies.ts       — getDependenciesApi + the store: name format, setDependency args,
     │                           full object structure, getter rejection
     ├── plugins.ts            — PluginsNamespace: count vs maxPlugins limit,
-    ├── lifecycle.ts          — LifecycleNamespace: handler type, not-registering guard,
-    │                           count vs maxLifecycleHandlers, guard answers that are
-    │                           neither true nor false, a thenable on the synchronous ask
+    ├── lifecycle.ts          — the guard doors: handler type, count vs maxLifecycleHandlers,
+    │                           guard answers that are neither true nor false,
+    │                           a thenable on the synchronous ask
     ├── navigation.ts         — NavigationNamespace: navigate args, navigateToDefault args,
     │                           NavigationOptions shape, params validation (navigate/buildPath/canNavigateTo),
     │                           start path validation
     ├── state.ts              — StateNamespace: makeState args, areStatesEqual args
-    ├── eventBus.ts           — EventBusNamespace: event name format, listener args
+    ├── eventBus.ts           — the listener count vs maxListeners
     └── retrospective.ts      — Retrospective validators: run once at usePlugin() time
                                 (existing routes, forwardTo consistency, route properties,
                                  dependency store structure, limits consistency)

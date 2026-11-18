@@ -126,6 +126,53 @@ export type DiagnosticEventMap = {
    * the hook `methodName`, so core skips that hook.
    */
   USE_PLUGIN_HOOK_NOT_FUNCTION: [methodName: string];
+
+  /**
+   * A `canActivate` guard is taking a new slot: the number of routes that hold
+   * one once it registers, a definition and an external guard on one route
+   * counted once. Raised after the `canActivate:count` checks pass.
+   */
+  CAN_ACTIVATE_COUNT: [count: number];
+
+  /** The same report for a `canDeactivate` guard. */
+  CAN_DEACTIVATE_COUNT: [count: number];
+
+  /**
+   * A `canActivate` guard is registering for a route that holds one already,
+   * of either origin. Raised before the registration.
+   */
+  CAN_ACTIVATE_OVERWRITE: [name: string];
+
+  /** The same report for a `canDeactivate` guard. */
+  CAN_DEACTIVATE_OVERWRITE: [name: string];
+
+  /**
+   * The synchronous ask met a thenable from the guard of route `name`, and
+   * answered `false` without waiting for it. `methodName` is the door that
+   * asked.
+   */
+  SYNC_GUARD_THENABLE: [name: string, methodName: string];
+
+  /**
+   * The synchronous ask met an answer that is neither a boolean nor a thenable
+   * (#2823), and read it as a refusal. `methodName` is the door that asked.
+   */
+  SYNC_GUARD_NON_BOOLEAN: [name: string, answer: unknown, methodName: string];
+
+  /**
+   * A transition met an answer, or the value a thenable settled on, that is not
+   * a boolean (#2823), and refused it. Several calls start a transition, so no
+   * door is named.
+   */
+  GUARD_NON_BOOLEAN: [name: string, answer: unknown];
+
+  /**
+   * A listener is registering for `eventName`: the number of listeners the event
+   * holds once it does. `methodName` is the door — `subscribe`,
+   * `addEventListener`, or `usePlugin` for a plugin's hooks. Raised before the
+   * registration.
+   */
+  LISTENER_COUNT: [count: number, eventName: string, methodName: string];
 };
 
 /**
@@ -358,6 +405,20 @@ export interface CheckPositionMap {
    * freezes it and wires its hooks.
    */
   "usePlugin:plugin": [plugin: Plugin];
+
+  /**
+   * The number of routes holding a `canActivate` guard, judged before a guard
+   * takes a new slot — a definition and an external guard on one route counted
+   * once. An overwrite takes no slot and is not judged.
+   *
+   * ⚑ `add`, `update` and `replace` ask it before writing anything, with the
+   * highest count their per-slot asks will receive, and then once per new slot
+   * as each guard registers.
+   */
+  "canActivate:count": [currentCount: number];
+
+  /** The same count for `canDeactivate` guards. */
+  "canDeactivate:count": [currentCount: number];
 }
 
 /**

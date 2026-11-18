@@ -8,8 +8,6 @@ import {
   invalidParamsArbitrary,
   validStartPathArbitrary,
   invalidStartPathArbitrary,
-  validEventNameArbitrary,
-  invalidEventNameArbitrary,
   validPluginArbitrary,
   unknownPluginKeyArbitrary,
   validHandlerArbitrary,
@@ -26,10 +24,6 @@ import {
   validateDependenciesObject,
   validateDependencyLimit,
 } from "../../src/validators/dependencies";
-import {
-  validateEventName,
-  validateListenerArgs,
-} from "../../src/validators/eventBus";
 import {
   validateHandler,
   validateHandlerLimit,
@@ -402,59 +396,6 @@ describe("validateMakeStateArgs — property-based", () => {
 });
 
 // =============================================================================
-// EventBus namespace
-// =============================================================================
-
-describe("validateEventName — property-based", () => {
-  test.prop([validEventNameArbitrary], { numRuns: NUM_RUNS.standard })(
-    "valid event names never throw",
-    (name) => {
-      expect(() => {
-        validateEventName(name);
-      }).not.toThrow();
-    },
-  );
-
-  test.prop([invalidEventNameArbitrary], { numRuns: NUM_RUNS.standard })(
-    "invalid event names always throw TypeError",
-    (name) => {
-      expect(() => {
-        validateEventName(name);
-      }).toThrow(TypeError);
-    },
-  );
-});
-
-describe("validateListenerArgs — property-based", () => {
-  test.prop([validEventNameArbitrary], { numRuns: NUM_RUNS.standard })(
-    "valid event name + function never throws",
-    (name) => {
-      expect(() => {
-        validateListenerArgs(name, (() => {}) as any);
-      }).not.toThrow();
-    },
-  );
-
-  test.prop(
-    [
-      validEventNameArbitrary,
-      fc.oneof(
-        fc.string(),
-        fc.integer(),
-        fc.boolean(),
-        fc.constant(null),
-        fc.constant(undefined),
-      ),
-    ],
-    { numRuns: NUM_RUNS.standard },
-  )("valid event name + non-function always throws TypeError", (name, cb) => {
-    expect(() => {
-      validateListenerArgs(name, cb as any);
-    }).toThrow(TypeError);
-  });
-});
-
-// =============================================================================
 // Plugins namespace
 // =============================================================================
 
@@ -794,18 +735,6 @@ describe("idempotency — calling twice yields same result", () => {
       }
 
       expect(threw1).toBe(threw2);
-    },
-  );
-
-  test.prop([validEventNameArbitrary], { numRuns: NUM_RUNS.standard })(
-    "validateEventName idempotent on valid input",
-    (name) => {
-      expect(() => {
-        validateEventName(name);
-      }).not.toThrow();
-      expect(() => {
-        validateEventName(name);
-      }).not.toThrow();
     },
   );
 });

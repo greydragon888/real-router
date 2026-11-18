@@ -1,12 +1,13 @@
 // packages/core/src/namespaces/RouteLifecycleNamespace/types.ts
 
 import type {
+  CheckPositionMap,
   DefaultDependencies,
+  DiagnosticEventMap,
   GuardFn,
   RouterLogger,
   GuardFnFactory,
 } from "../../types";
-import type { RouterValidator } from "../../types/RouterValidator";
 
 export interface RouteLifecycleDependencies<
   Dependencies extends DefaultDependencies = DefaultDependencies,
@@ -15,10 +16,22 @@ export interface RouteLifecycleDependencies<
   logger: RouterLogger;
 
   compileFactory: (factory: GuardFnFactory<Dependencies>) => GuardFn;
-  /**
-   * Returns the opt-in DX validator, or `null` when no validation-plugin is
-   * installed. A plain deps field (#1331) — internals are registered before
-   * wiring, so `getInternals(router)` never throws and no try/catch is needed.
-   */
-  getValidator: () => RouterValidator | null;
+
+  /** Runs the checks registered at a position (#2388); a check may only throw. */
+  runChecks: <P extends keyof CheckPositionMap>(
+    position: P,
+    ...args: CheckPositionMap[P]
+  ) => void;
+
+  /** Whether any check stands at a position — asked before computing its arguments. */
+  hasChecks: (position: keyof CheckPositionMap) => boolean;
+
+  /** Reports an internal DIAGNOSTIC (#2388). Core states what happened. */
+  emitDiagnostic: <K extends keyof DiagnosticEventMap>(
+    key: K,
+    ...args: DiagnosticEventMap[K]
+  ) => void;
+
+  /** How many handlers listen to a kind — asked before computing its arguments. */
+  diagnosticListenerCount: (key: keyof DiagnosticEventMap) => number;
 }

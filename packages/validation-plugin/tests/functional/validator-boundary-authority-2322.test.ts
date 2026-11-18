@@ -48,7 +48,8 @@ import type { LoggerConfig, Router } from "@real-router/core";
  * registration's callback makes as a statement, `<position> › <callee>`, and
  * each row names a file that went red with that one call removed.
  *
- * ⚠ **A no-op that reds NOTHING has two causes, and they are not the same.**
+ * ⚠ **A no-op that reds no file holding the call's message has two causes,
+ * and they are not the same.**
  * Either the effect is genuinely unheld, or core refuses the same input with
  * the same wording, so the copy can never be observed — the shape #2307 found
  * for the four `queryParams` format lists and deleted. A row of the first kind
@@ -70,10 +71,8 @@ import type { LoggerConfig, Router } from "@real-router/core";
  *
  * ⚠ **A parity test cannot own a mirrored consultation, by construction.**
  * `bare-core-message-parity` compares the two tiers' MESSAGES, so it passes
- * whichever tier produced one — which is why no-oping `validateListenerArgs`
- * leaves it green although it does exercise that door. The mirroring is a
- * recorded decision (#1047 for the reserved prefix, #1888 / #2088 for the
- * listener arguments), not a gap to report as one.
+ * whichever tier produced one. The mirroring is a recorded decision (#1047 for
+ * the reserved prefix), not a gap to report as one.
  */
 
 const CORE_SRC = path.resolve(__dirname, "../../../core/src");
@@ -97,8 +96,9 @@ const PLUGIN_TSCONFIG = path.resolve(__dirname, "../../tsconfig.src.json");
 const MIRRORED = "mirrored — core refuses the same input, same wording";
 
 /**
- * Held by the describe "what nothing else held" in THIS file, because nothing
- * else held it.
+ * Held by the describe "what nothing else held" in THIS file: no other file
+ * holds the call's message. Another file may still red without the call — a
+ * teardown row asserts only that the plugin changes the outcome.
  */
 const SELF = "validator-boundary-authority-2322.test.ts";
 
@@ -107,14 +107,6 @@ const SELF = "validator-boundary-authority-2322.test.ts";
  * {@link MIRRORED} when nothing can.
  */
 const OWNER: Record<string, string> = {
-  "eventBus.validateCountThresholds": "limits.test.ts",
-  "eventBus.validateListenerArgs": MIRRORED,
-  "lifecycle.validateCountThresholds": SELF,
-  "lifecycle.validateHandlerLimit": "limits.test.ts",
-  "lifecycle.warnAsyncGuardSync": "lifecycle.validation.test.ts",
-  "lifecycle.warnNonBooleanGuard": "guard-answer-diagnostic-2823.test.ts",
-  "lifecycle.warnNonBooleanGuardSync": "guard-answer-diagnostic-2823.test.ts",
-  "lifecycle.warnOverwrite": "lifecycle.validation.test.ts",
   "navigation.validateNavigateToDefaultArgs": "defaults-mutation-2148.test.ts",
   "navigation.validateNavigateToStateArgs": "navigation.validation.test.ts",
   "navigation.validateNavigationOptions": "navigation.validation.test.ts",
@@ -153,6 +145,18 @@ const REGISTRATION_OWNER: Record<string, string> = {
     "dependency-channels-consumer-2388.test.ts",
   "SET_DEPENDENCY_OVERWRITE › warnDepsOverwrite":
     "dependencies-reentrancy-1859.test.ts",
+  "CAN_ACTIVATE_COUNT › validateLifecycleCountThresholds": SELF,
+  "CAN_ACTIVATE_OVERWRITE › warnLifecycleOverwrite":
+    "lifecycle.validation.test.ts",
+  "CAN_DEACTIVATE_COUNT › validateLifecycleCountThresholds": SELF,
+  "CAN_DEACTIVATE_OVERWRITE › warnLifecycleOverwrite":
+    "lifecycle.validation.test.ts",
+  "GUARD_NON_BOOLEAN › warnNonBooleanGuard":
+    "guard-answer-diagnostic-2823.test.ts",
+  "LISTENER_COUNT › validateListenerCountThresholds": "limits.test.ts",
+  "SYNC_GUARD_NON_BOOLEAN › warnNonBooleanGuardSync":
+    "guard-answer-diagnostic-2823.test.ts",
+  "SYNC_GUARD_THENABLE › warnAsyncGuardSync": "lifecycle.validation.test.ts",
   "USE_PLUGIN_COUNT › validatePluginCountThresholds": SELF,
   "USE_PLUGIN_DUPLICATE_IN_BATCH › warnBatchDuplicates":
     "plugin-api.validation.test.ts",
@@ -164,6 +168,9 @@ const REGISTRATION_OWNER: Record<string, string> = {
   "addDeactivateGuard:entry › validateRouteName":
     "lifecycle.validation.test.ts",
   "addRoute:batch › checkRouteBatch": "routes.validation.test.ts",
+  "canActivate:count › validateHandlerLimit": "limits.test.ts",
+  "canDeactivate:count › validateHandlerLimit":
+    "lifecycle-channels-consumer-2388.test.ts",
   "buildNavigationState:state › validateSearch":
     "both-channels-authority-1972.test.ts",
   "buildNavigationState:state › validateStateBuilderArgs":
@@ -1093,7 +1100,7 @@ describe("each consultation the walk derives from core is classified (#2322)", (
     // ⚠ EXACT, not a floor. A row leaving this set is someone deciding the copy
     // became observable — or that it should go, the way #2307 retired four
     // lists once measurement showed core refusing first.
-    expect(mirroredIn(OWNER)).toStrictEqual(["eventBus.validateListenerArgs"]);
+    expect(mirroredIn(OWNER)).toStrictEqual([]);
   });
 
   it("CONTROL — the walk reaches core and sees a consultation made twice", () => {
@@ -1529,8 +1536,8 @@ describe("what nothing else held (#2322)", () => {
     register: () => void,
   ): string[] => warnedDuring(sink, register).map(([, message]) => message);
 
-  it("lifecycle.validateCountThresholds — a growing guard registry is named as it grows", () => {
-    // `maxLifecycleHandlers: 10` puts the warning at the second guard.
+  it("validateLifecycleCountThresholds — a growing guard registry is named as it grows, per guard type", () => {
+    // `maxLifecycleHandlers: 10` puts the warning at the second guard of a type.
     const run = (withPlugin: boolean): unknown[] => {
       const sink = warningSink();
       const router = createRouter([...ROUTES], {
@@ -1542,14 +1549,25 @@ describe("what nothing else held (#2322)", () => {
         router.usePlugin(validationPlugin());
       }
 
-      return warningsOf(sink, () => {
-        getLifecycleApi(router).addActivateGuard("a", () => () => true);
-        getLifecycleApi(router).addActivateGuard("b", () => () => true);
+      return warnedDuring(sink, () => {
+        const lifecycle = getLifecycleApi(router);
+
+        lifecycle.addActivateGuard("a", () => () => true);
+        lifecycle.addActivateGuard("b", () => () => true);
+        lifecycle.addDeactivateGuard("a", () => () => true);
+        lifecycle.addDeactivateGuard("b", () => () => true);
       });
     };
 
     expect(run(true)).toStrictEqual([
-      "2 lifecycle handlers registered. Consider consolidating logic.",
+      [
+        "router.canActivate",
+        "2 lifecycle handlers registered. Consider consolidating logic.",
+      ],
+      [
+        "router.canDeactivate",
+        "2 lifecycle handlers registered. Consider consolidating logic.",
+      ],
     ]);
     expect(run(false)).toStrictEqual([]);
   });

@@ -137,19 +137,6 @@ A registered mechanism that the anchor's sample no longer reaches fails the anch
 | 3   | `validateMakeStateArgs`: invalid params always throws `TypeError`          | 50   |
 | 4   | `validateMakeStateArgs`: non-string path always throws `TypeError`         | 50   |
 
-## EventBus namespace
-
-| #   | Invariant                                                                           | Runs |
-| --- | ----------------------------------------------------------------------------------- | ---- |
-| 1   | `validateEventName`: valid event names never throw                                  | 50   |
-| 2   | `validateEventName`: invalid event names always throw `TypeError`                   | 50   |
-| 3   | `validateListenerArgs`: valid event name + function never throws                    | 50   |
-| 4   | `validateListenerArgs`: valid event name + non-function always throws `TypeError`   | 50   |
-
-### Valid event name domain
-
-`$start`, `$stop`, `$$start`, `$$leaveApprove`, `$$cancel`, `$$success`, `$$error`
-
 ## Plugins namespace
 
 | #   | Invariant                                                                               | Runs |
@@ -221,4 +208,3 @@ The retrospective pass checks committed **state** (re-run on `usePlugin` and eve
 | #   | Invariant                                                                  | Runs |
 | --- | -------------------------------------------------------------------------- | ---- |
 | 1   | `validateNavigateArgs`: calling twice on invalid input yields same result  | 50   |
-| 2   | `validateEventName`: calling twice on valid input yields same result       | 50   |

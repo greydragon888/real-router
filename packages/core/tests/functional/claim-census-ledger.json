@@ -40,6 +40,10 @@
       "cd1033a00b9d",
       "e84771cf0ee1"
     ],
+    "packages/core/src/api/getLifecycleApi.ts": [
+      "f0b08cc44b3c",
+      "db08541921cb"
+    ],
     "packages/core/src/api/getPluginApi.ts": [
       "1a9864dfed80",
       "d7294177f708",
@@ -79,6 +83,7 @@
       "8541656699af",
       "b65768f82193",
       "9c6ae25dcf39",
+      "8bd128fe150e",
       "7cca791e0e60",
       "4f4e83cd1928",
       "67c40a8a628d",
@@ -88,7 +93,9 @@
       "207d5d04819b",
       "50b0042a9ad8",
       "916c95a2fd1f",
+      "35f758302c91",
       "7621d7ec1225",
+      "09cc27ec2c41",
       "78052c3fe277"
     ],
     "packages/core/src/api/helpers.ts": [
@@ -428,6 +435,7 @@
       "b6beb21ad10e",
       "3c806455a18d",
       "866fcce05b8d",
+      "dd094bf650fc",
       "e8475795d263",
       "f2dec967e8c0",
       "e4fc944c454a",
@@ -830,6 +838,7 @@
       "404faf8a5916",
       "8ce004766e62",
       "db9a132318ca",
+      "347ae8255789",
       "a83caaf7e5fa",
       "7dc62bcfd78f",
       "649573bc2251",
@@ -931,6 +940,7 @@
       "e2ff438b5d93",
       "c4139afb7789",
       "e263511098d1",
+      "da3a301894f6",
       "ff4ceb055cd1",
       "4fdfc78b5391",
       "a5ff539181a7",
@@ -1235,7 +1245,8 @@
       "aa526c0ae2b3",
       "63bc2f185642",
       "772db8d7665b",
-      "19a9b9a338fd"
+      "19a9b9a338fd",
+      "f88bdde7f1ea"
     ],
     "packages/validation-plugin/src/validators/defaultsMutation.ts": [
       "9c7a417f02bd",
@@ -1961,7 +1972,7 @@
     ],
     "packages/core/CLAUDE.md": [
       "7a2d1382b7c6",
-      "4b7177988f9f",
+      "833a016b61ea",
       "052ab94e7a6f",
       "2cac52cc89cd",
       "f63d566713b2",
@@ -2124,7 +2135,7 @@
       "8e90b61969cf",
       "cc230ad5947c",
       "c052220c114a",
-      "be00dc6fdf3d",
+      "10d5227b84bb",
       "a436a629adcf",
       "b76ffa761f28",
       "6f371ae53446",
@@ -2224,9 +2235,8 @@
     ],
     "packages/validation-plugin/CLAUDE.md": [
       "46ac7eb435f9",
-      "12e61264c5e2",
       "4319712a7f6e",
-      "6cbab15f70ad",
+      "4e2f60b90e8a",
       "c460d0800c1d",
       "651b745cc19a",
       "e623c09d4aac",
@@ -2242,10 +2252,11 @@
       "c343645e6019",
       "1fbca30c319c",
       "9694f202351f",
-      "1b148cedcfc9",
       "82c34ee36c78",
       "a177a79fe999",
       "1ad52f45ff00",
+      "6be94485caa9",
+      "caad69c4e4cd",
       "592e1eb0b1ae",
       "13113acd12d4",
       "f610c7255a78",
@@ -2253,8 +2264,8 @@
       "dc007e60f534",
       "e68091d164a6",
       "4b882f0ccf5f",
-      "6af4c1e40bb5",
-      "36a6e111996b",
+      "4b329faca451",
+      "555ea3417fd2",
       "d055d143ca1c",
       "6c43793526e7"
     ],

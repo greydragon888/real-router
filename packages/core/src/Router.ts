@@ -695,13 +695,21 @@ export class Router<
 
         assertEventNameIsValid(eventName);
         assertListenerIsFunction(cb);
-        internals.validator?.eventBus.validateListenerArgs(eventName, cb);
 
-        return this.#eventBus.addEventListener(
+        const unsubscribe = this.#eventBus.addEventListener(
           eventName,
           cb,
           "addEventListener",
         );
+
+        // ⚑ Again, after the listener-count report (#1859): its handlers run
+        // application code, and this stops the call handing back an
+        // unsubscribe on a router that code disposed. Asked here rather than
+        // in the namespace, which `usePlugin` shares: a refusal inside its hook
+        // loop would skip the teardown its own last question runs.
+        throwIfDisposed(internals.isDisposed);
+
+        return unsubscribe;
       },
       subscribeDiagnostic: (key, handler) =>
         this.#eventBus.subscribeDiagnostic(key, handler),

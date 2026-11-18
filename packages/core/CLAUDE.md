@@ -76,8 +76,10 @@ ordinal naming "the next one": an ordinal adds a second edit to every addition.)
   `typeof` (#2088), because the emitter stores whatever it is handed and isolates
   the call, so a non-function logs `cb is not a function` on every emit of that
   event for the life of the router — a registration that reported success and
-  never works. Both wordings are mirrored by `@real-router/validation-plugin` and
-  pinned against it by `bare-core-message-parity.test.ts`.
+  never works. Core is the only tier that refuses either, so both texts are the
+  same with `@real-router/validation-plugin` installed and without it;
+  `invalid-event-name-1888.test.ts` and `observable/addEventListener.test.ts`
+  hold them.
 - **`addInterceptor(method, fn)`** — refuses both arguments (#2088), because the
   door meets BOTH halves of the criterion at once: a name no seam reads registers
   cleanly, never fires and hands back a working `Unsubscribe` (a), and a
