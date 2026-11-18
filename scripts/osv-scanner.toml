@@ -23,6 +23,20 @@ reason = "glib 0.18.5 VariantStrIter unsoundness (RUSTSEC-2024-0429). Transitive
 id = "GHSA-pqg4-j6r4-53mv"  # shell-quote quote() command injection through a line terminator after a comment token
 reason = "Fixed in shell-quote 1.11.0, outside the exact 1.9.0 concurrently 10.0.5 pins; concurrently has no newer release. Only path: concurrently 10.0.5 (devDependency of examples/desktop/electron/*), which calls quote() only under --passthrough-arguments, and the examples' dev scripts do not pass it. examples/ is never published."
 
+# picomatch's ReDoS affects every release through 4.0.7, its latest, so no
+# bump fixes it. It needs a glob pattern the attacker writes, such as `+(*)`,
+# and only development tooling loads picomatch here: each path to it in the
+# three npm lockfiles starts at a devDependency, except vue-router 5 in
+# cross-router-bench, which imports it only in its build plugin
+# (`vue-router/vite`, `vue-router/unplugin`), and no code of the repository
+# imports picomatch itself. The published packages' `dependencies` reach only
+# @real-router/* packages. Drop it when api.osv.dev reports a picomatch
+# release past 4.0.7 clean and the lockfiles take it.
+
+[[IgnoredVulns]]
+id = "GHSA-fc5q-39xc-vjpf"  # picomatch ReDoS through single-branch repeated extglobs
+reason = "No picomatch release fixes it: every one through 4.0.7, the latest, is affected. The ReDoS needs a glob pattern the attacker writes, and only development tooling loads picomatch here; no published @real-router/* package depends on it."
+
 # NOTE (2026-09-10): ten entries stood here — RUSTSEC-2024-0411 through -0420,
 # the gtk-rs unmaintained-crate advisories (gdk, gtk, atk, their -sys crates and
 # gtk3-macros). They are gone, and the way they left is worth one paragraph
