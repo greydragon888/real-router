@@ -4,12 +4,13 @@
 
 ## getInvalidKeys
 
-| #   | Invariant                         | Description                                                                                                                                               |
-| --- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Exact equality with expected keys | Result Set equals exactly the set of `String(issue.path[0])` keys from all issues with non-empty path. No keys missing, no keys invented.                 |
-| 2   | Path-less issues ignored          | Issues without `path` or with `path.length === 0` contribute no keys to the result. Only issues with a non-empty path produce output.                     |
-| 3   | Object segment extraction         | When `path[0]` is `{ key: K }`, the extracted key equals `String(K)`. When `path[0]` is a bare `PropertyKey`, the extracted key equals `String(path[0])`. |
-| 4   | Idempotency                       | Calling `getInvalidKeys` twice on the same issues produces the same Set. The function has no side effects.                                                |
+| #   | Invariant                                    | Description                                                                                                                                               |
+| --- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Exact equality with expected keys            | Result Set equals exactly the set of `String(issue.path[0])` keys from all issues with non-empty path. No keys missing, no keys invented.                 |
+| 2   | Path-less issues ignored                     | Issues without `path` or with `path.length === 0` contribute no keys to the result. Only issues with a non-empty path produce output.                     |
+| 3   | Object segment extraction                    | When `path[0]` is `{ key: K }`, the extracted key equals `String(K)`. When `path[0]` is a bare `PropertyKey`, the extracted key equals `String(path[0])`. |
+| 4   | Idempotency                                  | Calling `getInvalidKeys` twice on the same issues produces the same Set. The function has no side effects.                                                |
+| 5   | Issues without path produce no keys stripped | When no issue has a `path`, `omitKeys(params, getInvalidKeys(issues))` holds exactly the own keys of `params`, each with the same value.                  |
 
 ## omitKeys
 
@@ -68,6 +69,6 @@ Rows 1–5, and Decoded Text row 1, run each schema in the three forms a library
 
 | File                                      | Invariants | Category                                       |
 | ----------------------------------------- | ---------- | ---------------------------------------------- |
-| `tests/property/helpers.properties.ts`    | 10         | getInvalidKeys, omitKeys, pickKeys             |
+| `tests/property/helpers.properties.ts`    | 11         | getInvalidKeys, omitKeys, pickKeys             |
 | `tests/property/validation.properties.ts` | 6          | Factory Options Validation                     |
 | `tests/property/pipeline.properties.ts`   | 9          | Validation Pipeline (forwardState interceptor), Channel Isolation, Decoded Text |
