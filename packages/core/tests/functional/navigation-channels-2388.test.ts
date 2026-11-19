@@ -276,8 +276,8 @@ describe("#2388 — navigateToState, setRootPath, navigateToDefault and start on
 
   describe("a report handler that throws is isolated", () => {
     // ⚑ The navigation runs as if the handler had returned, and the emitter
-    // logs the throw. Only a synchronous throw: an async handler's rejection
-    // is #2836's.
+    // logs the throw. An async handler's rejection is logged the same way once
+    // it settles (#2836).
     it("NAVIGATE_TO_DEFAULT: the navigation completes, and the throw reaches logger.error", async () => {
       const errors: unknown[][] = [];
       const router = createRouter(routes, {

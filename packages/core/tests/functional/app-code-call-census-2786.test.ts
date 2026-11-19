@@ -1500,6 +1500,14 @@ const HOPS = new Map([
     "a dependency bag `wireNamespaces` fills",
   ],
   [
+    "namespaces/PluginsNamespace/PluginsNamespace.ts › Cleanup",
+    "the cleanup core builds around a started plugin",
+  ],
+  [
+    "namespaces/PluginsNamespace/PluginsNamespace.ts › runCleanup().report",
+    "a report the namespace builds over its logger",
+  ],
+  [
     "namespaces/RoutesNamespace/helpers.ts › clearConfigEntries()",
     "its matcher is the route table's",
   ],
@@ -1599,6 +1607,10 @@ const OWN_PROTOCOL = new Map([
   [
     "utils/event-emitter/EventEmitter.ts › #invokeIsolated › then:catch",
     "the promise core builds around a listener's thenable",
+  ],
+  [
+    "utils/thenable.ts › consumeThenable › then:catch",
+    "the promise core builds around a callback's thenable",
   ],
 ]);
 
@@ -1721,6 +1733,7 @@ const PLACES = new Map([
   ["types/RouterValidator.ts › RouterValidator › family", VALIDATOR],
   [`${LOGGER} › #invokeCallback › call:LogCallback`, "counted:logger"],
   [`${LOGGER} › #invokeCallback › then:Promise.resolve`, "counted:logger"],
+  ["utils/thenable.ts › consumeThenable › then:Reflect.apply", DISPOSED],
   [
     `wiring/wireNamespaces.ts › createCompileFactory › call:${short(T_FACTORY)}`,
     INHERITS,

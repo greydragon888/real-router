@@ -1,6 +1,7 @@
 import { assertChannelCorrect } from "./channels";
 import { errorCodes } from "./constants";
-import { RouterError, freezeThrownError } from "./RouterError";
+import { RouterError, freezeThrownError, raiser } from "./RouterError";
+import { consumeThenable } from "./utils/thenable";
 
 import type { DependenciesStore } from "./dependenciesStore";
 import type { RouteTree } from "./engine";
@@ -589,6 +590,11 @@ export const POSITION = {
   "start:entry": "start:entry",
 } as const satisfies { [K in keyof CheckPositionMap]: K };
 
+/** Several doors reach `runChecks`, so its refusal names no door (#2487). */
+const atRunChecks = raiser("router");
+
+const ignoreRejection = (): undefined => undefined;
+
 /**
  * Runs every check registered at a position, in registration order.
  *
@@ -608,6 +614,12 @@ export const POSITION = {
  * by the same call — and copying the array would allocate on `buildPath`, which
  * is the render path. So a registration made during a run is not seen by that
  * run, and a removal made during one simply is not called.
+ *
+ * ⚠ **A check that returns a thenable refuses its door (#2836).** A promise
+ * settles after the door has answered, so it cannot refuse; `runChecks` throws
+ * a `TypeError` in its place, from where the check's own throw would come, and
+ * the promise is consumed without a report — the refusal already reported the
+ * call.
  */
 export function runChecks<P extends keyof CheckPositionMap>(
   checks: ReadonlyMap<string, ((...args: any[]) => void)[]>,
@@ -623,7 +635,12 @@ export function runChecks<P extends keyof CheckPositionMap>(
   const atEntry = registered.length;
 
   for (let i = 0; i < atEntry && i < registered.length; i++) {
-    registered[i](...args);
+    // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -- the void-typed check's runtime value is read to refuse a thenable (#2836)
+    const answer: unknown = registered[i](...args);
+
+    if (consumeThenable(answer, ignoreRejection)) {
+      throw atRunChecks.type`Async checks are not supported: the check at "${position}" returned a thenable. A check refuses by throwing synchronously.`;
+    }
   }
 }
 

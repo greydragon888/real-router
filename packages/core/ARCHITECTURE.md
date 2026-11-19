@@ -85,6 +85,7 @@ graph TD
 | **src/utils/logger**        | `RouterLogger` class — one instance per router                                                                         | Warning/error logging across namespaces  |
 | **src/types**               | Shared type definitions (the `/types` subpath)                                                                         | All modules                              |
 | **src/utils/ingest**        | Ingestion primitives — one discipline for writing into a record under a key core did not choose (the `/utils` subpath) | Every layer, and the plugins             |
+| **src/utils/thenable**      | `consumeThenable()` — takes over a thenable that application code returned where core expects nothing                  | `PluginsNamespace`, `runChecks`          |
 
 (`package.json` names no other `@real-router/*` package in any dependency field, and there are no runtime `dependencies`.)
 
@@ -597,7 +598,9 @@ const myPlugin: PluginFactory = (router, getDependency) => ({
 **Hook error isolation, sync and async.** A synchronous throw is caught and
 logged; an `async` hook that rejects is isolated the same way, so it does not
 escape as an `unhandledRejection`. A hook must not rely on its rejection
-propagating anywhere.
+propagating anywhere. `teardown` is held to the same rule: a throw, or a
+rejection of the promise it returns, is logged, and nothing waits for that
+promise.
 
 **Conditional registration:** `usePlugin()` silently skips falsy values, so
 `__DEV__ && validationPlugin()` works inline.
@@ -715,7 +718,8 @@ commit.
 Listeners are invoked synchronously; returned promises are not awaited, and a
 rejected one is isolated centrally to the same `onListenerError` sink a
 synchronous throw flows through, so it does not leak as a Node
-`unhandledRejection`. The same isolation covers **raw plugin hooks**.
+`unhandledRejection`. The same isolation covers **raw plugin hooks** and the
+handlers of `subscribeChanges` and `subscribeDiagnostic`.
 
 A **synchronous** reentrant navigation from inside a transition listener is
 **banned**, a `start()` on a router that is not running included, and so is one

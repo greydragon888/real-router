@@ -304,6 +304,10 @@ export interface Plugin {
     fromState: State | undefined,
     opts: NavigationOptions,
   ) => void;
+  /**
+   * Runs when the plugin is removed. Nothing waits for a promise it returns,
+   * and a throw, or a rejection of that promise, is logged (#2836).
+   */
   teardown?: () => void;
 }
 

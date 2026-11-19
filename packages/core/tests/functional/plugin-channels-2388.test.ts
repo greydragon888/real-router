@@ -332,8 +332,8 @@ describe("#2388 — usePlugin on the channels", () => {
 
   describe("a report handler that throws is isolated", () => {
     // ⚑ The install completes as if the handler had returned, and the emitter
-    // logs the throw. Only a synchronous throw: an async handler's rejection
-    // is #2836's.
+    // logs the throw. An async handler's rejection is logged the same way once
+    // it settles (#2836).
     const ROWS = [
       {
         kind: "USE_PLUGIN_COUNT",

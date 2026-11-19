@@ -99,7 +99,8 @@ InterceptableMethodMap]: K }` ties it to the type in both directions: a seam
   `CheckPositionMap` by `satisfies` in both directions, and neither half coerces
   the name. ⚑ The channel is REFUSAL-ONLY — a check may throw and may do nothing
   else — which is what separates it from a seam: measured, no shipped interceptor
-  refuses and no validator refusal replaces an argument.
+  refuses and no validator refusal replaces an argument. A check that returns a
+  thenable refuses its door instead; `CheckFn`'s docblock owns why (#2836).
 - **`addActivateGuard("")` / `addDeactivateGuard("")`** — refuse the root node
   (#2895), by criterion **(a)**: the root is no segment, so no transition
   activates or deactivates it, and a guard there would register cleanly and
