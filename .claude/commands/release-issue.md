@@ -31,7 +31,7 @@ $ARGUMENTS
 
 1. Каждый файл из `status` относится к задаче; пробы (`__probe*`, отладочные файлы) удали до `add`. В worktree задачи — `git -C <wt> add -A`, иначе поимённо.
 2. Сообщение — от `/commit-msg` (Skill) по `git -C <wt>`; его вывод в этой сессии годится, если дифф с тех пор не менялся. До коммита: `pnpm --dir <wt> exec commitlint < <file>`.
-3. `git -C <wt> commit -F <file> > <log> 2>&1; echo "rc=$?"` — в фоне: pre-commit гоняет тесты и линт затронутых пакетов. Вердикт — `rc=` в выводе.
+3. `TURBO_CACHE_DIR=<scratchpad>/turbo git -C <wt> commit -F <file> > <log> 2>&1; echo "rc=$?"` — в фоне: pre-commit гоняет тесты и линт затронутых пакетов, а turbo из worktree без переменной пишет в кеш основного чекаута. Вердикт — `rc=` в выводе.
 4. Провал хука оставляет индекс: перед повтором — `git status --short`. После коммита — `git show --stat HEAD` и пустой `status`.
 
 ## Шаг 2 — Свежая база
@@ -43,7 +43,7 @@ $ARGUMENTS
 ## Шаг 3 — Пуш
 
 1. `pnpm --dir <wt> lint:security` — на закоммиченном фиксе: без коммитов ветки скан отвечает «No branch delta» с кодом 0, а в pre-push он идёт только после сборки.
-2. `git -C <wt> push -u origin HEAD > <log> 2>&1; echo "exit=$?" >> <log>` — в фоне: pre-push — полная сборка и колонка линтеров. Вердикт — строка `exit=` в логе и `git ls-remote --heads origin <branch>`, а не статус фоновой задачи. Обрыв SSH и упавший тест, к ветке не относящийся, — по `/create-pr` Фаза 4 п. 2.
+2. `TURBO_CACHE_DIR=<scratchpad>/turbo git -C <wt> push -u origin HEAD > <log> 2>&1; echo "exit=$?" >> <log>` — в фоне: pre-push — полная сборка и колонка линтеров. Вердикт — строка `exit=` в логе и `git ls-remote --heads origin <branch>`, а не статус фоновой задачи. Обрыв SSH и упавший тест, к ветке не относящийся, — по `/create-pr` Фаза 4 п. 2.
 3. Падение pre-push настоящее: чини новым коммитом через шаг 1 и пушь снова. Pre-push собирает `dist` в worktree: перед следующими тестами там — `rm -rf packages/*/dist && pnpm install`.
 
 ## Шаг 4 — PR
