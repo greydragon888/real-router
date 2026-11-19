@@ -39,7 +39,6 @@ $ARGUMENTS
 1. `git -C <wt> fetch origin`; есть ли ветка на remote — `git -C <wt> ls-remote --heads origin <branch>`.
 2. Ветки на remote нет, а `git -C <wt> merge-base --is-ancestor origin/master HEAD` отвечает кодом 1 — `git -C <wt> rebase origin/master`. Конфликт — по `/create-pr` Фаза 0 п. 5 или сообщи и остановись. `master` принёс новый `pnpm-lock.yaml` — `pnpm install --frozen-lockfile` в worktree до хуков.
 3. Ветка уже на remote — не перебазируй: понадобился бы force-push. Расхождение с `master` решает `/create-pr`.
-4. Rebase меняет SHA: текст, который его цитирует, перечитай.
 
 ## Шаг 3 — Пуш
 
@@ -53,7 +52,7 @@ $ARGUMENTS
 
 ## Шаг 5 — Комментарий
 
-1. Черновик сверь с опубликованным: статус — «In PR #M, not merged yet», а не merged или released; SHA — только запушенные; номера follow-up задач — заведённые.
+1. Черновик сверь с опубликованным: статус — «In PR #M, not merged yet», а не merged или released; SHA и ссылки на коммит, ветку или вики — только видимые на remote; номера follow-up задач — заведённые; числа и изменения поведения — с телом PR и changeset'ом: вычитка и rebase идут после черновика.
 2. `gh issue comment <N> --repo greydragon888/real-router --body-file <file>`; выведи URL.
 3. Черновика нет — напиши его по `/bugfix` Фаза 7 п. 1 и опубликуй; текст — в отчёт.
 4. Задач в ветке несколько — по черновику на задачу.
