@@ -125,7 +125,17 @@ OPTIONAL_PEERS=(
 # tree (local tarballs + the optional `ink` peer) passes both with v12 defaults
 # and with this flag; npm silently ignores unknown flags, so on an older bundled
 # npm (< 11.16) this degrades to a no-op rather than failing. See #1596 item 6.
-(cd "$PROJECT_DIR" && npm install --install-strategy=hoisted --strict-allow-scripts=true "${INSTALL_ARGS[@]}" "${OPTIONAL_PEERS[@]}" 2>&1) | tail -3
+#
+# The output goes to a log. On a failure the script prints its `npm error`
+# lines: they name the package or version npm could not fetch, and the last
+# lines of the output do not.
+INSTALL_LOG="$TEMP_DIR/npm-install.log"
+if ! (cd "$PROJECT_DIR" && npm install --install-strategy=hoisted --strict-allow-scripts=true "${INSTALL_ARGS[@]}" "${OPTIONAL_PEERS[@]}") > "$INSTALL_LOG" 2>&1; then
+  echo "ERROR: npm install failed"
+  grep -E '^npm (error|ERR!)' "$INSTALL_LOG" || cat "$INSTALL_LOG"
+  exit 1
+fi
+tail -3 "$INSTALL_LOG"
 
 echo ""
 echo "=== Phase 3: Verify all exports resolve ==="

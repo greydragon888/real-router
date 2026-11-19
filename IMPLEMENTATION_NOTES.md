@@ -16083,3 +16083,11 @@ Four doors that take application code typed as returning `void` — a plugin's `
 - **The refusal names the position under the bare `[router]` prefix, where the decision named its door's.** `runChecks` serves every position in `POSITION`, and a raiser that several doors reach takes the bare prefix (#2487). The refusal leaves its door the way the check's own throw does — at `navigateToDefault:route`, for one, as a rejected promise and `[router] Unexpected navigation error`.
 - **The promise of a refused check is consumed without a report:** the refusal has already reported the call.
 - **A `then` the emitter cannot call is unsupported at the handler doors.** The emitter calls the `then` it read as `then.call(…)`, so a `then` carrying its own `call` property runs that instead, and one with a `null` prototype is logged as `then.call is not a function` — at `subscribeChanges` and `subscribeDiagnostic` as at `router.subscribe` and the plugin hooks. `consumeThenable` calls it through `Reflect.apply`. Only hostile code writes such a `then`, and the emitter lies outside these four doors, so the measure waits for the class's own delivery.
+
+## The smoke test prints what `npm install` could not fetch (2026-11-19)
+
+**Problem.** The smoke test piped `npm install` through `tail -3`. An E404 ends with npm's generic trailer and the path of its debug log, so on PR #2987 (run 44503039116) the job's log named neither the package nor the version. The same install of that branch's tarballs passed locally six minutes later, and a re-run of the job was green.
+
+**Solution.** The install's output goes to a log in the temp directory. When the install fails, the script prints the log's `npm error` lines, or the whole log when it has none, and exits 1. When it succeeds, the script prints the log's last three lines, as before.
+
+**Why.** The job restores no npm cache, so every dependency outside the tarballs comes from the registry. A 404 is then either a registry fault, which a re-run clears, or a manifest that names something unpublished, which it does not, and the name in npm's error lines is what tells the two apart.
