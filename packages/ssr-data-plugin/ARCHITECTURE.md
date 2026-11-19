@@ -263,7 +263,7 @@ unsubscribe() or router.dispose()
 
 All operations are synchronous and infallible. No try/catch needed (unlike `persistent-params-plugin` which calls `setRootPath` during teardown). The stale flag in the per-router `WeakMap` is **not** cleared on teardown — markStale entries are GC'd along with the router. A subsequent `usePlugin(ssrDataPluginFactory(...))` on the same router would inherit any pending flag (which is consistent with "the next refresh wins" semantics).
 
-**Error path.** If a claim collides or a loader factory fails, every claim acquired so far is released before the error propagates — see [Error-safe compilation](#error-safe-compilation). `tests/functional/data-loader.test.ts` checks the `"data"` claim on both paths: "should release claim when factory throws during compilation" and "releases 'data' namespace when 'ssrDataMode' is already claimed".
+**Error path.** If a claim collides or a loader factory fails, every claim acquired so far is released before the error propagates — see [Error-safe compilation](#error-safe-compilation). `tests/functional/data-loader.test.ts` checks both paths: "should release every claim when factory throws during compilation" re-claims all four namespaces, and "releases 'data' namespace when 'ssrDataMode' is already claimed" re-claims `"data"`, the one claim acquired before the collision.
 
 ## Validation
 

@@ -44,7 +44,7 @@
 | --- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Teardown releases `"data"` namespace claim                 | After `unsubscribe()`, the `"data"` namespace claim is released. Prevents stale data writes and frees the namespace for other plugins.                                                         |
 | 2   | Namespace re-claimable after teardown                      | After `unsubscribe()`, calling `claimContextNamespace("data")` succeeds. Verifies that `claim.release()` actually removes the claim from the router's claim registry.                          |
-| 3   | Factory compilation error releases claim                   | If a loader factory throws during compilation, the `"data"` namespace claim is released before the error propagates. Prevents permanently blocking the namespace.                               |
+| 3   | Factory compilation error releases every claim                   | If a loader factory throws during compilation, all four namespace claims are released before the error propagates. Prevents permanently blocking any of them.                               |
 | 4   | Teardown idempotency                                       | Double `unsubscribe()` does not throw. The second call is a no-op (core guards with `unsubscribed` flag).                                                                                      |
 
 ## Isolation
@@ -148,5 +148,5 @@
 
 | File                                         | Invariants | Category                                                                            |
 | -------------------------------------------- | ---------- | ----------------------------------------------------------------------------------- |
-| `tests/functional/data-loader.test.ts`       | 3          | getDependency integration, no caching                                                                                     |
-| `tests/property/ssr-data.properties.ts`      | 59         | Validation, loader invocation, loader arguments, data retrieval, prototype safety, teardown, isolation, factory invocation, SSR mode (×4), `escapeForScript` (×8), `defer()` / `isDeferred` (×9), stale registry (×6), `getSsrDataMode` (×4), `invalidate` cloneRouter isolation (×1), `withTimeout` (×3), `validateLoaders` (×6), `formatSettleScript`/`getDeferBootstrapScript` (×5) |
+| `tests/functional/data-loader.test.ts`       | 3          | getDependency integration, no caching, factory compilation error (Teardown Inv 3) |
+| `tests/property/ssr-data.properties.ts`      | 60         | Validation, loader invocation, loader arguments, data retrieval, prototype safety, teardown (+ Inv 3 PBT), isolation, factory invocation, SSR mode (×4), `escapeForScript` (×8), `defer()` / `isDeferred` (×9), stale registry (×6), `getSsrDataMode` (×4), `invalidate` cloneRouter isolation (×1), `withTimeout` (×3), `validateLoaders` (×6), `formatSettleScript`/`getDeferBootstrapScript` (×5) |

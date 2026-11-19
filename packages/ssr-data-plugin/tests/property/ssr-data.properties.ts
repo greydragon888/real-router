@@ -221,6 +221,59 @@ describe("teardown: unsubscribe completes without error", () => {
 });
 
 // =============================================================================
+// Teardown Inv 3 — Factory compilation error releases every claim
+// =============================================================================
+//
+// The functional suite covers this with one hand-crafted Error; PBT
+// generalises across throw shapes. Property: for ANY throw inside the loader
+// factory, `usePlugin()` rethrows the thrown value AND all four namespaces are
+// re-claimable after.
+
+describe("teardown: factory throw releases every claim (Inv 3)", () => {
+  const arbThrowValue = fc.oneof(
+    fc.string({ minLength: 1, maxLength: 32 }).map((m) => new Error(m)),
+    fc.string({ minLength: 1, maxLength: 32 }).map((m) => new TypeError(m)),
+    fc.string({ minLength: 1, maxLength: 32 }),
+  );
+
+  test.prop([arbThrowValue], { numRuns: NUM_RUNS.standard })(
+    "factory that throws → usePlugin rethrows it + every namespace re-claimable",
+    (thrown) => {
+      const router = createRouter(ROUTES, { defaultRoute: "home" });
+      const factory = ssrDataPluginFactory({
+        home: () => {
+          // Plain strings are valid JS throws, and the factory's try/catch is
+          // shape-blind, so the property covers them too.
+          // eslint-disable-next-line @typescript-eslint/only-throw-error
+          throw thrown;
+        },
+      });
+      let caught: unknown;
+
+      try {
+        router.usePlugin(factory);
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBe(thrown);
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("data"),
+      ).not.toThrow();
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("ssrDataMode"),
+      ).not.toThrow();
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("ssrDataDeferred"),
+      ).not.toThrow();
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("ssrDataDeferredKeys"),
+      ).not.toThrow();
+    },
+  );
+});
+
+// =============================================================================
 // Prototype safety: inherited properties ignored
 // =============================================================================
 

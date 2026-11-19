@@ -181,7 +181,7 @@ Outside `hydrateRouter`, every `start()` that commits calls the route's loader a
 - `"ssrDataDeferred"` — record of deferred promises from `defer()`
 - `"ssrDataDeferredKeys"` — declared deferred-key list (SSR-serializable)
 
-All four are claimed during `usePlugin()` and released in lock-step on teardown. A claim collision releases the claims acquired before it (`tests/functional/data-loader.test.ts` "releases 'data' namespace when 'ssrDataMode' is already claimed"); a factory compilation error releases all four, and the test there checks `"data"` ("should release claim when factory throws during compilation"). In SSR, `router.dispose()` triggers teardown automatically.
+All four are claimed during `usePlugin()` and released in lock-step on teardown. A claim collision releases the claims acquired before it (`tests/functional/data-loader.test.ts` "releases 'data' namespace when 'ssrDataMode' is already claimed"); a factory compilation error releases all four ("should release every claim when factory throws during compilation"). In SSR, `router.dispose()` triggers teardown automatically.
 
 ### `defer({ critical, deferred })` — formal critical/deferred split (#610)
 

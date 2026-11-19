@@ -38,7 +38,7 @@
 | --- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 11  | Teardown releases `"rsc"` namespace claim | After `unsubscribe()`, the `"rsc"` namespace claim is released. Prevents stale writes and frees the namespace for other plugins.                            |
 | 12  | Namespace re-claimable after teardown    | After `unsubscribe()`, calling `claimContextNamespace("rsc")` succeeds. Verifies that `claim.release()` actually removes the claim from the registry.        |
-| 13  | Factory compilation error releases claim | If a loader factory throws during compilation, the `"rsc"` namespace claim is released before the error propagates. Prevents permanently blocking the namespace. |
+| 13  | Factory compilation error releases every claim | If a loader factory throws during compilation, the `"rsc"` and `"ssrRscMode"` namespace claims are released before the error propagates. Prevents permanently blocking either namespace. |
 
 ## Composition
 

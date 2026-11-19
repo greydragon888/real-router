@@ -349,7 +349,7 @@ describe("@real-router/ssr-data-plugin", () => {
   });
 
   describe("Factory compilation errors", () => {
-    it("should release claim when factory throws during compilation", () => {
+    it("should release every claim when factory throws during compilation", () => {
       const factory = ssrDataPluginFactory({
         home: () => {
           throw new Error("factory crash");
@@ -360,6 +360,15 @@ describe("@real-router/ssr-data-plugin", () => {
 
       expect(() =>
         getPluginApi(router).claimContextNamespace("data"),
+      ).not.toThrow();
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("ssrDataMode"),
+      ).not.toThrow();
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("ssrDataDeferred"),
+      ).not.toThrow();
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("ssrDataDeferredKeys"),
       ).not.toThrow();
     });
 
@@ -374,7 +383,7 @@ describe("@real-router/ssr-data-plugin", () => {
       );
     });
 
-    it("should release claim when factory returns non-function", () => {
+    it("should release every claim when factory returns non-function", () => {
       const factory = ssrDataPluginFactory({
         home: (() => 42) as unknown as DataLoaderFactoryMap[string],
       });
@@ -383,6 +392,15 @@ describe("@real-router/ssr-data-plugin", () => {
 
       expect(() =>
         getPluginApi(router).claimContextNamespace("data"),
+      ).not.toThrow();
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("ssrDataMode"),
+      ).not.toThrow();
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("ssrDataDeferred"),
+      ).not.toThrow();
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("ssrDataDeferredKeys"),
       ).not.toThrow();
     });
   });
