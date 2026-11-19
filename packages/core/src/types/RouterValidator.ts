@@ -1,76 +1,22 @@
 /**
- * RouterValidator interface - defines all validation methods used by the router.
+ * RouterValidator — the three `state` diagnostics core reports through the
+ * validator slot. Every refusal and every other report is a check position or
+ * a diagnostic kind (#2388).
  *
- * This interface is implemented by the validation plugin and injected into RouterInternals.
- * When ctx.validator is null (default), validation is skipped.
- * When ctx.validator is set (by validation plugin), all methods are called.
+ * This interface is implemented by the validation plugin and injected into
+ * RouterInternals. When ctx.validator is null (default), nothing is reported.
  *
- * Parameters that carry a caller-supplied value use `unknown`, to avoid coupling
- * to internal type names. ⚠ That is not a blanket rule: where core already holds
- * the fact the analyser judges, the fact travels — a number, a name, a value —
- * rather than the container it was read from (#2382).
+ * Where core already holds the fact the analyser judges, the fact travels — a
+ * name, a key, a state — rather than the container it was read from (#2382).
  */
 
 import type { ParamsSearch, State, UrlChannels } from "./base";
 
 export interface RouterValidator {
   /**
-   * Route validation methods
-   */
-  routes: {
-    validateBuildPathArgs: (route: unknown, params: unknown) => void;
-    validateMatchPathArgs: (path: unknown) => void;
-    validateIsActiveRouteArgs: (
-      name: unknown,
-      params: unknown,
-      strict: unknown,
-      ignoreQP: unknown,
-    ) => void;
-    validateShouldUpdateNodeArgs: (name: unknown) => void;
-    validateStateBuilderArgs: (
-      name: unknown,
-      params: unknown,
-      caller: string,
-    ) => void;
-    validateRouteName: (name: unknown, caller: string) => void;
-  };
-
-  /**
-   * Navigation validation methods
-   */
-  navigation: {
-    /**
-     * The path bag's SHAPE, on the object the caller still owns (#2134).
-     *
-     * ⚑ Called BEFORE core copies the bag; `validateParams` is called after,
-     * on the copy. Why the halves take two different objects is stated once, on
-     * the implementations in `validation-plugin`'s `navigation.ts`.
-     */
-    validateParamsShape: (params: unknown, methodName: string) => void;
-    /**
-     * The QUERY channel's twin (#1972). Every door that takes both bags calls
-     * both; `both-channels-authority-1972` in the plugin classifies the door
-     * set against a snapshot of this surface, so a new one cannot ship
-     * UNCLASSIFIED. The table forces an answer; it does not check that the
-     * answer is right.
-     */
-    validateSearch: (search: unknown, methodName: string) => void;
-  };
-
-  /**
-   * State validation methods
+   * State diagnostics
    */
   state: {
-    validateMakeStateArgs: (
-      name: unknown,
-      params: unknown,
-      path: unknown,
-    ) => void;
-    validateAreStatesEqualArgs: (
-      s1: unknown,
-      s2: unknown,
-      ignoreQP: unknown,
-    ) => void;
     /**
      * The mode gate's opt-in diagnostic (#1575). Core DROPS a query key the
      * active `queryParamsMode` will not print — silently, by the same

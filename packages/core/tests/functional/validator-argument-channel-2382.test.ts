@@ -168,7 +168,9 @@ async function exerciseDoors(router: Router): Promise<void> {
   getLifecycleApi(router).addActivateGuard("shop", () => () => true);
 
   await router.start("/");
-  await router.navigate("shop.child");
+  // `tag` is a key the route declares nowhere, which is what reaches
+  // `reportUndeclaredParamKey`.
+  await router.navigate("shop.child", { tag: "x" });
   router.buildPath("shop.child");
   router.isActiveRoute("shop");
   router.canNavigateTo("home");
@@ -210,15 +212,9 @@ describe("the validator takes facts, not containers (#2382)", () => {
     // check or a diagnostic kind, and no authority judges THOSE for
     // reachability. The list is every member these doors still reach, and a
     // conversion takes its member's row with it.
-    const unexercised = [
-      "navigation.validateParamsShape",
-      "navigation.validateSearch",
-      "routes.validateBuildPathArgs",
-      "routes.validateIsActiveRouteArgs",
-      "routes.validateMatchPathArgs",
-      "routes.validateRouteName",
-      "routes.validateStateBuilderArgs",
-    ].filter((method) => !methods.has(method));
+    const unexercised = ["state.reportUndeclaredParamKey"].filter(
+      (method) => !methods.has(method),
+    );
 
     expect(unexercised).toStrictEqual([]);
   });

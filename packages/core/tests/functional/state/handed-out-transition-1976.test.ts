@@ -47,15 +47,17 @@ const DOORS = [
  * `pending-target-authority`'s subject, and covering them here would duplicate
  * that matrix rather than extend this one.
  *
- * `"navigateToState:entry"` is a check position: its entry is the argument list
- * core passes IN to a check, and a check hands nothing back. It keeps its
- * quotes because both scans read a key as it is written.
+ * `"navigateToState:entry"` and `"areStatesEqual:entry"` are check positions:
+ * an entry is the argument list core passes IN to a check, and a check hands
+ * nothing back. They keep their quotes because both scans read a key as it is
+ * written.
  */
 const NOT_DOORS = new Set([
   "route",
   "previousRoute",
   "nextRoute",
   '"navigateToState:entry"',
+  '"areStatesEqual:entry"',
 ]);
 
 /**
@@ -513,6 +515,7 @@ describe("every door hands back a State carrying transition (#1976)", () => {
       previousRoute: ["SubscribeState"],
       nextRoute: ["LeaveState"],
       '"navigateToState:entry"': ["CheckPositionMap"],
+      '"areStatesEqual:entry"': ["CheckPositionMap"],
     });
   });
 

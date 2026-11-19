@@ -532,15 +532,16 @@ Plugins publish per-route data via `claimContextNamespace()` on `PluginApi`. Eac
 | ssr-data-plugin          | `data` + `ssrDataMode` + `ssrDataDeferred` + `ssrDataDeferredKeys` | per-route loader result, SSR mode, `defer()` promises and their keys (via `createSsrLoaderPlugin`) |
 | rsc-server-plugin        | `rsc` + `ssrRscMode` + `rscAction` | per-route ReactNode and SSR mode (via `createSsrLoaderPlugin`) + server-action results |
 
-### Validator Slot
+### Validation Channels
 
-`@real-router/validation-plugin` uses a unique extension mechanism — not interceptors, not event listeners, but a **nullable validator slot** in `RouterInternals`:
+`@real-router/validation-plugin` refuses through **checks** and reports through **diagnostic kinds**. Core asks at a named position and raises a named kind; the plugin registers with `PluginApi.addCheck` and `PluginApi.subscribeDiagnostic`, and removes its registrations on teardown:
 
 ```typescript
-ctx.validator?.routes.validateBuildPathArgs(route); // no-op when null
+runChecks(ctx.checks, POSITION["buildPath:entry"], route, params, search); // core
+api.addCheck("buildPath:entry", (route, params, search) => { … }); // the plugin
 ```
 
-The slot is typed as `RouterValidator | null`. The plugin sets it on registration, clears it on teardown. All core call sites use optional chaining — zero overhead when absent.
+A position with no check registered calls nothing. `CheckPositionMap` and `DiagnosticEventMap` in `packages/core/src/types/api.ts` declare what each position and kind receives. The `RouterValidator | null` slot in `RouterInternals` carries the three `state` reports the route resolver asks.
 
 ## Invariants
 

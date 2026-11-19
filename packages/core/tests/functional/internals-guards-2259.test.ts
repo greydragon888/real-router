@@ -4,8 +4,6 @@ import { createRouter, errorCodes, events } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 import { getInternals } from "@real-router/core/validation";
 
-import { installSpyValidator } from "../helpers/spyValidator";
-
 import type { Router } from "@real-router/core/types";
 
 /**
@@ -95,6 +93,19 @@ describe("the internals adapters run the guards (#2259)", () => {
         ),
       ).toThrow(TypeError);
     });
+
+    it("navigateToState refuses a disposed router before touching the state", () => {
+      const ctx = getInternals(router);
+      const state = ctx.makeState("u", { id: "7" }, {}, "/u/7");
+
+      router.dispose();
+
+      // ⚠ THROWS rather than rejecting: the guard stands above the promise, so
+      // this door's disposed failure has a different shape from its others.
+      expect(() => ctx.navigateToState(state)).toThrow(
+        expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }),
+      );
+    });
   });
 
   describe("on the check channel, through the internal door (#2388)", () => {
@@ -127,56 +138,34 @@ describe("the internals adapters run the guards (#2259)", () => {
         [state, undefined],
       ]);
     });
-  });
 
-  describe("validator-gated, through the internal door", () => {
-    it("matchPath consults the validator", () => {
-      const validator = installSpyValidator(router);
+    it("matchPath asks its entry position", () => {
+      const seen: unknown[][] = [];
       const ctx = getInternals(router);
+
+      getPluginApi(router).addCheck("matchPath:entry", (...args) => {
+        seen.push(args);
+      });
 
       ctx.matchPath("/p", ctx.getOptions());
 
-      expect(validator.routes.validateMatchPathArgs).toHaveBeenCalledWith("/p");
+      expect(seen).toStrictEqual([["/p"]]);
     });
 
-    it("navigateToState refuses a disposed router before touching the state", () => {
-      // ⚠ Its own cell, because the validator cells below install a spy and
-      // never dispose — `throwIfDisposed` survived mutation until this existed.
-      const ctx = getInternals(router);
-      const state = ctx.makeState("u", { id: "7" }, {}, "/u/7");
-
-      router.dispose();
-
-      // ⚠ THROWS rather than rejecting: the guard stands above the promise, so
-      // this door's disposed failure has a different shape from its others.
-      expect(() => ctx.navigateToState(state)).toThrow(
-        expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }),
-      );
-    });
-
-    it("makeState consults the validator on the bag core adopted, not the caller's", () => {
-      const validator = installSpyValidator(router);
+    it("makeState asks `makeState:state` with the bag core adopted, not the caller's", () => {
+      const seen: unknown[][] = [];
       const caller = { id: "7" };
+
+      getPluginApi(router).addCheck("makeState:state", (...args) => {
+        seen.push(args);
+      });
 
       getInternals(router).makeState("u", caller, {}, "/u/7");
 
-      const seen = (
-        validator.state.validateMakeStateArgs as unknown as {
-          mock: { calls: unknown[][] };
-        }
-      ).mock.calls[0]?.[1];
-
       // ⚑ ONE read of the caller's bag, and the judged value is the shipped one
-      // (#2134) — so what the validator saw is core's copy, never the original.
-      expect(seen).toStrictEqual({ id: "7" });
-      expect(seen).not.toBe(caller);
-
-      // ⚠ The CALLER string too. Emptying it survived mutation: the validator
-      // uses it to name the door in its message, and nothing asserted it.
-      expect(validator.navigation.validateSearch).toHaveBeenCalledWith(
-        {},
-        "makeState",
-      );
+      // (#2134) — so what the check saw is core's copy, never the original.
+      expect(seen).toStrictEqual([["u", { id: "7" }, {}, "/u/7"]]);
+      expect(seen[0]?.[1]).not.toBe(caller);
     });
   });
 });

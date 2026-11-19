@@ -116,10 +116,10 @@ describe("the check channel (#2388)", () => {
 
     expect(() =>
       // @ts-expect-error -- the refusal exists for the JS caller the type stops
-      getPluginApi(router).addCheck("buildPath:entry", () => undefined),
+      getPluginApi(router).addCheck("getState:entry", () => undefined),
     ).toThrow(
       new TypeError(
-        '[router.addCheck] Invalid position: "buildPath:entry". Must be one of: buildPath:params, buildPathResolved:params, canNavigateTo:entry, canNavigateTo:params, navigate:entry, navigate:params, addRoute:batch, replaceRoutes:batch, removeRoute:entry, updateRoute:entry, hasRoute:entry, getRoute:entry, forwardState:entry, buildNavigationState:state, addActivateGuard:entry, addDeactivateGuard:entry, removeActivateGuard:entry, removeDeactivateGuard:entry, getDependency:entry, getDependency:value, setDependency:entry, setDependency:count, setDependencies:entry, setDependencies:count, removeDependency:entry, hasDependency:entry, cloneRouter:entry, usePlugin:count, usePlugin:entry, usePlugin:plugin, canActivate:count, canDeactivate:count, navigateToState:entry, setRootPath:entry, navigateToDefault:entry, navigateToDefault:route, start:entry',
+        '[router.addCheck] Invalid position: "getState:entry". Must be one of: buildPath:params, buildPathResolved:params, canNavigateTo:entry, canNavigateTo:params, navigate:entry, navigate:params, addRoute:batch, replaceRoutes:batch, removeRoute:entry, updateRoute:entry, hasRoute:entry, getRoute:entry, forwardState:entry, buildNavigationState:state, addActivateGuard:entry, addDeactivateGuard:entry, removeActivateGuard:entry, removeDeactivateGuard:entry, getDependency:entry, getDependency:value, setDependency:entry, setDependency:count, setDependencies:entry, setDependencies:count, removeDependency:entry, hasDependency:entry, cloneRouter:entry, usePlugin:count, usePlugin:entry, usePlugin:plugin, canActivate:count, canDeactivate:count, navigateToState:entry, setRootPath:entry, navigateToDefault:entry, navigateToDefault:route, start:entry, buildPath:entry, buildPathResolved:entry, isActiveRoute:entry, areStatesEqual:entry, shouldUpdateNode:entry, matchPath:entry, matchPath:decoded, makeState:state, navigate:state',
       ),
     );
   });
@@ -140,7 +140,7 @@ describe("the check channel (#2388)", () => {
       getPluginApi(router).addCheck(hostile, () => undefined),
     ).toThrow(
       new TypeError(
-        "[router.addCheck] Invalid position: object. Must be one of: buildPath:params, buildPathResolved:params, canNavigateTo:entry, canNavigateTo:params, navigate:entry, navigate:params, addRoute:batch, replaceRoutes:batch, removeRoute:entry, updateRoute:entry, hasRoute:entry, getRoute:entry, forwardState:entry, buildNavigationState:state, addActivateGuard:entry, addDeactivateGuard:entry, removeActivateGuard:entry, removeDeactivateGuard:entry, getDependency:entry, getDependency:value, setDependency:entry, setDependency:count, setDependencies:entry, setDependencies:count, removeDependency:entry, hasDependency:entry, cloneRouter:entry, usePlugin:count, usePlugin:entry, usePlugin:plugin, canActivate:count, canDeactivate:count, navigateToState:entry, setRootPath:entry, navigateToDefault:entry, navigateToDefault:route, start:entry",
+        "[router.addCheck] Invalid position: object. Must be one of: buildPath:params, buildPathResolved:params, canNavigateTo:entry, canNavigateTo:params, navigate:entry, navigate:params, addRoute:batch, replaceRoutes:batch, removeRoute:entry, updateRoute:entry, hasRoute:entry, getRoute:entry, forwardState:entry, buildNavigationState:state, addActivateGuard:entry, addDeactivateGuard:entry, removeActivateGuard:entry, removeDeactivateGuard:entry, getDependency:entry, getDependency:value, setDependency:entry, setDependency:count, setDependencies:entry, setDependencies:count, removeDependency:entry, hasDependency:entry, cloneRouter:entry, usePlugin:count, usePlugin:entry, usePlugin:plugin, canActivate:count, canDeactivate:count, navigateToState:entry, setRootPath:entry, navigateToDefault:entry, navigateToDefault:route, start:entry, buildPath:entry, buildPathResolved:entry, isActiveRoute:entry, areStatesEqual:entry, shouldUpdateNode:entry, matchPath:entry, matchPath:decoded, makeState:state, navigate:state",
       ),
     );
   });

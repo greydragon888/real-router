@@ -3,7 +3,6 @@ import { describe, beforeEach, afterEach, it, expect } from "vitest";
 import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../helpers";
-import { installSpyValidator } from "../../helpers/spyValidator";
 
 import type { Params, Route, Router, State } from "@real-router/core";
 import type { RoutesApi } from "@real-router/core/api";
@@ -1129,11 +1128,11 @@ describe("core/routes/routePath/matchPath", () => {
     });
   });
 
-  describe("a decoder's output is validated as user input (#1582)", () => {
-    // Core's half of the contract: does it consult the validator, with the right
-    // bag and the right caller label, under the right condition? Whether the bag
-    // is acceptable is the plugin's half, pinned in its own suite.
-    it("hands the DECODER's bag to the validator, labelled matchPath", () => {
+  describe("a decoder's output is judged as user input (#1582)", () => {
+    // Core's half of the contract: does it ask the check position, with the
+    // right bag, under the right condition? Whether the bag is acceptable is
+    // the plugin's half, pinned in its own suite.
+    it("hands the DECODER's bag to `matchPath:decoded`", () => {
       routesApi.add({
         name: "dec",
         path: "/dec/:id",
@@ -1143,30 +1142,48 @@ describe("core/routes/routePath/matchPath", () => {
         }),
       });
 
-      const validator = installSpyValidator(router);
+      const seen: unknown[][] = [];
+
+      getPluginApi(router).addCheck("matchPath:decoded", (...args) => {
+        seen.push(args);
+      });
 
       getPluginApi(router).matchPath("/dec/7");
 
-      expect(validator.routes.validateStateBuilderArgs).toHaveBeenCalledWith(
-        "dec",
-        // The decoder's output, not the matcher's — the matcher never produced
-        // `injected`.
-        { id: "7", injected: "yes" },
-        "matchPath",
-      );
+      // The decoder's output, not the matcher's — the matcher never produced
+      // `injected`.
+      expect(seen).toStrictEqual([["dec", { id: "7", injected: "yes" }]]);
     });
 
-    it("does not consult it for a route with no decoder", () => {
-      routesApi.add({ name: "plain", path: "/plain/:id" });
+    it("asks nothing about a route with no decoder, or about the forward core resolves", () => {
+      routesApi.add([
+        { name: "plain", path: "/plain/:id" },
+        { name: "fwd", path: "/fwd/:id", forwardTo: "plain" },
+      ]);
 
-      const validator = installSpyValidator(router);
+      const api = getPluginApi(router);
+      const seen: string[] = [];
 
-      getPluginApi(router).matchPath("/plain/7");
+      api.addCheck("matchPath:decoded", () => {
+        seen.push("matchPath:decoded");
+      });
+      api.addCheck("forwardState:entry", () => {
+        seen.push("forwardState:entry");
+      });
 
-      // The matcher's own output is router-produced and plain by construction.
-      // Validating it would be the internal-intermediate check the pipeline
-      // migration was right to drop.
-      expect(validator.routes.validateStateBuilderArgs).not.toHaveBeenCalled();
+      expect(api.matchPath("/plain/7")?.name).toBe("plain");
+      expect(api.matchPath("/fwd/7")?.name).toBe("plain");
+
+      // The matcher's own output, and the forward core resolves through its
+      // internal seam, are router-produced and plain by construction. Judging
+      // them would be the internal-intermediate check the pipeline migration
+      // was right to drop.
+      expect(seen).toStrictEqual([]);
+
+      // CONTROL — the `forwardState:entry` check is live: the facade asks it.
+      api.forwardState("fwd", { id: "7" });
+
+      expect(seen).toStrictEqual(["forwardState:entry"]);
     });
   });
 });

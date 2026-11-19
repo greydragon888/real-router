@@ -87,14 +87,9 @@ export function wireNamespaces<Dependencies extends DefaultDependencies>(
   // member reads through `ns.*` at CALL time, so no wiring order is baked in.
   const port = createRouteResolver(ns);
 
-  // Read by Routes. Internals are registered before wiring (#1331), so this
-  // never throws; returns null until validation-plugin installs the validator.
-  const getValidator = (): RouterValidator | null =>
-    getInternals(ns.router).validator;
-
   wireLimits(ns);
   wireRouteLifecycle(ns, compileFactory);
-  wireRoutes(ns, port, getValidator, getDependency);
+  wireRoutes(ns, port, getDependency);
   wirePlugins(ns, compileFactory);
   wireNavigation(ns, port, getDependency);
   wireRouterLifecycle(ns);
@@ -146,12 +141,13 @@ function wireRouteLifecycle<Dependencies extends DefaultDependencies>(
 function wireRoutes<Dependencies extends DefaultDependencies>(
   ns: NamespaceBag<Dependencies>,
   port: RouteResolver,
-  getValidator: () => RouterValidator | null,
   getDependency: GetDependency<Dependencies>,
 ): void {
   const deps: RoutesDependencies<Dependencies> = {
     logger: getInternals(ns.router).logger,
-    getValidator,
+    runChecks: (position, ...args) => {
+      runChecks(getInternals(ns.router).checks, position, ...args);
+    },
     port,
     addActivateGuard: (name, handler, precompiledFn) => {
       ns.routeLifecycle.addCanActivate(name, handler, true, precompiledFn);
@@ -339,12 +335,11 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     getMetaForState: (name) => ns.routes.getMetaForState(name),
     getState: () => ns.state.get(),
     buildNavigateState: (routeName, routeParams, routeSearch) => {
-      const ctx = getInternals(ns.router);
-
-      ctx.validator?.routes.validateStateBuilderArgs(
+      runChecks(
+        getInternals(ns.router).checks,
+        POSITION["navigate:state"],
         routeName,
         routeParams,
-        "navigate",
       );
 
       // The pipeline (RFC nav-pipeline, milestone 1): `canonicalize` is the sole

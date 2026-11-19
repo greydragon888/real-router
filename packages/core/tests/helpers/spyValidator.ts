@@ -10,23 +10,24 @@ import type { Router } from "@real-router/core/types";
  * A `RouterValidator` whose every namespace method is a `vi.fn()` spy.
  *
  * Core normally runs with `ctx.validator === null` (validation is opt-in via
- * `@real-router/validation-plugin`, a separate package). That makes every
- * `ctx.validator?.ns.method(arg, "caller")` call-site short-circuit to
- * `undefined` in the core suite — line coverage stays at 100 % while the
- * mutation tester reports the `"caller"` strings and the surrounding decision
- * logic (isOverwrite / option-guards) as survived/uncovered.
+ * `@real-router/validation-plugin`, a separate package). The route resolver
+ * asks the three `state` reports through that slot
+ * (`ctx.validator?.state.report…`), so in the core suite those calls
+ * short-circuit to `undefined` and the port's getters answer `undefined`.
  *
  * Installing this spy validator exercises those branches WITHOUT depending on
  * the validation-plugin package (which would create a dependency cycle:
  * validation-plugin already depends on core). It tests the **call-site
- * contract** — "does core invoke the right validator method, with the right
- * caller string, under the right condition?" — which is core's responsibility,
- * distinct from the plugin's own job of validating inputs correctly.
+ * contract** — "does core ask the right report, with the right arguments,
+ * under the right condition?" — which is core's responsibility, distinct from
+ * the plugin's own job of judging inputs correctly. A door that refuses and
+ * reports through check positions and diagnostic kinds (#2388) records no
+ * consultation on it at all.
  *
- * Lazily materialised via nested Proxies so the helper never has to enumerate
- * the ~50 methods of `RouterValidator` (which would rot as the interface grows).
- * Each accessed method returns a STABLE `vi.fn()` (cached per name), so
- * `expect(v.routes.validateBuildPathArgs).toHaveBeenCalledWith(...)` works.
+ * Lazily materialised via nested Proxies so the helper never enumerates the
+ * methods of `RouterValidator`. Each accessed method returns a STABLE `vi.fn()`
+ * (cached per name), so
+ * `expect(v.state.reportDroppedQueryKey).toHaveBeenCalledWith(...)` works.
  */
 /**
  * The spies each validator materialised, by namespace — the side channel

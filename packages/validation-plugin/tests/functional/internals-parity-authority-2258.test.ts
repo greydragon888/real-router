@@ -30,8 +30,8 @@ import type { Route, Router } from "@real-router/core";
  * filing the row as harmless.
  *
  * ⚠ **Both arms, because the gap WIDENS with the plugin.** Most facade guards are
- * `ctx.validator?.…`, so a single-arm run finds less than half of what a plugin
- * user meets.
+ * checks at named positions, which `@real-router/validation-plugin` registers,
+ * so a single-arm run finds less than half of what a plugin user meets.
  *
  * ⚠ **The input is derived no further than this.** Finding the pair is mechanical;
  * finding the value that separates it is not, so the vectors below are declared —

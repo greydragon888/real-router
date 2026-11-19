@@ -20,13 +20,15 @@ import type { DependenciesApi } from "@real-router/core/api";
 /**
  * Validator CALL-SITE contract tests.
  *
- * Core runs with `ctx.validator === null` by default, so every
- * `ctx.validator?.ns.method(arg, "caller")` short-circuits and the mutation
- * tester reports the `"caller"` strings + the surrounding decision logic as
- * survived. These tests install a spy validator (see helpers/spyValidator) and
- * assert that core calls the RIGHT validator method, with the RIGHT caller
- * string, under the RIGHT condition — core's responsibility, distinct from the
- * validation-plugin's own job of validating inputs (tested in that package).
+ * Every door below refuses through check positions (#2388), and on the inputs
+ * below none consults a spy validator installed on the router (see
+ * helpers/spyValidator); `consultationsOn` reads what it recorded.
+ * `buildNavigationState` raises the route resolver's `state` reports through
+ * the slot — for a key its route does not declare, and for a state it builds
+ * on a route with a codec; the `OWNER` table of
+ * `validator-boundary-authority-2322` names the plugin suite that owns each.
+ * Judging the inputs is the validation-plugin's own job, tested in that
+ * package.
  *
  * NOTE: not run under Stryker via property/stress files — Stryker only includes
  * `*.test.ts` (vitest.stryker.config.mts), hence these live here.
@@ -98,8 +100,7 @@ describe("core/validator call-site contract", () => {
   });
 
   // ===========================================================================
-  // getPluginApi  (kills "buildState"/"forwardState"/"buildNavigationState"
-  // caller strings)
+  // getPluginApi
   // ===========================================================================
   describe("getPluginApi", () => {
     let plugin: ReturnType<typeof getPluginApi>;
@@ -108,8 +109,8 @@ describe("core/validator call-site contract", () => {
       plugin = getPluginApi(router);
     });
 
-    it("the two state builders consult the validator for NOTHING (#2388)", () => {
-      // Both doors' consultations are checks now, and each check keeps its own
+    it("the two state builders consult the validator for nothing on these inputs (#2388)", () => {
+      // Both doors' refusals are checks now, and each check keeps its own
       // door's ORDER — the two consult the same pair in opposite sequences.
       vi.clearAllMocks();
 
@@ -134,8 +135,7 @@ describe("core/validator call-site contract", () => {
   });
 
   // ===========================================================================
-  // getRoutesApi  (kills "addRoute"/"removeRoute"/"updateRoute"/"hasRoute"/
-  // "getRoute"/"replaceRoutes" caller strings + the parentName guard)
+  // getRoutesApi
   // ===========================================================================
   describe("getRoutesApi", () => {
     let routes: ReturnType<typeof getRoutesApi>;

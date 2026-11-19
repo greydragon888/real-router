@@ -344,9 +344,10 @@ ledger rather than closed. Where a door is reached internally, the adapter is
 not a boundary.
 
 ⚠ **A "deliberately unguarded tier" is refused on evidence, not taste.** Most
-facade guards are `ctx.validator?.…`, so the gap WIDENS when an application
-installs `@real-router/validation-plugin` — a tier whose contract changes with a
-plugin is not a contract.
+facade guards are checks at named positions, which
+`@real-router/validation-plugin` registers, so the gap WIDENS when an
+application installs it — a tier whose contract changes with a plugin is not a
+contract.
 
 ⚑ **Three outcomes, and only the first is a defect.** A door may BYPASS (the
 guarded side refuses, the internal side accepts), be a PLAIN ALIAS (`X: ctx.X`,
@@ -615,9 +616,9 @@ bind in the constructor if it touches private fields.
 method on the returned object → reach internals via `getInternals(router)`.
 
 **Adding validation** never adds a member to `RouterValidator` or a call to one,
-wherever in core it goes: the calls core still makes are #2388's to convert, and
-that issue removes the interface. A refusal goes on the check channel and a
-report on the diagnostic channel; a consultation that does both is split
+wherever in core it goes: the interface carries the three `state` reports the
+route resolver asks, and #2388 owns them. A refusal goes on the check channel
+and a report on the diagnostic channel; a consultation that does both is split
 between them. Whether a refusal belongs to core rather than to the plugin is
 decided under _Who refuses — core or the analyser_ above.
 
@@ -661,7 +662,8 @@ Neither authority asks which calls REACH a site;
 
 Validation changes go in `@real-router/validation-plugin`'s
 `src/validators/<namespace>.ts`; logic changes in the namespace method or the
-`api/` function. `Router.ts` only CALLS validators — it never implements one.
+`api/` function. `Router.ts` only ASKS — `runChecks` at a position,
+`emitDiagnostic` for a kind — and implements no check.
 
 ### Type Locations
 

@@ -529,6 +529,8 @@ export const DIAGNOSTIC = {
   GUARD_NON_BOOLEAN: "GUARD_NON_BOOLEAN",
   LISTENER_COUNT: "LISTENER_COUNT",
   NAVIGATE_TO_DEFAULT: "NAVIGATE_TO_DEFAULT",
+  BUILD_PATH: "BUILD_PATH",
+  IS_ACTIVE_ROUTE: "IS_ACTIVE_ROUTE",
 } as const satisfies {
   [K in keyof DiagnosticEventMap]: DiagnosticEventMap[K] extends readonly [
     unknown?,
@@ -588,6 +590,15 @@ export const POSITION = {
   "navigateToDefault:entry": "navigateToDefault:entry",
   "navigateToDefault:route": "navigateToDefault:route",
   "start:entry": "start:entry",
+  "buildPath:entry": "buildPath:entry",
+  "buildPathResolved:entry": "buildPathResolved:entry",
+  "isActiveRoute:entry": "isActiveRoute:entry",
+  "areStatesEqual:entry": "areStatesEqual:entry",
+  "shouldUpdateNode:entry": "shouldUpdateNode:entry",
+  "matchPath:entry": "matchPath:entry",
+  "matchPath:decoded": "matchPath:decoded",
+  "makeState:state": "makeState:state",
+  "navigate:state": "navigate:state",
 } as const satisfies { [K in keyof CheckPositionMap]: K };
 
 /** Several doors reach `runChecks`, so its refusal names no door (#2487). */

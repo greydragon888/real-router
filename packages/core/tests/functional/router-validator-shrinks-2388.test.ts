@@ -19,18 +19,6 @@ import { describe, expect, it } from "vitest";
  * literal, a member without a name.
  */
 const MEMBERS = [
-  "routes.validateBuildPathArgs",
-  "routes.validateMatchPathArgs",
-  "routes.validateIsActiveRouteArgs",
-  "routes.validateShouldUpdateNodeArgs",
-  "routes.validateStateBuilderArgs",
-  "routes.validateRouteName",
-
-  "navigation.validateParamsShape",
-  "navigation.validateSearch",
-
-  "state.validateMakeStateArgs",
-  "state.validateAreStatesEqualArgs",
   "state.reportDroppedQueryKey",
   "state.reportUndeclaredParamKey",
   "state.reportCodecRoundTrip",

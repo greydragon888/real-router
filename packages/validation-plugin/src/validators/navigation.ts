@@ -133,9 +133,10 @@ function assertValidParamValues(
  *
  * ⚠ **Reads no value, and that is a contract rather than an optimisation.**
  * Every read of a caller-owned bag is a call into application code. This half
- * runs before core has read anything, so it must not run the application's
- * getters — `validateNavigateParams` walks the values afterwards, on core's own
- * copy, where a read is a read of data.
+ * runs before core reads the bag wherever a door asks its entry checks first —
+ * `buildPathResolved` takes its copy before them — so it must not run the
+ * application's getters: `validateNavigateParams` walks the values afterwards,
+ * on core's own copy, where a read is a read of data.
  */
 export function validateNavigateParamsShape(
   params: unknown,
@@ -175,11 +176,12 @@ export function validateNavigateParamsShape(
  * therefore admitted on the same value the URL prints.
  *
  * ⚠ **No shape branch here, and its absence is load bearing rather than an
- * omission.** Every caller passes `undefined` or core's own copy of the bag,
- * so a `typeof` guard would be an unreachable arm — the shape half runs one
- * call earlier, on the object that can still be the wrong shape. `isParams`
- * below still re-applies the shape rules to the copy, so a caller that
- * bypassed the pair is refused rather than admitted.
+ * omission.** Every caller passes `undefined` or what `adoptChannel` returned —
+ * a copy of a plain bag, the caller's own object for any other shape — so a
+ * `typeof` guard would be an unreachable arm — the shape half runs one call
+ * earlier, on the object that can still be the wrong shape. `isParams` below
+ * still re-applies the shape rules to that object, so a caller that bypassed
+ * the pair is refused rather than admitted.
  */
 export function validateNavigateParams(
   params: unknown,
