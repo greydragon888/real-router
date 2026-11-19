@@ -524,7 +524,7 @@ describe("Logger", () => {
       // An async callback (`(...) => Promise<void>` is assignable to the void-typed
       // LogCallback) returns a Promise; before the fix its rejection was discarded
       // and surfaced as a Node `unhandledRejection` — process-fatal under
-      // `--unhandled-rejections=strict` (Node 22+ default). It must be isolated
+      // the default `--unhandled-rejections=throw`. It must be isolated
       // into console.error like core's subscribe (#944 → #1161).
       const leaked: unknown[] = [];
       const onUnhandled = (reason: unknown): void => {

@@ -334,7 +334,7 @@ describe("core/observable", () => {
       // core: the subscribe wrapper attaches a `.catch` that routes the
       // rejection to the same `onListenerError` sink as a synchronous throw
       // (#944). It must NOT leak as a process-level `unhandledRejection` (fatal
-      // under `--unhandled-rejections=strict`, the Node 22+ default). Asserted
+      // under the default `--unhandled-rejections=throw`). Asserted
       // via the repo's captureUnhandledRejections helper. Symmetric with
       // subscribeLeave, which isolates rejections via `Promise.allSettled`.
       it("should isolate an async listener's rejection instead of leaking it (#944)", async () => {

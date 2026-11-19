@@ -253,7 +253,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
       // async hook or any-cast misuse). The sync `catch` below cannot see its
       // rejection, so route it to the same `#onListenerError` sink — otherwise
       // it escapes as a Node `unhandledRejection` (fatal under
-      // `--unhandled-rejections=strict`, the Node 22+ default). Centralised here
+      // the default `--unhandled-rejections=throw`). Centralised here
       // so every listener kind (plugin hooks, `subscribe`, …) is isolated
       // symmetrically (#1412; `subscribe`'s per-site #944 wrapper folds in).
       //

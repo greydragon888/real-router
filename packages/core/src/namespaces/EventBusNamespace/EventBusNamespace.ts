@@ -847,7 +847,7 @@ export class EventBusNamespace {
     // still returns a rejecting Promise at runtime, so return it to the emitter,
     // whose central isolation routes the rejection to the same `onListenerError`
     // sink a sync throw flows through — instead of leaking an `unhandledRejection`
-    // (fatal under `--unhandled-rejections=strict`, the Node 22+ default). This
+    // (fatal under the default `--unhandled-rejections=throw`). This
     // is #944, now folded into the emitter's central #1412 async isolation — the
     // former per-site `.catch` here is redundant (symmetric with `subscribeLeave`,
     // which isolates via `Promise.allSettled`).

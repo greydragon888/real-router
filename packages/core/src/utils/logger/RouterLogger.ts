@@ -374,7 +374,7 @@ export class RouterLogger {
       // An async callback (`(...) => Promise<void>` is assignable to the
       // void-typed LogCallback) returns a Promise whose rejection would otherwise
       // leak as a Node `unhandledRejection` — process-fatal under
-      // `--unhandled-rejections=strict` (Node 22+ default). Read the runtime
+      // the default `--unhandled-rejections=throw`. Read the runtime
       // return and isolate it like core's subscribe (#944): duck-check the
       // thenable + `.catch` into the same console.error sink a sync throw uses
       // (#1161).

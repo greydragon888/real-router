@@ -20,8 +20,8 @@ import type { Router } from "@real-router/core";
  * returning its promise: the abort lands while the pipeline is still
  * synchronous, so by the time `finishAsyncNavigation` is entered the signal is
  * dead and the pre-check fires. Measured — with the `catch` removed this exact
- * arc kills the process under `--unhandled-rejections=strict` (the Node 22+
- * default), which is why the assertion below is about the REJECTION EVENT and
+ * arc kills the process under the default `--unhandled-rejections=throw`,
+ * which is why the assertion below is about the REJECTION EVENT and
  * not about the navigation's outcome: that outcome is `TRANSITION_CANCELLED`
  * either way.
  */
