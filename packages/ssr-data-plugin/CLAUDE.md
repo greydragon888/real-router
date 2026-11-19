@@ -65,10 +65,11 @@ Intercepts only `start()`, not `navigate()`. Rationale:
 The plugin **does** register a single `subscribeLeave` listener, and it does two
 things on every navigation:
 
-1. **Publishes the SSR mode marker** for the destination route (#1915) — a
-   `Map.get`, a `claim.write`, and, for the function form, the resolver call.
-   Without it `getSsrDataMode` answered `"full"` for an `ssr: false` route after
-   any client navigation, which is the opposite of what the route declares.
+1. **Publishes the SSR mode marker** when the destination route has an entry
+   (#1915) — a `Map.get`, a `claim.write`, and, for the function form, the
+   resolver call. Without it `getSsrDataMode` would answer `"full"` for an
+   `ssr: false` route after any client navigation, which is the opposite of
+   what the route declares.
 2. **Re-runs the loader** for the `invalidate(router, "data")` revalidation
    channel (#605) — but only when the application has explicitly marked the
    namespace stale. That half stays a `WeakMap.get` + `Map.get` early-return

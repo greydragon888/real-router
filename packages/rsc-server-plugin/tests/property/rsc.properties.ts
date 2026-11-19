@@ -1039,17 +1039,18 @@ describe("getSsrRscMode: closed-set membership (Inv 28)", () => {
 // rscActionPluginFactory — runtime guard invariants (Inv 29-30)
 // =============================================================================
 //
-// §6.9-6.11: the per-start guard in `actionFactory.ts` rejects
-// Promise/thenable, array, and null. PBT generalises the existing
-// functional coverage:
+// §6.9-6.11: the per-start guard in `actionFactory.ts` rejects every
+// value except a non-null, non-array, non-thenable one whose `typeof` is
+// `"object"`. PBT generalises the existing functional coverage:
 //
 // - Inv 29: any plain object (typeof === "object", non-null, non-array,
 //   non-thenable) passes the guard and survives `claim.write`.
 // - Inv 30: any thenable result raises a "Promise/thenable …" TypeError
 //   with the documented prefix.
 //
-// §6.10 (determinism of `describeBadResult`) is trivially true in JS —
-// no PBT, but documented as Inv 29's pre-condition.
+// §6.10 (determinism of `classifyRscActionResult`) holds for any value
+// whose `then` is not a stateful getter — no PBT, but documented as Inv 29's
+// pre-condition.
 
 describe("rscActionPluginFactory: guard accepts plain objects (Inv 29)", () => {
   // arbPlainAcceptedResult — values that ALL of: typeof === "object",

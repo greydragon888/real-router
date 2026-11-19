@@ -121,7 +121,7 @@ rscServerPluginFactory(loaders)              ← factory.ts
                 │       └── compile factories → compiledLoaders Map
                 │               └── factory(router, getDependency) per entry
                 │               └── typeof check on each returned loader
-                │   catch: rollback(acquired) — release ALL acquired claims + rethrow
+                │   catch: rollback() — release ALL acquired claims + rethrow
                 ├── api.addInterceptor("start", ...)
                 │       └── claim.write(state, await loader({ params: state.params, search: state.search })) + modeClaim.write(state, resolveMode(...))
                 ├── router.subscribeLeave(...)
@@ -367,7 +367,7 @@ The claim acquisitions and the `compile()` call (whose per-route loop lives in `
 
 If a claim collides, any factory throws, or a factory returns a non-function:
 
-- `rollback(acquired)` calls `claim.release()` on EVERY successfully-claimed namespace — atomic all-or-nothing semantics
+- `rollback()` calls `claim.release()` on EVERY successfully-claimed namespace — atomic all-or-nothing semantics
 - The error is re-thrown to the `usePlugin()` caller
 - No interceptor is registered (it runs after the loop)
 - No leave listener is registered (it runs after the loop)

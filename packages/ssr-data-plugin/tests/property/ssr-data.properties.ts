@@ -795,8 +795,9 @@ describe("defer(): roundtrip + reserved-keys reject", () => {
   it("rejects inherited brand: Object.create({ [DEFER_BRAND]: true }) ⇒ false", () => {
     // Without `Object.hasOwn` guarding the brand check, a prototype-chain
     // bypass would mark every object inheriting from a brand-carrying
-    // proto as a defer payload — and `processLoaderResult`'s slow path
-    // would then crash reading `critical`/`deferred` off undefined.
+    // proto as a defer payload — sending it into the defer branch of
+    // `writeLoaderResult`, which rejects one that carries no `deferred`
+    // object.
     const inheritedBrand = Object.create({ [DEFER_BRAND]: true }) as object;
 
     expect(isDeferred(inheritedBrand)).toBe(false);
@@ -804,8 +805,9 @@ describe("defer(): roundtrip + reserved-keys reject", () => {
 
   it("documents the brand-only-plain contract: own brand without critical/deferred ⇒ true", () => {
     // Locks the current narrow contract: `isDeferred` is a brand check,
-    // not a structural check. Downstream `processLoaderResult` then
-    // either fails fast or treats the missing fields as `undefined`.
+    // not a structural check. Downstream, the defer branch of
+    // `writeLoaderResult` rejects a payload with no `deferred` object and
+    // writes a missing `critical` as `undefined`.
     // If a future refactor decides to require structural fields too,
     // this test will fail and force a doc update — that failure IS the
     // contract-change signal.

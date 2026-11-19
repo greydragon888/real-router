@@ -79,14 +79,14 @@ The wire-format helper publishes a canonical Flight payload from `state.context.
 
 ## Server Action Plugin (`rscActionPluginFactory`)
 
-The plugin publishes a Server Action result to `state.context.rscAction`. The per-start runtime guard — `classifyRscActionResult` (`actionFactory.ts`), called at `:127-133` after the `undefined` short-circuit at `:115-117` — rejects Promise/thenable, array, and `null` values to surface the most common consumer mistake (wiring an `async getResult`) eagerly.
+The plugin publishes a Server Action result to `state.context.rscAction`. The per-start runtime guard — `classifyRscActionResult` (`actionFactory.ts`), called in the `start` interceptor after the `undefined` short-circuit — rejects every value except a non-null, non-array, non-thenable one whose `typeof` is `"object"`, to surface the most common consumer mistake (wiring an `async getResult`) eagerly.
 
 | #   | Invariant                                                  | Description                                                                                                                                                                                  |
 | --- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 29  | Guard accepts any plain object                              | For any `result` with `typeof === "object" && !null && !Array.isArray && typeof .then !== "function"`, `claim.write(state, result)` succeeds — the value lands on `state.context.rscAction` unchanged. The guard is shape-blind beyond these four checks; extra/unknown fields ride through (forward-compat slot). |
 | 30  | Promise/thenable detection rejects with documented prefix   | For any thenable `result` (real `Promise`, POJO with `.then === function`), `start()` rejects with a `TypeError` containing `"Promise/thenable"`. Catches the common `async getResult` mistake at the call site rather than inside an unrelated render later. |
 
-> **Note on Inv 6.10 (audit):** `describeBadResult(value) === describeBadResult(value)` (detection determinism) is trivially true in JS — same call, same primitive comparisons, same string return. Not separately PBT-tested; documented here as Inv 29's pre-condition.
+> **Note on Inv 6.10 (audit):** `classifyRscActionResult(value) === classifyRscActionResult(value)` (detection determinism) holds for any value whose `then` is not a stateful getter — same call, same primitive comparisons, same result. Not separately PBT-tested; documented here as Inv 29's pre-condition.
 
 ## Stale Registry (`staleRegistry`)
 
@@ -105,6 +105,6 @@ The CSR revalidation channel (Inv 20) uses a `WeakMap<Router, Map<string, number
 | --------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `tests/functional/rsc-loader.test.ts`         | full       | All categories — loader semantics, validation, teardown, error paths, ReactNode variants, sync/async, DI                                                |
 | `tests/functional/buildRscPayload.test.ts`    | 22-27      | Pure function: root identity, override winning, null preservation, omit semantics, action passthrough, fixpoint                                          |
-| `tests/functional/rsc-action.test.ts`         | runtime    | rscActionPluginFactory: capture, skip semantics, runtime guard against Promise/array/null, namespace teardown, three-plugin composition                  |
+| `tests/functional/rsc-action.test.ts`         | runtime    | rscActionPluginFactory: capture, skip semantics, runtime guard against Promise/array/null/primitive returns, namespace teardown, three-plugin composition |
 | `tests/property/rsc.properties.ts`            | 34         | Validation, loader invocation, loader arguments, data retrieval, prototype safety, teardown (+ Inv 13 PBT), isolation, factory invocation, **composition with ssr-data-plugin**, **per-namespace `invalidate` orthogonality**, **SSR mode (×4) + idempotency + closed-set membership (×2)**, **buildRscPayload (×6)**, **rscActionPluginFactory guard (×2)**, **staleRegistry algebra (×4)** |
 | `tests/stress/*.stress.ts`                    | runtime    | Per-request isolation, error handling, concurrent loaders, slow loaders, full lifecycle churn                                                          |
