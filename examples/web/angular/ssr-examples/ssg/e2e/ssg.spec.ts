@@ -261,8 +261,9 @@ test.describe("SSG (Angular)", () => {
   test("CSR navigation post-hydration: navigating to dynamic route shows User not found (SSR-only plugin contract)", async ({
     page,
   }) => {
-    // /users initial visit: hydrateRouter calls start("/users") → loader runs
-    // → state.context.data is populated. Alice/Bob/Charlie render normally.
+    // /users initial visit: hydrateRouter calls start("/users"), and the
+    // plugin reuses state.context.data from the payload instead of running
+    // the loader. Alice/Bob/Charlie render normally.
     // After hydration, clicking a user triggers CSR navigation; the
     // ssr-data-plugin only intercepts start(), not navigate(), so
     // state.context.data is undefined → "User not found" renders.

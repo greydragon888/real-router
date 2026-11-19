@@ -195,7 +195,7 @@ await hydrateRouter(router, window.__SSR_STATE__);
 // loader was NOT called — state.context.data === server's value
 ```
 
-The skip is single-shot — only the first `start()` triggered by `hydrateRouter`consumes the scratchpad. Subsequent navigations run the loader normally. Composes with per-route mode: `"client-only"` skips the loader regardless of scratchpad contents (mode wins).
+The skip is single-shot — only the first `start()` triggered by `hydrateRouter` consumes the scratchpad. A later `start()` runs the loader again; a client navigation runs it only after `invalidate(router, "data")` marks the data stale. Composes with per-route mode: `"client-only"` skips the loader regardless of scratchpad contents (mode wins).
 
 **Mode marker is always written.** Even on a scratchpad-hit the plugin still calls `claim.write(state, mode)` for `state.context.ssrDataMode` before the loader-skip branch runs. So a route configured `ssr: "full"` keeps `getSsrDataMode(state) === "full"` on the client after hydration even when the loader was skipped — UI conditionals that branch on `ssrDataMode` don't need to special-case the post-hydration first paint. Symmetric on the rsc-server-plugin side (`state.context.ssrRscMode`).
 
@@ -328,7 +328,7 @@ See [`examples/web/react/ssr-examples/ssr-streaming/`](../../examples/web/react/
 ```typescript
 const unsubscribe = router.usePlugin(ssrDataPluginFactory(loaders));
 
-// Later — releases "data" namespace claim and stops data loading
+// Later — removes the start interceptor and the leave listener, releases the four namespace claims
 unsubscribe();
 ```
 

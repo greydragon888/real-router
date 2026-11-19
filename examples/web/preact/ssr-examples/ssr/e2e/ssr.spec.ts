@@ -518,15 +518,14 @@ test.describe("Preact SSR — smoke", () => {
   }) => {
     // ssr-data-plugin intercepts start(), not navigate(). After
     // hydration via hydrateRouter (which calls start once with the
-    // current path), subsequent client navigations resolve a fresh
-    // state with NO loader call — state.context.data is whatever the
-    // last start() write left, or undefined for routes never resolved.
+    // current path), each client navigation commits a state with a
+    // new state.context and NO loader call, so state.context.data is
+    // undefined on every route it reaches, the server-rendered one
+    // included, unless invalidate(router, "data") marked the data
+    // stale first; this example never calls it.
     //
-    // We start at /, then navigate via Link to /admin (no auth cookie
-    // → guard rejects → router goes to NotFound). We assert UsersList
-    // was never visited so its data was never set, then navigate to
-    // /users on the client and inspect router state via a tiny
-    // window-exposed hook.
+    // We start at /, click Users in the nav and assert that the list
+    // renders empty.
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
@@ -536,9 +535,9 @@ test.describe("Preact SSR — smoke", () => {
     await expect(page).toHaveURL("/users");
 
     // Page shows UsersList shell, but state.context.data is undefined
-    // (no SSR start for this URL after initial hydration). The list
-    // body therefore should be empty rather than populated. This
-    // documents the by-design contract.
+    // (a client navigation calls no loader). The list body therefore
+    // should be empty rather than populated. This documents the
+    // by-design contract.
     const usersList = page.locator('[data-testid="users-list"]');
     await expect(usersList).toBeAttached();
     // Empty <ul> is the expected shape — fallback `{ users: [] }` from

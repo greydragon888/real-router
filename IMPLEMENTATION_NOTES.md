@@ -6810,6 +6810,8 @@ The only #437 carry-over that does NOT apply: `shared/ssr/` consumers don't need
 
 `rsc-server-plugin` audit (2026-05-10 + 2026-05-16) verified composition: both plugins coexist on the same router without cross-namespace mutation, teardown of one does not affect the other, and `invalidate("data")` re-runs only the ssr-data-plugin loader while `state.context.rsc` stays cached. Invariants 14-15 in `packages/rsc-server-plugin/INVARIANTS.md` formalise this contract.
 
+⚠ **Erratum (2026-11-19):** `state.context.rsc` does not stay cached — `state.context` is rebuilt empty for every navigation (#2112).
+
 ## Subpath isolation for SSR/RSC concerns: `/ssr` entry-point split × 6 adapters (#574 + #609 + #610 + #611)
 
 ### Problem
@@ -7146,7 +7148,7 @@ Mechanics:
 
 1. `hydrateRouter(router, ssrState)` parses `ssrState` (or accepts pre-parsed), writes `parsed` to `RouterInternals.hydrationState`, calls `router.start(parsed.path)`.
 2. `ssr-data-plugin`'s start interceptor checks `RouterInternals.hydrationState` synchronously inside `wrappedStart`. If the path matches and `"data" in scratchpad.context` (presence-wins, see below), it writes the scratchpad value via `claim.write()` instead of calling `entry.loader(...)`.
-3. The plugin does **not** clear the scratchpad after reading — it is restored to its previous value (`null` outside a hydrate) in `hydrateRouter`'s `finally` block after `router.start()` resolves. All start-interceptor reads within one hydrate see the same scratchpad (side-by-side `ssr-data` + `rsc-server` both consume it); the next navigation sees `hydrationState === null` and runs the loader normally — **one-shot by design**, only the initial hydration benefits.
+3. The plugin does **not** clear the scratchpad after reading — it is restored to its previous value (`null` outside a hydrate) in `hydrateRouter`'s `finally` block after `router.start()` resolves. All start-interceptor reads within one hydrate see the same scratchpad (side-by-side `ssr-data` + `rsc-server` both consume it); a later `start()` sees `hydrationState === null` and runs the loader normally — **one-shot by design**, only the initial hydration benefits.
 
 Per-namespace: each loader plugin (ssr-data-plugin, rsc-server-plugin) reads its own namespace from the scratchpad independently. Side-by-side composition still works — both `"data"` and `"rsc"` skip their loaders on the same hydration.
 

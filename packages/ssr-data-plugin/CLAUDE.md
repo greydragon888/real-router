@@ -170,7 +170,7 @@ This is by design for SSR.
 
 ### No caching
 
-Every `start()` triggers a fresh loader call. Caching is the caller's responsibility (e.g., within the loader function itself).
+Outside `hydrateRouter`, every `start()` that commits calls the route's loader afresh, unless the route's mode is `"client-only"`. Caching is the caller's responsibility (e.g., within the loader function itself).
 
 ### Teardown releases four claims
 

@@ -317,8 +317,9 @@ test.describe("SSG (Solid)", () => {
   test("CSR navigation to dynamic route: state.context.data is undefined post-navigate (SSR-only plugin contract)", async ({
     page,
   }) => {
-    // /users initial visit: hydrateRouter calls start("/users") → loader
-    // runs → state.context.data is populated. Alice/Bob/Charlie render.
+    // /users initial visit: hydrateRouter calls start("/users"), and the
+    // plugin reuses state.context.data from the payload instead of running
+    // the loader. Alice/Bob/Charlie render.
     await page.goto("/users/");
     await page.waitForLoadState("networkidle");
     await expect(page.locator("main")).toContainText("Alice");
