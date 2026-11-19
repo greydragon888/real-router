@@ -405,6 +405,7 @@ describe("door total (#2303)", () => {
     // The external Standard Schema spec a schema library implements.
     StandardSchemaV1: "external spec",
     StandardSchemaV1Issue: "external spec",
+    StandardSchemaV1Result: "external spec",
     // Adapter and utility shapes core or an adapter BUILDS and hands out. Each
     // was classified by POSITION — measured, they appear as a return type or as
     // the parameter of a callback the application writes, never as a bag the

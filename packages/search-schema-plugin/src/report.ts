@@ -22,6 +22,15 @@ const DECODING =
   'The schema gets decoded values: under queryParams numberFormat / booleanFormat "auto" (the default) ?q=17 arrives as the number 17, ?q=true as true, and a key without a value as null. A rejected number or boolean — a key\'s value or an array element — is tried once more as its text.';
 
 /**
+ * The line logged with the error that a rejected Promise from
+ * `~standard.validate()` carries — zod's answer to a throw in a transform or a
+ * refinement (#2851).
+ */
+export function describeThrow(routeName: string, subject: string): string {
+  return `${ERROR_PREFIX} Route "${routeName}": the schema threw on ${subject} — ~standard.validate() answered with a rejected Promise, as zod does when a transform or a refinement throws.`;
+}
+
+/**
  * The `mode: "development"` report of a query the schema rejected: a line per
  * issue with the value it is about, as decoded where the text did not fix the
  * key. Such a key is followed by what the last text run said about it, with
