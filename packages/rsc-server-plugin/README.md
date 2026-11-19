@@ -250,7 +250,7 @@ try {
 ```typescript
 const unsubscribe = router.usePlugin(rscServerPluginFactory(loaders));
 
-// Later — releases "rsc" namespace claim and stops the start interceptor
+// Later — removes the start interceptor and the leave listener, releases the "rsc" and "ssrRscMode" namespace claims
 unsubscribe();
 ```
 

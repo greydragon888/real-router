@@ -35,7 +35,7 @@ Mirror of `@real-router/ssr-data-plugin/errors` — same `shared/ssr/errors.ts` 
 ## How It Works
 
 1. `rscServerPluginFactory(loaders)` validates loaders at factory call time, returns `PluginFactory`
-2. On `router.usePlugin()`: claims the `"rsc"` namespace via `api.claimContextNamespace("rsc")` and registers a `start` interceptor
+2. On `router.usePlugin()`: claims the `"rsc"` and `"ssrRscMode"` namespaces via `api.claimContextNamespace()`, registers a `start` interceptor and subscribes the `subscribeLeave` revalidation listener
 3. On `router.start(url)`: interceptor wraps `next(path)`, awaits the state, calls the matching loader, writes the resulting `ReactNode` to `state.context.rsc` via `claim.write()`
 4. The caller pipes `state.context.rsc` through their bundler's `renderToReadableStream` (e.g. `@vitejs/plugin-rsc/rsc`, `react-server-dom-webpack/server.edge`)
 
@@ -94,7 +94,7 @@ rscServerPluginFactory({
 });
 ```
 
-Validation at factory time: rejects `null`, non-objects, non-function values, unknown keys, invalid `ssr` types, and **`"data-only"`** (RSC has no semantically meaningful "data without component" — see `RscSsrMode`).
+Validation at factory time: rejects `null`, non-objects, entries that are neither a function nor a `{ ssr?, loader? }` object, unknown keys, invalid `ssr` types, and **`"data-only"`** (RSC has no semantically meaningful "data without component" — see `RscSsrMode`).
 
 ## Per-route SSR Mode
 
@@ -171,7 +171,7 @@ src/
 └── shared-ssr/         — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, staleRegistry, errors)
 ```
 
-`factory.ts` is intentionally a tiny adapter — the actual try/catch + interceptor + claim logic lives in [`shared/ssr/`](../../shared/ssr/) and is consumed by both `rsc-server-plugin` (`T = ReactNode`, namespace = `"rsc"`) and `ssr-data-plugin` (`T = unknown`, namespace = `"data"`). `factory.ts` binds `validateLoaders` itself (one consumer, no other importer); the validator factory is shared at `shared-ssr/createLoadersValidator.ts`.
+`factory.ts` is intentionally a tiny adapter — the actual try/catch + interceptor + claim logic lives in [`shared/ssr/`](../../shared/ssr/) and is consumed by both `rsc-server-plugin` (`T = ReactNode`, namespaces `"rsc"` + `"ssrRscMode"`, no deferred channel) and `ssr-data-plugin` (`T = unknown`, namespaces `"data"` + `"ssrDataMode"` + `"ssrDataDeferred"` + `"ssrDataDeferredKeys"`). `factory.ts` binds `validateLoaders` itself (one consumer, no other importer); the validator factory is shared at `shared-ssr/createLoadersValidator.ts`.
 
 ## Gotchas
 
@@ -261,7 +261,7 @@ The root [`vitest.config.unit.mts`](../../vitest.config.unit.mts) uses the `["te
 
 ## Composition with `ssr-data-plugin`
 
-`@real-router/rsc-server-plugin` and `@real-router/ssr-data-plugin` follow the **same factory pattern** (claim-based namespace + `start()` interceptor) and are designed to run **side-by-side** on the same router. Their namespaces are distinct:
+`@real-router/rsc-server-plugin` and `@real-router/ssr-data-plugin` follow the **same factory pattern** (claim-based namespaces + `start()` interceptor + `subscribeLeave` revalidation listener) and are designed to run **side-by-side** on the same router. Their namespaces are distinct:
 
 - `ssr-data-plugin` → `state.context.data` (plain JSON / `unknown`)
 - `rsc-server-plugin` → `state.context.rsc` (`ReactNode` / RSC payload)

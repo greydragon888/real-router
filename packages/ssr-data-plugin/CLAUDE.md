@@ -49,7 +49,7 @@ Discriminator is structural (`error.code === "LOADER_NOT_FOUND" | "LOADER_REDIRE
 ## How It Works
 
 1. `ssrDataPluginFactory(loaders)` validates loaders at factory call time, returns `PluginFactory`
-2. On `router.usePlugin()`: claims `"data"` namespace via `api.claimContextNamespace("data")` and registers a `start` interceptor
+2. On `router.usePlugin()`: claims the `"data"`, `"ssrDataMode"`, `"ssrDataDeferred"` and `"ssrDataDeferredKeys"` namespaces via `api.claimContextNamespace()`, registers a `start` interceptor and subscribes the `subscribeLeave` revalidation listener
 3. On `router.start(url)`: interceptor wraps `next(path)`, awaits the state, calls matching loader, writes result to `state.context.data` via `claim.write()`
 4. Data is accessible via `state.context.data` after `await router.start(url)`
 
@@ -107,7 +107,7 @@ ssrDataPluginFactory({
 
 Loaders/entries keyed by route name. Factory runs once at `usePlugin()` time; the returned loader is cached. `Object.entries()` walks the map at compilation time, `Map.get()` reads it at runtime, and `Object.hasOwn` gates each entry's `ssr` / `loader` — own keys on both axes (#1835). Enumerating the map by own key says nothing about how a field is read off an entry, and the `hasOwn` gate is what closes that second axis: without it an `Object.prototype.loader` supplies the route's loader for an entry that declares none, and an `Object.prototype.ssr` decides the mode for the short form, whose entry object the plugin builds itself.
 
-Validation at factory time: rejects `null`, non-objects, non-function values, unknown keys, invalid `ssr` types and string-form modes outside `allowedModes` with `TypeError`. Function-form `ssr` is validated at runtime per-navigation.
+Validation at factory time: rejects `null`, non-objects, entries that are neither a function nor a `{ ssr?, loader? }` object, unknown keys, invalid `ssr` types and string-form modes outside `allowedModes` with `TypeError`. Function-form `ssr` is validated at runtime per-navigation.
 
 ## Per-route SSR Mode
 
@@ -154,7 +154,7 @@ src/
 └── shared-ssr/    — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, errors, defer, deferRegistryClient, deferWireFormat, staleRegistry, types)
 ```
 
-The `factory.ts` is intentionally tiny (`validateLoaders` is a single-line binding) — the actual try/catch + interceptor + claim logic lives in [`shared/ssr/`](../../shared/ssr/) and is consumed by both `ssr-data-plugin` (T = `unknown`, namespace = `"data"`) and `rsc-server-plugin` (T = `ReactNode`, namespace = `"rsc"`).
+The `factory.ts` is intentionally tiny (`validateLoaders` is a single-line binding) — the actual try/catch + interceptor + claim logic lives in [`shared/ssr/`](../../shared/ssr/) and is consumed by both `ssr-data-plugin` (T = `unknown`, namespaces `"data"` + `"ssrDataMode"` + `"ssrDataDeferred"` + `"ssrDataDeferredKeys"`) and `rsc-server-plugin` (T = `ReactNode`, namespaces `"rsc"` + `"ssrRscMode"`, no deferred channel).
 
 ## Gotchas
 
@@ -181,7 +181,7 @@ Outside `hydrateRouter`, every `start()` that commits calls the route's loader a
 - `"ssrDataDeferred"` — record of deferred promises from `defer()`
 - `"ssrDataDeferredKeys"` — declared deferred-key list (SSR-serializable)
 
-All four are claimed during `usePlugin()` and released in lock-step on teardown — partial-rollback on factory compilation error is verified by `tests/functional/data-loader.test.ts` "releases ... namespace when ... is already claimed". In SSR, `router.dispose()` triggers teardown automatically.
+All four are claimed during `usePlugin()` and released in lock-step on teardown. A claim collision releases the claims acquired before it (`tests/functional/data-loader.test.ts` "releases 'data' namespace when 'ssrDataMode' is already claimed"); a factory compilation error releases all four, and the test there checks `"data"` ("should release claim when factory throws during compilation"). In SSR, `router.dispose()` triggers teardown automatically.
 
 ### `defer({ critical, deferred })` — formal critical/deferred split (#610)
 
@@ -424,7 +424,7 @@ On the `start()` path the loader runs **after** `await next(path)` committed the
 
 ## Composition with `rsc-server-plugin`
 
-`@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` follow the **same factory pattern** (claim-based namespace + `start()` interceptor) and are designed to run **side-by-side** on the same router. Their namespaces are distinct:
+`@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` follow the **same factory pattern** (claim-based namespaces + `start()` interceptor + `subscribeLeave` revalidation listener) and are designed to run **side-by-side** on the same router. Their namespaces are distinct:
 
 - `ssr-data-plugin` → `state.context.data` (plain JSON / `unknown`)
 - `rsc-server-plugin` → `state.context.rsc` (`ReactNode` / RSC payload)

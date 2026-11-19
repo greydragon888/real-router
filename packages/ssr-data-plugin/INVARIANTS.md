@@ -6,8 +6,8 @@
 
 | #   | Invariant                                                  | Description                                                                                                                                                                                    |
 | --- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Non-objects rejected                                       | `validateLoaders()` throws `TypeError` for `null`, `undefined`, strings, numbers, booleans, and arrays. Only plain objects pass validation.                                                     |
-| 2   | Non-function values rejected                               | `validateLoaders()` throws `TypeError` when any value in the loaders object is not a function. Prevents runtime errors during factory compilation.                                              |
+| 1   | Non-objects rejected                                       | `validateLoaders()` throws `TypeError` for `null`, `undefined`, strings, numbers, booleans, and arrays. Only non-null, non-array objects pass this check.                                                     |
+| 2   | Non-function, non-object values rejected                               | `validateLoaders()` throws `TypeError` when a value in the loaders object is neither a function nor a `{ ssr?, loader? }` object. Prevents runtime errors during factory compilation.                                              |
 
 ## Loader Invocation
 

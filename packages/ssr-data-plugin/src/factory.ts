@@ -4,7 +4,7 @@ import { createLoadersValidator, createSsrLoaderPlugin } from "./shared-ssr";
 import type { DataLoaderFactoryMap } from "./types";
 import type { DefaultDependencies, PluginFactory } from "@real-router/core";
 
-// Inlined binding — symmetric with rsc-server-plugin's same merge.
+// Bound here: this file is the validator's one consumer.
 const validateLoaders = createLoadersValidator(ERROR_PREFIX);
 
 export function ssrDataPluginFactory<

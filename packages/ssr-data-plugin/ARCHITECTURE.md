@@ -6,13 +6,13 @@
 
 `@real-router/ssr-data-plugin` loads per-route data during SSR by intercepting `router.start()`. After route resolution, the matching loader runs and its result is written to `state.context.data` via the claim-based API, accessible on the returned state object.
 
-**Core role:** A stateless interceptor that bridges route resolution and data loading on the server. Contains no rendering, serialization, or framework logic.
+**Core role:** An interceptor that bridges route resolution and data loading on the server. Contains no rendering, serialization, or framework logic.
 
 **Integration points with the core:**
 
 - `api.claimContextNamespace("data" | "ssrDataMode" | "ssrDataDeferred" | "ssrDataDeferredKeys")` — claims exclusive ownership of all four state.context namespaces written by the plugin
 - `addInterceptor("start", ...)` — wraps `start()` to load data after route resolution (SSR boot path)
-- `router.subscribeLeave(...)` — registers a leave listener that re-runs the loader while the `invalidate(router, "data")` stale flag is set (CSR revalidation channel)
+- `router.subscribeLeave(...)` — registers a leave listener that writes the `ssrDataMode` marker on every navigation after `start()` to a route with an entry, and re-runs the loader while the `invalidate(router, "data")` stale flag is set (CSR revalidation channel)
 - `claim.write(state, data)` — writes loader result + mode marker + deferred payload to the state's context
 - `claim.release()` — releases each namespace claim on teardown
 - Plugin hooks (`onTransitionSuccess`, `teardown`) — `onTransitionSuccess` clears the stale flag when the committed state carries a refresh; `teardown` removes interceptor + leave listener and releases all four claims
@@ -68,18 +68,18 @@ The plugin's factory + validation logic lives in [`shared/ssr/`](../../shared/ss
 
 The shared module exports:
 
-- `createSsrLoaderPlugin<T, D>(loaders, { namespace, errorPrefix })` — generic factory implementing the validate-compile-loop + start-interceptor + subscribeLeave-handler + claim/teardown pattern. Parameterised over loader return type `T` and dependency map `D`.
-- `createLoadersValidator(errorPrefix)` — generic shape validator (non-null object → function values).
+- `createSsrLoaderPlugin<T, D>(loaders, config)` — generic factory implementing the validate-compile-loop + start-interceptor + subscribeLeave-handler + claim/teardown pattern; `config` is an `SsrLoaderPluginConfig` (`shared/ssr/types.ts`). Parameterised over the loader's value type `T` and dependency map `D`.
+- `createLoadersValidator(errorPrefix, allowedModes?)` — generic shape validator; its rules are in [Validation](#validation).
 - `markStale` / `staleMark` / `clearStaleMark` — per-router stale registry backing the `invalidate()` helper. WeakMap-keyed by router instance; a `Map<string, number>` per router holds each stale namespace's latest mark.
 
-`@real-router/rsc-server-plugin` consumes the same helpers with a different namespace (`"rsc"`) and `T = ReactNode`. Because the shared logic is symlinked source (not a published package), bug fixes in one plugin's behaviour automatically apply to the other. The stale registry is one shared `WeakMap` — but namespace isolation comes free from the per-router `Map`'s namespace keys, so `invalidate(router, "data")` and `invalidate(router, "rsc")` operate independently.
+`@real-router/rsc-server-plugin` consumes the same helpers with `T = ReactNode`, namespaces `"rsc"` and `"ssrRscMode"`, `allowedModes = ALLOWED_RSC_MODES` and no deferred namespaces. Because the shared logic is symlinked source (not a published package), bug fixes in one plugin's behaviour automatically apply to the other. Each published package bundles its own copy of the stale registry; namespace isolation comes from the per-router `Map`'s namespace keys, so `invalidate(router, "data")` and `invalidate(router, "rsc")` operate independently even where one copy serves both plugins.
 
 ## Factory Pattern
 
 The plugin uses a plain closure (not a class) — the one collection it mutates after construction, `refreshes`, lives in that closure. The closure logic itself lives in [`shared/ssr/createSsrLoaderPlugin.ts`](../../shared/ssr/createSsrLoaderPlugin.ts); `ssrDataPluginFactory` is a thin adapter that runs validation and forwards to the shared factory:
 
 ```
-ssrDataPluginFactory(loaders)                ← factory.ts (~20 LOC)
+ssrDataPluginFactory(loaders)                ← factory.ts
         │
         │  1. validateLoaders(loaders)        ← inline binding of createLoadersValidator(ERROR_PREFIX)
         │  2. createSsrLoaderPlugin<unknown, Dependencies>(loaders, {
@@ -95,14 +95,15 @@ ssrDataPluginFactory(loaders)                ← factory.ts (~20 LOC)
                 │  Called by router.usePlugin():
                 │
                 ├── api = getPluginApi(router)
-                ├── dataClaim          = api.claimContextNamespace("data")
-                ├── modeClaim          = api.claimContextNamespace("ssrDataMode")
-                ├── deferredClaim      = api.claimContextNamespace("ssrDataDeferred")
-                ├── deferredKeysClaim  = api.claimContextNamespace("ssrDataDeferredKeys")
-                ├── try: compile factories → compiledLoaders Map
-                │       └── factory(router, getDependency) per entry
-                │       └── typeof check on each returned loader
-                │   catch: release all 4 claims + rethrow
+                ├── try:
+                │       ├── dataClaim          = api.claimContextNamespace("data")
+                │       ├── modeClaim          = api.claimContextNamespace("ssrDataMode")
+                │       ├── deferredClaim      = api.claimContextNamespace("ssrDataDeferred")
+                │       ├── deferredKeysClaim  = api.claimContextNamespace("ssrDataDeferredKeys")
+                │       └── compile factories → compiledLoaders Map
+                │               └── factory(router, getDependency) per entry
+                │               └── typeof check on each returned loader
+                │   catch: release every claim acquired so far + rethrow
                 ├── removeStartInterceptor = api.addInterceptor("start", ...)
                 │       └── scratchpad-hit OR await loader → write critical/mode/deferred/keys
                 ├── removeLeaveListener = router.subscribeLeave(...)
@@ -219,7 +220,7 @@ Data lives directly on the state object's context. No separate retrieval method 
 const router = cloneRouter(baseRouter, deps);
 router.usePlugin(ssrDataPluginFactory(loaders));
                                                     ← factory validates loaders (once)
-                                                    ← usePlugin claims "data" namespace + registers interceptor
+                                                    ← usePlugin claims the four namespaces, registers the interceptor + leave listener
 
 const state = await router.start(url);
                                                     ← interceptor: next(url) → state resolved
@@ -230,7 +231,7 @@ const data = state.context.data;
 
 const html = renderToString(<App />);
 router.dispose();
-                                                    ← teardown: removes interceptor + releases claim
+                                                    ← teardown: removes the interceptor + leave listener, releases the four claims
 ```
 
 ## Teardown Lifecycle
@@ -262,7 +263,7 @@ unsubscribe() or router.dispose()
 
 All operations are synchronous and infallible. No try/catch needed (unlike `persistent-params-plugin` which calls `setRootPath` during teardown). The stale flag in the per-router `WeakMap` is **not** cleared on teardown — markStale entries are GC'd along with the router. A subsequent `usePlugin(ssrDataPluginFactory(...))` on the same router would inherit any pending flag (which is consistent with "the next refresh wins" semantics).
 
-**Factory compilation error path.** If any loader factory throws during the compilation loop, all four claims are released before the error propagates — preventing permanent namespace blocking. Verified by `tests/functional/data-loader.test.ts` "releases ... namespace when ... is already claimed" anchors.
+**Error path.** If a claim collides or a loader factory fails, every claim acquired so far is released before the error propagates — see [Error-safe compilation](#error-safe-compilation). `tests/functional/data-loader.test.ts` checks the `"data"` claim on both paths: "should release claim when factory throws during compilation" and "releases 'data' namespace when 'ssrDataMode' is already claimed".
 
 ## Validation
 
@@ -317,13 +318,14 @@ Caching is intentionally omitted:
 
 ### Error-safe compilation
 
-The compilation loop is wrapped in `try/catch`. If any loader factory throws during `factory(router, getDependency)`, or if the returned value is not a function:
+The claim acquisitions and the compilation loop share one `try/catch`. If a claim collides, a loader factory throws during `factory(router, getDependency)`, or the returned value is not a function:
 
-- `claim.release()` is called to free the `"data"` namespace
+- Every claim acquired so far is released — all four once the claims have succeeded
 - The error is re-thrown to the `usePlugin()` caller
 - No interceptor is registered (it runs after the loop)
+- No leave listener is registered (it runs after the loop)
 
-This prevents permanently blocking the namespace when a factory has a bug.
+This prevents permanently blocking any of the plugin's namespaces when a factory has a bug.
 
 ### DI Access via getDependency
 

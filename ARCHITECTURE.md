@@ -521,16 +521,16 @@ Plugins extend the router instance with new properties via `extendRouter()` on `
 
 ### Context Namespace Claims
 
-Plugins publish per-route data via `claimContextNamespace()` on `PluginApi`. Each plugin claims a unique namespace key at registration time (O(1) collision detection via `Set<string>`), receives a `{ write, release }` object, and publishes data to `state.context.<namespace>` from lifecycle hooks. Mirrors the `extendRouter()` ownership model: closure-based tracking, manual `release()` in `teardown()`, dispose safety net for orphaned claims. Six plugins use this — 8 claims in total:
+Plugins publish per-route data via `claimContextNamespace()` on `PluginApi`. Each plugin claims one or more unique namespace keys at registration time (O(1) collision detection via a `Map<string, ContextNamespaceClaim>` keyed by namespace), receives a `{ write, release }` object per key, and publishes data to `state.context.<namespace>`. Mirrors the `extendRouter()` ownership model: closure-based tracking, manual `release()` in `teardown()`, dispose safety net for orphaned claims. Six plugins use this; each row lists every key its plugin claims:
 
 | Plugin                   | Namespace key(s)    | Published fields (examples)                                               |
 | ------------------------ | ------------------- | ------------------------------------------------------------------------- |
-| browser-plugin           | `browser` + `url`   | source, fullUrl                                                           |
-| navigation-plugin        | `navigation`        | direction, sourceElement                                                  |
+| browser-plugin           | `browser` + `url`   | source, direction, hash, hashChanged                                      |
+| navigation-plugin        | `navigation` + `url` | direction, sourceElement                                                  |
 | memory-plugin            | `memory`            | direction, historyIndex                                                   |
 | persistent-params-plugin | `persistentParams`  | persisted query param snapshot                                            |
-| ssr-data-plugin          | `data`              | per-route loader result (via `createSsrLoaderPlugin`)                     |
-| rsc-server-plugin        | `rsc` + `rscAction` | per-route ReactNode (via `createSsrLoaderPlugin`) + server-action results |
+| ssr-data-plugin          | `data` + `ssrDataMode` + `ssrDataDeferred` + `ssrDataDeferredKeys` | per-route loader result, SSR mode, `defer()` promises and their keys (via `createSsrLoaderPlugin`) |
+| rsc-server-plugin        | `rsc` + `ssrRscMode` + `rscAction` | per-route ReactNode and SSR mode (via `createSsrLoaderPlugin`) + server-action results |
 
 ### Validator Slot
 
