@@ -36,7 +36,9 @@
 | 3   | defaultSearch recovery                   | When the schema rejects keys for good and the route has `defaultSearch`, each rejected key takes its default AND each key of the repaired query carries the schema's output — or its value as the repair built it when that query fails too. A default for a key that was not rejected is merged as given. |
 | 4   | Strict mode output isolation             | With `strict: true`, on valid params and on a repaired query the schema accepts, result params equal the schema's output exactly. No keys from the original params leak through.                        |
 | 5   | Non-strict mode: override + preservation | With `strict: false`, schema-transformed values (uppercased) override originals for known keys, while extra keys pass through unchanged. Tests with transforming schema to prove override, not identity. |
-| 6   | Async rejection                          | If `~standard.validate()` returns a Promise, TypeError is thrown. The plugin never awaits.                                                                                                               |
+| 6   | Async rejection                          | If `~standard.validate()` returns a Promise, TypeError is thrown, and the plugin never awaits. A rejection of that Promise — zod's answer to a throw in the schema — reaches no `unhandledRejection` listener, and its error is logged once per navigation in mode `"development"` and never in mode `"production"` — the property sets no `onError`. The property draws resolves / rejects × development / production and requires every combination (#2851). |
+
+Rows 1–5, and Decoded Text row 1, run each schema in the three forms a library answers in — zod's `{ value }` / `{ issues }`, valibot's (`typed` on both, and a failure that carries a `value` of its own) and a success that spells `issues: undefined` — and each requires every form to have answered (#2851). The "Answer forms" cell checks the wrapper itself: each form answers as its library does, and every form is drawn.
 
 ## Channel Isolation
 

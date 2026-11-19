@@ -248,7 +248,7 @@ function refined(
   return createMockSchema({
     validate: (input) => {
       const result = object.validate(input) as StandardSchemaV1Result;
-      const issues = "issues" in result ? result.issues : [];
+      const issues = result.issues ?? [];
 
       if (issues.some(({ message }) => message.startsWith("expected "))) {
         return result;
