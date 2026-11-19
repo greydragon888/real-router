@@ -60,7 +60,6 @@
   "1243b02262ad": "packages/rsc-server-plugin/src/buildRscPayload.ts:5 -> packages/rsc-server-plugin/CLAUDE.md (58%)",
   "7658cb7a137b": "packages/rsc-server-plugin/src/buildRscPayload.ts:5 -> packages/rsc-server-plugin/ARCHITECTURE.md (100%)",
   "5aa03af26f79": "packages/rsc-server-plugin/src/factory.ts:13 -> packages/rsc-server-plugin/ARCHITECTURE.md (75%)",
-  "6f169bac51a6": "packages/rsc-server-plugin/src/factory.ts:13 -> packages/rsc-server-plugin/ARCHITECTURE.md (60%)",
   "e5b0a2d960df": "packages/rsc-server-plugin/src/factory.ts:13 -> packages/rsc-server-plugin/ARCHITECTURE.md (78%)",
   "f7f2e0225458": "packages/rsc-server-plugin/src/factory.ts:13 -> packages/rsc-server-plugin/ARCHITECTURE.md (56%)",
   "18ee7fd3e574": "packages/solid/src/components/HttpStatusCode.tsx:12 -> packages/solid/CLAUDE.md (100%)",
