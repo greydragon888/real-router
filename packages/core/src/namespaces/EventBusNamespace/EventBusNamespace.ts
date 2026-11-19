@@ -418,8 +418,13 @@ export class EventBusNamespace {
       )`cannot subscribe on a disposed router — dispose() is terminal`;
     }
 
+    // The handler's value goes back to the emitter, whose isolation consumes a
+    // thenable, as `subscribe`'s does (#2836).
     return this.#emitter.on(TREE_CHANGED, (event: TreeChangedEvent) => {
-      handler(event);
+      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -- the void-typed handler's runtime value is returned for the emitter's async isolation (#2836)
+      const result: unknown = handler(event);
+
+      return result;
     });
   }
 
@@ -455,8 +460,12 @@ export class EventBusNamespace {
       )`cannot subscribe on a disposed router — dispose() is terminal`;
     }
 
+    // As in `subscribeTreeChanged`: the value goes back to the emitter (#2836).
     return this.#emitter.on(key, (...args: DiagnosticEventMap[K]) => {
-      handler(...args);
+      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -- the void-typed handler's runtime value is returned for the emitter's async isolation (#2836)
+      const result: unknown = handler(...args);
+
+      return result;
     });
   }
 

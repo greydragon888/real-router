@@ -655,8 +655,8 @@ describe("#2388 — guards and the event bus on the channels", () => {
 
   describe("a report handler that throws is isolated", () => {
     // ⚑ The door completes as if the handler had returned, and the emitter logs
-    // the throw. Only a synchronous throw: an async handler's rejection is
-    // #2836's.
+    // the throw. An async handler's rejection is logged the same way once it
+    // settles (#2836).
     interface Row {
       kind: (typeof KINDS)[number];
       run: (router: Router) => Promise<unknown> | unknown;

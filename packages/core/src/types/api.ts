@@ -461,11 +461,15 @@ export interface CheckPositionMap {
 }
 
 /**
- * A check: it may THROW, and its return value is ignored by construction.
+ * A check: it refuses by THROWING, and a value it returns is no answer.
  *
  * ⚠ `void` rather than `boolean` is deliberate — a boolean would make silence
  * ambiguous (did it pass, or did the check forget to return?) and would tempt a
  * caller to treat the channel as a predicate. Refusal has exactly one spelling.
+ *
+ * ⚠ A check that returns a thenable — an `async` check, for one — refuses its
+ * door with a `TypeError` (#2836): its promise settles after the door has
+ * answered, too late to refuse.
  */
 export type CheckFn<P extends keyof CheckPositionMap> = (
   ...args: CheckPositionMap[P]
@@ -749,7 +753,8 @@ export interface PluginApi {
    * `TREE_CHANGED` established.
    *
    * ⚠ A handler here reaches application code if it logs, so core isolates the
-   * call: a throwing handler cannot break the operation that reported.
+   * call: a handler that throws, or returns a promise that rejects, cannot break
+   * the operation that reported, and the failure is logged (#2836).
    */
   subscribeDiagnostic: <K extends keyof DiagnosticEventMap>(
     key: K,
@@ -883,7 +888,8 @@ export interface RoutesApi<
    * Subscribe to structural route-tree mutations (`add` / `remove` / `update`
    * with structural fields / `replace` / `clear`). Fire-and-forget: the handler
    * cannot cancel the mutation, runs after the atomic commit, and sees the
-   * post-mutation tree via `get()` / `has()`.
+   * post-mutation tree via `get()` / `has()`. A handler that throws, or returns
+   * a promise that rejects, is logged and does not fail the mutation (#2836).
    *
    * Duplicate-registration semantics are **lenient** (mirrors
    * `router.subscribe`): each call registers an independent listener and

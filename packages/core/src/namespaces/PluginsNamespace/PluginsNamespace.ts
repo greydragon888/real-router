@@ -3,6 +3,7 @@
 import { EVENTS_MAP, EVENT_METHOD_NAMES, LOGGER_CONTEXT } from "./constants";
 import { validateNotDisposed, validatePlugin } from "./validators";
 import { DIAGNOSTIC, POSITION } from "../../internals";
+import { consumeThenable } from "../../utils/thenable";
 
 import type { PluginsDependencies } from "./types";
 import type {
@@ -14,6 +15,21 @@ import type {
 
 /** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
 const freeze = Object.freeze;
+
+/** A started plugin's cleanup; it returns what the plugin's `teardown` did. */
+type Cleanup = () => unknown;
+
+/**
+ * Runs a cleanup, and hands its failure — a throw, or a rejection of what
+ * `teardown` returned — to the one report its call site makes (#2836).
+ */
+function runCleanup(cleanup: Cleanup, report: (error: unknown) => void): void {
+  try {
+    consumeThenable(cleanup(), report);
+  } catch (error) {
+    report(error);
+  }
+}
 
 /**
  * Independent namespace for managing plugins.
@@ -92,13 +108,7 @@ export class PluginsNamespace<
         unsubscribed = true;
         this.#plugins.delete(factory);
         this.#unsubscribes.delete(unsubscribe);
-        try {
-          cleanup();
-        } catch (error) {
-          // Bare `router`: the returned unsubscribe and `dispose()` both run
-          // this teardown (#2821).
-          this.#deps.logger.error("router", "Error during cleanup:", error);
-        }
+        runCleanup(cleanup, this.#reportCleanupError);
       };
 
       this.#unsubscribes.add(unsubscribe);
@@ -112,7 +122,7 @@ export class PluginsNamespace<
     // Track successfully initialized plugins for cleanup
     const initializedPlugins: {
       factory: PluginFactory<Dependencies>;
-      cleanup: Unsubscribe;
+      cleanup: Cleanup;
     }[] = [];
 
     // Initialize deduplicated plugins sequentially
@@ -125,15 +135,7 @@ export class PluginsNamespace<
     } catch (error) {
       // Rollback on failure - cleanup all initialized plugins
       for (const { cleanup } of initializedPlugins) {
-        try {
-          cleanup();
-        } catch (cleanupError) {
-          this.#deps.logger.error(
-            LOGGER_CONTEXT,
-            "Cleanup error:",
-            cleanupError,
-          );
-        }
+        runCleanup(cleanup, this.#reportInstallCleanupError);
       }
 
       throw error;
@@ -160,13 +162,7 @@ export class PluginsNamespace<
       }
 
       for (const { cleanup } of initializedPlugins) {
-        try {
-          cleanup();
-        } catch (error) {
-          // Bare `router`: the returned unsubscribe and `dispose()` both run
-          // this teardown (#2821).
-          this.#deps.logger.error("router", "Error during cleanup:", error);
-        }
+        runCleanup(cleanup, this.#reportCleanupError);
       }
     };
 
@@ -203,6 +199,19 @@ export class PluginsNamespace<
   // =========================================================================
 
   /**
+   * The report of a cleanup the returned unsubscribe or `dispose()` runs. Bare
+   * `router`: both run this teardown (#2821).
+   */
+  readonly #reportCleanupError = (error: unknown): void => {
+    this.#deps.logger.error("router", "Error during cleanup:", error);
+  };
+
+  /** The report of a cleanup that runs inside the `usePlugin` call. */
+  readonly #reportInstallCleanupError = (error: unknown): void => {
+    this.#deps.logger.error(LOGGER_CONTEXT, "Cleanup error:", error);
+  };
+
+  /**
    * Deduplicates batch with warning for duplicates within batch.
    * Validation (existing duplicates) is done by facade.
    */
@@ -222,7 +231,7 @@ export class PluginsNamespace<
     return seenInBatch;
   }
 
-  #startPlugin(pluginFactory: PluginFactory<Dependencies>): Unsubscribe {
+  #startPlugin(pluginFactory: PluginFactory<Dependencies>): Cleanup {
     // Asked again here, not only at the facade: see `validateNotDisposed`.
     // A batch that meets a disposed router rolls back like any failed factory.
     PluginsNamespace.validateNotDisposed(this.#deps.isDisposed());
@@ -263,25 +272,26 @@ export class PluginsNamespace<
       }
     }
 
-    const cleanup: Unsubscribe = () => {
+    const cleanup: Cleanup = () => {
       for (const removeListener of removeEventListeners) {
         removeListener();
       }
 
-      if (typeof appliedPlugin.teardown === "function") {
-        appliedPlugin.teardown();
+      if (typeof appliedPlugin.teardown !== "function") {
+        return;
       }
+
+      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -- the void-typed teardown's runtime value goes to `runCleanup`, which consumes a thenable (#2836)
+      const result: unknown = appliedPlugin.teardown();
+
+      return result;
     };
 
     // Asked once more after the last application code of the start: nothing
     // has registered this plugin yet, so a `dispose()` from in here never
     // reached it, and it is torn down before the refusal.
     if (this.#deps.isDisposed()) {
-      try {
-        cleanup();
-      } catch (error) {
-        this.#deps.logger.error(LOGGER_CONTEXT, "Cleanup error:", error);
-      }
+      runCleanup(cleanup, this.#reportInstallCleanupError);
     }
 
     PluginsNamespace.validateNotDisposed(this.#deps.isDisposed());
