@@ -75,7 +75,6 @@ describe("surface census (#2303)", () => {
     "start",
     "subscribeDiagnostic",
     "systemCommit",
-    "validator",
   ];
 
   const PLUGIN_API = [
@@ -227,10 +226,9 @@ describe("surface census (#2303)", () => {
       sealed: Object.isSealed(row.o as unknown as object),
     }));
 
-    // ⚠ `getInternals` is the one cached-but-unfrozen surface, and that is the
-    // `LIVE_BY_CONTRACT` carve-out `factory-surface-freeze-authority-1805` owns:
-    // the handle exists to hand out core's live stores. (`handed-out-containers-1957`
-    // was named here and does not carry the carve-out at all.)
+    // ⚠ `getInternals` is the one cached-but-unfrozen surface: the
+    // `LIVE_BY_CONTRACT` carve-out of `factory-surface-freeze-authority-1805`,
+    // whose docblock gives the reason.
     expect(table).toStrictEqual([
       { name: "getInternals", cached: true, frozen: false, sealed: false },
       { name: "getPluginApi", cached: true, frozen: true, sealed: true },

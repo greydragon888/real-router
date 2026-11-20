@@ -3,11 +3,11 @@
  * the rules core applies, re-exported so a plugin depends on
  * `@real-router/core` alone and needs no second copy of a rule.
  *
- * `getInternals` is how `@real-router/validation-plugin` installs
- * `ctx.validator` and runs retrospective validation at registration time.
+ * `@real-router/validation-plugin` reaches `getInternals` for what `PluginApi`
+ * does not hand out; which members it reads is the `getInternals` row of the
+ * "what SHIPPED code outside core reaches for" cell in
+ * `tests/functional/door-census/consumers.test.ts`.
  */
-
-export type { RouterValidator } from "./types/RouterValidator";
 
 export { getInternals } from "./internals";
 

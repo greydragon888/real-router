@@ -41,6 +41,26 @@ describe("the diagnostic channel (#2388)", () => {
     router.stop();
   });
 
+  it("a plugin registered BEFORE start raises nothing", () => {
+    const router = createRouter(routes);
+    const seen: string[] = [];
+
+    getPluginApi(router).subscribeDiagnostic(
+      "PLUGIN_AFTER_START",
+      (methodName) => {
+        seen.push(methodName);
+      },
+    );
+
+    router.usePlugin(() => ({
+      onStart() {
+        /* called on start */
+      },
+    }));
+
+    expect(seen).toStrictEqual([]);
+  });
+
   it("unsubscribe stops delivery", async () => {
     const router = createRouter(routes);
     const heard = vi.fn();

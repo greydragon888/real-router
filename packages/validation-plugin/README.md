@@ -103,7 +103,7 @@ const remove = router.usePlugin(validationPlugin());
 // Throws VALIDATION_PLUGIN_ALREADY_INSTALLED
 router.usePlugin(validationPlugin());
 
-// Fine — the slot is empty again after teardown
+// Fine — after teardown the router takes an installation again
 remove();
 router.usePlugin(validationPlugin());
 ```
@@ -117,14 +117,6 @@ router.usePlugin(validationPlugin());
 
 const perRequest = cloneRouter(router); // already validated
 ```
-
-### `RouterValidator` type
-
-```typescript
-import type { RouterValidator } from "@real-router/validation-plugin";
-```
-
-The type of the `ctx.validator` slot. It declares no member: core asks nothing through the slot. Re-exported from `@real-router/core/validation`. A validator of your own registers checks at positions and subscribes to diagnostic kinds through `PluginApi` (`addCheck`, `subscribeDiagnostic`).
 
 ## Retrospective Validation
 

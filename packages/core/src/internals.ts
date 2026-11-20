@@ -33,7 +33,6 @@ import type {
   PluginFactory,
 } from "./types";
 import type { Limits } from "./types/internal";
-import type { RouterValidator } from "./types/RouterValidator";
 
 export interface RouterInternals<
   D extends DefaultDependencies = DefaultDependencies,
@@ -190,11 +189,8 @@ export interface RouterInternals<
 
   /**
    * Checks registered per position (#2388) — the channel's whole state.
-   *
-   * ⚑ `readonly`, and that is load-bearing rather than tidy: the slot it
-   * replaces (`validator`) was one of the two WRITABLE members that kept this
-   * bag out of `Object.freeze`. A map mutated in place adds no writable member,
-   * so retiring the validator still leaves the bag freezable.
+   * `PluginApi.addCheck` adds to the map in place, and the remover it hands
+   * back splices its check out.
    */
   /* eslint-disable @typescript-eslint/no-explicit-any -- heterogeneous map: stores different CheckFn<P> types under different keys, exactly as `interceptors` above does */
   readonly checks: Map<string, ((...args: any[]) => void)[]>;
@@ -206,8 +202,6 @@ export interface RouterInternals<
   readonly getTree: () => RouteTree;
 
   readonly isDisposed: () => boolean;
-
-  validator: RouterValidator | null;
 
   // Per-router logger instance (built from `options.logger` in the Router
   // constructor), so a `configure()` reaches one router rather than the process

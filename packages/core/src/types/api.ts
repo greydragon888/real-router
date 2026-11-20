@@ -286,9 +286,7 @@ export interface CheckPositionMap {
    *
    * ⚠ This door is documented TOTAL in bare core (INVARIANTS `canNavigateTo`
    * #5), and a check here can throw. That divergence is the analyser's to own,
-   * not this position's: it is the same shape the door already had when the
-   * validator answered here, and `predicate-totality-2245.test.ts` pins both
-   * arms.
+   * not this position's, and `predicate-totality-2245.test.ts` pins both arms.
    */
   "canNavigateTo:entry": [
     name: string,

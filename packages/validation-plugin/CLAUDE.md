@@ -7,11 +7,10 @@
 | Export             | Kind     | Description                                                                                                                              |
 | ------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `validationPlugin` | function | Plugin factory — pass to `router.usePlugin()`. No runtime arguments; generic over the router's dependency map, normally inferred (#1621) |
-| `RouterValidator`  | type     | The type of the `ctx.validator` slot. It declares no member: core asks nothing through the slot (#2388).                                 |
 
 ## Where core asks this plugin
 
-The `RouterValidator` interface declares no member (#2388): core asks every refusal at a check position and raises every report as a diagnostic kind — see _The dependency doors, `cloneRouter` and `usePlugin` refuse and report on the channels_, _The guard doors and the event bus refuse and report on the channels_, _`navigateToState`, `setRootPath`, `navigateToDefault` and `start` refuse and report on the channels_, _The render-path doors and the state builders refuse and report on the channels_ and _The route resolver reports on three kinds_ below. The route-CRUD walks are checks at `addRoute:batch`, `replaceRoutes:batch`, `removeRoute:entry` and `updateRoute:entry`.
+Core asks every refusal at a check position and raises every report as a diagnostic kind (#2388) — see _The dependency doors, `cloneRouter` and `usePlugin` refuse and report on the channels_, _The guard doors and the event bus refuse and report on the channels_, _`navigateToState`, `setRootPath`, `navigateToDefault` and `start` refuse and report on the channels_, _The render-path doors and the state builders refuse and report on the channels_ and _The route resolver reports on three kinds_ below. The route-CRUD walks are checks at `addRoute:batch`, `replaceRoutes:batch`, `removeRoute:entry` and `updateRoute:entry`.
 
 | Kind                   | Report                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -49,22 +48,22 @@ parameter from the start.
 
 ### One router, one validator (#2349)
 
-A registration that finds `ctx.validator` already occupied throws
+A registration on a router the plugin is already installed on throws
 `RouterError("VALIDATION_PLUGIN_ALREADY_INSTALLED")`. A second installation
 would register every check and kind a second time, so a call that passes would
 run each check twice and each report would print once per installation. The
-slot carries the first installation's mark, and `teardown` clears it.
+mark is a module-level `WeakSet` of routers: an installation adds its router,
+and `teardown` and a retrospective pass that throws take it out, so the router
+accepts an installation again after either.
 
 ⚠ **A clone needs no installation of its own.** `cloneRouter` re-runs the base's
 plugin factories, so a clone arrives validated; calling `usePlugin` on it is the
 shape this refuses, and the message says so. The SSR per-request clone is the
 common case.
 
-⚠ **The refusal reads the SLOT, not a tally of installations.** A counter would
-model an ownership the slot does not grant — `validator` is one of two writable
-members on an otherwise `readonly` `RouterInternals`, open to anything importing
-`@real-router/core/validation`. Reading the slot also keeps re-registration after
-`teardown()` working, which the two diagnostic de-dup tests depend on.
+⚠ **Two copies of this package on one router are not refused.** Each copy
+holds a set of its own, so a bundle that carries the package twice and installs
+both copies on one router runs every check and prints every report twice.
 
 ### `undefined` path is allowed in `validateStartArgs`
 
@@ -83,7 +82,7 @@ Value inspection is **own-property only** (mirrors `isParams`) and runs before t
 
 ### Retrospective rollback on failure
 
-If the retrospective pass throws (e.g., duplicate route name, or a dangling `forwardTo` target — a route forwarding to a name the tree does not hold), `ctx.validator` is set back to `null` before the error propagates. ⚠ A **dotted route name** is not among the throws this pass can produce (#1763). `createRouter`, `add` and `replace` each refuse a definition whose own `name` carries a dot — with this package's message, since the rule lives in `engine/validation/route-batch.ts` — so the failure lands before any plugin exists and a second check here would be unreachable. The router is left in a clean state — no partial validation active. The error surfaces at the `usePlugin()` call site.
+If the retrospective pass throws (e.g., duplicate route name, or a dangling `forwardTo` target — a route forwarding to a name the tree does not hold), the router leaves the installation mark before the error propagates, and nothing is registered: the checks and kinds are registered after the pass. ⚠ A **dotted route name** is not among the throws this pass can produce (#1763). `createRouter`, `add` and `replace` each refuse a definition whose own `name` carries a dot — with this package's message, since the rule lives in `engine/validation/route-batch.ts` — so the failure lands before any plugin exists and a second check here would be unreachable. The router is left in a clean state — no partial validation active. The error surfaces at the `usePlugin()` call site.
 
 ### The two diagnostics answer the predicates differently — on purpose (#1581)
 
@@ -159,9 +158,9 @@ for the design is the design's own bug report.
 regression — the shape recurred once already (#1579 copied #1575's module-level
 `Set` a release later), which is why the guard is a scan rather than two fixed
 call sites. It flags only ACCUMULATING state: a frozen lookup table is fine, and
-so is a `WeakMap` keyed by an object, which evicts with its key.
+so is a `WeakMap` or a `WeakSet` keyed by an object, which evicts with its key.
 
-### The `navigate` family consults the validator for nothing (#2388)
+### The `navigate` family refuses through checks (#2388)
 
 `navigate` and `canNavigateTo` register their argument refusals as checks at
 four positions — `navigate:entry` / `navigate:params` and the two
@@ -178,7 +177,7 @@ error (#1572), not something the channel introduced.
 the state from, the defaults a `navigateToDefault` callback returns included,
 and the check there runs `validateStateBuilderArgs`.
 
-### The printers' value walks are checks, not validator members (#2388)
+### The printers' value walks are checks (#2388)
 
 `buildPath` and `buildPathResolved` register their path-bag VALUE walk with
 `PluginApi.addCheck(…)`, at `buildPath:params` / `buildPathResolved:params`;
@@ -200,9 +199,8 @@ caller's bag, not core's copy — a copy launders every shape it exists to
 refuse — so `buildPath:entry` and `buildPathResolved:entry` hand it the
 caller's values, and only the value walk gets the copy.
 
-⚠ **`teardown` must remove the registration.** Nulling `ctx.validator` does
-nothing to a channel registration, so a leak here leaves a torn-down plugin
-still refusing.
+⚠ **`teardown` must remove the registration**, or a torn-down plugin keeps
+refusing.
 
 ### The dependency doors, `cloneRouter` and `usePlugin` refuse and report on the channels (#2388)
 
@@ -321,14 +319,6 @@ it, `replace()` throws it and keeps the state on its old path, and
 `isActiveRoute` on the active route and `canNavigateTo` catch it and answer
 `false`.
 
-### Teardown disables validation — and clears only the mark it still holds
-
-Calling the unsubscribe function returned by `router.usePlugin(validationPlugin())` removes every check and kind the plugin registered and clears `ctx.validator`. All subsequent router calls skip validation silently. This is by design — plugins are removable.
-
-⚠ **The release is owner-checked (#2339 §4 1b).** The plugin holds the object it wrote and nulls the slot only while that object is still there. `RouterInternals.validator` has no owner — it is plain data on a surface pinned `accessorNames === []`, so a second writer cannot be REFUSED at the slot — and an unconditional `= null` would therefore clear whoever holds the slot at teardown time, after which a further installation is no longer refused. `tests/functional/validator-slot-owner-1b.test.ts` holds both arms. Same shape as `claimContextNamespace`, which checks the holder on write and on release (#2059 / #1929); here only the release half is reachable.
-
-⚠ **The WRITE half stays open, deliberately.** Refusing a second write needs an accessor on `RouterInternals`, and `accessorNames === []` is pinned on all six handed-out surfaces (`door-census/surface.test.ts`). It is answered where the slot goes away, not here — #2373.
-
 ### Cross-field `Options` validation
 
 `validateOptions` + the retrospective pass diagnose combinations that individual field checks cannot catch:
@@ -359,15 +349,9 @@ The plugin does **not** import core's routing engine (`packages/core/src/engine/
 
 Every `[router.<door>]` head in `src/` is checked against the doors that can
 actually reach it, by `tests/functional/prefix-reachability-authority-2457.test.ts`.
-The door comes from three places, none of them a list: an `addCheck("<door>:<slot>")`
-position, the implementation in core that consults a `RouterValidator` member, or
-a `methodName` the caller hands down for a helper serving several doors.
-
-⚠ **The resolution of an implementation name STOPS at a published door.** It exists
-only to translate `#runStart` into `start` and `#startPlugin` → `use` into
-`usePlugin`. Left to run past a published name it becomes an unbounded closure —
-measured, that gave one validator eleven doors, because `navigate`, `start` and
-`matchPath` all reach a path build eventually, and a wrong door then passed.
+The door comes from two places, none of them a list: an `addCheck("<door>:<slot>")`
+position, or a `methodName` the caller hands down for a helper serving several
+doors.
 
 ⚑ The register holds the two published names (`[cloneRouter]`, `[validation-plugin]`) and nothing else: a refusal no caller input can reach takes O-1's `Internal error (please report): ` marker rather than a bracketed head (#2487). "Both batch doors report `addRoute`" needs no entry either — the shared helper is reached from both batch positions, so the rule admits it unaided.
 
@@ -377,15 +361,8 @@ that share it: two object-literal methods, a function and a method, two nested
 helpers, each reached from a different door. Through the checker a call follows
 lexical scope, an import through the `type-guards` barrel, and a method to the
 object or class that declares it, so no form of the collision is left for a key to
-separate. The member a wiring entry implements is keyed `namespace.member` for the
-same reason: a member name can repeat across namespaces, each consulted from its
-own doors. The real tree's collisions are inert today, so synthetic cells hold
-both keys, and the member cell reads a core tree written for it.
-
-⚠ **Core's call graph stays keyed by name.** Core reaches some doors through a
-dependency-injection interface the checker cannot follow, and linking those calls
-by name is what finds the door behind them. `doorsForMember` in the authority
-records the measurement.
+separate. The real tree's collisions are inert today, so synthetic cells hold
+the key.
 
 `route-door-prefix-2399.test.ts` stays beside it and answers a different question —
 what a caller SEES, driven end to end. Its reach is the sixteen refusals it drives:
@@ -440,4 +417,3 @@ only the exotic call described under _The dependency doors, `cloneRouter` and `u
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Source structure, data flow, design decisions
 - [packages/core/CLAUDE.md](../core/CLAUDE.md) — How core asks this plugin to refuse or report: check positions and diagnostic kinds
-- [packages/core/src/types/RouterValidator.ts](../core/src/types/RouterValidator.ts) — the slot's type, which declares no member

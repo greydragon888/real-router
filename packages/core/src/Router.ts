@@ -778,7 +778,6 @@ export class Router<
       getRootPath: () => this.#routes.getStore().rootPath,
       getTree: () => this.#routes.getStore().tree,
       isDisposed: () => this.#eventBus.isDisposed(),
-      validator: null,
       // Dependencies (issue #172)
       dependenciesGetStore: () => this.#dependenciesStore,
       // Clone support (issue #173)

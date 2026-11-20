@@ -85,8 +85,9 @@ describe("router.navigate() - edge cases input validation", () => {
   // Boundary inputs — params / opts / route name (#17)
   //
   // Every assertion below reflects the ACTUAL, empirically-observed behavior of
-  // the code (validation-plugin is NOT registered, so core's `validator?` hooks
-  // are no-ops and inputs flow straight into buildNavigateState / the matcher).
+  // the code (validation-plugin is NOT registered, so no check runs at core's
+  // check positions and inputs flow straight into buildNavigateState / the
+  // matcher).
   // Where the observed behavior is surprising it is called out in a comment.
   // ============================================================================
 

@@ -210,7 +210,7 @@ the user runs. That is the intended shape — the analyser is stricter — and i
 is the reason a refusal belongs to the plugin only where core can keep working.
 
 ⚑ **Worked application — four plugin-facing doors (#2247).** The rule answers
-each without a new `RouterValidator` member:
+each without a check position:
 
 | door                              | outcome                                          | measured reason                                                                                                                                                                           |
 | --------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -409,8 +409,8 @@ in shipped source carrying eight members or more was checked for members the
 declaring package never uses — the mechanical form of "it landed because someone
 else needed it". The majority came back clean, and the clean ones all have a
 construction that can say no: a dependency bag admits nothing without a call site
-that reads it, a store admits only state its namespace owns and references its
-doors read, a validator method needs a door to guard.
+that reads it, and a store admits only state its namespace owns and references
+its doors read.
 
 ⚠ **Size is not the signal, and neither is a member with one reader.** Both were
 tried and both failed: `NavigationDependencies` carries 29 members with over half
@@ -615,12 +615,10 @@ bind in the constructor if it touches private fields.
 **Standalone API methods:** module-private CRUD function in `api/get*Api.ts` →
 method on the returned object → reach internals via `getInternals(router)`.
 
-**Adding validation** never adds a member to `RouterValidator` or a call to one,
-wherever in core it goes: the interface declares no member, and core asks
-nothing through the slot (#2388). A refusal goes on the check channel
-and a report on the diagnostic channel; a consultation that does both is split
-between them. Whether a refusal belongs to core rather than to the plugin is
-decided under _Who refuses — core or the analyser_ above.
+**Adding validation** goes on the two channels (#2388): a refusal on the check
+channel and a report on the diagnostic channel, and a consultation that does
+both is split between them. Whether a refusal belongs to core rather than to
+the plugin is decided under _Who refuses — core or the analyser_ above.
 
 - **A refusal is a check at a named position.** Declare the argument tuple in
   `CheckPositionMap` (`src/types/api.ts`) and the key in `POSITION`
@@ -717,9 +715,8 @@ TypeScript-enforced invariants, and always give the reason.
 ### Mutation testing (Stryker)
 
 The score stops short of 100 %, and the remainder is structurally not worth
-disabling: **entangled** mutators (a killed and a survived variant on one line),
-**equivalents** (no test can kill them), and **validator-opt-in** branches that are
-dead in core and covered in the plugin.
+disabling: **entangled** mutators (a killed and a survived variant on one line)
+and **equivalents** (no test can kill them).
 
 - **`survived ≠ equivalent`.** Disable ONLY after proving equivalence empirically.
   Silencing an unproven survivor hides a real gap — the exact anti-pattern

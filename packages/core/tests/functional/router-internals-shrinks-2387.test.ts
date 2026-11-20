@@ -47,7 +47,6 @@ const MEMBERS = [
   "getRootPath",
   "getTree",
   "isDisposed",
-  "validator",
   "logger",
   "dependenciesGetStore",
   "getCloneState",
