@@ -179,6 +179,16 @@ export type DiagnosticEventMap = {
    * is about to resolve the configured defaults. Raised once per such call.
    */
   NAVIGATE_TO_DEFAULT: [];
+
+  /**
+   * A `buildPath` call passed its `buildPath:entry` checks: the route name and
+   * the `params` bag as the caller passed them, before core copies the bag.
+   * Raised once per such call; core judges nothing about the bag.
+   */
+  BUILD_PATH: [routeName: string, params: Params | undefined];
+
+  /** The same report from `isActiveRoute`, after `isActiveRoute:entry`. */
+  IS_ACTIVE_ROUTE: [routeName: string, params: Params | undefined];
 };
 
 /**
@@ -202,10 +212,7 @@ export type DiagnosticEventMap = {
  * here when shipped code asks the question there, never because a door looks
  * like it might want one — an eligible-looking position with no consultation is
  * how a vocabulary grows by default rather than by decision (core/CLAUDE.md
- * › _Before adding an aggregating entity_). A refusal has been recorded:
- * `buildPath`'s ENTRY is eligible and absent, because the consultation standing
- * there mixes a refusal with a diagnostic and a diagnostic is not this
- * channel's to carry.
+ * › _Before adding an aggregating entity_).
  *
  * ⚠ The map's VALUE is the argument tuple, so a check registered at a position
  * is typed by what that position judges rather than by the door's signature.
@@ -458,6 +465,86 @@ export interface CheckPositionMap {
    * when the caller passed none, for an interceptor to supply.
    */
   "start:entry": [path: string | undefined];
+
+  /**
+   * `buildPath`'s three arguments, as the caller passed them. The bag is the
+   * caller's, not core's copy: a check here judges its SHAPE, which the copy
+   * would launder.
+   */
+  "buildPath:entry": [
+    route: string,
+    params: Params | undefined,
+    search: SearchParams | undefined,
+  ];
+
+  /**
+   * The two bags of `PluginApi.buildPathResolved`, as the caller passed them.
+   * Asked after core copies the path bag, and handed the caller's.
+   */
+  "buildPathResolved:entry": [
+    params: Params | undefined,
+    search: SearchParams | undefined,
+  ];
+
+  /**
+   * `isActiveRoute`'s five arguments, as the caller passed them.
+   *
+   * ⚠ This door is documented TOTAL in bare core (INVARIANTS `isActiveRoute`
+   * #9), and a check here can throw — the divergence `canNavigateTo:entry`
+   * describes, pinned by the same `predicate-totality-2245.test.ts`.
+   */
+  "isActiveRoute:entry": [
+    name: string,
+    params: Params | undefined,
+    search: SearchParams | undefined,
+    strictEquality: boolean | undefined,
+    ignoreQueryParams: boolean | undefined,
+  ];
+
+  /**
+   * `areStatesEqual`'s three arguments — `ignoreQueryParams` with its default
+   * applied, so an omitted flag arrives as `true`.
+   */
+  "areStatesEqual:entry": [
+    state1: State | undefined,
+    state2: State | undefined,
+    ignoreQueryParams: boolean,
+  ];
+
+  /**
+   * `shouldUpdateNode`'s argument, asked when the predicate is built — not on
+   * the calls of the predicate it returns.
+   */
+  "shouldUpdateNode:entry": [nodeName: string];
+
+  /** `matchPath`'s path, as the caller passed it. */
+  "matchPath:entry": [path: string];
+
+  /**
+   * The `params` a route's `decodeParams` returned, `undefined` when it
+   * returned none — application code's output, which core builds the state
+   * from (#1582). Asked only for a route with a decoder.
+   */
+  "matchPath:decoded": [routeName: string, decodedParams: Params | undefined];
+
+  /**
+   * The arguments `makeState`'s state builder receives — `:state` for the
+   * reason `buildNavigationState:state` gives: `params` is core's ADOPTED copy
+   * (#2134), while the name, search and path are the caller's.
+   */
+  "makeState:state": [
+    name: string,
+    ownParams: Params | undefined,
+    search: SearchParams | undefined,
+    path: string | undefined,
+  ];
+
+  /**
+   * The name and path bag the navigation pipeline builds its target state from,
+   * below the `navigate` facade: core's copy of the caller's bag, or the
+   * defaults `navigateToDefault` resolved. A check here refuses as a rejection.
+   */
+  "navigate:state": [routeName: string, routeParams: Params];
 }
 
 /**

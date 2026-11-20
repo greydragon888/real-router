@@ -3,7 +3,13 @@
 import { raiser } from "@real-router/core/utils";
 import { areParamValuesEqual } from "@real-router/core/validation";
 
-import { isString, isParams, getTypeDescription } from "../type-guards";
+import {
+  isBoolean,
+  isString,
+  isParams,
+  isState,
+  getTypeDescription,
+} from "../type-guards";
 
 import type {
   Params,
@@ -16,6 +22,7 @@ import type {
 } from "@real-router/core";
 
 const atMakeState = raiser("router", "makeState");
+const atAreStatesEqual = raiser("router", "areStatesEqual");
 
 /**
  * Captured at module load (#1971): it decides which keys a bag returned by the
@@ -38,6 +45,49 @@ export function validateMakeStateArgs(
 
   if (path !== undefined && !isString(path)) {
     throw atMakeState.type`Invalid path: ${getTypeDescription(path)}. Expected string.`;
+  }
+}
+
+/**
+ * A `search` that `areStatesEqual(…, false)` can compare: an object that is
+ * neither `null` nor an array — the shape `validateSearch` accepts for a query
+ * bag.
+ */
+function isSearchBag(value: unknown): boolean {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function validateAreStatesEqualArgs(
+  state1: unknown,
+  state2: unknown,
+  ignoreQueryParams: unknown,
+): void {
+  if (!isState(state1)) {
+    throw atAreStatesEqual.type`Invalid state1: ${getTypeDescription(state1)}. Expected State object.`;
+  }
+  if (!isState(state2)) {
+    throw atAreStatesEqual.type`Invalid state2: ${getTypeDescription(state2)}. Expected State object.`;
+  }
+  if (ignoreQueryParams !== undefined && !isBoolean(ignoreQueryParams)) {
+    throw atAreStatesEqual.type`Invalid ignoreQueryParams: ${getTypeDescription(ignoreQueryParams)}. Expected boolean.`;
+  }
+  // `false` compares both states' `search`. `isState` does not read it: its
+  // fields are `isRequiredFields`, which `scripts/tests/twin-lockstep.test.mjs`
+  // holds code-identical to the history-entry guard's copy, where `search` may
+  // be absent.
+  if (ignoreQueryParams === false) {
+    // One read of each slot, so the message names the value judged.
+    const search1: unknown = state1.search;
+
+    if (!isSearchBag(search1)) {
+      throw atAreStatesEqual.type`Invalid state1.search: ${getTypeDescription(search1)}. Expected a plain object.`;
+    }
+
+    const search2: unknown = state2.search;
+
+    if (!isSearchBag(search2)) {
+      throw atAreStatesEqual.type`Invalid state2.search: ${getTypeDescription(search2)}. Expected a plain object.`;
+    }
   }
 }
 

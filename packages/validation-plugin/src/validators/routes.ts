@@ -400,9 +400,9 @@ export function validateBuildPathArgs(route: unknown): asserts route is string {
  * carries three carve-outs a copy would lose, and this package has already paid
  * for a mirrored rule drifting from its original (#1224 / #1225).
  *
- * De-duplicated per `route + key`, on a cache owned by the VALIDATOR object and
- * so by the router (#1583) — the same shape, and the same reason, as the mode
- * gate's reporter one file over.
+ * De-duplicated per `route + key`, on a cache the plugin's registration owns,
+ * one per router (#1583); the `BUILD_PATH` and `IS_ACTIVE_ROUTE` handlers
+ * share it.
  */
 export function createMisChanneledKeyReporter(
   queryNamesOf: (routeName: string) => readonly string[],
@@ -413,11 +413,12 @@ export function createMisChanneledKeyReporter(
     routeName: string,
     params: unknown,
   ): void {
-    // No name guard and no `try`: every caller runs the door's own validator
-    // first, which throws on anything but a non-empty string, and
-    // `getQueryParams` answers `[]` for a name the router does not hold rather
-    // than throwing — measured, not assumed. A branch neither reachable nor
-    // provable is a coverage hole with a comment attached.
+    // No name guard and no `try`: core raises both kinds after the door's
+    // `:entry` checks, where this plugin refuses a name that is not a string,
+    // and `getDeclaredQueryNames` answers `[]` for a name the router does not
+    // hold, the empty one `isActiveRoute` lets through included, rather than
+    // throwing — measured, not assumed. A branch neither reachable nor provable
+    // is a coverage hole with a comment attached.
     const key = findMisChanneledKey(
       params as Params | undefined,
       queryNamesOf(routeName),

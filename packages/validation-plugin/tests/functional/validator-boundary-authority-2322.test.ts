@@ -62,11 +62,13 @@ import type { LoggerConfig, Router } from "@real-router/core";
  * stays green when the plugin's method stops acting. A row only it reds is
  * {@link SELF}.
  *
- * ⚠ **Silence is not redundancy.** `validateParamsShape` produces the same
- * message as a sibling at every door, measured. What the sibling cannot
- * reproduce is WHEN: the shape half runs before `adoptChannel` asks the caller's
- * bag for its own keys, so removing it adds an `ownKeys` trap on application
- * code ahead of the refusal. The cell below pins the trap sequence rather than
+ * ⚠ **Silence is not redundancy.** `validateNavigateParamsShape` produces the
+ * same message as a sibling at `buildPath`, `buildPathResolved`, `navigate` and
+ * `canNavigateTo`, measured. What the sibling cannot reproduce is WHEN: the
+ * shape half runs before the value walk at the door's `:params` position asks
+ * the caller's bag for its own keys — `adoptChannel` hands a bag of the wrong
+ * shape back as it is — so removing it adds an `ownKeys` trap on application
+ * code ahead of the refusal. The cells below pin the trap sequence rather than
  * the message, which is the only form that can tell the two apart.
  *
  * ⚠ **A parity test cannot own a mirrored consultation, by construction.**
@@ -107,19 +109,9 @@ const SELF = "validator-boundary-authority-2322.test.ts";
  * {@link MIRRORED} when nothing can.
  */
 const OWNER: Record<string, string> = {
-  "navigation.validateParamsShape": SELF,
-  "navigation.validateSearch": "both-channels-authority-1972.test.ts",
-  "routes.validateBuildPathArgs": "router-methods.validation.test.ts",
-  "routes.validateIsActiveRouteArgs": "predicate-totality-2245.test.ts",
-  "routes.validateMatchPathArgs": SELF,
-  "routes.validateRouteName": "route-name-doors.test.ts",
-  "routes.validateShouldUpdateNodeArgs": "router-methods.validation.test.ts",
-  "routes.validateStateBuilderArgs": "plugin-api.validation.test.ts",
   "state.reportCodecRoundTrip": "codec-round-trip.test.ts",
   "state.reportDroppedQueryKey": "dropped-query-key.test.ts",
   "state.reportUndeclaredParamKey": "undeclared-param-key.test.ts",
-  "state.validateAreStatesEqualArgs": "plugin-api.validation.test.ts",
-  "state.validateMakeStateArgs": "plugin-api.validation.test.ts",
 };
 
 /**
@@ -156,12 +148,16 @@ const REGISTRATION_OWNER: Record<string, string> = {
     "plugin-api.validation.test.ts",
   "USE_PLUGIN_HOOK_NOT_FUNCTION › warnPluginMethodType":
     "plugin-api.validation.test.ts",
+  "BUILD_PATH › reportMisChanneledKey": "mis-channelled-href-2238.test.ts",
+  "IS_ACTIVE_ROUTE › reportMisChanneledKey": "mis-channelled-href-2238.test.ts",
   "addActivateGuard:entry › validateHandler": "lifecycle.validation.test.ts",
   "addActivateGuard:entry › validateRouteName": "lifecycle.validation.test.ts",
   "addDeactivateGuard:entry › validateHandler": SELF,
   "addDeactivateGuard:entry › validateRouteName":
     "lifecycle.validation.test.ts",
   "addRoute:batch › checkRouteBatch": "routes.validation.test.ts",
+  "areStatesEqual:entry › validateAreStatesEqualArgs":
+    "plugin-api.validation.test.ts",
   "canActivate:count › validateHandlerLimit": "limits.test.ts",
   "canDeactivate:count › validateHandlerLimit":
     "lifecycle-channels-consumer-2388.test.ts",
@@ -169,8 +165,15 @@ const REGISTRATION_OWNER: Record<string, string> = {
     "both-channels-authority-1972.test.ts",
   "buildNavigationState:state › validateStateBuilderArgs":
     "plugin-api.validation.test.ts",
+  "buildPath:entry › validateBuildPathArgs":
+    "router-methods.validation.test.ts",
+  "buildPath:entry › validateNavigateParamsShape": SELF,
+  "buildPath:entry › validateSearch": "both-channels-authority-1972.test.ts",
   "buildPath:params › validateNavigateParams":
     "check-channel-consumer-2388.test.ts",
+  "buildPathResolved:entry › validateNavigateParamsShape": SELF,
+  "buildPathResolved:entry › validateSearch":
+    "both-channels-authority-1972.test.ts",
   "buildPathResolved:params › validateNavigateParams":
     "check-channel-consumer-2388.test.ts",
   "canNavigateTo:entry › validateNavigateParamsShape": SELF,
@@ -191,11 +194,21 @@ const REGISTRATION_OWNER: Record<string, string> = {
   "hasDependency:entry › validateDependencyName":
     "dependencies.validation.test.ts",
   "hasRoute:entry › validateRouteName": "routes.validation.test.ts",
+  "isActiveRoute:entry › validateIsActiveRouteArgs":
+    "predicate-totality-2245.test.ts",
+  "isActiveRoute:entry › validateRouteName": SELF,
+  "isActiveRoute:entry › validateSearch":
+    "both-channels-authority-1972.test.ts",
+  "makeState:state › validateMakeStateArgs": "plugin-api.validation.test.ts",
+  "makeState:state › validateSearch": "both-channels-authority-1972.test.ts",
+  "matchPath:decoded › validateStateBuilderArgs": "decoder-output.test.ts",
+  "matchPath:entry › validateMatchPathArgs": SELF,
   "navigate:entry › validateNavigateArgs": "navigation.validation.test.ts",
   "navigate:entry › validateNavigateParamsShape": SELF,
   "navigate:entry › validateNavigationOptions": "navigation.validation.test.ts",
   "navigate:entry › validateSearch": "both-channels-authority-1972.test.ts",
   "navigate:params › validateNavigateParams": "navigation.validation.test.ts",
+  "navigate:state › validateStateBuilderArgs": SELF,
   "navigateToDefault:entry › validateNavigateToDefaultArgs":
     "navigation-channels-consumer-2388.test.ts",
   "navigateToDefault:entry › validateNavigationOptions":
@@ -225,6 +238,8 @@ const REGISTRATION_OWNER: Record<string, string> = {
   "setDependency:entry › validateSetDependencyArgs":
     "dependencies.validation.test.ts",
   "setRootPath:entry › validateSetRootPathArgs": "routes.validation.test.ts",
+  "shouldUpdateNode:entry › validateShouldUpdateNodeArgs":
+    "router-methods.validation.test.ts",
   "start:entry › validateStartArgs": "router-methods.validation.test.ts",
   "updateRoute:entry › throwIfInternalRoute": MIRRORED,
   "updateRoute:entry › validateUpdateRoute": "routes.validation.test.ts",
@@ -1109,11 +1124,40 @@ describe("each consultation the walk derives from core is classified (#2322)", (
     expect(mirroredIn(OWNER)).toStrictEqual([]);
   });
 
-  it("CONTROL — the walk reaches core and sees a consultation made twice", () => {
-    // A walk that silently matched nothing would agree with an empty table, and
-    // one that collapsed every site into one key would hide the file spread.
-    expect(derived).toContain("routes.validateBuildPathArgs");
-    expect(sites.length).toBeGreaterThan(derived.size);
+  // ⚑ On a tree written for it: converting core's consultations (#2388)
+  // leaves no member consulted twice in core's own tree. A walk that matched
+  // nothing in core reds the table cell above while the table has rows.
+  const twice = censusOf({
+    "RouterValidator.ts": [
+      "export interface RouterValidator {",
+      "  lifecycle: {",
+      "    member: () => void;",
+      "  };",
+      "}",
+    ],
+    "first.ts": [
+      'import type { RouterValidator } from "./RouterValidator";',
+      "",
+      "declare const ctx: { validator: RouterValidator | null };",
+      "",
+      "ctx.validator?.lifecycle.member();",
+    ],
+    "second.ts": [
+      'import type { RouterValidator } from "./RouterValidator";',
+      "",
+      "declare function getValidator(): RouterValidator | null;",
+      "",
+      "getValidator()?.lifecycle.member();",
+    ],
+  });
+
+  it("CONTROL — the walk keys a consultation made twice once per site", () => {
+    // One that collapsed every site into one key would hide the file spread.
+    expect(twice.sites).toStrictEqual([
+      { key: "lifecycle.member", file: "first.ts" },
+      { key: "lifecycle.member", file: "second.ts" },
+    ]);
+    expect(twice.diagnostics).toStrictEqual([]);
   });
 });
 
@@ -1604,12 +1648,14 @@ describe("what nothing else held (#2322)", () => {
     expect(run(false)).toStrictEqual([]);
   });
 
-  it("validateParamsShape — the refusal lands BEFORE the caller's bag is walked", () => {
-    // ⚑ The subject is the TRAP SEQUENCE, not the message: every door produces
-    // the same wording either way, because `isParams` re-applies the shape rules
-    // to core's copy one call later. What only this consultation can do is
-    // refuse before `adoptChannel` asks the bag for its own keys — application
-    // code that a wrong-shape argument should never have reached.
+  it("validateNavigateParamsShape — buildPath refuses BEFORE the caller's bag is walked", () => {
+    // ⚑ The subject is the TRAP SEQUENCE, not the message: `buildPath` produces
+    // the same wording either way, because the value walk at `buildPath:params`
+    // re-applies the shape rules to the same object one call later —
+    // `adoptChannel` hands a bag of the wrong shape back as it is. What only
+    // this consultation can do is refuse before that walk asks the bag for its
+    // own keys — application code that a wrong-shape argument should never
+    // have reached.
     const reads: string[] = [];
 
     expect(() =>
@@ -1655,6 +1701,71 @@ describe("what nothing else held (#2322)", () => {
       expect(bareReads).toContain("ownKeys");
     },
   );
+
+  it("validateNavigateParamsShape — buildPathResolved refuses BEFORE the value walk reads the caller's bag", () => {
+    // ⚑ The trap sequence again, at the door that takes its copy before the
+    // entry check: `adoptChannel` hands a bag of the wrong shape back as it
+    // is, so the value walk at `buildPathResolved:params` would ask the
+    // caller's own object for its keys. The wording is the same either way.
+    const reads: string[] = [];
+
+    expect(() =>
+      getPluginApi(make(true)).buildPathResolved(
+        "a",
+        watchedInstance(reads) as never,
+      ),
+    ).toThrow("params must be a plain object");
+
+    expect(reads).toStrictEqual(["get:constructor"]);
+  });
+
+  it("validateRouteName — isActiveRoute names a whitespace-only name", () => {
+    // `validateIsActiveRouteArgs` asks of the name only that it is a string,
+    // so a whitespace-only name reaches this call alone.
+    const run = (router: Router): unknown =>
+      router.isActiveRoute(" ".repeat(3));
+
+    expect(refusalOf(run, true)).toBe(
+      "[router.isActiveRoute] Route name cannot contain only whitespace",
+    );
+
+    expect(refusalOf(run, false)).toBe("NO THROW");
+  });
+
+  it("validateStateBuilderArgs — navigate:state refuses a defaults bag no entry check saw", async () => {
+    // ⚑ `navigateToDefault` hands the defaults a callback returns to the
+    // pipeline without the facade's entry checks, so `navigate:state` is the
+    // one position that judges their shape.
+    const outcome = async (withPlugin: boolean): Promise<string> => {
+      const router = createRouter([...ROUTES], {
+        defaultRoute: "b",
+        defaultParams: () => new Map() as never,
+        logger: { level: "none" },
+      });
+
+      if (withPlugin) {
+        router.usePlugin(validationPlugin());
+      }
+
+      await router.start("/a/1");
+
+      try {
+        const state = await router.navigateToDefault();
+
+        return state.name;
+      } catch (error) {
+        return (error as Error).message;
+      } finally {
+        router.dispose();
+      }
+    };
+
+    await expect(outcome(true)).resolves.toBe(
+      "[router.navigate] Invalid routeParams: Map. Expected plain object.",
+    );
+
+    await expect(outcome(false)).resolves.toBe("b");
+  });
 
   it("validateHandler — addDeactivateGuard names a handler that is neither a boolean nor a factory", () => {
     const run = (router: Router): unknown => {

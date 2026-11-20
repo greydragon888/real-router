@@ -31,45 +31,43 @@ describe("core/validator call-site contract (facade + namespaces)", () => {
   });
 
   // ===========================================================================
-  // Router.ts facade caller strings
+  // Router.ts facade
   // ===========================================================================
   describe("facade", () => {
-    it("isActiveRoute: validates name with caller 'isActiveRoute'", () => {
+    it("the render-path doors and the state builders consult the validator for NOTHING (#2388)", async () => {
+      // Their refusals are checks, and the report `buildPath` and
+      // `isActiveRoute` raise is a diagnostic kind; what each position and
+      // kind receives is `render-path-channels-2388.test.ts`'s.
+      await router.start("/home");
+      vi.clearAllMocks();
+
+      const api = getPluginApi(router);
+      const state = router.getState();
+
+      router.buildPath("items", { id: "1" });
       router.isActiveRoute("home");
+      router.areStatesEqual(state, state);
+      router.shouldUpdateNode("home");
+      api.buildPathResolved("items", { id: "1" });
+      api.matchPath("/home");
+      api.makeState("home", {}, undefined, "/home");
 
-      expect(validator.routes.validateRouteName).toHaveBeenCalledWith(
-        "home",
-        "isActiveRoute",
-      );
+      expect(consultationsOn(validator)).toStrictEqual([]);
     });
 
-    it("BOTH printers consult the validator at ENTRY, and neither for the copy's values", () => {
-      router.buildPath("items", { id: "1" });
-      getPluginApi(router).buildPathResolved("items", { id: "1" });
+    it("CONTROL — the consultation census sees a consultation made on purpose", () => {
+      // Without this the cells around it would agree with a census that
+      // reports an empty set for every door. The consultation is made here
+      // rather than through a door, so a door core converts later cannot
+      // empty the control along with the census.
+      const probe = validator as unknown as Record<
+        string,
+        Record<string, () => void>
+      >;
 
-      // Both halves since #2238: the plugin reports the retired single-bag
-      // spelling out of this call, so the bag travels with the name it is about.
-      expect(validator.routes.validateBuildPathArgs).toHaveBeenCalledWith(
-        "items",
-        { id: "1" },
-      );
+      probe.purpose.built();
 
-      // ⚑ The value walk left this tier for the check channel (#2388): core asks
-      // at each printer's `…:params` position instead, because those are handed
-      // `ownParams` — the copy that ships. A call here would mean the refusal is
-      // raised TWICE, on two different objects.
-      //
-      // ⚠ No assertion that `validateParams` was NOT called: the member has left
-      // `RouterValidator` entirely (#2388), so the compiler owns that now and a
-      // runtime cell would only restate it.
-    });
-
-    it("CONTROL — the consultation census sees a door that still consults", () => {
-      // Without this the two cells below would agree with a census that reports
-      // an empty set for every door, including one nothing was converted at.
-      router.buildPath("items", { id: "1" });
-
-      expect(consultationsOn(validator)).not.toStrictEqual([]);
+      expect(consultationsOn(validator)).toStrictEqual(["purpose.built"]);
     });
 
     it("canNavigateTo consults the validator for NOTHING — its refusals are checks (#2388)", async () => {
@@ -81,21 +79,18 @@ describe("core/validator call-site contract (facade + namespaces)", () => {
       expect(consultationsOn(validator)).toStrictEqual([]);
     });
 
-    it("navigate: the facade consults nothing, and the pipeline below is its own layer (#2388)", async () => {
+    it("navigate consults the validator for nothing, the pipeline below included (#2388)", async () => {
+      // The pipeline asks `navigate:state` about the state it BUILDS; what that
+      // position receives is `render-path-channels-2388.test.ts`'s.
       await router.start("/home");
       vi.clearAllMocks();
 
       await router.navigate("items", { id: "1" });
 
-      // ⚑ Not empty, and the remainder is the statement: the facade's four
-      // consultations became one check, while the pipeline underneath still
-      // judges the state it BUILDS. A door is converted at its own layer.
-      expect(consultationsOn(validator)).toStrictEqual([
-        "routes.validateStateBuilderArgs",
-      ]);
+      expect(consultationsOn(validator)).toStrictEqual([]);
     });
 
-    it("navigateToDefault: the facade consults nothing, and the pipeline below is its own layer (#2388)", async () => {
+    it("navigateToDefault consults the validator for nothing, the pipeline below included (#2388)", async () => {
       // Its refusals are checks at `navigateToDefault:entry` and
       // `navigateToDefault:route`, and its report a diagnostic kind; what each
       // receives is `navigation-channels-2388.test.ts`'s.
@@ -105,11 +100,7 @@ describe("core/validator call-site contract (facade + namespaces)", () => {
       // defaultRoute === "home" === current state → rejects SAME_STATES.
       await router.navigateToDefault().catch(() => {});
 
-      // ⚑ The remainder is `navigate`'s: the default navigation builds its
-      // target state through the same pipeline.
-      expect(consultationsOn(validator)).toStrictEqual([
-        "routes.validateStateBuilderArgs",
-      ]);
+      expect(consultationsOn(validator)).toStrictEqual([]);
     });
   });
 

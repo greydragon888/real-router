@@ -7,17 +7,15 @@
 | Export             | Kind     | Description                                                                                                                              |
 | ------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `validationPlugin` | function | Plugin factory — pass to `router.usePlugin()`. No runtime arguments; generic over the router's dependency map, normally inferred (#1621) |
-| `RouterValidator`  | type     | Full validator interface that core calls into via `ctx.validator?.ns.fn()`.                                                              |
+| `RouterValidator`  | type     | The validator interface of the three `state` reports, which core asks through `ctx.validator?.state.report…()`.                          |
 
 ## Validator Namespaces
 
-The `RouterValidator` interface is organized into namespaces matching core's namespace structure. The dependency doors, `cloneRouter`, `usePlugin`, the guard doors, the event bus, `navigateToState`, `setRootPath`, `navigateToDefault` and `start` have none — see _The dependency doors, `cloneRouter` and `usePlugin` refuse and report on the channels_, _The guard doors and the event bus refuse and report on the channels_ and _`navigateToState`, `setRootPath`, `navigateToDefault` and `start` refuse and report on the channels_ below:
+The `RouterValidator` interface holds one namespace, `state`, whose three reports the route resolver asks. Core asks this plugin's other refusals and reports at check positions and diagnostic kinds — see _The dependency doors, `cloneRouter` and `usePlugin` refuse and report on the channels_, _The guard doors and the event bus refuse and report on the channels_, _`navigateToState`, `setRootPath`, `navigateToDefault` and `start` refuse and report on the channels_ and _The render-path doors and the state builders refuse and report on the channels_ below. The route-CRUD walks are checks at `addRoute:batch`, `replaceRoutes:batch`, `removeRoute:entry` and `updateRoute:entry`.
 
-| Namespace    | Key methods                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `routes`     | `validateBuildPathArgs`, `validateMatchPathArgs`, `validateIsActiveRouteArgs`, `validateShouldUpdateNodeArgs`, `validateStateBuilderArgs`, `validateRouteName`. ⚠ The route-CRUD walks — `validateAddRouteArgs`, `validateRemoveRouteArgs`, `validateUpdateRouteBasicArgs`, `validateUpdateRoute`, `guardRouteCallbacks`, `guardNoAsyncCallbacks` — are NOT members: the plugin registers them as checks at `addRoute:batch`, `replaceRoutes:batch`, `removeRoute:entry` and `updateRoute:entry`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `navigation` | `validateParamsShape`, `validateSearch` — the query twin (#1972); shape only, because a query value round-trips through the URL and the path channel's Symbol / BigInt / control-char rules do not transfer. ⚠ The other navigation walks are NOT here: the plugin registers them as checks (#2388)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `state`      | `validateMakeStateArgs`, `validateAreStatesEqualArgs`, `reportDroppedQueryKey` — the mode gate's opt-in diagnostic (#1575); what it reports and why it warns once per route+key is its docblock in `src/validators/state.ts`; `reportUndeclaredParamKey` — the undeclared-params-bag diagnostic (#1579, the params half of #1553): a key the route declares NOWHERE stays in `state.params` as app-level data but never reaches the URL, so the state does not round-trip through its own `state.path`. Core keeps the key: dropping it would retire a documented capability, and the predicate cannot tell a typo from `navigate("users", { id })` on a parent whose child declares `:id`. Which producers raise each diagnostic, and why they differ: gotcha "The two diagnostics answer the predicates differently"; their de-dup scope: "Diagnostic de-dup is per router". ⚠ **Neither diagnostic says anything about a route that does not exist (#1584)** — core gates both on the route being real, because the declaration registries answer `[]` for a missing route exactly as they do for a route with no declarations, and reporting that would blame the caller's bag for a typo in the ROUTE name. `reportCodecRoundTrip` — the codec round-trip diagnostic (#2905): for each state a committing producer builds on a route that has a codec, it reloads the state's path through the router's own `matchPath`, without the path rebuild, and warns about each key the reload does not give back; what it compares, what it reports as the codec's, and that it judges a state before the navigation commits are the docblocks of `roundTripLosses` and `createCodecRoundTripReporter` in `src/validators/state.ts` |
+| Namespace | Key methods                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `state`   | `reportDroppedQueryKey` — the mode gate's opt-in diagnostic (#1575); what it reports and why it warns once per route+key is its docblock in `src/validators/state.ts`; `reportUndeclaredParamKey` — the undeclared-params-bag diagnostic (#1579, the params half of #1553): a key the route declares NOWHERE stays in `state.params` as app-level data but never reaches the URL, so the state does not round-trip through its own `state.path`. Core keeps the key: dropping it would retire a documented capability, and the predicate cannot tell a typo from `navigate("users", { id })` on a parent whose child declares `:id`. Which producers raise each diagnostic, and why they differ: gotcha "The two diagnostics answer the predicates differently"; their de-dup scope: "Diagnostic de-dup is per router". ⚠ **Neither diagnostic says anything about a route that does not exist (#1584)** — core gates both on the route being real, because the declaration registries answer `[]` for a missing route exactly as they do for a route with no declarations, and reporting that would blame the caller's bag for a typo in the ROUTE name. `reportCodecRoundTrip` — the codec round-trip diagnostic (#2905): for each state a committing producer builds on a route that has a codec, it reloads the state's path through the router's own `matchPath`, without the path rebuild, and warns about each key the reload does not give back; what it compares, what it reports as the codec's, and that it judges a state before the navigation commits are the docblocks of `roundTripLosses` and `createCodecRoundTripReporter` in `src/validators/state.ts` |
 
 ## Gotchas
 
@@ -115,6 +113,10 @@ A declared QUERY name carrying a value in the `params` bag is reported at
 `buildPath` and `isActiveRoute`. The other two doors already answer on their own:
 `navigate` throws `WRONG_CHANNEL` and `canNavigateTo` returns `false`.
 
+⚑ **The report is a diagnostic kind per door, `BUILD_PATH` and
+`IS_ACTIVE_ROUTE`**, raised after the door's `:entry` checks. One reporter
+handles both, so a route and key warn once across the two doors.
+
 ⚠ **The silence it closes reaches only the paths that never click.** A plain
 left-click throws — `<Link>` hands the same bag to `router.navigate`, and P1's
 throw is synchronous, so the component's own `.catch(() => {})` does not see it.
@@ -157,20 +159,20 @@ so is a `WeakMap` keyed by an object, which evicts with its key.
 
 ### The `navigate` family consults the validator for nothing (#2388)
 
-`navigate` and `canNavigateTo` register all nine of their refusals as checks at
+`navigate` and `canNavigateTo` register their argument refusals as checks at
 four positions — `navigate:entry` / `navigate:params` and the two
-`canNavigateTo` twins. Deleting one call from an entry check reddens
-`navigation.validation.test.ts`, and deleting a core `runChecks` reddens
-`predicate-totality-2245.test.ts`.
+`canNavigateTo` twins. Which suite holds each call is the `REGISTRATION_OWNER`
+table of `validator-boundary-authority-2322.test.ts`, and deleting a core
+`runChecks` at any of the four reddens a plugin suite outside that authority.
 
 ⚠ **`navigate`'s ENTRY still refuses SYNCHRONOUSLY**, from a method whose
 declared return is a promise. That is the facade's own shape for programmer
 error (#1572), not something the channel introduced.
 
-⚠ **The pipeline below `navigate` is a separate layer and still consults.**
-`routes.validateStateBuilderArgs` runs under `buildNavigateState`; a door is
-converted at its own layer, and `validatorContractNamespaces` pins that
-remainder rather than describing it.
+⚠ **The pipeline below `navigate` asks a position of its own.**
+`buildNavigateState` asks `navigate:state` about the name and params it builds
+the state from, the defaults a `navigateToDefault` callback returns included,
+and the check there runs `validateStateBuilderArgs`.
 
 ### The printers' value walks are checks, not validator members (#2388)
 
@@ -188,14 +190,15 @@ independently — the href door runs the forward chain itself and lands on the
 resolved one — so a shared position would make a refusal name a call that did not
 happen.
 
-⚠ **The SHAPE half stays on the validator, and that asymmetry is load-bearing.**
-`validateNavigateParamsShape` must judge the caller's bag BEFORE core copies —
-a copy launders every shape it exists to refuse — so only the value half has an
-object worth moving.
+⚠ **The SHAPE half is a check at each printer's `:entry` position, and that
+asymmetry is load-bearing.** `validateNavigateParamsShape` must judge the
+caller's bag, not core's copy — a copy launders every shape it exists to
+refuse — so `buildPath:entry` and `buildPathResolved:entry` hand it the
+caller's values, and only the value walk gets the copy.
 
-⚠ **`teardown` must remove the registration.** Nulling `ctx.validator` silences
-every other door and does nothing to a channel registration, so a leak here
-leaves a torn-down plugin still refusing.
+⚠ **`teardown` must remove the registration.** Nulling `ctx.validator` does
+nothing to a channel registration, so a leak here leaves a torn-down plugin
+still refusing.
 
 ### The dependency doors, `cloneRouter` and `usePlugin` refuse and report on the channels (#2388)
 
@@ -265,6 +268,31 @@ passes; a name the callback returns is refused after the report.
 Core hands both entry positions the caller's value, `undefined` included, so
 the checks substitute the empty bag for `undefined` alone, and `null` stays
 refused at both doors.
+
+### The render-path doors and the state builders refuse and report on the channels (#2388)
+
+The argument checks of `buildPath`, `buildPathResolved`, `isActiveRoute`,
+`areStatesEqual`, `shouldUpdateNode` and `matchPath` stand at each door's
+`:entry` position, which receives the caller's arguments. Three positions judge
+what core builds a state from: `matchPath:decoded` the params a route's
+`decodeParams` returned, `makeState:state` `makeState`'s arguments with core's
+copy of the params, and `navigate:state` the name and params the navigation
+pipeline builds its state from. The report of _The retired single-bag spelling_
+above is the `BUILD_PATH` and `IS_ACTIVE_ROUTE` kinds.
+`validator-boundary-authority-2322.test.ts` names, call by call, the file that
+reds without it.
+
+⚑ **The report follows the entry checks.** Core raises each door's kind after
+its `:entry` position, so a call the entry refuses reports nothing and the
+warning waits for the first call that passes. `buildPath`'s value walk at
+`buildPath:params` comes after the report, so a call that carries a
+mis-channelled key and a value the walk refuses warns and then throws.
+
+⚠ **Core asks the listener count before it raises either kind**, so a router
+with no listener of the kind builds no argument list for it on the render path.
+
+⚠ **A report handler's throw stays inside the emitter.** The emitter logs it
+through `logger.error`, and the door answers as it would without the report.
 
 ### Teardown disables validation — but only the validator it still holds
 

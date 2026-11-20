@@ -1,5 +1,6 @@
 // packages/core/src/namespaces/RoutesNamespace/types.ts
 
+import type { RouterInternals } from "../../internals";
 import type { RouteResolver } from "../../pipeline";
 import type {
   DefaultDependencies,
@@ -13,7 +14,6 @@ import type {
   GuardFnFactory,
   UrlChannels,
 } from "../../types";
-import type { RouterValidator } from "../../types/RouterValidator";
 
 /**
  * Dependencies injected into RoutesNamespace.
@@ -28,13 +28,11 @@ export interface RoutesDependencies<
   logger: RouterLogger;
 
   /**
-   * The opt-in validator, resolved PER CALL — `null` until `validation-plugin`
-   * installs one, and `null` again after its teardown. The same shared closure
-   * EventBus and RouteLifecycle receive; this namespace needs it for the
-   * one boundary on it where USER code hands back a value core then builds a
-   * state from (a route's `decodeParams`).
+   * The router's checks (#2388). This namespace asks one position,
+   * `matchPath:decoded`, at the one boundary on it where USER code hands back
+   * a value core then builds a state from (a route's `decodeParams`).
    */
-  getValidator: () => RouterValidator | null;
+  checks: RouterInternals["checks"];
 
   /**
    * The pipeline's read-model (`RouteResolver`), shared with NavigationNamespace
@@ -94,12 +92,10 @@ export interface RoutesDependencies<
   // No `forwardState` / `reportDroppedQueryKey` closures either: `matchPath`,
   // their only consumer, is on the pipeline (step 2-2), which reaches the SAME
   // seam through `port.resolveForward` and the same drop reporter through
-  // `port.reportDroppedQueryKey`. ⚠ `validateStateBuilderArgs` does not travel
-  // with them, and "an internal intermediate needs no validation" is only half
-  // true here: of the two bags it saw, the matcher's output is indeed
-  // router-produced, but a route's `decodeParams` is USER code and its return
-  // value is external input. Only the matcher half is redundant — the decoder
-  // half is back, at the decoder itself (#1582).
+  // `port.reportDroppedQueryKey`. ⚠ The matcher's own output is router-produced
+  // and asks no check; a route's `decodeParams` is application code, and what
+  // it returns is asked about at `matchPath:decoded` against the `checks`
+  // above (#1582).
 }
 
 /**

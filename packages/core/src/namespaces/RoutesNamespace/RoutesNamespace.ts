@@ -32,6 +32,7 @@ import {
   recordsShallowEqual,
   withoutUnsafeKey,
 } from "../../helpers";
+import { POSITION, runChecks } from "../../internals";
 import {
   buildURL,
   canonicalize,
@@ -589,12 +590,16 @@ export class RoutesNamespace<
       // decoder may hand back anything: an array becomes `params {"0":"a"}`, a
       // string becomes `{"0":"o","1":"o",…}`, a `Map` or a prototyped object
       // becomes `{}`, and every one of those commits silently. Opt-in, like every
-      // DX check: `null` in bare core, where the behaviour is unchanged either
-      // way. Labelled for THIS entry point — the pre-pipeline call sat inside a
-      // `forwardState` dep wrapper and blamed that method for a `matchPath` fault.
-      this.#deps
-        .getValidator()
-        ?.routes.validateStateBuilderArgs(name, returnedParams, "matchPath");
+      // DX check: bare core registers nothing at the position, and the
+      // behaviour is unchanged either way. The position names THIS entry point,
+      // so a refusal blames `matchPath` rather than a seam the value flows
+      // through later.
+      runChecks(
+        this.#deps.checks,
+        POSITION["matchPath:decoded"],
+        name,
+        returnedParams,
+      );
 
       // The channel half of the same boundary — always on, unlike the shape
       // check above. A decoder that moves a declared `?key` into the params bag

@@ -5,12 +5,7 @@ import { raiser } from "@real-router/core/utils";
 import { getInternals } from "@real-router/core/validation";
 
 import { CORE_LIMIT_DEFAULTS } from "./helpers";
-import {
-  validateRouteName,
-  isState,
-  isBoolean,
-  getTypeDescription,
-} from "./type-guards";
+import { validateRouteName } from "./type-guards";
 import { DefaultsMutationWatch } from "./validators/defaultsMutation";
 import {
   validateDependencyName,
@@ -91,6 +86,7 @@ import {
   createCodecRoundTripReporter,
   createDroppedQueryKeyReporter,
   createUndeclaredParamKeyReporter,
+  validateAreStatesEqualArgs,
   validateMakeStateArgs,
 } from "./validators/state";
 
@@ -109,19 +105,9 @@ import type { RouteTree } from "@real-router/core/validation";
 
 const atValidationPlugin = raiser("validation-plugin");
 const atAddRoute = raiser("router", "addRoute");
-const atAreStatesEqual = raiser("router", "areStatesEqual");
 
 /** The options a door judges for a call that passed none. */
 const EMPTY_OPTIONS: NavigationOptions = Object.freeze({});
-
-/**
- * A `search` that `areStatesEqual(…, false)` can compare: an object that is
- * neither `null` nor an array — the shape `validateSearch` accepts for a query
- * bag.
- */
-function isSearchBag(value: unknown): boolean {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 /** The one question existence asks of a tree node: its children by segment. */
 interface TreeNode {
@@ -217,44 +203,12 @@ function buildValidatorObject(
   api: PluginApi,
   reloadPath: ReloadPath,
 ): RouterValidator {
-  // One de-dup cache per validator object, i.e. per registration, i.e. per router
-  // (#1583) — the same lifetime the mode gate's reporters get, for the same
-  // reason: a module-level Set would let the first router in a process silence
-  // every one after it.
-  const reportMisChanneledKey = createMisChanneledKeyReporter((routeName) =>
-    api.getDeclaredQueryNames(routeName),
-  );
-
   return {
-    routes: {
-      validateBuildPathArgs(route, params) {
-        validateBuildPathArgs(route);
-        reportMisChanneledKey(route, params);
-      },
-      validateMatchPathArgs,
-      validateIsActiveRouteArgs(name, params, strict, ignoreQP) {
-        // An assertion, so `name` is a string below by the type system rather
-        // than by a second runtime check.
-        validateIsActiveRouteArgs(name, params, strict, ignoreQP);
-        reportMisChanneledKey(name, params);
-      },
-      validateShouldUpdateNodeArgs,
-      validateStateBuilderArgs,
-
-      validateRouteName(name, caller) {
-        validateRouteName(name, caller);
-      },
-    },
-    navigation: {
-      validateParamsShape: validateNavigateParamsShape,
-      validateSearch,
-    },
     state: {
-      validateMakeStateArgs,
       // One de-dup cache per validator object, i.e. per registration, i.e. per
-      // router (#1583). Module-level `Set`s made the first router in a process
-      // silence every one after it — the SSR / SSG case where the diagnostic
-      // fired for request #1 and never again.
+      // router (#1583): a module-level `Set` would let the first router in a
+      // process silence every one after it — the SSR / SSG case, where a
+      // diagnostic fires for request #1 and never again.
       reportDroppedQueryKey: createDroppedQueryKeyReporter(),
       reportUndeclaredParamKey: createUndeclaredParamKeyReporter(),
       reportCodecRoundTrip: createCodecRoundTripReporter(
@@ -262,29 +216,6 @@ function buildValidatorObject(
         reloadPath,
         api.forwardState,
       ),
-      validateAreStatesEqualArgs(s1, s2, ignoreQP) {
-        if (!isState(s1)) {
-          throw atAreStatesEqual.type`Invalid state1: ${getTypeDescription(s1)}. Expected State object.`;
-        }
-        if (!isState(s2)) {
-          throw atAreStatesEqual.type`Invalid state2: ${getTypeDescription(s2)}. Expected State object.`;
-        }
-        if (ignoreQP !== undefined && !isBoolean(ignoreQP)) {
-          throw atAreStatesEqual.type`Invalid ignoreQueryParams: ${getTypeDescription(ignoreQP)}. Expected boolean.`;
-        }
-        // `false` compares both states' `search`. `isState` does not read it:
-        // its fields are `isRequiredFields`, which
-        // `scripts/tests/twin-lockstep.test.mjs` holds code-identical to the
-        // history-entry guard's copy, where `search` may be absent.
-        if (ignoreQP === false) {
-          if (!isSearchBag(s1.search)) {
-            throw atAreStatesEqual.type`Invalid state1.search: ${getTypeDescription(s1.search)}. Expected a plain object.`;
-          }
-          if (!isSearchBag(s2.search)) {
-            throw atAreStatesEqual.type`Invalid state2.search: ${getTypeDescription(s2.search)}. Expected a plain object.`;
-          }
-        }
-      },
     },
   };
 }
@@ -995,6 +926,106 @@ export function validationPlugin<
       validateStartArgs(path);
     });
 
+    // ⚑ The render-path doors and the state builders (#2388). Each ENTRY check
+    // keeps the order core consulted its calls in, as above.
+    const removeBuildPathEntryCheck = api.addCheck(
+      "buildPath:entry",
+      (route, params, search) => {
+        validateBuildPathArgs(route);
+        validateNavigateParamsShape(params, "buildPath");
+        validateSearch(search, "buildPath");
+      },
+    );
+
+    const removeBuildPathResolvedEntryCheck = api.addCheck(
+      "buildPathResolved:entry",
+      (params, search) => {
+        validateNavigateParamsShape(params, "buildPathResolved");
+        validateSearch(search, "buildPathResolved");
+      },
+    );
+
+    const removeIsActiveRouteEntryCheck = api.addCheck(
+      "isActiveRoute:entry",
+      (name, params, search, strictEquality, ignoreQueryParams) => {
+        validateIsActiveRouteArgs(
+          name,
+          params,
+          strictEquality,
+          ignoreQueryParams,
+        );
+        validateSearch(search, "isActiveRoute");
+        validateRouteName(name, "isActiveRoute");
+      },
+    );
+
+    const removeAreStatesEqualEntryCheck = api.addCheck(
+      "areStatesEqual:entry",
+      (state1, state2, ignoreQueryParams) => {
+        validateAreStatesEqualArgs(state1, state2, ignoreQueryParams);
+      },
+    );
+
+    const removeShouldUpdateNodeEntryCheck = api.addCheck(
+      "shouldUpdateNode:entry",
+      (nodeName) => {
+        validateShouldUpdateNodeArgs(nodeName);
+      },
+    );
+
+    const removeMatchPathEntryCheck = api.addCheck(
+      "matchPath:entry",
+      (path) => {
+        validateMatchPathArgs(path);
+      },
+    );
+
+    // ⚑ A decoder's output is application code's, judged as a caller's bag
+    // would be (#1582). Core asks only for a route that has a decoder.
+    const removeMatchPathDecodedCheck = api.addCheck(
+      "matchPath:decoded",
+      (routeName, decodedParams) => {
+        validateStateBuilderArgs(routeName, decodedParams, "matchPath");
+      },
+    );
+
+    const removeMakeStateCheck = api.addCheck(
+      "makeState:state",
+      (name, ownParams, search, path) => {
+        validateMakeStateArgs(name, ownParams, path);
+        validateSearch(search, "makeState");
+      },
+    );
+
+    const removeNavigateStateCheck = api.addCheck(
+      "navigate:state",
+      (routeName, routeParams) => {
+        validateStateBuilderArgs(routeName, routeParams, "navigate");
+      },
+    );
+
+    // ⚑ The retired single-bag spelling (#2238), reported at the two doors
+    // whose answers stay silent about it. One de-dup cache per registration,
+    // i.e. per router (#1583), and both kinds share it, so a pair reported at
+    // one door is not reported again at the other.
+    const reportMisChanneledKey = createMisChanneledKeyReporter((routeName) =>
+      api.getDeclaredQueryNames(routeName),
+    );
+
+    const removeBuildPathDiagnostic = api.subscribeDiagnostic(
+      "BUILD_PATH",
+      (routeName, params) => {
+        reportMisChanneledKey(routeName, params);
+      },
+    );
+
+    const removeIsActiveRouteDiagnostic = api.subscribeDiagnostic(
+      "IS_ACTIVE_ROUTE",
+      (routeName, params) => {
+        reportMisChanneledKey(routeName, params);
+      },
+    );
+
     // ⚑ HERE, and not on every navigation. No door READS the watched bags
     // after construction — core runs on the copy adoption took (#2171) — so
     // the question is where a stale one would have CHANGED the outcome, and
@@ -1119,6 +1150,28 @@ export function validationPlugin<
         removeNavigateToDefaultRouteCheck();
 
         removeStartEntryCheck();
+
+        removeBuildPathEntryCheck();
+
+        removeBuildPathResolvedEntryCheck();
+
+        removeIsActiveRouteEntryCheck();
+
+        removeAreStatesEqualEntryCheck();
+
+        removeShouldUpdateNodeEntryCheck();
+
+        removeMatchPathEntryCheck();
+
+        removeMatchPathDecodedCheck();
+
+        removeMakeStateCheck();
+
+        removeNavigateStateCheck();
+
+        removeBuildPathDiagnostic();
+
+        removeIsActiveRouteDiagnostic();
 
         removeNavigateToDefaultDiagnostic();
 

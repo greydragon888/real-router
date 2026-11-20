@@ -616,7 +616,7 @@ export class Router<
     );
 
     // ⚑ Named rather than passed as a literal, so an adapter below can reach
-    // `internals.validator` at CALL time without a WeakMap hop per call. The
+    // `internals.checks` at CALL time without a WeakMap hop per call. The
     // guards live here rather than on the facade (#2259): `getInternals` ships
     // from `@real-router/core/validation` and a door reachable both ways must
     // refuse the same values from either side.
@@ -629,8 +629,14 @@ export class Router<
         // rather than on the facade so both doors judge and ship the same one.
         const ownParams = adoptChannel(params);
 
-        internals.validator?.state.validateMakeStateArgs(name, ownParams, path);
-        internals.validator?.navigation.validateSearch(search, "makeState");
+        runChecks(
+          internals.checks,
+          POSITION["makeState:state"],
+          name,
+          ownParams,
+          search,
+          path,
+        );
 
         return this.#state.makeState(name, ownParams, search, path);
       },
@@ -653,16 +659,16 @@ export class Router<
         // depends on it — a declared query name handed in the PATH bag makes
         // the RESOLVING door throw and this one print, which is the href that
         // arm has always rendered.
-        internals.validator?.navigation.validateParamsShape(
+        //
+        // ⚑ Core does not hold the refusals here — it asks whether anyone
+        // objects (#2388): about the caller's two bags, then at the position
+        // handed the copy that ships.
+        runChecks(
+          internals.checks,
+          POSITION["buildPathResolved:entry"],
           params,
-          "buildPathResolved",
-        );
-        internals.validator?.navigation.validateSearch(
           search,
-          "buildPathResolved",
         );
-        // ⚑ Core does not hold the refusal here — it asks whether anyone
-        // objects (#2388), at the position handed the copy that ships.
         runChecks(
           internals.checks,
           POSITION["buildPathResolved:params"],
@@ -677,7 +683,7 @@ export class Router<
       },
       port: () => this.#routes.getPort(),
       matchPath: (path, matchOptions) => {
-        internals.validator?.routes.validateMatchPathArgs(path);
+        runChecks(internals.checks, POSITION["matchPath:entry"], path);
 
         // ⚠ The signature declares `options?`, so the bag may be OMITTED — and
         // the matcher reads `rewritePathOnMatch` off it, which made the door
@@ -937,22 +943,28 @@ export class Router<
     strictEquality?: boolean,
     ignoreQueryParams?: boolean,
   ): boolean {
-    // ⚑ ONE handle for the whole method. `getInternals` is a WeakMap lookup, and
-    // this is a render-path predicate — a `<Link>` asks it on every render, so
-    // repeating the lookup per validator hop is measurable (#1972).
+    // ⚑ ONE handle for the whole method: `getInternals` is a WeakMap lookup,
+    // and a `<Link>` asks this predicate on every render (#1972).
     const ctx = getInternals(this);
 
-    ctx.validator?.routes.validateIsActiveRouteArgs(
+    runChecks(
+      ctx.checks,
+      POSITION["isActiveRoute:entry"],
       name,
       params,
+      search,
       strictEquality,
       ignoreQueryParams,
     );
-    // ⚑ Beside it, not inside: the path bag is checked by the call above and
-    // the query bag by its twin, so both halves of #1972's rule stand at every
-    // door that takes both — including the two predicates.
-    ctx.validator?.navigation.validateSearch(search, "isActiveRoute");
-    ctx.validator?.routes.validateRouteName(name, "isActiveRoute");
+
+    // ⚑ After the entry checks, so a call they refuse reports nothing. The
+    // listener count is asked first: `emitDiagnostic` gathers its arguments
+    // into an array, and a render-path predicate builds none on bare core.
+    if (
+      this.#eventBus.diagnosticListenerCount(DIAGNOSTIC.IS_ACTIVE_ROUTE) > 0
+    ) {
+      this.#eventBus.emitDiagnostic(DIAGNOSTIC.IS_ACTIVE_ROUTE, name, params);
+    }
 
     // Empty string is special case - warn and return false (root node is not a parent)
     if (name === "") {
@@ -978,22 +990,27 @@ export class Router<
   buildPath(route: string, params?: Params, search?: SearchParams): string {
     const ctx = getInternals(this);
 
-    ctx.validator?.routes.validateBuildPathArgs(route, params);
-    ctx.validator?.navigation.validateParamsShape(params, "buildPath");
-    ctx.validator?.navigation.validateSearch(search, "buildPath");
+    // ⚑ Core does not hold the refusals here — it asks whether anyone objects
+    // (#2388), first about the arguments as the caller passed them: the bag is
+    // the caller's, before the copy below.
+    runChecks(ctx.checks, POSITION["buildPath:entry"], route, params, search);
+
+    // ⚑ After the entry checks, so a call they refuse reports nothing; the
+    // listener count is asked first, for the reason `isActiveRoute` gives.
+    if (this.#eventBus.diagnosticListenerCount(DIAGNOSTIC.BUILD_PATH) > 0) {
+      this.#eventBus.emitDiagnostic(DIAGNOSTIC.BUILD_PATH, route, params);
+    }
 
     // ⚑ Core's SINGLE read of the caller's bag, and it happens here so that the
     // layer which judges and the layer which ships read the same one (#2134).
-    // Everything below — the seam, the validator's value walk, the merge — sees
-    // this object, so a key that answers differently per read is admitted on
-    // the same value it is printed with.
+    // Everything below — the seam, the checks at `buildPath:params`, the merge —
+    // sees this object, so a key that answers differently per read is admitted
+    // on the same value it is printed with.
     const ownParams = adoptChannel(params);
 
-    // ⚑ Core does not hold the refusal here — it asks whether anyone objects
-    // (#2388). `@real-router/validation-plugin` registers the value walk at this
-    // position; with no plugin installed nothing is registered and the call runs
-    // on. The three consultations above still reach `ctx.validator`, so this
-    // door is the one where both shapes stand side by side.
+    // ⚑ Then about the copy that ships: `@real-router/validation-plugin`
+    // registers the value walk at this position; with no plugin installed
+    // nothing is registered and the call runs on.
     runChecks(ctx.checks, POSITION["buildPath:params"], ownParams);
 
     // `search` (RFC-4 M2 / #1548) is the explicit query channel; the matcher
@@ -1040,7 +1057,9 @@ export class Router<
     state2: State | undefined,
     ignoreQueryParams = true,
   ): boolean {
-    getInternals(this).validator?.state.validateAreStatesEqualArgs(
+    runChecks(
+      getInternals(this).checks,
+      POSITION["areStatesEqual:entry"],
       state1,
       state2,
       ignoreQueryParams,
@@ -1052,7 +1071,11 @@ export class Router<
   shouldUpdateNode(
     nodeName: string,
   ): (toState: State, fromState?: State) => boolean {
-    getInternals(this).validator?.routes.validateShouldUpdateNodeArgs(nodeName);
+    runChecks(
+      getInternals(this).checks,
+      POSITION["shouldUpdateNode:entry"],
+      nodeName,
+    );
 
     return RoutesNamespace.shouldUpdateNode(nodeName, (name) =>
       this.#routes.getMetaForState(name),
@@ -1454,10 +1477,10 @@ export class Router<
       opts,
     );
 
-    // ⚑ One read for the whole navigation (#2134). `buildNavigateState` runs
-    // `validateStateBuilderArgs` further down the pipeline, and it now receives
-    // this object rather than the caller's — which is why the door's count
-    // falls from four reads to one and not merely to two.
+    // ⚑ One read for the whole navigation (#2134). The checks at
+    // `navigate:state`, which `buildNavigateState` asks further down the
+    // pipeline, receive this object rather than the caller's, so the caller's
+    // bag is read once.
     //
     // ⚠ A REJECTION, not a synchronous throw. The read is application code, and
     // everything this method answers with is a promise — a getter that throws

@@ -124,7 +124,7 @@ const perRequest = cloneRouter(router); // already validated
 import type { RouterValidator } from "@real-router/validation-plugin";
 ```
 
-The full validator interface that core calls into. Re-exported from `@real-router/core/validation`. Useful if you're building a custom validator or testing validator functions directly.
+The validator interface of the three `state` reports, which core asks through `ctx.validator?.state.report…()`. Re-exported from `@real-router/core/validation`. A validator of your own registers checks at positions and subscribes to diagnostic kinds through `PluginApi` (`addCheck`, `subscribeDiagnostic`).
 
 ## Retrospective Validation
 
