@@ -1,8 +1,8 @@
 // packages/core/src/namespaces/RoutesNamespace/types.ts
 
+import type { RouterInternals } from "../../internals";
 import type { RouteResolver } from "../../pipeline";
 import type {
-  CheckPositionMap,
   DefaultDependencies,
   ForwardToCallback,
   GuardFn,
@@ -28,15 +28,11 @@ export interface RoutesDependencies<
   logger: RouterLogger;
 
   /**
-   * Runs the checks registered at a position (#2388); a check may only throw.
-   * This namespace asks one, `matchPath:decoded`, at the one boundary on it
-   * where USER code hands back a value core then builds a state from (a
-   * route's `decodeParams`).
+   * The router's checks (#2388). This namespace asks one position,
+   * `matchPath:decoded`, at the one boundary on it where USER code hands back
+   * a value core then builds a state from (a route's `decodeParams`).
    */
-  runChecks: <P extends keyof CheckPositionMap>(
-    position: P,
-    ...args: CheckPositionMap[P]
-  ) => void;
+  checks: RouterInternals["checks"];
 
   /**
    * The pipeline's read-model (`RouteResolver`), shared with NavigationNamespace
@@ -98,8 +94,8 @@ export interface RoutesDependencies<
   // seam through `port.resolveForward` and the same drop reporter through
   // `port.reportDroppedQueryKey`. ⚠ The matcher's own output is router-produced
   // and asks no check; a route's `decodeParams` is application code, and what
-  // it returns is asked about at `matchPath:decoded` through `runChecks` above
-  // (#1582).
+  // it returns is asked about at `matchPath:decoded` against the `checks`
+  // above (#1582).
 }
 
 /**

@@ -145,9 +145,7 @@ function wireRoutes<Dependencies extends DefaultDependencies>(
 ): void {
   const deps: RoutesDependencies<Dependencies> = {
     logger: getInternals(ns.router).logger,
-    runChecks: (position, ...args) => {
-      runChecks(getInternals(ns.router).checks, position, ...args);
-    },
+    checks: getInternals(ns.router).checks,
     port,
     addActivateGuard: (name, handler, precompiledFn) => {
       ns.routeLifecycle.addCanActivate(name, handler, true, precompiledFn);
