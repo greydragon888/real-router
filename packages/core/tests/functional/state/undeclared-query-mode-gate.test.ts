@@ -3,8 +3,6 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import { createRouter } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 
-import { installSpyValidator } from "../../helpers/spyValidator";
-
 import type { QueryParamsMode, Router } from "@real-router/core";
 
 /**
@@ -186,25 +184,30 @@ describe("undeclared query key — the queryParamsMode gate (#1575)", () => {
 
   describe("the opt-in diagnostic — core's call-site contract", () => {
     // Bare core drops SILENTLY; making the drop visible is `validation-plugin`'s
-    // job. Core's own responsibility is only to CALL the hook, with the resolved
-    // route name and the dropped key — asserted here against a spy validator so
-    // the contract is covered without depending on the plugin package.
+    // job. Core's own responsibility is only to RAISE `DROPPED_QUERY_KEY`, with
+    // the resolved route name and the dropped key — asserted here with a
+    // listener of the kind, so the contract is covered without depending on the
+    // plugin package.
+
+    /** A spy on the kind the mode gate raises for each dropped key. */
+    const listenToDropped = (target: Router) => {
+      const spy = vi.fn();
+
+      getPluginApi(target).subscribeDiagnostic("DROPPED_QUERY_KEY", spy);
+
+      return spy;
+    };
+
     it("reports each dropped key on the intent direction", async () => {
       router = mk("default");
 
-      const validator = installSpyValidator(router);
+      const dropped = listenToDropped(router);
 
       await router.start("/h");
       await router.navigate("plain", {}, { foo: "1", bar: "2" });
 
-      expect(validator.state.reportDroppedQueryKey).toHaveBeenCalledWith(
-        "plain",
-        "foo",
-      );
-      expect(validator.state.reportDroppedQueryKey).toHaveBeenCalledWith(
-        "plain",
-        "bar",
-      );
+      expect(dropped).toHaveBeenCalledWith("plain", "foo");
+      expect(dropped).toHaveBeenCalledWith("plain", "bar");
     });
 
     it("reports nothing when the ROUTE does not exist (#1584)", async () => {
@@ -219,7 +222,7 @@ describe("undeclared query key — the queryParamsMode gate (#1575)", () => {
       // sweeping this file's sibling rather than named in the issue.
       router = mk("default");
 
-      const validator = installSpyValidator(router);
+      const dropped = listenToDropped(router);
 
       await router.start("/h");
 
@@ -227,15 +230,12 @@ describe("undeclared query key — the queryParamsMode gate (#1575)", () => {
         router.navigate("plainn", {}, { foo: "1" }),
       ).rejects.toMatchObject({ code: "ROUTE_NOT_FOUND" });
 
-      expect(validator.state.reportDroppedQueryKey).not.toHaveBeenCalled();
+      expect(dropped).not.toHaveBeenCalled();
 
       // Discrimination: the same key on a route that DOES exist still reports.
       await router.navigate("plain", {}, { foo: "1" });
 
-      expect(validator.state.reportDroppedQueryKey).toHaveBeenCalledWith(
-        "plain",
-        "foo",
-      );
+      expect(dropped).toHaveBeenCalledWith("plain", "foo");
     });
 
     it("reports nothing from the makeState terminal either (#1584)", () => {
@@ -255,12 +255,12 @@ describe("undeclared query key — the queryParamsMode gate (#1575)", () => {
       // terminal that WAS gated, once the name becomes real.
       router = mk("default");
 
-      const validator = installSpyValidator(router);
+      const dropped = listenToDropped(router);
       const api = getPluginApi(router);
 
       api.makeState("plainn", {}, { foo: "1" }, "/plainn");
 
-      expect(validator.state.reportDroppedQueryKey).not.toHaveBeenCalled();
+      expect(dropped).not.toHaveBeenCalled();
 
       // The DROP itself is unaffected — always-on and correct for any name.
       expect(
@@ -270,29 +270,23 @@ describe("undeclared query key — the queryParamsMode gate (#1575)", () => {
       // Discrimination: a route that DOES exist still reports from here.
       api.makeState("plain", {}, { foo: "1" }, "/plain");
 
-      expect(validator.state.reportDroppedQueryKey).toHaveBeenCalledWith(
-        "plain",
-        "foo",
-      );
+      expect(dropped).toHaveBeenCalledWith("plain", "foo");
     });
 
     it("reports on the URL direction too", () => {
       router = mk("default");
 
-      const validator = installSpyValidator(router);
+      const dropped = listenToDropped(router);
 
       getPluginApi(router).matchPath("/plain?foo=1");
 
-      expect(validator.state.reportDroppedQueryKey).toHaveBeenCalledWith(
-        "plain",
-        "foo",
-      );
+      expect(dropped).toHaveBeenCalledWith("plain", "foo");
     });
 
     it("reports from a DIRECT makeState — the producer navigate does not use", () => {
       router = mk("default");
 
-      const validator = installSpyValidator(router);
+      const dropped = listenToDropped(router);
 
       // `makeState` is the literal form of the same pipeline since Phase 4, so
       // this is no longer a second terminal — but it IS a second ENTRY, the one
@@ -301,21 +295,18 @@ describe("undeclared query key — the queryParamsMode gate (#1575)", () => {
       const state = getPluginApi(router).makeState("plain", {}, { foo: "1" });
 
       expect(state.search).toStrictEqual({});
-      expect(validator.state.reportDroppedQueryKey).toHaveBeenCalledWith(
-        "plain",
-        "foo",
-      );
+      expect(dropped).toHaveBeenCalledWith("plain", "foo");
     });
 
     it("stays silent when nothing is dropped", async () => {
       router = mk("default");
 
-      const validator = installSpyValidator(router);
+      const dropped = listenToDropped(router);
 
       await router.start("/h");
       await router.navigate("dec", {}, { a: "1" });
 
-      expect(validator.state.reportDroppedQueryKey).not.toHaveBeenCalled();
+      expect(dropped).not.toHaveBeenCalled();
     });
 
     /**
@@ -348,9 +339,7 @@ describe("undeclared query key — the queryParamsMode gate (#1575)", () => {
         router.stop();
         router = createRouter(routes, { queryParamsMode: "default" });
 
-        const spy = vi.mocked(
-          installSpyValidator(router).state.reportDroppedQueryKey,
-        );
+        const spy = listenToDropped(router);
 
         await router.start(startPath);
         spy.mockClear();

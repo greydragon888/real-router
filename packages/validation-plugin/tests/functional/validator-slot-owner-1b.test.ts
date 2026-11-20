@@ -7,7 +7,7 @@ import { validationPlugin } from "../../src/validationPlugin";
 /**
  * The slot `RouterInternals.validator` has no owner: it is plain data on a
  * surface pinned `accessorNames === []`, so a second write cannot be refused
- * there. What teardown MUST NOT do is destroy a validator it no longer holds.
+ * there. What teardown MUST NOT do is clear an object it no longer holds.
  *
  * #2349 closed the neighbouring half — a second `validationPlugin()` install is
  * refused — but that guard reads the slot, so a direct write still lands.
@@ -25,8 +25,8 @@ describe("the validator slot's release half is owned (#2339 §4 1b)", () => {
 
     remove();
 
-    // Before the fix this was `null` — the plugin destroyed a slot it had
-    // already lost, leaving the second holder silently without a validator.
+    // An unconditional `= null` would clear the foreign holder's object, and
+    // a further installation would then no longer be refused.
     expect(getInternals(router).validator).toBe(foreign);
   });
 

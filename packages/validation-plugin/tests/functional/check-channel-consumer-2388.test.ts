@@ -17,10 +17,10 @@ import { validationPlugin } from "../../src/validationPlugin";
  * rather than the one the caller still holds. No interceptor can express it: at
  * the call boundary the copy does not exist yet.
  *
- * ⚠ The SHAPE half stays on `ctx.validator`, and the asymmetry is the point:
- * `validateNavigateParamsShape` must run on the caller's bag, before core copies,
- * because a copy launders every shape it exists to refuse. Only the value half
- * belongs to core's copy, so only the value half moved.
+ * ⚠ The SHAPE half is a check at `buildPath:entry`, and the asymmetry is the
+ * point: `validateNavigateParamsShape` must run on the caller's bag, before core
+ * copies, because a copy launders every shape it exists to refuse. Only the
+ * value half belongs to core's copy, so only the value half stands here.
  */
 describe("the validation plugin refuses through the check channel (#2388)", () => {
   const routes = [{ name: "items", path: "/items/:id" }];
@@ -48,10 +48,9 @@ describe("the validation plugin refuses through the check channel (#2388)", () =
   });
 
   it("teardown removes the registration, and the door stops refusing", () => {
-    // ⚠ The check outlives the validator slot unless teardown says otherwise:
-    // nulling `ctx.validator` is what silences every OTHER door, and it does
-    // nothing to a channel registration. A leak here leaves a torn-down plugin
-    // still refusing.
+    // ⚠ The check outlives the plugin unless teardown removes it: core asks
+    // nothing through `ctx.validator`, so nulling the slot silences no door. A
+    // leak here leaves a torn-down plugin still refusing.
     const router = createRouter(routes);
     const remove = router.usePlugin(validationPlugin());
 

@@ -5,9 +5,9 @@
 ```
 src/
 ├── index.ts                  — Public API: validationPlugin(), RouterValidator type
-├── validationPlugin.ts       — Plugin factory: isActive() guard, validator construction,
-│                               ctx.validator assignment, retrospective pass, check and
-│                               kind registrations, teardown
+├── validationPlugin.ts       — Plugin factory: isActive() guard, the ctx.validator mark,
+│                               retrospective pass, check and kind registrations,
+│                               teardown
 ├── helpers.ts                — CORE_LIMIT_DEFAULTS (the plugin's single mirror of core's
 │                               DEFAULT_LIMITS) and the warn/error threshold arithmetic
 │                               every resource counter shares
@@ -28,7 +28,8 @@ src/
     ├── navigation.ts         — NavigationNamespace: navigate args, navigateToDefault args,
     │                           NavigationOptions shape, params validation (navigate/buildPath/canNavigateTo),
     │                           start path validation
-    ├── state.ts              — StateNamespace: makeState args, areStatesEqual args
+    ├── state.ts              — StateNamespace: makeState args, areStatesEqual args,
+    │                           the route resolver's three reports
     ├── eventBus.ts           — the listener count vs maxListeners
     └── retrospective.ts      — Retrospective validators: run once at usePlugin() time
                                 (existing routes, forwardTo consistency, route properties,
@@ -37,12 +38,10 @@ src/
 
 ## Validator Data Flow
 
-Core asks at named check positions and raises diagnostic kinds. The plugin registers its checks with `PluginApi.addCheck` and subscribes to its kinds with `PluginApi.subscribeDiagnostic`; a position with no check registered calls nothing. Core also holds a nullable `ctx.validator` slot: the plugin builds a `RouterValidator` object and assigns it there, and the route resolver asks its three `state` reports.
+Core asks at named check positions and raises diagnostic kinds. The plugin registers its checks with `PluginApi.addCheck` and subscribes to its kinds with `PluginApi.subscribeDiagnostic`; a position with no check registered calls nothing. Core also holds a nullable `ctx.validator` slot and asks nothing through it: the plugin writes an object there as the mark of its installation.
 
-The slot holds one validator, so a router holds one installation. A second
-registration is refused rather than allowed to overwrite: with two, whichever
-teardown runs first empties the slot and leaves a registered plugin behind a
-validator that no longer answers.
+The mark admits one installation per router. A second registration is refused:
+it would register every check and kind a second time.
 
 ```
 router.usePlugin(validationPlugin())
@@ -51,10 +50,7 @@ router.usePlugin(validationPlugin())
     │
     ├── ctx.validator occupied? — throws VALIDATION_PLUGIN_ALREADY_INSTALLED
     │
-    ├── buildValidatorObject()
-    │       └── Assembles RouterValidator: the three state reports
-    │
-    ├── ctx.validator = validator
+    ├── ctx.validator = {}  ← the installation's mark
     │
     ├── Retrospective pass (try/catch with rollback)
     │       ├── retroV.validateExistingRoutes(routes)
@@ -98,8 +94,7 @@ Retrospective validators receive facts read from the published surface — route
 usePlugin(validationPlugin())
     │
     ├── [REGISTER] isActive() guard
-    ├── [REGISTER] buildValidatorObject() — assembles the state reports
-    ├── [REGISTER] ctx.validator = validator
+    ├── [REGISTER] ctx.validator = {} — the installation's mark
     ├── [REGISTER] retrospective pass — validates current router state
     ├── [REGISTER] checks and diagnostic kinds
     │
@@ -119,7 +114,7 @@ Validation is a plugin, not a core feature. This keeps the core bundle small and
 
 ### Checks and kinds, and a nullable slot
 
-Core asks a check position or raises a kind; a position with no check registered calls nothing. The `ctx.validator` slot is typed as `RouterValidator | null` in core internals and carries the three `state` reports. The plugin is the only thing that sets it.
+Core asks a check position or raises a kind; a position with no check registered calls nothing. The `ctx.validator` slot is typed as `RouterValidator | null` in core internals, and `RouterValidator` declares no member: core asks nothing through it. The plugin is the only thing that sets it.
 
 ### Retrospective validators take facts, not stores
 
@@ -127,7 +122,7 @@ Retrospective functions take values whose types core publishes — `Route`, `Lim
 
 ### Rollback on retrospective failure
 
-If the retrospective pass throws, `ctx.validator` is set back to `null`. This prevents a half-validated state where some checks pass but others were never run. The error propagates to the caller of `usePlugin()`.
+If the retrospective pass throws, `ctx.validator` is set back to `null`, and nothing is registered: the checks and kinds are registered after the pass. A later installation is not refused, and no check of the failed one runs. The error propagates to the caller of `usePlugin()`.
 
 ### No module augmentation
 

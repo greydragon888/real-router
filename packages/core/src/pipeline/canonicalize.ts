@@ -212,8 +212,8 @@ export function canonicalize(
   // Three things keep this from costing anything it should not:
   //  - gated on the sink being present, so bare core pays one `undefined` check
   //    and never walks the bag (the port member is a GETTER that returns
-  //    `undefined` until `validation-plugin` installs the validator — a plain
-  //    closure would always be truthy and the gate would be decorative);
+  //    `undefined` while nothing listens to its kind — a plain closure would
+  //    always be truthy and the gate would be decorative);
   //  - opted in EXPLICITLY by the committing producers, so every predicate stays
   //    silent — including `canNavigateTo`, which resolves `forwardTo` and would
   //    therefore be caught by a form-based test while still running on every
@@ -362,8 +362,8 @@ export function canonicalize(
   // producer out of agreement, printing an href this very route's `matchPath`
   // rewrote on the spot. That is the #1552/#1578 class, re-opened.
   // The mode gate's sink, resolved ONCE — the read IS the gate. The router
-  // implements this member as a GETTER returning `undefined` while no validator
-  // is installed (`wiring/wireNamespaces.ts`), so in bare core `dropSink` is
+  // implements this member as a GETTER returning `undefined` while nothing
+  // listens to its kind (`wiring/wireNamespaces.ts`), so in bare core `dropSink` is
   // genuinely absent and the drop path below skips the `pathNames` existence
   // lookup entirely. Hoisting also keeps the getter from being re-invoked per
   // dropped key. (Wired as a plain closure it would be always truthy, so the
@@ -434,7 +434,7 @@ export function canonicalize(
             // diagnostics read the same `[]`-means-nothing answer.
             // The sink is checked FIRST: it is the cheap half, and it is the one
             // that is absent in bare core, so the `pathNames` lookup stays off the
-            // path of a router with no validator installed.
+            // path of a router where nothing listens to the kind.
             if (
               dropSink !== undefined &&
               port.pathNames(resolvedName) !== undefined

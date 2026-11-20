@@ -27,9 +27,8 @@ import { getInternals } from "@real-router/core/validation";
  * silence.** A one-line `getInternals(r).member`; a two-line
  * `const ctx = getInternals(r)` followed by `ctx.member`; and — the one that is
  * easy to forget — the surface arriving as a typed PARAMETER, never through a
- * factory call in that file at all. `validation-plugin`'s `buildValidatorObject`
- * takes `ctx: RouterInternals<D>`, so a census of the first two forms reports
- * zero consumers for `getQueryParams` while a shipped one exists.
+ * factory call in that file at all, which a census of the first two forms does
+ * not see.
  *
  * ⚑ **Three is not all of them, and the walk below is not where that is
  * fixed.** A surface also arrives as a class field and as a field of a

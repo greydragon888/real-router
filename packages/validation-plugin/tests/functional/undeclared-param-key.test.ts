@@ -48,8 +48,8 @@ function mk(): Router {
 
 describe("validation-plugin — undeclared params-bag key diagnostic (#1579)", () => {
   beforeEach(() => {
-    // No cache reset here (#1583): the de-dup belongs to the validator object,
-    // so each router built below starts with an empty one.
+    // No cache reset here (#1583): the de-dup belongs to the plugin's
+    // registration, so each router built below starts with an empty one.
     warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 

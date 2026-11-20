@@ -176,15 +176,14 @@ if (this.#eventBus.diagnosticListenerCount(DIAGNOSTIC.BUILD_PATH) > 0) {
 
 `CheckPositionMap` and `DiagnosticEventMap` (`src/types/api.ts`) declare what
 each position and kind receives; `POSITION` and `DIAGNOSTIC` in `internals.ts`
-are tied to them by `satisfies`. The `RouterValidator` slot carries the three
-`state` reports the route resolver asks; `src/types/RouterValidator.ts`
-declares them.
+are tied to them by `satisfies`. Core asks nothing through the `RouterValidator`
+slot: `src/types/RouterValidator.ts` declares no member.
 
 **Lifecycle:** registered before `router.start()` — throws
-`VALIDATION_PLUGIN_AFTER_START` otherwise; installs the validator, runs a
-retrospective pass and registers its checks and kinds; `unsubscribe()` removes
-the registrations and sets `ctx.validator = null`. One router
-carries one validator: a registration that finds the slot occupied throws
+`VALIDATION_PLUGIN_AFTER_START` otherwise; marks the slot, runs a retrospective
+pass and registers its checks and kinds; `unsubscribe()` removes the
+registrations and sets `ctx.validator = null`. One router carries one
+installation: a registration that finds the slot occupied throws
 `VALIDATION_PLUGIN_ALREADY_INSTALLED` instead of overwriting it.
 
 **`@real-router/core/validation` is the plugin's ONLY door to the engine.** It

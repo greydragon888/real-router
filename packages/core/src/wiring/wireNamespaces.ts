@@ -25,8 +25,7 @@ import type { RouterLifecycleDependencies } from "../namespaces/RouterLifecycleN
 import type { RoutesDependencies } from "../namespaces/RoutesNamespace";
 import type { RouteResolver } from "../pipeline";
 import type { Router } from "../Router";
-import type { DefaultDependencies, State } from "../types";
-import type { RouterValidator } from "../types/RouterValidator";
+import type { DefaultDependencies, DiagnosticEventMap, State } from "../types";
 
 /** The `getDependency` every factory and callback receives. */
 type GetDependency<Dependencies extends DefaultDependencies> = <
@@ -36,9 +35,7 @@ type GetDependency<Dependencies extends DefaultDependencies> = <
 ) => Dependencies[K];
 
 /** A route's two codecs as the codec diagnostic receives them (#2905). */
-type RouteCodec = Parameters<
-  RouterValidator["state"]["reportCodecRoundTrip"]
->[1];
+type RouteCodec = DiagnosticEventMap["CODEC_ROUND_TRIP"][1];
 
 /**
  * Compiles a guard/plugin factory against the router + a cached `getDependency`
@@ -217,11 +214,11 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
   const store = ns.routes.getStore();
 
   const reportUndeclaredParamKey = (routeName: string, key: string): void => {
-    ctx.validator?.state.reportUndeclaredParamKey(routeName, key);
+    ns.eventBus.emitDiagnostic(DIAGNOSTIC.UNDECLARED_PARAM_KEY, routeName, key);
   };
 
   const reportDroppedQueryKey = (routeName: string, key: string): void => {
-    ctx.validator?.state.reportDroppedQueryKey(routeName, key);
+    ns.eventBus.emitDiagnostic(DIAGNOSTIC.DROPPED_QUERY_KEY, routeName, key);
   };
 
   // The path slots a route's URL prints. The root's slots join the route's own:
@@ -244,12 +241,13 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
     };
 
     // A route with no codec has nothing to round-trip, and most routes have
-    // none, so the validator is not asked about them.
+    // none, so the kind is not raised for them.
     if (codec.encode === undefined && codec.decode === undefined) {
       return;
     }
 
-    ctx.validator?.state.reportCodecRoundTrip(
+    ns.eventBus.emitDiagnostic(
+      DIAGNOSTIC.CODEC_ROUND_TRIP,
       state,
       codec,
       printedPathSlots(name),
@@ -289,29 +287,39 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
     // here outright.
     admitsUndeclaredQuery: () =>
       resolveQueryParamsMode(ns.options.get().queryParamsMode) === "loose",
-    // A GETTER for the same reason as its sibling below — a plain closure is
-    // always truthy, so the pipeline's `?.` never gated anything and bare core
-    // paid #1584's `pathNames` existence lookup once per dropped key with no
-    // sink behind it. Both sinks now report their absence honestly.
+    // A GETTER for the same reason as its sibling below: a plain closure is
+    // always truthy, so the pipeline's `?.` would read it as present, and a
+    // router where nothing listens to the kind would pay #1584's `pathNames`
+    // existence lookup once per dropped key.
     get reportDroppedQueryKey() {
-      return ctx.validator ? reportDroppedQueryKey : undefined;
+      return ns.eventBus.diagnosticListenerCount(DIAGNOSTIC.DROPPED_QUERY_KEY) >
+        0
+        ? reportDroppedQueryKey
+        : undefined;
     },
     // A GETTER, not a closure — the absence is the gate (#1579). The pipeline
     // reads `port.reportUndeclaredParamKey` and skips the whole caller-bag walk
-    // when it is `undefined`; a plain closure is always truthy, so bare core
-    // (`validator === null`, the repo default) walked the bag on every commit
-    // anyway and the "opt-in sink" the design bought was never wired. The
-    // validator is installed AFTER wiring, so this cannot be decided once at
-    // construction — it has to be resolved per ACCESS. `admitsUndeclaredQuery`
-    // above is a closure for an unrelated reason (the port's type), so it is
-    // not the precedent this stands on.
+    // when it is `undefined`, which it is while nothing listens to the kind; a
+    // plain closure is always truthy, so the walk would run on every commit. A
+    // listener subscribes AFTER wiring, so this cannot be decided once at
+    // construction — it is resolved per ACCESS. `admitsUndeclaredQuery` above
+    // is a closure for an unrelated reason (the port's type), so it is not the
+    // precedent this stands on.
     get reportUndeclaredParamKey() {
-      return ctx.validator ? reportUndeclaredParamKey : undefined;
+      return ns.eventBus.diagnosticListenerCount(
+        DIAGNOSTIC.UNDECLARED_PARAM_KEY,
+      ) > 0
+        ? reportUndeclaredParamKey
+        : undefined;
     },
-    // A GETTER for the reason its two siblings give: bare core reads
-    // `undefined` and never looks up the route's codecs.
+    // A GETTER for the reason its two siblings give: while nothing listens to
+    // the kind, the producers read `undefined` and never look up the route's
+    // codecs.
     get reportCodecRoundTrip() {
-      return ctx.validator ? reportCodecRoundTrip : undefined;
+      return ns.eventBus.diagnosticListenerCount(DIAGNOSTIC.CODEC_ROUND_TRIP) >
+        0
+        ? reportCodecRoundTrip
+        : undefined;
     },
   };
 }

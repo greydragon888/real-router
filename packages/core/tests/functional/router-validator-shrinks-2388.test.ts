@@ -18,11 +18,7 @@ import { describe, expect, it } from "vitest";
  * declaration or a second one, a heritage clause, a namespace that is not a type
  * literal, a member without a name.
  */
-const MEMBERS = [
-  "state.reportDroppedQueryKey",
-  "state.reportUndeclaredParamKey",
-  "state.reportCodecRoundTrip",
-];
+const MEMBERS: readonly string[] = [];
 
 const FILE = path.resolve(__dirname, "../../src/types/RouterValidator.ts");
 

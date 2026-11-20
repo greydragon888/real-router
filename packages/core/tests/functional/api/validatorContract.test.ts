@@ -20,13 +20,9 @@ import type { DependenciesApi } from "@real-router/core/api";
 /**
  * Validator CALL-SITE contract tests.
  *
- * Every door below refuses through check positions (#2388), and on the inputs
- * below none consults a spy validator installed on the router (see
- * helpers/spyValidator); `consultationsOn` reads what it recorded.
- * `buildNavigationState` raises the route resolver's `state` reports through
- * the slot — for a key its route does not declare, and for a state it builds
- * on a route with a codec; the `OWNER` table of
- * `validator-boundary-authority-2322` names the plugin suite that owns each.
+ * Every door below refuses through check positions and reports through
+ * diagnostic kinds (#2388), and none consults a spy validator installed on the
+ * router (see helpers/spyValidator); `consultationsOn` reads what it recorded.
  * Judging the inputs is the validation-plugin's own job, tested in that
  * package.
  *
@@ -109,13 +105,17 @@ describe("core/validator call-site contract", () => {
       plugin = getPluginApi(router);
     });
 
-    it("the two state builders consult the validator for nothing on these inputs (#2388)", () => {
-      // Both doors' refusals are checks now, and each check keeps its own
-      // door's ORDER — the two consult the same pair in opposite sequences.
+    it("the two state builders consult the validator for nothing (#2388)", () => {
+      // Both doors' refusals are checks, and each check keeps its own door's
+      // ORDER — the two consult the same pair in opposite sequences. The
+      // reports `buildNavigationState` raises for a key its route does not
+      // declare and for a route with a codec are diagnostic kinds.
       vi.clearAllMocks();
 
       plugin.forwardState("home", {});
       plugin.buildNavigationState("home", {});
+      plugin.buildNavigationState("home", { undeclared: "x" });
+      plugin.buildNavigationState("withEncoder", { one: "1", two: "2" });
 
       expect(consultationsOn(validator)).toStrictEqual([]);
     });

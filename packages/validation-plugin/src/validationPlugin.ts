@@ -199,27 +199,6 @@ function readRoutes<Dependencies extends DefaultDependencies>(
   return routes;
 }
 
-function buildValidatorObject(
-  api: PluginApi,
-  reloadPath: ReloadPath,
-): RouterValidator {
-  return {
-    state: {
-      // One de-dup cache per validator object, i.e. per registration, i.e. per
-      // router (#1583): a module-level `Set` would let the first router in a
-      // process silence every one after it — the SSR / SSG case, where a
-      // diagnostic fires for request #1 and never again.
-      reportDroppedQueryKey: createDroppedQueryKeyReporter(),
-      reportUndeclaredParamKey: createUndeclaredParamKeyReporter(),
-      reportCodecRoundTrip: createCodecRoundTripReporter(
-        api.logger,
-        reloadPath,
-        api.forwardState,
-      ),
-    },
-  };
-}
-
 /**
  * The dependency map is a type parameter so the factory carries the CALLER's
  * `D` rather than the `object` default (#1621). `keyof object` is `never`, so a
@@ -247,11 +226,12 @@ export function validationPlugin<
       )`must be registered before router.start()`;
     }
 
-    // ⚑ One router, one validator (#2349). `RouterInternals.validator` is a
-    // single slot and `teardown` clears it, so with two installs either
-    // teardown leaves a registered plugin whose validator no longer answers.
-    // The refusal keeps that state unrepresentable; a tally of installs only
-    // models an ownership the slot does not grant.
+    // ⚑ One router, one install (#2349). A second install would register every
+    // check and kind a second time, so a call that passes would run each check
+    // twice and each report would print once per install.
+    // `RouterInternals.validator` carries the first install's mark and
+    // `teardown` clears it; a tally of installs only models an ownership the
+    // slot does not grant.
     //
     // ⚠ A CLONE needs no install of its own: `cloneRouter` re-runs plugin
     // factories by contract, which is what the message points at.
@@ -268,26 +248,17 @@ export function validationPlugin<
     // report already has a baseline to compare against.
     defaultsWatch.watch(api.getAdoptedOrigins());
 
-    // The codec diagnostic's reload (#2905) does not rebuild the path: the
-    // rebuild runs `encodeParams` over what the reload decoded, and an encoder
-    // that cannot print it would throw away the reload the diagnostic judges.
-    // `PluginApi.matchPath` takes the router's options, so the reload is asked
-    // of the internals.
-    const reloadPath: ReloadPath = (path) =>
-      ctx.matchPath(path, { ...api.getOptions(), rewritePathOnMatch: false });
-
     // ⚑ The object is held so teardown can prove it is still the holder.
     // The slot has no owner — `RouterInternals.validator` is plain data on a
     // surface pinned `accessorNames === []`, so a second writer cannot be
     // REFUSED here. What it can be is not silently destroyed: an
-    // unconditional `= null` on teardown nulls whoever holds the slot now.
-    // Measured: with a second writer in place, teardown destroyed the
-    // foreign validator; the control (no second writer) nulled its own.
+    // unconditional `= null` on teardown nulls whoever holds the slot now;
+    // `validator-slot-owner-1b.test.ts` holds both arms.
     // Same shape as `claimContextNamespace`, which checks the holder on
     // write and on release (#2059 / #1929) — here only the release half is
     // reachable, and the write half waits for the slot to go away.
     const lookup = createRouteLookup(api);
-    const ownValidator = buildValidatorObject(api, reloadPath);
+    const ownValidator: RouterValidator = {};
     // One branch, shared by the error path below and by `teardown`: both ask
     // the same question, so they share the site rather than each growing an
     // arm the other's test has to reach.
@@ -1041,6 +1012,47 @@ export function validationPlugin<
       },
     );
 
+    // The route resolver's three reports (#1575, #1579, #2905). Each reporter
+    // is built here with its own de-dup cache, once per registration, i.e. per
+    // router (#1583): a module-level `Set` would let the first router in a
+    // process silence every one after it — the SSR / SSG case, where a
+    // diagnostic fires for request #1 and never again.
+    const reportDroppedQueryKey = createDroppedQueryKeyReporter();
+    const reportUndeclaredParamKey = createUndeclaredParamKeyReporter();
+    // The codec diagnostic's reload does not rebuild the path: the rebuild
+    // runs `encodeParams` over what the reload decoded, and an encoder that
+    // cannot print it would throw away the reload the diagnostic judges.
+    // `PluginApi.matchPath` takes the router's options, so the reload is asked
+    // of the internals.
+    const reloadPath: ReloadPath = (path) =>
+      ctx.matchPath(path, { ...api.getOptions(), rewritePathOnMatch: false });
+    const reportCodecRoundTrip = createCodecRoundTripReporter(
+      api.logger,
+      reloadPath,
+      api.forwardState,
+    );
+
+    const removeDroppedQueryKeyDiagnostic = api.subscribeDiagnostic(
+      "DROPPED_QUERY_KEY",
+      (routeName, key) => {
+        reportDroppedQueryKey(routeName, key);
+      },
+    );
+
+    const removeUndeclaredParamKeyDiagnostic = api.subscribeDiagnostic(
+      "UNDECLARED_PARAM_KEY",
+      (routeName, key) => {
+        reportUndeclaredParamKey(routeName, key);
+      },
+    );
+
+    const removeCodecRoundTripDiagnostic = api.subscribeDiagnostic(
+      "CODEC_ROUND_TRIP",
+      (state, codec, pathSlots) => {
+        reportCodecRoundTrip(state, codec, pathSlots);
+      },
+    );
+
     return {
       teardown() {
         removeParamsCheck();
@@ -1174,6 +1186,12 @@ export function validationPlugin<
         removeIsActiveRouteDiagnostic();
 
         removeNavigateToDefaultDiagnostic();
+
+        removeDroppedQueryKeyDiagnostic();
+
+        removeUndeclaredParamKeyDiagnostic();
+
+        removeCodecRoundTripDiagnostic();
 
         removeInterceptor();
 

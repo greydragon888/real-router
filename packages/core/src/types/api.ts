@@ -5,10 +5,12 @@
 
 import type {
   Params,
+  ParamsSearch,
   SearchParams,
   State,
   SimpleState,
   Unsubscribe,
+  UrlChannels,
 } from "./base";
 import type { EventMethodMap, EventName } from "./constants";
 // Augment-target interfaces are declared lexically in the entry (#1540); the
@@ -189,6 +191,43 @@ export type DiagnosticEventMap = {
 
   /** The same report from `isActiveRoute`, after `isActiveRoute:entry`. */
   IS_ACTIVE_ROUTE: [routeName: string, params: Params | undefined];
+
+  /**
+   * The mode gate dropped `key` from the query channel of route `routeName`
+   * (#1575): the active `queryParamsMode` does not print a key the route does
+   * not declare, so it stays out of `state.search`. A `defaultSearch` entry for
+   * such a key is dropped the same way. Raised by the gate, once per dropped
+   * key, and only for a route that exists.
+   */
+  DROPPED_QUERY_KEY: [routeName: string, key: string];
+
+  /**
+   * The params a committing producer — `navigate`, `navigateToDefault` or
+   * `buildNavigationState` — hands route `routeName` hold `key`, which is
+   * neither a path slot the route's URL prints, the root's included, nor a
+   * query param the route declares (#1579). Core keeps the key in
+   * `state.params`, and the URL does not print it. Raised once per such key,
+   * before the route's defaults are merged in, and only for a route that
+   * exists.
+   */
+  UNDECLARED_PARAM_KEY: [routeName: string, key: string];
+
+  /**
+   * A committing producer — `navigate`, `navigateToDefault` or
+   * `buildNavigationState` — built `state` on a route with a codec (#2905),
+   * and printed its URL. `codec` carries the route's two codecs, one of them
+   * `undefined` when the route declares only the other; `pathSlots` are the
+   * path slot names the route's URL prints, the root's included. Not raised
+   * for a route with neither.
+   */
+  CODEC_ROUND_TRIP: [
+    state: State,
+    codec: {
+      readonly encode: ((channels: ParamsSearch) => ParamsSearch) | undefined;
+      readonly decode: ((channels: UrlChannels) => ParamsSearch) | undefined;
+    },
+    pathSlots: readonly string[],
+  ];
 };
 
 /**

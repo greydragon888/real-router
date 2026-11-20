@@ -170,8 +170,8 @@ criterion above:
   is accepted. Its radius is diagnostics: nothing routing reads it, so a hijack
   silences messages instead of steering a navigation. Neither (a) nor (b).
 - **`PluginApi.emitTransitionError`'s argument is checked by no tier.** Core
-  asserts nothing and `RouterValidator` has no member for it, so the plugin
-  cannot cover it either; every shape reaches `$$error` subscribers verbatim.
+  asserts nothing and asks no check position about it, so the plugin cannot
+  cover it either; every shape reaches `$$error` subscribers verbatim.
   ⚠ Its sibling `navigateToNotFound` distrusts its own declared type at the same
   layer — the asymmetry is real, and it is this door that is the exception.
 
@@ -616,8 +616,8 @@ bind in the constructor if it touches private fields.
 method on the returned object → reach internals via `getInternals(router)`.
 
 **Adding validation** never adds a member to `RouterValidator` or a call to one,
-wherever in core it goes: the interface carries the three `state` reports the
-route resolver asks, and #2388 owns them. A refusal goes on the check channel
+wherever in core it goes: the interface declares no member, and core asks
+nothing through the slot (#2388). A refusal goes on the check channel
 and a report on the diagnostic channel; a consultation that does both is split
 between them. Whether a refusal belongs to core rather than to the plugin is
 decided under _Who refuses — core or the analyser_ above.
@@ -742,5 +742,5 @@ Full record: `.claude/mutation-audit-2026-06-22.md`.
 - [src/channels/CLAUDE.md](src/channels/CLAUDE.md) — channel-correctness subsystem, the mode gate
 - [src/engine/CLAUDE.md](src/engine/CLAUDE.md) — routing engine
 - [src/utils/fsm/CLAUDE.md](src/utils/fsm/CLAUDE.md) — FSM engine internals
-- [packages/validation-plugin/CLAUDE.md](../validation-plugin/CLAUDE.md) — validator namespaces
+- [packages/validation-plugin/CLAUDE.md](../validation-plugin/CLAUDE.md) — where core asks the plugin
 - [root ARCHITECTURE.md](../../ARCHITECTURE.md) · [IMPLEMENTATION_NOTES.md](../../IMPLEMENTATION_NOTES.md) — system design, and the home of every "why it is this way"

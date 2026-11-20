@@ -1323,10 +1323,7 @@ const SURFACES = new Map([
 ]);
 
 /** Kinds whose members fold into one: core calls them at too many places to list. */
-const FAMILIES = [
-  "types/RouterValidator.ts › RouterValidator",
-  "types/router.ts › RouterLogger",
-];
+const FAMILIES = ["types/router.ts › RouterLogger"];
 
 const T_EMITTER =
   "utils/event-emitter/EventEmitter.ts › EventEmitter.#callListener()";
@@ -1393,7 +1390,6 @@ const KINDS = new Map([
   ["types/router.ts › RouteConfigUpdate.encodeParams", T_ENCODE],
   ["types/router.ts › RouterLogger.*", LEAF],
   ["types/router.ts › SubscribeFn", LEAF],
-  ["types/RouterValidator.ts › RouterValidator.*", LEAF],
 ]);
 
 /** Internal declarations whose values core writes itself, by prefix. */
@@ -1646,7 +1642,6 @@ const STOP_RESTART = "by-design:stop-restart";
 const DISPOSED = "harmless:disposed";
 const INHERITS = "inherits";
 const BOOT_RESTART = "unsupported:boot-restart";
-const VALIDATOR = "unsupported:third-party-validator";
 const LOGGER_MEMBER = "unsupported:replaced-logger-member";
 const VALUE_KEY = "unsupported:navigating-value-key";
 
@@ -1730,7 +1725,6 @@ const PLACES = new Map([
   ["Router.ts › #runStart › then:catch", BOOT_RESTART],
   ["Router.ts › start › then:catch", BOOT_RESTART],
   ["types/router.ts › RouterLogger › family", LOGGER_MEMBER],
-  ["types/RouterValidator.ts › RouterValidator › family", VALIDATOR],
   [`${LOGGER} › #invokeCallback › call:LogCallback`, "counted:logger"],
   [`${LOGGER} › #invokeCallback › then:Promise.resolve`, "counted:logger"],
   ["utils/thenable.ts › consumeThenable › then:Reflect.apply", DISPOSED],
@@ -1745,10 +1739,6 @@ const UNSUPPORTED = new Map([
   [
     BOOT_RESTART,
     "a restart from a boot stage — the start interceptors, the thenable one returns, the boot's `matchPath` — needs a boot-liveness predicate core does not have (#2798)",
-  ],
-  [
-    VALIDATOR,
-    "a `RouterValidator` that navigates: the shipped one throws or logs, and its logging is counted at `logger`",
   ],
   [
     LOGGER_MEMBER,
@@ -1798,7 +1788,8 @@ const B1_ROWS: readonly [string, string][] = [
   ],
   ["N3 B3 B6 B9 R7", `${RS} › registerSingleRouteHandlers`],
   ["N3 B3 B6 B9 R7", `${RS} › commitScalarConfig`],
-  ["N4 B1 B7 B9 R3 R5 R7", "types/RouterValidator.ts › RouterValidator"],
+  ["N4 B1 B7 B9 R3 R5 R7", "internals.ts › runChecks"],
+  ["N4 B7 B9 R5 R7", `${EBN} › emitDiagnostic`],
   ["B8", `${EBN} › emitRouterStart`],
   ["S2 S3 S4", `${EBN} › emitRouterStop`],
   ["S6", "namespaces/PluginsNamespace/PluginsNamespace.ts › cleanup"],
