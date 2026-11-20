@@ -179,12 +179,7 @@ describe("reachability census (#2303)", () => {
         "RouterError",
         "UNKNOWN_ROUTE",
       ].toSorted(byName),
-      types: [
-        "Constants",
-        "ErrorCodes",
-        "RouterValidator",
-        "RouteTree",
-      ].toSorted(byName),
+      types: ["Constants", "ErrorCodes", "RouteTree"].toSorted(byName),
       // ⚑ The root re-exports every type of `/types` by star, so the two
       // subpaths are one type surface. The names are pinned once, in the
       // `/types` cell below — a second copy here would drift from it.
@@ -233,7 +228,7 @@ describe("reachability census (#2303)", () => {
         "getInternals",
         "validateRoute",
       ],
-      types: ["Matcher", "RouterInternals", "RouterValidator", "RouteTree"],
+      types: ["Matcher", "RouterInternals", "RouteTree"],
       stars: [],
     });
   });

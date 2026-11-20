@@ -27,28 +27,25 @@ import type { LoggerConfig, Router } from "@real-router/core";
  *
  * `packages/core/CLAUDE.md` › _Who refuses — core or the analyser_ states the
  * rule. This file is the half a rule cannot carry: the SET of places it applies
- * to, derived from core's source.
+ * to, derived from this plugin's source.
  *
- * ⚑ **The set is DERIVED and the owner is DECLARED.** {@link OWNER} is
- * hand-written, and it is safe to keep by hand only because the keys come from
- * the checker: a consultation it resolves to the interface and nobody
- * classifies reds this file on the commit that adds it. The same division the
- * door census uses.
+ * ⚑ **The set is DERIVED and the owner is DECLARED.** The census reads the
+ * plugin's registrations on two channels, a check and a diagnostic:
+ * {@link REGISTRATION_OWNER} keys each call a registration's callback makes as
+ * a statement, `<position> › <callee>`. The keys come from the checker, so a
+ * call nobody classifies reds this file on the commit that adds it; the owners
+ * are hand-written. The same division the door census uses. The plugin's
+ * `start` interceptor, which only warns, registers on neither channel and is
+ * outside the census.
  *
  * ⚑ **Every row was established by MUTATION, not by reading a file's title.**
- * Each consultation was replaced with a no-op and this package's whole suite
- * run against it; the row names one file that went red. It is not the only one
- * — several consultations red four or five — it is the most subject-specific of
- * them, so the row points a reader at the nearest authority rather than at a
- * list that churns whenever a neighbouring test is added.
+ * Each call was removed from its callback and this package's whole suite run
+ * against it; the row names one file that went red. It is not the only one —
+ * several calls red four or five — it is the most subject-specific of them, so
+ * the row points a reader at the nearest authority rather than at a list that
+ * churns whenever a neighbouring test is added.
  *
- * ⚑ **The plugin's registrations are a second table, owned the same way.** Core
- * reaches a check or a diagnostic through a channel rather than a member, so
- * {@link OWNER} never meets one. {@link REGISTRATION_OWNER} keys each call a
- * registration's callback makes as a statement, `<position> › <callee>`, and
- * each row names a file that went red with that one call removed.
- *
- * ⚠ **A no-op that reds no file holding the call's message has two causes,
+ * ⚠ **A removed call that reds no file holding its message has two causes,
  * and they are not the same.**
  * Either the effect is genuinely unheld, or core refuses the same input with
  * the same wording, so the copy can never be observed — the shape #2307 found
@@ -57,9 +54,9 @@ import type { LoggerConfig, Router } from "@real-router/core";
  * below; a row of the second is {@link MIRRORED}.
  *
  * ⚠ **A row names a file that reds on BEHAVIOUR.**
- * `prefix-reachability-authority-2457` reads core's source for the doors a
- * message can name, so it can red when a consultation leaves the source, and it
- * stays green when the plugin's method stops acting. A row only it reds is
+ * `prefix-reachability-authority-2457` reads this package's source for the
+ * doors a message can name, so it can red when a call leaves its callback, and
+ * it stays green when a check stops acting. A row only it reds is
  * {@link SELF}.
  *
  * ⚠ **Silence is not redundancy.** `validateNavigateParamsShape` produces the
@@ -71,17 +68,12 @@ import type { LoggerConfig, Router } from "@real-router/core";
  * code ahead of the refusal. The cells below pin the trap sequence rather than
  * the message, which is the only form that can tell the two apart.
  *
- * ⚠ **A parity test cannot own a mirrored consultation, by construction.**
+ * ⚠ **A parity test cannot own a mirrored call, by construction.**
  * `bare-core-message-parity` compares the two tiers' MESSAGES, so it passes
  * whichever tier produced one. The mirroring is a recorded decision (#1047 for
  * the reserved prefix), not a gap to report as one.
  */
 
-const CORE_SRC = path.resolve(__dirname, "../../../core/src");
-const CORE_TSCONFIG = path.resolve(
-  __dirname,
-  "../../../core/tsconfig.src.json",
-);
 const HERE = __dirname;
 const PLUGIN_SRC = path.resolve(__dirname, "../../src");
 const PLUGIN_TSCONFIG = path.resolve(__dirname, "../../tsconfig.src.json");
@@ -103,12 +95,6 @@ const MIRRORED = "mirrored — core refuses the same input, same wording";
  * teardown row asserts only that the plugin changes the outcome.
  */
 const SELF = "validator-boundary-authority-2322.test.ts";
-
-/**
- * One file that reds when the consultation is replaced with a no-op, or
- * {@link MIRRORED} when nothing can.
- */
-const OWNER: Record<string, string> = {};
 
 /**
  * One file that reds when that call is removed from its registration's
@@ -253,38 +239,12 @@ const REGISTRATION_OWNER: Record<string, string> = {
   "usePlugin:plugin › validatePluginKeys": "plugin-api.validation.test.ts",
 };
 
-interface Census {
-  /**
-   * Every call whose callee is a property access the checker resolves to a
-   * `RouterValidator` member, keyed `namespace.member` — by each member it can
-   * reach, sorted and joined, for a receiver typed as a union of namespaces.
-   */
-  readonly sites: readonly { readonly key: string; readonly file: string }[];
-  /**
-   * Every other reference in a value position the checker resolves to a
-   * member — an alias, a destructuring declaration, an element access. The
-   * walk cannot say what such a reference consults, so it lists it rather
-   * than skipping it.
-   */
-  readonly unread: readonly {
-    readonly key: string;
-    readonly file: string;
-    readonly line: number;
-  }[];
-  /**
-   * What the compiler reports on the tree. A name it cannot resolve leaves a
-   * receiver without a type, and a call on that receiver resolves to nothing.
-   */
-  readonly diagnostics: readonly string[];
-}
-
 /**
- * A program over `root` compiled as a package compiles — core unless `tsconfig`
- * names another: with the options of its `tsconfig.src.json`, and so its lib
- * and its `types`. A receiver typed through `Readonly<…>` or `NonNullable<…>`
- * resolves only with the lib.
+ * A program over `root` compiled as a package compiles: with the options of
+ * `tsconfig`, and so its lib and its `types`. A receiver typed through
+ * `Readonly<…>` or `NonNullable<…>` resolves only with the lib.
  */
-function programOf(root: string, tsconfig: string = CORE_TSCONFIG): ts.Program {
+function programOf(root: string, tsconfig: string): ts.Program {
   const config = ts.getParsedCommandLineOfConfigFile(
     tsconfig,
     {},
@@ -307,229 +267,6 @@ function programOf(root: string, tsconfig: string = CORE_TSCONFIG): ts.Program {
     config.options,
     ts.createCompilerHost(config.options),
   );
-}
-
-/**
- * Each member of the `RouterValidator` interface, by its declaration.
- *
- * ⚠ Refused, not dropped: a tree the walk would read in part — no interface,
- * two, a namespace its body does not list, a namespace or a member of another
- * shape — agrees with a table that is missing the rest.
- */
-function membersOf(program: ts.Program): ReadonlyMap<ts.Node, string> {
-  const declared = program
-    .getSourceFiles()
-    .flatMap((source) =>
-      source.statements.filter(
-        (statement): statement is ts.InterfaceDeclaration =>
-          ts.isInterfaceDeclaration(statement) &&
-          statement.name.text === "RouterValidator",
-      ),
-    );
-
-  if (declared.length !== 1) {
-    throw new Error(
-      `Expected one RouterValidator interface, found ${declared.length}`,
-    );
-  }
-
-  const members = new Map<ts.Node, string>();
-  const listed = new Set<string>();
-
-  for (const namespace of declared[0].members) {
-    if (
-      !ts.isPropertySignature(namespace) ||
-      !ts.isIdentifier(namespace.name) ||
-      namespace.type === undefined ||
-      !ts.isTypeLiteralNode(namespace.type)
-    ) {
-      throw new Error(`A namespace of another shape: ${namespace.getText()}`);
-    }
-
-    listed.add(namespace.name.text);
-
-    for (const member of namespace.type.members) {
-      if (member.name === undefined || !ts.isIdentifier(member.name)) {
-        throw new Error(`A member of another shape: ${member.getText()}`);
-      }
-
-      members.set(member, `${namespace.name.text}.${member.name.text}`);
-    }
-  }
-
-  const unlisted = program
-    .getTypeChecker()
-    .getTypeAtLocation(declared[0].name)
-    .getProperties()
-    .map((property) => property.name)
-    .filter((name) => !listed.has(name));
-
-  if (unlisted.length > 0) {
-    throw new Error(
-      `RouterValidator has a namespace its body does not list: ${unlisted.join(", ")}`,
-    );
-  }
-
-  return members;
-}
-
-/**
- * The receiver and the name of a reference that names its member by a value:
- * an element access, or a destructuring by a computed or quoted name.
- */
-function namedByValue(
-  node: ts.Node,
-): { readonly receiver: ts.Node; readonly name: ts.Node } | undefined {
-  if (ts.isElementAccessExpression(node)) {
-    return { receiver: node.expression, name: node.argumentExpression };
-  }
-
-  if (
-    ts.isBindingElement(node) &&
-    node.propertyName !== undefined &&
-    !ts.isIdentifier(node.propertyName)
-  ) {
-    return {
-      receiver: node.parent,
-      name: ts.isComputedPropertyName(node.propertyName)
-        ? node.propertyName.expression
-        : node.propertyName,
-    };
-  }
-
-  return undefined;
-}
-
-/**
- * Every call the checker RESOLVES to a `RouterValidator` member, found by that
- * member rather than by how its receiver is spelled: `ctx.validator?.`, a
- * `getValidator()` result and a narrowed local reach the same declaration.
- */
-function consultations(root: string = CORE_SRC): Census {
-  const program = programOf(root);
-  const checker = program.getTypeChecker();
-  const members = membersOf(program);
-  const names = new Set(
-    [...members.values()].map((key) => key.split(".", 2)[1]),
-  );
-  const sites: { key: string; file: string }[] = [];
-  const unread: { key: string; file: string; line: number }[] = [];
-
-  // A symbol of a union or an intersection carries the declarations of every
-  // constituent, in an order the walk does not choose; only the interface's
-  // own map to a member, and their keys are sorted.
-  const memberOf = (symbol: ts.Symbol | undefined): string | undefined => {
-    const keys = new Set(
-      symbol?.declarations?.flatMap(
-        (declaration) => members.get(declaration) ?? [],
-      ),
-    );
-
-    return keys.size === 0
-      ? undefined
-      : [...keys].toSorted((a, b) => a.localeCompare(b)).join(" | ");
-  };
-
-  // The constituents of a type, each read through its apparent type, since a
-  // generic one among them can stand for a union of its own.
-  const constituentsOf = (type: ts.Type): ts.Type[] => {
-    const value = checker.getApparentType(type);
-
-    return value.isUnion()
-      ? value.types.flatMap((constituent) => constituentsOf(constituent))
-      : [value];
-  };
-
-  // The namespaces the members of a value of this type belong to, sorted. A
-  // union is read constituent by constituent: its members need not overlap.
-  const namespacesOf = (type: ts.Type): string[] =>
-    [
-      ...new Set(
-        constituentsOf(type)
-          .flatMap((constituent) => checker.getPropertiesOfType(constituent))
-          .flatMap((property) => property.declarations ?? [])
-          .flatMap(
-            (declaration) => members.get(declaration)?.split(".", 2)[0] ?? [],
-          ),
-      ),
-    ].toSorted((a, b) => a.localeCompare(b));
-
-  for (const source of program.getSourceFiles()) {
-    const file = path.relative(root, source.fileName);
-    const lineOf = (node: ts.Node): number =>
-      source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
-
-    const visit = (node: ts.Node): void => {
-      // Only an identifier spelled like a member can resolve to one, so the
-      // spelling decides which identifiers the checker is asked about.
-      if (
-        ts.isIdentifier(node) &&
-        names.has(node.text) &&
-        !members.has(node.parent)
-      ) {
-        const key = memberOf(checker.getSymbolAtLocation(node));
-        const access = node.parent;
-
-        if (key === undefined) {
-          // A namesake, or the local a shorthand destructuring binds.
-        } else if (
-          ts.isCallExpression(access.parent) &&
-          access.parent.expression === access
-        ) {
-          sites.push({ key, file });
-        } else {
-          unread.push({ key, file, line: lineOf(node) });
-        }
-      }
-
-      // A shorthand destructuring names the member through the local it binds.
-      if (
-        ts.isBindingElement(node) &&
-        node.propertyName === undefined &&
-        ts.isIdentifier(node.name)
-      ) {
-        const key = memberOf(
-          checker.getTypeAtLocation(node.parent).getProperty(node.name.text),
-        );
-
-        if (key !== undefined) {
-          unread.push({ key, file, line: lineOf(node) });
-        }
-      }
-
-      // A member named by a value is listed under each namespace its
-      // receiver's members belong to.
-      const named = namedByValue(node);
-
-      if (named !== undefined) {
-        const namespaces = namespacesOf(
-          checker.getTypeAtLocation(named.receiver),
-        );
-
-        if (namespaces.length > 0) {
-          unread.push({
-            key: `${namespaces.join(" | ")}.${named.name.getText(source)}`,
-            file,
-            line: lineOf(node),
-          });
-        }
-      }
-
-      ts.forEachChild(node, visit);
-    };
-
-    visit(source);
-  }
-
-  return {
-    sites,
-    unread,
-    diagnostics: ts
-      .getPreEmitDiagnostics(program)
-      .map(({ messageText }) =>
-        ts.flattenDiagnosticMessageText(messageText, " "),
-      ),
-  };
 }
 
 /** The members a plugin registers a check or a diagnostic through. */
@@ -555,7 +292,10 @@ interface Registrations {
     readonly file: string;
     readonly line: number;
   }[];
-  /** What the compiler reports on the tree, as for {@link Census}. */
+  /**
+   * What the compiler reports on the tree. A name it cannot resolve leaves a
+   * receiver without a type, and a call on that receiver resolves to nothing.
+   */
   readonly diagnostics: readonly string[];
 }
 
@@ -809,19 +549,12 @@ function inTree<T>(files: Tree, read: (root: string) => T): T {
   }
 }
 
-/** The census of a synthetic tree. */
-const censusOf = (files: Tree): Census =>
-  inTree(files, (root) => consultations(root));
-
 /** The registrations of a synthetic tree, compiled with this plugin's options. */
 const registrationsOf = (files: Tree): Registrations =>
   inTree(files, (root) => registrations(root));
 
 /** The message `read` refuses a synthetic tree with, or `"NO REFUSAL"`. */
-function refusalOf(
-  files: Tree,
-  read: (root: string) => unknown = (root) => consultations(root),
-): string {
+function refusalOf(files: Tree, read: (root: string) => unknown): string {
   try {
     inTree(files, read);
 
@@ -849,328 +582,6 @@ const mirroredIn = (table: Readonly<Record<string, string>>): string[] =>
       .filter(([, owner]) => owner === MIRRORED)
       .map(([key]) => key),
   );
-
-describe("each consultation the walk derives from core is classified (#2322)", () => {
-  const census = consultations();
-  const sites = census.sites;
-  const derived = new Set(sites.map(({ key }) => key));
-
-  it("every reference to a member the walk finds in core is a call", () => {
-    // A reference the walk lists is a consultation it cannot key, so it reds
-    // here until the walk learns the form.
-    expect(census.unread).toStrictEqual([]);
-  });
-
-  it("the compiler types every receiver in core's tree", () => {
-    // A call on a receiver without a type resolves to nothing, and the walk
-    // reads it as a namesake's, so the tree is held to compile.
-    expect(census.diagnostics).toStrictEqual([]);
-  });
-
-  // Each synthetic tree below is compiled ONCE, here at collection, right above
-  // the cell that reads it. A typed program built inside a cell runs under
-  // `testTimeout`, which a cell building several can miss under coverage on a
-  // loaded CI runner (#2818, #2839).
-
-  // ⚑ The walk resolves calls through the checker, so each spelling of the
-  // receiver here reaches the member — a property, a call's result, a narrowed
-  // local, the namespace held apart, a type the lib builds, an intersection —
-  // and a namesake on another object does not. A union of namespaces is keyed
-  // by both members in sorted order, though the checker meets `plugins`
-  // first, and an overloaded member once. A member handed on rather than
-  // called is listed, and so is a renamed destructuring, once, whatever its
-  // local is named. Here a member named by a value — an element access, a
-  // computed or quoted destructuring — is listed under each namespace its
-  // receiver reaches: a union read constituent by constituent, a generic
-  // constituent through its apparent type.
-  const spellings = censusOf({
-    "RouterValidator.ts": [
-      "export interface RouterValidator {",
-      "  lifecycle: {",
-      "    viewed: () => void;",
-      "    property: () => void;",
-      "    result: () => void;",
-      "    narrowed: () => void;",
-      "    apart: () => void;",
-      "    unwrapped: () => void;",
-      "    crossed: () => void;",
-      "    shared: () => void;",
-      "    destructured: () => void;",
-      "    aliased: () => void;",
-      "    indexed: () => void;",
-      "    renamed: () => void;",
-      "    passed: () => void;",
-      "    bound: () => void;",
-      "    overloaded(value: string): void;",
-      "    overloaded(value: number): void;",
-      "  };",
-      "  plugins: {",
-      "    shared: () => void;",
-      "  };",
-      "}",
-    ],
-    "consumer.ts": [
-      'import type { RouterValidator } from "./RouterValidator";',
-      "",
-      "declare const ctx: { validator: RouterValidator | null };",
-      "declare function getValidator(): RouterValidator | null;",
-      "declare function consume(value: unknown): void;",
-      "declare const present: NonNullable<typeof ctx.validator>;",
-      "declare const crossing: { lifecycle: { crossed: () => void } } & RouterValidator;",
-      'declare const either: RouterValidator["lifecycle"] | RouterValidator["plugins"];',
-      "declare const timer: NodeJS.Timeout;",
-      'declare const disjoint: Pick<RouterValidator["lifecycle"], "apart"> | RouterValidator["plugins"];',
-      'declare const key: "renamed";',
-      'declare const both: Pick<RouterValidator["lifecycle"], "shared"> & RouterValidator["plugins"];',
-      "",
-      "export function early(): void {",
-      "  getValidator()?.plugins.shared();",
-      "}",
-      "",
-      'export function view(lifecycle: Readonly<RouterValidator["lifecycle"]>): void {',
-      "  lifecycle.viewed();",
-      "}",
-      "",
-      "export function consult(): void {",
-      "  ctx.validator?.lifecycle.property();",
-      "  getValidator()?.lifecycle.result();",
-      "  const validator = getValidator();",
-      "  if (validator) {",
-      "    validator.lifecycle.narrowed();",
-      "  }",
-      "  const lifecycle = getValidator()?.lifecycle;",
-      "  lifecycle?.apart();",
-      "  present.lifecycle.unwrapped();",
-      "  crossing.lifecycle.crossed();",
-      "  either.shared();",
-      '  validator!.lifecycle.overloaded("x");',
-      "  const {",
-      "    destructured =",
-      "      undefined,",
-      "  } = validator!.lifecycle;",
-      "  const aliased = validator?.lifecycle.aliased;",
-      "  const indexed = lifecycle?.[",
-      '    "indexed"',
-      "  ];",
-      '  const merged = both["shared"];',
-      "  const {",
-      "    [key]: byKey,",
-      "  } = validator!.lifecycle;",
-      '  const { "aliased": quoted } = validator!.lifecycle;',
-      "  const { renamed: result } = validator!.lifecycle;",
-      "  consume(validator?.lifecycle.passed);",
-      "  consume(validator?.lifecycle.bound.bind(null));",
-      "  const other = { lifecycle: { property: (): void => {} } };",
-      "  other.lifecycle.property();",
-      "  void destructured; void aliased; void indexed; void result; void timer;",
-      "  void merged; void byKey; void quoted;",
-      "}",
-      "",
-      'export function generic<T extends typeof disjoint, U extends RouterValidator["plugins"]>(',
-      "  value: T | U,",
-      "  name: keyof T & keyof U,",
-      "): void {",
-      "  void value[name];",
-      "}",
-      "",
-      'export function joined<T extends typeof disjoint, U extends RouterValidator["plugins"]>(',
-      "  value: (T & U) | undefined,",
-      "  name: keyof (T & U),",
-      "): void {",
-      "  void value?.[name];",
-      "}",
-    ],
-  });
-
-  it("CONTROL — the walk keys each spelling of the receiver, and lists what it cannot key", () => {
-    expect(spellings.sites).toStrictEqual([
-      { key: "plugins.shared", file: "consumer.ts" },
-      { key: "lifecycle.viewed", file: "consumer.ts" },
-      { key: "lifecycle.property", file: "consumer.ts" },
-      { key: "lifecycle.result", file: "consumer.ts" },
-      { key: "lifecycle.narrowed", file: "consumer.ts" },
-      { key: "lifecycle.apart", file: "consumer.ts" },
-      { key: "lifecycle.unwrapped", file: "consumer.ts" },
-      { key: "lifecycle.crossed", file: "consumer.ts" },
-      { key: "lifecycle.shared | plugins.shared", file: "consumer.ts" },
-      { key: "lifecycle.overloaded", file: "consumer.ts" },
-    ]);
-    expect(spellings.unread).toStrictEqual([
-      { key: "lifecycle.destructured", file: "consumer.ts", line: 36 },
-      { key: "lifecycle.aliased", file: "consumer.ts", line: 39 },
-      { key: 'lifecycle."indexed"', file: "consumer.ts", line: 40 },
-      { key: 'lifecycle | plugins."shared"', file: "consumer.ts", line: 43 },
-      { key: "lifecycle.key", file: "consumer.ts", line: 45 },
-      { key: 'lifecycle."aliased"', file: "consumer.ts", line: 47 },
-      { key: "lifecycle.renamed", file: "consumer.ts", line: 48 },
-      { key: "lifecycle.passed", file: "consumer.ts", line: 49 },
-      { key: "lifecycle.bound", file: "consumer.ts", line: 50 },
-      { key: "lifecycle | plugins.name", file: "consumer.ts", line: 61 },
-      { key: "lifecycle | plugins.name", file: "consumer.ts", line: 68 },
-    ]);
-    // The tree compiles under core's own options — its `types` declare
-    // `NodeJS.Timeout` — so what the walk misses in it is the walk's.
-    expect(spellings.diagnostics).toStrictEqual([]);
-  });
-
-  const broken = censusOf({
-    "RouterValidator.ts": [
-      "export interface RouterValidator {",
-      "  lifecycle: {",
-      "    member: () => void;",
-      "  };",
-      "}",
-    ],
-    "broken.ts": ["export const broken = ;"],
-    "consumer.ts": [
-      'import type { RouterValidator } from "./RouterValidator";',
-      "",
-      "declare const untyped: Missing<RouterValidator>;",
-      "untyped.lifecycle.member();",
-    ],
-  });
-
-  it("CONTROL — a syntax error and an unresolved name are reported, and a receiver the compiler cannot type is not keyed", () => {
-    expect(broken.sites).toStrictEqual([]);
-    expect(broken.unread).toStrictEqual([]);
-    expect(broken.diagnostics).toStrictEqual([
-      "Expression expected.",
-      "Cannot find name 'Missing'.",
-    ]);
-  });
-
-  const declaration = [
-    "export interface RouterValidator {",
-    "  lifecycle: {",
-    "    member: () => void;",
-    "  };",
-    "}",
-  ];
-  const refused = {
-    noInterface: refusalOf({ "consumer.ts": ["export {};"] }),
-    twoInterfaces: refusalOf({
-      "first.ts": declaration,
-      "second.ts": declaration,
-    }),
-    inheritedNamespaces: refusalOf({
-      "RouterValidator.ts": [
-        "export interface RouterValidator extends Base {",
-        "  lifecycle: {",
-        "    member: () => void;",
-        "  };",
-        "}",
-        "interface Base {",
-        "  plugins: {",
-        "    member: () => void;",
-        "  };",
-        "  routes: {",
-        "    member: () => void;",
-        "  };",
-        "}",
-      ],
-    }),
-    namedNamespace: refusalOf({
-      "RouterValidator.ts": [
-        "export interface RouterValidator {",
-        "  lifecycle: Lifecycle;",
-        "}",
-        "interface Lifecycle {",
-        "  member: () => void;",
-        "}",
-      ],
-    }),
-    quotedMember: refusalOf({
-      "RouterValidator.ts": [
-        "export interface RouterValidator {",
-        "  lifecycle: {",
-        '    "quoted": () => void;',
-        "  };",
-        "}",
-      ],
-    }),
-  };
-
-  it("CONTROL — a tree the walk cannot read is refused, not read as empty", () => {
-    expect(refused.noInterface).toContain(
-      "Expected one RouterValidator interface, found 0",
-    );
-    expect(refused.twoInterfaces).toContain(
-      "Expected one RouterValidator interface, found 2",
-    );
-    expect(refused.inheritedNamespaces).toContain(
-      "RouterValidator has a namespace its body does not list: plugins, routes",
-    );
-    expect(refused.namedNamespace).toContain("A namespace of another shape");
-    expect(refused.quotedMember).toContain("A member of another shape");
-  });
-
-  it("the declared table covers the derived set, in both directions", () => {
-    // ⚑ This is the ratchet. A member core starts consulting reds here until
-    // someone runs it against this package's suite and records what held it,
-    // and a member core stops consulting reds here until its row goes.
-    expect(sorted(Object.keys(OWNER))).toStrictEqual(sorted(derived));
-  });
-
-  it("every authority a row cites exists", () => {
-    expect(absentFrom(OWNER)).toStrictEqual([]);
-  });
-
-  it("CONTROL — a row citing a file this directory does not hold is caught, and a mirrored row cites none", () => {
-    // ⚑ On a table written for it: converting core's consultations (#2388)
-    // empties `OWNER`, and an empty table cites nothing, so the cell above
-    // would agree with a check that never looks.
-    expect(
-      absentFrom({
-        "a.member": "no-such-file.test.ts",
-        "b.member": SELF,
-        "c.member": MIRRORED,
-      }),
-    ).toStrictEqual(["no-such-file.test.ts"]);
-  });
-
-  it("the copies nothing can observe are exactly these", () => {
-    // ⚠ EXACT, not a floor. A row leaving this set is someone deciding the copy
-    // became observable — or that it should go, the way #2307 retired four
-    // lists once measurement showed core refusing first.
-    expect(mirroredIn(OWNER)).toStrictEqual([]);
-  });
-
-  // ⚑ On a tree written for it: converting core's consultations (#2388)
-  // leaves core's own tree with none, so the table cell above agrees with a
-  // walk that matches nothing. This tree is where the walk shows it keys one.
-  const twice = censusOf({
-    "RouterValidator.ts": [
-      "export interface RouterValidator {",
-      "  lifecycle: {",
-      "    member: () => void;",
-      "  };",
-      "}",
-    ],
-    "first.ts": [
-      'import type { RouterValidator } from "./RouterValidator";',
-      "",
-      "declare const ctx: { validator: RouterValidator | null };",
-      "",
-      "ctx.validator?.lifecycle.member();",
-    ],
-    "second.ts": [
-      'import type { RouterValidator } from "./RouterValidator";',
-      "",
-      "declare function getValidator(): RouterValidator | null;",
-      "",
-      "getValidator()?.lifecycle.member();",
-    ],
-  });
-
-  it("CONTROL — the walk keys a consultation made twice once per site", () => {
-    // One that collapsed every site into one key would hide the file spread.
-    expect(twice.sites).toStrictEqual([
-      { key: "lifecycle.member", file: "first.ts" },
-      { key: "lifecycle.member", file: "second.ts" },
-    ]);
-    expect(twice.diagnostics).toStrictEqual([]);
-  });
-});
 
 describe("each call a registration of this plugin makes is classified (#2388)", () => {
   const census = registrations();
@@ -1352,10 +763,9 @@ describe("each call a registration of this plugin makes is classified (#2388)", 
   });
 
   it("the declared table covers the derived set, in both directions", () => {
-    // ⚑ The ratchet of the member table, for the other door into the plugin:
-    // a call a registration starts making reds here until someone removes it,
-    // runs this package's suite and records what held it, and a call it stops
-    // making reds here until its row goes.
+    // ⚑ This is the ratchet. A call a registration starts making reds here
+    // until someone removes it, runs this package's suite and records what held
+    // it, and a call it stops making reds here until its row goes.
     expect(sorted(Object.keys(REGISTRATION_OWNER))).toStrictEqual(
       sorted(derived),
     );
@@ -1367,10 +777,23 @@ describe("each call a registration of this plugin makes is classified (#2388)", 
     expect(absentFrom(REGISTRATION_OWNER)).toStrictEqual([]);
   });
 
+  it("CONTROL — a row citing a file this directory does not hold is caught, and a mirrored row cites none", () => {
+    // ⚑ On a table written for it: every file the live table cites exists, so
+    // the cell above would agree with a check that never looks.
+    expect(
+      absentFrom({
+        "a:entry › first": "no-such-file.test.ts",
+        "b:entry › first": SELF,
+        "c:entry › first": MIRRORED,
+      }),
+    ).toStrictEqual(["no-such-file.test.ts"]);
+  });
+
   it("the copies nothing can observe are exactly these", () => {
-    // ⚠ EXACT, as for the member table. Both are the reserved prefix (#1047):
-    // core's backstop refuses it at the same door, with the same wording, on
-    // the statement after the check.
+    // ⚠ EXACT, not a floor: a row leaving this set is someone deciding the copy
+    // became observable, or that it should go. Both are the reserved prefix
+    // (#1047): core's backstop refuses it at the same door, with the same
+    // wording, on the statement after the check.
     expect(mirroredIn(REGISTRATION_OWNER)).toStrictEqual([
       "removeRoute:entry › throwIfInternalRoute",
       "updateRoute:entry › throwIfInternalRoute",
@@ -1428,7 +851,7 @@ describe("what nothing else held (#2322)", () => {
   //
   // `throwIfInternalRouteInArray` and `validateParentOption` run inside
   // `checkRouteBatch`, the call both batch registrations key, so no row of
-  // either table names them.
+  // the table names them.
   const ROUTES = [
     { name: "a", path: "/a/:id" },
     { name: "b", path: "/b" },

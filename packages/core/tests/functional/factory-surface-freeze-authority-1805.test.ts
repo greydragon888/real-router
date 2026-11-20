@@ -63,15 +63,13 @@ const FACTORIES = [
 const OPEN = new Set<string>();
 
 /**
- * Cached and unfrozen because that IS the contract — a different thing from
- * `OPEN`, and conflating the two would either excuse a defect or demand a fix
- * that breaks a shipped package.
+ * Cached and unfrozen by decision — a different thing from `OPEN`, which is a
+ * backlog of defects: a row here carries the reason it stays.
  *
  * `getInternals` hands back the live internals bag on the published
- * `/validation` subpath, and one of its fields is declared WITHOUT `readonly`
- * on purpose: `validator`, which the validation plugin installs and its
- * teardown clears. Freezing this surface would break that install. The cell
- * below pins the write rather than merely excusing it.
+ * `/validation` subpath, and the bag is temporary: #2386 removes that export,
+ * and its row leaves with it, and #2387 dissolves the bag. Freezing it would
+ * change the published surface to harden an object that is going away.
  */
 const LIVE_BY_CONTRACT = new Set(["getInternals"]);
 
@@ -129,22 +127,6 @@ describe("factory surface freeze authority (#1805)", () => {
     }).map(({ name }) => name);
 
     expect(unfrozen).toStrictEqual([...OPEN, ...LIVE_BY_CONTRACT]);
-  });
-
-  it("getInternals stays writable, which is why it is exempt", () => {
-    // The carve-out, pinned rather than asserted in prose: freezing this
-    // surface would break the validation plugin, which writes `validator` on
-    // install and clears it on teardown.
-    const ctx = getInternals(createRouter(ROUTES)) as unknown as Surface;
-    const previous = ctx.validator;
-    const marker = { marker: true };
-
-    ctx.validator = marker;
-
-    expect(getInternals(createRouter(ROUTES))).toBeDefined();
-    expect(ctx.validator).toBe(marker);
-
-    ctx.validator = previous;
   });
 
   it.each(

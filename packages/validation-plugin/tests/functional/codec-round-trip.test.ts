@@ -2549,7 +2549,8 @@ describe("validation-plugin — codec round-trip diagnostic (#2905)", () => {
 
     it("again after the plugin is torn down and re-registered (#1583)", () => {
       // Pre-start, because the plugin refuses registration after `start()`.
-      // `buildNavigationState` is the other committing producer.
+      // `buildNavigationState` is the committing producer that runs on a
+      // router not yet started.
       const { router, warnings } = logged(ROUTES);
       const unsubscribe = router.usePlugin(validationPlugin());
 

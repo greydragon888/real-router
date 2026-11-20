@@ -21,9 +21,9 @@ import { describe, it, expect } from "vitest";
  *
  * ⚠ The rule is about ACCUMULATING state, not about module scope as such. A
  * frozen lookup table (`new Set(["a", "b"])`, never mutated) is fine and common
- * here; so is a `WeakMap` keyed by an object, which evicts with its key. The
- * scan therefore flags a module-level `Set` / `Map` only when the same file
- * mutates it at runtime.
+ * here; so is a `WeakMap` or a `WeakSet` keyed by an object, which evicts with
+ * its key — the install mark of #2349 is one. The scan therefore flags a
+ * module-level `Set` / `Map` only when the same file mutates it at runtime.
  *
  * Not repo-wide on purpose: core's `nameToIDsCache` is a legitimate
  * module-global — its value is a pure function of its key, so it is

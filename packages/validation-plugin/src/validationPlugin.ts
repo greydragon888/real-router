@@ -97,7 +97,6 @@ import type {
   NavigationOptions,
   PluginApi,
   PluginFactory,
-  RouterValidator,
   Route,
   RoutesApi,
 } from "@real-router/core";
@@ -108,6 +107,19 @@ const atAddRoute = raiser("router", "addRoute");
 
 /** The options a door judges for a call that passed none. */
 const EMPTY_OPTIONS: NavigationOptions = Object.freeze({});
+
+/**
+ * The routers this plugin is installed on (#2349). A second install on one
+ * router is refused: it would register every check and kind a second time, so
+ * a call that passes would run each check twice and each report would print
+ * twice. `teardown` takes the router out, and so does a retrospective pass
+ * that throws.
+ *
+ * ⚠ A `WeakSet`, so the entry goes with its router. Each copy of this package
+ * holds a set of its own, so a second COPY of the package installed on the
+ * same router is not refused.
+ */
+const INSTALLED = new WeakSet<object>();
 
 /** The one question existence asks of a tree node: its children by segment. */
 interface TreeNode {
@@ -226,49 +238,27 @@ export function validationPlugin<
       )`must be registered before router.start()`;
     }
 
-    // ⚑ One router, one install (#2349). A second install would register every
-    // check and kind a second time, so a call that passes would run each check
-    // twice and each report would print once per install.
-    // `RouterInternals.validator` carries the first install's mark and
-    // `teardown` clears it; a tally of installs only models an ownership the
-    // slot does not grant.
+    // ⚑ One router, one install (#2349) — the `INSTALLED` mark above.
     //
     // ⚠ A CLONE needs no install of its own: `cloneRouter` re-runs plugin
     // factories by contract, which is what the message points at.
-    if (ctx.validator !== null) {
+    if (INSTALLED.has(router)) {
       throw atValidationPlugin.code(
         "VALIDATION_PLUGIN_ALREADY_INSTALLED",
       )`is already installed on this router — a clone re-runs plugin factories, so it needs no usePlugin of its own`;
     }
 
-    // RouterInternals.validator is now mutable — direct assignment works
     const defaultsWatch = new DefaultsMutationWatch();
 
     // ⚠ BEFORE the `NAVIGATE_TO_DEFAULT` subscription below, so its first
     // report already has a baseline to compare against.
     defaultsWatch.watch(api.getAdoptedOrigins());
 
-    // ⚑ The object is held so teardown can prove it is still the holder.
-    // The slot has no owner — `RouterInternals.validator` is plain data on a
-    // surface pinned `accessorNames === []`, so a second writer cannot be
-    // REFUSED here. What it can be is not silently destroyed: an
-    // unconditional `= null` on teardown nulls whoever holds the slot now;
-    // `validator-slot-owner-1b.test.ts` holds both arms.
-    // Same shape as `claimContextNamespace`, which checks the holder on
-    // write and on release (#2059 / #1929) — here only the release half is
-    // reachable, and the write half waits for the slot to go away.
     const lookup = createRouteLookup(api);
-    const ownValidator: RouterValidator = {};
-    // One branch, shared by the error path below and by `teardown`: both ask
-    // the same question, so they share the site rather than each growing an
-    // arm the other's test has to reach.
-    const releaseIfStillOurs = () => {
-      if (ctx.validator === ownValidator) {
-        ctx.validator = null;
-      }
-    };
 
-    ctx.validator = ownValidator;
+    // Marked BEFORE the retrospective pass, and unmarked when it throws, so a
+    // corrected retry is accepted.
+    INSTALLED.add(router);
 
     try {
       const routes = readRoutes(api, getRoutesApi(router));
@@ -295,7 +285,7 @@ export function validationPlugin<
         validateConfiguredDefaultRoute(options.defaultRoute, lookup);
       }
     } catch (error) {
-      releaseIfStillOurs();
+      INSTALLED.delete(router);
 
       throw error;
     }
@@ -333,13 +323,12 @@ export function validationPlugin<
       return next(path);
     });
 
-    // ⚠ A CHECK, not a `RouterValidator` member, and the distinction is the
-    // argument rather than the style: core hands this position `ownParams` —
-    // the copy it will print the path from — which no seam can reach, because
-    // at the call boundary that object does not exist yet (#2134 / #2388).
+    // ⚠ Core hands this position `ownParams` — the copy it will print the path
+    // from — which no seam can reach, because at the call boundary that object
+    // does not exist yet (#2134 / #2388).
     //
-    // ⚠ Registered AFTER the retrospective pass above, so the error path's
-    // `releaseIfStillOurs` leaves nothing registered behind it.
+    // ⚠ Registered AFTER the retrospective pass above, so a pass that throws
+    // leaves nothing registered behind it.
     const removeParamsCheck = api.addCheck("buildPath:params", (ownParams) => {
       validateNavigateParams(ownParams, "buildPath");
     });
@@ -1195,7 +1184,7 @@ export function validationPlugin<
 
         removeInterceptor();
 
-        releaseIfStillOurs();
+        INSTALLED.delete(router);
       },
     };
   };

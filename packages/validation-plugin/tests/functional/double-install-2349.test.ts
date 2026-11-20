@@ -13,17 +13,12 @@ const probe = { seq: 0 };
  *
  * ⚑ **The state this refuses is reachable without the guard.** Two
  * installations register every check and diagnostic kind twice, so a call that
- * passes runs each check twice and each warning prints twice; and the teardown
- * of the one whose mark the slot holds empties it while the other is still
- * registered, so a further installation is no longer refused.
+ * passes runs each check twice and each warning prints twice.
  *
- * ⚠ **The refusal is the fix, not a counter.** A tally models an ownership the
- * slot does not grant: `validator` is one of two writable members on an
- * otherwise `readonly` `RouterInternals`, reachable by anyone importing
- * `@real-router/core/validation`. Refusing the second install makes the broken
- * state unrepresentable instead, so there is nothing here to keep in sync.
- * #2339 proposes replacing the slot with a `setValidator` door; the guard
- * belongs to whoever owns the write, and moves there with it.
+ * ⚠ **The mark is the plugin's own.** A module-level `WeakSet` holds the
+ * routers it is installed on, and teardown and a retrospective pass that
+ * throws take the router out of it. Nothing outside this package writes it,
+ * and a second copy of the package keeps a set of its own.
  *
  * ⚠ **A CLONE is not a second install.** `cloneRouter` re-runs plugin factories
  * by contract, so a clone arrives with its own validator and needs no
@@ -38,7 +33,7 @@ describe("one router, one validator (#2349)", () => {
 
   /**
    * The verdict is taken by driving a door only the plugin refuses, not by
-   * reading the slot: the cell measures the CAPABILITY, not the bookkeeping.
+   * reading the mark: the cell measures the CAPABILITY, not the bookkeeping.
    */
   const validationIsOn = (router: Router): boolean => {
     probe.seq += 1;
@@ -113,9 +108,8 @@ describe("one router, one validator (#2349)", () => {
     // ⚑ The arm the guard could plausibly break. `dropped-query-key` and
     // `undeclared-param-key` each run a teardown/re-register cycle, but their
     // subject is the de-dup cache leaving with its validator, so what they give
-    // this arm is incidental. Measured: a guard keyed on "was ever installed"
-    // rather than on the slot reds this cell and both of theirs, and only this
-    // one names why.
+    // this arm is incidental. A guard keyed on "was ever installed" reds this
+    // cell, and this one names why.
     const router = make();
     const remove = router.usePlugin(validationPlugin());
 
@@ -151,8 +145,8 @@ describe("one router, one validator (#2349)", () => {
     );
   });
 
-  it("a FAILED install leaves the slot clear, so a corrected retry is accepted", () => {
-    // ⚑ The sibling of the refusal: the retrospective pass clears the slot when
+  it("a FAILED install leaves the mark clear, so a corrected retry is accepted", () => {
+    // ⚑ The sibling of the refusal: the retrospective pass clears the mark when
     // it throws. Without that clear the guard above would lock the router out of
     // the plugin for good, and the failure that did it is a config error the
     // caller is expected to correct and retry.

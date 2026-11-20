@@ -541,7 +541,7 @@ runChecks(ctx.checks, POSITION["buildPath:entry"], route, params, search); // co
 api.addCheck("buildPath:entry", (route, params, search) => { … }); // the plugin
 ```
 
-A position with no check registered calls nothing. `CheckPositionMap` and `DiagnosticEventMap` in `packages/core/src/types/api.ts` declare what each position and kind receives. The `RouterValidator | null` slot in `RouterInternals` carries nothing core asks: the interface declares no member.
+A position with no check registered calls nothing. `CheckPositionMap` and `DiagnosticEventMap` in `packages/core/src/types/api.ts` declare what each position and kind receives.
 
 ## Invariants
 

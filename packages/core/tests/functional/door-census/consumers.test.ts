@@ -206,11 +206,6 @@ describe("consumer census (#2303)", () => {
    * derivation that called each member to see what comes back would start the
    * router. Reading the types answers the same question without running
    * anything.
-   *
-   * ⚠ **`null` on a bare router is not "flat".** `validator` is empty until a
-   * plugin fills it, and a reach into its namespaces would happen on exactly
-   * that slot. The declaration is what decides; the value on an unconfigured
-   * router is not evidence.
    */
   const RETURNS_OBJECT = new Set(
     MEMBERS.filter(({ type }) =>
@@ -666,10 +661,10 @@ describe("consumer census (#2303)", () => {
       getLifecycleApi: sorted(hits.getLifecycleApi.src),
     }).toStrictEqual({
       // ⚠ What is LEFT here: the dependency record the getter walk reads until
-      // its door goes (#2386), the validator slot (#2388), and the codec
-      // diagnostic's reload (#2905), which must skip the path rebuild that
-      // `PluginApi.matchPath` runs under the router's options.
-      getInternals: ["dependenciesGetStore", "matchPath", "validator"],
+      // its door goes (#2386), and the codec diagnostic's reload (#2905), which
+      // must skip the path rebuild that `PluginApi.matchPath` runs under the
+      // router's options.
+      getInternals: ["dependenciesGetStore", "matchPath"],
       getPluginApi: [
         "addCheck",
         "addEventListener",

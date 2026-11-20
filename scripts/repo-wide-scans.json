@@ -116,11 +116,7 @@
     },
     {
       "file": "packages/validation-plugin/tests/functional/prefix-reachability-authority-2457.test.ts",
-      "reads": "packages/core/src — the door names core publishes, and which of them consults each validator member; packages/core/tests/fixtures/raiser-heads — the shared raiser-head fixture"
-    },
-    {
-      "file": "packages/validation-plugin/tests/functional/validator-boundary-authority-2322.test.ts",
-      "reads": "core's src, for the places core consults this plugin and the channels this plugin registers through"
+      "reads": "packages/core/tests/fixtures/raiser-heads — the shared raiser-head fixture"
     }
   ]
 }

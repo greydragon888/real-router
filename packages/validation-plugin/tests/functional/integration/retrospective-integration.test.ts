@@ -76,13 +76,13 @@ describe("retrospective validation — triggered at usePlugin() time", () => {
 
     expect(() => router.usePlugin(validationPlugin())).toThrow(/ghost/);
 
-    // `getDependency` consults the validator itself, so it answers for the slot
-    // the failed install wrote and must have released.
+    // The plugin registers its checks after the retrospective pass, so the
+    // failed install registered none and `getDependency` answers as bare core.
     expect(
       getDependenciesApi(router).get("missing-dep" as never),
     ).toBeUndefined();
 
-    // Repaired, the router takes the install: a slot left held would refuse it
+    // Repaired, the router takes the install: a mark left held would refuse it
     // as VALIDATION_PLUGIN_ALREADY_INSTALLED.
     getRoutesApi(router).add({ name: "ghost", path: "/ghost" });
 
