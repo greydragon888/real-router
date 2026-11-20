@@ -1,12 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { createRouter } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 import { getInternals } from "@real-router/core/validation";
 
-import { installSpyValidator } from "../../helpers/spyValidator";
-
 import type {
+  DiagnosticEventMap,
   ParamsSearch,
   Route,
   Router,
@@ -15,11 +14,11 @@ import type {
 } from "@real-router/core";
 
 /**
- * The codec diagnostic's sink (#2905). `navigate` never runs a route's
- * `decodeParams`, so core hands the validator what a round trip needs: the
- * state a committing producer builds, the route's two codecs and the path
- * slots its URL prints. What the round trip finds is the plugin's verdict, and
- * `validation-plugin`'s `codec-round-trip.test.ts` owns it.
+ * The codec diagnostic's kind (#2905). `navigate` never runs a route's
+ * `decodeParams`, so core raises `CODEC_ROUND_TRIP` with what a round trip
+ * needs: the state a committing producer builds, the route's two codecs and
+ * the path slots its URL prints. What the round trip finds is the plugin's
+ * verdict, and `validation-plugin`'s `codec-round-trip.test.ts` owns it.
  */
 
 const lowered = ({ params, search }: ParamsSearch): ParamsSearch => ({
@@ -56,12 +55,20 @@ const routingOf = ({ name, params, search, path }: State) => ({
   path,
 });
 
-function reportsOf(router: Router) {
-  return vi.mocked(getInternals(router).validator!.state.reportCodecRoundTrip)
-    .mock.calls;
+type CodecReport = DiagnosticEventMap["CODEC_ROUND_TRIP"];
+
+/** Every report `router` raises from here on, as the kind's argument tuple. */
+function listen(router: Router): CodecReport[] {
+  const reports: CodecReport[] = [];
+
+  getPluginApi(router).subscribeDiagnostic("CODEC_ROUND_TRIP", (...report) => {
+    reports.push(report);
+  });
+
+  return reports;
 }
 
-describe("the codec round-trip sink (#2905)", () => {
+describe("the codec round-trip kind (#2905)", () => {
   let router: Router;
 
   beforeEach(async () => {
@@ -73,37 +80,43 @@ describe("the codec round-trip sink (#2905)", () => {
     router.stop();
   });
 
-  it("is absent from the port until a validator is installed, and once it is removed", async () => {
+  it("is absent from the port until the kind has a listener, and once it has none", async () => {
     const port = getInternals(router).port();
+    const reports: CodecReport[] = [];
 
     expect(port.reportCodecRoundTrip).toBeUndefined();
 
-    const validator = installSpyValidator(router);
+    const remove = getPluginApi(router).subscribeDiagnostic(
+      "CODEC_ROUND_TRIP",
+      (...report) => {
+        reports.push(report);
+      },
+    );
 
     expect(typeof port.reportCodecRoundTrip).toBe("function");
 
     await router.navigate("cars", { slug: "bmw" });
 
-    expect(validator.state.reportCodecRoundTrip).toHaveBeenCalledTimes(1);
+    expect(reports).toHaveLength(1);
 
-    getInternals(router).validator = null;
+    remove();
 
     expect(port.reportCodecRoundTrip).toBeUndefined();
 
     await router.navigate("cars", { slug: "audi" });
 
-    expect(validator.state.reportCodecRoundTrip).toHaveBeenCalledTimes(1);
+    expect(reports).toHaveLength(1);
   });
 
   it("hands over the state navigate builds, the route's codecs and its path slots", async () => {
-    installSpyValidator(router);
+    const reports = listen(router);
 
     const state = await router.navigate(
       "cars",
       { slug: "bmw" },
       { sort: "name" },
     );
-    const [[reported, codec, slots]] = reportsOf(router);
+    const [[reported, codec, slots]] = reports;
 
     expect(routingOf(reported)).toStrictEqual(routingOf(state));
     expect(slots).toStrictEqual(["slug"]);
@@ -117,36 +130,34 @@ describe("the codec round-trip sink (#2905)", () => {
 
     getPluginApi(rooted).setRootPath("/app/:tenant");
     await rooted.start("/app/acme/home");
-    installSpyValidator(rooted);
+
+    const reports = listen(rooted);
+
     await rooted.navigate("cars", { tenant: "acme", slug: "bmw" });
 
-    expect(reportsOf(rooted).map((call) => call[2])).toStrictEqual([
-      ["tenant", "slug"],
-    ]);
+    expect(reports.map((call) => call[2])).toStrictEqual([["tenant", "slug"]]);
 
     rooted.stop();
   });
 
   it("hands over the state buildNavigationState returns", () => {
-    installSpyValidator(router);
+    const reports = listen(router);
 
     const built = getPluginApi(router).buildNavigationState("cars", {
       slug: "bmw",
     });
 
-    expect(reportsOf(router).map(([reported]) => reported)).toStrictEqual([
-      built,
-    ]);
-    expect(reportsOf(router)[0][0]).toBe(built);
+    expect(reports.map(([reported]) => reported)).toStrictEqual([built]);
+    expect(reports[0][0]).toBe(built);
   });
 
   it("hands a codec the route does not have over as undefined", async () => {
-    installSpyValidator(router);
+    const reports = listen(router);
 
     await router.navigate("decoded", { slug: "bmw" });
     await router.navigate("encoded", { slug: "bmw" });
 
-    const codecs = reportsOf(router).map(([, codec]) => [
+    const codecs = reports.map(([, codec]) => [
       typeof codec.encode,
       typeof codec.decode,
     ]);
@@ -157,37 +168,37 @@ describe("the codec round-trip sink (#2905)", () => {
     ]);
   });
 
-  it("asks nothing about a route with no codec", async () => {
-    const validator = installSpyValidator(router);
+  it("raises nothing for a route with no codec", async () => {
+    const reports = listen(router);
 
     await router.navigate("plain");
 
-    expect(validator.state.reportCodecRoundTrip).not.toHaveBeenCalled();
+    expect(reports).toStrictEqual([]);
   });
 
-  it("asks about the target of a forward, with the target's codecs", async () => {
-    installSpyValidator(router);
+  it("reports the target of a forward, with the target's codecs", async () => {
+    const reports = listen(router);
 
     await router.navigate("old", { slug: "bmw" });
 
-    const [[reported, codec]] = reportsOf(router);
+    const [[reported, codec]] = reports;
 
     expect(reported.name).toBe("cars");
     expect(codec.decode?.(CHANNELS)).toStrictEqual(kinded(CHANNELS));
   });
 
-  it("asks nothing when the navigation builds no URL", async () => {
-    const validator = installSpyValidator(router);
+  it("raises nothing when the navigation builds no URL", async () => {
+    const reports = listen(router);
 
     await expect(router.navigate("decoded", {})).rejects.toThrow(
       "Missing required param 'slug'",
     );
 
-    expect(validator.state.reportCodecRoundTrip).not.toHaveBeenCalled();
+    expect(reports).toStrictEqual([]);
   });
 
-  it("asks nothing from a predicate or from the URL direction", async () => {
-    const validator = installSpyValidator(router);
+  it("raises nothing from a predicate or from the URL direction", async () => {
+    const reports = listen(router);
     const api = getPluginApi(router);
 
     router.buildPath("cars", { slug: "bmw" });
@@ -196,11 +207,11 @@ describe("the codec round-trip sink (#2905)", () => {
     api.makeState("cars", { slug: "bmw" });
     api.matchPath("/cars/bmw");
 
-    expect(validator.state.reportCodecRoundTrip).not.toHaveBeenCalled();
+    expect(reports).toStrictEqual([]);
 
-    // The control: the same route is asked about from a committing producer.
+    // The control: the same route is reported from a committing producer.
     await router.navigate("cars", { slug: "bmw" });
 
-    expect(validator.state.reportCodecRoundTrip).toHaveBeenCalledTimes(1);
+    expect(reports).toHaveLength(1);
   });
 });

@@ -131,17 +131,17 @@ export interface RouteResolver {
   admitsUndeclaredQuery: () => boolean;
 
   /**
-   * The mode gate's opt-in diagnostic sink (#1575) — `undefined` unless
-   * `validation-plugin` is installed, so bare core drops silently and the
-   * pipeline pays nothing. Resolved per call, not captured: the plugin
-   * registers after wiring.
+   * The mode gate's opt-in diagnostic sink (#1575) — `undefined` while nothing
+   * listens to the router's `DROPPED_QUERY_KEY` kind, so bare core drops
+   * silently and the pipeline pays nothing. Resolved per read, not captured: a
+   * listener subscribes after wiring.
    *
    * ⚠ Like its sibling below, the absence has to be REAL: the router implements
-   * this as a GETTER returning `undefined` while `validator === null`, not as a
-   * closure that forwards into an optional-chained validator. A closure is
-   * always truthy, so the pipeline's `?.` read as taken and bare core still paid
-   * the `pathNames` existence lookup (#1584) once per dropped key with nothing
-   * to feed. The `| undefined` in the type is what lets the getter say so under
+   * this as a GETTER returning `undefined` while the kind has no listener, not
+   * as a closure that forwards to the emitter. A closure is always truthy, so
+   * the pipeline's `?.` would read as taken and bare core would pay the
+   * `pathNames` existence lookup (#1584) once per dropped key with nothing to
+   * feed. The `| undefined` in the type is what lets the getter say so under
    * `exactOptionalPropertyTypes`.
    *
    * Optional on the interface so a MOCK port (the property tests) stays a
@@ -176,16 +176,16 @@ export interface RouteResolver {
 
   /**
    * Opt-in sink for a key the route declares NOWHERE (#1579 — the params half
-   * of #1553). Absent unless `validation-plugin` is installed, and the absence
-   * is what keeps the scan off the hot path: core checks one `undefined` and
-   * skips the walk entirely.
+   * of #1553). Absent while nothing listens to the `UNDECLARED_PARAM_KEY`
+   * kind, and the absence is what keeps the scan off the hot path: core checks
+   * one `undefined` and skips the walk entirely.
    *
    * ⚠ The absence has to be REAL — the router implements this member as a
-   * GETTER returning `undefined` while `validator === null`, not as a closure
-   * that forwards into an optional-chained validator. A closure is always
-   * truthy, so the gate would read as taken and bare core would walk the
-   * caller's bag on every commit; the `| undefined` in the type is what lets
-   * the getter say so under `exactOptionalPropertyTypes`.
+   * GETTER returning `undefined` while the kind has no listener, not as a
+   * closure that forwards to the emitter. A closure is always truthy, so the
+   * gate would read as taken and bare core would walk the caller's bag on
+   * every commit; the `| undefined` in the type is what lets the getter say so
+   * under `exactOptionalPropertyTypes`.
    *
    * A diagnostic, never a gate — core keeps the key in `state.params` as
    * app-level data (wiki `Route.md`). Dropping it was measured and rejected: it
@@ -196,14 +196,14 @@ export interface RouteResolver {
     ((routeName: string, key: string) => void) | undefined;
 
   /**
-   * Opt-in sink for a route codec's round trip (#2905). Absent unless
-   * `validation-plugin` is installed, so bare core reads one `undefined` per
-   * commit and runs no codec for it.
+   * Opt-in sink for a route codec's round trip (#2905). Absent while nothing
+   * listens to the `CODEC_ROUND_TRIP` kind, so bare core reads one `undefined`
+   * per commit and looks up no codec for it.
    *
    * ⚑ Read by the two committing producers, not by `canonicalize`: what is
    * judged is the state they build, which exists only after ⑤. The router's
-   * implementation hands the route's codecs and the path slots its URL prints
-   * to the validator, and only for a route that has a codec.
+   * implementation raises the kind with the route's codecs and the path slots
+   * its URL prints, and only for a route that has a codec.
    *
    * ⚠ A GETTER on the router's port, like the two sinks above, so the absence
    * is real.

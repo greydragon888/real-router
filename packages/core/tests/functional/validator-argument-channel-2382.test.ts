@@ -168,8 +168,8 @@ async function exerciseDoors(router: Router): Promise<void> {
   getLifecycleApi(router).addActivateGuard("shop", () => () => true);
 
   await router.start("/");
-  // `tag` is a key the route declares nowhere, which is what reaches
-  // `reportUndeclaredParamKey`.
+  // `tag` is a key the route declares nowhere: the report it raises goes to
+  // the `UNDECLARED_PARAM_KEY` kind, not to the slot.
   await router.navigate("shop.child", { tag: "x" });
   router.buildPath("shop.child");
   router.isActiveRoute("shop");
@@ -205,18 +205,34 @@ describe("the validator takes facts, not containers (#2382)", () => {
 
     expect(offenders).toStrictEqual([]);
 
-    // Anti-vacuum: every door of the recorded channel was exercised.
-    const methods = new Set(calls.map((call) => call.method));
+    // ⚠ The doors ask the slot nothing: #2388 moved every consultation onto a
+    // check or a diagnostic kind, and no authority judges THEIR arguments for
+    // reachability. A consultation that comes back to the slot shows up here.
+    expect(calls.map((call) => call.method)).toStrictEqual([]);
+  });
 
-    // ⚠ The members #2388 converts leave this channel: their arguments reach a
-    // check or a diagnostic kind, and no authority judges THOSE for
-    // reachability. The list is every member these doors still reach, and a
-    // conversion takes its member's row with it.
-    const unexercised = ["state.reportUndeclaredParamKey"].filter(
-      (method) => !methods.has(method),
-    );
+  it("CONTROL — the recorder judges a call made through the slot on purpose", () => {
+    // Without this the cell above would agree with a recorder that records
+    // nothing. The call is made here rather than through a door, so a door
+    // core converts cannot empty the control along with the cell.
+    const calls: Call[] = [];
+    const router = createDoorRouter();
+    const ctx = getInternals(router) as unknown as Internals;
 
-    expect(unexercised).toStrictEqual([]);
+    record(router, calls);
+
+    const probe = ctx.validator as Record<
+      string,
+      Record<string, (...args: unknown[]) => void>
+    >;
+
+    probe.purpose.built("a fact", ctx.routeGetStore());
+    probe.purpose.facts("a fact", 1);
+
+    expect(calls).toStrictEqual([
+      { method: "purpose.built", reachesStore: true },
+      { method: "purpose.facts", reachesStore: false },
+    ]);
   });
 
   it("CONTROL — the rejected forms are caught and the published ones are not", () => {

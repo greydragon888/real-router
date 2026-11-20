@@ -108,11 +108,7 @@ const SELF = "validator-boundary-authority-2322.test.ts";
  * One file that reds when the consultation is replaced with a no-op, or
  * {@link MIRRORED} when nothing can.
  */
-const OWNER: Record<string, string> = {
-  "state.reportCodecRoundTrip": "codec-round-trip.test.ts",
-  "state.reportDroppedQueryKey": "dropped-query-key.test.ts",
-  "state.reportUndeclaredParamKey": "undeclared-param-key.test.ts",
-};
+const OWNER: Record<string, string> = {};
 
 /**
  * One file that reds when that call is removed from its registration's
@@ -150,6 +146,10 @@ const REGISTRATION_OWNER: Record<string, string> = {
     "plugin-api.validation.test.ts",
   "BUILD_PATH › reportMisChanneledKey": "mis-channelled-href-2238.test.ts",
   "IS_ACTIVE_ROUTE › reportMisChanneledKey": "mis-channelled-href-2238.test.ts",
+  "DROPPED_QUERY_KEY › reportDroppedQueryKey": "dropped-query-key.test.ts",
+  "UNDECLARED_PARAM_KEY › reportUndeclaredParamKey":
+    "undeclared-param-key.test.ts",
+  "CODEC_ROUND_TRIP › reportCodecRoundTrip": "codec-round-trip.test.ts",
   "addActivateGuard:entry › validateHandler": "lifecycle.validation.test.ts",
   "addActivateGuard:entry › validateRouteName": "lifecycle.validation.test.ts",
   "addDeactivateGuard:entry › validateHandler": SELF,
@@ -1112,9 +1112,20 @@ describe("each consultation the walk derives from core is classified (#2322)", (
   });
 
   it("every authority a row cites exists", () => {
-    expect(citedBy(OWNER).length).toBeGreaterThan(0);
-
     expect(absentFrom(OWNER)).toStrictEqual([]);
+  });
+
+  it("CONTROL — a row citing a file this directory does not hold is caught, and a mirrored row cites none", () => {
+    // ⚑ On a table written for it: converting core's consultations (#2388)
+    // empties `OWNER`, and an empty table cites nothing, so the cell above
+    // would agree with a check that never looks.
+    expect(
+      absentFrom({
+        "a.member": "no-such-file.test.ts",
+        "b.member": SELF,
+        "c.member": MIRRORED,
+      }),
+    ).toStrictEqual(["no-such-file.test.ts"]);
   });
 
   it("the copies nothing can observe are exactly these", () => {
@@ -1125,8 +1136,8 @@ describe("each consultation the walk derives from core is classified (#2322)", (
   });
 
   // ⚑ On a tree written for it: converting core's consultations (#2388)
-  // leaves no member consulted twice in core's own tree. A walk that matched
-  // nothing in core reds the table cell above while the table has rows.
+  // leaves core's own tree with none, so the table cell above agrees with a
+  // walk that matches nothing. This tree is where the walk shows it keys one.
   const twice = censusOf({
     "RouterValidator.ts": [
       "export interface RouterValidator {",

@@ -11,11 +11,11 @@ const probe = { seq: 0 };
 /**
  * One router, one validator (#2349).
  *
- * ⚑ **The state this refuses is reachable without the guard, and the damage is
- * silent.** Measured on the released behaviour, three arms — two installs and
- * remove the first, remove the second, remove the middle of three — every one
- * leaves the router with a registered validation plugin and a validator that no
- * longer answers, against a single-install control that still validates.
+ * ⚑ **The state this refuses is reachable without the guard.** Two
+ * installations register every check and diagnostic kind twice, so a call that
+ * passes runs each check twice and each warning prints twice; and the teardown
+ * of the one whose mark the slot holds empties it while the other is still
+ * registered, so a further installation is no longer refused.
  *
  * ⚠ **The refusal is the fix, not a counter.** A tally models an ownership the
  * slot does not grant: `validator` is one of two writable members on an

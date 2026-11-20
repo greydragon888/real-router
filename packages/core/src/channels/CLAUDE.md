@@ -117,8 +117,10 @@ mode does not PRINT does not enter the canonical query channel._ That buys
   "key `q` is not declared on route `nope`" about a route that is not a route
   blames the query for a typo in the ROUTE name. Both diagnostics gate on
   `pathNames(name) !== undefined`.
-- Silent in bare core; the plugin's `reportDroppedQueryKey` makes it visible,
-  de-duplicated per route+key **per router**, so an SSR clone is not silenced.
+- Silent in bare core. Core raises `DROPPED_QUERY_KEY` for each dropped key
+  while the kind has a listener, and the plugin's `reportDroppedQueryKey` makes
+  it visible, de-duplicated per route+key **per router**, so an SSR clone is not
+  silenced.
 
 **A key declared NOWHERE keeps its params-bag home**, with an opt-in diagnostic.
 It stays in `state.params` as app-level data — the state does not round-trip

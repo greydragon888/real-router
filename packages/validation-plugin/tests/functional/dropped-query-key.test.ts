@@ -38,8 +38,8 @@ function mk(mode: QueryParamsMode): Router {
 
 describe("validation-plugin — dropped query key diagnostic (#1575)", () => {
   beforeEach(() => {
-    // No cache reset here, and that is the point of #1583: the de-dup lives on
-    // the validator object, so every `mk()` starts with an empty one.
+    // No cache reset here, and that is the point of #1583: the de-dup lives in
+    // the plugin's registration, so every `mk()` starts with an empty one.
     warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
@@ -188,8 +188,8 @@ describe("validation-plugin — dropped query key diagnostic (#1575)", () => {
   });
 
   it("warns again after the plugin is torn down and re-registered (#1583)", () => {
-    // `teardown()` nulls `ctx.validator`; the cache used to survive it, so
-    // re-registering bought silence instead of a fresh start.
+    // Each registration builds its own cache, so re-registering after
+    // `teardown()` starts fresh rather than silenced.
     //
     // Pre-start on purpose, and that is the reachable shape of this defect
     // rather than a convenience: the plugin REFUSES registration after

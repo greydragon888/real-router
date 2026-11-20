@@ -12,10 +12,10 @@ import {
 } from "../type-guards";
 
 import type {
+  DiagnosticEventMap,
   Params,
   ParamsSearch,
   RouterLogger,
-  RouterValidator,
   SearchParams,
   SimpleState,
   State,
@@ -120,11 +120,9 @@ export function validateAreStatesEqualArgs(
  * for a dev-time signal. It also survived `teardown()`, so re-registering the
  * plugin bought silence, and it grew without bound because nothing evicted.
  *
- * A factory rather than a `WeakMap<Router, Set>`: `buildValidatorObject` already
- * runs once per registration, so closing over a fresh `Set` there gives
- * per-router lifetime, per-router isolation and collection with the router at
- * zero new module state — and it retires the two `reset*` test seams, which
- * existed only to work around the module scope.
+ * A factory rather than a `WeakMap<Router, Set>`: the plugin calls it once per
+ * registration, so closing over a fresh `Set` there gives per-router lifetime,
+ * per-router isolation and collection with the router at zero module state.
  */
 export function createDroppedQueryKeyReporter(): (
   routeName: string,
@@ -199,9 +197,11 @@ export function createUndeclaredParamKeyReporter(): (
   };
 }
 
-type ReportCodecRoundTrip = RouterValidator["state"]["reportCodecRoundTrip"];
+type ReportCodecRoundTrip = (
+  ...args: DiagnosticEventMap["CODEC_ROUND_TRIP"]
+) => void;
 
-type RouteCodec = Parameters<ReportCodecRoundTrip>[1];
+type RouteCodec = DiagnosticEventMap["CODEC_ROUND_TRIP"][1];
 
 type Channel = keyof ParamsSearch;
 
@@ -603,9 +603,10 @@ function describeLoss(
  * `navigate` takes params in the form the route's `decodeParams` returns and
  * never runs it, so a link commits the caller's params and a reload of the same
  * URL commits what the decoder makes of them. The two agree only when the
- * decoder undoes `encodeParams` and adds no key. Core asks once per state a
- * committing producer builds, for a route that has a codec; this reloads the
- * state's path and warns about each key the reload does not give back.
+ * decoder undoes `encodeParams` and adds no key. Core raises `CODEC_ROUND_TRIP`
+ * once per state a committing producer builds, for a route that has a codec;
+ * this reloads the state's path and warns about each key the reload does not
+ * give back.
  *
  * ⚠ **A state is judged before its navigation commits.** On the navigation
  * that removes a param an interceptor carries over from the state the router

@@ -531,6 +531,9 @@ export const DIAGNOSTIC = {
   NAVIGATE_TO_DEFAULT: "NAVIGATE_TO_DEFAULT",
   BUILD_PATH: "BUILD_PATH",
   IS_ACTIVE_ROUTE: "IS_ACTIVE_ROUTE",
+  DROPPED_QUERY_KEY: "DROPPED_QUERY_KEY",
+  UNDECLARED_PARAM_KEY: "UNDECLARED_PARAM_KEY",
+  CODEC_ROUND_TRIP: "CODEC_ROUND_TRIP",
 } as const satisfies {
   [K in keyof DiagnosticEventMap]: DiagnosticEventMap[K] extends readonly [
     unknown?,

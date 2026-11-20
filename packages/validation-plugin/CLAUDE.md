@@ -7,15 +7,19 @@
 | Export             | Kind     | Description                                                                                                                              |
 | ------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `validationPlugin` | function | Plugin factory — pass to `router.usePlugin()`. No runtime arguments; generic over the router's dependency map, normally inferred (#1621) |
-| `RouterValidator`  | type     | The validator interface of the three `state` reports, which core asks through `ctx.validator?.state.report…()`.                          |
+| `RouterValidator`  | type     | The type of the `ctx.validator` slot. It declares no member: core asks nothing through the slot (#2388).                                 |
 
-## Validator Namespaces
+## Where core asks this plugin
 
-The `RouterValidator` interface holds one namespace, `state`, whose three reports the route resolver asks. Core asks this plugin's other refusals and reports at check positions and diagnostic kinds — see _The dependency doors, `cloneRouter` and `usePlugin` refuse and report on the channels_, _The guard doors and the event bus refuse and report on the channels_, _`navigateToState`, `setRootPath`, `navigateToDefault` and `start` refuse and report on the channels_ and _The render-path doors and the state builders refuse and report on the channels_ below. The route-CRUD walks are checks at `addRoute:batch`, `replaceRoutes:batch`, `removeRoute:entry` and `updateRoute:entry`.
+The `RouterValidator` interface declares no member (#2388): core asks every refusal at a check position and raises every report as a diagnostic kind — see _The dependency doors, `cloneRouter` and `usePlugin` refuse and report on the channels_, _The guard doors and the event bus refuse and report on the channels_, _`navigateToState`, `setRootPath`, `navigateToDefault` and `start` refuse and report on the channels_, _The render-path doors and the state builders refuse and report on the channels_ and _The route resolver reports on three kinds_ below. The route-CRUD walks are checks at `addRoute:batch`, `replaceRoutes:batch`, `removeRoute:entry` and `updateRoute:entry`.
 
-| Namespace | Key methods                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `state`   | `reportDroppedQueryKey` — the mode gate's opt-in diagnostic (#1575); what it reports and why it warns once per route+key is its docblock in `src/validators/state.ts`; `reportUndeclaredParamKey` — the undeclared-params-bag diagnostic (#1579, the params half of #1553): a key the route declares NOWHERE stays in `state.params` as app-level data but never reaches the URL, so the state does not round-trip through its own `state.path`. Core keeps the key: dropping it would retire a documented capability, and the predicate cannot tell a typo from `navigate("users", { id })` on a parent whose child declares `:id`. Which producers raise each diagnostic, and why they differ: gotcha "The two diagnostics answer the predicates differently"; their de-dup scope: "Diagnostic de-dup is per router". ⚠ **Neither diagnostic says anything about a route that does not exist (#1584)** — core gates both on the route being real, because the declaration registries answer `[]` for a missing route exactly as they do for a route with no declarations, and reporting that would blame the caller's bag for a typo in the ROUTE name. `reportCodecRoundTrip` — the codec round-trip diagnostic (#2905): for each state a committing producer builds on a route that has a codec, it reloads the state's path through the router's own `matchPath`, without the path rebuild, and warns about each key the reload does not give back; what it compares, what it reports as the codec's, and that it judges a state before the navigation commits are the docblocks of `roundTripLosses` and `createCodecRoundTripReporter` in `src/validators/state.ts` |
+| Kind                   | Report                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DROPPED_QUERY_KEY`    | `reportDroppedQueryKey` — the mode gate's opt-in diagnostic (#1575); what it reports and why it warns once per route+key is its docblock in `src/validators/state.ts`                                                                                                                                                                                                                                                                                                                                                                  |
+| `UNDECLARED_PARAM_KEY` | `reportUndeclaredParamKey` — the undeclared-params-bag diagnostic (#1579, the params half of #1553): a key the route declares NOWHERE — no path slot its URL prints, the root's included, and no query param — stays in `state.params` as app-level data but never reaches the URL, so the state does not round-trip through its own `state.path`. Core keeps the key: dropping it would retire a documented capability, and the predicate cannot tell a typo from `navigate("users", { id })` on a parent whose child declares `:id`. |
+| `CODEC_ROUND_TRIP`     | `reportCodecRoundTrip` — the codec round-trip diagnostic (#2905): for each state a committing producer builds on a route that has a codec, it reloads the state's path through the router's own `matchPath`, without the path rebuild, and warns about each key the reload does not give back; what it compares, what it reports as the codec's, and that it judges a state before the navigation commits are the docblocks of `roundTripLosses` and `createCodecRoundTripReporter` in `src/validators/state.ts`                       |
+
+Which producers raise the first two kinds, and why they differ: gotcha "The two diagnostics answer the predicates differently"; their de-dup scope: "Diagnostic de-dup is per router". ⚠ **Neither of the two says anything about a route that does not exist (#1584)** — core gates both on the route being real, because the declaration registries answer `[]` for a missing route exactly as they do for a route with no declarations, and reporting that would blame the caller's bag for a typo in the ROUTE name.
 
 ## Gotchas
 
@@ -46,11 +50,10 @@ parameter from the start.
 ### One router, one validator (#2349)
 
 A registration that finds `ctx.validator` already occupied throws
-`RouterError("VALIDATION_PLUGIN_ALREADY_INSTALLED")`. The slot holds one
-validator and `teardown` clears it, so two installations give the router a
-teardown that switches validation off while a plugin is still registered —
-whichever of the two runs first, and regardless of which installation it
-belongs to.
+`RouterError("VALIDATION_PLUGIN_ALREADY_INSTALLED")`. A second installation
+would register every check and kind a second time, so a call that passes would
+run each check twice and each report would print once per installation. The
+slot carries the first installation's mark, and `teardown` clears it.
 
 ⚠ **A clone needs no installation of its own.** `cloneRouter` re-runs the base's
 plugin factories, so a clone arrives validated; calling `usePlugin` on it is the
@@ -91,9 +94,10 @@ is read inside `canonicalize`'s slow path, and the arm for a route unrelated to
 the active one answers above it. So the nav item you are NOT on raises nothing,
 which is most of them. `dropped-query-key.test.ts` owns both arms.
 
-`reportUndeclaredParamKey` fires only from the **committing** producers
-(`navigate`, `buildNavigationState`) and every predicate stays silent. Both are
-correct, and the discriminator is whether anything was LOST:
+`reportUndeclaredParamKey` fires only from the **committing** producers —
+`navigate`, `navigateToDefault` and `buildNavigationState` — and every
+predicate stays silent. Both are correct, and the discriminator is whether
+anything was LOST:
 
 - the mode gate DROPPED the key, so the URL `buildPath` just returned is missing
   what the caller asked for — the warning is about the answer already handed
@@ -138,8 +142,8 @@ Both diagnostics warn once per `route + key` — the gate runs on every navigati
 and every `matchPath`, so an un-deduped warning would flood a dev console the
 moment a route is revisited.
 
-That cache lives on the **validator object**, which `buildValidatorObject` builds
-once per registration, i.e. once per router. A module-level `Set` — one per
+That cache lives in the **reporter** the plugin builds once per registration,
+i.e. once per router. A module-level `Set` — one per
 PROCESS — points every consequence the wrong way for a dev-time signal:
 
 - a second router, including a `cloneRouter` per-request clone under SSR/SSG,
@@ -292,13 +296,36 @@ mis-channelled key and a value the walk refuses warns and then throws.
 with no listener of the kind builds no argument list for it on the render path.
 
 ⚠ **A report handler's throw stays inside the emitter.** The emitter logs it
-through `logger.error`, and the door answers as it would without the report.
+through `logger.error`, and the door answers as it would without the report —
+unless `console.error` throws too: that error then leaves the door as the
+handler's throw would.
 
-### Teardown disables validation — but only the validator it still holds
+### The route resolver reports on three kinds (#2388)
 
-Calling the unsubscribe function returned by `router.usePlugin(validationPlugin())` clears `ctx.validator`. All subsequent router calls skip validation silently. This is by design — plugins are removable.
+The reports of _Where core asks this plugin_ above are the
+`DROPPED_QUERY_KEY`, `UNDECLARED_PARAM_KEY` and `CODEC_ROUND_TRIP` kinds, and
+the plugin subscribes to each. `validator-boundary-authority-2322.test.ts`
+names, call by call, the file that reds without it.
 
-⚠ **The release is owner-checked (#2339 §4 1b).** The plugin holds the object it wrote and nulls the slot only while that object is still there. `RouterInternals.validator` has no owner — it is plain data on a surface pinned `accessorNames === []`, so a second writer cannot be REFUSED at the slot — and an unconditional `= null` therefore destroyed whoever held the slot at teardown time. Measured with a control: with a second writer in place the foreign validator was nulled; with none, the plugin correctly nulled its own. Same shape as `claimContextNamespace`, which checks the holder on write and on release (#2059 / #1929); here only the release half is reachable.
+⚠ **Absence is still the gate.** The route resolver's three sinks answer
+`undefined` while their kind has no listener, so a router without one walks no
+caller's bag for an undeclared key and looks up no codec for the round-trip
+report.
+
+⚠ A report handler's throw stays inside the emitter, as for the render-path
+kinds above.
+
+When `console.error` throws too, its error takes the handler's place: the
+printers, the builders and `matchPath` throw it, the navigations reject with
+it, `replace()` throws it and keeps the state on its old path, and
+`isActiveRoute` on the active route and `canNavigateTo` catch it and answer
+`false`.
+
+### Teardown disables validation — and clears only the mark it still holds
+
+Calling the unsubscribe function returned by `router.usePlugin(validationPlugin())` removes every check and kind the plugin registered and clears `ctx.validator`. All subsequent router calls skip validation silently. This is by design — plugins are removable.
+
+⚠ **The release is owner-checked (#2339 §4 1b).** The plugin holds the object it wrote and nulls the slot only while that object is still there. `RouterInternals.validator` has no owner — it is plain data on a surface pinned `accessorNames === []`, so a second writer cannot be REFUSED at the slot — and an unconditional `= null` would therefore clear whoever holds the slot at teardown time, after which a further installation is no longer refused. `tests/functional/validator-slot-owner-1b.test.ts` holds both arms. Same shape as `claimContextNamespace`, which checks the holder on write and on release (#2059 / #1929); here only the release half is reachable.
 
 ⚠ **The WRITE half stays open, deliberately.** Refusing a second write needs an accessor on `RouterInternals`, and `accessorNames === []` is pinned on all six handed-out surfaces (`door-census/surface.test.ts`). It is answered where the slot goes away, not here — #2373.
 
@@ -413,4 +440,4 @@ only the exotic call described under _The dependency doors, `cloneRouter` and `u
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Source structure, data flow, design decisions
 - [packages/core/CLAUDE.md](../core/CLAUDE.md) — How core asks this plugin to refuse or report: check positions and diagnostic kinds
-- [packages/core/src/types/RouterValidator.ts](../core/src/types/RouterValidator.ts) — Full interface definition
+- [packages/core/src/types/RouterValidator.ts](../core/src/types/RouterValidator.ts) — the slot's type, which declares no member

@@ -86,11 +86,11 @@ export function admittedSearch<S extends SearchParams>(
       putField(admitted, key, value);
     } else {
       dropped = true;
-      // The drop is silent in bare core; `validation-plugin` passes a reporter.
-      // Reported from HERE rather than re-derived by the caller so the message
-      // can never disagree with what was actually dropped, and so the scan
-      // happens once. The callback is only ever supplied when a validator is
-      // installed, so the default path stays a plain filter.
+      // The drop is silent in bare core. Reported from HERE rather than
+      // re-derived by the caller so the report can never disagree with what
+      // was actually dropped, and so the scan happens once. `canonicalize`
+      // supplies the callback, and it reports only while something listens to
+      // the drop kind.
       onDropped?.(key);
     }
   }

@@ -1,10 +1,8 @@
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { createRouter } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 import { getInternals } from "@real-router/core/validation";
-
-import { installSpyValidator } from "../../helpers/spyValidator";
 
 import type { Router } from "@real-router/core";
 
@@ -159,18 +157,39 @@ describe("nav-pipeline Phase 2 — producer agreement", () => {
   });
 
   /**
-   * #1579's opt-in sink. The design bought "bare core checks one `undefined` and
-   * never walks the caller's bag"; a plain closure forwarding into an
-   * optional-chained validator is always truthy, so the gate read as taken and
-   * the walk ran on every commit regardless.
+   * #1579's opt-in sink. The design buys "bare core checks one `undefined` and
+   * never walks the caller's bag": the port answers `undefined` while nothing
+   * listens to the kind, and a plain closure in its place is always truthy, so
+   * the walk would run on every commit.
    */
   describe("the undeclared-key diagnostic is genuinely opt-in (#1579)", () => {
-    it("exposes no sink on the port until a validator is installed", () => {
+    /** A spy on each of the two kinds a commit raises, and their removal. */
+    const listen = (target: Router) => {
+      const api = getPluginApi(target);
+      const undeclared = vi.fn();
+      const dropped = vi.fn();
+      const removers = [
+        api.subscribeDiagnostic("UNDECLARED_PARAM_KEY", undeclared),
+        api.subscribeDiagnostic("DROPPED_QUERY_KEY", dropped),
+      ];
+
+      return {
+        undeclared,
+        dropped,
+        remove: () => {
+          for (const remove of removers) {
+            remove();
+          }
+        },
+      };
+    };
+
+    it("exposes no sink on the port until the kind has a listener", () => {
       const port = getInternals(router).port();
 
       expect(port.reportUndeclaredParamKey).toBeUndefined();
 
-      installSpyValidator(router);
+      getPluginApi(router).subscribeDiagnostic("UNDECLARED_PARAM_KEY", vi.fn());
 
       expect(typeof port.reportUndeclaredParamKey).toBe("function");
     });
@@ -185,7 +204,7 @@ describe("nav-pipeline Phase 2 — producer agreement", () => {
       //
       // `pathNames` carries the `undefined` arm that tells the two apart; the
       // committing producers still refuse the navigation on their own.
-      const validator = installSpyValidator(router);
+      const { undeclared, dropped } = listen(router);
 
       expect(
         getPluginApi(router).buildNavigationState("hoem", { first: "1" }),
@@ -195,8 +214,8 @@ describe("nav-pipeline Phase 2 — producer agreement", () => {
         router.navigate("hoem", { first: "1" }, { second: "2" }),
       ).rejects.toMatchObject({ code: "ROUTE_NOT_FOUND" });
 
-      expect(validator.state.reportUndeclaredParamKey).not.toHaveBeenCalled();
-      expect(validator.state.reportDroppedQueryKey).not.toHaveBeenCalled();
+      expect(undeclared).not.toHaveBeenCalled();
+      expect(dropped).not.toHaveBeenCalled();
 
       // Discrimination: the same bag on a route that DOES exist still reports,
       // so this is a precondition on existence, not the diagnostics going quiet.
@@ -204,32 +223,26 @@ describe("nav-pipeline Phase 2 — producer agreement", () => {
         reload: true,
       });
 
-      expect(validator.state.reportUndeclaredParamKey).toHaveBeenCalledWith(
-        "home",
-        "first",
-      );
+      expect(undeclared).toHaveBeenCalledWith("home", "first");
     });
 
-    it("stops reporting again once the validator is removed", async () => {
-      const validator = installSpyValidator(router);
+    it("stops reporting again once the listener is removed", async () => {
+      const { undeclared, remove } = listen(router);
 
       await router.navigate("home", { first: "1" }, undefined, {
         reload: true,
       });
 
-      expect(validator.state.reportUndeclaredParamKey).toHaveBeenCalledWith(
-        "home",
-        "first",
-      );
+      expect(undeclared).toHaveBeenCalledWith("home", "first");
 
-      getInternals(router).validator = null;
+      remove();
 
       // A DIFFERENT key, so a per-route+key de-dup cannot explain the silence.
       await router.navigate("home", { second: "2" }, undefined, {
         reload: true,
       });
 
-      expect(validator.state.reportUndeclaredParamKey).toHaveBeenCalledTimes(1);
+      expect(undeclared).toHaveBeenCalledTimes(1);
     });
   });
 });

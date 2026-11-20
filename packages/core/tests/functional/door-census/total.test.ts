@@ -363,7 +363,6 @@ describe("door total (#2303)", () => {
     Router: "surface",
     RouterError: "surface",
     RouterLogger: "surface",
-    RouterValidator: "surface",
     RoutesApi: "surface",
     Subscription: "surface",
     // Built by core and handed out. The handout axis owns these.

@@ -93,9 +93,9 @@ router.usePlugin(validationPlugin()); // too late
 ```
 
 Throws `RouterError("VALIDATION_PLUGIN_ALREADY_INSTALLED")` if the router
-already carries a validator. One router holds one — with two installations, the
-first `teardown` to run switches validation off while a plugin is still
-registered.
+already carries an installation. A second installation would register every
+check and diagnostic kind a second time, so a call that passes would run each
+check twice and each warning would print once per installation.
 
 ```typescript
 const remove = router.usePlugin(validationPlugin());
@@ -124,7 +124,7 @@ const perRequest = cloneRouter(router); // already validated
 import type { RouterValidator } from "@real-router/validation-plugin";
 ```
 
-The validator interface of the three `state` reports, which core asks through `ctx.validator?.state.report…()`. Re-exported from `@real-router/core/validation`. A validator of your own registers checks at positions and subscribes to diagnostic kinds through `PluginApi` (`addCheck`, `subscribeDiagnostic`).
+The type of the `ctx.validator` slot. It declares no member: core asks nothing through the slot. Re-exported from `@real-router/core/validation`. A validator of your own registers checks at positions and subscribes to diagnostic kinds through `PluginApi` (`addCheck`, `subscribeDiagnostic`).
 
 ## Retrospective Validation
 
