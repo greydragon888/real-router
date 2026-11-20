@@ -177,11 +177,11 @@ export function validateNavigateParamsShape(
  *
  * ⚠ **No shape branch here, and its absence is load bearing rather than an
  * omission.** Every caller passes `undefined` or what `adoptChannel` returned —
- * a copy of a plain bag, the caller's own object for any other shape — so a
- * `typeof` guard would be an unreachable arm — the shape half runs one call
- * earlier, on the object that can still be the wrong shape. `isParams` below
- * still re-applies the shape rules to that object, so a caller that bypassed
- * the pair is refused rather than admitted.
+ * a copy of a plain bag, the caller's own value for any other shape. A
+ * `typeof` guard would still be an unreachable arm: the shape half runs one
+ * call earlier, on the object that can still be the wrong shape. `isParams`
+ * below still re-applies the shape rules to that object, so a caller that
+ * bypassed the pair is refused rather than admitted.
  */
 export function validateNavigateParams(
   params: unknown,
