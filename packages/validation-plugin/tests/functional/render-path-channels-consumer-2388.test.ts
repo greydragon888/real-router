@@ -1,6 +1,6 @@
 import { createRouter } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { validationPlugin } from "../../src/validationPlugin";
 
@@ -26,18 +26,35 @@ type Mode = "bare" | "installed" | "torn down";
 
 type Options = Record<string, unknown>;
 
-let warn: ReturnType<typeof vi.spyOn>;
+const warnings: string[] = [];
 
-/** What `console.warn` received, one line per call. */
-const warned = (): string[] =>
-  warn.mock.calls.map((call: unknown[]) => call.map(String).join(" "));
+/**
+ * What the router's logger received at `warn`, one line per call, as the
+ * console prints it: the plugin reports through the router's logger (#2975).
+ */
+const warned = (): string[] => [...warnings];
 
 const routerIn = (mode: Mode, options: Options = {}): Router => {
   const router = createRouter(
     ROUTES as never,
     {
       ...options,
-      logger: { level: "none" },
+      logger: {
+        level: "none",
+        callbackIgnoresLevel: true,
+        callback: (
+          level: string,
+          context: string,
+          message: string,
+          ...args: unknown[]
+        ) => {
+          if (level === "warn") {
+            warnings.push(
+              [`[${context}] ${message}`, ...args].map(String).join(" "),
+            );
+          }
+        },
+      },
     } as never,
   );
 
@@ -61,11 +78,7 @@ const misChanneled = (route: string, key: string): string =>
 
 describe("#2388 — the render-path doors, as this plugin consumes the channels", () => {
   beforeEach(() => {
-    warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-  });
-
-  afterEach(() => {
-    warn.mockRestore();
+    warnings.length = 0;
   });
 
   describe("teardown removes every registration of these doors (#2388)", () => {
@@ -145,7 +158,7 @@ describe("#2388 — the render-path doors, as this plugin consumes the channels"
       const router = routerIn(mode, options);
       let thrown = "no throw";
 
-      warn.mockClear();
+      warnings.length = 0;
 
       try {
         await run(router);

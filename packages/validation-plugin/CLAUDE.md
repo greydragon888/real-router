@@ -160,6 +160,15 @@ regression — the shape recurred once already (#1579 copied #1575's module-leve
 call sites. It flags only ACCUMULATING state: a frozen lookup table is fine, and
 so is a `WeakMap` or a `WeakSet` keyed by an object, which evicts with its key.
 
+### The reports go to the router's logger (#2975)
+
+`reportDroppedQueryKey`, `reportUndeclaredParamKey` and `reportMisChanneledKey`
+write `logger.warn` under the context `router` through the logger their factory
+takes — `PluginApi.logger`, as `createCodecRoundTripReporter` takes it — so the
+router's `logger` option, its `level` and its `callback`, applies to them. Core's
+logger prints `[router] message`, so a message carries no head of its own.
+`tests/functional/router-logger-sink-2975.test.ts` holds a cell per reporter.
+
 ### The `navigate` family refuses through checks (#2388)
 
 `navigate` and `canNavigateTo` register their argument refusals as checks at

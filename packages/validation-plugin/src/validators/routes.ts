@@ -31,6 +31,7 @@ import type {
   Route,
   RouteConfigUpdate,
   DefaultDependencies,
+  RouterLogger,
 } from "@real-router/core";
 import type { RouteTree } from "@real-router/core/validation";
 
@@ -402,9 +403,10 @@ export function validateBuildPathArgs(route: unknown): asserts route is string {
  *
  * De-duplicated per `route + key`, on a cache the plugin's registration owns,
  * one per router (#1583); the `BUILD_PATH` and `IS_ACTIVE_ROUTE` handlers
- * share it.
+ * share it. The warning goes to the router's logger.
  */
 export function createMisChanneledKeyReporter(
+  logger: RouterLogger,
   queryNamesOf: (routeName: string) => readonly string[],
 ): (routeName: string, params: unknown) => void {
   const reported = new Set<string>();
@@ -436,8 +438,9 @@ export function createMisChanneledKeyReporter(
 
     reported.add(seen);
 
-    console.warn(
-      `[router] Route "${routeName}" declares \`${key}\` as a query param, but it was given in the ` +
+    logger.warn(
+      "router",
+      `Route "${routeName}" declares \`${key}\` as a query param, but it was given in the ` +
         `\`params\` bag — the path channel. The URL is built without it, so the href does not match ` +
         `what you asked for; a plain click throws, but a ⌘-click, a copied link and server-rendered ` +
         `markup all follow the wrong URL in silence. Pass it in \`search\` instead.`,
