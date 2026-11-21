@@ -1,5 +1,31 @@
 # @real-router/validation-plugin
 
+## 0.40.0
+
+### Minor Changes
+
+- [#2994](https://github.com/greydragon888/real-router/pull/2994) [`c78519e`](https://github.com/greydragon888/real-router/commit/c78519ebb20dfb831f016ed9c9dc25d39f7493a9) Thanks [@greydragon888](https://github.com/greydragon888)! - The `RouterValidator` re-export is removed, and the refusal of a second installation reads the plugin's own mark ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  **Breaking Change:** the package no longer re-exports the `RouterValidator`
+  type, which `@real-router/core` no longer publishes. It has declared no member
+  since 0.39.0; drop the import.
+
+  A second installation on a router the plugin is already installed on is still
+  refused with `VALIDATION_PLUGIN_ALREADY_INSTALLED`, and the router accepts an
+  installation again after `teardown` and after a retrospective pass that throws.
+  The mark is a module-level `WeakSet` of routers, so `getInternals(router)`
+  holds nothing for the plugin.
+
+  ⚠ **Two copies of the package on one router are no longer refused.** Each copy
+  holds a mark of its own, so a bundle that carries the package twice and
+  installs both copies on one router runs every check twice and prints every
+  warning twice. That setup is unsupported: install one copy of the package.
+
+### Patch Changes
+
+- Updated dependencies [[`c78519e`](https://github.com/greydragon888/real-router/commit/c78519ebb20dfb831f016ed9c9dc25d39f7493a9)]:
+  - @real-router/core@0.170.0
+
 ## 0.39.0
 
 ### Minor Changes
