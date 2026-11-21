@@ -46,10 +46,10 @@ src/
 ├── factory.ts    — searchSchemaPlugin: validates options, freezes config, returns PluginFactory
 ├── plugin.ts     — SearchSchemaPlugin class: forwardState interceptor + TREE_CHANGED subscription, tree validation
 ├── helpers.ts    — getInvalidKeys / issueKey / namesOneOf / segmentKey (the keys issues name), isNumberOrBoolean (the two types the router decodes from text), readAsText (the query with each rejected number or boolean as its text), omitKeys (shallow copy without keys), pickKeys (shallow copy of only those keys), collectPathParams (the path-slot names in a route's URL)
-├── report.ts     — describeRejection: the mode "development" console.error message; describeThrow: the line logged with a rejected Promise's error
+├── report.ts     — describeRejection: the mode "development" message of rejected search params; describeThrow: the line logged with a rejected Promise's error
 ├── validation.ts — validateOptions: mode / strict / onError, TypeError at factory time
 ├── types.ts      — StandardSchemaV1 types (inline), SearchSchemaPluginOptions
-├── constants.ts  — ERROR_PREFIX
+├── constants.ts  — LOGGER_CONTEXT (the context the plugin logs under), ERROR_PREFIX (the head of a message it throws)
 └── index.ts      — Public exports + Route module augmentation
 ```
 
@@ -69,13 +69,17 @@ A number or boolean the schema rejects — a key's value or an array element —
 
 The schema runs on what `next()` returns: the caller's channels plus any `forwardTo` hop's defaults — not the route's own `defaultSearch`, which core merges under the result afterwards (at `canonicalize`). So `z.number().default(1)` fires whenever the caller omits the key, and the value it produces is caller-side from core's point of view: `defaultSearch` merges under it. The repair's run is handed, of the route's defaults, only the rejected keys' own — so there too an absent key takes `.default()` ahead of its `defaultSearch` value.
 
+### The plugin's messages go to the router's logger (#2975)
+
+The report of rejected search params, the error of a rejected answer and both findings of the dev-time `defaultSearch` check go through `PluginApi.logger` under the context `search-schema-plugin` (`LOGGER_CONTEXT`), so the router's `logger` option — its `level` and its `callback` — applies to them. Core's logger prints `[search-schema-plugin] message`, so a logged message carries no head of its own; a thrown one keeps `ERROR_PREFIX`. `tests/functional/router-logger-sink-2975.test.ts` holds a cell per call site.
+
 ### `onError` bypasses the built-in recovery, not the text runs
 
-When `onError` is set, the plugin does NOT call `console.error`, strip params or run the repair. The text runs come first: `onError` is called only when issues are left, with the query they settle on — each key the text fixed as text, every other key as decoded — and the schema's own issues on that query (the property `onError is handed a query and the schema's own issues on it`). It must return clean params. No re-validation of returned params (avoids infinite loops).
+When `onError` is set, the plugin does NOT log the issues, strip params or run the repair. The text runs come first: `onError` is called only when issues are left, with the query they settle on — each key the text fixed as text, every other key as decoded — and the schema's own issues on that query (the property `onError is handed a query and the schema's own issues on it`). It must return clean params. No re-validation of returned params (avoids infinite loops).
 
 ### Path-less validation issues (cross-field `refine`) can't be stripped by key
 
-The strip-and-recover path removes only the keys a validation issue **names** in its `path` — `getInvalidKeys` (`helpers.ts`) skips any issue whose `path` is empty (an issue with no path concerns the whole object, not one key). So a **cross-field** `.refine()` / `.superRefine()` that reports a **path-less** issue strips **nothing**: `invalidKeys` is empty → `omitKeys` is a no-op → the repair's run rejects the same query → the invalid combination passes into `state` unrepaired, a number the text fixed as its text and every other value as decoded. In `mode: "development"` a `console.error` is still logged; `mode: "production"` is **silent**.
+The strip-and-recover path removes only the keys a validation issue **names** in its `path` — `getInvalidKeys` (`helpers.ts`) skips any issue whose `path` is empty (an issue with no path concerns the whole object, not one key). So a **cross-field** `.refine()` / `.superRefine()` that reports a **path-less** issue strips **nothing**: `invalidKeys` is empty → `omitKeys` is a no-op → the repair's run rejects the same query → the invalid combination passes into `state` unrepaired, a number the text fixed as its text and every other value as decoded. In `mode: "development"` the router's `logger.error` still reports it; `mode: "production"` is **silent**.
 
 ```typescript
 const schema = z
@@ -141,7 +145,7 @@ Prefer the recommended order (schema outermost) so `state` is validated as a who
 
 At `usePlugin()` time, validates all existing routes' `defaultSearch` against their `searchSchema` (the query-channel default is what the schema governs; `defaultParams` is the path/arbitrary channel since #1549). Runtime tree mutations are then re-validated via the `TREE_CHANGED` subscription: `add`/`replace` validate the whole added subtree (flat, full dotted names), and `update` re-validates the route when its `defaultSearch` changes. `remove`/`clear` are no-ops (routes gone), and so is `rootPath` (it carries no routes). Production mode skips all of this (no subscription registered).
 
-A schema that answers the check with a Promise is skipped; a rejected one is reported on `console.warn` with its error, the channel of the check's other finding — whatever `onError` is.
+A schema that answers the check with a Promise is skipped; a rejected one is reported through the router's `logger.warn` with its error, as the check's other finding is — whatever `onError` is.
 
 ### Invalid `defaultSearch` reaches state at runtime — core-injected, plugin cannot gate (#802)
 
