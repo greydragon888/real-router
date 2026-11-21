@@ -5,6 +5,7 @@ import { vi } from "vitest";
 import {
   arbDistinctRouteNamePair,
   arbDistinctIdPair,
+  arbHookOutcomes,
   arbNavigationAttempts,
   arbSignalAttempts,
   arbSimpleRouteName,
@@ -12,12 +13,13 @@ import {
   createHookSpies,
   createLifecycleRouter,
   createOrderTrackingRouter,
+  createOutcomeRouter,
   createSignalRouter,
-  navigateBy,
   NUM_RUNS,
+  runSignalAttempts,
 } from "./helpers";
 import { lifecyclePluginFactory } from "../../src";
-import { captureAsyncRethrows } from "../helpers";
+import { flush, recordingLogger } from "../helpers";
 
 import type { LifecycleHookFactory } from "../../src";
 import type { Route } from "@real-router/core";
@@ -182,26 +184,6 @@ describe("hook dispatch: onLeave fires when a route becomes inactive", () => {
 // =============================================================================
 
 describe("signals: each aborts exactly when its lifetime ends (#2692)", () => {
-  // Runs the attempts, a trailing `pending` left parked.
-  async function runAttempts(
-    router: ReturnType<typeof createSignalRouter>["router"],
-    attempts: Parameters<typeof navigateBy>[1][],
-  ): Promise<Promise<unknown>[]> {
-    const settled: Promise<unknown>[] = [];
-
-    for (const attempt of attempts) {
-      const navigation = navigateBy(router, attempt).catch(() => {});
-
-      settled.push(navigation);
-
-      if (attempt.kind !== "pending") {
-        await navigation;
-      }
-    }
-
-    return settled;
-  }
-
   test.prop([arbSimpleRouteName, arbSignalAttempts], {
     numRuns: NUM_RUNS.standard,
   })(
@@ -210,7 +192,7 @@ describe("signals: each aborts exactly when its lifetime ends (#2692)", () => {
       const { router, handed, commits } = createSignalRouter();
 
       await router.start(startRoute === "home" ? "/" : `/${startRoute}`);
-      const settled = await runAttempts(router, attempts);
+      const settled = await runSignalAttempts(router, attempts);
 
       // The lifetime of each signal, read off core's commit stream alone.
       const expected = handed.map(({ hook, route, commit }) =>
@@ -237,7 +219,7 @@ describe("signals: each aborts exactly when its lifetime ends (#2692)", () => {
       const { router, handed } = createSignalRouter();
 
       await router.start(startRoute === "home" ? "/" : `/${startRoute}`);
-      const settled = await runAttempts(router, attempts);
+      const settled = await runSignalAttempts(router, attempts);
 
       expect(handed.some(({ signal }) => !signal.aborted)).toBe(true);
 
@@ -623,6 +605,7 @@ describe("onNavigate orthogonality survives a throwing onEnter (#798)", () => {
     async ([fromRoute, toRoute]) => {
       const onNavigate = vi.fn();
       const boom = new Error("onEnter boom");
+      const log = recordingLogger();
       const routes: Route[] = ["home", "about", "contact"].map((name) => ({
         name,
         path: name === "home" ? "/" : `/${name}`,
@@ -631,25 +614,20 @@ describe("onNavigate orthogonality survives a throwing onEnter (#798)", () => {
         },
         onNavigate: () => onNavigate,
       }));
-      const router = createRouter(routes, { defaultRoute: "home" });
+      const router = createRouter(routes, {
+        defaultRoute: "home",
+        logger: log.logger,
+      });
 
       router.usePlugin(lifecyclePluginFactory());
 
-      // The isolated hook error is re-thrown asynchronously (queueMicrotask);
-      // capture it so it does not fail the run, then restore listeners.
-      const rethrown = captureAsyncRethrows();
-
       try {
         await router.start(`/${fromRoute === "home" ? "" : fromRoute}`);
-        // Drain the start transition's re-throw, then isolate the navigation.
-        await rethrown.flush();
+        // The start transition's onEnter threw too; isolate the navigation.
         onNavigate.mockClear();
-        rethrown.errors.length = 0;
+        log.callback.mockClear();
 
         await router.navigate(toRoute);
-
-        // Drain the navigation's queueMicrotask-scheduled re-throw.
-        await rethrown.flush();
 
         // onEnter threw, yet onNavigate still fired for the target route —
         // the orthogonality invariant holds under a throwing sibling hook.
@@ -658,11 +636,9 @@ describe("onNavigate orthogonality survives a throwing onEnter (#798)", () => {
         );
 
         expect(callsForTarget).toHaveLength(1);
-        // The developer signal survived, surfaced asynchronously.
-        expect(rethrown.errors).toStrictEqual([boom]);
+        // The error went to the router's logger.
+        expect(log.errors()).toStrictEqual([boom]);
       } finally {
-        rethrown.restore();
-
         router.stop();
       }
     },
@@ -682,29 +658,26 @@ describe("onNavigate orthogonality survives a throwing onEnter FACTORY (#1222)",
       const throwingFactory: LifecycleHookFactory = () => {
         throw boom;
       };
+      const log = recordingLogger();
       const routes: Route[] = ["home", "about", "contact"].map((name) => ({
         name,
         path: name === "home" ? "/" : `/${name}`,
         onEnter: throwingFactory,
         onNavigate: () => onNavigate,
       }));
-      const router = createRouter(routes, { defaultRoute: "home" });
+      const router = createRouter(routes, {
+        defaultRoute: "home",
+        logger: log.logger,
+      });
 
       router.usePlugin(lifecyclePluginFactory());
 
-      // The compile (factory) throw is isolated one seam earlier than the #798
-      // body throw and re-thrown asynchronously — capture it, restore listeners.
-      const rethrown = captureAsyncRethrows();
-
       try {
         await router.start(`/${fromRoute === "home" ? "" : fromRoute}`);
-        await rethrown.flush();
         onNavigate.mockClear();
-        rethrown.errors.length = 0;
+        log.callback.mockClear();
 
         await router.navigate(toRoute);
-
-        await rethrown.flush();
 
         const callsForTarget = onNavigate.mock.calls.filter(
           ([toState]) => toState.name === toRoute,
@@ -713,12 +686,42 @@ describe("onNavigate orthogonality survives a throwing onEnter FACTORY (#1222)",
         // onEnter FACTORY threw, yet onNavigate still fired — the orthogonality
         // invariant holds under a throwing factory, not just a throwing body.
         expect(callsForTarget).toHaveLength(1);
-        expect(rethrown.errors).toStrictEqual([boom]);
+        expect(log.errors()).toStrictEqual([boom]);
       } finally {
-        rethrown.restore();
-
         router.stop();
       }
+    },
+  );
+});
+
+// =============================================================================
+// What the logger sees (#2975)
+// =============================================================================
+
+describe("the logger sees exactly the failures that are not the hook's own abort (#2975)", () => {
+  test.prop([arbSimpleRouteName, arbSignalAttempts, arbHookOutcomes], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "every throw and rejection is logged once, except a rejection with the signal's reason or with it as `cause`",
+    async (startRoute, attempts, outcomes) => {
+      const { router, failures, logged } = createOutcomeRouter(outcomes);
+
+      await router.start(startRoute === "home" ? "/" : `/${startRoute}`);
+      const settled = await runSignalAttempts(router, attempts);
+
+      // stop() aborts every live signal, so every load settles.
+      router.stop();
+      await Promise.all(settled);
+      await flush();
+
+      const byError = (
+        [, a]: readonly [string, unknown],
+        [, b]: readonly [string, unknown],
+      ): number => String(a).localeCompare(String(b));
+
+      expect(logged().toSorted(byError)).toStrictEqual(
+        failures.toSorted(byError),
+      );
     },
   );
 });

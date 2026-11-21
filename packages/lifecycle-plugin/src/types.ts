@@ -3,10 +3,12 @@ import type { Router } from "@real-router/core/types";
 
 /**
  * Lifecycle hook callback for route transitions.
- * Fire-and-forget: return values are ignored. A throwing hook is caught and
- * re-thrown asynchronously via `queueMicrotask` (#798), so it surfaces as an
- * uncaught error to global handlers — it never aborts the transition and is NOT
- * routed through the router's EventEmitter.
+ * A hook returns its load — a thenable — or nothing. A throwing hook and the
+ * rejection of the thenable it returned go to the router's logger as
+ * `logger.error` (#2975): neither aborts the transition, and neither silences
+ * a later hook of the same transition (#798). A rejection with the reason of
+ * the hook's `signal`, or with that reason as its `cause`, is the hook's own
+ * abort and is not logged.
  *
  * `signal` aborts when the work the hook started is no longer wanted (#2692):
  * `onEnter`'s when its route is left, and `onStay`'s, `onNavigate`'s and
@@ -18,7 +20,8 @@ export type LifecycleHook = (
   toState: State,
   fromState: State | undefined,
   signal: AbortSignal,
-) => void;
+  // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- `void` admits a hook with no `return`; the thenable is the load a hook returns
+) => void | PromiseLike<unknown>;
 
 /**
  * Factory function for creating lifecycle hooks.
@@ -26,9 +29,9 @@ export type LifecycleHook = (
  * Factory runs once at first invocation; the returned hook is cached per route.
  *
  * A throwing factory (e.g. a failing DI init) is isolated exactly like a throwing
- * hook body — caught and re-thrown asynchronously via `queueMicrotask` (#1222), so
- * it never swallows a sibling `onNavigate` and never aborts the transition. A
- * failed compile is NOT cached, so the factory is retried on every navigation.
+ * hook body (#1222) — its error goes to the router's logger, it never swallows
+ * a sibling `onNavigate` and never aborts the transition. A failed compile is
+ * NOT cached, so the factory is retried on every navigation.
  */
 export type LifecycleHookFactory<
   Dependencies extends DefaultDependencies = DefaultDependencies,

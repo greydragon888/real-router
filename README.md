@@ -83,17 +83,18 @@ const routes: Route[] = [
     canActivate: authGuard,
     // A hook is a factory: it runs once and returns the function
     // that runs on each navigation to the route. The signal aborts
-    // when the next navigation commits.
-    onNavigate: () => (toState, _fromState, signal) => {
-      store.users.load(toState.search, { signal });
-    },
+    // when the next navigation commits; a returned load's failure
+    // reaches the router's logger.
+    onNavigate: () => (toState, _fromState, signal) =>
+      store.users.load(toState.search, { signal }),
     children: [
       {
         name: "profile",
         path: "/:id",
         onNavigate: () => (toState, _fromState, signal) => {
           document.title = `User ${toState.params.id}`;
-          store.users.loadOne(toState.params.id, { signal });
+
+          return store.users.loadOne(toState.params.id, { signal });
         },
       },
     ],

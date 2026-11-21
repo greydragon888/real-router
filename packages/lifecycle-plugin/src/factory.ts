@@ -5,6 +5,67 @@ import type { PluginFactory, State, TreeChangedEvent } from "@real-router/core";
 
 const HOOK_NAMES = ["onEnter", "onStay", "onLeave", "onNavigate"] as const;
 
+type HookName = (typeof HOOK_NAMES)[number];
+
+/** The context of the messages this plugin logs through the router's logger. */
+const LOGGER_CONTEXT = "lifecycle-plugin";
+
+/**
+ * The hook's own abort: a rejection with the reason of the signal it was
+ * handed, or with that reason as its `cause` — one level, as `setTimeout` of
+ * `node:timers/promises` and `events.once` reject. Before the signal aborts
+ * its `reason` is `undefined`, which a bare `Promise.reject()` and an error
+ * without a `cause` both match, so `signal.aborted` is checked first.
+ */
+function isOwnAbort(reason: unknown, signal: AbortSignal): boolean {
+  return (
+    signal.aborted &&
+    (reason === signal.reason || causeOf(reason) === signal.reason)
+  );
+}
+
+/**
+ * The `cause` of a rejection reason. A read that throws gives `undefined`,
+ * which no aborted signal's `reason` is, so the rejection is reported rather
+ * than thrown out of the plugin's handler.
+ */
+function causeOf(reason: unknown): unknown {
+  try {
+    return (reason as { cause?: unknown } | null | undefined)?.cause;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Reads what a hook returned. A thenable — a promise of any realm, or any
+ * object with a callable `then` — is settled into a promise the plugin holds,
+ * and its rejection goes to `report` unless it is the hook's own abort. A
+ * `then` that throws on its read throws out of this call.
+ */
+function readReturned(
+  value: unknown,
+  signal: AbortSignal,
+  report: (error: unknown) => void,
+): void {
+  const then: unknown = (value as { then?: unknown } | null | undefined)?.then;
+
+  if (typeof then !== "function") {
+    return;
+  }
+
+  new Promise<unknown>((resolve, reject) => {
+    Reflect.apply(then as (...args: unknown[]) => unknown, value, [
+      resolve,
+      reject,
+    ]);
+  }).catch((error: unknown) => {
+    if (!isOwnAbort(error, signal)) {
+      report(error);
+    }
+  });
+}
+
 function createPlugin(
   ...args: Parameters<PluginFactory>
 ): ReturnType<PluginFactory> {
@@ -102,7 +163,7 @@ function createPlugin(
   };
 
   function compileHook(
-    hookName: "onEnter" | "onStay" | "onLeave" | "onNavigate",
+    hookName: HookName,
     routeName: string,
   ): LifecycleHook | undefined {
     const key = `${hookName}:${routeName}`;
@@ -131,6 +192,21 @@ function createPlugin(
     return hook;
   }
 
+  // A hook's failure goes to the router's logger (#2975), the sink core's
+  // listener errors take: the throw of its factory or body, and the rejection
+  // of the thenable it returned.
+  const report = (
+    hookName: HookName,
+    routeName: string,
+    error: unknown,
+  ): void => {
+    api.logger.error(
+      LOGGER_CONTEXT,
+      `Error in ${hookName} hook of route "${routeName}":`,
+      error,
+    );
+  };
+
   // Compile AND invoke a hook with per-hook exception isolation. A throwing hook
   // must not abort the handler before a *later* hook of the same transition
   // runs — otherwise a throwing onLeave, onEnter or onStay silently swallows the
@@ -140,25 +216,29 @@ function createPlugin(
   // one seam earlier than a throwing hook body, but must be isolated identically.
   // Passing a pre-compiled hook as the argument would evaluate `compileHook` (and
   // its factory) BEFORE the try is entered, leaking the compile-throw — the
-  // `isolate(produce())` anti-pattern. Mirrors the per-listener isolation in
-  // `BaseSource` / `createActiveNameSelector` (@real-router/sources): re-throw
-  // asynchronously via `queueMicrotask` so the developer signal still surfaces to
-  // global error handlers / test harnesses without aborting the sync dispatch.
-  // `signal()` is an argument of the optional call, so it opens a controller
-  // only for a route that carries the hook.
+  // `isolate(produce())` anti-pattern. `signal()` runs after the hook is
+  // found, so it opens a controller only for a route that carries the hook.
   function runHook(
-    hookName: "onEnter" | "onStay" | "onLeave" | "onNavigate",
+    hookName: HookName,
     routeName: string,
     toState: State,
     fromState: State | undefined,
     signal: () => AbortSignal,
   ): void {
     try {
-      compileHook(hookName, routeName)?.(toState, fromState, signal());
-    } catch (error) {
-      queueMicrotask(() => {
-        throw error;
+      const hook = compileHook(hookName, routeName);
+
+      if (!hook) {
+        return;
+      }
+
+      const handed = signal();
+
+      readReturned(hook(toState, fromState, handed), handed, (error) => {
+        report(hookName, routeName, error);
       });
+    } catch (error) {
+      report(hookName, routeName, error);
     }
   }
 

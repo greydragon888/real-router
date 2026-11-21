@@ -14,7 +14,9 @@
 lifecycle-plugin/
 ├── src/
 │   ├── factory.ts    — compileHook (lazy compile + cache with factory invalidation),
-│   │                   the two signal controllers, createPlugin, lifecyclePluginFactory
+│   │                   runHook (isolation, the logger sink, the read of a returned
+│   │                   thenable), the two signal controllers, createPlugin,
+│   │                   lifecyclePluginFactory
 │   ├── types.ts      — LifecycleHook, LifecycleHookFactory types
 │   └── index.ts      — Public exports + Route module augmentation
 ```
@@ -35,11 +37,11 @@ graph LR
     end
 ```
 
-| Import source               | What it uses                                                                                                              | Purpose                                                                                             |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| **@real-router/core**       | `PluginFactory`, `State`, `TreeChangedEvent`, `DefaultDependencies` types; the `Route` / `RouteConfigUpdate` augmentation | The plugin factory's return type, the hook signature, route-tree events, the hook fields of a route |
-| **@real-router/core/api**   | `getPluginApi`, `getRoutesApi`                                                                                            | `getRouteConfig()` reads a route's hooks; `subscribeChanges()` drops removed routes from the cache  |
-| **@real-router/core/types** | `Router` type                                                                                                             | The `router` a hook factory receives                                                                |
+| Import source               | What it uses                                                                                                              | Purpose                                                                                                                             |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **@real-router/core**       | `PluginFactory`, `State`, `TreeChangedEvent`, `DefaultDependencies` types; the `Route` / `RouteConfigUpdate` augmentation | The plugin factory's return type, the hook signature, route-tree events, the hook fields of a route                                 |
+| **@real-router/core/api**   | `getPluginApi`, `getRoutesApi`                                                                                            | `getRouteConfig()` reads a route's hooks; `logger` takes a hook's failure; `subscribeChanges()` drops removed routes from the cache |
+| **@real-router/core/types** | `Router` type                                                                                                             | The `router` a hook factory receives                                                                                                |
 
 ## Core Algorithm
 
@@ -151,9 +153,17 @@ The plugin has no options. The hooks themselves (defined on routes) are the conf
 
 ### Why per-hook try/catch (isolation)
 
-Each hook's compile (factory) **and** invocation is wrapped in a per-hook `try/catch` that re-throws asynchronously via `queueMicrotask`. This exists for one reason: a throwing `onLeave`, `onEnter` or `onStay` — whether the **factory** throws at compile (a failing DI init) or the hook **body** throws at invocation — must not abort the `onTransitionSuccess` handler before the hooks after it run; otherwise the throw silently swallows them, `onNavigate` among them, breaking the orthogonality invariant. The `compileHook` call lives **inside** the `try`: passing a pre-compiled hook as the argument would evaluate the factory _before_ the `try` is entered — the `isolate(produce())` anti-pattern — leaking a compile-throw. Re-throwing on a microtask (rather than swallowing with `console.warn`) keeps the developer signal visible to global error handlers while every other hook of the transition still fires; the router continues operating regardless. This mirrors the per-listener isolation in `BaseSource` / `createActiveNameSelector` (`@real-router/sources`).
+Each hook's compile (factory) **and** invocation is wrapped in a per-hook `try/catch`, and the error it catches goes to the router's logger — `api.logger.error` under the context `lifecycle-plugin`, the sink core sends its own listeners' errors to. This exists for one reason: a throwing `onLeave`, `onEnter` or `onStay` — whether the **factory** throws at compile (a failing DI init) or the hook **body** throws at invocation — must not abort the `onTransitionSuccess` handler before the hooks after it run; otherwise the throw silently swallows them, `onNavigate` among them, breaking the orthogonality invariant. The `compileHook` call lives **inside** the `try`: passing a pre-compiled hook as the argument would evaluate the factory _before_ the `try` is entered — the `isolate(produce())` anti-pattern — leaking a compile-throw.
 
-The trade-off: a throwing hook surfaces **asynchronously** (uncaught, via the microtask), not synchronously through the EventEmitter's "Error in listener" sink. The isolation is one local `runHook` helper applied to all four hooks, not a shared cross-package `invokeSafely` primitive: a shared helper cannot enforce its own adoption, and the error policy differs per context. A `no-restricted-syntax` rule in the root `eslint.config.mjs` refuses a call as `runHook`'s first argument — the `isolate(produce())` shape; it does not see a hook invoked outside `runHook`.
+The plugin reports the error to the logger instead of throwing it. A throw straight out of the handler would reach core's sink for listener errors, which logs it under the context `router`, but skip the hooks after it; a throw deferred out of the handler, to a microtask say, reaches nothing that catches it and ends a Node process. The router's `logger` option already decides where an error lands in each environment, so the plugin does not read its environment. On a clone `cloneRouter` builds, that is a logger with the base router's settings and the `logger` option of `cloneRouter` merged over them.
+
+The isolation is one local `runHook` helper applied to all four hooks, not a shared cross-package `invokeSafely` primitive: a shared helper cannot enforce its own adoption, and the error policy differs per context. A `no-restricted-syntax` rule in the root `eslint.config.mjs` refuses a call as `runHook`'s first argument — the `isolate(produce())` shape; it does not see a hook invoked outside `runHook`.
+
+### Why the plugin reads what a hook returns
+
+A hook returns its load, or nothing: `LifecycleHook` returns `void | PromiseLike<unknown>`. The plugin settles a returned thenable — a promise of any realm, or any object with a callable `then`, whose `then` it reads once — into a promise it holds, so a rejection reaches the logger instead of ending a Node process as an unhandled rejection.
+
+A rejection with the reason of the hook's own `signal`, or with that reason as its `cause`, is not logged: it is a load the plugin itself cancelled — superseded by the next commit, or ended by `stop()`, `dispose()` or teardown. The filter compares identity, never the error's `name`: an `AbortError` the application makes is an error like any other, and so is an abort error a client makes of its own, axios's `CanceledError` among them — a hook that returns such a load catches it. It looks one level into `cause`, because `setTimeout` of `node:timers/promises` and `events.once` reject with a new `AbortError` whose `cause` is the reason; a reason found deeper is logged, so the filter walks no chain and needs no guard against a `cause` cycle. Before the signal aborts, its `reason` is `undefined` — the value a bare `Promise.reject()` rejects with, and the `cause` of an error that has none — so the filter checks `signal.aborted` first.
 
 ## See Also
 

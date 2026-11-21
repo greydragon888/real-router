@@ -1,14 +1,22 @@
+import { setTimeout as setTimeoutPromise } from "node:timers/promises";
+import { runInNewContext } from "node:vm";
+
 import {
   createRouter,
   errorCodes,
   RouterError,
   UNKNOWN_ROUTE,
 } from "@real-router/core";
-import { getRoutesApi } from "@real-router/core/api";
+import { cloneRouter, getRoutesApi } from "@real-router/core/api";
 import { describe, afterEach, it, expect, vi } from "vitest";
 
 import { lifecyclePluginFactory } from "../../src";
-import { captureAsyncRethrows } from "../helpers";
+import {
+  flush,
+  hookFailure,
+  PLUGIN_CONTEXT,
+  recordingLogger,
+} from "../helpers";
 
 import type { LifecycleHook, LifecycleHookFactory } from "../../src";
 import type { Route, Router, State } from "@real-router/core";
@@ -650,33 +658,14 @@ describe("@real-router/lifecycle-plugin", () => {
     });
   });
 
-  describe("intra-plugin hook isolation (#798)", () => {
-    // A throwing hook is re-thrown asynchronously via queueMicrotask (mirrors
-    // BaseSource / createActiveNameSelector in @real-router/sources). Observe it
-    // at the SCHEDULE, not at the process-level `uncaughtException` event — the
-    // event count is the host's, not ours, and it is not stable across Node
-    // patch releases. See the doc-block on `captureAsyncRethrows`.
-    async function withUncaughtCapture(
-      run: () => Promise<void>,
-    ): Promise<unknown[]> {
-      const capture = captureAsyncRethrows();
-
-      try {
-        await run();
-        await capture.flush();
-      } finally {
-        capture.restore();
-      }
-
-      return capture.errors;
-    }
-
+  describe("a hook's failure goes to the router's logger (#798, #2975)", () => {
     it("still fires onNavigate when onEnter throws (orthogonality preserved)", async () => {
       const boom = new Error("boomE");
       const throwingEnter: LifecycleHook = () => {
         throw boom;
       };
       const onNavigate = vi.fn();
+      const log = recordingLogger();
 
       router = createRouter(
         [
@@ -688,20 +677,18 @@ describe("@real-router/lifecycle-plugin", () => {
             onNavigate: () => onNavigate,
           },
         ],
-        { defaultRoute: "home" },
+        { defaultRoute: "home", logger: log.logger },
       );
       router.usePlugin(lifecyclePluginFactory());
 
       await router.start("/");
-
-      const rethrown = await withUncaughtCapture(async () => {
-        await router.navigate("about");
-      });
+      await router.navigate("about");
 
       // onNavigate is NOT swallowed by the throwing onEnter (the #798 bug).
       expect(onNavigate).toHaveBeenCalledTimes(1);
-      // The developer signal still surfaces — re-thrown asynchronously.
-      expect(rethrown).toStrictEqual([boom]);
+      expect(log.callback.mock.calls).toStrictEqual([
+        ["error", PLUGIN_CONTEXT, hookFailure("onEnter", "about"), boom],
+      ]);
     });
 
     it("still fires onNavigate when onStay throws (orthogonality preserved)", async () => {
@@ -710,6 +697,7 @@ describe("@real-router/lifecycle-plugin", () => {
         throw boom;
       };
       const onNavigate = vi.fn();
+      const log = recordingLogger();
 
       router = createRouter(
         [
@@ -727,7 +715,7 @@ describe("@real-router/lifecycle-plugin", () => {
             ],
           },
         ],
-        { defaultRoute: "home" },
+        { defaultRoute: "home", logger: log.logger },
       );
       router.usePlugin(lifecyclePluginFactory());
 
@@ -735,12 +723,12 @@ describe("@real-router/lifecycle-plugin", () => {
       await router.navigate("users.view", { id: "1" });
       onNavigate.mockClear();
 
-      const rethrown = await withUncaughtCapture(async () => {
-        await router.navigate("users.view", { id: "2" });
-      });
+      await router.navigate("users.view", { id: "2" });
 
       expect(onNavigate).toHaveBeenCalledTimes(1);
-      expect(rethrown).toStrictEqual([boom]);
+      expect(log.callback.mock.calls).toStrictEqual([
+        ["error", PLUGIN_CONTEXT, hookFailure("onStay", "users.view"), boom],
+      ]);
     });
 
     it("isolates a throwing onNavigate without aborting the transition", async () => {
@@ -748,6 +736,7 @@ describe("@real-router/lifecycle-plugin", () => {
       const throwingNavigate: LifecycleHook = () => {
         throw boom;
       };
+      const log = recordingLogger();
 
       router = createRouter(
         [
@@ -758,22 +747,20 @@ describe("@real-router/lifecycle-plugin", () => {
             onNavigate: () => throwingNavigate,
           },
         ],
-        { defaultRoute: "home" },
+        { defaultRoute: "home", logger: log.logger },
       );
       router.usePlugin(lifecyclePluginFactory());
 
       await router.start("/");
+      await router.navigate("about");
 
-      const rethrown = await withUncaughtCapture(async () => {
-        await router.navigate("about");
-      });
-
-      // Transition still commits; the error surfaces asynchronously.
       expect(router.getState()?.name).toBe("about");
-      expect(rethrown).toStrictEqual([boom]);
+      expect(log.callback.mock.calls).toStrictEqual([
+        ["error", PLUGIN_CONTEXT, hookFailure("onNavigate", "about"), boom],
+      ]);
     });
 
-    it("re-throws hook errors asynchronously instead of through the event emitter", async () => {
+    it("logs a hook's error under its own context, not through the event emitter's listener sink", async () => {
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const boom = new Error("hook error");
       const throwingEnter: LifecycleHook = () => {
@@ -790,27 +777,46 @@ describe("@real-router/lifecycle-plugin", () => {
       router.usePlugin(lifecyclePluginFactory());
 
       await router.start("/");
-
-      const rethrown = await withUncaughtCapture(async () => {
-        await router.navigate("about");
-      });
+      await router.navigate("about");
 
       // Isolation does not cancel the navigation.
       expect(router.getState()?.name).toBe("about");
-      // The error surfaces via async re-throw, NOT the core "Error in listener"
-      // sink — the plugin now catches the throw before it reaches EventEmitter.
-      expect(rethrown).toStrictEqual([boom]);
-      expect(errorSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining("Error in listener"),
-        expect.any(Error),
+      // The default logger prints it with the plugin's context, once.
+      expect(errorSpy.mock.calls).toStrictEqual([
+        [`[${PLUGIN_CONTEXT}] ${hookFailure("onEnter", "about")}`, boom],
+      ]);
+    });
+
+    it("the clone of a router logs a hook's error to the base's logger callback", async () => {
+      const boom = new Error("hook on the clone");
+      const log = recordingLogger();
+      const base = createRouter(
+        [
+          { name: "home", path: "/" },
+          {
+            name: "about",
+            path: "/about",
+            onNavigate: () => () => {
+              throw boom;
+            },
+          },
+        ],
+        { defaultRoute: "home", logger: log.logger },
       );
 
-      errorSpy.mockRestore();
+      base.usePlugin(lifecyclePluginFactory());
+      router = cloneRouter(base);
+
+      await router.start("/about");
+
+      expect(log.callback.mock.calls).toStrictEqual([
+        ["error", PLUGIN_CONTEXT, hookFailure("onNavigate", "about"), boom],
+      ]);
     });
 
     // #1222 — the compile (factory) throw is one seam earlier than the #798
     // hook-body throw. It must be isolated the same way, else a throwing FACTORY
-    // (the common DI-init shape) swallows a sibling onNavigate and re-throws on
+    // (the common DI-init shape) swallows a sibling onNavigate and fails on
     // every navigation (failed compile is not cached).
     // onLeave shares the success handler with onEnter / onNavigate (#2691).
     it.each<{ shape: string; onLeave: LifecycleHookFactory }>([
@@ -831,6 +837,7 @@ describe("@real-router/lifecycle-plugin", () => {
       async ({ onLeave }) => {
         const onEnter = vi.fn();
         const onNavigate = vi.fn();
+        const log = recordingLogger();
 
         router = createRouter(
           [
@@ -842,19 +849,23 @@ describe("@real-router/lifecycle-plugin", () => {
               onNavigate: () => onNavigate,
             },
           ],
-          { defaultRoute: "home" },
+          { defaultRoute: "home", logger: log.logger },
         );
         router.usePlugin(lifecyclePluginFactory());
 
         await router.start("/");
-
-        const rethrown = await withUncaughtCapture(async () => {
-          await router.navigate("about");
-        });
+        await router.navigate("about");
 
         expect(onEnter).toHaveBeenCalledTimes(1);
         expect(onNavigate).toHaveBeenCalledTimes(1);
-        expect(rethrown).toStrictEqual([new Error("boomL")]);
+        expect(log.callback.mock.calls).toStrictEqual([
+          [
+            "error",
+            PLUGIN_CONTEXT,
+            hookFailure("onLeave", "home"),
+            new Error("boomL"),
+          ],
+        ]);
       },
     );
 
@@ -864,6 +875,7 @@ describe("@real-router/lifecycle-plugin", () => {
         throw boom;
       };
       const onNavigate = vi.fn();
+      const log = recordingLogger();
 
       router = createRouter(
         [
@@ -875,23 +887,21 @@ describe("@real-router/lifecycle-plugin", () => {
             onNavigate: () => onNavigate,
           },
         ],
-        { defaultRoute: "home" },
+        { defaultRoute: "home", logger: log.logger },
       );
       router.usePlugin(lifecyclePluginFactory());
 
       await router.start("/");
-
-      const rethrown = await withUncaughtCapture(async () => {
-        await router.navigate("about");
-      });
+      await router.navigate("about");
 
       // Navigation still commits.
       expect(router.getState()?.name).toBe("about");
       // onNavigate is NOT swallowed by the throwing factory.
       expect(onNavigate).toHaveBeenCalledTimes(1);
-      // The factory error surfaces via the SAME async channel as a body throw
-      // (#798), not the sync "Error in listener" sink — channel unified.
-      expect(rethrown).toStrictEqual([boom]);
+      // The factory error takes the same sink as a body throw.
+      expect(log.callback.mock.calls).toStrictEqual([
+        ["error", PLUGIN_CONTEXT, hookFailure("onEnter", "about"), boom],
+      ]);
     });
 
     it("still fires onNavigate when the onStay FACTORY throws (#1222)", async () => {
@@ -900,6 +910,7 @@ describe("@real-router/lifecycle-plugin", () => {
         throw boom;
       };
       const onNavigate = vi.fn();
+      const log = recordingLogger();
 
       router = createRouter(
         [
@@ -917,7 +928,7 @@ describe("@real-router/lifecycle-plugin", () => {
             ],
           },
         ],
-        { defaultRoute: "home" },
+        { defaultRoute: "home", logger: log.logger },
       );
       router.usePlugin(lifecyclePluginFactory());
 
@@ -925,12 +936,241 @@ describe("@real-router/lifecycle-plugin", () => {
       await router.navigate("users.view", { id: "1" });
       onNavigate.mockClear();
 
-      const rethrown = await withUncaughtCapture(async () => {
-        await router.navigate("users.view", { id: "2" });
-      });
+      await router.navigate("users.view", { id: "2" });
 
       expect(onNavigate).toHaveBeenCalledTimes(1);
-      expect(rethrown).toStrictEqual([boom]);
+      expect(log.callback.mock.calls).toStrictEqual([
+        ["error", PLUGIN_CONTEXT, hookFailure("onStay", "users.view"), boom],
+      ]);
+    });
+  });
+
+  describe("the thenable a hook returns is read (#2975)", () => {
+    const boom = new Error("load failed");
+    // Its promise is another realm's, so `instanceof Promise` answers false.
+    const rejectInAnotherRealm = runInNewContext(
+      "(reason) => Promise.reject(reason)",
+    ) as (reason: unknown) => PromiseLike<unknown>;
+
+    // `about` carries `hook` as its onNavigate; the router starts on `home`
+    // and navigates to `about`.
+    async function navigateWith(
+      hook: LifecycleHook,
+    ): Promise<ReturnType<typeof recordingLogger>> {
+      const log = recordingLogger();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          { name: "about", path: "/about", onNavigate: () => hook },
+        ],
+        { defaultRoute: "home", logger: log.logger },
+      );
+      router.usePlugin(lifecyclePluginFactory());
+
+      await router.start("/");
+      await router.navigate("about");
+      await flush();
+
+      return log;
+    }
+
+    // A load that rejects with `reasonOf(signal)` once its signal aborts.
+    const loadRejectingWith =
+      (reasonOf: (signal: AbortSignal) => unknown): LifecycleHook =>
+      (_toState, _fromState, signal) =>
+        new Promise<void>((_resolve, reject) => {
+          signal.addEventListener(
+            "abort",
+            () => {
+              reject(reasonOf(signal));
+            },
+            { once: true },
+          );
+        });
+
+    // `hook`, with each rejection of the load it returns recorded in
+    // `rejected` before the plugin reads it.
+    const observingRejections =
+      (hook: LifecycleHook, rejected: unknown[]): LifecycleHook =>
+      (toState, fromState, signal) =>
+        Promise.resolve(hook(toState, fromState, signal)).catch(
+          (error: unknown) => {
+            rejected.push(error);
+
+            throw error;
+          },
+        );
+
+    it.each<{ shape: string; hook: LifecycleHook; logged: unknown }>([
+      {
+        shape: "an async hook that throws",
+        hook: async () => {
+          throw boom;
+        },
+        logged: boom,
+      },
+      {
+        shape: "a returned promise that rejects",
+        hook: () => Promise.reject(boom),
+        logged: boom,
+      },
+      {
+        shape: "a rejected promise of another realm",
+        hook: () => rejectInAnotherRealm(boom),
+        logged: boom,
+      },
+      {
+        shape: "an object with one `then` that rejects",
+        hook: () =>
+          ({
+            // eslint-disable-next-line unicorn/no-thenable -- a thenable that is not a Promise is the return under test
+            then: (_resolve: unknown, reject: (reason: unknown) => void) => {
+              reject(boom);
+            },
+          }) as unknown as PromiseLike<unknown>,
+        logged: boom,
+      },
+      {
+        shape: "a rejection with no reason",
+        hook: () => Promise.reject(),
+        logged: undefined,
+      },
+      {
+        shape: "a `then` that throws when it is read",
+        hook: () => ({
+          // eslint-disable-next-line unicorn/no-thenable -- a `then` that throws on its read is the return under test
+          get then(): never {
+            throw boom;
+          },
+        }),
+        logged: boom,
+      },
+    ])("$shape is logged", async ({ hook, logged }) => {
+      const log = await navigateWith(hook);
+
+      expect(log.callback.mock.calls).toStrictEqual([
+        ["error", PLUGIN_CONTEXT, hookFailure("onNavigate", "about"), logged],
+      ]);
+    });
+
+    it("a promise that resolves is not logged", async () => {
+      const log = await navigateWith(() => Promise.resolve("loaded"));
+
+      expect(log.callback).not.toHaveBeenCalled();
+    });
+
+    it.each<{ shape: string; hook: LifecycleHook }>([
+      {
+        shape: "the signal's reason, as `fetch` rejects",
+        hook: loadRejectingWith((signal) => signal.reason),
+      },
+      {
+        shape:
+          "the reason as `cause`, as `setTimeout` of `node:timers/promises` rejects",
+        hook: (_toState, _fromState, signal) =>
+          setTimeoutPromise(60_000, undefined, { signal }),
+      },
+      {
+        shape: "the reason as `cause` of the hook's own error",
+        hook: loadRejectingWith(
+          (signal) => new Error("wrapped", { cause: signal.reason }),
+        ),
+      },
+    ])("the hook's own abort with $shape is not logged", async ({ hook }) => {
+      const rejected: unknown[] = [];
+      const log = await navigateWith(observingRejections(hook, rejected));
+
+      // The next commit aborts onNavigate's signal.
+      await router.navigate("home");
+      await flush();
+
+      expect(rejected).toHaveLength(1);
+      expect(log.callback).not.toHaveBeenCalled();
+    });
+
+    it.each<{ end: string; act: (r: Router) => Promise<unknown> | void }>([
+      { end: "the next commit", act: (r) => r.navigate("home") },
+      {
+        end: "router.stop()",
+        act: (r) => {
+          r.stop();
+        },
+      },
+      {
+        end: "router.dispose()",
+        act: (r) => {
+          r.dispose();
+          // dispose() is terminal; the shared afterEach stops a fresh router.
+          router = createRouter([{ name: "home", path: "/" }]);
+        },
+      },
+    ])("a returned load aborted by $end is not logged", async ({ act }) => {
+      const rejected: unknown[] = [];
+      const log = await navigateWith(
+        observingRejections(
+          loadRejectingWith((signal) => signal.reason),
+          rejected,
+        ),
+      );
+
+      await act(router);
+      await flush();
+
+      expect(rejected).toHaveLength(1);
+      expect(log.callback).not.toHaveBeenCalled();
+    });
+
+    it.each<{ shape: string; reasonOf: (signal: AbortSignal) => unknown }>([
+      {
+        shape: "a reason found only at `cause.cause`",
+        reasonOf: (signal) =>
+          new Error("outer", {
+            cause: new Error("inner", { cause: signal.reason }),
+          }),
+      },
+      {
+        shape: "an `AbortError` that is not the signal's reason",
+        reasonOf: () =>
+          new DOMException("aborted by the library", "AbortError"),
+      },
+      {
+        shape: "an error that is not an abort",
+        reasonOf: () => new Error("the load failed as it was aborted"),
+      },
+      {
+        shape: "a reason whose `cause` throws when it is read",
+        reasonOf: (): object =>
+          Object.create({
+            get cause(): never {
+              throw new Error("the cause getter throws");
+            },
+          }) as object,
+      },
+    ])("after the signal aborts, $shape is logged", async ({ reasonOf }) => {
+      const rejected: unknown[] = [];
+      const log = await navigateWith(
+        loadRejectingWith((signal) => {
+          const reason = reasonOf(signal);
+
+          rejected.push(reason);
+
+          return reason;
+        }),
+      );
+
+      await router.navigate("home");
+      await flush();
+
+      expect(rejected).toHaveLength(1);
+      expect(log.callback.mock.calls).toStrictEqual([
+        [
+          "error",
+          PLUGIN_CONTEXT,
+          hookFailure("onNavigate", "about"),
+          rejected[0],
+        ],
+      ]);
     });
   });
 
