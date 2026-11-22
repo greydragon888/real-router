@@ -568,6 +568,9 @@ These are deliberately designed constraints. Violating them will break the syste
 - **Plugins are observers** — they react to events but cannot block or modify the transition pipeline.
 - **Guard execution order is fixed**: deactivation innermost → outermost, then activation outermost → innermost.
 - **`navigateToNotFound()` bypasses ACTIVATION guards and plugins** — plugins only see `onTransitionSuccess`, and nothing is activated at `UNKNOWN_ROUTE`. It does consult the current route's `canDeactivate`: leaving is still leaving.
+- **One contract, one executor** — on one router, a route-config field, a `state.context` namespace and a router extension each have one executor: the package that declares it runs the field, writes the namespace or defines the extension, and others may read them. Core refuses a second claim of a namespace and a second extension of a key, so two packages that declare the same namespace or extension cannot share a router. The rest is a convention: nothing stops a plugin from writing `state.context` directly under a namespace it does not hold, or from running a route-config field it did not declare.
+- **A plugin is isomorphic by default** — it works the same in every environment and reads none of it. What depends on the environment — whether anyone waits for the work, what is serialized, where an error lands — is decided at the boundary, the entry point. Where the entry point acts on a plugin's work, the plugin hands it a handle (a promise, a signal). The plugin writes its own diagnostics to the router's logger, `PluginApi.logger`, which the entry point configures through the router's `logger` option. The exception is an environment-specific plugin, whose work is an environment API — the URL and its history, DOM events, the host console — or server rendering and hydration. Where it needs a capability of its environment, it checks the capability itself and decides what to do without it: it stays empty, works through a stand-in, or refuses with an error. The census of environment reads, `scripts/tests/env-read-census.test.mjs`, checks the code of `packages/*/src` and `shared/` outside the UI layer for reads of the environment: the packages it allows whole, with their shared layers, are this repository's environment-specific ones, and it names the few places of isomorphic code that read the environment, the router's logger among them.
+- **The start phase is an explicit fact, not the environment** — a start that hydrates is the one `hydrateRouter` runs: it deposits the payload it starts the router with, and a plugin reads it with `getHydrationState(router)` from its `start` interceptor — `null` outside a hydration.
 
 ### Navigation
 
@@ -578,7 +581,7 @@ These are deliberately designed constraints. Violating them will break the syste
 ### Packages
 
 - **Shared sources are never imported by end users** — `shared/` is bundled into the packages that link it, at build time.
-- **`core` never depends on browser APIs** — platform-agnostic. The `start(path)` method requires a path; browser-plugin makes it optional by injecting `browser.getLocation()` via interceptor.
+- **`core` is isomorphic** — of the environment it reads only the host console, in the router's logger (see "A plugin is isomorphic by default" above). The `start(path)` method requires a path; browser-plugin makes it optional by injecting `browser.getLocation()` via interceptor.
 
 ## Boundaries
 
@@ -609,7 +612,7 @@ These are deliberately designed constraints. Violating them will break the syste
 - The `engine` subsystem (`core/src/engine`) is self-contained — the `route-tree` → `path-matcher` / `search-params` layering is an internal boundary within `src/engine`, enforced by core's lint
 - The `channels` subsystem (`core/src/channels`) imports **nothing** from the namespaces, the engine or the pipeline — declared query names arrive as DATA (`readonly string[]` or a `queryNamesOf` accessor), so the one registry that classifies and prints cannot grow a second derivation. Also enforced by core's lint
 - The `pipeline` subsystem (`core/src/pipeline`) reaches the routes layer only through its `RouteResolver` port, implemented by the router at wiring time — same inversion, so the module stays pure and mock-testable
-- `shared/browser-env` is the **only** location that touches `window`, `history`, `addEventListener` (enforced by convention, not by package boundary)
+- In `packages/*/src` and `shared/`, outside the UI layer (the framework adapters and `shared/dom-utils`), code reads the environment only where "A plugin is isomorphic by default" (Invariants › Guards & Plugins) lets it; the census of environment reads enforces this, not a package boundary
 
 **FORBIDDEN:**
 
