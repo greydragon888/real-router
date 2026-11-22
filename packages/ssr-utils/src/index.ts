@@ -7,6 +7,13 @@ export type {
   RequestScopeSource,
 } from "./createRequestScope";
 
+export {
+  LoaderNotFound,
+  LoaderRedirect,
+  LoaderTimeout,
+  withTimeout,
+} from "./errors";
+
 export { getStaticPaths } from "./getStaticPaths";
 
 export { getHydrationState } from "./hydrationScratchpad";

@@ -3,4 +3,4 @@ export {
   LoaderNotFound,
   LoaderTimeout,
   withTimeout,
-} from "./shared-ssr/errors";
+} from "@real-router/ssr-utils";

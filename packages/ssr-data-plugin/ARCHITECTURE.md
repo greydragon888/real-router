@@ -27,10 +27,10 @@ ssr-data-plugin/
 │   ├── invalidate.ts       — invalidate(router, "data"): typed wrapper over markStale
 │   ├── getSsrDataMode.ts   — getSsrDataMode(state): runtime-guarded reader of state.context.ssrDataMode
 │   ├── server.ts           — injectDeferredScripts + getDeferBootstrapScript + Serializer type: streaming wire-format helpers (subpath: /server)
-│   ├── errors.ts           — Re-export of LoaderRedirect / LoaderNotFound / LoaderTimeout / withTimeout (subpath: /errors)
+│   ├── errors.ts           — Re-export of LoaderRedirect / LoaderNotFound / LoaderTimeout / withTimeout from @real-router/ssr-utils (subpath: /errors)
 │   ├── types.ts            — DataLoaderFn, DataLoaderFnFactory, DataLoaderFactoryMap, DataRouteEntry, SsrLoaderContext, SsrMode
 │   ├── constants.ts        — ERROR_PREFIX (LOGGER_CONTEXT — internal)
-│   └── shared-ssr/         — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, defer, deferRegistryClient, deferWireFormat, staleRegistry, errors, types)
+│   └── shared-ssr/         — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, defer, deferRegistryClient, deferWireFormat, staleRegistry, types)
 ```
 
 ## Module Dependency Graph
@@ -50,7 +50,7 @@ index.ts
     └── (re-exports defer, isDeferred, DeferredPayload from shared-ssr)
 
 server.ts → shared-ssr/deferWireFormat.ts (formatSettleScript, getDeferBootstrapScript, escapeForScript) — server-only, kept out of the client `.` chunk
-errors.ts → shared-ssr/errors.ts (LoaderRedirect, LoaderNotFound, LoaderTimeout, withTimeout)
+errors.ts → @real-router/ssr-utils (LoaderRedirect, LoaderNotFound, LoaderTimeout, withTimeout)
 ```
 
 External dependencies:
@@ -60,6 +60,7 @@ External dependencies:
 | `@real-router/core/api`           | `getPluginApi`                                                                  | `shared-ssr/createSsrLoaderPlugin.ts`  |
 | `@real-router/core/validation`    | `areParamValuesEqual` (the hydration check compares values by core's rule)      | `shared-ssr/createSsrLoaderPlugin.ts`  |
 | `@real-router/ssr-utils`          | `getHydrationState` (read-only access to the hydration scratchpad)              | `shared-ssr/createSsrLoaderPlugin.ts`  |
+| `@real-router/ssr-utils`          | `LoaderRedirect`, `LoaderNotFound`, `LoaderTimeout`, `withTimeout` (re-exported as `./errors`) | `errors.ts` |
 | `@real-router/core/types`              | `StateContext` (module augmentation target), `Plugin`, `PluginFactory`, `State` | `index.ts`, all factories              |
 
 ## Shared SSR Scaffolding
@@ -357,7 +358,7 @@ This tests:
 | Teardown under load         | `dispose()` of one clone corrupts another's state          |
 | Loader dispatch correctness | Wrong `state.name` → wrong loader called under concurrency |
 
-Property-based tests (59 invariants in `tests/property/`) complement functional and stress tests — see INVARIANTS.md for the full list, including the security-critical `escapeForScript` family (`numRuns: 1000`, 8 invariants), the `defer()` / `isDeferred` payload-constructor invariants (9, incl. anti-bypass + key-order), the stale-registry algebra (`markStale`/`staleMark`/`clearStaleMark` idempotency, a clear with an older mark leaving a newer one + per-router/per-namespace isolation), `getSsrDataMode` totality + idempotency, `withTimeout` race semantics, `validateLoaders` structural acceptance/rejection, `formatSettleScript`/`getDeferBootstrapScript` HTML safety, and `invalidate()` cloneRouter isolation. The stress test covers the one dimension unit tests cannot: concurrent access patterns that mirror real SSR server load.
+Property-based tests in `tests/property/` complement functional and stress tests — INVARIANTS.md lists and counts them, including the security-critical `escapeForScript` family (`numRuns: 1000`, 8 invariants), the `defer()` / `isDeferred` payload-constructor invariants (9, incl. anti-bypass + key-order), the stale-registry algebra (`markStale`/`staleMark`/`clearStaleMark` idempotency, a clear with an older mark leaving a newer one + per-router/per-namespace isolation), `getSsrDataMode` totality + idempotency, `validateLoaders` structural acceptance/rejection, `formatSettleScript`/`getDeferBootstrapScript` HTML safety, and `invalidate()` cloneRouter isolation. The stress test covers the one dimension unit tests cannot: concurrent access patterns that mirror real SSR server load.
 
 ## Related Documents
 

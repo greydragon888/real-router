@@ -1090,7 +1090,8 @@ jobs:
   # ============================================
 
   # Smoke test: pack all public packages, install from tarballs
-  # into an isolated project, verify every export resolves.
+  # into an isolated project, verify every export resolves and check the
+  # loader errors of ssr-utils in its builds and copies.
   # Uses `bundle` (not `build`) — no test/lint overhead.
   smoke:
     name: Package Smoke Test
@@ -1108,7 +1109,8 @@ jobs:
     # Not on a diff that holds no source — a release PR, where the tarballs are
     # packed from master's code and every assertion here (exports resolve, no
     # private package in `dependencies`, no source shipped, no
-    # missing `dist`) is independent of the version being bumped. It is
+    # missing `dist`, the loader errors of ssr-utils) is independent of the
+    # version being bumped. It is
     # also the wrong address: a `changeset-release/*` PR is regenerated from
     # master, so a failure there cannot be answered there.
     # ⚠ That leaves the packaging guard off the master → npm path entirely —

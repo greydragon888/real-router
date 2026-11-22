@@ -553,12 +553,13 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 ## Related Packages
 
-| Package                                                                                  | Description                            |
-| ---------------------------------------------------------------------------------------- | -------------------------------------- |
-| [@real-router/core](https://www.npmjs.com/package/@real-router/core)                     | Core router (required peer dependency) |
-| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) | Browser History API integration        |
-| [@real-router/sources](https://www.npmjs.com/package/@real-router/sources)               | Subscription layer (used internally)   |
-| [@real-router/route-utils](https://www.npmjs.com/package/@real-router/route-utils)       | Route tree queries (`useRouteUtils`)   |
+| Package                                                                                  | Description                                                   |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| [@real-router/core](https://www.npmjs.com/package/@real-router/core)                     | Core router (required peer dependency)                        |
+| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) | Browser History API integration                               |
+| [@real-router/sources](https://www.npmjs.com/package/@real-router/sources)               | Subscription layer (used internally)                          |
+| [@real-router/route-utils](https://www.npmjs.com/package/@real-router/route-utils)       | Route tree queries (`useRouteUtils`)                          |
+| [@real-router/ssr-utils](https://www.npmjs.com/package/@real-router/ssr-utils)           | SSR helpers: serialize, hydrate, request scope, loader errors |
 
 ## Contributing
 

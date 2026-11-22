@@ -6,15 +6,18 @@ is NOT the SSR home: that subpath holds core's ingestion primitives
 (`putField` / `copyFields`, #1852), nothing SSR-related lives there, and this
 package does not import it. Isomorphic: `serializeState` /
 `serializeRouterState` run on the server, `hydrateRouter` on the client,
-`getStaticPaths` / `createRequestScope` are server-only in practice but carry
-no platform-specific imports.
+`getStaticPaths` / `createRequestScope` are server-only in practice,
+`withTimeout` runs wherever a loader runs, and none carries platform-specific
+imports.
 
 **Not** consumed by `@real-router/core` itself — the dependency runs one way
 (`ssr-utils` → `core`, via `@real-router/core/api` and `/types`).
 Consumed by `@real-router/angular` (`provideRealRouterFactory`), and by
 `@real-router/ssr-data-plugin` / `@real-router/rsc-server-plugin` at runtime:
 their `shared/ssr/createSsrLoaderPlugin.ts` reads the hydration scratchpad
-through `getHydrationState`, so both declare this package as a `dependency`.
+through `getHydrationState`, and their `src/errors.ts` — the `./errors`
+subpath — re-exports the loader errors and `withTimeout` from here, so both
+declare this package as a `dependency`.
 
 **Sibling, not merged, with `shared/ssr`.** `shared/ssr` (`createSsrLoaderPlugin`)
 is plugin-level scaffolding _inlined_ into `ssr-data-plugin` / `rsc-server-plugin`
@@ -38,6 +41,8 @@ see issue #1543 for the design decision.
 | `Deserialize`, `HydrateRouterOptions`                                      | types    | `hydrateRouter` options                                                                                                                                                     |
 | `StaticPathEntries`, `StaticPathEntry`                                     | types    | `getStaticPaths` per-route entry map; an entry names its channels — `{ params?, search? }`                                                                                  |
 | `IncomingMessageLike`, `RequestLike`, `RequestScopeSource`, `RequestScope` | types    | `createRequestScope` request/return shapes                                                                                                                                  |
+| `withTimeout(routeName, ms, loader, opts?)`                                | function | Races a loader against a deadline and passes it a `signal` that aborts on the deadline or on `opts.upstreamSignal`; rejects with `LoaderTimeout` on the deadline            |
+| `LoaderRedirect`, `LoaderNotFound`, `LoaderTimeout`                        | classes  | Loader errors an SSR handler maps to 30x / 404 / 504; `code` tells them apart, and `instanceof` holds across copies of this package and its ESM/CJS builds                |
 
 ## Module Structure
 
@@ -49,6 +54,7 @@ src/
 ├── hydrationScratchpad.ts   — the scratchpad WeakMap, getHydrationState and the deposit hydrateRouter uses
 ├── getStaticPaths.ts        — getStaticPaths (imports getPluginApi from @real-router/core/api, RouteTree from @real-router/core)
 ├── createRequestScope.ts    — createRequestScope (imports cloneRouter from @real-router/core/api)
+├── errors.ts                — LoaderRedirect, LoaderNotFound, LoaderTimeout (the mark and Symbol.hasInstance) and withTimeout
 └── index.ts                 — public re-exports
 ```
 
@@ -59,6 +65,8 @@ src/
 - **`hydrateRouter`'s scratchpad is single-shot, and it lives here (#2361).** `hydrationScratchpad.ts` keeps a module-private `WeakMap` keyed by router; `hydrateRouter` deposits just before `router.start()` and restores the previous value in `finally`, so only the `start()` it triggers reads a payload. `getHydrationState` is the only exported door and it reads — the package's runtime exports are pinned in `hydrateRouter.test.ts`, so a write door cannot appear unnoticed.
 - ⚠ **Writer and reader must resolve ONE copy of this package.** Two copies hold two `WeakMap`s: `hydrateRouter` deposits into one, the SSR loader plugin reads the other, and the loader re-runs on first paint without an error. The two plugins declare this package as a plain `dependency` so a single release line resolves to one copy; the choice over a peer dependency, and when to revisit it, is recorded in `IMPLEMENTATION_NOTES.md` "Hydration scratchpad moves to `ssr-utils`".
 - ⚠ **`hydrateRouter` validates the router through `getPluginApi` before depositing.** The scratchpad is keyed by identity and a plugin reads it with the router it was installed on, so a `Proxy` over a router (Vue `reactive()`), a router from another copy of core or a non-router would otherwise hydrate a key nothing reads. The refusal is core's own message.
+- ⚠ **The loader errors' mark is a contract between versions.** Across copies and builds, `instanceof` asks the instance for `Symbol.for("@real-router/ssr-utils/loader-error")`, whose value is the class's `code`, so a copy that spells the key or a value differently does not recognise this copy's errors. `tests/functional/errors.test.ts` pins both as literals; Phase 4 of `scripts/smoke-test-packages.sh` holds `instanceof` across the packed builds and a second copy.
+- **`Symbol.hasInstance` of a loader error admits what the prototype chain admits, and on the class itself a value that carries the class's mark as well; a subclass reads the chain alone**, so `instanceof ProductNotFound` admits no plain `LoaderNotFound`, while an object built on `LoaderNotFound.prototype` without the constructor is still an instance in its own copy. Its return type is `boolean`, not a `value is …` predicate: under a predicate `err instanceof ProductNotFound` narrows to `LoaderNotFound`, and the subclass's own field does not type-check.
 - **`createRequestScope`'s Node vs Web branch is structural, not `instanceof`-based.** `isRequestLike()` duck-types on `"signal" in request` — a Node `IncomingMessage` and a Web `Request` are both accepted without an explicit runtime dependency on either platform's global types.
 - **`getStaticPaths` entries are two-channel, and the guard asks the URL — not the declarations (#1580).** An entry is `{ params?, search? }`; there is deliberately no single-bag form, because which channel a key belongs to is the caller's contract everywhere else in the router and a flat bag cannot express it. The check builds the URL, matches it back, and reports any supplied key that did not survive. It must NOT be re-derived from `paramMeta.queryParams` on the leaf node — measured wrong three ways: that reports the `/items/:id?id` collision as a query name (core excludes it, #843/#1549) and sees neither an ancestor's `?q` nor a `setRootPath("?lang")` declaration. Matching the URL back sees all three and adapts to `queryParamsMode` for free. It compares PRESENCE, not values, so a route's `encodeParams` may still rewrite a value on the way out.
 - **An enumerated leaf that FORWARDS must land on a URL the manifest produced (#2256).** Since #2250 an href RESOLVES the chain, while this function prints the LITERAL form — the one that answers about the route it was NAMED (INVARIANTS #8). So an entry supplied for a forwarding source writes a file at the SOURCE's URL while every `<Link>` to it names the TARGET's, which nothing produced: a silent 404 on a static host with no build step failing. The check asks `forwardState`, the door `buildHref` asks — not `buildNavigationState`, which resolves the same chain but opts into `reportUndeclaredParamKey`, and enumerating a manifest commits nothing. ⚠ It REPORTS, never emits: leaf-only enumeration is an explicit contract (#608, closed NOT_PLANNED), so inferring a page the author did not enumerate is what that decision refuses. ⚠ Forwarding is decided by BEHAVIOUR (`terminal.name !== routeName`), so a dynamic `forwardTo` is covered, and the trigger is `forwardTo` on an enumerated leaf rather than "the target takes params" — measured, a parameterless source forwarding to a route with CHILDREN lands on a path a leaf-only walk never emits.

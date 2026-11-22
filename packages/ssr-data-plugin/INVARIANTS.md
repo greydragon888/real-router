@@ -89,14 +89,6 @@
 | 8   | Promise identity preserved for every own key                               | For every `k` in the deferred input map, `payload.deferred[k] === input.deferred[k]`. The settle pipeline depends on observing the same Promise instance `.catch()` was attached to in the validator loop — a deep-clone regression breaks this without breaking primitive-payload roundtrip tests. |
 | 9   | Key-order preserved                                                        | `Object.keys(payload.deferred)` strictly equals `Object.keys(input.deferred)`. Locks the contract that `state.context.ssrDataDeferredKeys` (declared order) matches the order consumers iterate via `useDeferred()`.                                                                                |
 
-## `withTimeout` (race semantics — `numRuns: 50`)
-
-| #   | Invariant                                                | Description                                                                                                                                                                              |
-| --- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Fast-path returns loader value                            | For any T (incl. NaN, objects, arrays), when the loader resolves before the deadline, `withTimeout(route, ms, () => Promise.resolve(v))` resolves to a value structurally equal to `v`. |
-| 2   | Deadline-path rejects with `LoaderTimeout(route, ms)`     | When the loader never settles, the rejection is a `LoaderTimeout` carrying the supplied `route` + `ms` (so HTTP middleware can map to 504 with route context).                          |
-| 3   | Pre-aborted upstream short-circuit                        | When `upstreamSignal` is already aborted at call time, the loader is NEVER invoked, regardless of route name / timeout — the rejection mirrors `upstreamSignal.reason`.                  |
-
 ## `validateLoaders` (factory-time structural gate — `numRuns: 50`)
 
 | #   | Invariant                                                | Description                                                                                                                                                                              |
@@ -149,4 +141,4 @@
 | File                                         | Invariants | Category                                                                            |
 | -------------------------------------------- | ---------- | ----------------------------------------------------------------------------------- |
 | `tests/functional/data-loader.test.ts`       | 3          | getDependency integration, no caching, factory compilation error (Teardown Inv 3) |
-| `tests/property/ssr-data.properties.ts`      | 60         | Validation, loader invocation, loader arguments, data retrieval, prototype safety, teardown (+ Inv 3 PBT), isolation, factory invocation, SSR mode (×4), `escapeForScript` (×8), `defer()` / `isDeferred` (×9), stale registry (×6), `getSsrDataMode` (×4), `invalidate` cloneRouter isolation (×1), `withTimeout` (×3), `validateLoaders` (×6), `formatSettleScript`/`getDeferBootstrapScript` (×5) |
+| `tests/property/ssr-data.properties.ts`      | 57         | Validation, loader invocation, loader arguments, data retrieval, prototype safety, teardown (+ Inv 3 PBT), isolation, factory invocation, SSR mode (×4), `escapeForScript` (×8), `defer()` / `isDeferred` (×9), stale registry (×6), `getSsrDataMode` (×4), `invalidate` cloneRouter isolation (×1), `validateLoaders` (×6), `formatSettleScript`/`getDeferBootstrapScript` (×5) |

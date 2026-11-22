@@ -44,7 +44,7 @@ for the React stream piped through `injectDeferredScripts`. See
 | `LoaderTimeout`  | class    | Thrown by `withTimeout()` when the deadline elapses. Fields: `route: string`, `ms: number`                                                                                                                                 |
 | `withTimeout`    | function | `(routeName, ms, loader, options?) => Promise<T>` — race against a deadline; passes `{ signal }` to the loader for cooperative cancellation; optional `options.upstreamSignal` composes via `AbortSignal.any` (Node 20.3+) |
 
-Discriminator is structural (`error.code === "LOADER_NOT_FOUND" | "LOADER_REDIRECT" | "LOADER_TIMEOUT"`), so consumers don't need to import the classes to inspect — `instanceof` is optional. The errors are reusable across both `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` (same shared source under `shared/ssr/errors.ts`).
+Their home is `@real-router/ssr-utils` (`packages/ssr-utils/src/errors.ts`): this subpath re-exports them, and so does `@real-router/rsc-server-plugin/errors`. The discriminator is `code` (`"LOADER_NOT_FOUND" | "LOADER_REDIRECT" | "LOADER_TIMEOUT"`), so a consumer can inspect an error without importing the classes. `instanceof` holds as well, for an error from another copy of `ssr-utils` and from its other build, ESM or CJS — `ssr-utils`' CLAUDE.md says how.
 
 ## How It Works
 
@@ -148,11 +148,11 @@ src/
 ├── getSsrDataMode.ts — getSsrDataMode(state): runtime-guarded reader of state.context.ssrDataMode ("full" fallback, never throws)
 ├── invalidate.ts  — invalidate(router, "data"): typed wrapper over markStale for CSR revalidation
 ├── types.ts       — DataLoaderFn, DataLoaderFnFactory, DataLoaderFactoryMap, DataRouteEntry, SsrLoaderContext, SsrMode (public-facing types)
-├── errors.ts      — Re-export from shared-ssr/errors (LoaderRedirect, LoaderNotFound, LoaderTimeout, withTimeout)
+├── errors.ts      — Re-export from @real-router/ssr-utils (LoaderRedirect, LoaderNotFound, LoaderTimeout, withTimeout)
 ├── server.ts      — Server-side wire-format helpers: injectDeferredScripts, getDeferBootstrapScript, Serializer (#610). Subpath: @real-router/ssr-data-plugin/server.
 ├── constants.ts   — ERROR_PREFIX (LOGGER_CONTEXT — internal)
 ├── index.ts       — Public exports + module augmentation (@real-router/core/types for StateContext, including ssrDataDeferred / ssrDataDeferredKeys)
-└── shared-ssr/    — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, errors, defer, deferRegistryClient, deferWireFormat, staleRegistry, types)
+└── shared-ssr/    — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, defer, deferRegistryClient, deferWireFormat, staleRegistry, types)
 ```
 
 The `factory.ts` is intentionally tiny (`validateLoaders` is a single-line binding) — the actual try/catch + interceptor + claim logic lives in [`shared/ssr/`](../../shared/ssr/) and is consumed by both `ssr-data-plugin` (T = `unknown`, namespaces `"data"` + `"ssrDataMode"` + `"ssrDataDeferred"` + `"ssrDataDeferredKeys"`) and `rsc-server-plugin` (T = `ReactNode`, namespaces `"rsc"` + `"ssrRscMode"`, no deferred channel).

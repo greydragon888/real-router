@@ -37,9 +37,9 @@ rsc-server-plugin/
 │   ├── invalidate.ts       — invalidate(router, "rsc"): typed wrapper over markStale
 │   ├── getSsrRscMode.ts    — getSsrRscMode(state): runtime-guarded reader of state.context.ssrRscMode
 │   ├── types.ts            — RscLoaderFn, RscLoaderFnFactory, RscLoaderFactoryMap, RscActionResult, RscPayload
-│   ├── errors.ts           — Re-export of LoaderRedirect / LoaderNotFound / LoaderTimeout / withTimeout (subpath: /errors)
+│   ├── errors.ts           — Re-export of LoaderRedirect / LoaderNotFound / LoaderTimeout / withTimeout from @real-router/ssr-utils (subpath: /errors)
 │   ├── constants.ts        — ERROR_PREFIX, ALLOWED_RSC_MODES (single source of truth shared by factory/validation/getter)
-│   └── shared-ssr/         — symlink → shared/ssr/ (factory, validator, stale registry, errors)
+│   └── shared-ssr/         — symlink → shared/ssr/ (factory, validator, stale registry)
 ```
 
 ## Module Dependency Graph
@@ -62,7 +62,7 @@ index.ts
     ├── invalidate.ts → shared-ssr/staleRegistry.ts (markStale)
     └── getSsrRscMode.ts → constants.ts (ALLOWED_RSC_MODES) + types.ts (RscSsrMode)
 
-errors.ts → shared-ssr/errors.ts (LoaderRedirect, LoaderNotFound, LoaderTimeout, withTimeout)
+errors.ts → @real-router/ssr-utils (LoaderRedirect, LoaderNotFound, LoaderTimeout, withTimeout)
 ```
 
 External dependencies:
@@ -72,6 +72,7 @@ External dependencies:
 | `@real-router/core/api`           | `getPluginApi`                                                                | `actionFactory.ts`, `shared-ssr/createSsrLoaderPlugin.ts` |
 | `@real-router/core/validation`    | `areParamValuesEqual` (the hydration check compares values by core's rule)    | `shared-ssr/createSsrLoaderPlugin.ts`  |
 | `@real-router/ssr-utils`          | `getHydrationState` (read-only access to the hydration scratchpad)            | `shared-ssr/createSsrLoaderPlugin.ts`  |
+| `@real-router/ssr-utils`          | `LoaderRedirect`, `LoaderNotFound`, `LoaderTimeout`, `withTimeout` (re-exported as `./errors`) | `errors.ts` |
 | `@real-router/core/types`              | `StateContext` (module augmentation target), `Plugin`, `PluginFactory`, `State` | `index.ts`, all factories              |
 | `react`                           | `ReactNode` type only (peer dep)                                              | `types.ts`, `index.ts`, `buildRscPayload.ts` |
 
@@ -383,7 +384,7 @@ The plugin imports only:
 - `@real-router/core/api` (peer)
 - `@real-router/core/validation` (peer, `areParamValuesEqual` in `shared-ssr`)
 - `@real-router/core/types` (the subpath it augments) and `@real-router/core` (type-only)
-- `@real-router/ssr-utils` (the one regular dependency, `getHydrationState` in `shared-ssr`)
+- `@real-router/ssr-utils` (the one regular dependency: `getHydrationState` in `shared-ssr`, and the loader errors and `withTimeout` that `errors.ts` re-exports)
 - `react` (peer, type-only `ReactNode` import)
 
 The Flight renderer is **never** imported. The caller chooses

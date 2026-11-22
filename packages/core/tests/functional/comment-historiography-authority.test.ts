@@ -1434,11 +1434,6 @@ const COUNT_BASELINE: readonly Row[] = [
     form: "N code-artifacts",
     count: 1,
   },
-  {
-    file: "shared/ssr/errors.ts",
-    form: "N/M",
-    count: 1,
-  },
 ];
 
 describe("comments in src describe the present (CLAUDE.md: No historiography)", () => {
