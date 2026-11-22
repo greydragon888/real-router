@@ -968,8 +968,9 @@ export function validationPlugin<
     // whose answers stay silent about it. One de-dup cache per registration,
     // i.e. per router (#1583), and both kinds share it, so a pair reported at
     // one door is not reported again at the other.
-    const reportMisChanneledKey = createMisChanneledKeyReporter((routeName) =>
-      api.getDeclaredQueryNames(routeName),
+    const reportMisChanneledKey = createMisChanneledKeyReporter(
+      api.logger,
+      (routeName) => api.getDeclaredQueryNames(routeName),
     );
 
     const removeBuildPathDiagnostic = api.subscribeDiagnostic(
@@ -1006,8 +1007,10 @@ export function validationPlugin<
     // router (#1583): a module-level `Set` would let the first router in a
     // process silence every one after it — the SSR / SSG case, where a
     // diagnostic fires for request #1 and never again.
-    const reportDroppedQueryKey = createDroppedQueryKeyReporter();
-    const reportUndeclaredParamKey = createUndeclaredParamKeyReporter();
+    const reportDroppedQueryKey = createDroppedQueryKeyReporter(api.logger);
+    const reportUndeclaredParamKey = createUndeclaredParamKeyReporter(
+      api.logger,
+    );
     // The codec diagnostic's reload does not rebuild the path: the rebuild
     // runs `encodeParams` over what the reload decoded, and an encoder that
     // cannot print it would throw away the reload the diagnostic judges.

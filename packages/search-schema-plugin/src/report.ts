@@ -1,6 +1,5 @@
 // packages/search-schema-plugin/src/report.ts
 
-import { ERROR_PREFIX } from "./constants";
 import { isNumberOrBoolean, issueKey, segmentKey } from "./helpers";
 
 import type { KeyedIssue } from "./helpers";
@@ -24,10 +23,10 @@ const DECODING =
 /**
  * The line logged with the error that a rejected Promise from
  * `~standard.validate()` carries — zod's answer to a throw in a transform or a
- * refinement (#2851).
+ * refinement (#2851). The router's logger prints the plugin's head before it.
  */
 export function describeThrow(routeName: string, subject: string): string {
-  return `${ERROR_PREFIX} Route "${routeName}": the schema threw on ${subject} — ~standard.validate() answered with a rejected Promise, as zod does when a transform or a refinement throws.`;
+  return `Route "${routeName}": the schema threw on ${subject} — ~standard.validate() answered with a rejected Promise, as zod does when a transform or a refinement throws.`;
 }
 
 /**
@@ -36,7 +35,8 @@ export function describeThrow(routeName: string, subject: string): string {
  * key. Such a key is followed by what the last text run said about it, with
  * its values as text, and by each element tried that it named no issue at. How
  * the router decodes is explained only when a rejected value is one it decodes
- * from text — a number, a boolean or `null`.
+ * from text — a number, a boolean or `null`. The router's logger prints the
+ * plugin's head before it.
  */
 export function describeRejection(
   routeName: string,
@@ -89,7 +89,7 @@ export function describeRejection(
   }
 
   return [
-    `${ERROR_PREFIX} Route "${routeName}": the schema rejected these search params${keyed ? "; each takes its default value or is removed" : ""}:`,
+    `Route "${routeName}": the schema rejected these search params${keyed ? "; each takes its default value or is removed" : ""}:`,
     ...lines,
     ...(decoded ? [DECODING] : []),
   ].join("\n");

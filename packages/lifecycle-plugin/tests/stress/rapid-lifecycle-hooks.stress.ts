@@ -10,7 +10,7 @@ import {
 } from "vitest";
 
 import { lifecyclePluginFactory } from "../../src";
-import { captureAsyncRethrows } from "../helpers";
+import { recordingLogger } from "../helpers";
 
 import type { LifecycleHook, LifecycleHookFactory } from "../../src";
 import type { Router } from "@real-router/core";
@@ -178,47 +178,36 @@ describe("Rapid Lifecycle Hook Invocation", () => {
     }
   });
 
-  it("100 navigations with throwing hooks: errors surface asynchronously, transitions complete", async () => {
+  it("100 navigations with throwing hooks: each error is logged, transitions complete", async () => {
     let enterCount = 0;
     const throwingEnter: LifecycleHook = () => {
       enterCount++;
 
       throw new Error(`hook error ${enterCount}`);
     };
+    const log = recordingLogger();
 
     router = createRouter(
       [
         { name: "home", path: "/" },
         { name: "about", path: "/about", onEnter: () => throwingEnter },
       ],
-      { defaultRoute: "home" },
+      { defaultRoute: "home", logger: log.logger },
     );
     router.usePlugin(lifecyclePluginFactory());
 
-    // A throwing onEnter is isolated and re-thrown asynchronously (#798) —
-    // capture the queueMicrotask re-throws so they don't fail the run as
-    // unhandled errors, then restore the previous listeners.
-    const rethrown = captureAsyncRethrows();
+    await router.start("/");
 
-    try {
-      await router.start("/");
-
-      for (let i = 0; i < 100; i++) {
-        await router.navigate("about");
-        await router.navigate("home");
-      }
-
-      // Drain queueMicrotask-scheduled re-throws.
-      await rethrown.flush();
-
-      // Every throwing onEnter fired and surfaced its error asynchronously —
-      // isolation neither swallowed the error nor aborted the transition.
-      expect(enterCount).toBe(100);
-      expect(rethrown.errors).toHaveLength(100);
-      expect(router.getState()?.name).toBe("home");
-    } finally {
-      rethrown.restore();
+    for (let i = 0; i < 100; i++) {
+      await router.navigate("about");
+      await router.navigate("home");
     }
+
+    // Every throwing onEnter fired and its error went to the router's logger —
+    // isolation neither swallowed the error nor aborted the transition (#798).
+    expect(enterCount).toBe(100);
+    expect(log.errors()).toHaveLength(100);
+    expect(router.getState()?.name).toBe("home");
   });
 
   it("100 navigations with throwing hook factory: retried each time, sibling onNavigate still fires (#1222)", async () => {
@@ -229,6 +218,8 @@ describe("Rapid Lifecycle Hook Invocation", () => {
       throw new Error(`factory error ${factoryCallCount}`);
     };
     let navCount = 0;
+
+    const log = recordingLogger();
 
     router = createRouter(
       [
@@ -242,35 +233,23 @@ describe("Rapid Lifecycle Hook Invocation", () => {
           },
         },
       ],
-      { defaultRoute: "home" },
+      { defaultRoute: "home", logger: log.logger },
     );
     router.usePlugin(lifecyclePluginFactory());
 
-    // The factory (compile) throw is isolated and re-thrown asynchronously —
-    // #1222 unifies it with the #798 body-throw channel. Capture the
-    // queueMicrotask re-throws so they don't fail the run, then restore.
-    const rethrown = captureAsyncRethrows();
+    await router.start("/");
 
-    try {
-      await router.start("/");
-
-      for (let i = 0; i < 100; i++) {
-        await router.navigate("about");
-        await router.navigate("home");
-      }
-
-      // Drain queueMicrotask-scheduled re-throws.
-      await rethrown.flush();
-
-      // Factory throws → hook not cached → factory retried each navigation.
-      expect(factoryCallCount).toBe(100);
-      // The throwing factory does NOT swallow the sibling onNavigate (#1222).
-      expect(navCount).toBe(100);
-      // Each compile-throw surfaced asynchronously (channel unified with #798).
-      expect(rethrown.errors).toHaveLength(100);
-      expect(router.getState()?.name).toBe("home");
-    } finally {
-      rethrown.restore();
+    for (let i = 0; i < 100; i++) {
+      await router.navigate("about");
+      await router.navigate("home");
     }
+
+    // Factory throws → hook not cached → factory retried each navigation.
+    expect(factoryCallCount).toBe(100);
+    // The throwing factory does NOT swallow the sibling onNavigate (#1222).
+    expect(navCount).toBe(100);
+    // Each compile-throw went to the logger, as a body throw does (#798).
+    expect(log.errors()).toHaveLength(100);
+    expect(router.getState()?.name).toBe("home");
   });
 });

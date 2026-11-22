@@ -753,6 +753,12 @@ describe("consumer census (#2303)", () => {
     // `validators/retrospective.ts`, which reads route fields and map entries
     // there. An empty or missing `src` for either means "no reach this
     // instrument can see", not "no reach".
+    //
+    // ⚠ The `getPluginApi.logger` row is not the logger's whole reach.
+    // `validationPlugin` hands `api.logger` whole to its warn helpers and
+    // reporter factories, and `searchSchemaPlugin` passes the api to the
+    // `SearchSchemaPlugin` constructor, which keeps it in a class field and
+    // calls `this.#pluginApi.logger` through it — both past the walk.
     expect(rows).toStrictEqual({
       "getInternals.dependenciesGetStore()": {
         src: ["dependencies"],
@@ -779,6 +785,7 @@ describe("consumer census (#2303)", () => {
         src: ["maxDependencies"],
         tests: [],
       },
+      "getPluginApi.logger": { src: ["error"], tests: [] },
       "getPluginApi.makeState()": {
         src: [],
         tests: ["name", "params", "path"],

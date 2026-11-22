@@ -7,7 +7,7 @@
 | Export                   | Kind     | Description                                                       |
 | ------------------------ | -------- | ----------------------------------------------------------------- |
 | `lifecyclePluginFactory` | function | Plugin factory — pass to `router.usePlugin()`. No args            |
-| `LifecycleHook`          | type     | Compiled hook signature: `(toState, fromState, signal) => void`   |
+| `LifecycleHook`          | type     | Compiled hook signature: `(toState, fromState, signal) => void \| PromiseLike<unknown>` — a hook returns its load, or nothing |
 | `LifecycleHookFactory`   | type     | Factory signature: `(router, getDependency) => LifecycleHook`     |
 
 ## How It Works
@@ -41,6 +41,7 @@ Hooks fire only for the **navigation target** and the **route being left** (`toS
 ```
 src/
 ├── factory.ts  — lifecyclePluginFactory, compileHook (lazy compile + cache),
+│                 runHook (isolation, logger sink, read of a returned thenable),
 │                 the two signal controllers, onTransitionSuccess / onStop handlers
 ├── types.ts    — LifecycleHook, LifecycleHookFactory types
 └── index.ts    — Public exports + declare module augmentation (Route interface)
@@ -48,9 +49,13 @@ src/
 
 ## Gotchas
 
-### Hooks are fire-and-forget, with per-hook error isolation
+### A hook's failure goes to the router's logger, with per-hook isolation
 
-Return values are ignored. Each hook is invoked with **per-hook exception isolation** (#798): a throwing hook is caught and re-thrown **asynchronously** via `queueMicrotask`, so it never aborts the handler before a later hook of the same transition runs (the `onNavigate` orthogonality invariant), and never blocks or cancels the transition. The error still surfaces to global error handlers as an async uncaught error — mirroring `BaseSource` / `createActiveNameSelector` in `@real-router/sources` — and not through the router's EventEmitter "Error in listener" sink. **This covers a throwing hook FACTORY too** (a failing DI init at compile time): `compileHook` runs inside the same `try` (#1222), so a factory throw is isolated identically — same async channel, never swallows a sibling `onNavigate`. A failed compile is not cached, so the factory retries on every navigation.
+Each hook is invoked with **per-hook exception isolation** (#798): a throwing hook never aborts the handler before a later hook of the same transition runs (the `onNavigate` orthogonality invariant), and never blocks or cancels the transition. Its error goes to the router's logger — `api.logger.error` under the context `lifecycle-plugin` (#2975), the sink core sends its listeners' errors to — so the router's `logger` option decides where it lands; a clone logs with its base router's settings, with the `logger` option of `cloneRouter` merged over them. **This covers a throwing hook FACTORY too** (a failing DI init at compile time): `compileHook` runs inside the same `try` (#1222), so a factory throw is isolated identically — same sink, never swallows a sibling `onNavigate`. A failed compile is not cached, so the factory retries on every navigation.
+
+The plugin reads what a hook returns. A thenable — a promise of any realm, or any object with a callable `then` — is settled into a promise the plugin holds, and its rejection takes the same sink. A rejection with the reason of the hook's own `signal`, or with that reason as its `cause` one level deep — `setTimeout` of `node:timers/promises` and `events.once` reject so — is the hook's own abort and is not logged; a reason found only at `cause.cause` is, and so is an abort error a client makes of its own, axios's `CanceledError` among them: the filter compares identity, not the error's name. `tests/functional/lifecycle.test.ts` › "the thenable a hook returns is read (#2975)" holds the cells, and `tests/property/lifecycle.properties.ts` › "the logger sees exactly the failures that are not the hook's own abort (#2975)" the class.
+
+A load the hook starts and does not return is invisible to the plugin: its rejection is the application's to handle.
 
 ### onLeave runs on the commit, not at leave-approve
 
@@ -72,7 +77,7 @@ Return values are ignored. Each hook is invoked with **per-hook exception isolat
 
 ### Redirect from a hook
 
-A **synchronous** `router.navigate()` from inside a hook (the intuitive "redirect on `onEnter`") is **banned**: the hook runs inside a transition-event dispatch, so a reentrant navigate throws `RouterError(REENTRANT_NAVIGATION)` (RFC navigation-cancellation-unification §4, #1035). The redirect does **not** happen, and the per-hook isolation (#798) re-throws that error on a microtask — surfacing it as an uncaught exception (process-fatal under Node's default handler). Defer instead: `queueMicrotask(() => router.navigate(...))` (or an `await`ed async flow) runs after the transition has settled (FSM `READY` again) and is allowed:
+A **synchronous** `router.navigate()` from inside a hook (the intuitive "redirect on `onEnter`") is **banned**: the hook runs inside a transition-event dispatch, so a reentrant navigate throws `RouterError(REENTRANT_NAVIGATION)` (RFC navigation-cancellation-unification §4, #1035). The redirect does **not** happen, and the per-hook isolation (#798) sends that error to the router's logger. Defer instead: `queueMicrotask(() => router.navigate(...))` (or an `await`ed async flow) runs after the transition has settled (FSM `READY` again) and is allowed:
 
 ```typescript
 onEnter: (router) => (toState) => {

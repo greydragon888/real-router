@@ -111,7 +111,8 @@ export function validateAreStatesEqualArgs(
  *
  * De-duplicated per `route + key`: the gate runs on every navigation and every
  * `matchPath`, so an un-deduped warning would flood a dev console the moment a
- * route is revisited.
+ * route is revisited. The warning goes to the router's logger, so the router's
+ * `logger` option applies to it.
  *
  * ⚠ **The cache belongs to the ROUTER, not to the module (#1583).** A `Set` at
  * module scope is one per PROCESS: the first router to report a `route + key`
@@ -124,10 +125,9 @@ export function validateAreStatesEqualArgs(
  * registration, so closing over a fresh `Set` there gives per-router lifetime,
  * per-router isolation and collection with the router at zero module state.
  */
-export function createDroppedQueryKeyReporter(): (
-  routeName: string,
-  key: string,
-) => void {
+export function createDroppedQueryKeyReporter(
+  logger: RouterLogger,
+): (routeName: string, key: string) => void {
   const reported = new Set<string>();
 
   return function reportDroppedQueryKey(routeName: string, key: string): void {
@@ -139,8 +139,9 @@ export function createDroppedQueryKeyReporter(): (
 
     reported.add(seen);
 
-    console.warn(
-      `[router] Query key "${key}" is not declared on route "${routeName}" (\`?${key}\`), so the ` +
+    logger.warn(
+      "router",
+      `Query key "${key}" is not declared on route "${routeName}" (\`?${key}\`), so the ` +
         `current \`queryParamsMode\` will not print it — it was dropped from \`state.search\` rather ` +
         `than published beside a \`state.path\` that cannot show it. Declare it on the route path, ` +
         `or use \`queryParamsMode: "loose"\` to keep undeclared keys. A \`defaultSearch\` entry for ` +
@@ -167,12 +168,12 @@ export function createDroppedQueryKeyReporter(): (
  *
  * De-duplicated per `route + key`, like the mode gate's: this runs on every
  * navigation, so an un-deduped warning floods the console on a revisit — and
- * per ROUTER, for the same reasons and by the same factory shape (#1583).
+ * per ROUTER, for the same reasons and by the same factory shape (#1583). The
+ * warning goes to the router's logger, as the mode gate's does.
  */
-export function createUndeclaredParamKeyReporter(): (
-  routeName: string,
-  key: string,
-) => void {
+export function createUndeclaredParamKeyReporter(
+  logger: RouterLogger,
+): (routeName: string, key: string) => void {
   const undeclaredReported = new Set<string>();
 
   return function reportUndeclaredParamKey(
@@ -187,8 +188,9 @@ export function createUndeclaredParamKeyReporter(): (
 
     undeclaredReported.add(seen);
 
-    console.warn(
-      `[router] Param "${key}" is declared nowhere on route "${routeName}" — neither as a path ` +
+    logger.warn(
+      "router",
+      `Param "${key}" is declared nowhere on route "${routeName}" — neither as a path ` +
         `slot (:${key}) nor as a query param (?${key}), so it stays in state.params but never ` +
         `reaches the URL. The state will not round-trip: matchPath(state.path) cannot recover ` +
         `it. Declare it on the route path if it belongs in the URL, or pass it through the ` +

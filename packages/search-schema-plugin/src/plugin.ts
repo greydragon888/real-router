@@ -1,6 +1,6 @@
 import { putField } from "@real-router/core/utils";
 
-import { ERROR_PREFIX } from "./constants";
+import { ERROR_PREFIX, LOGGER_CONTEXT } from "./constants";
 import {
   collectPathParams,
   getInvalidKeys,
@@ -218,7 +218,8 @@ export class SearchSchemaPlugin {
     }
 
     if (this.#mode === "development") {
-      console.error(
+      this.#pluginApi.logger.error(
+        LOGGER_CONTEXT,
         describeRejection(
           result.name,
           verdict.input,
@@ -373,7 +374,11 @@ export class SearchSchemaPlugin {
     if (answer instanceof Promise) {
       answer.catch((error: unknown) => {
         if (this.#mode === "development" && !this.#onError) {
-          console.error(describeThrow(routeName, "the query"), error);
+          this.#pluginApi.logger.error(
+            LOGGER_CONTEXT,
+            describeThrow(routeName, "the query"),
+            error,
+          );
         }
       });
 
@@ -518,7 +523,11 @@ export class SearchSchemaPlugin {
       // Reported as the check's other finding is: in mode "development",
       // whatever `onError` is (#2851).
       answer.catch((error: unknown) => {
-        console.warn(describeThrow(routeName, "defaultSearch"), error);
+        this.#pluginApi.logger.warn(
+          LOGGER_CONTEXT,
+          describeThrow(routeName, "defaultSearch"),
+          error,
+        );
       });
 
       return;
@@ -533,8 +542,9 @@ export class SearchSchemaPlugin {
       // and the URL at runtime regardless of this warning (documented contract,
       // #802). Hence the message states the consequence + the fix, rather than
       // implying the value was blocked.
-      console.warn(
-        `${ERROR_PREFIX} Route "${routeName}": defaultSearch does not pass searchSchema — it is trusted config and will still reach state and the URL at runtime (the plugin validates user input, not config). Fix the route's defaultSearch to satisfy its searchSchema.`,
+      this.#pluginApi.logger.warn(
+        LOGGER_CONTEXT,
+        `Route "${routeName}": defaultSearch does not pass searchSchema — it is trusted config and will still reach state and the URL at runtime (the plugin validates user input, not config). Fix the route's defaultSearch to satisfy its searchSchema.`,
         run.issues,
       );
     }
