@@ -5,6 +5,92 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-11-22]
+
+### @real-router/lifecycle-plugin@0.10.0
+
+### Minor Changes
+
+- [#2996](https://github.com/greydragon888/real-router/pull/2996) [`749176a`](https://github.com/greydragon888/real-router/commit/749176a702f284e48ff4351a44a4e41d48fd4f2b) Thanks [@greydragon888](https://github.com/greydragon888)! - A hook's error goes to the router's logger, and the plugin reads the load a hook returns ([#2975](https://github.com/greydragon888/real-router/issues/2975))
+
+  A hook that throws — its body or its factory — and the rejection of a thenable
+  the hook returns go to the router's `logger.error`, under the context
+  `lifecycle-plugin`. Neither ends a Node process any more: the throw was
+  re-thrown on a microtask, an uncaught exception, and the promise of an `async`
+  hook was dropped, an unhandled rejection. Each hook stays isolated, so a
+  failing hook does not stop a later hook of the same navigation.
+
+  A rejection with the reason of the hook's own `signal`, or with that reason as
+  its `cause`, is the hook's own abort and is not logged: `fetch` rejects with
+  the reason, and `setTimeout` of `node:timers/promises` and `events.once` with
+  the reason as `cause`. An abort error a client makes of its own is logged —
+  axios rejects with its `CanceledError`.
+
+  **Breaking Change:**
+
+  - `LifecycleHook` returns `void | PromiseLike<unknown>`: a hook returns its
+    load, or nothing. A hook whose expression body returns a value that is not a
+    thenable no longer type-checks — write it as a block:
+
+    ```diff
+    - onEnter: () => (toState) => cache.set(toState.name, Date.now()),
+    + onEnter: () => (toState) => {
+    +   cache.set(toState.name, Date.now());
+    + },
+    ```
+
+  - A hook's error no longer reaches a global handler — `window`'s `error` and
+    `unhandledrejection` events, Node's `uncaughtException` and
+    `unhandledRejection`. An error tracker that listens there receives it from
+    the router's `logger.callback` instead, with `callbackIgnoresLevel: true`
+    under `level: "none"`.
+  - Return the load from the hook — `return loadServices(toState.search, { signal })` —
+    so that its failure reaches the logger. A load the hook starts without
+    returning it is the application's to handle. A returned load whose client
+    rejects an abort with an error of its own is logged whenever the hook's
+    `signal` aborts; catch that error in the hook — for axios,
+    `.catch((error) => { if (!axios.isCancel(error)) throw error; })`.
+
+### @real-router/search-schema-plugin@0.11.0
+
+### Minor Changes
+
+- [#2996](https://github.com/greydragon888/real-router/pull/2996) [`749176a`](https://github.com/greydragon888/real-router/commit/749176a702f284e48ff4351a44a4e41d48fd4f2b) Thanks [@greydragon888](https://github.com/greydragon888)! - The plugin logs through the router's logger instead of `console` ([#2975](https://github.com/greydragon888/real-router/issues/2975))
+
+  The plugin's messages go to the router's logger, under the context
+  `search-schema-plugin`: in `mode: "development"` without `onError`, the report
+  of rejected search params and the error of a schema that answers a search with
+  a rejected Promise as `logger.error`, and in `mode: "development"`, both
+  findings of the `defaultSearch` check as `logger.warn`. The router's `logger`
+  option — its `level` and its `callback` — applies to them. With the default
+  logger the console shows the same lines as before.
+
+  **Breaking Change:** the messages no longer reach `console` under a `level`
+  that filters them — `"none"`, and `"error-only"` for the two `defaultSearch`
+  warnings. To keep them under such a level, read them in the router's
+  `logger.callback` with `callbackIgnoresLevel: true`: it receives each under the
+  context `search-schema-plugin`, without the `[search-schema-plugin]` head the
+  console prints.
+
+### @real-router/validation-plugin@0.41.0
+
+### Minor Changes
+
+- [#2996](https://github.com/greydragon888/real-router/pull/2996) [`749176a`](https://github.com/greydragon888/real-router/commit/749176a702f284e48ff4351a44a4e41d48fd4f2b) Thanks [@greydragon888](https://github.com/greydragon888)! - The query-key warnings respect the router's `logger` option ([#2975](https://github.com/greydragon888/real-router/issues/2975))
+
+  The warnings about a query key the `queryParamsMode` drops, a param the route
+  declares nowhere, and a declared query param given in the `params` bag were
+  written to `console.warn` directly, past the router's `logger` option. They go
+  to the router's `logger.warn` under the context `router`, as the codec
+  round-trip warning does, so `level` and `callback` apply to them. With the
+  default logger the console shows the same lines as before.
+
+  **Breaking Change:** the warnings no longer reach `console` under
+  `level: "error-only"` or `"none"`. To keep them under such a level, read them in
+  the router's `logger.callback` with `callbackIgnoresLevel: true`: it receives
+  each under the context `router`, without the `[router]` head the console
+  prints.
+
 ## [2026-11-20]
 
 ### @real-router/core@0.170.0

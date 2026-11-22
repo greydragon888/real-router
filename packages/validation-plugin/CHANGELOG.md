@@ -1,5 +1,24 @@
 # @real-router/validation-plugin
 
+## 0.41.0
+
+### Minor Changes
+
+- [#2996](https://github.com/greydragon888/real-router/pull/2996) [`749176a`](https://github.com/greydragon888/real-router/commit/749176a702f284e48ff4351a44a4e41d48fd4f2b) Thanks [@greydragon888](https://github.com/greydragon888)! - The query-key warnings respect the router's `logger` option ([#2975](https://github.com/greydragon888/real-router/issues/2975))
+
+  The warnings about a query key the `queryParamsMode` drops, a param the route
+  declares nowhere, and a declared query param given in the `params` bag were
+  written to `console.warn` directly, past the router's `logger` option. They go
+  to the router's `logger.warn` under the context `router`, as the codec
+  round-trip warning does, so `level` and `callback` apply to them. With the
+  default logger the console shows the same lines as before.
+
+  **Breaking Change:** the warnings no longer reach `console` under
+  `level: "error-only"` or `"none"`. To keep them under such a level, read them in
+  the router's `logger.callback` with `callbackIgnoresLevel: true`: it receives
+  each under the context `router`, without the `[router]` head the console
+  prints.
+
 ## 0.40.0
 
 ### Minor Changes
