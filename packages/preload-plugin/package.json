@@ -54,7 +54,7 @@
   "sideEffects": false,
   "devDependencies": {
     "@real-router/core": "workspace:^",
-    "jsdom": "31.0.0"
+    "jsdom": "31.0.1"
   },
   "peerDependencies": {
     "@real-router/core": "workspace:>=0.170.0"
