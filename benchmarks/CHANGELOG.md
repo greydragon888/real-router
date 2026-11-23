@@ -1,5 +1,82 @@
 # router-benchmarks
 
+## 0.3.201
+
+### Patch Changes
+
+- Updated dependencies [[`749176a`](https://github.com/greydragon888/real-router/commit/749176a702f284e48ff4351a44a4e41d48fd4f2b)]:
+  - @real-router/search-schema-plugin@0.11.0
+
+## 0.3.200
+
+### Patch Changes
+
+- Updated dependencies [[`c78519e`](https://github.com/greydragon888/real-router/commit/c78519ebb20dfb831f016ed9c9dc25d39f7493a9)]:
+  - @real-router/core@0.170.0
+
+## 0.3.199
+
+### Patch Changes
+
+- Updated dependencies [[`59311a0`](https://github.com/greydragon888/real-router/commit/59311a056550c1ab0de10fd9d1118cf047e05d59)]:
+  - @real-router/core@0.169.0
+
+## 0.3.198
+
+### Patch Changes
+
+- Updated dependencies [[`c7c7bfc`](https://github.com/greydragon888/real-router/commit/c7c7bfc56ee724b7de0128dca4dac67e97a1fccf)]:
+  - @real-router/core@0.168.0
+
+## 0.3.197
+
+### Patch Changes
+
+- Updated dependencies [[`70ff55c`](https://github.com/greydragon888/real-router/commit/70ff55c5a7c0eb79f02b9a3eda16bd678d8ce7e8)]:
+  - @real-router/search-schema-plugin@0.10.0
+
+## 0.3.196
+
+### Patch Changes
+
+- Updated dependencies [[`5fd2240`](https://github.com/greydragon888/real-router/commit/5fd22404fbb40684a257e6d57efe72e603d74b23)]:
+  - @real-router/core@0.167.0
+
+## 0.3.195
+
+### Patch Changes
+
+- Updated dependencies [[`1a85574`](https://github.com/greydragon888/real-router/commit/1a85574fa572d751f2e8342ed6d0c9d3b44f8b45)]:
+  - @real-router/core@0.166.0
+
+## 0.3.194
+
+### Patch Changes
+
+- Updated dependencies [[`fc3f359`](https://github.com/greydragon888/real-router/commit/fc3f3594de209d01223a4c0bf1b7bf39b15aa383)]:
+  - @real-router/core@0.165.0
+
+## 0.3.193
+
+### Patch Changes
+
+- Updated dependencies [[`4c15047`](https://github.com/greydragon888/real-router/commit/4c1504791eaab1ce5dc81acc6755cbfcc261bf30)]:
+  - @real-router/core@0.164.0
+
+## 0.3.192
+
+### Patch Changes
+
+- Updated dependencies [[`96a8bb0`](https://github.com/greydragon888/real-router/commit/96a8bb03392d5ecff9865400b2ac7711a0f0e4f7)]:
+  - @real-router/core@0.163.0
+
+## 0.3.191
+
+### Patch Changes
+
+- Updated dependencies [[`39cafb9`](https://github.com/greydragon888/real-router/commit/39cafb91e25d4bd1e62e57505c1ba2d97c02e992)]:
+  - @real-router/core@0.162.0
+
 ## 0.3.190
 
 ### Patch Changes

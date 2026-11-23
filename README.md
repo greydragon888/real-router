@@ -83,17 +83,18 @@ const routes: Route[] = [
     canActivate: authGuard,
     // A hook is a factory: it runs once and returns the function
     // that runs on each navigation to the route. The signal aborts
-    // when the next navigation commits.
-    onNavigate: () => (toState, _fromState, signal) => {
-      store.users.load(toState.search, { signal });
-    },
+    // when the next navigation commits; a returned load's failure
+    // reaches the router's logger.
+    onNavigate: () => (toState, _fromState, signal) =>
+      store.users.load(toState.search, { signal }),
     children: [
       {
         name: "profile",
         path: "/:id",
         onNavigate: () => (toState, _fromState, signal) => {
           document.title = `User ${toState.params.id}`;
-          store.users.loadOne(toState.params.id, { signal });
+
+          return store.users.loadOne(toState.params.id, { signal });
         },
       },
     ],
@@ -231,7 +232,7 @@ The only standalone router that ships the **same SSR contract** across React 19,
 
 - **Per-route SSR mode** — `full` / `data-only` / `client-only` + function form `(state) => SsrMode` (data-driven, not path-based)
 - **Cross-adapter SSR components** — `<ClientOnly>`, `<ServerOnly>`, `<Await>`, `<Streamed>`, `<HttpStatusCode>` shipped symmetric across 5 adapters via `/ssr` subpath
-- **Typed loader errors → HTTP** — a loader throws `LoaderRedirect` / `LoaderNotFound` / `LoaderTimeout`; each carries a `code` (a redirect also its `status`) that your server maps to 30x / 404 / 504 — both the SSR and the RSC loader plugin export them; match on `code`
+- **Typed loader errors → HTTP** — a loader throws `LoaderRedirect` / `LoaderNotFound` / `LoaderTimeout`; each carries a `code` (a redirect also its `status`) that your server maps to 30x / 404 / 504 — `@real-router/ssr-utils` exports them and the SSR and RSC loader plugins re-export them; match on `code`, or with `instanceof`, which holds across copies of `ssr-utils` and its ESM and CJS builds
 - **`createRequestScope(req, baseRouter, deps)`** — correct-by-construction request DI: clone + AbortController + `req.on("close")` + dispose in one call
 - **Network-level cancellation** — `withTimeout()` composes deadline + client-disconnect into one `AbortSignal`; in-flight `fetch` aborts at TCP level when deadline fires
 - **Post-hydration loader skip** — after `hydrateRouter()` the SSR loader plugins take the first client load from the server's payload instead of calling the loader, when that payload describes the state being started; works with every adapter (Angular's `provideRealRouterFactory` calls `hydrateRouter()` for you)
@@ -374,7 +375,7 @@ function App() {
 | [`@real-router/core`](packages/core)           | [![npm](https://img.shields.io/npm/v/@real-router/core.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/core)           | Router implementation                                                                                                                         |
 | `@real-router/core/api`                        |                                                                                                                                           | Tree-shakeable modular API: `getRoutesApi`, `getDependenciesApi`, `getLifecycleApi`, `getPluginApi`, `cloneRouter`                            |
 | `@real-router/core/types`                      |                                                                                                                                           | Public types (`State`, `Route`, `Params`, `SearchParams`, …) and the module-augmentation site                                                 |
-| [`@real-router/ssr-utils`](packages/ssr-utils) | [![npm](https://img.shields.io/npm/v/@real-router/ssr-utils.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/ssr-utils) | Router-level SSR / SSG / hydration helpers: `serializeState`, `serializeRouterState`, `hydrateRouter`, `getStaticPaths`, `createRequestScope` |
+| [`@real-router/ssr-utils`](packages/ssr-utils) | [![npm](https://img.shields.io/npm/v/@real-router/ssr-utils.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/ssr-utils) | Router-level SSR / SSG / hydration helpers: `serializeState`, `serializeRouterState`, `hydrateRouter`, `getStaticPaths`, `createRequestScope`; loader errors and `withTimeout` |
 
 ### Framework Integration
 

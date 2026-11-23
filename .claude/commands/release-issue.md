@@ -31,7 +31,7 @@ $ARGUMENTS
 
 1. Каждый файл из `status` относится к задаче; пробы (`__probe*`, отладочные файлы) удали до `add`. В worktree задачи — `git -C <wt> add -A`, иначе поимённо.
 2. Сообщение — от `/commit-msg` (Skill) по `git -C <wt>`; его вывод в этой сессии годится, если дифф с тех пор не менялся. До коммита: `pnpm --dir <wt> exec commitlint < <file>`.
-3. `git -C <wt> commit -F <file> > <log> 2>&1; echo "rc=$?"` — в фоне: pre-commit гоняет тесты и линт затронутых пакетов. Вердикт — `rc=` в выводе.
+3. `TURBO_CACHE_DIR=<scratchpad>/turbo git -C <wt> commit -F <file> > <log> 2>&1; echo "rc=$?"` — в фоне: pre-commit гоняет тесты и линт затронутых пакетов, а turbo из worktree без переменной пишет в кеш основного чекаута. Вердикт — `rc=` в выводе.
 4. Провал хука оставляет индекс: перед повтором — `git status --short`. После коммита — `git show --stat HEAD` и пустой `status`.
 
 ## Шаг 2 — Свежая база
@@ -39,12 +39,11 @@ $ARGUMENTS
 1. `git -C <wt> fetch origin`; есть ли ветка на remote — `git -C <wt> ls-remote --heads origin <branch>`.
 2. Ветки на remote нет, а `git -C <wt> merge-base --is-ancestor origin/master HEAD` отвечает кодом 1 — `git -C <wt> rebase origin/master`. Конфликт — по `/create-pr` Фаза 0 п. 5 или сообщи и остановись. `master` принёс новый `pnpm-lock.yaml` — `pnpm install --frozen-lockfile` в worktree до хуков.
 3. Ветка уже на remote — не перебазируй: понадобился бы force-push. Расхождение с `master` решает `/create-pr`.
-4. Rebase меняет SHA: текст, который его цитирует, перечитай.
 
 ## Шаг 3 — Пуш
 
 1. `pnpm --dir <wt> lint:security` — на закоммиченном фиксе: без коммитов ветки скан отвечает «No branch delta» с кодом 0, а в pre-push он идёт только после сборки.
-2. `git -C <wt> push -u origin HEAD > <log> 2>&1; echo "exit=$?" >> <log>` — в фоне: pre-push — полная сборка и колонка линтеров. Вердикт — строка `exit=` в логе и `git ls-remote --heads origin <branch>`, а не статус фоновой задачи. Обрыв SSH и упавший тест, к ветке не относящийся, — по `/create-pr` Фаза 4 п. 2.
+2. `TURBO_CACHE_DIR=<scratchpad>/turbo git -C <wt> push -u origin HEAD > <log> 2>&1; echo "exit=$?" >> <log>` — в фоне: pre-push — полная сборка и колонка линтеров. Вердикт — строка `exit=` в логе и `git ls-remote --heads origin <branch>`, а не статус фоновой задачи. Обрыв SSH и упавший тест, к ветке не относящийся, — по `/create-pr` Фаза 4 п. 2.
 3. Падение pre-push настоящее: чини новым коммитом через шаг 1 и пушь снова. Pre-push собирает `dist` в worktree: перед следующими тестами там — `rm -rf packages/*/dist && pnpm install`.
 
 ## Шаг 4 — PR
@@ -53,7 +52,7 @@ $ARGUMENTS
 
 ## Шаг 5 — Комментарий
 
-1. Черновик сверь с опубликованным: статус — «In PR #M, not merged yet», а не merged или released; SHA — только запушенные; номера follow-up задач — заведённые.
+1. Черновик сверь с опубликованным: статус — «In PR #M, not merged yet», а не merged или released; SHA и ссылки на коммит, ветку или вики — только видимые на remote; номера follow-up задач — заведённые; числа и изменения поведения — с телом PR и changeset'ом: вычитка и rebase идут после черновика.
 2. `gh issue comment <N> --repo greydragon888/real-router --body-file <file>`; выведи URL.
 3. Черновика нет — напиши его по `/bugfix` Фаза 7 п. 1 и опубликуй; текст — в отчёт.
 4. Задач в ветке несколько — по черновику на задачу.

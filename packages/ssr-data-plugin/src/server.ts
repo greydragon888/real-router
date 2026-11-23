@@ -78,8 +78,8 @@ function safeSerializeError(
  * (or `__rrDeferError__`) chunks via `safeEnqueue` as each deferred promise
  * settles.
  *
- * Extracted from `injectDeferredScripts` so the streaming wrapper's `start`
- * callback reads top-down without a 35-line inline `entries.map` body.
+ * Kept out of `injectDeferredScripts` so the streaming wrapper's `start`
+ * callback reads top-down.
  *
  * `Promise.resolve(thenable)` adopts the thenable's state under the standard
  * Promise machinery. This buys two safety properties:
@@ -126,12 +126,12 @@ function buildSettlePromises(
 
 /**
  * Emit the bootstrap `<script>` once, gated on `(includeBootstrap, entries)`.
- * Lifted out of the `start` callback so the streaming wrapper reads
+ * Kept out of the `start` callback so the streaming wrapper reads
  * top-down: bootstrap → upstream forwarding → settle awaits → close.
  *
  * Returns nothing — side-effect call into `safeEnqueue`. Kept as a function
- * (instead of inlining a 4-line `if`) so the reader can ignore the bootstrap
- * concern entirely when scanning `injectDeferredScripts`.
+ * so the reader can ignore the bootstrap concern entirely when scanning
+ * `injectDeferredScripts`.
  */
 function bootstrapForwarder(
   includeBootstrap: boolean,
@@ -155,8 +155,7 @@ function bootstrapForwarder(
  * reader-level throw that the caller propagates via `controller.error(...)`.
  * Splitting the loop out of `start` keeps the upstream-reader +
  * settle-promise orchestration linear in the caller. The error is passed
- * through verbatim — matches the previous `controller.error(error)` shape
- * where non-Error throws stayed non-Error.
+ * through verbatim, so a non-Error throw stays non-Error.
  */
 async function htmlForwarder(
   reader: ReadableStreamDefaultReader<Uint8Array>,

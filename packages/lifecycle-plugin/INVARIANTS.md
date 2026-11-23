@@ -33,8 +33,8 @@
 | 2   | `onNavigate` fires on param-change regardless of `onStay`       | Navigating to the same route with different params calls `onNavigate` exactly once. Fires alongside `onStay` when both are defined — hooks are orthogonal.                                   |
 | 3   | `onEnter` and `onNavigate` both fire on entry when both defined | Each hook fires based on its own condition — declaring `onEnter` does not silence `onNavigate`. Enables hybrid declarations (entry-specific setup + shared navigation logic).               |
 | 4   | `onStay` and `onNavigate` both fire on param-change when both defined | Each hook fires based on its own condition — declaring `onStay` does not silence `onNavigate`. Enables hybrid declarations (stay-specific update + shared navigation logic).             |
-| 5   | Orthogonality survives a throwing sibling hook (#798)          | A throwing `onEnter`/`onStay` does not swallow `onNavigate` of the same transition — each hook is invoked with per-hook exception isolation, and the error is re-thrown asynchronously. Closes the invariant-generator gap: prior generators never threw, so intra-plugin swallowing went undetected. |
-| 6   | Orthogonality survives a throwing sibling hook FACTORY (#1222) | A throwing `onEnter`/`onStay` **factory** (a compile-throw, one seam earlier than the #798 body throw) does not swallow `onNavigate` either — `compileHook` runs inside the same per-hook isolation, so the factory throw is re-thrown asynchronously (not the sync "Error in listener" sink) and the sibling still fires. |
+| 5   | Orthogonality survives a throwing sibling hook (#798)          | A throwing `onEnter`/`onStay` does not swallow `onNavigate` of the same transition — each hook is invoked with per-hook exception isolation, and the error goes to the router's logger. Closes the invariant-generator gap: prior generators never threw, so intra-plugin swallowing went undetected. |
+| 6   | Orthogonality survives a throwing sibling hook FACTORY (#1222) | A throwing `onEnter`/`onStay` **factory** (a compile-throw, one seam earlier than the #798 body throw) does not swallow `onNavigate` either — `compileHook` runs inside the same per-hook isolation, so the factory throw goes to the router's logger as a body throw does and the sibling still fires. |
 
 ## Hook Ordering
 
@@ -48,6 +48,12 @@
 | --- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Each signal aborts exactly when its lifetime ends (#2692) | Over any sequence of navigation attempts — commits to another route, search changes and reloads on the same route, navigations refused by `canActivate`, failed by a throwing guard, or cancelled while an async guard is pending — `onEnter`'s signal is aborted iff a later commit left its route, and `onStay`'s, `onNavigate`'s and `onLeave`'s iff a later commit exists, as `router.subscribe` reports the commits. A navigation that does not commit aborts none. |
 | 2   | `router.stop()` aborts every signal a hook was handed   | After any such sequence, `stop()` leaves no signal a hook received unaborted.                                                                                                                 |
+
+## Error Sink
+
+| #   | Invariant                                               | Description                                                                                                                                                                                  |
+| --- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | The logger sees exactly the failures that are not the hook's own abort (#2975) | Over any sequence of navigation attempts whose hooks return, throw or reject — with an error of their own, an `AbortError` that is not the signal's reason, the signal's reason, that reason as `cause`, or that reason at `cause.cause` — the router's `logger.error` receives each failure once, and no rejection with the signal's reason or with that reason as its `cause`. |
 
 ## Teardown
 
@@ -72,4 +78,4 @@
 
 | File                                          | Invariants | Category                                                     |
 | --------------------------------------------- | ---------- | ------------------------------------------------------------ |
-| `tests/property/lifecycle.properties.ts`      | 21         | onEnter dispatch, onLeave dispatch (incl. refused / cancelled navigations, #2691), onStay dispatch, onNavigate dispatch + orthogonality (incl. throwing-hook **and throwing-factory** isolation, #798 / #1222), signal lifetimes (#2692), ordering, teardown, mutual exclusion, compilation |
+| `tests/property/lifecycle.properties.ts`      | 22         | onEnter dispatch, onLeave dispatch (incl. refused / cancelled navigations, #2691), onStay dispatch, onNavigate dispatch + orthogonality (incl. throwing-hook **and throwing-factory** isolation, #798 / #1222), signal lifetimes (#2692), error sink (#2975), ordering, teardown, mutual exclusion, compilation |

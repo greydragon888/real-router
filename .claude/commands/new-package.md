@@ -49,6 +49,7 @@ $ARGUMENTS
 - `.size-limit.js` measures an npm-public package's bundle, or `SIZE_LIMIT_EXCEPTIONS` of `scripts/check-coverage-scope.mjs` says why not — check 4 of `pnpm lint:coverage-scope` fails a public package with neither
 - A consumer of a `shared/` dir names that dir in the inputs of its tasks in its own `turbo.json` — check 5 of `pnpm lint:coverage-scope` names each task that misses it
 - `classify` of `scripts/build-matrix.mjs` puts it in a shard bucket by its dependencies and symlinks, and `scripts/tests/build-matrix.test.mjs` asserts the number of packages in each bucket: raise the count of its bucket and the total, and leave its named lists of buckets alone: other cells build fixtures of a fixed size from them
+- A framework adapter joins `UI_PACKAGES` of `scripts/tests/env-read-census.test.mjs`. A package whose work is an environment API — the URL and its history, DOM events, the host console — or server rendering and hydration joins `ENV_PACKAGES` there, by a design decision about that work. Any other package is isomorphic: the census fails it on an environment read outside the places it names, and on a symlink under its `src/`
 - Update `CLAUDE.md` — package count (line 5), See Also link
 - Update `ARCHITECTURE.md` — Package Map tree, Public packages list, Mermaid diagram node + deps
 - The full graph passes with 0 failures — the pre-push hook runs it; read the task COUNT off that run, never off a number written here

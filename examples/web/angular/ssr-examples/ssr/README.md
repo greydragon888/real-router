@@ -132,7 +132,7 @@ Sister test in `examples/web/angular/ssr-examples/ssr-streaming/e2e/` verifies t
 
 ## SSR-Only Plugin Contract
 
-The `@real-router/ssr-data-plugin` intercepts `router.start()`, **not** `router.navigate()`. After hydration, subsequent CSR navigations via `realLink` do NOT re-run loaders — `state.context.data` becomes `undefined` for the target route. This matches the Vue/Solid/Svelte/React `ssr/` examples. Use `lifecycle-plugin`'s `onNavigate` if you need data fetching on every navigation.
+The `@real-router/ssr-data-plugin` intercepts `router.start()`, **not** `router.navigate()`. After hydration, subsequent CSR navigations via `realLink` do NOT re-run loaders — `state.context.data` becomes `undefined` for the target route. This matches the Vue/Solid/Svelte/React `ssr/` examples. Use `lifecycle-plugin`'s `onNavigate` if you need data fetching on every navigation, and read "`onNavigate` fires on `start()` too" in [Limitations](../README.md#limitations) before pairing it with the `ssr-data-plugin` loaders.
 
 The e2e suite verifies this contract with two assertions: (1) the DOM ends up showing the "User not found" branch after a CSR click, and (2) Playwright's `page.on("request")` confirms zero new HTML/document/fetch/xhr requests during the click — the data really did NOT come from a server roundtrip.
 

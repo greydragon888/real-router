@@ -230,7 +230,7 @@ describe("lifecycle validation — with validationPlugin", () => {
   });
 });
 
-describe("lifecycle.warnOverwrite", () => {
+describe("warnOverwrite", () => {
   let router: Router;
 
   beforeEach(() => {
@@ -267,7 +267,7 @@ describe("lifecycle.warnOverwrite", () => {
   });
 });
 
-describe("lifecycle.warnAsyncGuardSync", () => {
+describe("warnAsyncGuardSync", () => {
   let router: Router;
 
   afterEach(() => {

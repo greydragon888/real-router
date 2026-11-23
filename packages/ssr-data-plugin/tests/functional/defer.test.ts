@@ -289,8 +289,8 @@ describe("defer()", () => {
       // realm can fabricate it. The defence is `Object.hasOwn`: an object
       // that inherits the brand from its prototype must NOT be tagged
       // as a defer() payload, otherwise a foreign-prototype attack could
-      // smuggle a no-`critical`/no-`deferred` value into the slow path
-      // of processLoaderResult.
+      // smuggle a no-`critical`/no-`deferred` value into the defer branch
+      // of writeLoaderResult.
       const proto = { [DEFER_BRAND]: true };
       const inherited = Object.create(proto) as Record<symbol, unknown>;
 

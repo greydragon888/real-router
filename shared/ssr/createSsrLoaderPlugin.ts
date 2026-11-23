@@ -66,11 +66,9 @@ interface CompiledEntry<T> {
 /**
  * Compile a `SsrLoaderFactoryMap` into a `Map<name, CompiledEntry>`.
  *
- * Extracted from the inline `for (const [name, raw] of …)` body that lived
- * inside `createSsrLoaderPlugin` so the main function reads top-down:
+ * Kept out of `createSsrLoaderPlugin` so the main function reads top-down:
  * claims are acquired, compilation runs against this helper, and any throw
- * bubbles to the shared `rollback()` path. Tested in isolation by the same
- * functional + property suites that pin the previous inline behaviour.
+ * bubbles to the shared `rollback()` path.
  *
  * The compile step is pure — it touches no router state other than via the
  * caller-provided `router` + `getDependency` arguments.
@@ -83,7 +81,7 @@ interface CompiledEntry<T> {
  * Mode pre-resolution: static `ssr` forms (`undefined` / boolean / string)
  * are resolved here at compile time and cached as `staticMode`. The
  * runtime path in `prepareEntry` then reuses the cached value on every
- * `start()` + stale-flag leave handler invocation, skipping the
+ * `start()` and leave-handler invocation, skipping the
  * `resolveMode` if/else chain. Function-form `ssr` keeps a typed
  * `modeFn` for per-navigation evaluation.
  */
@@ -321,11 +319,9 @@ export function createSsrLoaderPlugin<
     const api = getPluginApi(router);
     const allowed = config.allowedModes ?? ALL_SSR_MODES;
 
-    // Sequential claim acquisition with all-or-nothing rollback. Any
-    // failure (collision, validation error during compile loop) releases
-    // every claim acquired so far and rethrows. This replaces the
-    // previous 4 nested try/catch blocks with progressively-longer
-    // release lists — same semantics, one shared rollback path.
+    // Sequential claim acquisition with all-or-nothing rollback: a claim
+    // collision, or a loader factory that throws or returns a non-function,
+    // releases every claim acquired so far and rethrows.
     const acquired: ContextNamespaceClaim[] = [];
     const claim = (namespace: string): ContextNamespaceClaim => {
       const handle = api.claimContextNamespace(namespace);
@@ -375,13 +371,9 @@ export function createSsrLoaderPlugin<
       throw error;
     }
 
-    // Hot path on every successful start() / subscribeLeave refresh. The
-    // previous shape ran a `processLoaderResult` helper that always allocated
-    // a `{ critical, deferred }` wrapper object — wasted on the common
-    // plain-data path (and on every call from `rsc-server-plugin`, which
-    // never opts into deferred support). Inlining the branch keeps the
-    // fast path allocation-free and the slow path (defer payload) at one
-    // intentional `Object.keys(...)` array allocation per loader.
+    // Hot path on every successful start() / subscribeLeave refresh. A plain
+    // value goes straight to `dataClaim.write` with no wrapper object; a
+    // defer payload adds one `objectKeys(...)` array per call.
     const writeLoaderResult = (state: State, value: T): void => {
       if (isDeferred(value) && deferredClaims === null) {
         throw new TypeError(
@@ -611,12 +603,12 @@ export function createSsrLoaderPlugin<
     // and it preserves the flag for retry, as no-entry / client-only ones do.
     const removeLeaveListener = router.subscribeLeave(
       async ({ nextRoute, signal }) => {
-        // ⚑ The mode marker is published on EVERY navigation, ahead of the
-        // staleness gate (#1915). `getSsrDataMode`'s `?? "full"` fallback means
-        // "this route has no plugin entry"; without a write here it speaks for
-        // routes that HAVE one too, so a route declared `ssr: false` answers
-        // `"full"` after any client navigation and the documented
-        // `mode === "client-only"` branch never fires.
+        // ⚑ The mode marker is published on EVERY navigation to a route with
+        // an entry, ahead of the staleness gate (#1915). `getSsrDataMode`'s
+        // `?? "full"` fallback means "this route has no plugin entry"; without
+        // a write here it speaks for routes that HAVE one too, so a route
+        // declared `ssr: false` answers `"full"` after any client navigation
+        // and the documented `mode === "client-only"` branch never fires.
         //
         // This listener runs on every navigation regardless — it returns early
         // one line down — so the cost is a `Map.get`, a `claim.write`, and,

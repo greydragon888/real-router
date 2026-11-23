@@ -3,8 +3,6 @@ import { describe, expect, it } from "vitest";
 import { createRouter } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 
-import { installSpyValidator } from "../helpers/spyValidator";
-
 /**
  * Both codec directions read the container they are handed ONCE (#2254 row 5).
  *
@@ -75,29 +73,6 @@ describe("a codec's container is read once (#2254)", () => {
     ]);
 
     await router.start("/u/7");
-    probe.reset();
-
-    getPluginApi(router).matchPath("/u/7");
-
-    expect(probe.reads()).toBe(1);
-  });
-
-  it("decodeParams — with a validator live, which reads the slot again", async () => {
-    // ⚠ Its own arm, and it is not redundant: in bare core `getValidator()`
-    // answers null, so the validator's read never happens and a single-arm cell
-    // leaves half the fix unpinned. Measured — reverting just that line survived
-    // until this existed.
-    const probe = counting();
-    const router = createRouter([
-      {
-        name: "u",
-        path: "/u/:id",
-        decodeParams: () => probe.container,
-      } as never,
-    ]);
-
-    await router.start("/u/7");
-    installSpyValidator(router);
     probe.reset();
 
     getPluginApi(router).matchPath("/u/7");

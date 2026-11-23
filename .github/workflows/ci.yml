@@ -1090,7 +1090,8 @@ jobs:
   # ============================================
 
   # Smoke test: pack all public packages, install from tarballs
-  # into an isolated project, verify every export resolves.
+  # into an isolated project, verify every export resolves and check the
+  # loader errors of ssr-utils in its builds and copies.
   # Uses `bundle` (not `build`) — no test/lint overhead.
   smoke:
     name: Package Smoke Test
@@ -1108,7 +1109,8 @@ jobs:
     # Not on a diff that holds no source — a release PR, where the tarballs are
     # packed from master's code and every assertion here (exports resolve, no
     # private package in `dependencies`, no source shipped, no
-    # missing `dist`) is independent of the version being bumped. It is
+    # missing `dist`, the loader errors of ssr-utils) is independent of the
+    # version being bumped. It is
     # also the wrong address: a `changeset-release/*` PR is regenerated from
     # master, so a failure there cannot be answered there.
     # ⚠ That leaves the packaging guard off the master → npm path entirely —
@@ -1535,7 +1537,7 @@ jobs:
           fetch-depth: 2
 
       - name: Install pnpm
-        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
 
       - name: Setup Node.js
         uses: actions/setup-node@v7

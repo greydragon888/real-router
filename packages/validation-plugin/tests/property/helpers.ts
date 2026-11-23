@@ -383,26 +383,6 @@ export const invalidStartPathArbitrary = fc
   .filter((s) => !s.startsWith("/") && s !== "");
 
 // =============================================================================
-// EventBus namespace arbitraries
-// =============================================================================
-
-export const VALID_EVENT_NAMES = [
-  "$start",
-  "$stop",
-  "$$start",
-  "$$leaveApprove",
-  "$$cancel",
-  "$$success",
-  "$$error",
-] as const;
-
-export const validEventNameArbitrary = fc.constantFrom(...VALID_EVENT_NAMES);
-
-export const invalidEventNameArbitrary = fc
-  .string({ minLength: 1, maxLength: 20 })
-  .filter((s) => !(VALID_EVENT_NAMES as readonly string[]).includes(s));
-
-// =============================================================================
 // Plugins namespace arbitraries
 // =============================================================================
 

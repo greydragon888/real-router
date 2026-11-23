@@ -6,8 +6,8 @@
 
 | #   | Invariant                                                  | Description                                                                                                                                                                                    |
 | --- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Non-objects rejected                                       | `validateLoaders()` throws `TypeError` for `null`, `undefined`, strings, numbers, booleans, and arrays. Only plain objects pass validation.                                                     |
-| 2   | Non-function values rejected                               | `validateLoaders()` throws `TypeError` when any value in the loaders object is not a function. Prevents runtime errors during factory compilation.                                              |
+| 1   | Non-objects rejected                                       | `validateLoaders()` throws `TypeError` for `null`, `undefined`, strings, numbers, booleans, and arrays. Only non-null, non-array objects pass this check.                                                     |
+| 2   | Non-function, non-object values rejected                               | `validateLoaders()` throws `TypeError` when a value in the loaders object is neither a function nor a `{ ssr?, loader? }` object. Prevents runtime errors during factory compilation.                                              |
 
 ## Loader Invocation
 
@@ -44,7 +44,7 @@
 | --- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Teardown releases `"data"` namespace claim                 | After `unsubscribe()`, the `"data"` namespace claim is released. Prevents stale data writes and frees the namespace for other plugins.                                                         |
 | 2   | Namespace re-claimable after teardown                      | After `unsubscribe()`, calling `claimContextNamespace("data")` succeeds. Verifies that `claim.release()` actually removes the claim from the router's claim registry.                          |
-| 3   | Factory compilation error releases claim                   | If a loader factory throws during compilation, the `"data"` namespace claim is released before the error propagates. Prevents permanently blocking the namespace.                               |
+| 3   | Factory compilation error releases every claim                   | If a loader factory throws during compilation, all four namespace claims are released before the error propagates. Prevents permanently blocking any of them.                               |
 | 4   | Teardown idempotency                                       | Double `unsubscribe()` does not throw. The second call is a no-op (core guards with `unsubscribed` flag).                                                                                      |
 
 ## Isolation
@@ -84,18 +84,10 @@
 | 3   | Freeze: payload + inner deferred map                                       | `Object.isFrozen(payload)` and `Object.isFrozen(payload.deferred)` both `true`. The wire-format value is immutable to consumers.                                                                                                       |
 | 4   | Isolation: post-`defer` mutations to caller's map don't leak               | `defer()` works on a shallow clone of the deferred record — late additions to the user's map (e.g. `userMap.evil = badPromise`) never appear in `payload.deferred`. Locks the validation contract: only the snapshot at call time. |
 | 5   | `isDeferred` rejects non-`defer()` values                                  | For any value the user could plausibly pass (primitives, plain objects, arrays, nested dicts), `isDeferred(value)` returns `false`. Prevents accidental brand collision via `Symbol.for` on third-party code.                       |
-| 6   | `isDeferred` rejects inherited brand                                       | `isDeferred(Object.create({ [DEFER_BRAND]: true })) === false`. The brand check uses `Object.hasOwn` so a prototype-chain bypass — branding via inheritance — cannot smuggle an object past `processLoaderResult`'s slow path.   |
+| 6   | `isDeferred` rejects inherited brand                                       | `isDeferred(Object.create({ [DEFER_BRAND]: true })) === false`. The brand check uses `Object.hasOwn` so a prototype-chain bypass — branding via inheritance — cannot smuggle an object into the defer branch of `writeLoaderResult`.   |
 | 7   | `isDeferred` brand-only-plain contract                                     | `isDeferred({ [DEFER_BRAND]: true }) === true`. The guard is a brand check, not a structural check. Pinned to lock the current contract — any future refactor that requires `critical`/`deferred` fields to count must update this. |
 | 8   | Promise identity preserved for every own key                               | For every `k` in the deferred input map, `payload.deferred[k] === input.deferred[k]`. The settle pipeline depends on observing the same Promise instance `.catch()` was attached to in the validator loop — a deep-clone regression breaks this without breaking primitive-payload roundtrip tests. |
 | 9   | Key-order preserved                                                        | `Object.keys(payload.deferred)` strictly equals `Object.keys(input.deferred)`. Locks the contract that `state.context.ssrDataDeferredKeys` (declared order) matches the order consumers iterate via `useDeferred()`.                                                                                |
-
-## `withTimeout` (race semantics — `numRuns: 50`)
-
-| #   | Invariant                                                | Description                                                                                                                                                                              |
-| --- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Fast-path returns loader value                            | For any T (incl. NaN, objects, arrays), when the loader resolves before the deadline, `withTimeout(route, ms, () => Promise.resolve(v))` resolves to a value structurally equal to `v`. |
-| 2   | Deadline-path rejects with `LoaderTimeout(route, ms)`     | When the loader never settles, the rejection is a `LoaderTimeout` carrying the supplied `route` + `ms` (so HTTP middleware can map to 504 with route context).                          |
-| 3   | Pre-aborted upstream short-circuit                        | When `upstreamSignal` is already aborted at call time, the loader is NEVER invoked, regardless of route name / timeout — the rejection mirrors `upstreamSignal.reason`.                  |
 
 ## `validateLoaders` (factory-time structural gate — `numRuns: 50`)
 
@@ -148,5 +140,5 @@
 
 | File                                         | Invariants | Category                                                                            |
 | -------------------------------------------- | ---------- | ----------------------------------------------------------------------------------- |
-| `tests/functional/data-loader.test.ts`       | 3          | getDependency integration, no caching                                                                                     |
-| `tests/property/ssr-data.properties.ts`      | 59         | Validation, loader invocation, loader arguments, data retrieval, prototype safety, teardown, isolation, factory invocation, SSR mode (×4), `escapeForScript` (×8), `defer()` / `isDeferred` (×9), stale registry (×6), `getSsrDataMode` (×4), `invalidate` cloneRouter isolation (×1), `withTimeout` (×3), `validateLoaders` (×6), `formatSettleScript`/`getDeferBootstrapScript` (×5) |
+| `tests/functional/data-loader.test.ts`       | 3          | getDependency integration, no caching, factory compilation error (Teardown Inv 3) |
+| `tests/property/ssr-data.properties.ts`      | 57         | Validation, loader invocation, loader arguments, data retrieval, prototype safety, teardown (+ Inv 3 PBT), isolation, factory invocation, SSR mode (×4), `escapeForScript` (×8), `defer()` / `isDeferred` (×9), stale registry (×6), `getSsrDataMode` (×4), `invalidate` cloneRouter isolation (×1), `validateLoaders` (×6), `formatSettleScript`/`getDeferBootstrapScript` (×5) |

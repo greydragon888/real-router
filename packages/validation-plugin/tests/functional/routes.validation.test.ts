@@ -410,7 +410,7 @@ describe("routes API validation — with validationPlugin", () => {
   });
 });
 
-describe("routes.validateSetRootPathArgs", () => {
+describe("validateSetRootPathArgs", () => {
   let router: Router;
 
   beforeEach(() => {
@@ -443,7 +443,7 @@ describe("routes.validateSetRootPathArgs", () => {
   });
 });
 
-describe("routes.guardRouteCallbacks", () => {
+describe("guardRouteCallbacks", () => {
   let router: Router;
 
   beforeEach(async () => {
@@ -483,7 +483,7 @@ describe("routes.guardRouteCallbacks", () => {
   });
 });
 
-describe("routes.guardNoAsyncCallbacks", () => {
+describe("guardNoAsyncCallbacks", () => {
   let router: Router;
 
   beforeEach(async () => {

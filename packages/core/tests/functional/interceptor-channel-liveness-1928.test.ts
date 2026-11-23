@@ -14,12 +14,10 @@
 // ⚠ Both halves are asserted together on purpose. "The interceptor sees a live
 // bag" is only safe while "the committed state is still frozen" holds — drop the
 // second and this file would green a fix that simply stopped freezing.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createRouter } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
-
-import { installSpyValidator } from "../helpers/spyValidator";
 
 import type { Params } from "@real-router/core/types";
 
@@ -151,7 +149,12 @@ describe("#1928 — the interceptor's params bag", () => {
     // the merge (#1938) the order is fixed by construction, and this is the
     // cell that fails if a seam is ever added there again.
     const { router } = routerWithProbe();
-    const validator = installSpyValidator(router);
+    const undeclared = vi.fn();
+
+    getPluginApi(router).subscribeDiagnostic(
+      "UNDECLARED_PARAM_KEY",
+      undeclared,
+    );
 
     getPluginApi(router).addInterceptor(
       "forwardState",
@@ -169,10 +172,7 @@ describe("#1928 — the interceptor's params bag", () => {
     await router.start("/plain/0");
     await router.navigate("plain", { id: "9" });
 
-    expect(validator.state.reportUndeclaredParamKey).toHaveBeenCalledWith(
-      "plain",
-      "leaked",
-    );
+    expect(undeclared).toHaveBeenCalledWith("plain", "leaked");
 
     // The key is KEPT, not stripped — an undeclared path param rides
     // `state.params` without printing, exactly as it does from any caller.
@@ -190,11 +190,16 @@ describe("#1928 — the interceptor's params bag", () => {
     // navigation — `producer-agreement-phase2` pins that count, and an
     // unconditional re-walk would have reported every key twice.
     const { router } = routerWithProbe();
-    const validator = installSpyValidator(router);
+    const undeclared = vi.fn();
+
+    getPluginApi(router).subscribeDiagnostic(
+      "UNDECLARED_PARAM_KEY",
+      undeclared,
+    );
 
     await router.start("/plain/0");
     await router.navigate("plain", { id: "9", undeclared: "x" } as Params);
 
-    expect(validator.state.reportUndeclaredParamKey).toHaveBeenCalledTimes(1);
+    expect(undeclared).toHaveBeenCalledTimes(1);
   });
 });

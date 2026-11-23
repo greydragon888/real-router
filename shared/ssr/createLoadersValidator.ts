@@ -20,10 +20,9 @@ const objectEntries = Object.entries;
 const hasOwn = Object.hasOwn;
 
 /**
- * The `ssr` half of one entry. Split out for the same reason as
- * {@link validateEntry} — the three shapes `ssr` accepts (string, boolean,
- * resolver) each need their own branch, and inlining them put
- * `validateLoaders` at a cognitive complexity of 27 against a limit of 15.
+ * The `ssr` half of one entry, called when the entry has an own `ssr` other
+ * than `undefined`: a boolean or a resolver passes, a string must be one of
+ * `allowedModes`, and anything else throws.
  */
 function validateSsr(
   route: string,

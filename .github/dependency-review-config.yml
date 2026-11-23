@@ -81,5 +81,5 @@ allow-dependencies-licenses:
 allow-ghsas:
   - GHSA-wrw7-89jp-8q8g
   - GHSA-pqg4-j6r4-53mv
-  - GHSA-gcqx-w48m-w2h4
+  - GHSA-fc5q-39xc-vjpf
 # <<< sync-config: allow-ghsas

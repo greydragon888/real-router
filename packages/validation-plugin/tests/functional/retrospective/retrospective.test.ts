@@ -486,7 +486,7 @@ describe("validateLimitsConsistency", () => {
     }).not.toThrow();
   });
 
-  // #1225 — the live limiter (`validateDependencyCount`) counts BEFORE the
+  // #1225 — the live limiter (`validateDependencyLimit`) counts BEFORE the
   // insert, so reaching EXACTLY maxDependencies is legal. The retrospective pass
   // checks state, not room-for-next-insert, so it must accept an at-limit store
   // (else every cloneRouter on an at-limit base throws — breaking SSR).

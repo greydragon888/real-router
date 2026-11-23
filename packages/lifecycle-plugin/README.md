@@ -40,9 +40,10 @@ const routes: Route[] = [
     name: "catalog",
     path: "/catalog?q&sort&dir",
     // Fires on entry AND on param-change — recommended default. The signal
-    // aborts this load when the next navigation commits.
+    // aborts this load when the next navigation commits; returned, its
+    // failure reaches the router's logger.
     onNavigate: () => (toState, _fromState, signal) => {
-      loadServices(toState.search, { signal });
+      return loadServices(toState.search, { signal });
     },
   },
   {
@@ -59,7 +60,8 @@ const routes: Route[] = [
     // room's connection when the next navigation commits.
     onNavigate: () => (toState, _fromState, signal) => {
       chatSocket.connect(toState.params.roomId, { signal });
-      loadMessages(toState.params.roomId, { signal });
+
+      return loadMessages(toState.params.roomId, { signal });
     },
   },
 ];
@@ -83,7 +85,7 @@ await router.start("/catalog");
 
 **Orthogonal dispatch:** `onEnter` / `onStay` / `onNavigate` fire independently based on their own conditions. On entry, `onEnter` **and** `onNavigate` fire. On param-change, `onStay` **and** `onNavigate` fire. Each hook is composable — declaring one never silences another.
 
-Each hook field is a **factory function** `(router, getDependency) => (toState, fromState, signal) => void`. The factory runs once per route; the returned callback is cached and invoked on each matching transition. When you don't need DI, omit the factory params:
+Each hook field is a **factory function** `(router, getDependency) => hook`, and the hook is `(toState, fromState, signal) => void | PromiseLike<unknown>`: it returns its load, or nothing. The factory runs once per route; the returned hook is cached and invoked on each matching transition. When you don't need DI, omit the factory params:
 
 <!-- doc-code: skip — two variants of one route option, outside their route -->
 ```typescript
@@ -117,7 +119,23 @@ The third argument is an `AbortSignal` that aborts when the work the hook starte
 
 A navigation that does not commit — refused by a guard, cancelled, failed, or to the current state — aborts none of them: the user stays on the route. A navigation that commits aborts the previous signals before any of its hooks runs, so a superseded load is already cancelled when the next one starts. A `replace()` that drops the active route commits too, so the route's signals abort even though its `onLeave` no longer runs.
 
-The reason is a fresh `DOMException` named `AbortError` — the value `fetch` rejects with — so `if (error.name === "AbortError") return;` keeps a cancelled load out of your error handling.
+The reason is a fresh `DOMException` named `AbortError` — the value `fetch` rejects with — so `if (error.name === "AbortError") return;` keeps a cancelled load out of your own error handling. A load the hook returns needs no such check when it rejects with that reason, as `fetch` does: the plugin does not log the hook's own abort (see [Errors](#errors)).
+
+### Errors
+
+A hook that throws — or whose factory throws — and a load the hook returned that rejects go to the router's logger as `logger.error`, under the context `lifecycle-plugin`. Neither stops the navigation, and neither stops the hooks after it in the same navigation. The `logger` option of `createRouter` decides where the error lands: by default it is printed to the console, and a `callback` you set receives it as well — an error tracker, say:
+
+```typescript
+const router = createRouter(routes, {
+  logger: {
+    callback: (level, context, message, ...args) => {
+      if (level === "error") trackError(context, message, args);
+    },
+  },
+});
+```
+
+A rejection with the reason of the hook's own `signal`, or with that reason as its `cause`, is the hook's own abort and is not logged: `fetch` rejects with the reason, and `setTimeout` of `node:timers/promises` with the reason as `cause`. An abort error a client makes of its own is logged, axios's `CanceledError` among them — catch it in the hook; for axios, `.catch((error) => { if (!axios.isCancel(error)) throw error; })` on the returned load. The plugin reads only what the hook returns: a load the hook starts without returning it is the application's to handle.
 
 #### Which hook for which work
 
@@ -138,11 +156,13 @@ The reason is a fresh `DOMException` named `AbortError` — the value `fetch` re
   path: "/search?q",
   onEnter: () => (toState, _fromState, signal) => {
     showSkeleton();
-    loadResults(toState.search.q, { signal });
+
+    return loadResults(toState.search.q, { signal });
   },
   onStay: () => (toState, _fromState, signal) => {
     showSpinner();
-    loadResults(toState.search.q, { signal });
+
+    return loadResults(toState.search.q, { signal });
   },
 }
 ```
@@ -160,14 +180,14 @@ The reason is a fresh `DOMException` named `AbortError` — the value `fetch` re
     showSpinner();
   },
   onNavigate: () => (toState, _fromState, signal) => {
-    loadResults(toState.search.q, { signal });
+    return loadResults(toState.search.q, { signal });
   },
 }
 ```
 
 ### Redirect from a hook
 
-Redirecting with a **synchronous** `router.navigate()` inside a hook throws `REENTRANT_NAVIGATION` (a reentrant navigate from a transition listener is banned) and, via the #798 isolation, surfaces as an uncaught error — the redirect never happens. Defer it: `queueMicrotask(() => router.navigate("login"))` runs after the transition settles and works.
+Redirecting with a **synchronous** `router.navigate()` inside a hook throws `REENTRANT_NAVIGATION` (a reentrant navigate from a transition listener is banned), and the error goes to the router's logger like any hook error — the redirect never happens. Defer it: `queueMicrotask(() => router.navigate("login"))` runs after the transition settles and works.
 
 ## Use Cases
 
@@ -179,8 +199,10 @@ Redirecting with a **synchronous** `router.navigate()` inside a hook throws `REE
   path: "/catalog?q&sort&dir",
   onNavigate: () => (toState, _fromState, signal) => {
     // Fires on entry from another route AND on filter/sort param changes;
-    // the next navigation aborts this request before its own load starts
-    loadServices(toState.search, { signal });
+    // the next navigation aborts this request before its own load starts.
+    // Returned, a failed load reaches the router's logger, and one aborted
+    // with the signal's reason, as `fetch` rejects, does not.
+    return loadServices(toState.search, { signal });
   },
 }
 ```

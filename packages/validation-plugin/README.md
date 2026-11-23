@@ -93,9 +93,9 @@ router.usePlugin(validationPlugin()); // too late
 ```
 
 Throws `RouterError("VALIDATION_PLUGIN_ALREADY_INSTALLED")` if the router
-already carries a validator. One router holds one — with two installations, the
-first `teardown` to run switches validation off while a plugin is still
-registered.
+already carries an installation. A second installation would register every
+check and diagnostic kind a second time, so a call that passes would run each
+check twice and each warning would print once per installation.
 
 ```typescript
 const remove = router.usePlugin(validationPlugin());
@@ -103,7 +103,7 @@ const remove = router.usePlugin(validationPlugin());
 // Throws VALIDATION_PLUGIN_ALREADY_INSTALLED
 router.usePlugin(validationPlugin());
 
-// Fine — the slot is empty again after teardown
+// Fine — after teardown the router takes an installation again
 remove();
 router.usePlugin(validationPlugin());
 ```
@@ -117,14 +117,6 @@ router.usePlugin(validationPlugin());
 
 const perRequest = cloneRouter(router); // already validated
 ```
-
-### `RouterValidator` type
-
-```typescript
-import type { RouterValidator } from "@real-router/validation-plugin";
-```
-
-The full validator interface that core calls into. Re-exported from `@real-router/core/validation`. Useful if you're building a custom validator or testing validator functions directly.
 
 ## Retrospective Validation
 
@@ -152,7 +144,7 @@ If the retrospective pass fails, the plugin rolls back cleanly. The router is le
 | Lifecycle     | Guard/hook handler type, count vs `maxLifecycleHandlers`; a guard answering neither `true` nor `false`; an async guard in a synchronous check                                                |
 | Navigation    | `navigate` args, `navigateToDefault` args, `NavigationOptions` shape, `params` validation (navigate, buildPath, canNavigateTo), `start` path validation, a `defaultParams` / `defaultSearch` bag mutated after `createRouter()` |
 | State         | `makeState` args, `areStatesEqual` args                                                                                                                                                      |
-| Event bus     | Event name format, listener args                                                                                                                                                             |
+| Event bus     | Listener count vs `maxListeners` — a `warn` at 20 % and an `error` at 50 % on `subscribe`, `addEventListener` and a plugin's hooks                                                          |
 | Retrospective | Existing route tree integrity, `forwardTo` consistency, decoder/encoder types, dependency store structure, limits consistency, static `defaultRoute` resolves to a registered route         |
 
 ## Error Messages

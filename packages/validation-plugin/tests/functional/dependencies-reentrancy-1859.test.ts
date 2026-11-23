@@ -5,22 +5,24 @@ import { describe, expect, it } from "vitest";
 import { validationPlugin } from "../../src";
 
 /**
- * #1859, the half that only this package can reach.
+ * #1859, through the logger callback.
  *
  * Core's write paths have TWO user-code windows per key. The first is reading
- * `deps[key]`, which runs a caller's accessor — pinned in core's own suite. The
- * second is THIS one: `validateDependencyCount` and `warnOverwrite` call
- * `logger.warn`, and `logger.callback` is public `RouterOptions` API, invoked
- * synchronously between the read and the write.
+ * `deps[key]`, which runs a caller's `Proxy` trap; core refuses an own accessor
+ * before reading it, and pins that in its own suite. The second is the reports
+ * core raises between the read and the write: this plugin's handlers —
+ * `reportDependencyCount` and `warnOverwrite` — call `logger.warn` or
+ * `logger.error`, and `logger.callback` is public `RouterOptions` API, invoked
+ * synchronously.
  *
  * It matters because it needs no accessor at all — a plain data bag reaches it.
  * A disposal probe placed between the read and the write closes the first window
  * and leaves this one open; core's fix is a captured write target, which closes
  * both. These cells are what tell those two designs apart.
  *
- * ⚑ Everything here goes through the public surface. Core cannot host it: it
- * does not depend on this plugin, and functional tests may not import
- * `src/internals` to fake a validator.
+ * ⚑ Core drives the same window with a handler of its own, through
+ * `PluginApi.subscribeDiagnostic` (`setall-reentrancy-1859.test.ts`). This file
+ * drives it the way an application meets it: through the plugin and the logger.
  */
 const ROUTES = [{ name: "a", path: "/a" }];
 

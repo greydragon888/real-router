@@ -211,7 +211,7 @@ The skip is single-shot — only the first `start()` triggered by `hydrateRouter
 
 ## Typed Loader Errors (`@real-router/rsc-server-plugin/errors`)
 
-Mirror of [`@real-router/ssr-data-plugin/errors`](../ssr-data-plugin/README.md#typed-loader-errors-real-routerssr-data-pluginerrors) — same shared source under `shared/ssr/errors.ts`. RSC apps can import error classes without adding `ssr-data-plugin` as a dependency:
+Re-exports the loader errors and `withTimeout` of [`@real-router/ssr-utils`](../ssr-utils/README.md#loader-errors-and-withtimeoutroutename-ms-loader-options), their home, as [`@real-router/ssr-data-plugin/errors`](../ssr-data-plugin/README.md#typed-loader-errors-real-routerssr-data-pluginerrors) does; `instanceof` holds across the three imports, even when they resolve different copies of `ssr-utils`. RSC apps can import them without adding `ssr-data-plugin` as a dependency:
 
 <!-- doc-code: skip — the body of a fetch handler: a top-level return -->
 ```typescript
@@ -243,14 +243,14 @@ try {
 }
 ```
 
-`LoaderNotFound`, `LoaderRedirect`, `LoaderTimeout`, `withTimeout` — same shape and structural `code` discriminator as the data-plugin counterparts.
+`LoaderNotFound`, `LoaderRedirect`, `LoaderTimeout`, `withTimeout` — the `code` field is the discriminator. `instanceof` holds as well, for an error from another copy of `@real-router/ssr-utils` and from its other build, ESM or CJS.
 
 ## Cleanup
 
 ```typescript
 const unsubscribe = router.usePlugin(rscServerPluginFactory(loaders));
 
-// Later — releases "rsc" namespace claim and stops the start interceptor
+// Later — removes the start interceptor and the leave listener, releases the "rsc" and "ssrRscMode" namespace claims
 unsubscribe();
 ```
 

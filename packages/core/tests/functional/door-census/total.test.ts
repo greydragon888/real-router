@@ -363,7 +363,6 @@ describe("door total (#2303)", () => {
     Router: "surface",
     RouterError: "surface",
     RouterLogger: "surface",
-    RouterValidator: "surface",
     RoutesApi: "surface",
     Subscription: "surface",
     // Built by core and handed out. The handout axis owns these.
@@ -405,6 +404,7 @@ describe("door total (#2303)", () => {
     // The external Standard Schema spec a schema library implements.
     StandardSchemaV1: "external spec",
     StandardSchemaV1Issue: "external spec",
+    StandardSchemaV1Result: "external spec",
     // Adapter and utility shapes core or an adapter BUILDS and hands out. Each
     // was classified by POSITION — measured, they appear as a return type or as
     // the parameter of a callback the application writes, never as a bag the
@@ -466,6 +466,12 @@ describe("door total (#2303)", () => {
     // Shapes of the host platform, not of this library.
     IncomingMessageLike: "external platform shape",
     RequestLike: "external platform shape",
+    // Error classes: their one static member is `Symbol.hasInstance`, which
+    // answers from the value `instanceof` hands it — its prototype chain, or
+    // its mark — and keeps nothing.
+    LoaderNotFound: "thrown by an application's loader, caught by its handler",
+    LoaderRedirect: "thrown by an application's loader, caught by its handler",
+    LoaderTimeout: "output — `withTimeout` rejects with it",
     // Factories the census does not seed, each for its own reason.
     createRouterPlugin: "takes core's own router, not an application value",
     internalDefect:
@@ -1144,13 +1150,13 @@ describe("door total (#2303)", () => {
       "plugin augmentations": 15,
       "plugin factory params": 14,
       "provider props": 6,
-      "surface members": 86,
+      "surface members": 84,
     });
   });
 
   it("the total", () => {
     // ⚠ The bucket table above is what a reader diffs; this line exists so the
     // headline is a test rather than a sentence somebody wrote down once.
-    expect(union.size).toBe(297);
+    expect(union.size).toBe(295);
   });
 });

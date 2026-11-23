@@ -46,7 +46,7 @@
 
 **4. Реши артефакт по ГЛУБОКОМУ корню (не по метке issue):**
 
-- **STRONG + существующий владелец** → **RFC** (Тип-1 collapse: усилить владельца авторитетом, удалить ad-hoc-координацию + band-aid'ы; шаблон-эталон `navigation-cancellation-unification.md`) → `/brainstorm` (если есть развилка дизайна, как Variant A/B) → `/audit-rfc` → `/implement-rfc`.
+- **STRONG + существующий владелец** → **RFC** (Тип-1 collapse: усилить владельца авторитетом, удалить ad-hoc-координацию + band-aid'ы; шаблон-эталон содержания `packages/core/.claude/rfc/navigation-cancellation-unification.md`, план — по `.claude/prompts/rfc-plan-contract.md`) → `/brainstorm` (если есть развилка дизайна, как Variant A/B) → `/audit-rfc` → `/implement-rfc`.
 - **WEAK / независимые точечные** → `/bugfix` (или `/bugfix-batch`), без RFC-overhead.
 - **Спин-офф под-корни** → отдельные цепочки (новый issue / `/debt-map --verify`).
 - **Найдена более глубокая ОСЬ** → эскалируй: текущая цепочка — её грань; полное разрешение = ось, не только эта цепочка. **НО ось почти всегда ДИСЦИПЛИНА, не RFC:** её фасеты обычно span N пакетов без общего шва (per-site лекарство + lint-превентер «module-level/shared X holding per-instance state»). Collapsible на RFC ТОЛЬКО если фасеты funnel через ОДНОГО УЖЕ существующего владельца в ОДНОМ пакете (cancellation→FSM — редкое «да»; A1/A3/A4/A5 — все «нет»: 4 разных лекарства / 4 пакета / нет общего seam → дисциплина). **Дефолт оси = пометка в карте + lint, НЕ RFC.** Registry/примитив поверх разнопакетных фасетов = Variant-A (один консьюмер).

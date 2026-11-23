@@ -5,9 +5,7 @@ import type { RscLoaderFactoryMap } from "./types";
 import type { DefaultDependencies, PluginFactory } from "@real-router/core";
 import type { ReactNode } from "react";
 
-// Inlined from the deleted validation.ts — single 7-line consumer was
-// here, no other importer in src/ or tests/, so the indirection was
-// pure ceremony.
+// Bound here: this file is the validator's one consumer.
 const validateLoaders = createLoadersValidator(ERROR_PREFIX, ALLOWED_RSC_MODES);
 
 /**
@@ -29,7 +27,7 @@ const validateLoaders = createLoadersValidator(ERROR_PREFIX, ALLOWED_RSC_MODES);
  * const router = cloneRouter(baseRouter);
  *
  * router.usePlugin(rscServerPluginFactory({
- *   "users.profile": () => async (params) => {
+ *   "users.profile": () => async ({ params }) => {
  *     const user = await db.users.findById(params.id);
  *     return <UserProfile user={user} />;
  *   },

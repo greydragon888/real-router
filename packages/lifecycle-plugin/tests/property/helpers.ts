@@ -311,6 +311,188 @@ export function navigateBy(
 }
 
 /**
+ * Runs the attempts in turn, each awaited but a `pending` one, which stays
+ * parked. Answers each navigation's promise, its failure caught.
+ */
+export async function runSignalAttempts(
+  router: Router,
+  attempts: readonly SignalAttempt[],
+): Promise<Promise<unknown>[]> {
+  const settled: Promise<unknown>[] = [];
+
+  for (const attempt of attempts) {
+    const navigation = navigateBy(router, attempt).catch(() => {});
+
+    settled.push(navigation);
+
+    if (attempt.kind !== "pending") {
+      await navigation;
+    }
+  }
+
+  return settled;
+}
+
+/**
+ * What a hook does when it runs (#2975): returns nothing, throws, returns a
+ * promise that rejects, or returns a load that rejects once its signal
+ * aborts. Such a load rejects with an error of its own, with an `AbortError`
+ * that is not the signal's reason, with the signal's reason, or with that
+ * reason as `cause` — one level deep, or two.
+ */
+export type HookOutcome =
+  | "returns"
+  | "throws"
+  | "rejects"
+  | "abort:error"
+  | "abort:foreign-AbortError"
+  | "abort:reason"
+  | "abort:cause"
+  | "abort:cause.cause";
+
+export const arbHookOutcomes: fc.Arbitrary<HookOutcome[]> = fc.array(
+  fc.constantFrom<HookOutcome>(
+    "returns",
+    "throws",
+    "rejects",
+    "abort:error",
+    "abort:foreign-AbortError",
+    "abort:reason",
+    "abort:cause",
+    "abort:cause.cause",
+  ),
+  { minLength: 1, maxLength: 12 },
+);
+
+/** A message the plugin logged, or one it should log: `[message, error]`. */
+export type HookFailure = readonly [message: string, error: unknown];
+
+/**
+ * The {@link createSignalRouter} routes, each hook of each simple route taking
+ * the next of `outcomes` in turn, round and round. `failures` holds what the
+ * logger should see — every reason a hook produced that is not its own abort —
+ * and `logged()` what the plugin logged, both as `[message, error]`.
+ */
+export function createOutcomeRouter(outcomes: readonly HookOutcome[]): {
+  router: Router;
+  failures: HookFailure[];
+  logged: () => HookFailure[];
+} {
+  const failures: HookFailure[] = [];
+  const logged: HookFailure[] = [];
+  let runs = 0;
+
+  const hookOf =
+    (hook: string, route: string): LifecycleHookFactory =>
+    () =>
+    (_toState, _fromState, signal) => {
+      const outcome = outcomes[runs % outcomes.length];
+      const message = `Error in ${hook} hook of route "${route}":`;
+      const id = `failure #${runs}`;
+      // The reason a failing outcome produces is one the logger should see.
+      const fail = (reason: unknown): unknown => {
+        failures.push([message, reason]);
+
+        return reason;
+      };
+
+      runs++;
+
+      switch (outcome) {
+        case "throws": {
+          throw fail(new Error(id));
+        }
+        case "rejects": {
+          return Promise.reject(fail(new Error(id)));
+        }
+        case "returns": {
+          return;
+        }
+        default: {
+          return new Promise<void>((_resolve, reject) => {
+            signal.addEventListener(
+              "abort",
+              () => {
+                reject(abortReason(outcome, signal, id, fail));
+              },
+              { once: true },
+            );
+          });
+        }
+      }
+    };
+
+  const routes: Route[] = [
+    ...["home", "about", "contact"].map((name) => ({
+      name,
+      path: name === "home" ? "/?q" : `/${name}?q`,
+      onEnter: hookOf("onEnter", name),
+      onStay: hookOf("onStay", name),
+      onLeave: hookOf("onLeave", name),
+      onNavigate: hookOf("onNavigate", name),
+    })),
+    { name: "refused", path: "/refused", canActivate: () => () => false },
+    {
+      name: "throwing",
+      path: "/throwing",
+      canActivate: () => () => {
+        throw new Error("guard boom");
+      },
+    },
+    {
+      name: "pending",
+      path: "/pending",
+      canActivate: () => () => new Promise<boolean>(() => {}),
+    },
+  ];
+
+  const router = createRouter(routes, {
+    defaultRoute: "home",
+    logger: {
+      level: "none",
+      callbackIgnoresLevel: true,
+      callback: (_level, context, message, error) => {
+        if (context === "lifecycle-plugin") {
+          logged.push([message, error]);
+        }
+      },
+    },
+  });
+
+  router.usePlugin(lifecyclePluginFactory());
+
+  return { router, failures, logged: () => logged };
+}
+
+/** The reason a load of an `abort:` outcome rejects with once `signal` aborts. */
+function abortReason(
+  outcome: HookOutcome,
+  signal: AbortSignal,
+  id: string,
+  fail: (reason: unknown) => unknown,
+): unknown {
+  switch (outcome) {
+    case "abort:reason": {
+      return signal.reason;
+    }
+    case "abort:cause": {
+      return new Error(id, { cause: signal.reason });
+    }
+    case "abort:cause.cause": {
+      return fail(
+        new Error(id, { cause: new Error(id, { cause: signal.reason }) }),
+      );
+    }
+    case "abort:foreign-AbortError": {
+      return fail(new DOMException(id, "AbortError"));
+    }
+    default: {
+      return fail(new Error(id));
+    }
+  }
+}
+
+/**
  * Creates a router with lifecycle hooks that record call order.
  * Returns the router and the shared call order array.
  */

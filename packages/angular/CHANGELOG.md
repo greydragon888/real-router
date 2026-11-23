@@ -1,5 +1,12 @@
 # @real-router/angular
 
+## 0.24.11
+
+### Patch Changes
+
+- Updated dependencies [[`457cfcf`](https://github.com/greydragon888/real-router/commit/457cfcfa5936bb7a37001e5e908be4089d3b0aee)]:
+  - @real-router/ssr-utils@0.4.0
+
 ## 0.24.10
 
 ### Patch Changes

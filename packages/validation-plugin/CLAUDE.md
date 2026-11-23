@@ -7,22 +7,18 @@
 | Export             | Kind     | Description                                                                                                                              |
 | ------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `validationPlugin` | function | Plugin factory — pass to `router.usePlugin()`. No runtime arguments; generic over the router's dependency map, normally inferred (#1621) |
-| `RouterValidator`  | type     | Full validator interface that core calls into via `ctx.validator?.ns.fn()`.                                                              |
 
-## Validator Namespaces
+## Where core asks this plugin
 
-The `RouterValidator` interface is organized into 8 namespaces, matching core's namespace structure:
+Core asks every refusal at a check position and raises every report as a diagnostic kind (#2388) — see _The dependency doors, `cloneRouter` and `usePlugin` refuse and report on the channels_, _The guard doors and the event bus refuse and report on the channels_, _`navigateToState`, `setRootPath`, `navigateToDefault` and `start` refuse and report on the channels_, _The render-path doors and the state builders refuse and report on the channels_ and _The route resolver reports on three kinds_ below. The route-CRUD walks are checks at `addRoute:batch`, `replaceRoutes:batch`, `removeRoute:entry` and `updateRoute:entry`.
 
-| Namespace      | Key methods                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `routes`       | `validateBuildPathArgs`, `validateMatchPathArgs`, `validateIsActiveRouteArgs`, `validateShouldUpdateNodeArgs`, `validateStateBuilderArgs`, `validateRouteName`, `validateSetRootPathArgs`. ⚠ The route-CRUD walks — `validateAddRouteArgs`, `validateRemoveRouteArgs`, `validateUpdateRouteBasicArgs`, `validateUpdateRoute`, `guardRouteCallbacks`, `guardNoAsyncCallbacks` — are NOT members: the plugin registers them as checks at `addRoute:batch`, `replaceRoutes:batch`, `removeRoute:entry` and `updateRoute:entry` |
-| `options`      | `validateOptions`, `validateResolvedDefaultRoute`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `dependencies` | `validateDependencyName`, `validateSetDependencyArgs`, `validateDependenciesObject`, `validateDependencyExists`, `validateDependencyCount`, `validateCloneArgs`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `plugins`      | `validatePluginLimit`, `validateNoDuplicatePlugins`, `validatePluginKeys` (validates hook names: `onStart`, `onStop`, `onTransitionStart`, `onTransitionLeaveApprove`, `onTransitionSuccess`, `onTransitionError`, `onTransitionCancel`, `teardown`), `validateCountThresholds`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `lifecycle`    | `validateHandlerLimit`, `validateCountThresholds`; the diagnostics `warnOverwrite`, `warnAsyncGuardSync` (a thenable met by the synchronous ask), `warnNonBooleanGuardSync` / `warnNonBooleanGuard` (an answer neither `true` nor `false`, on the synchronous ask / on a transition). ⚠ `validateHandler` is NOT a member: the plugin registers it as a check at `addActivateGuard:entry` / `addDeactivateGuard:entry` |
-| `navigation`   | `validateNavigateToDefaultArgs`, `validateNavigateToStateArgs`, `validateNavigationOptions`, `validateParamsShape`, `validateSearch` — the query twin (#1972); shape only, because a query value round-trips through the URL and the path channel's Symbol / BigInt / control-char rules do not transfer, `validateStartArgs`. ⚠ `validateParams` and `validateNavigateArgs` are NOT here: they left the interface with #2388, and the plugin registers those walks as checks instead                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `state`        | `validateMakeStateArgs`, `validateAreStatesEqualArgs`, `reportDroppedQueryKey` — the mode gate's opt-in diagnostic (#1575); what it reports and why it warns once per route+key is its docblock in `src/validators/state.ts`; `reportUndeclaredParamKey` — the undeclared-params-bag diagnostic (#1579, the params half of #1553): a key the route declares NOWHERE stays in `state.params` as app-level data but never reaches the URL, so the state does not round-trip through its own `state.path`. Core keeps the key: dropping it would retire a documented capability, and the predicate cannot tell a typo from `navigate("users", { id })` on a parent whose child declares `:id`. Which producers raise each diagnostic, and why they differ: gotcha "The two diagnostics answer the predicates differently"; their de-dup scope: "Diagnostic de-dup is per router". ⚠ **Neither diagnostic says anything about a route that does not exist (#1584)** — core gates both on the route being real, because the declaration registries answer `[]` for a missing route exactly as they do for a route with no declarations, and reporting that would blame the caller's bag for a typo in the ROUTE name. `reportCodecRoundTrip` — the codec round-trip diagnostic (#2905): for each state a committing producer builds on a route that has a codec, it reloads the state's path through the router's own `matchPath`, without the path rebuild, and warns about each key the reload does not give back; what it compares, what it reports as the codec's, and that it judges a state before the navigation commits are the docblocks of `roundTripLosses` and `createCodecRoundTripReporter` in `src/validators/state.ts` |
-| `eventBus`     | `validateListenerArgs` — validates event names: `$start`, `$stop`, `$$start`, `$$leaveApprove`, `$$cancel`, `$$success`, `$$error`; `validateCountThresholds` — proactive `warn@20% / error@50%` on the per-event listener count for `subscribe` / `addEventListener` / a plugin's hooks, each warning named after the door that registered the listener — core hands `usePlugin` for the hooks (#1188, #2821), mirroring the plugins / lifecycle / dependencies counters                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Kind                   | Report                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DROPPED_QUERY_KEY`    | `reportDroppedQueryKey` — the mode gate's opt-in diagnostic (#1575); what it reports and why it warns once per route+key is its docblock in `src/validators/state.ts`                                                                                                                                                                                                                                                                                                                                                                  |
+| `UNDECLARED_PARAM_KEY` | `reportUndeclaredParamKey` — the undeclared-params-bag diagnostic (#1579, the params half of #1553): a key the route declares NOWHERE — no path slot its URL prints, the root's included, and no query param — stays in `state.params` as app-level data but never reaches the URL, so the state does not round-trip through its own `state.path`. Core keeps the key: dropping it would retire a documented capability, and the predicate cannot tell a typo from `navigate("users", { id })` on a parent whose child declares `:id`. |
+| `CODEC_ROUND_TRIP`     | `reportCodecRoundTrip` — the codec round-trip diagnostic (#2905): for each state a committing producer builds on a route that has a codec, it reloads the state's path through the router's own `matchPath`, without the path rebuild, and warns about each key the reload does not give back; what it compares, what it reports as the codec's, and that it judges a state before the navigation commits are the docblocks of `roundTripLosses` and `createCodecRoundTripReporter` in `src/validators/state.ts`                       |
+
+Which producers raise the first two kinds, and why they differ: gotcha "The two diagnostics answer the predicates differently"; their de-dup scope: "Diagnostic de-dup is per router". ⚠ **Neither of the two says anything about a route that does not exist (#1584)** — core gates both on the route being real, because the declaration registries answer `[]` for a missing route exactly as they do for a route with no declarations, and reporting that would blame the caller's bag for a typo in the ROUTE name.
 
 ## Gotchas
 
@@ -52,27 +48,26 @@ parameter from the start.
 
 ### One router, one validator (#2349)
 
-A registration that finds `ctx.validator` already occupied throws
-`RouterError("VALIDATION_PLUGIN_ALREADY_INSTALLED")`. The slot holds one
-validator and `teardown` clears it, so two installations give the router a
-teardown that switches validation off while a plugin is still registered —
-whichever of the two runs first, and regardless of which installation it
-belongs to.
+A registration on a router the plugin is already installed on throws
+`RouterError("VALIDATION_PLUGIN_ALREADY_INSTALLED")`. A second installation
+would register every check and kind a second time, so a call that passes would
+run each check twice and each report would print once per installation. The
+mark is a module-level `WeakSet` of routers: an installation adds its router,
+and `teardown` and a retrospective pass that throws take it out, so the router
+accepts an installation again after either.
 
 ⚠ **A clone needs no installation of its own.** `cloneRouter` re-runs the base's
 plugin factories, so a clone arrives validated; calling `usePlugin` on it is the
 shape this refuses, and the message says so. The SSR per-request clone is the
 common case.
 
-⚠ **The refusal reads the SLOT, not a tally of installations.** A counter would
-model an ownership the slot does not grant — `validator` is one of two writable
-members on an otherwise `readonly` `RouterInternals`, open to anything importing
-`@real-router/core/validation`. Reading the slot also keeps re-registration after
-`teardown()` working, which the two diagnostic de-dup tests depend on.
+⚠ **Two copies of this package on one router are not refused.** Each copy
+holds a set of its own, so a bundle that carries the package twice and installs
+both copies on one router runs every check and prints every report twice.
 
 ### `undefined` path is allowed in `validateStartArgs`
 
-`validateStartArgs(undefined)` does not throw. This is intentional: the facade calls `validateStartArgs(startPath)` **before** the interceptor pipeline runs. `browser-plugin` injects `window.location` via `addInterceptor("start", ...)`, which wraps the internal `start()` call — **after** facade validation. If `undefined` were rejected, `router.start()` without an argument would fail when `browser-plugin` is installed.
+`validateStartArgs(undefined)` does not throw. This is intentional: the plugin registers it at `start:entry`, which core asks **before** the interceptor pipeline runs. `browser-plugin` injects `window.location` via `addInterceptor("start", ...)`, which wraps the internal `start()` call — **after** that check. If `undefined` were rejected, `router.start()` without an argument would fail when `browser-plugin` is installed.
 
 ### Unsafe path-param value rejection (#934 / #942)
 
@@ -87,7 +82,7 @@ Value inspection is **own-property only** (mirrors `isParams`) and runs before t
 
 ### Retrospective rollback on failure
 
-If the retrospective pass throws (e.g., duplicate route name, or a dangling `forwardTo` target — a route forwarding to a name the tree does not hold), `ctx.validator` is set back to `null` before the error propagates. ⚠ A **dotted route name** is not among the throws this pass can produce (#1763). `createRouter`, `add` and `replace` each refuse a definition whose own `name` carries a dot — with this package's message, since the rule lives in `engine/validation/route-batch.ts` — so the failure lands before any plugin exists and a second check here would be unreachable. The router is left in a clean state — no partial validation active. The error surfaces at the `usePlugin()` call site.
+If the retrospective pass throws (e.g., duplicate route name, or a dangling `forwardTo` target — a route forwarding to a name the tree does not hold), the router leaves the installation mark before the error propagates, and nothing is registered: the checks and kinds are registered after the pass. ⚠ A **dotted route name** is not among the throws this pass can produce (#1763). `createRouter`, `add` and `replace` each refuse a definition whose own `name` carries a dot — with this package's message, since the rule lives in `engine/validation/route-batch.ts` — so the failure lands before any plugin exists and a second check here would be unreachable. The router is left in a clean state — no partial validation active. The error surfaces at the `usePlugin()` call site.
 
 ### The two diagnostics answer the predicates differently — on purpose (#1581)
 
@@ -98,9 +93,10 @@ is read inside `canonicalize`'s slow path, and the arm for a route unrelated to
 the active one answers above it. So the nav item you are NOT on raises nothing,
 which is most of them. `dropped-query-key.test.ts` owns both arms.
 
-`reportUndeclaredParamKey` fires only from the **committing** producers
-(`navigate`, `buildNavigationState`) and every predicate stays silent. Both are
-correct, and the discriminator is whether anything was LOST:
+`reportUndeclaredParamKey` fires only from the **committing** producers —
+`navigate`, `navigateToDefault` and `buildNavigationState` — and every
+predicate stays silent. Both are correct, and the discriminator is whether
+anything was LOST:
 
 - the mode gate DROPPED the key, so the URL `buildPath` just returned is missing
   what the caller asked for — the warning is about the answer already handed
@@ -119,6 +115,10 @@ whichever ran first while the others with the identical defect went unmentioned.
 A declared QUERY name carrying a value in the `params` bag is reported at
 `buildPath` and `isActiveRoute`. The other two doors already answer on their own:
 `navigate` throws `WRONG_CHANNEL` and `canNavigateTo` returns `false`.
+
+⚑ **The report is a diagnostic kind per door, `BUILD_PATH` and
+`IS_ACTIVE_ROUTE`**, raised after the door's `:entry` checks. One reporter
+handles both, so a route and key warn once across the two doors.
 
 ⚠ **The silence it closes reaches only the paths that never click.** A plain
 left-click throws — `<Link>` hands the same bag to `router.navigate`, and P1's
@@ -141,8 +141,8 @@ Both diagnostics warn once per `route + key` — the gate runs on every navigati
 and every `matchPath`, so an un-deduped warning would flood a dev console the
 moment a route is revisited.
 
-That cache lives on the **validator object**, which `buildValidatorObject` builds
-once per registration, i.e. once per router. A module-level `Set` — one per
+That cache lives in the **reporter** the plugin builds once per registration,
+i.e. once per router. A module-level `Set` — one per
 PROCESS — points every consequence the wrong way for a dev-time signal:
 
 - a second router, including a `cloneRouter` per-request clone under SSR/SSG,
@@ -158,26 +158,35 @@ for the design is the design's own bug report.
 regression — the shape recurred once already (#1579 copied #1575's module-level
 `Set` a release later), which is why the guard is a scan rather than two fixed
 call sites. It flags only ACCUMULATING state: a frozen lookup table is fine, and
-so is a `WeakMap` keyed by an object, which evicts with its key.
+so is a `WeakMap` or a `WeakSet` keyed by an object, which evicts with its key.
 
-### The `navigate` family consults the validator for nothing (#2388)
+### The reports go to the router's logger (#2975)
 
-`navigate` and `canNavigateTo` register all nine of their refusals as checks at
+`reportDroppedQueryKey`, `reportUndeclaredParamKey` and `reportMisChanneledKey`
+write `logger.warn` under the context `router` through the logger their factory
+takes — `PluginApi.logger`, as `createCodecRoundTripReporter` takes it — so the
+router's `logger` option, its `level` and its `callback`, applies to them. Core's
+logger prints `[router] message`, so a message carries no head of its own.
+`tests/functional/router-logger-sink-2975.test.ts` holds a cell per reporter.
+
+### The `navigate` family refuses through checks (#2388)
+
+`navigate` and `canNavigateTo` register their argument refusals as checks at
 four positions — `navigate:entry` / `navigate:params` and the two
-`canNavigateTo` twins. Deleting one call from an entry check reddens
-`navigation.validation.test.ts`, and deleting a core `runChecks` reddens
-`predicate-totality-2245.test.ts`.
+`canNavigateTo` twins. Which suite holds each call is the `REGISTRATION_OWNER`
+table of `validator-boundary-authority-2322.test.ts`, and deleting a core
+`runChecks` at any of the four reddens a plugin suite outside that authority.
 
 ⚠ **`navigate`'s ENTRY still refuses SYNCHRONOUSLY**, from a method whose
 declared return is a promise. That is the facade's own shape for programmer
 error (#1572), not something the channel introduced.
 
-⚠ **The pipeline below `navigate` is a separate layer and still consults.**
-`routes.validateStateBuilderArgs` runs under `buildNavigateState`; a door is
-converted at its own layer, and `validatorContractNamespaces` pins that
-remainder rather than describing it.
+⚠ **The pipeline below `navigate` asks a position of its own.**
+`buildNavigateState` asks `navigate:state` about the name and params it builds
+the state from, the defaults a `navigateToDefault` callback returns included,
+and the check there runs `validateStateBuilderArgs`.
 
-### The printers' value walks are checks, not validator members (#2388)
+### The printers' value walks are checks (#2388)
 
 `buildPath` and `buildPathResolved` register their path-bag VALUE walk with
 `PluginApi.addCheck(…)`, at `buildPath:params` / `buildPathResolved:params`;
@@ -193,40 +202,151 @@ independently — the href door runs the forward chain itself and lands on the
 resolved one — so a shared position would make a refusal name a call that did not
 happen.
 
-⚠ **The SHAPE half stays on the validator, and that asymmetry is load-bearing.**
-`validateNavigateParamsShape` must judge the caller's bag BEFORE core copies —
-a copy launders every shape it exists to refuse — so only the value half has an
-object worth moving.
+⚠ **The SHAPE half is a check at each printer's `:entry` position, and that
+asymmetry is load-bearing.** `validateNavigateParamsShape` must judge the
+caller's bag, not core's copy — a copy launders every shape it exists to
+refuse — so `buildPath:entry` and `buildPathResolved:entry` hand it the
+caller's values, and only the value walk gets the copy.
 
-⚠ **`teardown` must remove the registration.** Nulling `ctx.validator` silences
-every other door and does nothing to a channel registration, so a leak here
-leaves a torn-down plugin still refusing.
+⚠ **`teardown` must remove the registration**, or a torn-down plugin keeps
+refusing.
 
-### Teardown disables validation — but only the validator it still holds
+### The dependency doors, `cloneRouter` and `usePlugin` refuse and report on the channels (#2388)
 
-Calling the unsubscribe function returned by `router.usePlugin(validationPlugin())` clears `ctx.validator`. All subsequent router calls skip validation silently. This is by design — plugins are removable.
+Each refusal of `getDependenciesApi`, `cloneRouter` and `usePlugin` is a check —
+at the door's `:entry` position for the caller's arguments, at
+`getDependency:value` for the value core read, at `usePlugin:plugin` for the
+object a factory returned, and at `setDependency:count` /
+`setDependencies:count` / `usePlugin:count` for the count before a new key or
+before the call's first factory — and each report is a diagnostic kind.
+`validator-boundary-authority-2322.test.ts` names, call by call, the file that
+reds without it.
 
-⚠ **The release is owner-checked (#2339 §4 1b).** The plugin holds the object it wrote and nulls the slot only while that object is still there. `RouterInternals.validator` has no owner — it is plain data on a surface pinned `accessorNames === []`, so a second writer cannot be REFUSED at the slot — and an unconditional `= null` therefore destroyed whoever held the slot at teardown time. Measured with a control: with a second writer in place the foreign validator was nulled; with none, the plugin correctly nulled its own. Same shape as `claimContextNamespace`, which checks the holder on write and on release (#2059 / #1929); here only the release half is reachable.
+⚑ **One count, two halves.** `validateDependencyLimit` and
+`validatePluginLimit` refuse at the count positions, and
+`reportDependencyCount` and `validatePluginCountThresholds` log the `warn` /
+`error` thresholds from the count kinds. Core asks the count position before it
+raises the count kind, so a write or call the limit refuses reports nothing.
 
-⚠ **The WRITE half stays open, deliberately.** Refusing a second write needs an accessor on `RouterInternals`, and `accessorNames === []` is pinned on all six handed-out surfaces (`door-census/surface.test.ts`). It is answered where the slot goes away, not here — #2373.
+⚠ **A `usePlugin` call refused once a factory has run has reported its count.**
+`USE_PLUGIN_COUNT` is raised after the count and entry checks pass and before
+the first factory, so a refusal at `usePlugin:plugin`, or a factory that throws,
+follows the report.
+
+⚠ **The per-key refusal of `setAll` fires only on an exotic call.**
+`validateDependencyBatchLimit` refuses, before core writes a key, every bag
+whose keys would cross the limit. Past it, `setDependencies:count` refuses only
+when the record or the bag changes between that limit and core's walk — a
+`Proxy` whose `ownKeys` answers one key longer on each call, for one.
+
+### The guard doors and the event bus refuse and report on the channels (#2388)
+
+Each refusal of the guard doors is a check — at `addActivateGuard:entry` /
+`addDeactivateGuard:entry` for the caller's arguments, and at
+`canActivate:count` / `canDeactivate:count` for the count before a new slot —
+and each report is a diagnostic kind: the count, an overwrite, a guard's
+non-boolean answer, a thenable the synchronous ask meets, and the listener
+count of `subscribe`, `addEventListener` and a plugin's hooks.
+`validator-boundary-authority-2322.test.ts` names, call by call, the file that
+reds without it.
+
+⚑ **One count, two halves, as for the plugins.** `validateHandlerLimit` refuses
+at the count position, and `validateLifecycleCountThresholds` logs the `warn` /
+`error` thresholds from the count kind. Core asks the count position before it
+raises the count kind, so a guard the limit refuses reports nothing, and
+`add`, `update` and `replace` ask the position before they write a route.
+
+⚠ **`addEventListener`'s arguments are core's alone.** Core refuses an unknown
+event name and a non-function callback on every router, so this plugin keeps no
+copy, and both texts are the same with it installed and without it.
+
+### `navigateToState`, `setRootPath`, `navigateToDefault` and `start` refuse and report on the channels (#2388)
+
+Each refusal of these doors is a check — at `navigateToState:entry`,
+`setRootPath:entry`, `navigateToDefault:entry` and `start:entry` for the
+caller's arguments, and at `navigateToDefault:route` for the name a
+`defaultRoute` callback returned — and the report of a defaults bag mutated
+after `createRouter()` (#2148) is the `NAVIGATE_TO_DEFAULT` kind.
+`validator-boundary-authority-2322.test.ts` names, call by call, the file that
+reds without it.
+
+⚑ **The report follows the entry checks.** Core raises `NAVIGATE_TO_DEFAULT`
+after `navigateToDefault:entry` and before it resolves the defaults, so a call
+the entry refuses reports nothing and the warning waits for the first call that
+passes; a name the callback returns is refused after the report.
+
+⚠ **An omitted options bag is judged as the empty one, and `null` as itself.**
+Core hands both entry positions the caller's value, `undefined` included, so
+the checks substitute the empty bag for `undefined` alone, and `null` stays
+refused at both doors.
+
+### The render-path doors and the state builders refuse and report on the channels (#2388)
+
+The argument checks of `buildPath`, `buildPathResolved`, `isActiveRoute`,
+`areStatesEqual`, `shouldUpdateNode` and `matchPath` stand at each door's
+`:entry` position, which receives the caller's arguments. Three positions judge
+what core builds a state from: `matchPath:decoded` the params a route's
+`decodeParams` returned, `makeState:state` `makeState`'s arguments with core's
+copy of the params, and `navigate:state` the name and params the navigation
+pipeline builds its state from. The report of _The retired single-bag spelling_
+above is the `BUILD_PATH` and `IS_ACTIVE_ROUTE` kinds.
+`validator-boundary-authority-2322.test.ts` names, call by call, the file that
+reds without it.
+
+⚑ **The report follows the entry checks.** Core raises each door's kind after
+its `:entry` position, so a call the entry refuses reports nothing and the
+warning waits for the first call that passes. `buildPath`'s value walk at
+`buildPath:params` comes after the report, so a call that carries a
+mis-channelled key and a value the walk refuses warns and then throws.
+
+⚠ **Core asks the listener count before it raises either kind**, so a router
+with no listener of the kind builds no argument list for it on the render path.
+
+⚠ **A report handler's throw stays inside the emitter.** The emitter logs it
+through `logger.error`, and the door answers as it would without the report —
+unless `console.error` throws too: that error then leaves the door as the
+handler's throw would.
+
+### The route resolver reports on three kinds (#2388)
+
+The reports of _Where core asks this plugin_ above are the
+`DROPPED_QUERY_KEY`, `UNDECLARED_PARAM_KEY` and `CODEC_ROUND_TRIP` kinds, and
+the plugin subscribes to each. `validator-boundary-authority-2322.test.ts`
+names, call by call, the file that reds without it.
+
+⚠ **Absence is still the gate.** The route resolver's three sinks answer
+`undefined` while their kind has no listener, so a router without one walks no
+caller's bag for an undeclared key and looks up no codec for the round-trip
+report.
+
+⚠ A report handler's throw stays inside the emitter, as for the render-path
+kinds above.
+
+When `console.error` throws too, its error takes the handler's place: the
+printers, the builders and `matchPath` throw it, the navigations reject with
+it, `replace()` throws it and keeps the state on its old path, and
+`isActiveRoute` on the active route and `canNavigateTo` catch it and answer
+`false`.
 
 ### Cross-field `Options` validation
 
 `validateOptions` + the retrospective pass diagnose combinations that individual field checks cannot catch:
 
-| Combination                                                                   | Behavior                                                                                                                       | Location                                                                                                                    |
-| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| `limits.warnListeners > limits.maxListeners` (and `maxListeners > 0`)         | `throw RangeError`                                                                                                             | `validators/options.ts::validateLimits`                                                                                     |
-| Static `defaultRoute: "<name>"` that does not exist in the route tree         | `throw Error` with `[validation-plugin]` prefix                                                                                | Retrospective pass (`validationPlugin.ts`)                                                                                  |
-| `DefaultRouteCallback` returning a name that does not exist in the route tree | `throw Error` with `[validation-plugin]` prefix; propagates as `Promise.reject` via `navigateToDefault()` / `start()` fallback | Runtime hook `options.validateResolvedDefaultRoute` called from core's `resolveDefault()` when `defaultRoute` is a callback |
+| Combination                                                                   | Behavior                                                                                      | Location                                                                                                    |
+| ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `limits.warnListeners > limits.maxListeners` (and `maxListeners > 0`)         | `throw RangeError`                                                                            | `validators/options.ts::validateLimits`                                                                     |
+| Static `defaultRoute: "<name>"` that does not exist in the route tree         | `throw Error` with `[validation-plugin]` prefix                                               | Retrospective pass (`validationPlugin.ts`)                                                                  |
+| `DefaultRouteCallback` returning a name that does not exist in the route tree | `throw Error` with `[router.navigateToDefault]` prefix; `navigateToDefault()` rejects with it | Check at `navigateToDefault:route`, which core asks in `resolveDefault()` when `defaultRoute` is a callback |
 
-Callbacks are intentionally **not** probed at registration time — their return value depends on dependencies that may not be set yet. The hook on `resolveDefault()` catches bad return values on the first actual use.
+Callbacks are intentionally **not** probed at registration time — their return value depends on dependencies that may not be set yet. The check in `resolveDefault()` catches bad return values on the first actual use.
 
 **Logger config is not validated by this plugin.** The Router constructor consumes `options.logger` (it builds the router's own `RouterLogger` from it) and strips the key before options are stored (#724), so the retrospective pass — which reads the stored, logger-stripped options — never sees it. Logger config (`level` incl. `"none"`, `callback`, `callbackIgnoresLevel`) is therefore validated solely by core's `isLoggerConfig` guard at construction, the only place the input exists (#789).
 
 ### `navigateToDefault()` Promise contract
 
-`navigateToDefault()` is declared `Promise<State>` but is not `async`. Synchronous exceptions from `deps.resolveDefault()` — a callback that throws, or a validator that rejects a callback's return — are caught and converted to `Promise.reject` so callers can uniformly handle errors via `.catch()` / `await`.
+`navigateToDefault()` is declared `Promise<State>` but is not `async`. Synchronous exceptions from `deps.resolveDefault()` — a callback that throws, or a check at `navigateToDefault:route` that refuses a callback's return — are caught and converted to `Promise.reject` so callers can uniformly handle errors via `.catch()` / `await`.
+
+⚠ The entry refusals are not among them: a check at `navigateToDefault:entry` throws synchronously, as one at `navigate:entry` does.
 
 ### Reaches the engine only through `@real-router/core` (#1301)
 
@@ -238,15 +358,9 @@ The plugin does **not** import core's routing engine (`packages/core/src/engine/
 
 Every `[router.<door>]` head in `src/` is checked against the doors that can
 actually reach it, by `tests/functional/prefix-reachability-authority-2457.test.ts`.
-The door comes from three places, none of them a list: an `addCheck("<door>:<slot>")`
-position, the implementation in core that consults a `RouterValidator` member, or
-a `methodName` the caller hands down for a helper serving several doors.
-
-⚠ **The resolution of an implementation name STOPS at a published door.** It exists
-only to translate `#runStart` into `start` and `#startPlugin` → `use` into
-`usePlugin`. Left to run past a published name it becomes an unbounded closure —
-measured, that gave one validator eleven doors, because `navigate`, `start` and
-`matchPath` all reach a path build eventually, and a wrong door then passed.
+The door comes from two places, none of them a list: an `addCheck("<door>:<slot>")`
+position, or a `methodName` the caller hands down for a helper serving several
+doors.
 
 ⚑ The register holds the two published names (`[cloneRouter]`, `[validation-plugin]`) and nothing else: a refusal no caller input can reach takes O-1's `Internal error (please report): ` marker rather than a bracketed head (#2487). "Both batch doors report `addRoute`" needs no entry either — the shared helper is reached from both batch positions, so the rule admits it unaided.
 
@@ -256,15 +370,8 @@ that share it: two object-literal methods, a function and a method, two nested
 helpers, each reached from a different door. Through the checker a call follows
 lexical scope, an import through the `type-guards` barrel, and a method to the
 object or class that declares it, so no form of the collision is left for a key to
-separate. The member a wiring entry implements is keyed `namespace.member` for the
-same reason: `validateCountThresholds` belongs to three namespaces, each consulted
-from its own doors. The real tree's collisions are inert today, so synthetic cells
-hold both keys.
-
-⚠ **Core's call graph stays keyed by name.** Core reaches some doors through a
-dependency-injection interface the checker cannot follow, and linking those calls
-by name is what finds the door behind them. `doorsForMember` in the authority
-records the measurement.
+separate. The real tree's collisions are inert today, so synthetic cells hold
+the key.
 
 `route-door-prefix-2399.test.ts` stays beside it and answers a different question —
 what a caller SEES, driven end to end. Its reach is the sixteen refusals it drives:
@@ -273,7 +380,7 @@ whole suite green.
 
 ### Core's limit defaults live in ONE place here (#1879)
 
-`helpers.ts` exports `CORE_LIMIT_DEFAULTS`, and every reader takes its fallback from it, in one of two shapes: a `?? …` (four in `validationPlugin.ts`) or a defaulted parameter (`eventBus.ts`, `lifecycle.ts`, `plugins.ts`). Core keeps `DEFAULT_LIMITS` internal, so this is a copy by decision, not by accident.
+`helpers.ts` exports `CORE_LIMIT_DEFAULTS`, and every reader takes its fallback from it, in one of two shapes: a `?? …` (in `validationPlugin.ts`) or a defaulted parameter (`eventBus.ts`, `lifecycle.ts`, `plugins.ts`). Core keeps `DEFAULT_LIMITS` internal, so this is a copy by decision, not by accident.
 
 Two things keep it honest, and they answer different questions. `Readonly<LimitsConfig>` — core's own interface — is what a **key** added in core hits, as a TS2741 here and in `LIMIT_BOUNDS`. `tests/functional/limit-defaults-authority-1879.test.ts` is what a **value** hits: it reads the resolved bag off a router built with no `limits`, so it compares against what core enforces rather than what any file says. The same file scans `src/` for a re-inlined literal, which is what stops the eight-copies shape coming back.
 
@@ -290,13 +397,13 @@ worth hearing about.
 `warnListeners` to the event bus's `EventEmitter`, which throws at the cap
 (`Listener limit (N) reached for "<event>"`) and warns at `warnListeners`;
 `packages/core/tests/functional/limits.test.ts` pins both on a router without this
-plugin. With the plugin installed, `eventBus.validateCountThresholds` adds its
+plugin. With the plugin installed, its report on `LISTENER_COUNT` adds
 warn/error thresholds below that cap — the cap itself stays core's.
 
 ⚠ **`RouteLifecycleNamespace.preflightHandlerLimit` reads as core enforcement and is
-not.** It lives in core and is called from core's route-CRUD prepare phase — and returns
-on its first line without a validator, which its own docblock states ("Plugin-gated: a
-no-op without the validator").
+not.** It lives in core and is called from core's route-CRUD prepare phase — and asks a guard
+type's count position only when a check stands there, which its own docblock states ("A
+no-op for a type with no check at its count position").
 
 So the shape to copy when a limit needs a better position — pre-flight instead of mid-loop,
 say — is `preflightHandlerLimit`: core may own the PROJECTION and the call site while the
@@ -304,13 +411,14 @@ plugin owns the VERDICT. Moving a limit's enforcement into bare core would be a 
 product, not a bug fix.
 
 ⚑ **`setDependencies` is the worked example (#2253).** Its limit is asked by
-`validateDependencyBatchLimit`, from inside this plugin's `validateDependenciesObject`
-wrapper — core's only pre-flight call on the whole bag, and therefore the one position from
-which a refusal can precede every write. The position already existed in core, and
-`PluginApi.getDependencyKeys()` plus `getResolvedLimits()` give the wrapper what it needs to
-project (#2382). The per-key `validateDependencyCount` stays where it is, because the advisory `warn` / `error`
-thresholds fire as the store grows and a projection cannot say which of them a batch would
-cross without replaying it.
+`validateDependencyBatchLimit`, registered at `setDependencies:entry` beside
+`validateDependenciesObject` — the position core asks once, before it writes a key, so a
+refusal there leaves the record as it was.
+`PluginApi.getDependencyKeys()` plus `getResolvedLimits()` give it what it needs to
+project (#2382). The per-key count stays too. Its report on `SET_DEPENDENCIES_COUNT`
+logs the advisory `warn` / `error` thresholds as the store grows, which a projection
+cannot place without replaying the batch. Its check at `setDependencies:count` refuses
+only the exotic call described under _The dependency doors, `cloneRouter` and `usePlugin` refuse and report on the channels_.
 
 ⚠ A limit core owns and `LIMIT_BOUNDS` does not is not a missing check — `validateLimits` rejects it as `unknown limit`, the `plugin ⊇ core` false-reject of #1224 / #1225. That is why the bounds table is keyed by core's type and not by its own literals.
 
@@ -318,4 +426,3 @@ cross without replaying it.
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Source structure, data flow, design decisions
 - [packages/core/CLAUDE.md](../core/CLAUDE.md) — How core asks this plugin to refuse or report: check positions and diagnostic kinds
-- [packages/core/src/types/RouterValidator.ts](../core/src/types/RouterValidator.ts) — Full interface definition

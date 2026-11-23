@@ -1,5 +1,232 @@
 # @real-router/validation-plugin
 
+## 0.41.0
+
+### Minor Changes
+
+- [#2996](https://github.com/greydragon888/real-router/pull/2996) [`749176a`](https://github.com/greydragon888/real-router/commit/749176a702f284e48ff4351a44a4e41d48fd4f2b) Thanks [@greydragon888](https://github.com/greydragon888)! - The query-key warnings respect the router's `logger` option ([#2975](https://github.com/greydragon888/real-router/issues/2975))
+
+  The warnings about a query key the `queryParamsMode` drops, a param the route
+  declares nowhere, and a declared query param given in the `params` bag were
+  written to `console.warn` directly, past the router's `logger` option. They go
+  to the router's `logger.warn` under the context `router`, as the codec
+  round-trip warning does, so `level` and `callback` apply to them. With the
+  default logger the console shows the same lines as before.
+
+  **Breaking Change:** the warnings no longer reach `console` under
+  `level: "error-only"` or `"none"`. To keep them under such a level, read them in
+  the router's `logger.callback` with `callbackIgnoresLevel: true`: it receives
+  each under the context `router`, without the `[router]` head the console
+  prints.
+
+## 0.40.0
+
+### Minor Changes
+
+- [#2994](https://github.com/greydragon888/real-router/pull/2994) [`c78519e`](https://github.com/greydragon888/real-router/commit/c78519ebb20dfb831f016ed9c9dc25d39f7493a9) Thanks [@greydragon888](https://github.com/greydragon888)! - The `RouterValidator` re-export is removed, and the refusal of a second installation reads the plugin's own mark ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  **Breaking Change:** the package no longer re-exports the `RouterValidator`
+  type, which `@real-router/core` no longer publishes. It has declared no member
+  since 0.39.0; drop the import.
+
+  A second installation on a router the plugin is already installed on is still
+  refused with `VALIDATION_PLUGIN_ALREADY_INSTALLED`, and the router accepts an
+  installation again after `teardown` and after a retrospective pass that throws.
+  The mark is a module-level `WeakSet` of routers, so `getInternals(router)`
+  holds nothing for the plugin.
+
+  ⚠ **Two copies of the package on one router are no longer refused.** Each copy
+  holds a mark of its own, so a bundle that carries the package twice and
+  installs both copies on one router runs every check twice and prints every
+  warning twice. That setup is unsupported: install one copy of the package.
+
+### Patch Changes
+
+- Updated dependencies [[`c78519e`](https://github.com/greydragon888/real-router/commit/c78519ebb20dfb831f016ed9c9dc25d39f7493a9)]:
+  - @real-router/core@0.170.0
+
+## 0.39.0
+
+### Minor Changes
+
+- [#2992](https://github.com/greydragon888/real-router/pull/2992) [`59311a0`](https://github.com/greydragon888/real-router/commit/59311a056550c1ab0de10fd9d1118cf047e05d59) Thanks [@greydragon888](https://github.com/greydragon888)! - The route resolver's three warnings move onto diagnostics ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  The mode gate's dropped-query-key warning, the undeclared-params-key warning
+  and the codec round-trip warning are subscriptions to `DROPPED_QUERY_KEY`,
+  `UNDECLARED_PARAM_KEY` and `CODEC_ROUND_TRIP`, removed on `teardown`. Each
+  keeps its message and its de-dup per router.
+
+  The re-exported `RouterValidator` type declares no member; code typed against
+  its `state` namespace subscribes to the kinds instead, as `@real-router/core`
+  describes. While the plugin is installed, `getInternals(router).validator`
+  holds an object with no member: it marks the installation, so a second one on
+  the same router is still refused.
+
+  ⚠ **A `console.warn` that throws on one of these warnings no longer escapes
+  the door.** The router logs the throw through `logger.error`, and the door
+  answers as it does without the warning. On a dropped query key that is
+  `buildPath`, `buildPathResolved`, `makeState`, `buildNavigationState`,
+  `matchPath`, `isActiveRoute` on the active route, `canNavigateTo`, `navigate`,
+  `navigateToDefault`, `start` and the revalidation of `RoutesApi.replace()`; on
+  an undeclared params key or a codec warning, `navigate`, `navigateToDefault`
+  and `buildNavigationState`. Previously the printers, the builders and
+  `matchPath` threw, the two predicates answered `false`, the navigations
+  rejected, and `replace()` threw and left the state on its old path. A setup
+  whose `console.error` throws as well still gets those answers, with the error
+  `console.error` threw when the router logged the warning's throw.
+
+### Patch Changes
+
+- Updated dependencies [[`59311a0`](https://github.com/greydragon888/real-router/commit/59311a056550c1ab0de10fd9d1118cf047e05d59)]:
+  - @real-router/core@0.169.0
+
+## 0.38.0
+
+### Minor Changes
+
+- [#2989](https://github.com/greydragon888/real-router/pull/2989) [`c7c7bfc`](https://github.com/greydragon888/real-router/commit/c7c7bfc56ee724b7de0128dca4dac67e97a1fccf) Thanks [@greydragon888](https://github.com/greydragon888)! - The validation of the render-path doors and the state builders moves onto checks and diagnostics ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  The argument refusals of `buildPath`, `buildPathResolved`, `isActiveRoute`,
+  `areStatesEqual`, `shouldUpdateNode` and `matchPath` are checks at their
+  `:entry` positions; what a route's `decodeParams` returns is refused at
+  `matchPath:decoded`, the arguments of `makeState` at `makeState:state`, and
+  what the navigation pipeline builds a state from at `navigate:state`. The
+  warning about a declared query name handed in the `params` bag is a
+  subscription to `BUILD_PATH` and `IS_ACTIVE_ROUTE`. All are removed on
+  `teardown`, and each refusal and report keeps its message.
+
+  The re-exported `RouterValidator` type loses its `routes` and `navigation`
+  namespaces and `state.validateMakeStateArgs` / `state.validateAreStatesEqualArgs`;
+  code typed against it registers checks and diagnostics instead, as
+  `@real-router/core` describes.
+
+  ⚑ **The warning follows the entry refusals.** A `buildPath` or `isActiveRoute`
+  call the plugin refuses at its entry logs no warning about a declared query
+  name in `params`, and the warning comes on the first call that passes.
+  Previously a `buildPath` call with `params` or `search` of the wrong shape,
+  and an `isActiveRoute` call with a `search` of the wrong shape, logged it
+  before the throw. `buildPath` refuses a path value — a `Symbol`, say — after the warning,
+  as before.
+
+  ⚠ **A throw from the warning no longer escapes the door.** A `console.warn`
+  that throws is logged through the router's `logger.error`, and `buildPath`
+  returns its path, `isActiveRoute` its answer.
+
+### Patch Changes
+
+- Updated dependencies [[`c7c7bfc`](https://github.com/greydragon888/real-router/commit/c7c7bfc56ee724b7de0128dca4dac67e97a1fccf)]:
+  - @real-router/core@0.168.0
+
+## 0.37.0
+
+### Minor Changes
+
+- [#2983](https://github.com/greydragon888/real-router/pull/2983) [`1a85574`](https://github.com/greydragon888/real-router/commit/1a85574fa572d751f2e8342ed6d0c9d3b44f8b45) Thanks [@greydragon888](https://github.com/greydragon888)! - The validation of `navigateToState`, `setRootPath`, `navigateToDefault` and `start` moves onto checks and a diagnostic ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  The argument refusals of the four doors are checks at their `:entry`
+  positions, the refusal of an unknown route name a `defaultRoute` callback
+  returns is a check at `navigateToDefault:route`, and the warning about a
+  `defaultParams` / `defaultSearch` bag mutated after `createRouter()` is a
+  subscription to `NAVIGATE_TO_DEFAULT`, all removed on `teardown`. Each refusal
+  and report keeps its message and logger channel.
+
+  The re-exported `RouterValidator` type loses its `options` namespace,
+  `routes.validateSetRootPathArgs` and four `navigation` members; code typed
+  against it registers checks and diagnostics instead, as `@real-router/core`
+  describes.
+
+  ⚑ **The warning follows the entry refusals.** A `navigateToDefault` call whose
+  options carry a field the plugin refuses — `{ replace: "yes" }`, say — no
+  longer logs the warning about a mutated defaults bag before it throws; the
+  warning comes on the first call that passes. A name a `defaultRoute` callback returns is refused
+  after the warning, as before.
+
+### Patch Changes
+
+- Updated dependencies [[`1a85574`](https://github.com/greydragon888/real-router/commit/1a85574fa572d751f2e8342ed6d0c9d3b44f8b45)]:
+  - @real-router/core@0.166.0
+
+## 0.36.0
+
+### Minor Changes
+
+- [#2980](https://github.com/greydragon888/real-router/pull/2980) [`fc3f359`](https://github.com/greydragon888/real-router/commit/fc3f3594de209d01223a4c0bf1b7bf39b15aa383) Thanks [@greydragon888](https://github.com/greydragon888)! - The guard and listener-count validation moves onto checks and diagnostics ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  The handler limit refuses at `canActivate:count` / `canDeactivate:count`, and
+  the count thresholds, the overwrite warning, the two reports of the synchronous
+  ask, the transition's non-boolean report and the listener-count thresholds are
+  subscriptions to their diagnostic kinds, all removed on `teardown`. Each refusal
+  and report keeps its message and logger channel.
+
+  The re-exported `RouterValidator` type loses its `lifecycle` and `eventBus`
+  namespaces; code typed against it registers checks and diagnostics instead, as
+  `@real-router/core` describes.
+
+  The plugin no longer checks the arguments of `addEventListener`: core refuses an
+  unknown event name and a non-function callback on every router, with the same
+  messages, before the plugin's copy could run.
+
+  ⚑ **One count, two halves.** The limit refuses at the count positions, and the
+  `warn` / `error` thresholds are logged from `CAN_ACTIVATE_COUNT` /
+  `CAN_DEACTIVATE_COUNT`. Core asks the position first, so a guard refused at the
+  limit logs nothing.
+
+### Patch Changes
+
+- Updated dependencies [[`fc3f359`](https://github.com/greydragon888/real-router/commit/fc3f3594de209d01223a4c0bf1b7bf39b15aa383)]:
+  - @real-router/core@0.165.0
+
+## 0.35.0
+
+### Minor Changes
+
+- [#2978](https://github.com/greydragon888/real-router/pull/2978) [`4c15047`](https://github.com/greydragon888/real-router/commit/4c1504791eaab1ce5dc81acc6755cbfcc261bf30) Thanks [@greydragon888](https://github.com/greydragon888)! - The `usePlugin` validation is registered as checks and diagnostics ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  The limit, the duplicate-factory and the plugin-key refusals are checks at
+  `usePlugin:count`, `usePlugin:entry` and `usePlugin:plugin`, and the threshold,
+  batch-duplicate and hook-type reports are subscriptions to their diagnostic
+  kinds, all removed on `teardown`. Each refusal and report keeps its message
+  and logger channel.
+
+  The re-exported `RouterValidator` type loses its `plugins` namespace; code
+  typed against it registers checks and diagnostics instead, as
+  `@real-router/core` describes.
+
+  ⚑ **One count, two halves.** The limit refuses at
+  `usePlugin:count`, and the `warn` / `error` thresholds are logged from
+  `USE_PLUGIN_COUNT`. Core asks the position first, so a call refused at the
+  limit logs nothing.
+
+### Patch Changes
+
+- Updated dependencies [[`4c15047`](https://github.com/greydragon888/real-router/commit/4c1504791eaab1ce5dc81acc6755cbfcc261bf30)]:
+  - @real-router/core@0.164.0
+
+## 0.34.0
+
+### Minor Changes
+
+- [#2971](https://github.com/greydragon888/real-router/pull/2971) [`96a8bb0`](https://github.com/greydragon888/real-router/commit/96a8bb03392d5ecff9865400b2ac7711a0f0e4f7) Thanks [@greydragon888](https://github.com/greydragon888)! - The dependency and `cloneRouter` validation is registered as checks and diagnostics ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  Each refusal of `getDependenciesApi` and `cloneRouter` is a check at its door's
+  position, and each warning a subscription to its diagnostic kind, all removed on
+  `teardown`. Each refusal and warning keeps its message and logger channel, and
+  the refusals keep their order.
+
+  The re-exported `RouterValidator` type loses its `dependencies` namespace; code
+  typed against it registers checks and diagnostics instead, as
+  `@real-router/core` describes.
+
+  ⚑ **The dependency count is split in two.** The limit refuses at
+  `setDependency:count` / `setDependencies:count`, and the `warn` / `error`
+  thresholds are logged from `SET_DEPENDENCY_COUNT` / `SET_DEPENDENCIES_COUNT`.
+  Core asks the position first, so a write refused at the limit logs nothing.
+
+### Patch Changes
+
+- Updated dependencies [[`96a8bb0`](https://github.com/greydragon888/real-router/commit/96a8bb03392d5ecff9865400b2ac7711a0f0e4f7)]:
+  - @real-router/core@0.163.0
+
 ## 0.33.2
 
 ### Patch Changes

@@ -106,9 +106,10 @@ describe("router.start() - error handling", () => {
       // #1412: a Plugin.onStart that rejects ASYNCHRONOUSLY must be isolated too.
       // Plugin hooks are raw EventEmitter listeners; the emitter previously caught
       // only SYNC throws, so an async rejection leaked as a Node unhandledRejection
-      // (fatal under --unhandled-rejections=strict). The emitter now isolates a
-      // returned thenable's rejection centrally, routing it to the same
-      // logger.error sink a sync throw flows through — symmetric with subscribe/#944.
+      // (fatal under the default --unhandled-rejections=throw). The emitter now
+      // isolates a returned thenable's rejection centrally, routing it to the
+      // same logger.error sink a sync throw flows through — symmetric with
+      // subscribe/#944.
       it("isolates an async (rejecting) Plugin.onStart — router still starts, rejection logged (#1412)", async () => {
         const errorSpy = vi
           .spyOn(console, "error")

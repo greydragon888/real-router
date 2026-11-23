@@ -396,7 +396,7 @@ describe("@real-router/rsc-server-plugin", () => {
   });
 
   describe("Factory compilation errors", () => {
-    it("should release claim when factory throws during compilation", () => {
+    it("should release every claim when factory throws during compilation", () => {
       const factory = rscServerPluginFactory({
         home: () => {
           throw new Error("factory crash");
@@ -407,6 +407,9 @@ describe("@real-router/rsc-server-plugin", () => {
 
       expect(() =>
         getPluginApi(router).claimContextNamespace("rsc"),
+      ).not.toThrow();
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("ssrRscMode"),
       ).not.toThrow();
     });
 
@@ -421,7 +424,7 @@ describe("@real-router/rsc-server-plugin", () => {
       );
     });
 
-    it("should release claim when factory returns non-function", () => {
+    it("should release every claim when factory returns non-function", () => {
       const factory = rscServerPluginFactory({
         home: (() => 42) as unknown as RscLoaderFactoryMap[string],
       });
@@ -430,6 +433,9 @@ describe("@real-router/rsc-server-plugin", () => {
 
       expect(() =>
         getPluginApi(router).claimContextNamespace("rsc"),
+      ).not.toThrow();
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("ssrRscMode"),
       ).not.toThrow();
     });
   });

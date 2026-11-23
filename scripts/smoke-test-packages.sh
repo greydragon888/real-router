@@ -2,12 +2,15 @@
 set -euo pipefail
 
 # Smoke test: pack all public packages, install from tarballs into
-# an isolated temp project, and verify that every export resolves.
+# an isolated temp project, verify that every export resolves, and check the
+# loader errors of @real-router/ssr-utils in its builds and copies.
 #
 # Catches:
 # - Private packages leaking into dependencies (#413)
 # - Source files shipped in tarball causing Vite resolve failures (#418)
 # - Broken export paths, missing dist files
+# - Loader errors of @real-router/ssr-utils that go wrong in its builds and
+#   copies or behind the SSR plugins' `./errors` (Phase 4)
 #
 # Usage: bash scripts/smoke-test-packages.sh
 
@@ -125,7 +128,17 @@ OPTIONAL_PEERS=(
 # tree (local tarballs + the optional `ink` peer) passes both with v12 defaults
 # and with this flag; npm silently ignores unknown flags, so on an older bundled
 # npm (< 11.16) this degrades to a no-op rather than failing. See #1596 item 6.
-(cd "$PROJECT_DIR" && npm install --install-strategy=hoisted --strict-allow-scripts=true "${INSTALL_ARGS[@]}" "${OPTIONAL_PEERS[@]}" 2>&1) | tail -3
+#
+# The output goes to a log. On a failure the script prints its `npm error`
+# lines: they name the package or version npm could not fetch, and the last
+# lines of the output do not.
+INSTALL_LOG="$TEMP_DIR/npm-install.log"
+if ! (cd "$PROJECT_DIR" && npm install --install-strategy=hoisted --strict-allow-scripts=true "${INSTALL_ARGS[@]}" "${OPTIONAL_PEERS[@]}") > "$INSTALL_LOG" 2>&1; then
+  echo "ERROR: npm install failed"
+  grep -E '^npm (error|ERR!)' "$INSTALL_LOG" || cat "$INSTALL_LOG"
+  exit 1
+fi
+tail -3 "$INSTALL_LOG"
 
 echo ""
 echo "=== Phase 3: Verify all exports resolve ==="
@@ -231,3 +244,47 @@ fi
 
 echo ""
 echo "All $PASSED exports resolve correctly from consumer perspective"
+
+echo ""
+echo "=== Phase 4: Loader errors of ssr-utils in its builds and copies ==="
+
+# @real-router/ssr-utils exports the loader errors and withTimeout, and the
+# `./errors` subpath of each SSR plugin re-exports them. `import` and `require`
+# load two builds of the package, and an application whose own ssr-utils
+# leaves a plugin's range gives the plugin a copy of its own, which npm puts
+# under the plugin. The copy here sits there too, so the six places below hold
+# four different classes of each: two builds of two copies.
+SECOND_COPY="$PROJECT_DIR/node_modules/@real-router/ssr-data-plugin/node_modules/@real-router/ssr-utils"
+mkdir -p "$(dirname "$SECOND_COPY")"
+cp -R "$PROJECT_DIR/node_modules/@real-router/ssr-utils" "$SECOND_COPY"
+
+# The check is `loaderErrorFailures` in `scripts/loader-error-identity.mjs`,
+# whose docblock lists what it holds.
+if ! (cd "$PROJECT_DIR" && CHECK="$REPO_ROOT/scripts/loader-error-identity.mjs" node --input-type=module -e "
+  import { createRequire } from 'node:module';
+  import { pathToFileURL } from 'node:url';
+
+  const { loaderErrorFailures } = await import(pathToFileURL(process.env.CHECK).href);
+  const require = createRequire(process.cwd() + '/');
+  const places = [];
+  for (const spec of [
+    '@real-router/ssr-utils',
+    '@real-router/rsc-server-plugin/errors',
+    '@real-router/ssr-data-plugin/errors',
+  ]) {
+    places.push({ label: spec + ' (import)', module: await import(spec) });
+    places.push({ label: spec + ' (require)', module: require(spec) });
+  }
+  const failures = await loaderErrorFailures(places, { distinct: 4 });
+  for (const failure of failures) {
+    console.log('  FAIL: ' + failure);
+  }
+  if (failures.length > 0) {
+    process.exit(1);
+  }
+  console.log('  ' + places.length + ' places: instanceof holds for every loader error');
+"); then
+  echo ""
+  echo "Smoke test FAILED — the loader errors of ssr-utils failed Phase 4"
+  exit 1
+fi

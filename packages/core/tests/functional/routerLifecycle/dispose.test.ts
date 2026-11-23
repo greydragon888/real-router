@@ -606,6 +606,34 @@ describe("dispose", () => {
       } catch (error: any) {
         expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
       }
+
+      // A call that carries no factory meets only the facade's question.
+      for (const skipped of [[], [false, null]] as const) {
+        let code: unknown = "no throw";
+
+        try {
+          boundUsePlugin(...skipped);
+        } catch (error: any) {
+          code = error.code;
+        }
+
+        expect(code).toBe(errorCodes.ROUTER_DISPOSED);
+      }
+    });
+  });
+
+  // ⚑ The facade asks whether the router is alive after its entry checks and
+  // report, and a reference bound before dispose() reaches that question too.
+  describe("a bound navigateToDefault() reference throws ROUTER_DISPOSED after dispose() (#2388)", () => {
+    it("throws synchronously, as the swapped facade does", async () => {
+      await router.start("/home");
+      const boundNavigateToDefault = router.navigateToDefault.bind(router);
+
+      router.dispose();
+
+      expect(() => boundNavigateToDefault()).toThrow(
+        expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }),
+      );
     });
   });
 

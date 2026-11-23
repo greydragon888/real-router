@@ -2,8 +2,11 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 
 import { createRouter } from "@real-router/core";
-import { cloneRouter, getDependenciesApi } from "@real-router/core/api";
-import { getInternals } from "@real-router/core/validation";
+import {
+  cloneRouter,
+  getDependenciesApi,
+  getPluginApi,
+} from "@real-router/core/api";
 
 import {
   createFixtureRouter,
@@ -105,43 +108,32 @@ describe("getDependenciesApi CRUD Properties", () => {
 
   // The store-level idempotency above (Object.is semantics) holds for NaN too,
   // but it can't exercise the `bothAreNaN` special case in setDependency: that
-  // case only suppresses the validator's overwrite WARNING (validation-plugin-
-  // gated) — the store writes NaN regardless. `arbParamValue` also never emits
-  // NaN. So a focused unit with a mock validator is the right probe.
-  it("NaN idempotency: re-setting NaN over NaN suppresses the overwrite warning (bothAreNaN)", () => {
+  // case only suppresses the overwrite REPORT — the store writes NaN
+  // regardless. `arbParamValue` also never emits NaN. So a focused unit that
+  // listens to the report is the right probe.
+  it("NaN idempotency: re-setting NaN over NaN suppresses the overwrite report (bothAreNaN)", () => {
     const router = createFixtureRouter();
     const deps = getDependenciesApi(router) as unknown as AnyDepsApi;
 
     const overwriteWarnings: string[] = [];
 
-    // set() calls several validator.dependencies hooks (validateSetDependencyArgs,
-    // validateDependencyCount, warnOverwrite, …). Stub them all as no-ops via a
-    // Proxy and record only warnOverwrite — the bothAreNaN signal under test.
-    const dependenciesValidator = new Proxy(
-      {
-        warnOverwrite: (name: string) => {
-          overwriteWarnings.push(name);
-        },
-      } as Record<string, (...args: unknown[]) => unknown>,
-      {
-        get: (target, prop: string) => target[prop] ?? (() => undefined),
+    getPluginApi(router).subscribeDiagnostic(
+      "SET_DEPENDENCY_OVERWRITE",
+      (name) => {
+        overwriteWarnings.push(name);
       },
     );
 
-    getInternals(router).validator = {
-      dependencies: dependenciesValidator,
-    } as never;
-
     // NaN over NaN looks like a change (NaN !== NaN) but `bothAreNaN` suppresses
-    // the overwrite warning — idempotent.
+    // the overwrite report — idempotent.
     deps.set("k", Number.NaN);
     // eslint-disable-next-line sonarjs/no-element-overwrite -- re-setting the same key IS the idempotency under test
     deps.set("k", Number.NaN);
 
     expect(overwriteWarnings).toStrictEqual([]);
 
-    // A genuine value change DOES warn — proves the suppression is NaN-specific
-    // (not a blanket "never warn").
+    // A genuine value change DOES report — proves the suppression is NaN-specific
+    // (not a blanket "never report").
     deps.set("k", 1);
     // eslint-disable-next-line sonarjs/no-element-overwrite -- intentional overwrite with a different value
     deps.set("k", 2);

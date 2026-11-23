@@ -9,8 +9,9 @@ export const ERROR_PREFIX = `[@real-router/${LOGGER_CONTEXT}]`;
  * `"data-only"` is intentionally excluded — RSC has no semantically meaningful
  * "data without component" (the Flight payload IS the data + component).
  *
- * Single source of truth for `factory.ts` (`createSsrLoaderPlugin` allowedModes),
- * `validation.ts` (factory-time loader-map validator), and `getSsrRscMode.ts`
- * (runtime read-side guard against TS-cast-bypassed garbage in `state.context`).
+ * Single source of truth for `factory.ts` (the factory-time loader-map
+ * validator it binds and the `allowedModes` it passes to `createSsrLoaderPlugin`)
+ * and `getSsrRscMode.ts` (runtime read-side guard against TS-cast-bypassed
+ * garbage in `state.context`).
  */
 export const ALLOWED_RSC_MODES: readonly RscSsrMode[] = ["full", "client-only"];

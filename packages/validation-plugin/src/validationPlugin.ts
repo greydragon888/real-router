@@ -5,29 +5,22 @@ import { raiser } from "@real-router/core/utils";
 import { getInternals } from "@real-router/core/validation";
 
 import { CORE_LIMIT_DEFAULTS } from "./helpers";
-import {
-  validateRouteName,
-  isState,
-  isBoolean,
-  getTypeDescription,
-} from "./type-guards";
+import { validateRouteName } from "./type-guards";
 import { DefaultsMutationWatch } from "./validators/defaultsMutation";
 import {
   validateDependencyName,
-  validateSetDependencyArgs as validateSetDependencyArgsRaw,
+  validateSetDependencyArgs,
   validateDependenciesObject,
   validateDependencyBatchLimit,
-  validateDependencyExists as validateDependencyExistsRaw,
-  validateDependencyCount,
+  validateDependencyExists,
+  validateDependencyLimit,
+  reportDependencyCount,
   validateCloneArgs,
   warnOverwrite as warnDepsOverwrite,
   warnBatchOverwrite,
   warnRemoveNonExistent,
 } from "./validators/dependencies";
-import {
-  validateListenerArgs,
-  validateListenerCountThresholds,
-} from "./validators/eventBus";
+import { validateListenerCountThresholds } from "./validators/eventBus";
 import { nameInTable } from "./validators/forwardTo";
 import {
   validateHandler,
@@ -93,35 +86,40 @@ import {
   createCodecRoundTripReporter,
   createDroppedQueryKeyReporter,
   createUndeclaredParamKeyReporter,
+  validateAreStatesEqualArgs,
   validateMakeStateArgs,
 } from "./validators/state";
 
-import type { EventName, EventMethodMap } from "./validators/eventBus";
 import type { RouteLookup } from "./validators/forwardTo";
 import type { ReloadPath } from "./validators/state";
 import type {
   DefaultDependencies,
+  NavigationOptions,
   PluginApi,
   PluginFactory,
-  RouterValidator,
   Route,
   RoutesApi,
-  Plugin,
 } from "@real-router/core";
 import type { RouteTree } from "@real-router/core/validation";
 
 const atValidationPlugin = raiser("validation-plugin");
 const atAddRoute = raiser("router", "addRoute");
-const atAreStatesEqual = raiser("router", "areStatesEqual");
+
+/** The options a door judges for a call that passed none. */
+const EMPTY_OPTIONS: NavigationOptions = Object.freeze({});
 
 /**
- * A `search` that `areStatesEqual(…, false)` can compare: an object that is
- * neither `null` nor an array — the shape `validateSearch` accepts for a query
- * bag.
+ * The routers this plugin is installed on (#2349). A second install on one
+ * router is refused: it would register every check and kind a second time, so
+ * a call that passes would run each check twice and each report would print
+ * twice. `teardown` takes the router out, and so does a retrospective pass
+ * that throws.
+ *
+ * ⚠ A `WeakSet`, so the entry goes with its router. Each copy of this package
+ * holds a set of its own, so a second COPY of the package installed on the
+ * same router is not refused.
  */
-function isSearchBag(value: unknown): boolean {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+const INSTALLED = new WeakSet<object>();
 
 /** The one question existence asks of a tree node: its children by segment. */
 interface TreeNode {
@@ -213,225 +211,6 @@ function readRoutes<Dependencies extends DefaultDependencies>(
   return routes;
 }
 
-function buildValidatorObject(
-  api: PluginApi,
-  lookup: RouteLookup,
-  defaultsWatch: DefaultsMutationWatch,
-  reloadPath: ReloadPath,
-): RouterValidator {
-  // One de-dup cache per validator object, i.e. per registration, i.e. per router
-  // (#1583) — the same lifetime the mode gate's reporters get, for the same
-  // reason: a module-level Set would let the first router in a process silence
-  // every one after it.
-  const reportMisChanneledKey = createMisChanneledKeyReporter((routeName) =>
-    api.getDeclaredQueryNames(routeName),
-  );
-
-  return {
-    routes: {
-      validateBuildPathArgs(route, params) {
-        validateBuildPathArgs(route);
-        reportMisChanneledKey(route, params);
-      },
-      validateMatchPathArgs,
-      validateIsActiveRouteArgs(name, params, strict, ignoreQP) {
-        // An assertion, so `name` is a string below by the type system rather
-        // than by a second runtime check.
-        validateIsActiveRouteArgs(name, params, strict, ignoreQP);
-        reportMisChanneledKey(name, params);
-      },
-      validateShouldUpdateNodeArgs,
-      validateStateBuilderArgs,
-
-      validateRouteName(name, caller) {
-        validateRouteName(name, caller);
-      },
-      validateSetRootPathArgs,
-    },
-    options: {
-      validateOptions,
-      validateResolvedDefaultRoute(routeName) {
-        validateResolvedDefaultRoute(routeName, lookup);
-      },
-    },
-    dependencies: {
-      validateDependencyName,
-      validateSetDependencyArgs(_name, _value, _caller) {
-        validateSetDependencyArgsRaw(_name);
-      },
-      validateDependenciesObject(deps, methodName) {
-        validateDependenciesObject(deps, methodName);
-
-        // ⚑ The limit, asked here rather than from inside the ingest loop
-        // (#2253). This is core's only pre-flight call on the whole bag, so it
-        // is the one position where a refusal can precede every write. The
-        // shape check above runs first: a bag that is not a plain object, or
-        // carries a getter, is refused for what it IS before it is measured.
-        validateDependencyBatchLimit(
-          deps,
-          api.getDependencyKeys(),
-          api.getResolvedLimits().maxDependencies,
-          methodName,
-        );
-      },
-      validateDependencyExists(name, value) {
-        validateDependencyExistsRaw(value, name);
-      },
-      validateDependencyCount(currentCount, maxDependencies, methodName) {
-        validateDependencyCount(
-          currentCount,
-          maxDependencies,
-          methodName,
-          api.logger,
-        );
-      },
-      validateCloneArgs,
-      warnOverwrite(name, methodName) {
-        warnDepsOverwrite(name, methodName, api.logger);
-      },
-      warnBatchOverwrite(keys, methodName) {
-        warnBatchOverwrite(keys, methodName, api.logger);
-      },
-      warnRemoveNonExistent(name) {
-        warnRemoveNonExistent(name, api.logger);
-      },
-    },
-    plugins: {
-      validatePluginLimit(currentCount, newCount, limits) {
-        validatePluginLimit(
-          currentCount,
-          newCount,
-          (limits as { maxPlugins?: number } | undefined)?.maxPlugins,
-        );
-      },
-      validateNoDuplicatePlugins,
-      validatePluginKeys,
-      validateCountThresholds(count) {
-        const maxPlugins =
-          api.getOptions().limits?.maxPlugins ?? CORE_LIMIT_DEFAULTS.maxPlugins;
-
-        validatePluginCountThresholds(count, maxPlugins, api.logger);
-      },
-      warnBatchDuplicates() {
-        warnBatchDuplicates(api.logger);
-      },
-      warnPluginMethodType(methodName) {
-        warnPluginMethodType(methodName, api.logger);
-      },
-    },
-    lifecycle: {
-      validateHandlerLimit(count, methodName) {
-        const maxHandlers =
-          api.getOptions().limits?.maxLifecycleHandlers ??
-          CORE_LIMIT_DEFAULTS.maxLifecycleHandlers;
-
-        validateHandlerLimit(count, methodName, maxHandlers);
-      },
-      validateCountThresholds(count, methodName) {
-        const maxHandlers =
-          api.getOptions().limits?.maxLifecycleHandlers ??
-          CORE_LIMIT_DEFAULTS.maxLifecycleHandlers;
-
-        validateLifecycleCountThresholds(
-          count,
-          methodName,
-          maxHandlers,
-          api.logger,
-        );
-      },
-      warnOverwrite(name, type, methodName) {
-        warnLifecycleOverwrite(name, type, methodName, api.logger);
-      },
-      warnAsyncGuardSync(name, methodName) {
-        warnAsyncGuardSync(name, methodName, api.logger);
-      },
-      warnNonBooleanGuardSync(name, answer, methodName) {
-        warnNonBooleanGuardSync(name, answer, methodName, api.logger);
-      },
-      warnNonBooleanGuard(name, answer) {
-        warnNonBooleanGuard(name, answer, api.logger);
-      },
-    },
-    navigation: {
-      validateNavigateToDefaultArgs(opts) {
-        validateNavigateToDefaultArgs(opts);
-        // ⚑ HERE, and not on every navigation. No door READS the watched bags
-        // after construction — core runs on the copy adoption took (#2171) — so
-        // the question is where a stale one would have CHANGED the outcome, and
-        // this is the only door where those slots take effect. Measured: with a
-        // counting getter on the bag, `start`, `navigate` and `buildPath` add
-        // zero reads, and `buildPath` refuses a missing param rather than filling
-        // it from the option. An application that never calls this is never
-        // charged for the check.
-        defaultsWatch.check(api.logger);
-      },
-      validateNavigateToStateArgs,
-      validateNavigationOptions,
-      validateParamsShape: validateNavigateParamsShape,
-      validateSearch,
-      validateStartArgs,
-    },
-    state: {
-      validateMakeStateArgs,
-      // One de-dup cache per validator object, i.e. per registration, i.e. per
-      // router (#1583). Module-level `Set`s made the first router in a process
-      // silence every one after it — the SSR / SSG case where the diagnostic
-      // fired for request #1 and never again.
-      reportDroppedQueryKey: createDroppedQueryKeyReporter(),
-      reportUndeclaredParamKey: createUndeclaredParamKeyReporter(),
-      reportCodecRoundTrip: createCodecRoundTripReporter(
-        api.logger,
-        reloadPath,
-        api.forwardState,
-      ),
-      validateAreStatesEqualArgs(s1, s2, ignoreQP) {
-        if (!isState(s1)) {
-          throw atAreStatesEqual.type`Invalid state1: ${getTypeDescription(s1)}. Expected State object.`;
-        }
-        if (!isState(s2)) {
-          throw atAreStatesEqual.type`Invalid state2: ${getTypeDescription(s2)}. Expected State object.`;
-        }
-        if (ignoreQP !== undefined && !isBoolean(ignoreQP)) {
-          throw atAreStatesEqual.type`Invalid ignoreQueryParams: ${getTypeDescription(ignoreQP)}. Expected boolean.`;
-        }
-        // `false` compares both states' `search`. `isState` does not read it:
-        // its fields are `isRequiredFields`, which
-        // `scripts/tests/twin-lockstep.test.mjs` holds code-identical to the
-        // history-entry guard's copy, where `search` may be absent.
-        if (ignoreQP === false) {
-          if (!isSearchBag(s1.search)) {
-            throw atAreStatesEqual.type`Invalid state1.search: ${getTypeDescription(s1.search)}. Expected a plain object.`;
-          }
-          if (!isSearchBag(s2.search)) {
-            throw atAreStatesEqual.type`Invalid state2.search: ${getTypeDescription(s2.search)}. Expected a plain object.`;
-          }
-        }
-      },
-    },
-    eventBus: {
-      validateListenerArgs(name, cb) {
-        validateListenerArgs<EventName>(
-          name as EventName,
-          cb as Plugin[EventMethodMap[EventName]],
-        );
-      },
-      validateCountThresholds(count, eventName, methodName) {
-        const maxListeners =
-          api.getOptions().limits?.maxListeners ??
-          CORE_LIMIT_DEFAULTS.maxListeners;
-
-        validateListenerCountThresholds(
-          count,
-          eventName,
-          methodName,
-          api.logger,
-          maxListeners,
-        );
-      },
-    },
-  };
-}
-
 /**
  * The dependency map is a type parameter so the factory carries the CALLER's
  * `D` rather than the `object` default (#1621). `keyof object` is `never`, so a
@@ -459,62 +238,27 @@ export function validationPlugin<
       )`must be registered before router.start()`;
     }
 
-    // ⚑ One router, one validator (#2349). `RouterInternals.validator` is a
-    // single slot and `teardown` clears it, so with two installs either
-    // teardown leaves a registered plugin whose validator no longer answers.
-    // The refusal keeps that state unrepresentable; a tally of installs only
-    // models an ownership the slot does not grant.
+    // ⚑ One router, one install (#2349) — the `INSTALLED` mark above.
     //
     // ⚠ A CLONE needs no install of its own: `cloneRouter` re-runs plugin
     // factories by contract, which is what the message points at.
-    if (ctx.validator !== null) {
+    if (INSTALLED.has(router)) {
       throw atValidationPlugin.code(
         "VALIDATION_PLUGIN_ALREADY_INSTALLED",
       )`is already installed on this router — a clone re-runs plugin factories, so it needs no usePlugin of its own`;
     }
 
-    // RouterInternals.validator is now mutable — direct assignment works
     const defaultsWatch = new DefaultsMutationWatch();
 
-    // ⚠ BEFORE the validator goes live, so the first `navigateToDefault` after
-    // this line already has a baseline to compare against.
+    // ⚠ BEFORE the `NAVIGATE_TO_DEFAULT` subscription below, so its first
+    // report already has a baseline to compare against.
     defaultsWatch.watch(api.getAdoptedOrigins());
 
-    // The codec diagnostic's reload (#2905) does not rebuild the path: the
-    // rebuild runs `encodeParams` over what the reload decoded, and an encoder
-    // that cannot print it would throw away the reload the diagnostic judges.
-    // `PluginApi.matchPath` takes the router's options, so the reload is asked
-    // of the internals.
-    const reloadPath: ReloadPath = (path) =>
-      ctx.matchPath(path, { ...api.getOptions(), rewritePathOnMatch: false });
-
-    // ⚑ The object is held so teardown can prove it is still the holder.
-    // The slot has no owner — `RouterInternals.validator` is plain data on a
-    // surface pinned `accessorNames === []`, so a second writer cannot be
-    // REFUSED here. What it can be is not silently destroyed: an
-    // unconditional `= null` on teardown nulls whoever holds the slot now.
-    // Measured: with a second writer in place, teardown destroyed the
-    // foreign validator; the control (no second writer) nulled its own.
-    // Same shape as `claimContextNamespace`, which checks the holder on
-    // write and on release (#2059 / #1929) — here only the release half is
-    // reachable, and the write half waits for the slot to go away.
     const lookup = createRouteLookup(api);
-    const ownValidator = buildValidatorObject(
-      api,
-      lookup,
-      defaultsWatch,
-      reloadPath,
-    );
-    // One branch, shared by the error path below and by `teardown`: both ask
-    // the same question, so they share the site rather than each growing an
-    // arm the other's test has to reach.
-    const releaseIfStillOurs = () => {
-      if (ctx.validator === ownValidator) {
-        ctx.validator = null;
-      }
-    };
 
-    ctx.validator = ownValidator;
+    // Marked BEFORE the retrospective pass, and unmarked when it throws, so a
+    // corrected retry is accepted.
+    INSTALLED.add(router);
 
     try {
       const routes = readRoutes(api, getRoutesApi(router));
@@ -535,16 +279,13 @@ export function validationPlugin<
         api.getDependencyKeys().length,
         limits.maxDependencies,
       );
-      ctx.validator.options.validateOptions(
-        options,
-        "constructor (retrospective)",
-      );
+      validateOptions(options, "constructor (retrospective)");
 
       if (typeof options.defaultRoute === "string") {
         validateConfiguredDefaultRoute(options.defaultRoute, lookup);
       }
     } catch (error) {
-      releaseIfStillOurs();
+      INSTALLED.delete(router);
 
       throw error;
     }
@@ -582,13 +323,12 @@ export function validationPlugin<
       return next(path);
     });
 
-    // ⚠ A CHECK, not a `RouterValidator` member, and the distinction is the
-    // argument rather than the style: core hands this position `ownParams` —
-    // the copy it will print the path from — which no seam can reach, because
-    // at the call boundary that object does not exist yet (#2134 / #2388).
+    // ⚠ Core hands this position `ownParams` — the copy it will print the path
+    // from — which no seam can reach, because at the call boundary that object
+    // does not exist yet (#2134 / #2388).
     //
-    // ⚠ Registered AFTER the retrospective pass above, so the error path's
-    // `releaseIfStillOurs` leaves nothing registered behind it.
+    // ⚠ Registered AFTER the retrospective pass above, so a pass that throws
+    // leaves nothing registered behind it.
     const removeParamsCheck = api.addCheck("buildPath:params", (ownParams) => {
       validateNavigateParams(ownParams, "buildPath");
     });
@@ -815,6 +555,109 @@ export function validationPlugin<
       },
     );
 
+    const removeGetDependencyEntryCheck = api.addCheck(
+      "getDependency:entry",
+      (name) => {
+        validateDependencyName(name, "getDependency");
+      },
+    );
+
+    const removeGetDependencyValueCheck = api.addCheck(
+      "getDependency:value",
+      (name, value) => {
+        validateDependencyExists(value, name);
+      },
+    );
+
+    const removeSetDependencyEntryCheck = api.addCheck(
+      "setDependency:entry",
+      (name) => {
+        validateSetDependencyArgs(name);
+      },
+    );
+
+    // ⚑ The limit half of the count. Its thresholds are a diagnostic of the
+    // same count, registered below, and core asks this position first.
+    const removeSetDependencyCountCheck = api.addCheck(
+      "setDependency:count",
+      (currentCount, maxDependencies) => {
+        validateDependencyLimit(currentCount, maxDependencies, "setDependency");
+      },
+    );
+
+    const removeSetDependenciesEntryCheck = api.addCheck(
+      "setDependencies:entry",
+      (deps) => {
+        validateDependenciesObject(deps, "setDependencies");
+        // ⚑ The limit, asked here rather than from inside the ingest loop
+        // (#2253). Core asks this position once, before it writes a key, so a
+        // refusal here leaves the record as it was. The shape check above runs
+        // first: a bag that is not a plain object, or carries a getter, is
+        // refused for what it IS before it is measured.
+        validateDependencyBatchLimit(
+          deps,
+          api.getDependencyKeys(),
+          api.getResolvedLimits().maxDependencies,
+          "setDependencies",
+        );
+      },
+    );
+
+    // ⚠ Behind the batch limit above, this refusal fires only when the record
+    // or the bag changes between that limit and core's walk.
+    const removeSetDependenciesCountCheck = api.addCheck(
+      "setDependencies:count",
+      (currentCount, maxDependencies) => {
+        validateDependencyLimit(
+          currentCount,
+          maxDependencies,
+          "setDependencies",
+        );
+      },
+    );
+
+    const removeRemoveDependencyEntryCheck = api.addCheck(
+      "removeDependency:entry",
+      (name) => {
+        validateDependencyName(name, "removeDependency");
+      },
+    );
+
+    const removeHasDependencyEntryCheck = api.addCheck(
+      "hasDependency:entry",
+      (name) => {
+        validateDependencyName(name, "hasDependency");
+      },
+    );
+
+    const removeCloneRouterEntryCheck = api.addCheck(
+      "cloneRouter:entry",
+      (dependencies) => {
+        validateCloneArgs(dependencies);
+      },
+    );
+
+    const removeUsePluginCountCheck = api.addCheck(
+      "usePlugin:count",
+      (currentCount, newCount, maxPlugins) => {
+        validatePluginLimit(currentCount, newCount, maxPlugins);
+      },
+    );
+
+    const removeUsePluginEntryCheck = api.addCheck(
+      "usePlugin:entry",
+      (factory, registered) => {
+        validateNoDuplicatePlugins(factory, registered);
+      },
+    );
+
+    const removeUsePluginPluginCheck = api.addCheck(
+      "usePlugin:plugin",
+      (plugin) => {
+        validatePluginKeys(plugin);
+      },
+    );
+
     // ⚠ A DIAGNOSTIC, not a check, and the channel is the difference rather
     // than the style: this one cannot refuse the registration it describes —
     // the plugin is already installed by the time core reports.
@@ -822,6 +665,383 @@ export function validationPlugin<
       "PLUGIN_AFTER_START",
       (methodName) => {
         warnPluginAfterStart(methodName, api.logger);
+      },
+    );
+
+    const removeSetDependencyCountDiagnostic = api.subscribeDiagnostic(
+      "SET_DEPENDENCY_COUNT",
+      (currentCount, maxDependencies) => {
+        reportDependencyCount(
+          currentCount,
+          maxDependencies,
+          "setDependency",
+          api.logger,
+        );
+      },
+    );
+
+    const removeSetDependenciesCountDiagnostic = api.subscribeDiagnostic(
+      "SET_DEPENDENCIES_COUNT",
+      (currentCount, maxDependencies) => {
+        reportDependencyCount(
+          currentCount,
+          maxDependencies,
+          "setDependencies",
+          api.logger,
+        );
+      },
+    );
+
+    const removeSetDependencyOverwriteDiagnostic = api.subscribeDiagnostic(
+      "SET_DEPENDENCY_OVERWRITE",
+      (name) => {
+        warnDepsOverwrite(name, "setDependency", api.logger);
+      },
+    );
+
+    const removeSetDependenciesOverwriteDiagnostic = api.subscribeDiagnostic(
+      "SET_DEPENDENCIES_OVERWRITE",
+      (keys) => {
+        warnBatchOverwrite(keys, "setDependencies", api.logger);
+      },
+    );
+
+    const removeRemoveDependencyMissingDiagnostic = api.subscribeDiagnostic(
+      "REMOVE_DEPENDENCY_MISSING",
+      (name) => {
+        warnRemoveNonExistent(name, api.logger);
+      },
+    );
+
+    const removeUsePluginCountDiagnostic = api.subscribeDiagnostic(
+      "USE_PLUGIN_COUNT",
+      (count) => {
+        validatePluginCountThresholds(
+          count,
+          api.getOptions().limits?.maxPlugins ?? CORE_LIMIT_DEFAULTS.maxPlugins,
+          api.logger,
+        );
+      },
+    );
+
+    const removeUsePluginDuplicateDiagnostic = api.subscribeDiagnostic(
+      "USE_PLUGIN_DUPLICATE_IN_BATCH",
+      () => {
+        warnBatchDuplicates(api.logger);
+      },
+    );
+
+    const removeUsePluginHookDiagnostic = api.subscribeDiagnostic(
+      "USE_PLUGIN_HOOK_NOT_FUNCTION",
+      (methodName) => {
+        warnPluginMethodType(methodName, api.logger);
+      },
+    );
+
+    // ⚑ One position and two kinds per guard type: the messages name the
+    // type's `canActivate` / `canDeactivate` door, and core asks the count
+    // position before it raises the count kind.
+    const removeCanActivateCountCheck = api.addCheck(
+      "canActivate:count",
+      (currentCount) => {
+        validateHandlerLimit(
+          currentCount,
+          "canActivate",
+          api.getOptions().limits?.maxLifecycleHandlers ??
+            CORE_LIMIT_DEFAULTS.maxLifecycleHandlers,
+        );
+      },
+    );
+
+    const removeCanDeactivateCountCheck = api.addCheck(
+      "canDeactivate:count",
+      (currentCount) => {
+        validateHandlerLimit(
+          currentCount,
+          "canDeactivate",
+          api.getOptions().limits?.maxLifecycleHandlers ??
+            CORE_LIMIT_DEFAULTS.maxLifecycleHandlers,
+        );
+      },
+    );
+
+    const removeCanActivateCountDiagnostic = api.subscribeDiagnostic(
+      "CAN_ACTIVATE_COUNT",
+      (count) => {
+        validateLifecycleCountThresholds(
+          count,
+          "canActivate",
+          api.getOptions().limits?.maxLifecycleHandlers ??
+            CORE_LIMIT_DEFAULTS.maxLifecycleHandlers,
+          api.logger,
+        );
+      },
+    );
+
+    const removeCanDeactivateCountDiagnostic = api.subscribeDiagnostic(
+      "CAN_DEACTIVATE_COUNT",
+      (count) => {
+        validateLifecycleCountThresholds(
+          count,
+          "canDeactivate",
+          api.getOptions().limits?.maxLifecycleHandlers ??
+            CORE_LIMIT_DEFAULTS.maxLifecycleHandlers,
+          api.logger,
+        );
+      },
+    );
+
+    const removeCanActivateOverwriteDiagnostic = api.subscribeDiagnostic(
+      "CAN_ACTIVATE_OVERWRITE",
+      (name) => {
+        warnLifecycleOverwrite(name, "activate", "canActivate", api.logger);
+      },
+    );
+
+    const removeCanDeactivateOverwriteDiagnostic = api.subscribeDiagnostic(
+      "CAN_DEACTIVATE_OVERWRITE",
+      (name) => {
+        warnLifecycleOverwrite(name, "deactivate", "canDeactivate", api.logger);
+      },
+    );
+
+    const removeSyncGuardThenableDiagnostic = api.subscribeDiagnostic(
+      "SYNC_GUARD_THENABLE",
+      (name, methodName) => {
+        warnAsyncGuardSync(name, methodName, api.logger);
+      },
+    );
+
+    const removeSyncGuardNonBooleanDiagnostic = api.subscribeDiagnostic(
+      "SYNC_GUARD_NON_BOOLEAN",
+      (name, answer, methodName) => {
+        warnNonBooleanGuardSync(name, answer, methodName, api.logger);
+      },
+    );
+
+    const removeGuardNonBooleanDiagnostic = api.subscribeDiagnostic(
+      "GUARD_NON_BOOLEAN",
+      (name, answer) => {
+        warnNonBooleanGuard(name, answer, api.logger);
+      },
+    );
+
+    const removeListenerCountDiagnostic = api.subscribeDiagnostic(
+      "LISTENER_COUNT",
+      (count, eventName, methodName) => {
+        validateListenerCountThresholds(
+          count,
+          eventName,
+          methodName,
+          api.logger,
+          api.getOptions().limits?.maxListeners ??
+            CORE_LIMIT_DEFAULTS.maxListeners,
+        );
+      },
+    );
+
+    // ⚑ An omitted bag is judged as the empty one core runs on, and a `null`
+    // one as itself, which this door refuses.
+    const removeNavigateToStateEntryCheck = api.addCheck(
+      "navigateToState:entry",
+      (state, options) => {
+        validateNavigateToStateArgs(state);
+        validateNavigationOptions(
+          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- the declared type admits no `null`, and `??` would admit a JavaScript caller's
+          options === undefined ? EMPTY_OPTIONS : options,
+          "navigateToState",
+        );
+      },
+    );
+
+    const removeSetRootPathEntryCheck = api.addCheck(
+      "setRootPath:entry",
+      (rootPath) => {
+        validateSetRootPathArgs(rootPath);
+      },
+    );
+
+    // ⚑ The bag's type first, then its fields. The first refuses `null`, so
+    // the `??` below substitutes the empty bag core runs on for an omitted one
+    // alone.
+    const removeNavigateToDefaultEntryCheck = api.addCheck(
+      "navigateToDefault:entry",
+      (options) => {
+        validateNavigateToDefaultArgs(options);
+        validateNavigationOptions(
+          options ?? EMPTY_OPTIONS,
+          "navigateToDefault",
+        );
+      },
+    );
+
+    const removeNavigateToDefaultRouteCheck = api.addCheck(
+      "navigateToDefault:route",
+      (routeName) => {
+        validateResolvedDefaultRoute(routeName, lookup);
+      },
+    );
+
+    const removeStartEntryCheck = api.addCheck("start:entry", (path) => {
+      validateStartArgs(path);
+    });
+
+    // ⚑ The render-path doors and the state builders (#2388). Each ENTRY check
+    // keeps the order core consulted its calls in, as above.
+    const removeBuildPathEntryCheck = api.addCheck(
+      "buildPath:entry",
+      (route, params, search) => {
+        validateBuildPathArgs(route);
+        validateNavigateParamsShape(params, "buildPath");
+        validateSearch(search, "buildPath");
+      },
+    );
+
+    const removeBuildPathResolvedEntryCheck = api.addCheck(
+      "buildPathResolved:entry",
+      (params, search) => {
+        validateNavigateParamsShape(params, "buildPathResolved");
+        validateSearch(search, "buildPathResolved");
+      },
+    );
+
+    const removeIsActiveRouteEntryCheck = api.addCheck(
+      "isActiveRoute:entry",
+      (name, params, search, strictEquality, ignoreQueryParams) => {
+        validateIsActiveRouteArgs(
+          name,
+          params,
+          strictEquality,
+          ignoreQueryParams,
+        );
+        validateSearch(search, "isActiveRoute");
+        validateRouteName(name, "isActiveRoute");
+      },
+    );
+
+    const removeAreStatesEqualEntryCheck = api.addCheck(
+      "areStatesEqual:entry",
+      (state1, state2, ignoreQueryParams) => {
+        validateAreStatesEqualArgs(state1, state2, ignoreQueryParams);
+      },
+    );
+
+    const removeShouldUpdateNodeEntryCheck = api.addCheck(
+      "shouldUpdateNode:entry",
+      (nodeName) => {
+        validateShouldUpdateNodeArgs(nodeName);
+      },
+    );
+
+    const removeMatchPathEntryCheck = api.addCheck(
+      "matchPath:entry",
+      (path) => {
+        validateMatchPathArgs(path);
+      },
+    );
+
+    // ⚑ A decoder's output is application code's, judged as a caller's bag
+    // would be (#1582). Core asks only for a route that has a decoder.
+    const removeMatchPathDecodedCheck = api.addCheck(
+      "matchPath:decoded",
+      (routeName, decodedParams) => {
+        validateStateBuilderArgs(routeName, decodedParams, "matchPath");
+      },
+    );
+
+    const removeMakeStateCheck = api.addCheck(
+      "makeState:state",
+      (name, ownParams, search, path) => {
+        validateMakeStateArgs(name, ownParams, path);
+        validateSearch(search, "makeState");
+      },
+    );
+
+    const removeNavigateStateCheck = api.addCheck(
+      "navigate:state",
+      (routeName, routeParams) => {
+        validateStateBuilderArgs(routeName, routeParams, "navigate");
+      },
+    );
+
+    // ⚑ The retired single-bag spelling (#2238), reported at the two doors
+    // whose answers stay silent about it. One de-dup cache per registration,
+    // i.e. per router (#1583), and both kinds share it, so a pair reported at
+    // one door is not reported again at the other.
+    const reportMisChanneledKey = createMisChanneledKeyReporter(
+      api.logger,
+      (routeName) => api.getDeclaredQueryNames(routeName),
+    );
+
+    const removeBuildPathDiagnostic = api.subscribeDiagnostic(
+      "BUILD_PATH",
+      (routeName, params) => {
+        reportMisChanneledKey(routeName, params);
+      },
+    );
+
+    const removeIsActiveRouteDiagnostic = api.subscribeDiagnostic(
+      "IS_ACTIVE_ROUTE",
+      (routeName, params) => {
+        reportMisChanneledKey(routeName, params);
+      },
+    );
+
+    // ⚑ HERE, and not on every navigation. No door READS the watched bags
+    // after construction — core runs on the copy adoption took (#2171) — so
+    // the question is where a stale one would have CHANGED the outcome, and
+    // `navigateToDefault` is the only door where those slots take effect.
+    // Measured: with a counting getter on the bag, `start`, `navigate` and
+    // `buildPath` add zero reads, and `buildPath` refuses a missing param
+    // rather than filling it from the option. An application that never calls
+    // `navigateToDefault` is never charged for the check.
+    const removeNavigateToDefaultDiagnostic = api.subscribeDiagnostic(
+      "NAVIGATE_TO_DEFAULT",
+      () => {
+        defaultsWatch.check(api.logger);
+      },
+    );
+
+    // The route resolver's three reports (#1575, #1579, #2905). Each reporter
+    // is built here with its own de-dup cache, once per registration, i.e. per
+    // router (#1583): a module-level `Set` would let the first router in a
+    // process silence every one after it — the SSR / SSG case, where a
+    // diagnostic fires for request #1 and never again.
+    const reportDroppedQueryKey = createDroppedQueryKeyReporter(api.logger);
+    const reportUndeclaredParamKey = createUndeclaredParamKeyReporter(
+      api.logger,
+    );
+    // The codec diagnostic's reload does not rebuild the path: the rebuild
+    // runs `encodeParams` over what the reload decoded, and an encoder that
+    // cannot print it would throw away the reload the diagnostic judges.
+    // `PluginApi.matchPath` takes the router's options, so the reload is asked
+    // of the internals.
+    const reloadPath: ReloadPath = (path) =>
+      ctx.matchPath(path, { ...api.getOptions(), rewritePathOnMatch: false });
+    const reportCodecRoundTrip = createCodecRoundTripReporter(
+      api.logger,
+      reloadPath,
+      api.forwardState,
+    );
+
+    const removeDroppedQueryKeyDiagnostic = api.subscribeDiagnostic(
+      "DROPPED_QUERY_KEY",
+      (routeName, key) => {
+        reportDroppedQueryKey(routeName, key);
+      },
+    );
+
+    const removeUndeclaredParamKeyDiagnostic = api.subscribeDiagnostic(
+      "UNDECLARED_PARAM_KEY",
+      (routeName, key) => {
+        reportUndeclaredParamKey(routeName, key);
+      },
+    );
+
+    const removeCodecRoundTripDiagnostic = api.subscribeDiagnostic(
+      "CODEC_ROUND_TRIP",
+      (state, codec, pathSlots) => {
+        reportCodecRoundTrip(state, codec, pathSlots);
       },
     );
 
@@ -863,11 +1083,111 @@ export function validationPlugin<
 
         removeRemoveDeactivateGuardCheck();
 
+        removeGetDependencyEntryCheck();
+
+        removeGetDependencyValueCheck();
+
+        removeSetDependencyEntryCheck();
+
+        removeSetDependencyCountCheck();
+
+        removeSetDependenciesEntryCheck();
+
+        removeSetDependenciesCountCheck();
+
+        removeRemoveDependencyEntryCheck();
+
+        removeHasDependencyEntryCheck();
+
+        removeCloneRouterEntryCheck();
+
+        removeUsePluginCountCheck();
+
+        removeUsePluginEntryCheck();
+
+        removeUsePluginPluginCheck();
+
         removePluginAfterStartDiagnostic();
+
+        removeSetDependencyCountDiagnostic();
+
+        removeSetDependenciesCountDiagnostic();
+
+        removeSetDependencyOverwriteDiagnostic();
+
+        removeSetDependenciesOverwriteDiagnostic();
+
+        removeRemoveDependencyMissingDiagnostic();
+
+        removeUsePluginCountDiagnostic();
+
+        removeUsePluginDuplicateDiagnostic();
+
+        removeUsePluginHookDiagnostic();
+
+        removeCanActivateCountCheck();
+
+        removeCanDeactivateCountCheck();
+
+        removeCanActivateCountDiagnostic();
+
+        removeCanDeactivateCountDiagnostic();
+
+        removeCanActivateOverwriteDiagnostic();
+
+        removeCanDeactivateOverwriteDiagnostic();
+
+        removeSyncGuardThenableDiagnostic();
+
+        removeSyncGuardNonBooleanDiagnostic();
+
+        removeGuardNonBooleanDiagnostic();
+
+        removeListenerCountDiagnostic();
+
+        removeNavigateToStateEntryCheck();
+
+        removeSetRootPathEntryCheck();
+
+        removeNavigateToDefaultEntryCheck();
+
+        removeNavigateToDefaultRouteCheck();
+
+        removeStartEntryCheck();
+
+        removeBuildPathEntryCheck();
+
+        removeBuildPathResolvedEntryCheck();
+
+        removeIsActiveRouteEntryCheck();
+
+        removeAreStatesEqualEntryCheck();
+
+        removeShouldUpdateNodeEntryCheck();
+
+        removeMatchPathEntryCheck();
+
+        removeMatchPathDecodedCheck();
+
+        removeMakeStateCheck();
+
+        removeNavigateStateCheck();
+
+        removeBuildPathDiagnostic();
+
+        removeIsActiveRouteDiagnostic();
+
+        removeNavigateToDefaultDiagnostic();
+
+        removeDroppedQueryKeyDiagnostic();
+
+        removeUndeclaredParamKeyDiagnostic();
+
+        removeCodecRoundTripDiagnostic();
 
         removeInterceptor();
 
-        releaseIfStillOurs();
+        INSTALLED.delete(router);
       },
     };
   };

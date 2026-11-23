@@ -42,11 +42,29 @@ const DOORS = [
  * hand nothing BACK — each named, with why, so the set below stays a closed
  * claim rather than a filter that quietly grows.
  *
- * These are payload FIELDS of `subscribe` / `subscribeLeave`, i.e. states the
- * router passes IN. They are `pending-target-authority`'s subject, and covering
- * them here would duplicate that matrix rather than extend this one.
+ * `route`, `previousRoute` and `nextRoute` are payload FIELDS of `subscribe` /
+ * `subscribeLeave`, i.e. states the router passes IN. They are
+ * `pending-target-authority`'s subject, and covering them here would duplicate
+ * that matrix rather than extend this one.
+ *
+ * `"navigateToState:entry"` and `"areStatesEqual:entry"` are check positions:
+ * an entry is the argument list core passes IN to a check, and a check hands
+ * nothing back. They keep their quotes because both scans read a key as it is
+ * written.
+ *
+ * `CODEC_ROUND_TRIP` is a diagnostic kind: its `state` is the one `navigate`,
+ * `navigateToDefault` or `buildNavigationState` is building, passed IN to a
+ * listener, which hands nothing back. All three doors are rows of the table
+ * below.
  */
-const NOT_DOORS = new Set(["route", "previousRoute", "nextRoute"]);
+const NOT_DOORS = new Set([
+  "route",
+  "previousRoute",
+  "nextRoute",
+  '"navigateToState:entry"',
+  '"areStatesEqual:entry"',
+  "CODEC_ROUND_TRIP",
+]);
 
 /**
  * The declarations a public door has to be added to. A member that appears on
@@ -107,9 +125,10 @@ function finalReturnType(node: ts.TypeNode): ts.TypeNode {
  *
  * ⚠ An exclusion list is the one part of a derived census that can still hide a
  * door, and only by being trusted. This makes it checkable: the cell below
- * asserts each excluded name is declared ONLY on a subscribe-payload type, so a
- * real door added under one of those names cannot slip through the filter that
- * exists to keep the list honest.
+ * asserts each excluded name is declared ONLY on a subscribe-payload type,
+ * `CheckPositionMap` or `DiagnosticEventMap`, so a real door added under one of
+ * those names cannot slip through the filter that exists to keep the list
+ * honest.
  */
 function ownersOf(names: ReadonlySet<string>): Record<string, string[]> {
   const owners: Record<string, string[]> = {};
@@ -497,11 +516,15 @@ describe("every door hands back a State carrying transition (#1976)", () => {
     ).toStrictEqual(SURFACE_FILES.toSorted((a, b) => a.localeCompare(b)));
 
     // And the exclusion list, the one hand-written part left: each name it
-    // drops must belong ONLY to a subscribe payload.
+    // drops must belong ONLY to a subscribe payload, to the check positions or
+    // to the diagnostic kinds.
     expect(owners).toStrictEqual({
       route: ["SubscribeState", "LeaveState"],
       previousRoute: ["SubscribeState"],
       nextRoute: ["LeaveState"],
+      '"navigateToState:entry"': ["CheckPositionMap"],
+      '"areStatesEqual:entry"': ["CheckPositionMap"],
+      CODEC_ROUND_TRIP: ["DiagnosticEventMap"],
     });
   });
 

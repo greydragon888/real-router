@@ -1,6 +1,6 @@
 import { putField } from "@real-router/core/utils";
 
-import { ERROR_PREFIX } from "./constants";
+import { ERROR_PREFIX, LOGGER_CONTEXT } from "./constants";
 import {
   collectPathParams,
   getInvalidKeys,
@@ -9,7 +9,7 @@ import {
   pickKeys,
   readAsText,
 } from "./helpers";
-import { describeRejection } from "./report";
+import { describeRejection, describeThrow } from "./report";
 
 import type { TextPlaces } from "./helpers";
 import type { TextRun } from "./report";
@@ -58,6 +58,36 @@ type Verdict =
       readonly issues: readonly StandardSchemaV1Issue[];
       readonly text: TextRun;
     };
+
+/** One answer of the schema as {@link readAnswer} reads it: its output, or its issues. */
+type SchemaRun =
+  | { readonly value: unknown }
+  | { readonly issues: readonly StandardSchemaV1Issue[] };
+
+/**
+ * Reads one answer of `~standard.validate()`: `issues` decides, as
+ * {@link StandardSchemaV1Result} states, so a failure that carries `value` as
+ * well is a failure (#2851). An answer with no issues and no `value` is not a
+ * Standard Schema result, and is refused.
+ */
+function readAnswer(
+  routeName: string,
+  answer: StandardSchemaV1Result,
+): SchemaRun {
+  const { issues } = answer;
+
+  if (issues) {
+    return { issues };
+  }
+
+  if (!("value" in answer)) {
+    throw new TypeError(
+      `${ERROR_PREFIX} Route "${routeName}": ~standard.validate() answered with no issues and no "value", which is not a Standard Schema result.`,
+    );
+  }
+
+  return { value: answer.value };
+}
 
 export class SearchSchemaPlugin {
   readonly #pluginApi: PluginApi;
@@ -141,7 +171,8 @@ export class SearchSchemaPlugin {
 
         break;
       }
-      // "remove" / "clear": the routes are gone — nothing to validate.
+      // "remove" / "clear": the routes are gone; "rootPath" carries none —
+      // nothing to validate.
     }
   }
 
@@ -187,7 +218,8 @@ export class SearchSchemaPlugin {
     }
 
     if (this.#mode === "development") {
-      console.error(
+      this.#pluginApi.logger.error(
+        LOGGER_CONTEXT,
         describeRejection(
           result.name,
           verdict.input,
@@ -325,21 +357,37 @@ export class SearchSchemaPlugin {
       : { ...input, ...(value as Params) };
   }
 
-  /** `forwardState` is synchronous, so a schema that answers with a Promise is refused. */
+  /**
+   * One run of the schema, read by {@link readAnswer}. `forwardState` is
+   * synchronous, so a schema that answers with a Promise is refused — once the
+   * Promise's rejection is handled: zod answers a throw in a transform or a
+   * refinement with a rejected Promise (#2851). Its error is logged as rejected
+   * search params are, in mode "development" without `onError`.
+   */
   #runSchema(
     schema: StandardSchemaV1,
     routeName: string,
     input: Params,
-  ): StandardSchemaV1Result {
-    const validation = schema["~standard"].validate(input);
+  ): SchemaRun {
+    const answer = schema["~standard"].validate(input);
 
-    if (validation instanceof Promise) {
+    if (answer instanceof Promise) {
+      answer.catch((error: unknown) => {
+        if (this.#mode === "development" && !this.#onError) {
+          this.#pluginApi.logger.error(
+            LOGGER_CONTEXT,
+            describeThrow(routeName, "the query"),
+            error,
+          );
+        }
+      });
+
       throw new TypeError(
-        `${ERROR_PREFIX} Async schema validation is not supported. Route "${routeName}" returned a Promise from ~standard.validate().`,
+        `${ERROR_PREFIX} Async schema validation is not supported. Route "${routeName}" returned a Promise from ~standard.validate(). zod answers with a rejected Promise when a transform or a refinement throws; in mode "development" without onError, the plugin logs that error.`,
       );
     }
 
-    return validation;
+    return readAnswer(routeName, answer);
   }
 
   /**
@@ -469,22 +517,35 @@ export class SearchSchemaPlugin {
       return;
     }
 
-    const validation = schema["~standard"].validate(defaultSearch);
+    const answer = schema["~standard"].validate(defaultSearch);
 
-    if (validation instanceof Promise) {
+    if (answer instanceof Promise) {
+      // Reported as the check's other finding is: in mode "development",
+      // whatever `onError` is (#2851).
+      answer.catch((error: unknown) => {
+        this.#pluginApi.logger.warn(
+          LOGGER_CONTEXT,
+          describeThrow(routeName, "defaultSearch"),
+          error,
+        );
+      });
+
       return;
     }
 
-    if ("issues" in validation) {
+    const run = readAnswer(routeName, answer);
+
+    if ("issues" in run) {
       // The plugin gates invalid user *input*, not developer *config*: core
       // injects `defaultSearch` into `state.search` / `state.path` below the
       // interceptor seam this plugin hooks, so an invalid default reaches state
       // and the URL at runtime regardless of this warning (documented contract,
       // #802). Hence the message states the consequence + the fix, rather than
       // implying the value was blocked.
-      console.warn(
-        `${ERROR_PREFIX} Route "${routeName}": defaultSearch does not pass searchSchema — it is trusted config and will still reach state and the URL at runtime (the plugin validates user input, not config). Fix the route's defaultSearch to satisfy its searchSchema.`,
-        validation.issues,
+      this.#pluginApi.logger.warn(
+        LOGGER_CONTEXT,
+        `Route "${routeName}": defaultSearch does not pass searchSchema — it is trusted config and will still reach state and the URL at runtime (the plugin validates user input, not config). Fix the route's defaultSearch to satisfy its searchSchema.`,
+        run.issues,
       );
     }
   }

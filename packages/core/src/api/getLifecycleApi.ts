@@ -29,6 +29,11 @@ export function getLifecycleApi<
       // uniformly — see #961.
       // `false` — the EXTERNAL lane, named rather than defaulted (#1977).
       lifecycleNamespace.addCanActivate(name, handler, false);
+
+      // ⚑ Again, after the registration (#1859). The checks, the reports and
+      // the factory run application code, and this stops the call reporting
+      // success on a router that code disposed.
+      throwIfDisposed(ctx.isDisposed);
     },
 
     addDeactivateGuard(name, handler) {
@@ -44,6 +49,9 @@ export function getLifecycleApi<
       );
 
       lifecycleNamespace.addCanDeactivate(name, handler, false);
+
+      // ⚑ Again, after the registration: see `addActivateGuard`.
+      throwIfDisposed(ctx.isDisposed);
     },
 
     removeActivateGuard(name) {

@@ -5,6 +5,677 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-11-23]
+
+### @real-router/ssr-utils@0.4.0
+
+### Minor Changes
+
+- [#2998](https://github.com/greydragon888/real-router/pull/2998) [`457cfcf`](https://github.com/greydragon888/real-router/commit/457cfcfa5936bb7a37001e5e908be4089d3b0aee) Thanks [@greydragon888](https://github.com/greydragon888)! - Export `withTimeout` and the loader errors `LoaderNotFound`, `LoaderRedirect` and `LoaderTimeout` ([#2977](https://github.com/greydragon888/real-router/issues/2977))
+
+  A loader throws `LoaderNotFound` or `LoaderRedirect`, and `withTimeout` rejects with `LoaderTimeout` once its deadline passes; the server's handler maps each to a 404, a 30x or a 504. `@real-router/ssr-data-plugin/errors` and `@real-router/rsc-server-plugin/errors` re-export these four names.
+
+  - `instanceof` holds for an error made by another copy of `@real-router/ssr-utils` — the one a plugin keeps when the application's own `ssr-utils` leaves the plugin's range — and by its other build, ESM or CJS: each instance carries a mark under `Symbol.for("@real-router/ssr-utils/loader-error")`, and `instanceof` against one of these classes admits a value that carries its mark, besides what the prototype chain admits.
+  - An application's subclass reads its own prototype chain alone, so `instanceof ProductNotFound` admits no plain `LoaderNotFound`, and TypeScript narrows to the subclass.
+  - The `code` field (`"LOADER_NOT_FOUND"`, `"LOADER_REDIRECT"`, `"LOADER_TIMEOUT"`) tells the errors apart as well, without importing the classes.
+
+### @real-router/angular@0.24.11
+
+### Patch Changes
+
+- Updated dependencies [[`457cfcf`](https://github.com/greydragon888/real-router/commit/457cfcfa5936bb7a37001e5e908be4089d3b0aee)]:
+  - @real-router/ssr-utils@0.4.0
+
+### @real-router/rsc-server-plugin@0.5.2
+
+### Patch Changes
+
+- [#2998](https://github.com/greydragon888/real-router/pull/2998) [`457cfcf`](https://github.com/greydragon888/real-router/commit/457cfcfa5936bb7a37001e5e908be4089d3b0aee) Thanks [@greydragon888](https://github.com/greydragon888)! - `@real-router/rsc-server-plugin/errors` re-exports the loader errors and `withTimeout` of `@real-router/ssr-utils` ([#2977](https://github.com/greydragon888/real-router/issues/2977))
+
+  The import path and its four names stay. They are now the classes of `@real-router/ssr-utils`, which `@real-router/ssr-data-plugin/errors` re-exports as well, and `instanceof` holds across this plugin's ESM and CJS builds and across copies of `@real-router/ssr-utils`. Before, each build of each SSR plugin carried classes of its own, so `instanceof` against a class from the other build, or from `@real-router/ssr-data-plugin/errors`, answered `false`.
+
+- Updated dependencies [[`457cfcf`](https://github.com/greydragon888/real-router/commit/457cfcfa5936bb7a37001e5e908be4089d3b0aee)]:
+  - @real-router/ssr-utils@0.4.0
+
+### @real-router/ssr-data-plugin@0.7.2
+
+### Patch Changes
+
+- [#2998](https://github.com/greydragon888/real-router/pull/2998) [`457cfcf`](https://github.com/greydragon888/real-router/commit/457cfcfa5936bb7a37001e5e908be4089d3b0aee) Thanks [@greydragon888](https://github.com/greydragon888)! - `@real-router/ssr-data-plugin/errors` re-exports the loader errors and `withTimeout` of `@real-router/ssr-utils` ([#2977](https://github.com/greydragon888/real-router/issues/2977))
+
+  The import path and its four names stay. They are now the classes of `@real-router/ssr-utils`, which `@real-router/rsc-server-plugin/errors` re-exports as well, and `instanceof` holds across this plugin's ESM and CJS builds and across copies of `@real-router/ssr-utils`. Before, each build of each SSR plugin carried classes of its own, so `instanceof` against a class from the other build, or from `@real-router/rsc-server-plugin/errors`, answered `false`.
+
+- Updated dependencies [[`457cfcf`](https://github.com/greydragon888/real-router/commit/457cfcfa5936bb7a37001e5e908be4089d3b0aee)]:
+  - @real-router/ssr-utils@0.4.0
+
+## [2026-11-22]
+
+### @real-router/lifecycle-plugin@0.10.0
+
+### Minor Changes
+
+- [#2996](https://github.com/greydragon888/real-router/pull/2996) [`749176a`](https://github.com/greydragon888/real-router/commit/749176a702f284e48ff4351a44a4e41d48fd4f2b) Thanks [@greydragon888](https://github.com/greydragon888)! - A hook's error goes to the router's logger, and the plugin reads the load a hook returns ([#2975](https://github.com/greydragon888/real-router/issues/2975))
+
+  A hook that throws — its body or its factory — and the rejection of a thenable
+  the hook returns go to the router's `logger.error`, under the context
+  `lifecycle-plugin`. Neither ends a Node process any more: the throw was
+  re-thrown on a microtask, an uncaught exception, and the promise of an `async`
+  hook was dropped, an unhandled rejection. Each hook stays isolated, so a
+  failing hook does not stop a later hook of the same navigation.
+
+  A rejection with the reason of the hook's own `signal`, or with that reason as
+  its `cause`, is the hook's own abort and is not logged: `fetch` rejects with
+  the reason, and `setTimeout` of `node:timers/promises` and `events.once` with
+  the reason as `cause`. An abort error a client makes of its own is logged —
+  axios rejects with its `CanceledError`.
+
+  **Breaking Change:**
+
+  - `LifecycleHook` returns `void | PromiseLike<unknown>`: a hook returns its
+    load, or nothing. A hook whose expression body returns a value that is not a
+    thenable no longer type-checks — write it as a block:
+
+    ```diff
+    - onEnter: () => (toState) => cache.set(toState.name, Date.now()),
+    + onEnter: () => (toState) => {
+    +   cache.set(toState.name, Date.now());
+    + },
+    ```
+
+  - A hook's error no longer reaches a global handler — `window`'s `error` and
+    `unhandledrejection` events, Node's `uncaughtException` and
+    `unhandledRejection`. An error tracker that listens there receives it from
+    the router's `logger.callback` instead, with `callbackIgnoresLevel: true`
+    under `level: "none"`.
+  - Return the load from the hook — `return loadServices(toState.search, { signal })` —
+    so that its failure reaches the logger. A load the hook starts without
+    returning it is the application's to handle. A returned load whose client
+    rejects an abort with an error of its own is logged whenever the hook's
+    `signal` aborts; catch that error in the hook — for axios,
+    `.catch((error) => { if (!axios.isCancel(error)) throw error; })`.
+
+### @real-router/search-schema-plugin@0.11.0
+
+### Minor Changes
+
+- [#2996](https://github.com/greydragon888/real-router/pull/2996) [`749176a`](https://github.com/greydragon888/real-router/commit/749176a702f284e48ff4351a44a4e41d48fd4f2b) Thanks [@greydragon888](https://github.com/greydragon888)! - The plugin logs through the router's logger instead of `console` ([#2975](https://github.com/greydragon888/real-router/issues/2975))
+
+  The plugin's messages go to the router's logger, under the context
+  `search-schema-plugin`: in `mode: "development"` without `onError`, the report
+  of rejected search params and the error of a schema that answers a search with
+  a rejected Promise as `logger.error`, and in `mode: "development"`, both
+  findings of the `defaultSearch` check as `logger.warn`. The router's `logger`
+  option — its `level` and its `callback` — applies to them. With the default
+  logger the console shows the same lines as before.
+
+  **Breaking Change:** the messages no longer reach `console` under a `level`
+  that filters them — `"none"`, and `"error-only"` for the two `defaultSearch`
+  warnings. To keep them under such a level, read them in the router's
+  `logger.callback` with `callbackIgnoresLevel: true`: it receives each under the
+  context `search-schema-plugin`, without the `[search-schema-plugin]` head the
+  console prints.
+
+### @real-router/validation-plugin@0.41.0
+
+### Minor Changes
+
+- [#2996](https://github.com/greydragon888/real-router/pull/2996) [`749176a`](https://github.com/greydragon888/real-router/commit/749176a702f284e48ff4351a44a4e41d48fd4f2b) Thanks [@greydragon888](https://github.com/greydragon888)! - The query-key warnings respect the router's `logger` option ([#2975](https://github.com/greydragon888/real-router/issues/2975))
+
+  The warnings about a query key the `queryParamsMode` drops, a param the route
+  declares nowhere, and a declared query param given in the `params` bag were
+  written to `console.warn` directly, past the router's `logger` option. They go
+  to the router's `logger.warn` under the context `router`, as the codec
+  round-trip warning does, so `level` and `callback` apply to them. With the
+  default logger the console shows the same lines as before.
+
+  **Breaking Change:** the warnings no longer reach `console` under
+  `level: "error-only"` or `"none"`. To keep them under such a level, read them in
+  the router's `logger.callback` with `callbackIgnoresLevel: true`: it receives
+  each under the context `router`, without the `[router]` head the console
+  prints.
+
+## [2026-11-20]
+
+### @real-router/core@0.170.0
+
+### Minor Changes
+
+- [#2994](https://github.com/greydragon888/real-router/pull/2994) [`c78519e`](https://github.com/greydragon888/real-router/commit/c78519ebb20dfb831f016ed9c9dc25d39f7493a9) Thanks [@greydragon888](https://github.com/greydragon888)! - `RouterValidator` and `RouterInternals.validator` are removed ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  **Breaking Change:** `@real-router/core` and `@real-router/core/validation` no
+  longer export the `RouterValidator` type, and `getInternals(router)` no longer
+  carries a `validator` member. Since 0.169.0 the type has declared no member and
+  core has read the slot nowhere. Core holds nothing for a validator — a refusal
+  is a check at a named position, and a report is a diagnostic kind.
+
+  **Migration:** drop the type and the slot, and register on the channels:
+
+  ```diff
+  - import type { RouterValidator } from "@real-router/core/validation";
+  - getInternals(router).validator = myValidator;
+  + const api = getPluginApi(router);
+  +
+  + api.addCheck("buildPath:entry", (route, params, search) => { … });
+  + api.subscribeDiagnostic("BUILD_PATH", (routeName, params) => { … });
+  ```
+
+### @real-router/validation-plugin@0.40.0
+
+### Minor Changes
+
+- [#2994](https://github.com/greydragon888/real-router/pull/2994) [`c78519e`](https://github.com/greydragon888/real-router/commit/c78519ebb20dfb831f016ed9c9dc25d39f7493a9) Thanks [@greydragon888](https://github.com/greydragon888)! - The `RouterValidator` re-export is removed, and the refusal of a second installation reads the plugin's own mark ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  **Breaking Change:** the package no longer re-exports the `RouterValidator`
+  type, which `@real-router/core` no longer publishes. It has declared no member
+  since 0.39.0; drop the import.
+
+  A second installation on a router the plugin is already installed on is still
+  refused with `VALIDATION_PLUGIN_ALREADY_INSTALLED`, and the router accepts an
+  installation again after `teardown` and after a retrospective pass that throws.
+  The mark is a module-level `WeakSet` of routers, so `getInternals(router)`
+  holds nothing for the plugin.
+
+  ⚠ **Two copies of the package on one router are no longer refused.** Each copy
+  holds a mark of its own, so a bundle that carries the package twice and
+  installs both copies on one router runs every check twice and prints every
+  warning twice. That setup is unsupported: install one copy of the package.
+
+### Patch Changes
+
+- Updated dependencies [[`c78519e`](https://github.com/greydragon888/real-router/commit/c78519ebb20dfb831f016ed9c9dc25d39f7493a9)]:
+  - @real-router/core@0.170.0
+
+
+### @real-router/core@0.169.0
+
+### Minor Changes
+
+- [#2992](https://github.com/greydragon888/real-router/pull/2992) [`59311a0`](https://github.com/greydragon888/real-router/commit/59311a056550c1ab0de10fd9d1118cf047e05d59) Thanks [@greydragon888](https://github.com/greydragon888)! - The route resolver reports through diagnostics, and `RouterValidator` declares no member ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  Three new diagnostic kinds. `DROPPED_QUERY_KEY` (`[routeName, key]`) is a key
+  the mode gate drops from a route's query channel. `UNDECLARED_PARAM_KEY`
+  (`[routeName, key]`) is a key that is neither a path slot the route's URL
+  prints nor a query param the route declares, in the params `navigate`,
+  `navigateToDefault` or `buildNavigationState` builds a state from.
+  `CODEC_ROUND_TRIP` (`[state, codec, pathSlots]`) is a state those three build
+  on a route with a codec. Each kind is raised only while it has a listener;
+  without one, core walks no caller's bag for an undeclared key and looks up no
+  codec for the report.
+
+  `RouterValidator` loses its `state` namespace — `reportDroppedQueryKey`,
+  `reportUndeclaredParamKey` and `reportCodecRoundTrip` — and declares no member:
+  core asks nothing through `getInternals(router).validator`. A validator of your
+  own subscribes to the three kinds with `PluginApi.subscribeDiagnostic` instead.
+
+  ⚠ **A report handler that throws no longer escapes the door.** The router logs
+  the throw through `logger.error`, and the door answers as it does without the
+  report. Previously the throw of the validator's report changed the answer:
+
+  - on a dropped query key, `buildPath`, `buildPathResolved`, `makeState`,
+    `buildNavigationState` and `matchPath` threw it; `isActiveRoute` on the
+    active route and `canNavigateTo` answered `false`; `navigate`,
+    `navigateToDefault` and `start` rejected with it; and `RoutesApi.replace()`,
+    revalidating a state that carries the key, threw it and left the state on its
+    old path;
+  - on an undeclared params key or a codec report, `navigate` and
+    `navigateToDefault` rejected with it and `buildNavigationState` threw it.
+
+  A setup whose `console.error` throws as well still gets those answers, with the
+  error `console.error` threw when the router logged the handler's throw.
+
+### @real-router/validation-plugin@0.39.0
+
+### Minor Changes
+
+- [#2992](https://github.com/greydragon888/real-router/pull/2992) [`59311a0`](https://github.com/greydragon888/real-router/commit/59311a056550c1ab0de10fd9d1118cf047e05d59) Thanks [@greydragon888](https://github.com/greydragon888)! - The route resolver's three warnings move onto diagnostics ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  The mode gate's dropped-query-key warning, the undeclared-params-key warning
+  and the codec round-trip warning are subscriptions to `DROPPED_QUERY_KEY`,
+  `UNDECLARED_PARAM_KEY` and `CODEC_ROUND_TRIP`, removed on `teardown`. Each
+  keeps its message and its de-dup per router.
+
+  The re-exported `RouterValidator` type declares no member; code typed against
+  its `state` namespace subscribes to the kinds instead, as `@real-router/core`
+  describes. While the plugin is installed, `getInternals(router).validator`
+  holds an object with no member: it marks the installation, so a second one on
+  the same router is still refused.
+
+  ⚠ **A `console.warn` that throws on one of these warnings no longer escapes
+  the door.** The router logs the throw through `logger.error`, and the door
+  answers as it does without the warning. On a dropped query key that is
+  `buildPath`, `buildPathResolved`, `makeState`, `buildNavigationState`,
+  `matchPath`, `isActiveRoute` on the active route, `canNavigateTo`, `navigate`,
+  `navigateToDefault`, `start` and the revalidation of `RoutesApi.replace()`; on
+  an undeclared params key or a codec warning, `navigate`, `navigateToDefault`
+  and `buildNavigationState`. Previously the printers, the builders and
+  `matchPath` threw, the two predicates answered `false`, the navigations
+  rejected, and `replace()` threw and left the state on its old path. A setup
+  whose `console.error` throws as well still gets those answers, with the error
+  `console.error` threw when the router logged the warning's throw.
+
+### Patch Changes
+
+- Updated dependencies [[`59311a0`](https://github.com/greydragon888/real-router/commit/59311a056550c1ab0de10fd9d1118cf047e05d59)]:
+  - @real-router/core@0.169.0
+
+
+### @real-router/core@0.168.0
+
+### Minor Changes
+
+- [#2989](https://github.com/greydragon888/real-router/pull/2989) [`c7c7bfc`](https://github.com/greydragon888/real-router/commit/c7c7bfc56ee724b7de0128dca4dac67e97a1fccf) Thanks [@greydragon888](https://github.com/greydragon888)! - The render-path doors and the state builders refuse and report through checks and diagnostics ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  Nine new check positions. `buildPath:entry`, `isActiveRoute:entry` and
+  `shouldUpdateNode:entry` receive the caller's arguments, `matchPath:entry` the
+  path, `buildPathResolved:entry` the caller's two bags, and
+  `areStatesEqual:entry` the two states with `ignoreQueryParams` defaulted to
+  `true`. Three positions receive what core builds a state from:
+  `matchPath:decoded` the route name and the params the route's `decodeParams`
+  returned, asked only for a route with a decoder; `makeState:state` the
+  arguments of `makeState` with core's copy of the params; and `navigate:state`
+  the name and params the navigation pipeline builds its state from, where a
+  refusal rejects the navigation. Two new diagnostic kinds: `BUILD_PATH` and
+  `IS_ACTIVE_ROUTE`.
+
+  `RouterValidator` loses its `routes` and `navigation` namespaces and two `state`
+  members, `validateMakeStateArgs` and `validateAreStatesEqualArgs`; it keeps the
+  three `state` reports. A validator of your own registers checks at these
+  positions with `PluginApi.addCheck`, and subscribes to the kinds with
+  `PluginApi.subscribeDiagnostic`, instead.
+
+  ⚑ **`BUILD_PATH` and `IS_ACTIVE_ROUTE` are raised after the door's `:entry`
+  checks pass**, so a call those checks refuse reports nothing. `buildPath`
+  raises its kind before it copies the params bag, so a refusal at
+  `buildPath:params` follows the report.
+
+  ⚠ **A report handler that throws no longer escapes `buildPath` or
+  `isActiveRoute`.** The router logs the throw through `logger.error`, and the
+  door answers. Previously a throwing report of the validator made the call throw.
+
+### @real-router/validation-plugin@0.38.0
+
+### Minor Changes
+
+- [#2989](https://github.com/greydragon888/real-router/pull/2989) [`c7c7bfc`](https://github.com/greydragon888/real-router/commit/c7c7bfc56ee724b7de0128dca4dac67e97a1fccf) Thanks [@greydragon888](https://github.com/greydragon888)! - The validation of the render-path doors and the state builders moves onto checks and diagnostics ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  The argument refusals of `buildPath`, `buildPathResolved`, `isActiveRoute`,
+  `areStatesEqual`, `shouldUpdateNode` and `matchPath` are checks at their
+  `:entry` positions; what a route's `decodeParams` returns is refused at
+  `matchPath:decoded`, the arguments of `makeState` at `makeState:state`, and
+  what the navigation pipeline builds a state from at `navigate:state`. The
+  warning about a declared query name handed in the `params` bag is a
+  subscription to `BUILD_PATH` and `IS_ACTIVE_ROUTE`. All are removed on
+  `teardown`, and each refusal and report keeps its message.
+
+  The re-exported `RouterValidator` type loses its `routes` and `navigation`
+  namespaces and `state.validateMakeStateArgs` / `state.validateAreStatesEqualArgs`;
+  code typed against it registers checks and diagnostics instead, as
+  `@real-router/core` describes.
+
+  ⚑ **The warning follows the entry refusals.** A `buildPath` or `isActiveRoute`
+  call the plugin refuses at its entry logs no warning about a declared query
+  name in `params`, and the warning comes on the first call that passes.
+  Previously a `buildPath` call with `params` or `search` of the wrong shape,
+  and an `isActiveRoute` call with a `search` of the wrong shape, logged it
+  before the throw. `buildPath` refuses a path value — a `Symbol`, say — after the warning,
+  as before.
+
+  ⚠ **A throw from the warning no longer escapes the door.** A `console.warn`
+  that throws is logged through the router's `logger.error`, and `buildPath`
+  returns its path, `isActiveRoute` its answer.
+
+### Patch Changes
+
+- Updated dependencies [[`c7c7bfc`](https://github.com/greydragon888/real-router/commit/c7c7bfc56ee724b7de0128dca4dac67e97a1fccf)]:
+  - @real-router/core@0.168.0
+
+## [2026-11-19]
+
+### @real-router/search-schema-plugin@0.10.0
+
+### Minor Changes
+
+- [#2987](https://github.com/greydragon888/real-router/pull/2987) [`70ff55c`](https://github.com/greydragon888/real-router/commit/70ff55c5a7c0eb79f02b9a3eda16bd678d8ce7e8) Thanks [@greydragon888](https://github.com/greydragon888)! - Read each `~standard.validate()` answer by `issues`, as Standard Schema does, and handle the rejection of a Promise answer ([#2851](https://github.com/greydragon888/real-router/issues/2851))
+
+  **Breaking Change:** the success member of the exported `StandardSchemaV1Result` is now `{ readonly value: Output; readonly issues?: undefined }`, as the spec types it. Code that narrows a result with `"issues" in result` and then reads `result.issues` as an array no longer compiles, since `result.issues` may be `undefined`. Test `result.issues` itself: it is truthy on a failure. A hand-written schema whose success answer carries a truthy `issues` that is not an array, such as `{ value, issues: {} }`, read as a success; it now refuses the navigation with a `TypeError`, and the type refuses it too. Answer a success without a truthy `issues`.
+
+  **Migration:**
+
+  ```diff
+  - const issues = "issues" in result ? result.issues : [];
+  + const issues = result.issues ?? [];
+  ```
+
+  - A failure that carries a `value` as well, as valibot's does, is now read as a rejection. The rejected keys are stripped and their `defaultSearch` values restored, mode `"development"` logs the rejection, and `onError` is called. Before, the failing value was written to the state and the URL.
+  - So a valibot `v.string()` field handed `?q=17` settles as `"17"`: the rejected number is tried as text, as it is for zod. Before, the number `17` the failure carried was written.
+  - `issues` decides. A truthy `issues`, an empty array included, is a failure. A success spelled `{ value, issues: undefined }` no longer draws a false warning from the dev `defaultSearch` check.
+  - An answer object with neither a truthy `issues` nor a `value` is refused with a `TypeError` that names the route; before, it failed with `issues is not iterable`. In mode `"development"`, such a schema on a route with a `defaultSearch` makes `usePlugin()` throw. On `add`, `replace` or `update` the change commits, and core logs the error.
+  - A Promise from `~standard.validate()` is still refused with a `TypeError`, and its rejection is now handled. zod answers a throw in a transform or a refinement with a rejected Promise, and that unhandled rejection ended a Node process. In mode `"development"`, the plugin logs the schema's error with `console.error` when `onError` is not set, and the dev `defaultSearch` check reports it with `console.warn` whatever `onError` is. On a navigation in mode `"production"`, or with `onError` set, the schema's error is dropped, and the refusal is all that remains. An async refinement or transform stays unsupported: when one throws, zod abandons a rejected Promise of its own in its synchronous attempt, which never reaches the plugin and stays unhandled.
+
+
+### @real-router/core@0.167.0
+
+### Minor Changes
+
+- [#2985](https://github.com/greydragon888/real-router/pull/2985) [`5fd2240`](https://github.com/greydragon888/real-router/commit/5fd22404fbb40684a257e6d57efe72e603d74b23) Thanks [@greydragon888](https://github.com/greydragon888)! - Handle the promise an `async` plugin `teardown`, `subscribeChanges` or `subscribeDiagnostic` handler, or check returns ([#2836](https://github.com/greydragon888/real-router/issues/2836))
+
+  **Breaking Change:** a check registered with `getPluginApi(router).addCheck()` that returns a thenable — an `async` check, whether its promise rejects or resolves — now refuses every call that reaches its position with `TypeError: [router] Async checks are not supported: the check at "<position>" returned a thenable. A check refuses by throwing synchronously.` The refusal leaves the door the way a synchronous throw of that check does, the checks after it at that position do not run, and its promise is consumed without a report. Before, the door went on as if the check had passed, and a rejection was an unhandled rejection.
+
+  **Migration:** throw from the check synchronously. A decision that has to wait for a promise cannot be a check; for a navigation, an async guard can wait for it.
+
+  - A plugin's `teardown` whose returned promise rejects is logged with the line a synchronous throw on the same path gets: `[router] Error during cleanup:` when its unsubscribe or `router.dispose()` removes the plugin, `[router.usePlugin] Cleanup error:` when the `usePlugin` call tears it down itself. Nothing waits for the promise, so the line comes after the call has returned. Before, the rejection was an unhandled rejection, which ends a Node process under the default `--unhandled-rejections=throw`.
+  - A `getRoutesApi(router).subscribeChanges()` or `getPluginApi(router).subscribeDiagnostic()` handler whose returned promise rejects is logged as `[router] Error in listener for <EVENT>:`, the line its synchronous throw gets, once the promise settles; the mutation or the operation that reported is unaffected. The rejected promise of an `async` diagnostic handler, which the notes of 0.163.0–0.166.0 leave unisolated, is isolated now.
+  - These failures reach the router's logger instead of `unhandledrejection`, under the same logger settings as a synchronous throw at the same place: an error tracker that read them there reads them from `logger.callback` now.
+  - A thenable that starts its work only when its `then` is called — a query builder, for one — returned from one of these slots now starts, because core calls its `then`. Returned from a check, it starts and the door refuses.
+  - The types are unchanged.
+
+## [2026-11-18]
+
+### @real-router/core@0.166.0
+
+### Minor Changes
+
+- [#2983](https://github.com/greydragon888/real-router/pull/2983) [`1a85574`](https://github.com/greydragon888/real-router/commit/1a85574fa572d751f2e8342ed6d0c9d3b44f8b45) Thanks [@greydragon888](https://github.com/greydragon888)! - `navigateToState`, `setRootPath`, `navigateToDefault` and `start` refuse and report through checks and diagnostics ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  Five new check positions: `navigateToState:entry`, `setRootPath:entry`,
+  `navigateToDefault:entry` and `start:entry` receive the caller's arguments,
+  `undefined` for an omitted one, and `navigateToDefault:route` receives the name
+  a `defaultRoute` callback returned. One new diagnostic kind:
+  `NAVIGATE_TO_DEFAULT`.
+
+  `RouterValidator` loses its `options` namespace, `routes.validateSetRootPathArgs`
+  and four `navigation` members: `validateNavigateToDefaultArgs`,
+  `validateNavigateToStateArgs`, `validateNavigationOptions` and
+  `validateStartArgs`. Core never called `options.validateOptions`
+  ([#2367](https://github.com/greydragon888/real-router/issues/2367)). A
+  validator of your own registers checks at these positions with
+  `PluginApi.addCheck`, and subscribes to the kind with
+  `PluginApi.subscribeDiagnostic`, instead.
+
+  ⚑ **`start:entry` is asked before the `start` interceptor chain**, so a check
+  there sees `undefined` when the caller passed no path, and its refusal throws
+  synchronously. `navigateToDefault:route` is asked only when `defaultRoute` is a
+  callback, once core has resolved all three defaults.
+
+  ⚑ **`NAVIGATE_TO_DEFAULT` is raised after the `navigateToDefault:entry` checks
+  pass** and before core resolves the defaults, so a call those checks refuse
+  reports nothing.
+
+  ⚠ **A report handler that throws no longer escapes `navigateToDefault`.** The
+  router logs the throw through `logger.error`, and the navigation runs.
+  Previously a throwing report of the validator — the warning about a defaults
+  bag mutated after `createRouter()` — made `navigateToDefault` throw before the
+  navigation. Only a synchronous throw is isolated; the rejected promise of an
+  `async` handler is not
+  ([#2836](https://github.com/greydragon888/real-router/issues/2836)).
+
+  ⚠ **A router disposed by a check at `navigateToDefault:entry`, a handler of
+  `NAVIGATE_TO_DEFAULT` or the logger callback behind it makes
+  `navigateToDefault` throw `ROUTER_DISPOSED`.** Previously a logger callback
+  that disposed the router on the validator's warning left the navigation to
+  start on the disposed router, and the call rejected with `ROUTER_NOT_STARTED`.
+
+  ⚠ **A `navigateToDefault` reference bound before `dispose()` throws
+  `ROUTER_DISPOSED` when called after it**, as `router.navigateToDefault` does,
+  instead of rejecting with `ROUTER_NOT_STARTED`.
+
+### @real-router/validation-plugin@0.37.0
+
+### Minor Changes
+
+- [#2983](https://github.com/greydragon888/real-router/pull/2983) [`1a85574`](https://github.com/greydragon888/real-router/commit/1a85574fa572d751f2e8342ed6d0c9d3b44f8b45) Thanks [@greydragon888](https://github.com/greydragon888)! - The validation of `navigateToState`, `setRootPath`, `navigateToDefault` and `start` moves onto checks and a diagnostic ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  The argument refusals of the four doors are checks at their `:entry`
+  positions, the refusal of an unknown route name a `defaultRoute` callback
+  returns is a check at `navigateToDefault:route`, and the warning about a
+  `defaultParams` / `defaultSearch` bag mutated after `createRouter()` is a
+  subscription to `NAVIGATE_TO_DEFAULT`, all removed on `teardown`. Each refusal
+  and report keeps its message and logger channel.
+
+  The re-exported `RouterValidator` type loses its `options` namespace,
+  `routes.validateSetRootPathArgs` and four `navigation` members; code typed
+  against it registers checks and diagnostics instead, as `@real-router/core`
+  describes.
+
+  ⚑ **The warning follows the entry refusals.** A `navigateToDefault` call whose
+  options carry a field the plugin refuses — `{ replace: "yes" }`, say — no
+  longer logs the warning about a mutated defaults bag before it throws; the
+  warning comes on the first call that passes. A name a `defaultRoute` callback returns is refused
+  after the warning, as before.
+
+### Patch Changes
+
+- Updated dependencies [[`1a85574`](https://github.com/greydragon888/real-router/commit/1a85574fa572d751f2e8342ed6d0c9d3b44f8b45)]:
+  - @real-router/core@0.166.0
+
+
+### @real-router/core@0.165.0
+
+### Minor Changes
+
+- [#2980](https://github.com/greydragon888/real-router/pull/2980) [`fc3f359`](https://github.com/greydragon888/real-router/commit/fc3f3594de209d01223a4c0bf1b7bf39b15aa383) Thanks [@greydragon888](https://github.com/greydragon888)! - The guard doors and the event bus refuse and report through checks and diagnostics ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  Two new check positions: `canActivate:count` and `canDeactivate:count`. Eight
+  new diagnostic kinds: `CAN_ACTIVATE_COUNT`, `CAN_DEACTIVATE_COUNT`,
+  `CAN_ACTIVATE_OVERWRITE`, `CAN_DEACTIVATE_OVERWRITE`, `SYNC_GUARD_THENABLE`,
+  `SYNC_GUARD_NON_BOOLEAN`, `GUARD_NON_BOOLEAN` and `LISTENER_COUNT`.
+
+  `RouterValidator` loses its `lifecycle` and `eventBus` namespaces: core has no
+  consultation left for them. A validator of your own registers checks at these
+  positions with `PluginApi.addCheck`, and subscribes to these kinds with
+  `PluginApi.subscribeDiagnostic`, instead.
+
+  ⚑ **A count position is asked before a guard takes a new slot**, with the
+  number of routes holding a guard of its type; an overwrite takes no slot and is
+  not judged. `add`, `update` and `replace` ask it before they write anything,
+  once per guard type that gains a slot, with the highest count their per-slot
+  asks will receive; each new slot is then asked as it registers. The count kind
+  follows once the checks pass, with the count the registration makes, so a
+  refused guard reports nothing.
+
+  ⚠ **A report handler that throws no longer escapes the door.** The router logs
+  the throw through `logger.error`, and the call completes as if the handler had
+  returned. Previously a throwing report of the validator made `addActivateGuard`
+  and `addDeactivateGuard` throw without registering the guard, keeping the old
+  one on an overwrite; made `add`, `update` and `replace` throw after writing the
+  routes, without the guard; made `subscribe`, `PluginApi.addEventListener` and
+  `usePlugin` with a hook throw before the listener registered; and made a
+  transition to a guard answering a non-boolean — `navigate`,
+  `navigateToDefault`, `start` or `PluginApi.navigateToState` — reject with that
+  error, which `TRANSITION_ERROR` listeners received too, instead of a
+  `CANNOT_ACTIVATE` `RouterError`. The synchronous ask of `canNavigateTo`,
+  `navigateToNotFound` and `replace`'s revalidation keeps its answers, and the
+  throw reaches `logger.error` instead of the `logger.warn` "Guard … threw —
+  treated as navigation-blocking". Only a
+  synchronous throw is isolated; the rejected promise of an `async` handler is not
+  ([#2836](https://github.com/greydragon888/real-router/issues/2836)).
+
+  ⚠ **Disposing the router during these calls makes them throw
+  `ROUTER_DISPOSED`.** `addActivateGuard`, `addDeactivateGuard`, `add`, `update`
+  and `replace` throw when a check at the count position, a report handler, the
+  logger callback behind a report or a guard factory disposes it; `subscribe` and
+  `PluginApi.addEventListener` when a handler of `LISTENER_COUNT`, or the logger
+  callback behind it, does. Previously these calls returned normally on the
+  disposed router.
+
+  Bare core counts the routes holding a guard only for a consumer: a check at the
+  count position, or a handler of the count kind.
+
+### @real-router/validation-plugin@0.36.0
+
+### Minor Changes
+
+- [#2980](https://github.com/greydragon888/real-router/pull/2980) [`fc3f359`](https://github.com/greydragon888/real-router/commit/fc3f3594de209d01223a4c0bf1b7bf39b15aa383) Thanks [@greydragon888](https://github.com/greydragon888)! - The guard and listener-count validation moves onto checks and diagnostics ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  The handler limit refuses at `canActivate:count` / `canDeactivate:count`, and
+  the count thresholds, the overwrite warning, the two reports of the synchronous
+  ask, the transition's non-boolean report and the listener-count thresholds are
+  subscriptions to their diagnostic kinds, all removed on `teardown`. Each refusal
+  and report keeps its message and logger channel.
+
+  The re-exported `RouterValidator` type loses its `lifecycle` and `eventBus`
+  namespaces; code typed against it registers checks and diagnostics instead, as
+  `@real-router/core` describes.
+
+  The plugin no longer checks the arguments of `addEventListener`: core refuses an
+  unknown event name and a non-function callback on every router, with the same
+  messages, before the plugin's copy could run.
+
+  ⚑ **One count, two halves.** The limit refuses at the count positions, and the
+  `warn` / `error` thresholds are logged from `CAN_ACTIVATE_COUNT` /
+  `CAN_DEACTIVATE_COUNT`. Core asks the position first, so a guard refused at the
+  limit logs nothing.
+
+### Patch Changes
+
+- Updated dependencies [[`fc3f359`](https://github.com/greydragon888/real-router/commit/fc3f3594de209d01223a4c0bf1b7bf39b15aa383)]:
+  - @real-router/core@0.165.0
+
+## [2026-11-17]
+
+### @real-router/core@0.164.0
+
+### Minor Changes
+
+- [#2978](https://github.com/greydragon888/real-router/pull/2978) [`4c15047`](https://github.com/greydragon888/real-router/commit/4c1504791eaab1ce5dc81acc6755cbfcc261bf30) Thanks [@greydragon888](https://github.com/greydragon888)! - `usePlugin` refuses and reports through checks and diagnostics ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  Three new check positions: `usePlugin:count`, `usePlugin:entry` and
+  `usePlugin:plugin`. Three new diagnostic kinds: `USE_PLUGIN_COUNT`,
+  `USE_PLUGIN_DUPLICATE_IN_BATCH` and `USE_PLUGIN_HOOK_NOT_FUNCTION`.
+
+  `RouterValidator` loses its `plugins` namespace: core has no consultation left
+  for it. A validator of your own registers checks at these positions with
+  `PluginApi.addCheck`, and subscribes to these kinds with
+  `PluginApi.subscribeDiagnostic`, instead.
+
+  ⚑ **`usePlugin:count` judges the call whole**, once, before its first factory
+  runs, with the number of plugins the router holds, the number of distinct
+  factories in the call and the resolved `limits.maxPlugins`. `usePlugin:entry`
+  receives each factory with the factories the router held when the call began,
+  and `usePlugin:plugin` the object a factory returned, after core's own shape
+  check. `USE_PLUGIN_COUNT` follows once the count and entry checks pass, with
+  the number of plugins held plus every factory the call carries, so a call
+  refused there reports nothing.
+
+  ⚠ **A report handler that throws no longer escapes `usePlugin`.** The router
+  logs the throw through `logger.error`, and the install completes as if the
+  handler had returned. Previously a throwing count or batch-duplicate report of
+  the validator made `usePlugin` throw before any factory ran, and a throwing
+  hook-type report threw after the factory had run, leaving its `teardown`
+  uncalled. Only a synchronous throw is isolated; the rejected promise of an
+  `async` handler is not ([#2836](https://github.com/greydragon888/real-router/issues/2836)).
+
+  ⚠ **Disposing the router during `usePlugin` makes the call throw
+  `ROUTER_DISPOSED`**, whether a factory, a check, a report handler or the logger
+  callback disposes it. If that happens before a factory runs, the factory does
+  not run. If it happens during a plugin's start, the plugin's `teardown` runs
+  first, and a batch rolls back. Previously the call returned a working
+  unsubscribe for a plugin wired into the cleared emitter, whose `teardown` ran
+  only when the caller unsubscribed, and a router disposed before a factory still
+  ran that factory.
+
+  Bare core builds the distinct-factory set and the registered list only for a
+  check at their position.
+
+### @real-router/validation-plugin@0.35.0
+
+### Minor Changes
+
+- [#2978](https://github.com/greydragon888/real-router/pull/2978) [`4c15047`](https://github.com/greydragon888/real-router/commit/4c1504791eaab1ce5dc81acc6755cbfcc261bf30) Thanks [@greydragon888](https://github.com/greydragon888)! - The `usePlugin` validation is registered as checks and diagnostics ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  The limit, the duplicate-factory and the plugin-key refusals are checks at
+  `usePlugin:count`, `usePlugin:entry` and `usePlugin:plugin`, and the threshold,
+  batch-duplicate and hook-type reports are subscriptions to their diagnostic
+  kinds, all removed on `teardown`. Each refusal and report keeps its message
+  and logger channel.
+
+  The re-exported `RouterValidator` type loses its `plugins` namespace; code
+  typed against it registers checks and diagnostics instead, as
+  `@real-router/core` describes.
+
+  ⚑ **One count, two halves.** The limit refuses at
+  `usePlugin:count`, and the `warn` / `error` thresholds are logged from
+  `USE_PLUGIN_COUNT`. Core asks the position first, so a call refused at the
+  limit logs nothing.
+
+### Patch Changes
+
+- Updated dependencies [[`4c15047`](https://github.com/greydragon888/real-router/commit/4c1504791eaab1ce5dc81acc6755cbfcc261bf30)]:
+  - @real-router/core@0.164.0
+
+
+### @real-router/core@0.163.0
+
+### Minor Changes
+
+- [#2971](https://github.com/greydragon888/real-router/pull/2971) [`96a8bb0`](https://github.com/greydragon888/real-router/commit/96a8bb03392d5ecff9865400b2ac7711a0f0e4f7) Thanks [@greydragon888](https://github.com/greydragon888)! - `getDependenciesApi` and `cloneRouter` stop consulting the validator ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  Nine new check positions: `getDependency:entry`, `getDependency:value`,
+  `setDependency:entry`, `setDependency:count`, `setDependencies:entry`,
+  `setDependencies:count`, `removeDependency:entry`, `hasDependency:entry` and
+  `cloneRouter:entry`. Five new diagnostic kinds: `SET_DEPENDENCY_COUNT`,
+  `SET_DEPENDENCIES_COUNT`, `SET_DEPENDENCY_OVERWRITE`,
+  `SET_DEPENDENCIES_OVERWRITE` and `REMOVE_DEPENDENCY_MISSING`.
+
+  `RouterValidator` loses its `dependencies` namespace: core has no consultation
+  left for it. A validator of your own registers checks at these positions with
+  `PluginApi.addCheck`, and subscribes to these kinds with
+  `PluginApi.subscribeDiagnostic`, instead.
+
+  ⚑ **A count position is asked about a NEW key only**, with the number of keys
+  the record held before the write and `limits.maxDependencies`. The count kind
+  follows with the same two numbers once the checks there pass, so a refused write
+  reports nothing.
+
+  ⚠ **A report handler that throws no longer escapes the door.** On `set`,
+  `setAll` and `remove`, the router logs the throw through `logger.error`, and the
+  call completes as if the handler had returned. Previously a throwing overwrite
+  or missing-key report of the validator escaped all three: `set` before the
+  write, `setAll` after every key was written. Only a synchronous throw is
+  isolated; the rejected promise of an `async` handler is not ([#2836](https://github.com/greydragon888/real-router/issues/2836)).
+
+  Bare core reads the record's keys only for a consumer: a check at the count
+  position, or a handler of the count or overwrite kind.
+
+### @real-router/validation-plugin@0.34.0
+
+### Minor Changes
+
+- [#2971](https://github.com/greydragon888/real-router/pull/2971) [`96a8bb0`](https://github.com/greydragon888/real-router/commit/96a8bb03392d5ecff9865400b2ac7711a0f0e4f7) Thanks [@greydragon888](https://github.com/greydragon888)! - The dependency and `cloneRouter` validation is registered as checks and diagnostics ([#2388](https://github.com/greydragon888/real-router/issues/2388))
+
+  Each refusal of `getDependenciesApi` and `cloneRouter` is a check at its door's
+  position, and each warning a subscription to its diagnostic kind, all removed on
+  `teardown`. Each refusal and warning keeps its message and logger channel, and
+  the refusals keep their order.
+
+  The re-exported `RouterValidator` type loses its `dependencies` namespace; code
+  typed against it registers checks and diagnostics instead, as
+  `@real-router/core` describes.
+
+  ⚑ **The dependency count is split in two.** The limit refuses at
+  `setDependency:count` / `setDependencies:count`, and the `warn` / `error`
+  thresholds are logged from `SET_DEPENDENCY_COUNT` / `SET_DEPENDENCIES_COUNT`.
+  Core asks the position first, so a write refused at the limit logs nothing.
+
+### Patch Changes
+
+- Updated dependencies [[`96a8bb0`](https://github.com/greydragon888/real-router/commit/96a8bb03392d5ecff9865400b2ac7711a0f0e4f7)]:
+  - @real-router/core@0.163.0
+
+
+### @real-router/core@0.162.0
+
+### Minor Changes
+
+- [#2968](https://github.com/greydragon888/real-router/pull/2968) [`39cafb9`](https://github.com/greydragon888/real-router/commit/39cafb91e25d4bd1e62e57505c1ba2d97c02e992) Thanks [@greydragon888](https://github.com/greydragon888)! - Move the tree-change channel from `RouterInternals` onto the routes store, and seal the references the store carries for its doors ([#2952](https://github.com/greydragon888/real-router/issues/2952))
+
+  **Breaking Change:** only for code that reaches core's internals through `getInternals` from `@real-router/core/validation`.
+
+  - `RouterInternals` no longer has `treeChanged`. Subscribe to route-tree changes through `getRoutesApi(router).subscribeChanges(handler)`. Emitting on the channel, counting its listeners and asking whether it is emitting have no public replacement.
+  - The store that `routeGetStore()` returns carries the channel as `treeChanged`. Its `treeChanged`, `depsStore` and `lifecycleNamespace` slots refuse an assignment, a redefinition and a `delete`; in strict mode each refusal is a `TypeError`. The channel object is frozen, and the three slots are `readonly` in the type `routeGetStore()` returns.
+
+  `subscribeChanges`, its payloads and the `REENTRANT_TREE_MUTATION` ban are unchanged.
+
 ## [2026-11-12]
 
 ### @real-router/core@0.161.0

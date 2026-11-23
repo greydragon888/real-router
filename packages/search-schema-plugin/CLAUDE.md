@@ -10,7 +10,7 @@
 | `SearchSchemaPluginOptions` | type   | Configuration: `mode`, `strict`, `onError`                     |
 | `StandardSchemaV1`        | type     | Standard Schema V1 interface (inline, zero deps)               |
 | `StandardSchemaV1Issue`   | type     | Validation issue from Standard Schema                          |
-| `StandardSchemaV1Result`  | type     | Validation result (success or failure)                         |
+| `StandardSchemaV1Result`  | type     | Validation result — `issues` decides: truthy is a failure      |
 
 ## How It Works
 
@@ -46,10 +46,10 @@ src/
 ├── factory.ts    — searchSchemaPlugin: validates options, freezes config, returns PluginFactory
 ├── plugin.ts     — SearchSchemaPlugin class: forwardState interceptor + TREE_CHANGED subscription, tree validation
 ├── helpers.ts    — getInvalidKeys / issueKey / namesOneOf / segmentKey (the keys issues name), isNumberOrBoolean (the two types the router decodes from text), readAsText (the query with each rejected number or boolean as its text), omitKeys (shallow copy without keys), pickKeys (shallow copy of only those keys), collectPathParams (the path-slot names in a route's URL)
-├── report.ts     — describeRejection: the mode "development" console.error message
+├── report.ts     — describeRejection: the mode "development" message of rejected search params; describeThrow: the line logged with a rejected Promise's error
 ├── validation.ts — validateOptions: mode / strict / onError, TypeError at factory time
 ├── types.ts      — StandardSchemaV1 types (inline), SearchSchemaPluginOptions
-├── constants.ts  — ERROR_PREFIX
+├── constants.ts  — LOGGER_CONTEXT (the context the plugin logs under), ERROR_PREFIX (the head of a message it throws)
 └── index.ts      — Public exports + Route module augmentation
 ```
 
@@ -69,13 +69,17 @@ A number or boolean the schema rejects — a key's value or an array element —
 
 The schema runs on what `next()` returns: the caller's channels plus any `forwardTo` hop's defaults — not the route's own `defaultSearch`, which core merges under the result afterwards (at `canonicalize`). So `z.number().default(1)` fires whenever the caller omits the key, and the value it produces is caller-side from core's point of view: `defaultSearch` merges under it. The repair's run is handed, of the route's defaults, only the rejected keys' own — so there too an absent key takes `.default()` ahead of its `defaultSearch` value.
 
+### The plugin's messages go to the router's logger (#2975)
+
+The report of rejected search params, the error of a rejected answer and both findings of the dev-time `defaultSearch` check go through `PluginApi.logger` under the context `search-schema-plugin` (`LOGGER_CONTEXT`), so the router's `logger` option — its `level` and its `callback` — applies to them. Core's logger prints `[search-schema-plugin] message`, so a logged message carries no head of its own; a thrown one keeps `ERROR_PREFIX`. `tests/functional/router-logger-sink-2975.test.ts` holds a cell per call site.
+
 ### `onError` bypasses the built-in recovery, not the text runs
 
-When `onError` is set, the plugin does NOT call `console.error`, strip params or run the repair. The text runs come first: `onError` is called only when issues are left, with the query they settle on — each key the text fixed as text, every other key as decoded — and the schema's own issues on that query (the property `onError is handed a query and the schema's own issues on it`). It must return clean params. No re-validation of returned params (avoids infinite loops).
+When `onError` is set, the plugin does NOT log the issues, strip params or run the repair. The text runs come first: `onError` is called only when issues are left, with the query they settle on — each key the text fixed as text, every other key as decoded — and the schema's own issues on that query (the property `onError is handed a query and the schema's own issues on it`). It must return clean params. No re-validation of returned params (avoids infinite loops).
 
 ### Path-less validation issues (cross-field `refine`) can't be stripped by key
 
-The strip-and-recover path removes only the keys a validation issue **names** in its `path` — `getInvalidKeys` (`helpers.ts`) skips any issue whose `path` is empty (an issue with no path concerns the whole object, not one key). So a **cross-field** `.refine()` / `.superRefine()` that reports a **path-less** issue strips **nothing**: `invalidKeys` is empty → `omitKeys` is a no-op → the repair's run rejects the same query → the invalid combination passes into `state` unrepaired, a number the text fixed as its text and every other value as decoded. In `mode: "development"` a `console.error` is still logged; `mode: "production"` is **silent**.
+The strip-and-recover path removes only the keys a validation issue **names** in its `path` — `getInvalidKeys` (`helpers.ts`) skips any issue whose `path` is empty (an issue with no path concerns the whole object, not one key). So a **cross-field** `.refine()` / `.superRefine()` that reports a **path-less** issue strips **nothing**: `invalidKeys` is empty → `omitKeys` is a no-op → the repair's run rejects the same query → the invalid combination passes into `state` unrepaired, a number the text fixed as its text and every other value as decoded. In `mode: "development"` the router's `logger.error` still reports it; `mode: "production"` is **silent**.
 
 ```typescript
 const schema = z
@@ -87,9 +91,13 @@ router.getState().search; // { min: 10, max: 5 } — NOT stripped
 
 So the "validate → strip → restore → validate again" contract holds **per key**; it cannot recover a rule class for which strip-by-key is structurally impossible. To recover from a cross-field failure, give the refine a `path` (`{ message, path: ["max"] }`) so the offending key is stripped and its default restored, or handle it in `onError` (which sees the path-less issue). A whole-object reset on a path-less failure is not built in — add it via `onError` if you need it.
 
+### `issues` decides a run, not `value`
+
+Every answer of `~standard.validate()` is read by `readAnswer` (`plugin.ts`), as the spec decides it: a truthy `issues` is a failure — an empty array included, and a `value` beside it, which valibot's failure carries, changes nothing. An answer object with no truthy `issues` and no `value` is not a Standard Schema result, and the run throws a `TypeError` naming the route (`standard-schema-result-2851.test.ts`). The dev `defaultSearch` check reads through the same function, so in mode `"development"` such a schema on a route with a `defaultSearch` makes `usePlugin()` throw; on `add` / `replace` / `update` the change has committed, and core logs the throw as a listener error.
+
 ### Async schemas throw immediately
 
-If `~standard.validate()` returns a Promise, the plugin throws `TypeError`. This is by design — `forwardState` is synchronous.
+If `~standard.validate()` returns a Promise, the plugin throws `TypeError`. This is by design — `forwardState` is synchronous. The Promise is handed a rejection handler first, because zod answers a throw in a transform or a refinement with a rejected Promise, and unhandled it would end a Node process. The handler logs the error with `describeThrow` in mode `"development"` without `onError`, as rejected search params are logged; otherwise the error is dropped. A Promise is recognised by `instanceof Promise`, read off the live global: one from another realm, or a native one while `globalThis.Promise` is replaced, is refused as a non-result, and its rejection is not handled. zod also abandons a Promise of its own when an async refinement or transform throws inside its synchronous attempt — that rejection never reaches the plugin and stays unhandled.
 
 ### A schema that throws on a restored default or on a text refuses the navigation
 
@@ -135,7 +143,9 @@ Prefer the recommended order (schema outermost) so `state` is validated as a who
 
 ### Dev-time defaultSearch check
 
-At `usePlugin()` time, validates all existing routes' `defaultSearch` against their `searchSchema` (the query-channel default is what the schema governs; `defaultParams` is the path/arbitrary channel since #1549). Runtime tree mutations are then re-validated via the `TREE_CHANGED` subscription: `add`/`replace` validate the whole added subtree (flat, full dotted names), and `update` re-validates the route when its `defaultSearch` changes. `remove`/`clear` are no-ops (routes gone). Production mode skips all of this (no subscription registered).
+At `usePlugin()` time, validates all existing routes' `defaultSearch` against their `searchSchema` (the query-channel default is what the schema governs; `defaultParams` is the path/arbitrary channel since #1549). Runtime tree mutations are then re-validated via the `TREE_CHANGED` subscription: `add`/`replace` validate the whole added subtree (flat, full dotted names), and `update` re-validates the route when its `defaultSearch` changes. `remove`/`clear` are no-ops (routes gone), and so is `rootPath` (it carries no routes). Production mode skips all of this (no subscription registered).
+
+A schema that answers the check with a Promise is skipped; a rejected one is reported through the router's `logger.warn` with its error, as the check's other finding is — whatever `onError` is.
 
 ### Invalid `defaultSearch` reaches state at runtime — core-injected, plugin cannot gate (#802)
 

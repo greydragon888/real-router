@@ -366,19 +366,20 @@ describe("validation: non-function loader values rejected", () => {
 });
 
 // =============================================================================
-// Invariant 13 — Factory compilation error releases claim (PBT coverage)
+// Invariant 13 — Factory compilation error releases every claim (PBT coverage)
 // =============================================================================
 //
 // The functional suite covers this with a single hand-crafted Error; PBT
 // generalises across arbitrary error shapes so a regression that only
-// releases the claim on certain message lengths or error subclasses
+// releases the claims on certain message lengths or error subclasses
 // surfaces here. Property: for ANY throw inside the loader factory,
-// `usePlugin()` rethrows AND the `"rsc"` namespace is re-claimable after.
+// `usePlugin()` rethrows the thrown value AND both namespaces, `"rsc"` and
+// `"ssrRscMode"`, are re-claimable after.
 
-describe("teardown: factory throw releases claim (Inv 13)", () => {
+describe("teardown: factory throw releases every claim (Inv 13)", () => {
   // Strings and Errors hit the two common throw shapes in JS code. The
   // factory's try/catch is shape-blind — what matters is that the
-  // exception propagates and the claim is released regardless.
+  // exception propagates and every claim is released regardless.
   const arbThrowValue = fc.oneof(
     fc.string({ minLength: 1, maxLength: 32 }).map((m) => new Error(m)),
     fc.string({ minLength: 1, maxLength: 32 }).map((m) => new TypeError(m)),
@@ -386,7 +387,7 @@ describe("teardown: factory throw releases claim (Inv 13)", () => {
   );
 
   test.prop([arbThrowValue], { numRuns: NUM_RUNS.standard })(
-    "factory that throws → usePlugin rethrows + namespace re-claimable",
+    "factory that throws → usePlugin rethrows it + every namespace re-claimable",
     (thrown) => {
       const router = createRouter(ROUTES, { defaultRoute: "home" });
       const factory = rscServerPluginFactory({
@@ -402,14 +403,25 @@ describe("teardown: factory throw releases claim (Inv 13)", () => {
         },
       });
 
-      // Rethrow is shape-preserving — fast-check shrinking would give us
-      // the minimal reproducer if a regression broke this.
-      expect(() => router.usePlugin(factory)).toThrow();
+      // The rethrow is the thrown value itself — fast-check shrinking gives
+      // the minimal reproducer if a regression wraps or replaces it.
+      let caught: unknown;
 
-      // Same-namespace re-claim must succeed AFTER the rethrow — proves
-      // the factory released the claim on its way out (Inv 13).
+      try {
+        router.usePlugin(factory);
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBe(thrown);
+
+      // Re-claiming each namespace must succeed AFTER the rethrow — proves
+      // the factory released every claim on its way out (Inv 13).
       expect(() =>
         getPluginApi(router).claimContextNamespace("rsc"),
+      ).not.toThrow();
+      expect(() =>
+        getPluginApi(router).claimContextNamespace("ssrRscMode"),
       ).not.toThrow();
     },
   );
@@ -1027,17 +1039,18 @@ describe("getSsrRscMode: closed-set membership (Inv 28)", () => {
 // rscActionPluginFactory — runtime guard invariants (Inv 29-30)
 // =============================================================================
 //
-// §6.9-6.11: the per-start guard in `actionFactory.ts` rejects
-// Promise/thenable, array, and null. PBT generalises the existing
-// functional coverage:
+// §6.9-6.11: the per-start guard in `actionFactory.ts` rejects every
+// value except a non-null, non-array, non-thenable one whose `typeof` is
+// `"object"`. PBT generalises the existing functional coverage:
 //
 // - Inv 29: any plain object (typeof === "object", non-null, non-array,
 //   non-thenable) passes the guard and survives `claim.write`.
 // - Inv 30: any thenable result raises a "Promise/thenable …" TypeError
 //   with the documented prefix.
 //
-// §6.10 (determinism of `describeBadResult`) is trivially true in JS —
-// no PBT, but documented as Inv 29's pre-condition.
+// §6.10 (determinism of `classifyRscActionResult`) holds for any value
+// whose `then` is not a stateful getter — no PBT, but documented as Inv 29's
+// pre-condition.
 
 describe("rscActionPluginFactory: guard accepts plain objects (Inv 29)", () => {
   // arbPlainAcceptedResult — values that ALL of: typeof === "object",

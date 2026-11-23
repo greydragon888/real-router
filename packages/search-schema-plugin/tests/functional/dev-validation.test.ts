@@ -143,8 +143,9 @@ describe("Search schema plugin", () => {
 
     /**
      * Async schema asymmetry (by design):
-     * - Dev-time validation (usePlugin / add interceptor) silently skips async schemas
-     *   because it cannot block router startup with an await.
+     * - The dev-time check (usePlugin, then a TREE_CHANGED subscription) silently
+     *   skips a Promise that resolves, because it cannot block router startup with
+     *   an await. A rejected one is logged (standard-schema-result-2851.test.ts).
      * - Runtime forwardState throws TypeError on async schemas because forwardState
      *   is synchronous — a Promise return breaks the interceptor chain.
      *

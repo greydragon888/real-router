@@ -1323,10 +1323,7 @@ const SURFACES = new Map([
 ]);
 
 /** Kinds whose members fold into one: core calls them at too many places to list. */
-const FAMILIES = [
-  "types/RouterValidator.ts › RouterValidator",
-  "types/router.ts › RouterLogger",
-];
+const FAMILIES = ["types/router.ts › RouterLogger"];
 
 const T_EMITTER =
   "utils/event-emitter/EventEmitter.ts › EventEmitter.#callListener()";
@@ -1363,7 +1360,6 @@ const KINDS = new Map([
   ["internals.ts › RouterInternals.checks", T_CHECKS],
   ["internals.ts › RouterInternals.interceptors", T_INTERCEPTORS],
   ["internals.ts › RouterInternals.subscribeDiagnostic.handler", T_DIAGNOSTIC],
-  ["internals.ts › RouterInternals.treeChanged.subscribe.handler", T_TREE],
   ["types/api.ts › CheckFn", T_CHECKS],
   // `claimContextNamespace` hands the claim OUT; core calls its own methods.
   ["types/api.ts › ContextNamespaceClaim.release", UNCALLED],
@@ -1394,7 +1390,6 @@ const KINDS = new Map([
   ["types/router.ts › RouteConfigUpdate.encodeParams", T_ENCODE],
   ["types/router.ts › RouterLogger.*", LEAF],
   ["types/router.ts › SubscribeFn", LEAF],
-  ["types/RouterValidator.ts › RouterValidator.*", LEAF],
 ]);
 
 /** Internal declarations whose values core writes itself, by prefix. */
@@ -1422,6 +1417,10 @@ const HOPS = new Map([
   [
     "channels/modeGate.ts › admittedSearch()",
     "its reporter is a closure of core's",
+  ],
+  [
+    "dependenciesStore.ts › DependencyDiagnostics",
+    "the reports `Router` builds over its bus",
   ],
   [
     "engine/path-matcher/encoding.ts",
@@ -1456,10 +1455,6 @@ const HOPS = new Map([
   ],
   ["internals.ts › throwIfDisposed()", "its predicate reads core's own state"],
   [`${EBN} › bridgeSignal()`, "the bridge's own closures"],
-  [
-    `${EBN} › EventBusNamespace.#getValidator`,
-    "the accessor `wireNamespaces` installs",
-  ],
   [
     "namespaces/NavigationNamespace/transition/errorHandling.ts › resolveAsyncGuard().warnNonBooleanGuard",
     "the report a dependency bag carries, a closure `wireNamespaces` fills",
@@ -1501,10 +1496,19 @@ const HOPS = new Map([
     "a dependency bag `wireNamespaces` fills",
   ],
   [
+    "namespaces/PluginsNamespace/PluginsNamespace.ts › Cleanup",
+    "the cleanup core builds around a started plugin",
+  ],
+  [
+    "namespaces/PluginsNamespace/PluginsNamespace.ts › runCleanup().report",
+    "a report the namespace builds over its logger",
+  ],
+  [
     "namespaces/RoutesNamespace/helpers.ts › clearConfigEntries()",
     "its matcher is the route table's",
   ],
   [`${RS} › compilePendingGuards()`, "its compiler is core's"],
+  [`${RS} › TreeChangedChannel`, "the channel `Router` builds over its bus"],
   [`${RS} › walkRouteNames()`, "its visitor is a closure of core's"],
   [
     "namespaces/RoutesNamespace/types.ts › RouteConfig",
@@ -1600,6 +1604,10 @@ const OWN_PROTOCOL = new Map([
     "utils/event-emitter/EventEmitter.ts › #invokeIsolated › then:catch",
     "the promise core builds around a listener's thenable",
   ],
+  [
+    "utils/thenable.ts › consumeThenable › then:catch",
+    "the promise core builds around a callback's thenable",
+  ],
 ]);
 
 /** Leaves the emitter dispatches: each is reached from an `emit` place. */
@@ -1634,7 +1642,6 @@ const STOP_RESTART = "by-design:stop-restart";
 const DISPOSED = "harmless:disposed";
 const INHERITS = "inherits";
 const BOOT_RESTART = "unsupported:boot-restart";
-const VALIDATOR = "unsupported:third-party-validator";
 const LOGGER_MEMBER = "unsupported:replaced-logger-member";
 const VALUE_KEY = "unsupported:navigating-value-key";
 
@@ -1695,7 +1702,7 @@ const PLACES = new Map([
     "counted:default-prep",
   ],
   [
-    "namespaces/PluginsNamespace/PluginsNamespace.ts › #startPlugin › call:Plugin.teardown",
+    "namespaces/PluginsNamespace/PluginsNamespace.ts › cleanup › call:Plugin.teardown",
     DISPOSED,
   ],
   [`${RLN} › #checkGuardSync › call:GuardFn`, INHERITS],
@@ -1718,9 +1725,9 @@ const PLACES = new Map([
   ["Router.ts › #runStart › then:catch", BOOT_RESTART],
   ["Router.ts › start › then:catch", BOOT_RESTART],
   ["types/router.ts › RouterLogger › family", LOGGER_MEMBER],
-  ["types/RouterValidator.ts › RouterValidator › family", VALIDATOR],
   [`${LOGGER} › #invokeCallback › call:LogCallback`, "counted:logger"],
   [`${LOGGER} › #invokeCallback › then:Promise.resolve`, "counted:logger"],
+  ["utils/thenable.ts › consumeThenable › then:Reflect.apply", DISPOSED],
   [
     `wiring/wireNamespaces.ts › createCompileFactory › call:${short(T_FACTORY)}`,
     INHERITS,
@@ -1732,10 +1739,6 @@ const UNSUPPORTED = new Map([
   [
     BOOT_RESTART,
     "a restart from a boot stage — the start interceptors, the thenable one returns, the boot's `matchPath` — needs a boot-liveness predicate core does not have (#2798)",
-  ],
-  [
-    VALIDATOR,
-    "a `RouterValidator` that navigates: the shipped one throws or logs, and its logging is counted at `logger`",
   ],
   [
     LOGGER_MEMBER,
@@ -1785,10 +1788,11 @@ const B1_ROWS: readonly [string, string][] = [
   ],
   ["N3 B3 B6 B9 R7", `${RS} › registerSingleRouteHandlers`],
   ["N3 B3 B6 B9 R7", `${RS} › commitScalarConfig`],
-  ["N4 B1 B7 B9 R3 R5 R7", "types/RouterValidator.ts › RouterValidator"],
+  ["N4 B1 B7 B9 R3 R5 R7", "internals.ts › runChecks"],
+  ["N4 B7 B9 R5 R7", `${EBN} › emitDiagnostic`],
   ["B8", `${EBN} › emitRouterStart`],
   ["S2 S3 S4", `${EBN} › emitRouterStop`],
-  ["S6", "namespaces/PluginsNamespace/PluginsNamespace.ts › #startPlugin"],
+  ["S6", "namespaces/PluginsNamespace/PluginsNamespace.ts › cleanup"],
   ["F2 R8", `${RLN} › #checkGuardSync`],
   ["R1", "internals.ts › runChecks"],
   ["R4", "wiring/wireNamespaces.ts › createCompileFactory"],

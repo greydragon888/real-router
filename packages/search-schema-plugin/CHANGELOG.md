@@ -1,5 +1,47 @@
 # @real-router/search-schema-plugin
 
+## 0.11.0
+
+### Minor Changes
+
+- [#2996](https://github.com/greydragon888/real-router/pull/2996) [`749176a`](https://github.com/greydragon888/real-router/commit/749176a702f284e48ff4351a44a4e41d48fd4f2b) Thanks [@greydragon888](https://github.com/greydragon888)! - The plugin logs through the router's logger instead of `console` ([#2975](https://github.com/greydragon888/real-router/issues/2975))
+
+  The plugin's messages go to the router's logger, under the context
+  `search-schema-plugin`: in `mode: "development"` without `onError`, the report
+  of rejected search params and the error of a schema that answers a search with
+  a rejected Promise as `logger.error`, and in `mode: "development"`, both
+  findings of the `defaultSearch` check as `logger.warn`. The router's `logger`
+  option — its `level` and its `callback` — applies to them. With the default
+  logger the console shows the same lines as before.
+
+  **Breaking Change:** the messages no longer reach `console` under a `level`
+  that filters them — `"none"`, and `"error-only"` for the two `defaultSearch`
+  warnings. To keep them under such a level, read them in the router's
+  `logger.callback` with `callbackIgnoresLevel: true`: it receives each under the
+  context `search-schema-plugin`, without the `[search-schema-plugin]` head the
+  console prints.
+
+## 0.10.0
+
+### Minor Changes
+
+- [#2987](https://github.com/greydragon888/real-router/pull/2987) [`70ff55c`](https://github.com/greydragon888/real-router/commit/70ff55c5a7c0eb79f02b9a3eda16bd678d8ce7e8) Thanks [@greydragon888](https://github.com/greydragon888)! - Read each `~standard.validate()` answer by `issues`, as Standard Schema does, and handle the rejection of a Promise answer ([#2851](https://github.com/greydragon888/real-router/issues/2851))
+
+  **Breaking Change:** the success member of the exported `StandardSchemaV1Result` is now `{ readonly value: Output; readonly issues?: undefined }`, as the spec types it. Code that narrows a result with `"issues" in result` and then reads `result.issues` as an array no longer compiles, since `result.issues` may be `undefined`. Test `result.issues` itself: it is truthy on a failure. A hand-written schema whose success answer carries a truthy `issues` that is not an array, such as `{ value, issues: {} }`, read as a success; it now refuses the navigation with a `TypeError`, and the type refuses it too. Answer a success without a truthy `issues`.
+
+  **Migration:**
+
+  ```diff
+  - const issues = "issues" in result ? result.issues : [];
+  + const issues = result.issues ?? [];
+  ```
+
+  - A failure that carries a `value` as well, as valibot's does, is now read as a rejection. The rejected keys are stripped and their `defaultSearch` values restored, mode `"development"` logs the rejection, and `onError` is called. Before, the failing value was written to the state and the URL.
+  - So a valibot `v.string()` field handed `?q=17` settles as `"17"`: the rejected number is tried as text, as it is for zod. Before, the number `17` the failure carried was written.
+  - `issues` decides. A truthy `issues`, an empty array included, is a failure. A success spelled `{ value, issues: undefined }` no longer draws a false warning from the dev `defaultSearch` check.
+  - An answer object with neither a truthy `issues` nor a `value` is refused with a `TypeError` that names the route; before, it failed with `issues is not iterable`. In mode `"development"`, such a schema on a route with a `defaultSearch` makes `usePlugin()` throw. On `add`, `replace` or `update` the change commits, and core logs the error.
+  - A Promise from `~standard.validate()` is still refused with a `TypeError`, and its rejection is now handled. zod answers a throw in a transform or a refinement with a rejected Promise, and that unhandled rejection ended a Node process. In mode `"development"`, the plugin logs the schema's error with `console.error` when `onError` is not set, and the dev `defaultSearch` check reports it with `console.warn` whatever `onError` is. On a navigation in mode `"production"`, or with `onError` set, the schema's error is dropped, and the refusal is all that remains. An async refinement or transform stays unsupported: when one throws, zod abandons a rejected Promise of its own in its synchronous attempt, which never reaches the plugin and stays unhandled.
+
 ## 0.9.1
 
 ### Patch Changes

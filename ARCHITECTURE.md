@@ -521,26 +521,27 @@ Plugins extend the router instance with new properties via `extendRouter()` on `
 
 ### Context Namespace Claims
 
-Plugins publish per-route data via `claimContextNamespace()` on `PluginApi`. Each plugin claims a unique namespace key at registration time (O(1) collision detection via `Set<string>`), receives a `{ write, release }` object, and publishes data to `state.context.<namespace>` from lifecycle hooks. Mirrors the `extendRouter()` ownership model: closure-based tracking, manual `release()` in `teardown()`, dispose safety net for orphaned claims. Six plugins use this — 8 claims in total:
+Plugins publish per-route data via `claimContextNamespace()` on `PluginApi`. Each plugin claims one or more unique namespace keys at registration time (O(1) collision detection via a `Map<string, ContextNamespaceClaim>` keyed by namespace), receives a `{ write, release }` object per key, and publishes data to `state.context.<namespace>`. Mirrors the `extendRouter()` ownership model: closure-based tracking, manual `release()` in `teardown()`, dispose safety net for orphaned claims. Six plugins use this; each row lists every key its plugin claims:
 
 | Plugin                   | Namespace key(s)    | Published fields (examples)                                               |
 | ------------------------ | ------------------- | ------------------------------------------------------------------------- |
-| browser-plugin           | `browser` + `url`   | source, fullUrl                                                           |
-| navigation-plugin        | `navigation`        | direction, sourceElement                                                  |
+| browser-plugin           | `browser` + `url`   | source, direction, hash, hashChanged                                      |
+| navigation-plugin        | `navigation` + `url` | direction, sourceElement                                                  |
 | memory-plugin            | `memory`            | direction, historyIndex                                                   |
 | persistent-params-plugin | `persistentParams`  | persisted query param snapshot                                            |
-| ssr-data-plugin          | `data`              | per-route loader result (via `createSsrLoaderPlugin`)                     |
-| rsc-server-plugin        | `rsc` + `rscAction` | per-route ReactNode (via `createSsrLoaderPlugin`) + server-action results |
+| ssr-data-plugin          | `data` + `ssrDataMode` + `ssrDataDeferred` + `ssrDataDeferredKeys` | per-route loader result, SSR mode, `defer()` promises and their keys (via `createSsrLoaderPlugin`) |
+| rsc-server-plugin        | `rsc` + `ssrRscMode` + `rscAction` | per-route ReactNode and SSR mode (via `createSsrLoaderPlugin`) + server-action results |
 
-### Validator Slot
+### Validation Channels
 
-`@real-router/validation-plugin` uses a unique extension mechanism — not interceptors, not event listeners, but a **nullable validator slot** in `RouterInternals`:
+`@real-router/validation-plugin` refuses through **checks** and reports through **diagnostic kinds**. Core asks at a named position and raises a named kind; the plugin registers with `PluginApi.addCheck` and `PluginApi.subscribeDiagnostic`, and removes its registrations on teardown:
 
 ```typescript
-ctx.validator?.routes.validateBuildPathArgs(route); // no-op when null
+runChecks(ctx.checks, POSITION["buildPath:entry"], route, params, search); // core
+api.addCheck("buildPath:entry", (route, params, search) => { … }); // the plugin
 ```
 
-The slot is typed as `RouterValidator | null`. The plugin sets it on registration, clears it on teardown. All core call sites use optional chaining — zero overhead when absent.
+A position with no check registered calls nothing. `CheckPositionMap` and `DiagnosticEventMap` in `packages/core/src/types/api.ts` declare what each position and kind receives.
 
 ## Invariants
 
@@ -567,6 +568,9 @@ These are deliberately designed constraints. Violating them will break the syste
 - **Plugins are observers** — they react to events but cannot block or modify the transition pipeline.
 - **Guard execution order is fixed**: deactivation innermost → outermost, then activation outermost → innermost.
 - **`navigateToNotFound()` bypasses ACTIVATION guards and plugins** — plugins only see `onTransitionSuccess`, and nothing is activated at `UNKNOWN_ROUTE`. It does consult the current route's `canDeactivate`: leaving is still leaving.
+- **One contract, one executor** — on one router, a route-config field, a `state.context` namespace and a router extension each have one executor: the package that declares it runs the field, writes the namespace or defines the extension, and others may read them. Core refuses a second claim of a namespace and a second extension of a key, so two packages that declare the same namespace or extension cannot share a router. The rest is a convention: nothing stops a plugin from writing `state.context` directly under a namespace it does not hold, or from running a route-config field it did not declare.
+- **A plugin is isomorphic by default** — it works the same in every environment and reads none of it. What depends on the environment — whether anyone waits for the work, what is serialized, where an error lands — is decided at the boundary, the entry point. Where the entry point acts on a plugin's work, the plugin hands it a handle (a promise, a signal). The plugin writes its own diagnostics to the router's logger, `PluginApi.logger`, which the entry point configures through the router's `logger` option. The exception is an environment-specific plugin, whose work is an environment API — the URL and its history, DOM events, the host console — or server rendering and hydration. Where it needs a capability of its environment, it checks the capability itself and decides what to do without it: it stays empty, works through a stand-in, or refuses with an error. The census of environment reads, `scripts/tests/env-read-census.test.mjs`, checks the code of `packages/*/src` and `shared/` outside the UI layer for reads of the environment: the packages it allows whole, with their shared layers, are this repository's environment-specific ones, and it names the few places of isomorphic code that read the environment, the router's logger among them.
+- **The start phase is an explicit fact, not the environment** — a start that hydrates is the one `hydrateRouter` runs: it deposits the payload it starts the router with, and a plugin reads it with `getHydrationState(router)` from its `start` interceptor — `null` outside a hydration.
 
 ### Navigation
 
@@ -577,7 +581,7 @@ These are deliberately designed constraints. Violating them will break the syste
 ### Packages
 
 - **Shared sources are never imported by end users** — `shared/` is bundled into the packages that link it, at build time.
-- **`core` never depends on browser APIs** — platform-agnostic. The `start(path)` method requires a path; browser-plugin makes it optional by injecting `browser.getLocation()` via interceptor.
+- **`core` is isomorphic** — of the environment it reads only the host console, in the router's logger (see "A plugin is isomorphic by default" above). The `start(path)` method requires a path; browser-plugin makes it optional by injecting `browser.getLocation()` via interceptor.
 
 ## Boundaries
 
@@ -608,7 +612,7 @@ These are deliberately designed constraints. Violating them will break the syste
 - The `engine` subsystem (`core/src/engine`) is self-contained — the `route-tree` → `path-matcher` / `search-params` layering is an internal boundary within `src/engine`, enforced by core's lint
 - The `channels` subsystem (`core/src/channels`) imports **nothing** from the namespaces, the engine or the pipeline — declared query names arrive as DATA (`readonly string[]` or a `queryNamesOf` accessor), so the one registry that classifies and prints cannot grow a second derivation. Also enforced by core's lint
 - The `pipeline` subsystem (`core/src/pipeline`) reaches the routes layer only through its `RouteResolver` port, implemented by the router at wiring time — same inversion, so the module stays pure and mock-testable
-- `shared/browser-env` is the **only** location that touches `window`, `history`, `addEventListener` (enforced by convention, not by package boundary)
+- In `packages/*/src` and `shared/`, outside the UI layer (the framework adapters and `shared/dom-utils`), code reads the environment only where "A plugin is isomorphic by default" (Invariants › Guards & Plugins) lets it; the census of environment reads enforces this, not a package boundary
 
 **FORBIDDEN:**
 

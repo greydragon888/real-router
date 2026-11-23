@@ -44,12 +44,12 @@ for the React stream piped through `injectDeferredScripts`. See
 | `LoaderTimeout`  | class    | Thrown by `withTimeout()` when the deadline elapses. Fields: `route: string`, `ms: number`                                                                                                                                 |
 | `withTimeout`    | function | `(routeName, ms, loader, options?) => Promise<T>` — race against a deadline; passes `{ signal }` to the loader for cooperative cancellation; optional `options.upstreamSignal` composes via `AbortSignal.any` (Node 20.3+) |
 
-Discriminator is structural (`error.code === "LOADER_NOT_FOUND" | "LOADER_REDIRECT" | "LOADER_TIMEOUT"`), so consumers don't need to import the classes to inspect — `instanceof` is optional. The errors are reusable across both `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` (same shared source under `shared/ssr/errors.ts`).
+Their home is `@real-router/ssr-utils` (`packages/ssr-utils/src/errors.ts`): this subpath re-exports them, and so does `@real-router/rsc-server-plugin/errors`. The discriminator is `code` (`"LOADER_NOT_FOUND" | "LOADER_REDIRECT" | "LOADER_TIMEOUT"`), so a consumer can inspect an error without importing the classes. `instanceof` holds as well, for an error from another copy of `ssr-utils` and from its other build, ESM or CJS — `ssr-utils`' CLAUDE.md says how.
 
 ## How It Works
 
 1. `ssrDataPluginFactory(loaders)` validates loaders at factory call time, returns `PluginFactory`
-2. On `router.usePlugin()`: claims `"data"` namespace via `api.claimContextNamespace("data")` and registers a `start` interceptor
+2. On `router.usePlugin()`: claims the `"data"`, `"ssrDataMode"`, `"ssrDataDeferred"` and `"ssrDataDeferredKeys"` namespaces via `api.claimContextNamespace()`, registers a `start` interceptor and subscribes the `subscribeLeave` revalidation listener
 3. On `router.start(url)`: interceptor wraps `next(path)`, awaits the state, calls matching loader, writes result to `state.context.data` via `claim.write()`
 4. Data is accessible via `state.context.data` after `await router.start(url)`
 
@@ -65,10 +65,11 @@ Intercepts only `start()`, not `navigate()`. Rationale:
 The plugin **does** register a single `subscribeLeave` listener, and it does two
 things on every navigation:
 
-1. **Publishes the SSR mode marker** for the destination route (#1915) — a
-   `Map.get`, a `claim.write`, and, for the function form, the resolver call.
-   Without it `getSsrDataMode` answered `"full"` for an `ssr: false` route after
-   any client navigation, which is the opposite of what the route declares.
+1. **Publishes the SSR mode marker** when the destination route has an entry
+   (#1915) — a `Map.get`, a `claim.write`, and, for the function form, the
+   resolver call. Without it `getSsrDataMode` would answer `"full"` for an
+   `ssr: false` route after any client navigation, which is the opposite of
+   what the route declares.
 2. **Re-runs the loader** for the `invalidate(router, "data")` revalidation
    channel (#605) — but only when the application has explicitly marked the
    namespace stale. That half stays a `WeakMap.get` + `Map.get` early-return
@@ -107,7 +108,7 @@ ssrDataPluginFactory({
 
 Loaders/entries keyed by route name. Factory runs once at `usePlugin()` time; the returned loader is cached. `Object.entries()` walks the map at compilation time, `Map.get()` reads it at runtime, and `Object.hasOwn` gates each entry's `ssr` / `loader` — own keys on both axes (#1835). Enumerating the map by own key says nothing about how a field is read off an entry, and the `hasOwn` gate is what closes that second axis: without it an `Object.prototype.loader` supplies the route's loader for an entry that declares none, and an `Object.prototype.ssr` decides the mode for the short form, whose entry object the plugin builds itself.
 
-Validation at factory time: rejects `null`, non-objects, non-function values, unknown keys, invalid `ssr` types and string-form modes outside `allowedModes` with `TypeError`. Function-form `ssr` is validated at runtime per-navigation.
+Validation at factory time: rejects `null`, non-objects, entries that are neither a function nor a `{ ssr?, loader? }` object, unknown keys, invalid `ssr` types and string-form modes outside `allowedModes` with `TypeError`. Function-form `ssr` is validated at runtime per-navigation.
 
 ## Per-route SSR Mode
 
@@ -147,14 +148,14 @@ src/
 ├── getSsrDataMode.ts — getSsrDataMode(state): runtime-guarded reader of state.context.ssrDataMode ("full" fallback, never throws)
 ├── invalidate.ts  — invalidate(router, "data"): typed wrapper over markStale for CSR revalidation
 ├── types.ts       — DataLoaderFn, DataLoaderFnFactory, DataLoaderFactoryMap, DataRouteEntry, SsrLoaderContext, SsrMode (public-facing types)
-├── errors.ts      — Re-export from shared-ssr/errors (LoaderRedirect, LoaderNotFound, LoaderTimeout, withTimeout)
+├── errors.ts      — Re-export from @real-router/ssr-utils (LoaderRedirect, LoaderNotFound, LoaderTimeout, withTimeout)
 ├── server.ts      — Server-side wire-format helpers: injectDeferredScripts, getDeferBootstrapScript, Serializer (#610). Subpath: @real-router/ssr-data-plugin/server.
 ├── constants.ts   — ERROR_PREFIX (LOGGER_CONTEXT — internal)
 ├── index.ts       — Public exports + module augmentation (@real-router/core/types for StateContext, including ssrDataDeferred / ssrDataDeferredKeys)
-└── shared-ssr/    — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, errors, defer, deferRegistryClient, deferWireFormat, staleRegistry, types)
+└── shared-ssr/    — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, defer, deferRegistryClient, deferWireFormat, staleRegistry, types)
 ```
 
-The `factory.ts` is intentionally tiny (`validateLoaders` is a single-line binding) — the actual try/catch + interceptor + claim logic lives in [`shared/ssr/`](../../shared/ssr/) and is consumed by both `ssr-data-plugin` (T = `unknown`, namespace = `"data"`) and `rsc-server-plugin` (T = `ReactNode`, namespace = `"rsc"`).
+The `factory.ts` is intentionally tiny (`validateLoaders` is a single-line binding) — the actual try/catch + interceptor + claim logic lives in [`shared/ssr/`](../../shared/ssr/) and is consumed by both `ssr-data-plugin` (T = `unknown`, namespaces `"data"` + `"ssrDataMode"` + `"ssrDataDeferred"` + `"ssrDataDeferredKeys"`) and `rsc-server-plugin` (T = `ReactNode`, namespaces `"rsc"` + `"ssrRscMode"`, no deferred channel).
 
 ## Gotchas
 
@@ -170,7 +171,7 @@ This is by design for SSR.
 
 ### No caching
 
-Every `start()` triggers a fresh loader call. Caching is the caller's responsibility (e.g., within the loader function itself).
+Outside `hydrateRouter`, every `start()` that commits calls the route's loader afresh, unless the route's mode is `"client-only"`. Caching is the caller's responsibility (e.g., within the loader function itself).
 
 ### Teardown releases four claims
 
@@ -181,7 +182,7 @@ Every `start()` triggers a fresh loader call. Caching is the caller's responsibi
 - `"ssrDataDeferred"` — record of deferred promises from `defer()`
 - `"ssrDataDeferredKeys"` — declared deferred-key list (SSR-serializable)
 
-All four are claimed during `usePlugin()` and released in lock-step on teardown — partial-rollback on factory compilation error is verified by `tests/functional/data-loader.test.ts` "releases ... namespace when ... is already claimed". In SSR, `router.dispose()` triggers teardown automatically.
+All four are claimed during `usePlugin()` and released in lock-step on teardown. A claim collision releases the claims acquired before it (`tests/functional/data-loader.test.ts` "releases 'data' namespace when 'ssrDataMode' is already claimed"); a factory compilation error releases all four ("should release every claim when factory throws during compilation"). In SSR, `router.dispose()` triggers teardown automatically.
 
 ### `defer({ critical, deferred })` — formal critical/deferred split (#610)
 
@@ -424,7 +425,7 @@ On the `start()` path the loader runs **after** `await next(path)` committed the
 
 ## Composition with `rsc-server-plugin`
 
-`@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` follow the **same factory pattern** (claim-based namespace + `start()` interceptor) and are designed to run **side-by-side** on the same router. Their namespaces are distinct:
+`@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` follow the **same factory pattern** (claim-based namespaces + `start()` interceptor + `subscribeLeave` revalidation listener) and are designed to run **side-by-side** on the same router. Their namespaces are distinct:
 
 - `ssr-data-plugin` → `state.context.data` (plain JSON / `unknown`)
 - `rsc-server-plugin` → `state.context.rsc` (`ReactNode` / RSC payload)

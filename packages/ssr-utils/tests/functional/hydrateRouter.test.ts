@@ -273,8 +273,12 @@ describe("hydrateRouter", () => {
       "getHydrationState",
       "getStaticPaths",
       "hydrateRouter",
+      "LoaderNotFound",
+      "LoaderRedirect",
+      "LoaderTimeout",
       "serializeRouterState",
       "serializeState",
+      "withTimeout",
     ]);
   });
 

@@ -8,6 +8,7 @@ import {
   events,
 } from "../../constants";
 import { adoptForeignBag, adoptForeignTransition } from "../../helpers";
+import { DIAGNOSTIC } from "../../internals";
 import { recordNavigationEnd } from "../../navigationEnds";
 import { raiser, RouterError, freezeThrownError } from "../../RouterError";
 import { routerEvents, routerStates } from "../../routerFSM";
@@ -37,7 +38,6 @@ import type {
   DiagnosticEventMap,
 } from "../../types";
 import type { RouterEventMap } from "../../types/internal";
-import type { RouterValidator } from "../../types/RouterValidator";
 import type { EventEmitter } from "../../utils/event-emitter";
 import type { FSM } from "../../utils/fsm";
 
@@ -188,10 +188,6 @@ export class EventBusNamespace {
     RouterPayloads
   >;
   readonly #emitter: EventEmitter<RouterEventMap>;
-  // Lazy accessor for the opt-in RouterValidator (wired by wireNamespaces).
-  // Returns `null` until validation-plugin is registered — so the proactive
-  // listener-count threshold (#1188) costs the no-plugin path nothing.
-  #getValidator: (() => RouterValidator | null) | undefined;
   readonly #leaveListeners: LeaveFn[] = [];
 
   // Depth of the synchronous router-dispatch window — elevated while a
@@ -422,8 +418,13 @@ export class EventBusNamespace {
       )`cannot subscribe on a disposed router — dispose() is terminal`;
     }
 
+    // The handler's value goes back to the emitter, whose isolation consumes a
+    // thenable, as `subscribe`'s does (#2836).
     return this.#emitter.on(TREE_CHANGED, (event: TreeChangedEvent) => {
-      handler(event);
+      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -- the void-typed handler's runtime value is returned for the emitter's async isolation (#2836)
+      const result: unknown = handler(event);
+
+      return result;
     });
   }
 
@@ -459,14 +460,22 @@ export class EventBusNamespace {
       )`cannot subscribe on a disposed router — dispose() is terminal`;
     }
 
+    // As in `subscribeTreeChanged`: the value goes back to the emitter (#2836).
     return this.#emitter.on(key, (...args: DiagnosticEventMap[K]) => {
-      handler(...args);
+      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -- the void-typed handler's runtime value is returned for the emitter's async isolation (#2836)
+      const result: unknown = handler(...args);
+
+      return result;
     });
   }
 
   /** Number of active `TREE_CHANGED` listeners (drives conditional emit). */
   treeChangedListenerCount(): number {
     return this.#emitter.listenerCount(TREE_CHANGED);
+  }
+
+  diagnosticListenerCount(key: keyof DiagnosticEventMap): number {
+    return this.#emitter.listenerCount(key);
   }
 
   sendStart(): void {
@@ -786,7 +795,8 @@ export class EventBusNamespace {
    * duplicates.
    *
    * `methodName` is the door the caller typed — `addEventListener`, or
-   * `usePlugin` for a plugin's hooks — and names the validator's count warning.
+   * `usePlugin` for a plugin's hooks — and travels with the listener-count
+   * report.
    */
   addEventListener<E extends EventName>(
     eventName: E,
@@ -832,12 +842,21 @@ export class EventBusNamespace {
 
     this.#checkListenerThreshold(events.TRANSITION_SUCCESS, "subscribe");
 
+    // ⚑ Again, after the listener-count report (#1859): its handlers run
+    // application code, and one that disposes the router ends the call here,
+    // before a listener is wired into the cleared emitter.
+    if (this.isDisposed()) {
+      throw atSubscribe.code(
+        errorCodes.ROUTER_DISPOSED,
+      )`cannot subscribe on a disposed router — dispose() is terminal`;
+    }
+
     // `subscribe` is fire-and-forget; the listener's return value is ignored at
     // the type level (`SubscribeFn` is `=> void`). A void-typed async listener
     // still returns a rejecting Promise at runtime, so return it to the emitter,
     // whose central isolation routes the rejection to the same `onListenerError`
     // sink a sync throw flows through — instead of leaking an `unhandledRejection`
-    // (fatal under `--unhandled-rejections=strict`, the Node 22+ default). This
+    // (fatal under the default `--unhandled-rejections=throw`). This
     // is #944, now folded into the emitter's central #1412 async isolation — the
     // former per-site `.catch` here is redundant (symmetric with `subscribeLeave`,
     // which isolates via `Promise.allSettled`).
@@ -1014,16 +1033,6 @@ export class EventBusNamespace {
     this.#emitter.setLimits(limits);
   }
 
-  /**
-   * Injects the lazy validator accessor (wireNamespaces), mirroring
-   * `PluginsNamespace` / `RouteLifecycleNamespace`. The closure reads the live
-   * `RouterInternals.validator`, so a validation-plugin registered AFTER wiring
-   * is still observed on the next `subscribe` / `addEventListener`.
-   */
-  setValidatorAccessor(getValidator: () => RouterValidator | null): void {
-    this.#getValidator = getValidator;
-  }
-
   // Single entry point for routing a cancel into the FSM `CANCEL` action — every
   // source comes through here: stop/dispose and a supersede pass no reason, the
   // external `opts.signal` passes its abort reason (#943), and a cancel
@@ -1140,24 +1149,21 @@ export class EventBusNamespace {
   }
 
   /**
-   * Proactive listener-count threshold (#1188) — mirrors the plugins /
-   * lifecycle / dependencies counters. Opt-in: the emitter's per-event count is
-   * read ONLY when the validator is installed, so the bare-core hot path pays
-   * nothing. `count` is the POST-add size (`listenerCount + 1`), matching
-   * `RouteLifecycleNamespace`'s `count + 1`, so warn/error fire exactly when the
-   * new listener reaches the threshold. Core keeps the emitter's bare-`Error`
-   * hard cap; this only surfaces an actionable signal well before it.
+   * Reports the listener count a registration is about to make (#1188) — the
+   * counterpart of the plugins / lifecycle / dependencies counts. `count` is the
+   * POST-add size (`listenerCount + 1`), as `RouteLifecycleNamespace` reports
+   * `count + 1`: a listener of the kind judges the count the registration
+   * makes. Core keeps the emitter's bare-`Error` hard cap; a listener of
+   * the kind can only surface a signal well before it. The count is one `Map`
+   * read, and with no listener the report is another.
    */
   #checkListenerThreshold(eventName: EventName, methodName: string): void {
-    const validator = this.#getValidator?.();
-
-    if (validator) {
-      validator.eventBus.validateCountThresholds(
-        this.#emitter.listenerCount(eventName) + 1,
-        eventName,
-        methodName,
-      );
-    }
+    this.emitDiagnostic(
+      DIAGNOSTIC.LISTENER_COUNT,
+      this.#emitter.listenerCount(eventName) + 1,
+      eventName,
+      methodName,
+    );
   }
 
   /**

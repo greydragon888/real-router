@@ -3,19 +3,26 @@
 import { raiser } from "@real-router/core/utils";
 import { areParamValuesEqual } from "@real-router/core/validation";
 
-import { isString, isParams, getTypeDescription } from "../type-guards";
+import {
+  isBoolean,
+  isString,
+  isParams,
+  isState,
+  getTypeDescription,
+} from "../type-guards";
 
 import type {
+  DiagnosticEventMap,
   Params,
   ParamsSearch,
   RouterLogger,
-  RouterValidator,
   SearchParams,
   SimpleState,
   State,
 } from "@real-router/core";
 
 const atMakeState = raiser("router", "makeState");
+const atAreStatesEqual = raiser("router", "areStatesEqual");
 
 /**
  * Captured at module load (#1971): it decides which keys a bag returned by the
@@ -42,6 +49,49 @@ export function validateMakeStateArgs(
 }
 
 /**
+ * A `search` that `areStatesEqual(…, false)` can compare: an object that is
+ * neither `null` nor an array — the shape `validateSearch` accepts for a query
+ * bag.
+ */
+function isSearchBag(value: unknown): boolean {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function validateAreStatesEqualArgs(
+  state1: unknown,
+  state2: unknown,
+  ignoreQueryParams: unknown,
+): void {
+  if (!isState(state1)) {
+    throw atAreStatesEqual.type`Invalid state1: ${getTypeDescription(state1)}. Expected State object.`;
+  }
+  if (!isState(state2)) {
+    throw atAreStatesEqual.type`Invalid state2: ${getTypeDescription(state2)}. Expected State object.`;
+  }
+  if (ignoreQueryParams !== undefined && !isBoolean(ignoreQueryParams)) {
+    throw atAreStatesEqual.type`Invalid ignoreQueryParams: ${getTypeDescription(ignoreQueryParams)}. Expected boolean.`;
+  }
+  // `false` compares both states' `search`. `isState` does not read it: its
+  // fields are `isRequiredFields`, which `scripts/tests/twin-lockstep.test.mjs`
+  // holds code-identical to the history-entry guard's copy, where `search` may
+  // be absent.
+  if (ignoreQueryParams === false) {
+    // One read of each slot, so the message names the value judged.
+    const search1: unknown = state1.search;
+
+    if (!isSearchBag(search1)) {
+      throw atAreStatesEqual.type`Invalid state1.search: ${getTypeDescription(search1)}. Expected a plain object.`;
+    }
+
+    const search2: unknown = state2.search;
+
+    if (!isSearchBag(search2)) {
+      throw atAreStatesEqual.type`Invalid state2.search: ${getTypeDescription(search2)}. Expected a plain object.`;
+    }
+  }
+}
+
+/**
  * The mode gate's opt-in diagnostic (#1575).
  *
  * Core DROPS a query key the active `queryParamsMode` will not print — always-on
@@ -61,7 +111,8 @@ export function validateMakeStateArgs(
  *
  * De-duplicated per `route + key`: the gate runs on every navigation and every
  * `matchPath`, so an un-deduped warning would flood a dev console the moment a
- * route is revisited.
+ * route is revisited. The warning goes to the router's logger, so the router's
+ * `logger` option applies to it.
  *
  * ⚠ **The cache belongs to the ROUTER, not to the module (#1583).** A `Set` at
  * module scope is one per PROCESS: the first router to report a `route + key`
@@ -70,16 +121,13 @@ export function validateMakeStateArgs(
  * for a dev-time signal. It also survived `teardown()`, so re-registering the
  * plugin bought silence, and it grew without bound because nothing evicted.
  *
- * A factory rather than a `WeakMap<Router, Set>`: `buildValidatorObject` already
- * runs once per registration, so closing over a fresh `Set` there gives
- * per-router lifetime, per-router isolation and collection with the router at
- * zero new module state — and it retires the two `reset*` test seams, which
- * existed only to work around the module scope.
+ * A factory rather than a `WeakMap<Router, Set>`: the plugin calls it once per
+ * registration, so closing over a fresh `Set` there gives per-router lifetime,
+ * per-router isolation and collection with the router at zero module state.
  */
-export function createDroppedQueryKeyReporter(): (
-  routeName: string,
-  key: string,
-) => void {
+export function createDroppedQueryKeyReporter(
+  logger: RouterLogger,
+): (routeName: string, key: string) => void {
   const reported = new Set<string>();
 
   return function reportDroppedQueryKey(routeName: string, key: string): void {
@@ -91,8 +139,9 @@ export function createDroppedQueryKeyReporter(): (
 
     reported.add(seen);
 
-    console.warn(
-      `[router] Query key "${key}" is not declared on route "${routeName}" (\`?${key}\`), so the ` +
+    logger.warn(
+      "router",
+      `Query key "${key}" is not declared on route "${routeName}" (\`?${key}\`), so the ` +
         `current \`queryParamsMode\` will not print it — it was dropped from \`state.search\` rather ` +
         `than published beside a \`state.path\` that cannot show it. Declare it on the route path, ` +
         `or use \`queryParamsMode: "loose"\` to keep undeclared keys. A \`defaultSearch\` entry for ` +
@@ -119,12 +168,12 @@ export function createDroppedQueryKeyReporter(): (
  *
  * De-duplicated per `route + key`, like the mode gate's: this runs on every
  * navigation, so an un-deduped warning floods the console on a revisit — and
- * per ROUTER, for the same reasons and by the same factory shape (#1583).
+ * per ROUTER, for the same reasons and by the same factory shape (#1583). The
+ * warning goes to the router's logger, as the mode gate's does.
  */
-export function createUndeclaredParamKeyReporter(): (
-  routeName: string,
-  key: string,
-) => void {
+export function createUndeclaredParamKeyReporter(
+  logger: RouterLogger,
+): (routeName: string, key: string) => void {
   const undeclaredReported = new Set<string>();
 
   return function reportUndeclaredParamKey(
@@ -139,8 +188,9 @@ export function createUndeclaredParamKeyReporter(): (
 
     undeclaredReported.add(seen);
 
-    console.warn(
-      `[router] Param "${key}" is declared nowhere on route "${routeName}" — neither as a path ` +
+    logger.warn(
+      "router",
+      `Param "${key}" is declared nowhere on route "${routeName}" — neither as a path ` +
         `slot (:${key}) nor as a query param (?${key}), so it stays in state.params but never ` +
         `reaches the URL. The state will not round-trip: matchPath(state.path) cannot recover ` +
         `it. Declare it on the route path if it belongs in the URL, or pass it through the ` +
@@ -149,9 +199,11 @@ export function createUndeclaredParamKeyReporter(): (
   };
 }
 
-type ReportCodecRoundTrip = RouterValidator["state"]["reportCodecRoundTrip"];
+type ReportCodecRoundTrip = (
+  ...args: DiagnosticEventMap["CODEC_ROUND_TRIP"]
+) => void;
 
-type RouteCodec = Parameters<ReportCodecRoundTrip>[1];
+type RouteCodec = DiagnosticEventMap["CODEC_ROUND_TRIP"][1];
 
 type Channel = keyof ParamsSearch;
 
@@ -553,9 +605,10 @@ function describeLoss(
  * `navigate` takes params in the form the route's `decodeParams` returns and
  * never runs it, so a link commits the caller's params and a reload of the same
  * URL commits what the decoder makes of them. The two agree only when the
- * decoder undoes `encodeParams` and adds no key. Core asks once per state a
- * committing producer builds, for a route that has a codec; this reloads the
- * state's path and warns about each key the reload does not give back.
+ * decoder undoes `encodeParams` and adds no key. Core raises `CODEC_ROUND_TRIP`
+ * once per state a committing producer builds, for a route that has a codec;
+ * this reloads the state's path and warns about each key the reload does not
+ * give back.
  *
  * ⚠ **A state is judged before its navigation commits.** On the navigation
  * that removes a param an interceptor carries over from the state the router

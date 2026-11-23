@@ -27,9 +27,8 @@ import { getInternals } from "@real-router/core/validation";
  * silence.** A one-line `getInternals(r).member`; a two-line
  * `const ctx = getInternals(r)` followed by `ctx.member`; and — the one that is
  * easy to forget — the surface arriving as a typed PARAMETER, never through a
- * factory call in that file at all. `validation-plugin`'s `buildValidatorObject`
- * takes `ctx: RouterInternals<D>`, so a census of the first two forms reports
- * zero consumers for `getQueryParams` while a shipped one exists.
+ * factory call in that file at all, which a census of the first two forms does
+ * not see.
  *
  * ⚑ **Three is not all of them, and the walk below is not where that is
  * fixed.** A surface also arrives as a class field and as a field of a
@@ -207,11 +206,6 @@ describe("consumer census (#2303)", () => {
    * derivation that called each member to see what comes back would start the
    * router. Reading the types answers the same question without running
    * anything.
-   *
-   * ⚠ **`null` on a bare router is not "flat".** `validator` is empty until a
-   * plugin fills it, and the shipped reach this census exists to find —
-   * `ctx.validator.options.validateOptions(…)` — happens on exactly that slot. The declaration is what decides; the value on an
-   * unconfigured router is not evidence.
    */
   const RETURNS_OBJECT = new Set(
     MEMBERS.filter(({ type }) =>
@@ -279,15 +273,17 @@ describe("consumer census (#2303)", () => {
     tests: number;
   }
 
-  function scan(): {
+  function scan(
+    files: readonly string[] = consumerFiles(),
+    read: (relativePath: string) => string = (relativePath) =>
+      readFileSync(path.join(ROOT, relativePath), "utf8"),
+  ): {
     hits: Record<string, Reached>;
     second: Record<string, Reached>;
     calls: Record<string, Called>;
     files: number;
     readers: number;
   } {
-    const files = consumerFiles();
-
     const hits: Record<string, Reached> = {};
     const calls: Record<string, Called> = {};
 
@@ -307,7 +303,7 @@ describe("consumer census (#2303)", () => {
     let readers = 0;
 
     for (const relativePath of files) {
-      const text = readFileSync(path.join(ROOT, relativePath), "utf8");
+      const text = read(relativePath);
 
       if (
         Object.keys(FACTORY_BY_TYPE).every((t) => !text.includes(t)) &&
@@ -440,7 +436,7 @@ describe("consumer census (#2303)", () => {
           secondBucket(aliasDown.get(target.text)!)[bucket].add(node.name.text);
         }
 
-        // chained through a PROPERTY: `ctx.validator.options`. The key keeps the
+        // chained through a PROPERTY: `ctx.logger.warn`. The key keeps the
         // shape — `<factory>.<member>` without parentheses — because a property
         // and a call are different doors even when they hand back the same kind
         // of object.
@@ -665,10 +661,10 @@ describe("consumer census (#2303)", () => {
       getLifecycleApi: sorted(hits.getLifecycleApi.src),
     }).toStrictEqual({
       // ⚠ What is LEFT here: the dependency record the getter walk reads until
-      // its door goes (#2386), the validator slot (#2388), and the codec
-      // diagnostic's reload (#2905), which must skip the path rebuild that
-      // `PluginApi.matchPath` runs under the router's options.
-      getInternals: ["dependenciesGetStore", "matchPath", "validator"],
+      // its door goes (#2386), and the codec diagnostic's reload (#2905), which
+      // must skip the path rebuild that `PluginApi.matchPath` runs under the
+      // router's options.
+      getInternals: ["dependenciesGetStore", "matchPath"],
       getPluginApi: [
         "addCheck",
         "addEventListener",
@@ -757,12 +753,17 @@ describe("consumer census (#2303)", () => {
     // `validators/retrospective.ts`, which reads route fields and map entries
     // there. An empty or missing `src` for either means "no reach this
     // instrument can see", not "no reach".
+    //
+    // ⚠ The `getPluginApi.logger` row is not the logger's whole reach.
+    // `validationPlugin` hands `api.logger` whole to its warn helpers and
+    // reporter factories, and `searchSchemaPlugin` passes the api to the
+    // `SearchSchemaPlugin` constructor, which keeps it in a class field and
+    // calls `this.#pluginApi.logger` through it — both past the walk.
     expect(rows).toStrictEqual({
       "getInternals.dependenciesGetStore()": {
         src: ["dependencies"],
         tests: [],
       },
-      "getInternals.validator": { src: ["options"], tests: [] },
       "getNavigator.getState()": { src: [], tests: ["name"] },
       "getPluginApi.buildNavigationState()": {
         src: ["name", "params", "path", "search"],
@@ -784,6 +785,7 @@ describe("consumer census (#2303)", () => {
         src: ["maxDependencies"],
         tests: [],
       },
+      "getPluginApi.logger": { src: ["error"], tests: [] },
       "getPluginApi.makeState()": {
         src: [],
         tests: ["name", "params", "path"],
@@ -796,6 +798,24 @@ describe("consumer census (#2303)", () => {
         src: [],
         tests: ["defaultParams", "forwardTo", "path"],
       },
+    });
+  });
+
+  it("CONTROL — a reach chained through a PROPERTY gets a row of its own", () => {
+    // ⚑ No file on the tree reaches through a property-valued member, so the
+    // cell above holds no row of that shape, and a walk that stopped keying
+    // `<factory>.<member>` would leave it green. A purpose-built file is where
+    // the shape exists.
+    const synthetic = scan(["packages/synthetic/src/reach.ts"], () =>
+      [
+        'import { getInternals } from "@real-router/core/validation";',
+        "",
+        'getInternals(router).logger.warn("x");',
+      ].join("\n"),
+    );
+
+    expect(synthetic.second).toStrictEqual({
+      "getInternals.logger": { src: new Set(["warn"]), tests: new Set() },
     });
   });
 
@@ -914,7 +934,6 @@ describe("consumer census (#2303)", () => {
         "start",
         "subscribeDiagnostic",
         "systemCommit",
-        "treeChanged",
       ],
       // ⚑ Both plugin-facing surfaces come back EMPTY: no member of
       // `getPluginApi` or of `getRoutesApi` is untouched by shipped code and

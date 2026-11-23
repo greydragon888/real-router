@@ -138,7 +138,7 @@ export function getPluginApi<
     },
     setRootPath: (rootPath) => {
       throwIfDisposed(ctx.isDisposed);
-      // The sixth tree mutator, and the one that joined the family late (#1751).
+      // The sixth tree mutator (#1751).
       // `applyRootPath` rebuilds tree AND matcher, so a call from inside a
       // `subscribeChanges` handler swaps what the router resolves against while
       // the listeners still queued in that dispatch reason about the payload's
@@ -151,7 +151,7 @@ export function getPluginApi<
       // every route name survives a `setRootPath` and every PATH moves, so the
       // committed `state.path` stops belonging to `state.name` (#1758).
       throwIfReentrantTreeMutation(
-        ctx.treeChanged.isEmitting,
+        ctx.routeGetStore().treeChanged.isEmitting,
         () => ctx.routeGetStore().revalidating,
       );
 
@@ -165,17 +165,11 @@ export function getPluginApi<
       // `void`, undetectable. Measured: a plugin holding a path prefix, torn
       // down mid-navigation, leaked that prefix forever.
       //
-      // ⚑ The sixth member of the in-flight family rule, and the last to join it
-      // (#1755). Validation runs ABOVE it: an argument-shape defect is the
-      // caller's bug whatever the router is doing, while this refusal is about
-      // timing, and reporting the timing first would hide a `TypeError` behind a
-      // log line the caller did not cause.
+      // ⚑ The sixth member of the in-flight family rule (#1755).
       //
-      // ⚠ That matches `remove` (and `update`'s argument half) and CONTRADICTS
-      // `replace`, which puts its in-flight gate above `guardRouteStructure` and
-      // every validator. The family is not uniform on this axis, so the ordering
-      // is chosen on its merits here rather than copied — do not read it as a
-      // convention.
+      // ⚠ The argument check runs BELOW this gate, at `setRootPath:entry` in
+      // the `RouterInternals` adapter (#2259): during a navigation a non-string
+      // `rootPath` meets the gate first, and the check does not name it.
       if (
         !validateSetRootPath(
           ctx.getRootPath(),
@@ -205,7 +199,9 @@ export function getPluginApi<
       // consumers to ignore it. The refusal above returns before this line, so a
       // gated change announces nothing either.
       if (previous !== rootPath) {
-        ctx.treeChanged.emit({ op: "rootPath", previous, next: rootPath });
+        ctx
+          .routeGetStore()
+          .treeChanged.emit({ op: "rootPath", previous, next: rootPath });
       }
 
       return true;

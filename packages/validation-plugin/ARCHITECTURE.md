@@ -4,9 +4,10 @@
 
 ```
 src/
-├── index.ts                  — Public API: validationPlugin(), RouterValidator type
-├── validationPlugin.ts       — Plugin factory: isActive() guard, validator construction,
-│                               ctx.validator assignment, retrospective pass, teardown
+├── index.ts                  — Public API: validationPlugin()
+├── validationPlugin.ts       — Plugin factory: isActive() guard, the installation mark,
+│                               retrospective pass, check and kind registrations,
+│                               teardown
 ├── helpers.ts                — CORE_LIMIT_DEFAULTS (the plugin's single mirror of core's
 │                               DEFAULT_LIMITS) and the warn/error threshold arithmetic
 │                               every resource counter shares
@@ -21,14 +22,15 @@ src/
     ├── dependencies.ts       — getDependenciesApi + the store: name format, setDependency args,
     │                           full object structure, getter rejection
     ├── plugins.ts            — PluginsNamespace: count vs maxPlugins limit,
-    ├── lifecycle.ts          — LifecycleNamespace: handler type, not-registering guard,
-    │                           count vs maxLifecycleHandlers, guard answers that are
-    │                           neither true nor false, a thenable on the synchronous ask
+    ├── lifecycle.ts          — the guard doors: handler type, count vs maxLifecycleHandlers,
+    │                           guard answers that are neither true nor false,
+    │                           a thenable on the synchronous ask
     ├── navigation.ts         — NavigationNamespace: navigate args, navigateToDefault args,
     │                           NavigationOptions shape, params validation (navigate/buildPath/canNavigateTo),
     │                           start path validation
-    ├── state.ts              — StateNamespace: makeState args, areStatesEqual args
-    ├── eventBus.ts           — EventBusNamespace: event name format, listener args
+    ├── state.ts              — StateNamespace: makeState args, areStatesEqual args,
+    │                           the route resolver's three reports
+    ├── eventBus.ts           — the listener count vs maxListeners
     └── retrospective.ts      — Retrospective validators: run once at usePlugin() time
                                 (existing routes, forwardTo consistency, route properties,
                                  dependency store structure, limits consistency)
@@ -36,24 +38,19 @@ src/
 
 ## Validator Data Flow
 
-Core holds a nullable `ctx.validator` slot. When the slot is `null`, all validation calls are skipped. When the plugin registers, it builds a `RouterValidator` object and assigns it to the slot. From that point on, core calls `ctx.validator?.ns.fn(args)` before every mutating operation.
+Core asks at named check positions and raises diagnostic kinds. The plugin registers its checks with `PluginApi.addCheck` and subscribes to its kinds with `PluginApi.subscribeDiagnostic`; a position with no check registered calls nothing. The mark of an installation is the plugin's own: a module-level `WeakSet` of the routers it is installed on.
 
-The slot holds one validator, so a router holds one installation. A second
-registration is refused rather than allowed to overwrite: with two, whichever
-teardown runs first empties the slot and leaves a registered plugin behind a
-validator that no longer answers.
+The mark admits one installation per router. A second registration is refused:
+it would register every check and kind a second time.
 
 ```
 router.usePlugin(validationPlugin())
     │
     ├── router.isActive() check — throws VALIDATION_PLUGIN_AFTER_START if already started
     │
-    ├── ctx.validator occupied? — throws VALIDATION_PLUGIN_ALREADY_INSTALLED
+    ├── INSTALLED.has(router)? — throws VALIDATION_PLUGIN_ALREADY_INSTALLED
     │
-    ├── buildValidatorObject()
-    │       └── Assembles RouterValidator from all validator modules
-    │
-    ├── ctx.validator = validator   ← core now calls validators on every operation
+    ├── INSTALLED.add(router)  ← the installation's mark
     │
     ├── Retrospective pass (try/catch with rollback)
     │       ├── retroV.validateExistingRoutes(routes)
@@ -62,23 +59,23 @@ router.usePlugin(validationPlugin())
     │       ├── retroV.validateForwardToTargetsStore(forwardMap, lookup)
     │       ├── retroV.validateDependenciesStructure(dependencies, limits)
     │       ├── retroV.validateLimitsConsistency(options, dependencyCount, maxDependencies)
-    │       ├── validator.options.validateOptions(options)
+    │       ├── validateOptions(options, "constructor (retrospective)")
     │       │       └── cross-field: warnListeners ≤ maxListeners, callbackIgnoresLevel requires callback
-    │       └── retroV.validateResolvedDefaultRoute(options.defaultRoute, lookup)  ← string defaultRoute only
-    │               (callback defaultRoute is validated at runtime via ctx.validator?.options.validateResolvedDefaultRoute,
-    │                called from core's resolveDefault() on each navigateToDefault() / start() fallback)
+    │       └── retroV.validateConfiguredDefaultRoute(options.defaultRoute, lookup)  ← string defaultRoute only
+    │               (a callback defaultRoute is judged by the check at navigateToDefault:route,
+    │                which core asks in resolveDefault() on each navigateToDefault())
     │
-    │   On error: ctx.validator = null  ← rollback, then re-throw
+    │   On error: INSTALLED.delete(router)  ← rollback, then re-throw
     │
-    └── return { teardown() { ctx.validator = null } }
+    ├── api.addInterceptor("start", …), api.addCheck(…), api.subscribeDiagnostic(…)
+    │
+    └── return { teardown() { remove the registrations; INSTALLED.delete(router) } }
 
 
 router.addRoute(routes)
     │
-    └── core: ctx.validator?.routes.validateAddRouteArgs(routes)
-                                    └── routes.ts: validateAddRouteArgs()
-                                            ├── null/array/non-object check
-                                            └── validateRouteProperties() per route
+    └── core: runChecks(ctx.checks, POSITION["addRoute:batch"], …)
+                                    └── the check registered there: checkRouteBatch(…, "addRoute", …)
 ```
 
 ## Retrospective Validation Design
@@ -87,7 +84,7 @@ The plugin registers after `createRouter()` returns, so routes and dependencies 
 
 This is intentional: users often call `addRoute()` or `setDependency()` before `usePlugin()`. Without retrospective validation, those early calls would bypass all checks. The retrospective pass catches problems that accumulated before the plugin was installed.
 
-The pass runs inside a `try/catch`. If any check fails, `ctx.validator` is rolled back to `null` before the error propagates. The router is left in a clean state — no partial validation active.
+The pass runs inside a `try/catch`. If any check fails, the router leaves the mark before the error propagates. The router is left in a clean state — no partial validation active.
 
 Retrospective validators receive facts read from the published surface — routes as `RoutesApi.get` reports them, `PluginApi.getForwardMap()`, `getResolvedLimits()`, `getDependencyKeys()`, `getExternalGuardNames()` — never a core store. The one exception is the dependency getter walk, which reads core's live record: `getInternals` still hands that record out, so a getter can still be planted in it.
 
@@ -97,17 +94,17 @@ Retrospective validators receive facts read from the published surface — route
 usePlugin(validationPlugin())
     │
     ├── [REGISTER] isActive() guard
-    ├── [REGISTER] buildValidatorObject() — assembles all namespace validators
-    ├── [REGISTER] ctx.validator = validator
+    ├── [REGISTER] INSTALLED.add(router) — the installation's mark
     ├── [REGISTER] retrospective pass — validates current router state
+    ├── [REGISTER] checks and diagnostic kinds
     │
-    │   ... router is running, ctx.validator active ...
-    │   ... core calls ctx.validator?.ns.fn() on every operation ...
+    │   ... router is running ...
+    │   ... core asks the checks at each position and raises the kinds ...
     │
-    └── [TEARDOWN] ctx.validator = null
+    └── [TEARDOWN] the registrations removed; INSTALLED.delete(router)
 ```
 
-The plugin has no `onStart`, `onStop`, or transition hooks. It only sets and clears `ctx.validator`. All validation happens synchronously inside the validator functions themselves, called by core at the point of each operation.
+The plugin has no `onStart`, `onStop`, or transition hooks. It registers its checks and kinds, and marks and unmarks the router. All validation happens synchronously inside the validator functions themselves, called by core at the point of each operation.
 
 ## Key Design Decisions
 
@@ -115,9 +112,9 @@ The plugin has no `onStart`, `onStop`, or transition hooks. It only sets and cle
 
 Validation is a plugin, not a core feature. This keeps the core bundle small and lets production builds skip validation entirely. The `noValidate: true` option (deprecated) was the old way to disable validation; the new model is simply not registering this plugin.
 
-### `ctx.validator` as a nullable slot
+### Checks and kinds, and a mark of its own
 
-Core checks `ctx.validator?.ns.fn()` — optional chaining means zero overhead when the plugin is absent. The slot is typed as `RouterValidator | null` in core internals. The plugin is the only thing that sets it.
+Core asks a check position or raises a kind; a position with no check registered calls nothing. Core holds nothing for the plugin: the mark that admits one installation per router is a module-level `WeakSet` in the plugin, so its entry goes with its router. Each copy of the package holds a set of its own, so a second copy installed on the same router is not refused.
 
 ### Retrospective validators take facts, not stores
 
@@ -125,11 +122,11 @@ Retrospective functions take values whose types core publishes — `Route`, `Lim
 
 ### Rollback on retrospective failure
 
-If the retrospective pass throws, `ctx.validator` is set back to `null`. This prevents a half-validated state where some checks pass but others were never run. The error propagates to the caller of `usePlugin()`.
+If the retrospective pass throws, the router leaves the mark, and nothing is registered: the checks and kinds are registered after the pass. A later installation is not refused, and no check of the failed one runs. The error propagates to the caller of `usePlugin()`.
 
 ### No module augmentation
 
-The plugin doesn't extend the router's public API. It only affects internal behavior via `ctx.validator`. No `declare module` augmentation, no `extendRouter()` calls.
+The plugin doesn't extend the router's public API. It only affects internal behavior, through its checks and its kinds. No `declare module` augmentation, no `extendRouter()` calls.
 
 ### Core's limit defaults are mirrored once, and the mirror is derived
 
@@ -163,7 +160,7 @@ In addition, core has two **invariant guards** added specifically to prevent sil
 
 **Tier 2 — Plugin DX validation layer (opt-in)**
 
-This plugin adds full argument validation for all public API methods via the `ctx.validator?` nullable slot. Core calls `ctx.validator?.ns.fn(args)` — optional chaining means zero overhead when the plugin is absent.
+This plugin adds argument validation for the public API methods through the check positions core asks, and its reports through the diagnostic kinds core raises; a position with no check registered calls nothing.
 
 The plugin covers everything that core's invariant guards do not: argument type checks, shape validation, enum membership, limit enforcement, and descriptive error messages with `[router.METHOD]` prefixes.
 

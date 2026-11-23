@@ -1,6 +1,7 @@
 import { assertChannelCorrect } from "./channels";
 import { errorCodes } from "./constants";
-import { RouterError, freezeThrownError } from "./RouterError";
+import { RouterError, freezeThrownError, raiser } from "./RouterError";
+import { consumeThenable } from "./utils/thenable";
 
 import type { DependenciesStore } from "./dependenciesStore";
 import type { RouteTree } from "./engine";
@@ -24,7 +25,6 @@ import type {
   SearchParams,
   SimpleState,
   State,
-  TreeChangedEvent,
   Unsubscribe,
   EventMethodMap,
   InterceptableMethodMap,
@@ -33,7 +33,6 @@ import type {
   PluginFactory,
 } from "./types";
 import type { Limits } from "./types/internal";
-import type { RouterValidator } from "./types/RouterValidator";
 
 export interface RouterInternals<
   D extends DefaultDependencies = DefaultDependencies,
@@ -128,13 +127,6 @@ export interface RouterInternals<
   ) => Unsubscribe;
 
   /**
-   * Route-tree mutation channel — internal access for the `getRoutesApi`
-   * wrapper. A dedicated bridge is required because the public
-   * `addEventListener<E extends EventName>` structurally rejects
-   * `"TREE_CHANGED"` (it is not in the public `EventName` union), is strict on
-   * duplicates, and exposes neither `emit` nor `listenerCount`.
-   */
-  /**
    * Subscribes to one internal DIAGNOSTIC kind (#2388). The wiring path for
    * `PluginApi.subscribeDiagnostic`; core itself never listens.
    */
@@ -142,19 +134,6 @@ export interface RouterInternals<
     key: K,
     handler: (...args: DiagnosticEventMap[K]) => void,
   ) => Unsubscribe;
-
-  readonly treeChanged: {
-    readonly emit: (event: TreeChangedEvent) => void;
-    readonly subscribe: (
-      handler: (event: TreeChangedEvent) => void,
-    ) => Unsubscribe;
-    readonly listenerCount: () => number;
-    /**
-     * True while a `TREE_CHANGED` emit is on the stack — `getRoutesApi` reads it
-     * to reject reentrant route-CRUD from a `subscribeChanges` handler (#1032).
-     */
-    readonly isEmitting: () => boolean;
-  };
 
   /**
    * The navigation pipeline's read-model, for entry points that live on this
@@ -210,11 +189,8 @@ export interface RouterInternals<
 
   /**
    * Checks registered per position (#2388) — the channel's whole state.
-   *
-   * ⚑ `readonly`, and that is load-bearing rather than tidy: the slot it
-   * replaces (`validator`) was one of the two WRITABLE members that kept this
-   * bag out of `Object.freeze`. A map mutated in place adds no writable member,
-   * so retiring the validator still leaves the bag freezable.
+   * `PluginApi.addCheck` adds to the map in place, and the remover it hands
+   * back splices its check out.
    */
   /* eslint-disable @typescript-eslint/no-explicit-any -- heterogeneous map: stores different CheckFn<P> types under different keys, exactly as `interceptors` above does */
   readonly checks: Map<string, ((...args: any[]) => void)[]>;
@@ -226,8 +202,6 @@ export interface RouterInternals<
   readonly getTree: () => RouteTree;
 
   readonly isDisposed: () => boolean;
-
-  validator: RouterValidator | null;
 
   // Per-router logger instance (built from `options.logger` in the Router
   // constructor), so a `configure()` reaches one router rather than the process
@@ -518,6 +492,54 @@ export const SEAM = {
 } as const satisfies { [K in keyof InterceptableMethodMap]: K };
 
 /**
+ * The runtime half of the diagnostic channel (#2388) — the same
+ * pair-with-the-type construction {@link SEAM} and {@link POSITION} use.
+ *
+ * ⚑ A key added to {@link DiagnosticEventMap} and not here fails this object to
+ * compile, and a value drifting from its key is an error rather than a silent
+ * alias.
+ *
+ * ⚠ So does a kind whose tuple can hold more than four arguments: five
+ * elements, five optional ones, or a rest element. `EventEmitter.emit` passes
+ * four after the name, and `EventBusNamespace.emitDiagnostic` reaches it through
+ * a generic spread whose length the compiler does not check.
+ */
+export const DIAGNOSTIC = {
+  PLUGIN_AFTER_START: "PLUGIN_AFTER_START",
+  SET_DEPENDENCY_COUNT: "SET_DEPENDENCY_COUNT",
+  SET_DEPENDENCIES_COUNT: "SET_DEPENDENCIES_COUNT",
+  SET_DEPENDENCY_OVERWRITE: "SET_DEPENDENCY_OVERWRITE",
+  SET_DEPENDENCIES_OVERWRITE: "SET_DEPENDENCIES_OVERWRITE",
+  REMOVE_DEPENDENCY_MISSING: "REMOVE_DEPENDENCY_MISSING",
+  USE_PLUGIN_COUNT: "USE_PLUGIN_COUNT",
+  USE_PLUGIN_DUPLICATE_IN_BATCH: "USE_PLUGIN_DUPLICATE_IN_BATCH",
+  USE_PLUGIN_HOOK_NOT_FUNCTION: "USE_PLUGIN_HOOK_NOT_FUNCTION",
+  CAN_ACTIVATE_COUNT: "CAN_ACTIVATE_COUNT",
+  CAN_DEACTIVATE_COUNT: "CAN_DEACTIVATE_COUNT",
+  CAN_ACTIVATE_OVERWRITE: "CAN_ACTIVATE_OVERWRITE",
+  CAN_DEACTIVATE_OVERWRITE: "CAN_DEACTIVATE_OVERWRITE",
+  SYNC_GUARD_THENABLE: "SYNC_GUARD_THENABLE",
+  SYNC_GUARD_NON_BOOLEAN: "SYNC_GUARD_NON_BOOLEAN",
+  GUARD_NON_BOOLEAN: "GUARD_NON_BOOLEAN",
+  LISTENER_COUNT: "LISTENER_COUNT",
+  NAVIGATE_TO_DEFAULT: "NAVIGATE_TO_DEFAULT",
+  BUILD_PATH: "BUILD_PATH",
+  IS_ACTIVE_ROUTE: "IS_ACTIVE_ROUTE",
+  DROPPED_QUERY_KEY: "DROPPED_QUERY_KEY",
+  UNDECLARED_PARAM_KEY: "UNDECLARED_PARAM_KEY",
+  CODEC_ROUND_TRIP: "CODEC_ROUND_TRIP",
+} as const satisfies {
+  [K in keyof DiagnosticEventMap]: DiagnosticEventMap[K] extends readonly [
+    unknown?,
+    unknown?,
+    unknown?,
+    unknown?,
+  ]
+    ? K
+    : never;
+};
+
+/**
  * The runtime half of the check channel (#2388) — the same pair-with-the-type
  * construction {@link SEAM} uses, for the same reason.
  *
@@ -527,18 +549,6 @@ export const SEAM = {
  * The call sites below read a PROPERTY of this object rather than spelling a
  * literal, so the set that decides is the set that acts.
  */
-/**
- * The runtime half of the diagnostic channel (#2388) — the same
- * pair-with-the-type construction {@link SEAM} and {@link POSITION} use.
- *
- * ⚑ A key added to {@link DiagnosticEventMap} and not here fails this object to
- * compile, and a value drifting from its key is an error rather than a silent
- * alias.
- */
-export const DIAGNOSTIC = {
-  PLUGIN_AFTER_START: "PLUGIN_AFTER_START",
-} as const satisfies { [K in keyof DiagnosticEventMap]: K };
-
 export const POSITION = {
   "buildPath:params": "buildPath:params",
   "buildPathResolved:params": "buildPathResolved:params",
@@ -558,7 +568,40 @@ export const POSITION = {
   "addDeactivateGuard:entry": "addDeactivateGuard:entry",
   "removeActivateGuard:entry": "removeActivateGuard:entry",
   "removeDeactivateGuard:entry": "removeDeactivateGuard:entry",
+  "getDependency:entry": "getDependency:entry",
+  "getDependency:value": "getDependency:value",
+  "setDependency:entry": "setDependency:entry",
+  "setDependency:count": "setDependency:count",
+  "setDependencies:entry": "setDependencies:entry",
+  "setDependencies:count": "setDependencies:count",
+  "removeDependency:entry": "removeDependency:entry",
+  "hasDependency:entry": "hasDependency:entry",
+  "cloneRouter:entry": "cloneRouter:entry",
+  "usePlugin:count": "usePlugin:count",
+  "usePlugin:entry": "usePlugin:entry",
+  "usePlugin:plugin": "usePlugin:plugin",
+  "canActivate:count": "canActivate:count",
+  "canDeactivate:count": "canDeactivate:count",
+  "navigateToState:entry": "navigateToState:entry",
+  "setRootPath:entry": "setRootPath:entry",
+  "navigateToDefault:entry": "navigateToDefault:entry",
+  "navigateToDefault:route": "navigateToDefault:route",
+  "start:entry": "start:entry",
+  "buildPath:entry": "buildPath:entry",
+  "buildPathResolved:entry": "buildPathResolved:entry",
+  "isActiveRoute:entry": "isActiveRoute:entry",
+  "areStatesEqual:entry": "areStatesEqual:entry",
+  "shouldUpdateNode:entry": "shouldUpdateNode:entry",
+  "matchPath:entry": "matchPath:entry",
+  "matchPath:decoded": "matchPath:decoded",
+  "makeState:state": "makeState:state",
+  "navigate:state": "navigate:state",
 } as const satisfies { [K in keyof CheckPositionMap]: K };
+
+/** Several doors reach `runChecks`, so its refusal names no door (#2487). */
+const atRunChecks = raiser("router");
+
+const ignoreRejection = (): undefined => undefined;
 
 /**
  * Runs every check registered at a position, in registration order.
@@ -579,6 +622,12 @@ export const POSITION = {
  * by the same call — and copying the array would allocate on `buildPath`, which
  * is the render path. So a registration made during a run is not seen by that
  * run, and a removal made during one simply is not called.
+ *
+ * ⚠ **A check that returns a thenable refuses its door (#2836).** A promise
+ * settles after the door has answered, so it cannot refuse; `runChecks` throws
+ * a `TypeError` in its place, from where the check's own throw would come, and
+ * the promise is consumed without a report — the refusal already reported the
+ * call.
  */
 export function runChecks<P extends keyof CheckPositionMap>(
   checks: ReadonlyMap<string, ((...args: any[]) => void)[]>,
@@ -594,8 +643,27 @@ export function runChecks<P extends keyof CheckPositionMap>(
   const atEntry = registered.length;
 
   for (let i = 0; i < atEntry && i < registered.length; i++) {
-    registered[i](...args);
+    // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -- the void-typed check's runtime value is read to refuse a thenable (#2836)
+    const answer: unknown = registered[i](...args);
+
+    if (consumeThenable(answer, ignoreRejection)) {
+      throw atRunChecks.type`Async checks are not supported: the check at "${position}" returned a thenable. A check refuses by throwing synchronously.`;
+    }
   }
+}
+
+/**
+ * Does any check stand at `position`? A door asks before it computes what the
+ * position judges, so bare core computes nothing (#2388).
+ *
+ * ⚠ Not `checks.has(position)`: removing the last check leaves an empty list
+ * under the key, and `has` keeps answering `true`.
+ */
+export function hasChecks(
+  checks: ReadonlyMap<string, readonly unknown[]>,
+  position: keyof CheckPositionMap,
+): boolean {
+  return (checks.get(position)?.length ?? 0) > 0;
 }
 
 /**

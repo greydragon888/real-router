@@ -125,14 +125,90 @@ function createRejectingPassSchema(output: SearchParams): StandardSchemaV1 {
   };
 }
 
-function createAsyncSchema(): StandardSchemaV1 {
+/** A schema that answers with a Promise — a rejected one is zod's answer to a throw in it (#2851). */
+function createAsyncSchema(settles: "resolves" | "rejects"): StandardSchemaV1 {
   return {
     "~standard": {
       version: 1,
       vendor: "test",
-      validate: () => Promise.resolve({ value: {} }),
+      validate: () =>
+        settles === "resolves"
+          ? Promise.resolve({ value: {} })
+          : Promise.reject(new Error("thrown in the schema")),
     },
   };
+}
+
+/**
+ * The form a library gives one answer (#2851): zod's `{ value }` / `{ issues }`;
+ * valibot's, with `typed` on both and a `value` on a failure as well; and a
+ * success that spells `issues: undefined`. Standard Schema decides by `issues`,
+ * so the form must change nothing.
+ */
+type AnswerForm = "zod" | "valibot" | "spec";
+
+const arbAnswerForm = fc.constantFrom<AnswerForm>("zod", "valibot", "spec");
+
+/** A valibot failure's `value` at each key here — no step may write it. */
+const FAILURE_VALUE = "a failure's value";
+
+/** `schema`, answering in `form`; `answered` counts its answers per form. */
+function answeringAs(
+  schema: StandardSchemaV1,
+  form: AnswerForm,
+  answered?: Record<AnswerForm, number>,
+): StandardSchemaV1 {
+  const { validate } = schema["~standard"];
+
+  return {
+    "~standard": {
+      ...schema["~standard"],
+      validate: (input: unknown) => {
+        const answer = validate(input);
+
+        if (answered) {
+          answered[form] += 1;
+        }
+
+        if (answer instanceof Promise || form === "zod") {
+          return answer;
+        }
+
+        if (answer.issues) {
+          const failure = {
+            value: Object.fromEntries(
+              Object.keys(input as Params).map((key) => [key, FAILURE_VALUE]),
+            ),
+            typed: false,
+            issues: answer.issues,
+          };
+
+          return form === "valibot" ? failure : answer;
+        }
+
+        const success =
+          form === "valibot"
+            ? { value: answer.value, typed: true }
+            : { value: answer.value, issues: undefined };
+
+        return success;
+      },
+    },
+  };
+}
+
+/** A count of answers per form, for {@link answeringAs}. */
+const noAnswers = (): Record<AnswerForm, number> => ({
+  zod: 0,
+  valibot: 0,
+  spec: 0,
+});
+
+/** Each form answered in a property's runs, so none of them went untried. */
+function expectEveryForm(answered: Readonly<Record<AnswerForm, number>>): void {
+  for (const [form, count] of Object.entries(answered)) {
+    expect(count, `answers in the ${form} form`).toBeGreaterThan(0);
+  }
 }
 
 // =============================================================================
@@ -188,13 +264,15 @@ const arbAllParams = fc.dictionary(
 describe("Validation Pipeline (forwardState interceptor)", () => {
   it("Valid params pass-through", async () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const answered = noAnswers();
 
     try {
       await fc.assert(
         fc.asyncProperty(
           arbValidatedParams,
           arbExtraParams,
-          async (validParams, extraParams) => {
+          arbAnswerForm,
+          async (validParams, extraParams, form) => {
             const navigateParams: SearchParams = {
               ...validParams,
               ...extraParams,
@@ -206,7 +284,11 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
                 {
                   name: "test",
                   path: ROUTE_PATH,
-                  searchSchema: createSubsetSchema(VALIDATED_KEYS),
+                  searchSchema: answeringAs(
+                    createSubsetSchema(VALIDATED_KEYS),
+                    form,
+                    answered,
+                  ),
                 },
               ],
               { defaultRoute: "home" },
@@ -235,10 +317,13 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
     } finally {
       consoleSpy.mockRestore();
     }
+
+    expectEveryForm(answered);
   });
 
   it("Invalid key stripping", async () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const answered = noAnswers();
 
     try {
       await fc.assert(
@@ -246,7 +331,8 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
           arbValidatedParams,
           fc.subarray(EXTRA_KEYS, { minLength: 1 }),
           arbRepairOutcome,
-          async (validParams, invalidKeys, outcome) => {
+          arbAnswerForm,
+          async (validParams, invalidKeys, outcome, form) => {
             const allParams: SearchParams = { ...validParams };
 
             for (const key of invalidKeys) {
@@ -264,10 +350,13 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
                 {
                   name: "test",
                   path: ROUTE_PATH,
-                  searchSchema:
+                  searchSchema: answeringAs(
                     outcome === "passes"
                       ? createRejectingUppercaseSchema()
                       : createFailSchema(issues),
+                    form,
+                    answered,
+                  ),
                 },
               ],
               { defaultRoute: "home" },
@@ -298,10 +387,13 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
     } finally {
       consoleSpy.mockRestore();
     }
+
+    expectEveryForm(answered);
   });
 
   it("defaultSearch recovery", async () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const answered = noAnswers();
 
     try {
       await fc.assert(
@@ -313,7 +405,8 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
             maxKeys: EXTRA_KEYS.length,
           }),
           arbRepairOutcome,
-          async (validParams, invalidKeys, defaults, outcome) => {
+          arbAnswerForm,
+          async (validParams, invalidKeys, defaults, outcome, form) => {
             const allParams: SearchParams = { ...validParams };
 
             for (const key of invalidKeys) {
@@ -337,10 +430,13 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
                   // is refused at registration. This is also the only slot the
                   // plugin's recovery reads now, for the same reason.
                   defaultSearch: defaults,
-                  searchSchema:
+                  searchSchema: answeringAs(
                     outcome === "passes"
                       ? createRejectingUppercaseSchema()
                       : createFailSchema(issues),
+                    form,
+                    answered,
+                  ),
                 },
               ],
               { defaultRoute: "home" },
@@ -379,11 +475,14 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
     } finally {
       consoleSpy.mockRestore();
     }
+
+    expectEveryForm(answered);
   });
 
   it("Strict mode output isolation", async () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const answered = noAnswers();
 
     try {
       await fc.assert(
@@ -391,7 +490,8 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
           arbValidatedParams,
           arbExtraParams,
           fc.boolean(),
-          async (schemaOutput, extraParams, repaired) => {
+          arbAnswerForm,
+          async (schemaOutput, extraParams, repaired, form) => {
             const navigateParams: SearchParams = {
               ...schemaOutput,
               ...extraParams,
@@ -408,7 +508,11 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
                 {
                   name: "test",
                   path: ROUTE_PATH,
-                  searchSchema: createRejectingPassSchema(schemaOutput),
+                  searchSchema: answeringAs(
+                    createRejectingPassSchema(schemaOutput),
+                    form,
+                    answered,
+                  ),
                 },
               ],
               { defaultRoute: "home" },
@@ -438,18 +542,22 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
       consoleSpy.mockRestore();
       warnSpy.mockRestore();
     }
+
+    expectEveryForm(answered);
   });
 
   it("Non-strict mode: schema output overrides original, extras preserved", async () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const answered = noAnswers();
 
     try {
       await fc.assert(
         fc.asyncProperty(
           arbValidatedParams,
           arbExtraParams,
-          async (validParams, extraParams) => {
+          arbAnswerForm,
+          async (validParams, extraParams, form) => {
             const navigateParams: SearchParams = {
               ...validParams,
               ...extraParams,
@@ -461,7 +569,11 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
                 {
                   name: "test",
                   path: ROUTE_PATH,
-                  searchSchema: createUppercaseSchema(VALIDATED_KEYS),
+                  searchSchema: answeringAs(
+                    createUppercaseSchema(VALIDATED_KEYS),
+                    form,
+                    answered,
+                  ),
                 },
               ],
               { defaultRoute: "home" },
@@ -494,33 +606,90 @@ describe("Validation Pipeline (forwardState interceptor)", () => {
       consoleSpy.mockRestore();
       warnSpy.mockRestore();
     }
+
+    expectEveryForm(answered);
   });
 
   it("Async rejection", async () => {
-    await fc.assert(
-      fc.asyncProperty(arbAllParams, async (params) => {
-        const router = createRouter(
-          [
-            { name: "home", path: "/" },
-            {
-              name: "test",
-              path: ROUTE_PATH,
-              searchSchema: createAsyncSchema(),
-            },
-          ],
-          { defaultRoute: "home" },
-        );
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const unhandled: unknown[] = [];
+    const record = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    const previous = process.listeners("unhandledRejection");
 
-        router.usePlugin(searchSchemaPlugin({ mode: "production" }));
-        await router.start("/");
+    process.removeAllListeners("unhandledRejection");
+    process.on("unhandledRejection", record);
 
-        await expect(router.navigate("test", {}, params)).rejects.toThrow(
-          TypeError,
-        );
+    const drawn: Record<
+      `${"development" | "production"}/${"resolves" | "rejects"}`,
+      number
+    > = {
+      "development/resolves": 0,
+      "development/rejects": 0,
+      "production/resolves": 0,
+      "production/rejects": 0,
+    };
+    const control = new Error("a rejection nobody handles");
+    let logged = 0;
 
-        router.stop();
-      }),
-    );
+    try {
+      await fc.assert(
+        fc.asyncProperty(
+          arbAllParams,
+          fc.constantFrom("resolves", "rejects"),
+          fc.constantFrom("development", "production"),
+          async (params, settles, mode) => {
+            drawn[`${mode}/${settles}`] += 1;
+
+            const router = createRouter(
+              [
+                { name: "home", path: "/" },
+                {
+                  name: "test",
+                  path: ROUTE_PATH,
+                  searchSchema: createAsyncSchema(settles),
+                },
+              ],
+              { defaultRoute: "home" },
+            );
+
+            router.usePlugin(searchSchemaPlugin({ mode }));
+            await router.start("/");
+
+            await expect(router.navigate("test", {}, params)).rejects.toThrow(
+              TypeError,
+            );
+
+            router.stop();
+          },
+        ),
+      );
+
+      // The control shows the recorder sees what nobody handles; Node reports
+      // it once a macrotask has run.
+      void Promise.reject(control);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      logged = errors.mock.calls.filter(([message]: unknown[]) =>
+        String(message).startsWith("[search-schema-plugin]"),
+      ).length;
+    } finally {
+      process.off("unhandledRejection", record);
+
+      for (const listener of previous) {
+        process.on("unhandledRejection", listener);
+      }
+
+      errors.mockRestore();
+    }
+
+    expect(unhandled).toStrictEqual([control]);
+    // One Promise per navigation, its error logged in mode "development" alone.
+    expect(logged).toBe(drawn["development/rejects"]);
+
+    for (const [draw, count] of Object.entries(drawn)) {
+      expect(count, `${draw} draws`).toBeGreaterThan(0);
+    }
   });
 });
 
@@ -786,7 +955,7 @@ function createRefinedSchema(
         handed.push(structuredClone(value as Params));
 
         const result = text.validate(value) as StandardSchemaV1Result;
-        const issues = "issues" in result ? [...result.issues] : [];
+        const issues = [...(result.issues ?? [])];
         const named = refine(JSON.stringify(value));
 
         if (named !== undefined) {
@@ -893,12 +1062,14 @@ describe("Decoded text (#2725)", () => {
     // the case the text decides, as without it the key is stripped. Without
     // each kind, the two formats agree for want of anything to differ on.
     const fixed = { number: 0, boolean: 0, value: 0, element: 0 };
+    const answered = noAnswers();
 
     await fc.assert(
       fc.asyncProperty(
         arbTextQuery,
         fc.func(fc.boolean()),
-        async (query, accept) => {
+        arbAnswerForm,
+        async (query, accept, form) => {
           const decoded: Decoded[] = [];
           const schema = createTextSchema(accept, (value) => {
             decoded.push(value);
@@ -906,8 +1077,10 @@ describe("Decoded text (#2725)", () => {
           const url = toUrl(query);
           const asText = await settleText(schema, url, "none");
 
+          // Only this arm takes the drawn form; the arm above, in zod's, is the
+          // reference a misread answer departs from (#2851).
           await expect(
-            settleText(schema, url, "default"),
+            settleText(answeringAs(schema, form, answered), url, "default"),
           ).resolves.toStrictEqual(asText);
 
           const kept = decoded.filter(({ key }) =>
@@ -930,6 +1103,9 @@ describe("Decoded text (#2725)", () => {
     expect(fixed.boolean).toBeGreaterThan(0);
     expect(fixed.value).toBeGreaterThan(0);
     expect(fixed.element).toBeGreaterThan(0);
+
+    // The arm that takes the drawn form ran in each form.
+    expectEveryForm(answered);
   });
 
   it("onError is handed a query and the schema's own issues on it", async () => {
@@ -1019,5 +1195,35 @@ describe("Decoded text (#2725)", () => {
     expect(reached.text).toBeGreaterThan(0);
     expect(reached.settled).toBeGreaterThan(0);
     expect(reached.refined).toBeGreaterThan(0);
+  });
+});
+
+describe("Answer forms (#2851)", () => {
+  it("each form answers as its library does, and every form is drawn", () => {
+    const schema = createRejectingUppercaseSchema();
+    const rejected = { a: "x", b: INVALID };
+    const issues = [{ message: "b is invalid", path: ["b"] }];
+    const run = (form: AnswerForm, input: Params) =>
+      answeringAs(schema, form)["~standard"].validate(input);
+
+    expect(run("zod", rejected)).toStrictEqual({ issues });
+    expect(run("zod", { a: "x" })).toStrictEqual({ value: { a: "X" } });
+    expect(run("valibot", rejected)).toStrictEqual({
+      value: { a: FAILURE_VALUE, b: FAILURE_VALUE },
+      typed: false,
+      issues,
+    });
+    expect(run("valibot", { a: "x" })).toStrictEqual({
+      value: { a: "X" },
+      typed: true,
+    });
+    expect(run("spec", rejected)).toStrictEqual({ issues });
+    expect(run("spec", { a: "x" })).toStrictEqual({
+      value: { a: "X" },
+      issues: undefined,
+    });
+    expect(
+      new Set(fc.sample(arbAnswerForm, { numRuns: 100, seed: 2851 })),
+    ).toStrictEqual(new Set(["zod", "valibot", "spec"]));
   });
 });

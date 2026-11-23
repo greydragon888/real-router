@@ -85,6 +85,7 @@ graph TD
 | **src/utils/logger**        | `RouterLogger` class — one instance per router                                                                         | Warning/error logging across namespaces  |
 | **src/types**               | Shared type definitions (the `/types` subpath)                                                                         | All modules                              |
 | **src/utils/ingest**        | Ingestion primitives — one discipline for writing into a record under a key core did not choose (the `/utils` subpath) | Every layer, and the plugins             |
+| **src/utils/thenable**      | `consumeThenable()` — takes over a thenable that application code returned where core expects nothing                  | `PluginsNamespace`, `runChecks`          |
 
 (`package.json` names no other `@real-router/*` package in any dependency field, and there are no runtime `dependencies`.)
 
@@ -106,17 +107,21 @@ Router.ts (facade — validates and delegates)
 
 **Facade pattern flow:**
 
-1. Facade method validates inputs via `ctx.validator?.ns.fn()` (opt-in plugin pattern)
+1. Facade method asks the checks at its `:entry` position via `runChecks` (opt-in: `@real-router/validation-plugin` registers them)
 2. Delegates to namespace instance method via `getInternals(this)` (WeakMap)
 3. Returns result to caller
 
 ```typescript
-// Router.ts — facade
+// Router.ts — facade (abridged)
 buildPath(route: string, params?: Params, search?: SearchParams): string {
   const ctx = getInternals(this);
-  ctx.validator?.routes.validateBuildPathArgs(route);      // no-op if plugin absent
-  ctx.validator?.navigation.validateParams(params, "buildPath");
-  return this.#buildPathIntent(route, params, search);     // search = query channel
+  runChecks(ctx.checks, POSITION["buildPath:entry"], route, params, search);
+  if (this.#eventBus.diagnosticListenerCount(DIAGNOSTIC.BUILD_PATH) > 0) {
+    this.#eventBus.emitDiagnostic(DIAGNOSTIC.BUILD_PATH, route, params);
+  }
+  const ownParams = adoptChannel(params);                  // the copy that ships
+  runChecks(ctx.checks, POSITION["buildPath:params"], ownParams);
+  return this.#buildPathIntent(route, ownParams ?? EMPTY_PARAMS, search); // search = query channel
 }
 ```
 
@@ -130,14 +135,14 @@ Three kinds of module make up the router, and where a file sits says which kind 
 | **store**     | a per-router record — an interface plus functions, never a class                                                            | beside its owner: `namespaces/RoutesNamespace/routesStore.ts` (owned by `RoutesNamespace`), `dependenciesStore.ts` (owned by the router) | `RouterInternals` — `routeGetStore()`, `dependenciesGetStore()`                                                                 |
 | **door**      | a standalone API function: `getRoutesApi`, `getDependenciesApi`, `getLifecycleApi`, `getPluginApi`, `cloneRouter`           | `api/` — the `@real-router/core/api` entry                                                                                               | the application and plugins; a door reaches router state only through `getInternals`                                            |
 
-`RoutesStore` also carries the references its doors need — `src/namespaces/RoutesNamespace/CLAUDE.md` owns why. `DependenciesStore` carries none.
+`RoutesStore` also carries the references its doors need, each in a slot sealed where it arrives, so a write through `routeGetStore()` cannot replace one — `src/namespaces/RoutesNamespace/CLAUDE.md` owns why. `DependenciesStore` carries one, the object its doors report through, sealed the same way in `createDependenciesStore`.
 
 A door holds the mutation logic only it needs, so that logic ships in the `/api` entry rather than the main one. What a door and the facade both need lives below both — `internals.ts`, `guards.ts`, a store module — because nothing else in `src/` imports from `api/`. **Lint-enforced** by an `import-x/no-restricted-paths` zone in `packages/core/eslint.config.mjs`; the zone resolves paths rather than matching specifiers, so `src/types/api.ts`, which shares the name, is not caught by it.
 
 ### Dependency Injection
 
 Namespaces are constructed independently and wired by `wireNamespaces()`.
-`setDependencies()` is a **pure assignment**, so the `wire*` call order is
+`setDependencies()` **calls into no namespace**, so the `wire*` call order is
 arbitrary.
 
 **Initial-route guard factories flush last** — `flushPendingGuards()` is the final
@@ -156,27 +161,29 @@ across a navigation and expects zero.
 ### Validation Pattern
 
 Two tiers: **invariant protection** in core, and **DX validation** opt-in via
-`@real-router/validation-plugin`, which installs a `RouterValidator` into
-`RouterInternals.validator`. Facade methods and standalone API functions call
-through it with optional chaining, so it is a no-op when the plugin is absent:
+`@real-router/validation-plugin`. Core asks at named check positions and raises
+diagnostic kinds; the plugin registers its checks with `PluginApi.addCheck` and
+its reports with `PluginApi.subscribeDiagnostic`, so a door calls nothing when
+no check or listener is registered:
 
 ```typescript
-buildPath(route: string, params?: Params, search?: SearchParams): string {
-  const ctx = getInternals(this);
-  ctx.validator?.routes.validateBuildPathArgs(route);
-  ctx.validator?.navigation.validateParams(params, "buildPath");
-  return this.#buildPathIntent(route, params, search);
+runChecks(ctx.checks, POSITION["buildPath:entry"], route, params, search);
+
+if (this.#eventBus.diagnosticListenerCount(DIAGNOSTIC.BUILD_PATH) > 0) {
+  this.#eventBus.emitDiagnostic(DIAGNOSTIC.BUILD_PATH, route, params);
 }
 ```
 
-The validator is namespaced by concern (`routes`, `navigation`, `state`,
-`lifecycle`, `dependencies`, `plugins`, `options`, `eventBus`).
+`CheckPositionMap` and `DiagnosticEventMap` (`src/types/api.ts`) declare what
+each position and kind receives; `POSITION` and `DIAGNOSTIC` in `internals.ts`
+are tied to them by `satisfies`.
 
 **Lifecycle:** registered before `router.start()` — throws
-`VALIDATION_PLUGIN_AFTER_START` otherwise; installs the validator and runs a
-retrospective pass; `unsubscribe()` sets `ctx.validator = null`. One router
-carries one validator: a registration that finds the slot occupied throws
-`VALIDATION_PLUGIN_ALREADY_INSTALLED` instead of overwriting it.
+`VALIDATION_PLUGIN_AFTER_START` otherwise; runs a retrospective pass and
+registers its checks and kinds; `unsubscribe()` removes the registrations. One
+router carries one installation: the plugin marks the routers it is installed
+on, and a second registration on one throws
+`VALIDATION_PLUGIN_ALREADY_INSTALLED`.
 
 **`@real-router/core/validation` is the plugin's ONLY door to the engine.** It
 re-exports `validateRoute`, the path reader `buildParamMeta` and the
@@ -184,8 +191,8 @@ re-exports `validateRoute`, the path reader `buildParamMeta` and the
 directly. A guard test in the plugin blocks a `route-tree` import.
 
 **Validation runs on the RAW argument, before interceptors** — which is why
-`validateStartArgs` deliberately permits `undefined`: a browser-plugin
-interceptor fills the path in downstream.
+the plugin's check at `start:entry` deliberately permits `undefined`: a
+browser-plugin interceptor fills the path in downstream.
 
 ### WeakMap Internals Registry
 
@@ -222,11 +229,10 @@ Namespaces are constructed independently, then wired via **dependency-bundle inj
 // wireNamespaces.ts
 function wireNamespaces(ns: NamespaceBag) {
   const compileFactory = createCompileFactory(ns); // shared by guards + plugins
-  const getValidator = () => getInternals(ns.router).validator; // shared, never throws
   wireLimits(ns); // eventBus gets the listener caps
-  wireRouteLifecycle(ns, compileFactory, getValidator); // guard registry
+  wireRouteLifecycle(ns, compileFactory); // guard registry, both channels
   wireRoutes(ns); // routes get guard registration + state accessors
-  wirePlugins(ns, compileFactory, getValidator); // plugins get addEventListener + canNavigate
+  wirePlugins(ns, compileFactory); // plugins get addEventListener, canNavigate and both channels
   wireNavigation(ns); // navigation gets state, routes, eventBus, ...
   wireRouterLifecycle(ns); // start/stop get navigate, matchPath, ...
   wireState(ns); // state gets defaultParams, buildPath, getUrlParams, getQueryParams
@@ -382,9 +388,9 @@ dropping either side silently regresses one case.
            │
            ▼
 ┌──────────────────────┐
-│  Validate arguments  │  ctx.validator?.navigation.validateNavigateArgs() + …
-│  (a no-op unless     │  the validator is installed by
-│   the plugin is on)  │  @real-router/validation-plugin
+│  Validate arguments  │  the checks at navigate:entry, then at
+│  (a no-op unless     │  navigate:params, which
+│   the plugin is on)  │  @real-router/validation-plugin registers
 └──────────┬───────────┘
            │
            ▼
@@ -394,7 +400,7 @@ dropping either side silently regresses one case.
            │
            ▼
 ┌──────────────────────┐
-│  Build target state  │  buildNavigateState() → src/pipeline: canonicalize → buildURL + materialize
+│  Build target state  │  buildNavigateState(): the checks at navigate:state, then src/pipeline: canonicalize → buildURL + materialize
 │  + force replace     │  forceReplaceFromUnknown(opts, fromState)
 │  + SAME_STATES check │  fromState.path === toState.path — canonical path comparison
 └──────────┬───────────┘
@@ -597,7 +603,9 @@ const myPlugin: PluginFactory = (router, getDependency) => ({
 **Hook error isolation, sync and async.** A synchronous throw is caught and
 logged; an `async` hook that rejects is isolated the same way, so it does not
 escape as an `unhandledRejection`. A hook must not rely on its rejection
-propagating anywhere.
+propagating anywhere. `teardown` is held to the same rule: a throw, or a
+rejection of the promise it returns, is logged, and nothing waits for that
+promise.
 
 **Conditional registration:** `usePlugin()` silently skips falsy values, so
 `__DEV__ && validationPlugin()` works inline.
@@ -715,7 +723,8 @@ commit.
 Listeners are invoked synchronously; returned promises are not awaited, and a
 rejected one is isolated centrally to the same `onListenerError` sink a
 synchronous throw flows through, so it does not leak as a Node
-`unhandledRejection`. The same isolation covers **raw plugin hooks**.
+`unhandledRejection`. The same isolation covers **raw plugin hooks** and the
+handlers of `subscribeChanges` and `subscribeDiagnostic`.
 
 A **synchronous** reentrant navigation from inside a transition listener is
 **banned**, a `start()` on a router that is not running included, and so is one
@@ -805,7 +814,7 @@ never touches the base.
 - `NavigationNamespace` is the **only** namespace that orchestrates multi-namespace operations (state + routes + eventBus + lifecycle)
 - `EventBusNamespace` is the **only** namespace that holds the FSM instance and EventEmitter
 - A store is not a namespace — see [Namespaces, stores and doors](#namespaces-stores-and-doors)
-- Structural guards remain in namespace folders (`OptionsNamespace`, `PluginsNamespace`). DX validators live in `@real-router/validation-plugin`, accessed via `ctx.validator?.`
+- Structural guards remain in namespace folders (`OptionsNamespace`, `PluginsNamespace`). DX validators live in `@real-router/validation-plugin`, registered at check positions and diagnostic kinds
 
 ### Route-Name Type Gates
 
@@ -891,7 +900,7 @@ SSR loader plugins read it through `getHydrationState(router)` from inside their
 ### Facade Rules
 
 - Facade **never** contains business logic — only validation + delegation
-- Facade validation uses `ctx.validator?.ns.fn()` — optional chaining means zero overhead when plugin is absent
+- Facade validation asks the checks at a named position (`runChecks`) — with no check registered it calls nothing
 - All facade methods access internals via `getInternals(this)` — never via direct namespace field access
 
 ### API Function Rules

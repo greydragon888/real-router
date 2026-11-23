@@ -14,9 +14,13 @@ export interface StandardSchemaV1Issue {
     readonly (PropertyKey | { readonly key: PropertyKey })[] | undefined;
 }
 
-/** Validation result — either success or failure. */
+/**
+ * Validation result — either success or failure. `issues` decides: "A falsy
+ * value for `issues` indicates success", and a failure may carry `value` as
+ * well — valibot's does (#2851).
+ */
 export type StandardSchemaV1Result<Output = unknown> =
-  | { readonly value: Output }
+  | { readonly value: Output; readonly issues?: undefined }
   | { readonly issues: readonly StandardSchemaV1Issue[] };
 
 /**
@@ -49,7 +53,9 @@ export interface StandardSchemaV1<Input = unknown, Output = Input> {
 export interface SearchSchemaPluginOptions {
   /**
    * Error handling mode.
-   * - "development" (default): strip invalid + console.error
+   * - "development" (default): strip invalid + `logger.error` of the router,
+   *   under the context "search-schema-plugin", which also logs the error of a
+   *   schema that answers with a rejected Promise
    * - "production": silent strip
    *
    * For recovery of invalid params use defaultSearch (strip + restore + diagnostics).
@@ -69,7 +75,8 @@ export interface SearchSchemaPluginOptions {
   readonly strict?: boolean;
 
   /**
-   * Custom error handler (overrides mode completely).
+   * Custom error handler (overrides mode at runtime; the dev-time
+   * defaultSearch check still warns).
    * Must return cleaned params.
    *
    * Contract:
@@ -78,9 +85,13 @@ export interface SearchSchemaPluginOptions {
    *   (Re-validation would risk infinite loops.)
    * - Exceptions from onError propagate up without suppression.
    *   Consistent with interceptor behavior in core.
-   * - When onError is set, neither console.error (mode: "development"),
-   *   nor silent strip (mode: "production") are executed.
+   * - When onError is set, neither the router's `logger.error`
+   *   (mode: "development"), nor silent strip (mode: "production") are
+   *   executed.
    *   All responsibility for diagnostics and recovery is on the callback.
+   * - A schema that answers with a Promise refuses the navigation before
+   *   onError is called, so with onError set a rejected one's error is not
+   *   logged.
    */
   readonly onError?: (
     routeName: string,

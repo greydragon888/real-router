@@ -12,18 +12,17 @@ import type {
 /**
  * Per-start runtime validator for `getResult()` return values.
  *
- * Returns `null` when the value is acceptable (typed `RscActionResult`,
- * non-thenable, non-array, non-null object). Otherwise returns a short
- * descriptor used in the thrown `TypeError` message — keeps the error
- * actionable by pointing at the exact failure mode (`"null"`, `"array"`,
+ * Returns `null` when the value is acceptable (typed `RscActionResult`: a
+ * non-null, non-array, non-thenable value whose `typeof` is `"object"`).
+ * Otherwise returns a short descriptor used in the thrown `TypeError`
+ * message — keeps the error actionable by pointing at the exact failure
+ * mode (`"null"`, `"array"`,
  * `"Promise/thenable — wire your action result synchronously"`, or the
- * raw `typeof` for primitives).
+ * raw `typeof` for primitives and functions).
  *
  * Single source of truth for the two-decision pattern: "throw or
- * accept" + "what to say in the error". Previously the same checks
- * lived inline at the call site AND in `describeBadResult` — a typo in
- * one would silently break the symmetry. Unifying as one classifier
- * eliminates that drift class.
+ * accept" + "what to say in the error" — one classifier, so the decision
+ * and the error description cannot drift apart.
  */
 function classifyRscActionResult(value: unknown): string | null {
   if (value === null) {

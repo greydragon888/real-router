@@ -57,8 +57,7 @@ and never throws.
   route-CRUD.
 - ⚑ **`getPluginApi().addEventListener` is the fifth door of the same shape**,
   and its predicate is MEMBERSHIP rather than a type check: the valid set is
-  closed and `events` declares it, so core derives the seven from that constant
-  and `@real-router/validation-plugin` derives its own set from the same one.
+  closed and `events` declares it, so core derives the seven from that constant.
   That closes the typo a route-name type check cannot, which is why the two
   doors do NOT share a backstop.
 - ⚑ **A read-count instrument is the wrong tool for this family** — these doors
@@ -77,8 +76,9 @@ and never throws.
   and uses that key for the check, the old-value read, the diagnostic and the
   write. No gate on any of them, and a **symbol** name is exempt from the
   coercion entirely — a symbol IS a property key, so nothing drifts. This family
-  HAS a validator seam: `validateDependencyName` refuses a non-string at zero
-  coercions.
+  HAS a check at the `:entry` position of each door that takes a name, where
+  `@real-router/validation-plugin` refuses a non-string name before the door
+  coerces it.
 
 ⚠ Do not restate any of this as "every entry point that takes a route name". It
 was written that way once, from a sweep that was never enumerated, and three doors
@@ -251,9 +251,9 @@ const unsubscribe = getRoutesApi(router).subscribeChanges((event) => {
 | **`remove` payload is the SPLICE**            | `removedSubtree` names the node that was spliced out plus its real `children`, and nothing else. The same set drives the config/lifecycle purge, so a survivor cannot lose its guards                                                                                                                                                                                     |
 | **Timing**                                    | Post-commit — the handler sees the new tree. For `replace`, after the swap but before state revalidation, which puts it INSIDE that call's window: route-CRUD and navigation both refuse there                                                                                                                                                                                                                                                                  |
 | **`update` filter**                           | Emits only when the patch has a structural field. Guard-only and empty patches are silent                                                                                                                                                                                                                                                                                 |
-| **Fire-and-forget**                           | The handler cannot cancel the mutation; returned promises are ignored                                                                                                                                                                                                                                                                                                     |
+| **Fire-and-forget**                           | The handler cannot cancel the mutation, and nothing waits for a promise it returns                                                                                                                                                                                                                                                                                        |
 | **Reentrant tree mutation is banned**         | Any tree mutator called from inside a handler throws `REENTRANT_TREE_MUTATION` synchronously, **before mutating**. The door set is DERIVED — `tree-mutator-guard-authority-1751.test.ts` walks `src` for API members that transitively write a `RoutesStore` field, so a seventh door cannot ship without a guard                                                         |
-| **Errors**                                    | A throwing handler is isolated via `onListenerError`; a runaway listener-driven nested same-event emit is coalesced at the emitter                                                                                                                                                                                                                                        |
+| **Errors**                                    | A handler that throws, or returns a promise that rejects, is isolated via `onListenerError`, the rejection once it settles; a runaway listener-driven nested same-event emit is coalesced at the emitter                                                                                                                                                                  |
 | **Duplicates**                                | Lenient — each call is an independent subscription                                                                                                                                                                                                                                                                                                                        |
 | **Clone isolation**                           | A cloned router has an independent emitter                                                                                                                                                                                                                                                                                                                                |
 | **Scope**                                     | Internal-only channel: `TREE_CHANGED` is not in the public `EventName` union, the `events.*` registry or the `Plugin` interface. By design                                                                                                                                                                                                                                |
@@ -312,10 +312,18 @@ no ownership benefit.
 ## The store is a transport, not inert data
 
 **Store pattern:** `RoutesStore` and `DependenciesStore` are data-holder
-interfaces, not classes. `RoutesStore` deliberately carries cross-namespace
-references set during wiring, so the standalone CRUD helpers reach the lifecycle
-namespace without threading a parameter through every helper. It is the api/
-layer's transport channel, not inert data.
+interfaces, not classes. `RoutesStore` deliberately carries the references its
+doors reach — the lifecycle namespace and the dependency bag, installed at
+wiring, and the tree-change channel, which `Router` hands in with the store —
+so the standalone CRUD helpers reach them without threading a parameter through
+every helper. It is the api/ layer's transport channel, not inert data.
+`DependenciesStore` carries one reference too, the object its doors report
+through.
+
+**Each reference's slot is sealed where it arrives**, so replacing one through
+`routeGetStore()` is refused instead of re-pointing a door. The comment in
+`createRoutesStore` says which of the objects behind the slots is frozen, and
+`tests/functional/routes-store-references-2952.test.ts` pins the refusal.
 
 ## See Also
 

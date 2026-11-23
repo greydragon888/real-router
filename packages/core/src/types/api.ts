@@ -5,10 +5,12 @@
 
 import type {
   Params,
+  ParamsSearch,
   SearchParams,
   State,
   SimpleState,
   Unsubscribe,
+  UrlChannels,
 } from "./base";
 import type { EventMethodMap, EventName } from "./constants";
 // Augment-target interfaces are declared lexically in the entry (#1540); the
@@ -20,6 +22,7 @@ import type {
   DefaultDependencies,
   GuardFnFactory,
   Plugin,
+  PluginFactory,
   Route,
   RouteConfigUpdate,
   RouterLogger,
@@ -54,6 +57,180 @@ export interface InterceptableMethodMap {
 }
 
 /**
+ * The DIAGNOSTIC half of #2388 — what core reports rather than refuses.
+ *
+ * ⚑ **Internal keys, the shape `TREE_CHANGED` established.** They ride the same
+ * `EventEmitter` — so this is the mechanism core already has, not a third one —
+ * and are deliberately absent from the public `EventName` union, the `events.*`
+ * registry and the `Plugin` interface. `PluginApi.subscribeDiagnostic` is the
+ * only door.
+ *
+ * ⚠ **One key per diagnostic KIND, never one shared key.** `EventEmitter.emit`
+ * coalesces a re-entrant emit of an in-flight event NAME and drops it silently
+ * (#1033), and a listener here reaches the application's own
+ * `LoggerConfig.callback`, from which another diagnostic is raisable. Under one
+ * shared key that second diagnostic is lost.
+ *
+ * ⚠ **At most four arguments per kind.** `DIAGNOSTIC` in `internals.ts` fails to
+ * compile on a longer tuple: the emitter passes four after the name, and the
+ * generic spread that reaches it is not measured by the compiler.
+ */
+// eslint-disable-next-line @typescript-eslint/consistent-type-definitions -- must be `type`: `RouterEventMap` intersects it against a `Record<string, unknown[]>` constraint, which an interface does not satisfy
+export type DiagnosticEventMap = {
+  PLUGIN_AFTER_START: [methodName: string];
+
+  /**
+   * `setDependency` is adding a key: the count the record holds before the
+   * write, and the limit. Raised once per new key, after the
+   * `setDependency:count` checks pass.
+   */
+  SET_DEPENDENCY_COUNT: [currentCount: number, maxDependencies: number];
+
+  /**
+   * The same report from `setDependencies`, once per key the batch adds; the
+   * count grows as the walk writes.
+   */
+  SET_DEPENDENCIES_COUNT: [currentCount: number, maxDependencies: number];
+
+  /**
+   * `setDependency` is replacing a held value with a different one, before
+   * the write — `NaN` over `NaN` is no change.
+   */
+  SET_DEPENDENCY_OVERWRITE: [name: string];
+
+  /**
+   * The keys `setDependencies` replaced, in walk order. Raised once, after the
+   * walk, and only when there is one.
+   */
+  SET_DEPENDENCIES_OVERWRITE: [keys: readonly string[]];
+
+  /**
+   * `removeDependency` named a key the record does not hold. The name is the key
+   * core asked about, so a symbol arrives as the symbol.
+   */
+  REMOVE_DEPENDENCY_MISSING: [name: string | symbol];
+
+  /**
+   * `usePlugin` is about to start a call's factories: the plugins the router
+   * holds plus every factory the call carries, a repeated one counted each time
+   * it appears. Raised once per call, before the first factory runs.
+   */
+  USE_PLUGIN_COUNT: [count: number];
+
+  /**
+   * A factory the call has already carried once. It is registered once, and
+   * the kind is raised for each repetition, before the first factory runs.
+   */
+  USE_PLUGIN_DUPLICATE_IN_BATCH: [];
+
+  /**
+   * The object a factory returned holds a value that is not a function under
+   * the hook `methodName`, so core skips that hook.
+   */
+  USE_PLUGIN_HOOK_NOT_FUNCTION: [methodName: string];
+
+  /**
+   * A `canActivate` guard is taking a new slot: the number of routes that hold
+   * one once it registers, a definition and an external guard on one route
+   * counted once. Raised after the `canActivate:count` checks pass.
+   */
+  CAN_ACTIVATE_COUNT: [count: number];
+
+  /** The same report for a `canDeactivate` guard. */
+  CAN_DEACTIVATE_COUNT: [count: number];
+
+  /**
+   * A `canActivate` guard is registering for a route that holds one already,
+   * of either origin. Raised before the registration.
+   */
+  CAN_ACTIVATE_OVERWRITE: [name: string];
+
+  /** The same report for a `canDeactivate` guard. */
+  CAN_DEACTIVATE_OVERWRITE: [name: string];
+
+  /**
+   * The synchronous ask met a thenable from the guard of route `name`, and
+   * answered `false` without waiting for it. `methodName` is the door that
+   * asked.
+   */
+  SYNC_GUARD_THENABLE: [name: string, methodName: string];
+
+  /**
+   * The synchronous ask met an answer that is neither a boolean nor a thenable
+   * (#2823), and read it as a refusal. `methodName` is the door that asked.
+   */
+  SYNC_GUARD_NON_BOOLEAN: [name: string, answer: unknown, methodName: string];
+
+  /**
+   * A transition met an answer, or the value a thenable settled on, that is not
+   * a boolean (#2823), and refused it. Several calls start a transition, so no
+   * door is named.
+   */
+  GUARD_NON_BOOLEAN: [name: string, answer: unknown];
+
+  /**
+   * A listener is registering for `eventName`: the number of listeners the event
+   * holds once it does. `methodName` is the door — `subscribe`,
+   * `addEventListener`, or `usePlugin` for a plugin's hooks. Raised before the
+   * registration.
+   */
+  LISTENER_COUNT: [count: number, eventName: string, methodName: string];
+
+  /**
+   * A `navigateToDefault` call passed its `navigateToDefault:entry` checks and
+   * is about to resolve the configured defaults. Raised once per such call.
+   */
+  NAVIGATE_TO_DEFAULT: [];
+
+  /**
+   * A `buildPath` call passed its `buildPath:entry` checks: the route name and
+   * the `params` bag as the caller passed them, before core copies the bag.
+   * Raised once per such call; core judges nothing about the bag.
+   */
+  BUILD_PATH: [routeName: string, params: Params | undefined];
+
+  /** The same report from `isActiveRoute`, after `isActiveRoute:entry`. */
+  IS_ACTIVE_ROUTE: [routeName: string, params: Params | undefined];
+
+  /**
+   * The mode gate dropped `key` from the query channel of route `routeName`
+   * (#1575): the active `queryParamsMode` does not print a key the route does
+   * not declare, so it stays out of `state.search`. A `defaultSearch` entry for
+   * such a key is dropped the same way. Raised by the gate, once per dropped
+   * key, and only for a route that exists.
+   */
+  DROPPED_QUERY_KEY: [routeName: string, key: string];
+
+  /**
+   * The params a committing producer — `navigate`, `navigateToDefault` or
+   * `buildNavigationState` — hands route `routeName` hold `key`, which is
+   * neither a path slot the route's URL prints, the root's included, nor a
+   * query param the route declares (#1579). Core keeps the key in
+   * `state.params`, and the URL does not print it. Raised once per such key,
+   * before the route's defaults are merged in, and only for a route that
+   * exists.
+   */
+  UNDECLARED_PARAM_KEY: [routeName: string, key: string];
+
+  /**
+   * A committing producer — `navigate`, `navigateToDefault` or
+   * `buildNavigationState` — built `state` on a route with a codec (#2905),
+   * and printed its URL. `codec` carries the route's two codecs, one of them
+   * `undefined` when the route declares only the other; `pathSlots` are the
+   * path slot names the route's URL prints, the root's included. Not raised
+   * for a route with neither.
+   */
+  CODEC_ROUND_TRIP: [
+    state: State,
+    codec: {
+      readonly encode: ((channels: ParamsSearch) => ParamsSearch) | undefined;
+      readonly decode: ((channels: UrlChannels) => ParamsSearch) | undefined;
+    },
+    pathSlots: readonly string[],
+  ];
+};
+
+/**
  * Every position at which core asks whether anyone OBJECTS, and the values it
  * hands the question (#2388).
  *
@@ -74,34 +251,11 @@ export interface InterceptableMethodMap {
  * here when shipped code asks the question there, never because a door looks
  * like it might want one — an eligible-looking position with no consultation is
  * how a vocabulary grows by default rather than by decision (core/CLAUDE.md
- * › _Before adding an aggregating entity_). A refusal has been recorded:
- * `buildPath`'s ENTRY is eligible and absent, because the consultation standing
- * there mixes a refusal with a diagnostic and a diagnostic is not this
- * channel's to carry.
+ * › _Before adding an aggregating entity_).
  *
  * ⚠ The map's VALUE is the argument tuple, so a check registered at a position
  * is typed by what that position judges rather than by the door's signature.
  */
-/**
- * The DIAGNOSTIC half of #2388 — what core reports rather than refuses.
- *
- * ⚑ **Internal keys, the shape `TREE_CHANGED` established.** They ride the same
- * `EventEmitter` — so this is the mechanism core already has, not a third one —
- * and are deliberately absent from the public `EventName` union, the `events.*`
- * registry and the `Plugin` interface. `PluginApi.subscribeDiagnostic` is the
- * only door.
- *
- * ⚠ **One key per diagnostic KIND, never one shared key.** `EventEmitter.emit`
- * coalesces a re-entrant emit of an in-flight event NAME and drops it silently
- * (#1033), and a listener here reaches the application's own
- * `LoggerConfig.callback`, from which another diagnostic is raisable. Under one
- * shared key that second diagnostic is lost.
- */
-// eslint-disable-next-line @typescript-eslint/consistent-type-definitions -- must be `type`: `RouterEventMap` intersects it against a `Record<string, unknown[]>` constraint, which an interface does not satisfy
-export type DiagnosticEventMap = {
-  PLUGIN_AFTER_START: [methodName: string];
-};
-
 export interface CheckPositionMap {
   /**
    * The bag core adopted from the caller's, and prints the path from (#2134).
@@ -132,9 +286,7 @@ export interface CheckPositionMap {
    *
    * ⚠ This door is documented TOTAL in bare core (INVARIANTS `canNavigateTo`
    * #5), and a check here can throw. That divergence is the analyser's to own,
-   * not this position's: it is the same shape the door already had when the
-   * validator answered here, and `predicate-totality-2245.test.ts` pins both
-   * arms.
+   * not this position's, and `predicate-totality-2245.test.ts` pins both arms.
    */
   "canNavigateTo:entry": [
     name: string,
@@ -235,14 +387,213 @@ export interface CheckPositionMap {
 
   /** `removeDeactivateGuard`'s argument. */
   "removeDeactivateGuard:entry": [name: string];
+
+  /** `getDependency`'s argument, as the caller spelled it. */
+  "getDependency:entry": [name: PropertyKey];
+
+  /**
+   * The value `getDependency` read for the name, judged before it is returned —
+   * the value, not the record it came from (#2382).
+   */
+  "getDependency:value": [name: PropertyKey, value: unknown];
+
+  /** `setDependency`'s two arguments, as the caller spelled them. */
+  "setDependency:entry": [name: string, value: unknown];
+
+  /**
+   * The key count `setDependency` judges before it adds a key — `Object.keys`
+   * of the record — and the resolved limit.
+   *
+   * ⚠ Reached for a NEW key only: an overwrite leaves the count unchanged.
+   */
+  "setDependency:count": [currentCount: number, maxDependencies: number];
+
+  /** `setDependencies`' bag, as the caller passed it, before core walks it. */
+  "setDependencies:entry": [deps: DefaultDependencies];
+
+  /**
+   * The same count for `setDependencies`, once per key the batch adds; it grows
+   * as the walk writes.
+   */
+  "setDependencies:count": [currentCount: number, maxDependencies: number];
+
+  /** `removeDependency`'s argument. */
+  "removeDependency:entry": [name: PropertyKey];
+
+  /** `hasDependency`'s argument. */
+  "hasDependency:entry": [name: PropertyKey];
+
+  /** `cloneRouter`'s override bag, as the caller passed it. */
+  "cloneRouter:entry": [dependencies: DefaultDependencies | undefined];
+
+  /**
+   * The count `usePlugin` judges before the call's first factory runs: the
+   * plugins the router holds, the distinct factories the call carries — one the
+   * call repeats takes one slot — and the resolved limit. Asked once per call,
+   * so a batch is judged whole (#2413).
+   */
+  "usePlugin:count": [
+    currentCount: number,
+    newCount: number,
+    maxPlugins: number,
+  ];
+
+  /**
+   * Each factory the call carries, in the caller's order, and the factories the
+   * router held when the call began. Asked after `usePlugin:count`, before the
+   * first factory runs.
+   */
+  /* eslint-disable @typescript-eslint/no-explicit-any -- a factory is `PluginFactory<Dependencies>` at the call site and this map is not generic */
+  "usePlugin:entry": [
+    factory: PluginFactory<any>,
+    registered: readonly PluginFactory<any>[],
+  ];
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+
+  /**
+   * The object a factory returned, after core's own shape check and before core
+   * freezes it and wires its hooks.
+   */
+  "usePlugin:plugin": [plugin: Plugin];
+
+  /**
+   * The number of routes holding a `canActivate` guard, judged before a guard
+   * takes a new slot — a definition and an external guard on one route counted
+   * once. An overwrite takes no slot and is not judged.
+   *
+   * ⚑ `add`, `update` and `replace` ask it before writing anything, with the
+   * highest count their per-slot asks will receive, and then once per new slot
+   * as each guard registers.
+   */
+  "canActivate:count": [currentCount: number];
+
+  /** The same count for `canDeactivate` guards. */
+  "canDeactivate:count": [currentCount: number];
+
+  /**
+   * `navigateToState`'s two arguments, as the caller passed them.
+   *
+   * ⚠ `options` is `undefined` when the caller passed none: this door does not
+   * substitute core's empty options before the position.
+   */
+  "navigateToState:entry": [
+    state: State,
+    options: NavigationOptions | undefined,
+  ];
+
+  /** `setRootPath`'s argument. */
+  "setRootPath:entry": [rootPath: string];
+
+  /**
+   * `navigateToDefault`'s argument, as the caller passed it — `undefined` when
+   * there is none.
+   */
+  "navigateToDefault:entry": [options: NavigationOptions | undefined];
+
+  /**
+   * The route name a `defaultRoute` CALLBACK returned, once core has resolved
+   * all three defaults and before it judges the name itself. A `defaultRoute`
+   * given as a string is not asked here.
+   */
+  "navigateToDefault:route": [routeName: string];
+
+  /**
+   * `start`'s path, before the `start` interceptor chain runs — `undefined`
+   * when the caller passed none, for an interceptor to supply.
+   */
+  "start:entry": [path: string | undefined];
+
+  /**
+   * `buildPath`'s three arguments, as the caller passed them. The bag is the
+   * caller's, not core's copy: a check here judges its SHAPE, which the copy
+   * would launder.
+   */
+  "buildPath:entry": [
+    route: string,
+    params: Params | undefined,
+    search: SearchParams | undefined,
+  ];
+
+  /**
+   * The two bags of `PluginApi.buildPathResolved`, as the caller passed them.
+   * Asked after core copies the path bag, and handed the caller's.
+   */
+  "buildPathResolved:entry": [
+    params: Params | undefined,
+    search: SearchParams | undefined,
+  ];
+
+  /**
+   * `isActiveRoute`'s five arguments, as the caller passed them.
+   *
+   * ⚠ This door is documented TOTAL in bare core (INVARIANTS `isActiveRoute`
+   * #9), and a check here can throw — the divergence `canNavigateTo:entry`
+   * describes, pinned by the same `predicate-totality-2245.test.ts`.
+   */
+  "isActiveRoute:entry": [
+    name: string,
+    params: Params | undefined,
+    search: SearchParams | undefined,
+    strictEquality: boolean | undefined,
+    ignoreQueryParams: boolean | undefined,
+  ];
+
+  /**
+   * `areStatesEqual`'s three arguments — `ignoreQueryParams` with its default
+   * applied, so an omitted flag arrives as `true`.
+   */
+  "areStatesEqual:entry": [
+    state1: State | undefined,
+    state2: State | undefined,
+    ignoreQueryParams: boolean,
+  ];
+
+  /**
+   * `shouldUpdateNode`'s argument, asked when the predicate is built — not on
+   * the calls of the predicate it returns.
+   */
+  "shouldUpdateNode:entry": [nodeName: string];
+
+  /** `matchPath`'s path, as the caller passed it. */
+  "matchPath:entry": [path: string];
+
+  /**
+   * The `params` a route's `decodeParams` returned, `undefined` when it
+   * returned none — application code's output, which core builds the state
+   * from (#1582). Asked only for a route with a decoder.
+   */
+  "matchPath:decoded": [routeName: string, decodedParams: Params | undefined];
+
+  /**
+   * The arguments `makeState`'s state builder receives — `:state` for the
+   * reason `buildNavigationState:state` gives: `params` is core's ADOPTED copy
+   * (#2134), while the name, search and path are the caller's.
+   */
+  "makeState:state": [
+    name: string,
+    ownParams: Params | undefined,
+    search: SearchParams | undefined,
+    path: string | undefined,
+  ];
+
+  /**
+   * The name and path bag the navigation pipeline builds its target state from,
+   * below the `navigate` facade: core's copy of the caller's bag, or the
+   * defaults `navigateToDefault` resolved. A check here refuses as a rejection.
+   */
+  "navigate:state": [routeName: string, routeParams: Params];
 }
 
 /**
- * A check: it may THROW, and its return value is ignored by construction.
+ * A check: it refuses by THROWING, and a value it returns is no answer.
  *
  * ⚠ `void` rather than `boolean` is deliberate — a boolean would make silence
  * ambiguous (did it pass, or did the check forget to return?) and would tempt a
  * caller to treat the channel as a predicate. Refusal has exactly one spelling.
+ *
+ * ⚠ A check that returns a thenable — an `async` check, for one — refuses its
+ * door with a `TypeError` (#2836): its promise settles after the door has
+ * answered, too late to refuse.
  */
 export type CheckFn<P extends keyof CheckPositionMap> = (
   ...args: CheckPositionMap[P]
@@ -517,6 +868,24 @@ export interface PluginApi {
   ) => Unsubscribe;
 
   /**
+   * Subscribes to one internal DIAGNOSTIC kind (#2388) — what core REPORTS
+   * rather than refuses.
+   *
+   * ⚑ The twin of {@link addCheck}, and the split is the same one: a check may
+   * refuse and a diagnostic may not. These ride the router's own emitter, on
+   * keys deliberately absent from the public `EventName` union — the shape
+   * `TREE_CHANGED` established.
+   *
+   * ⚠ A handler here reaches application code if it logs, so core isolates the
+   * call: a handler that throws, or returns a promise that rejects, cannot break
+   * the operation that reported, and the failure is logged (#2836).
+   */
+  subscribeDiagnostic: <K extends keyof DiagnosticEventMap>(
+    key: K,
+    handler: (...args: DiagnosticEventMap[K]) => void,
+  ) => Unsubscribe;
+
+  /**
    * Registers a REFUSAL at a named position (#2388).
    *
    * The check runs where core chose, receives what that position judges, and may
@@ -528,23 +897,6 @@ export interface PluginApi {
    * wins: core does not collect refusals, because the caller gets one error and
    * a second check's opinion about a value already refused is not actionable.
    */
-  /**
-   * Subscribes to one internal DIAGNOSTIC kind (#2388) — what core REPORTS
-   * rather than refuses.
-   *
-   * ⚑ The twin of {@link addCheck}, and the split is the same one: a check may
-   * refuse and a diagnostic may not. These ride the router's own emitter, on
-   * keys deliberately absent from the public `EventName` union — the shape
-   * `TREE_CHANGED` established.
-   *
-   * ⚠ A handler here reaches application code if it logs, so core isolates the
-   * call: a throwing handler cannot break the operation that reported.
-   */
-  subscribeDiagnostic: <K extends keyof DiagnosticEventMap>(
-    key: K,
-    handler: (...args: DiagnosticEventMap[K]) => void,
-  ) => Unsubscribe;
-
   addCheck: <P extends keyof CheckPositionMap>(
     position: P,
     check: CheckFn<P>,
@@ -660,7 +1012,8 @@ export interface RoutesApi<
    * Subscribe to structural route-tree mutations (`add` / `remove` / `update`
    * with structural fields / `replace` / `clear`). Fire-and-forget: the handler
    * cannot cancel the mutation, runs after the atomic commit, and sees the
-   * post-mutation tree via `get()` / `has()`.
+   * post-mutation tree via `get()` / `has()`. A handler that throws, or returns
+   * a promise that rejects, is logged and does not fail the mutation (#2836).
    *
    * Duplicate-registration semantics are **lenient** (mirrors
    * `router.subscribe`): each call registers an independent listener and

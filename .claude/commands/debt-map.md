@@ -86,7 +86,7 @@
 
 **6. Артефакт + чейнинг.**
 
-- На STRONG-цепочку — **research-RFC** (`.claude/<topic>-unification.md`, формат под `/audit-rfc`→`/implement-rfc`; шаблон-эталон: `navigation-cancellation-unification.md`): гипотеза корня · код-доказательство convergence (`file:line`+commit) · предлагаемый single-owner + удаляемые band-aid'ы · затронутые пакеты + breaking-рябь · членство в оси.
+- На STRONG-цепочку — **research-RFC** (`.claude/<topic>-unification.md` под `/audit-rfc`→`/implement-rfc`; план — по `.claude/prompts/rfc-plan-contract.md`, шаблон-эталон содержания — `packages/core/.claude/rfc/navigation-cancellation-unification.md`): гипотеза корня · код-доказательство convergence (`file:line`+commit) · предлагаемый single-owner + удаляемые band-aid'ы · затронутые пакеты + breaking-рябь · членство в оси.
 - На WEAK-цепочку — `/bugfix` (точечно), без RFC-overhead. **НО различай форму WEAK:** WEAK-**независимые** корни в РАЗНЫХ местах → N точечных `/bugfix`; **WEAK-но-≥2-фасета-в-ОДНОМ-код-локусе → `/bugfix-batch`** (один PR, один RED per facet), НЕ N точечных — иначе whack-a-mole (фикс одного фасета оставит остальные живыми в том же блоке, а Phase-0.8-гейт bugfix при заходе на любой из них всё равно эскалирует обратно сюда). Пример дельты №3: #950-семья (#1170 meta / #1201 guards / #1236 context) — все в коммите ревалидации `getRoutesApi` → ОДИН batch, не три /bugfix. ⚠ Локус называй ИМЕНЕМ (функция/блок), не диапазоном строк: номера строк уплывают за несколько релизов, а сама форма кода может разъехаться на несколько сайтов.
 - Сквозные оси — отдельные стратегические заметки (плечо × пакеты).
 - **Обнови `project_architectural_debt_map`** (память): новые/перевёрнутые вердикты, новые оси, закрытые цепочки.

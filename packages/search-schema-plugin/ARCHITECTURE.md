@@ -26,9 +26,9 @@ search-schema-plugin/
 │   ├── factory.ts      — searchSchemaPlugin (options validation, freeze, returns PluginFactory)
 │   ├── plugin.ts       — SearchSchemaPlugin class (forwardState interceptor + TREE_CHANGED subscription, tree walk)
 │   ├── helpers.ts      — Pure param utilities (getInvalidKeys, issueKey, namesOneOf, segmentKey, isNumberOrBoolean, readAsText, omitKeys, pickKeys, collectPathParams)
-│   ├── report.ts       — describeRejection (the mode "development" console.error message)
+│   ├── report.ts       — describeRejection (the mode "development" message of rejected search params), describeThrow (the line logged with a rejected Promise's error)
 │   ├── types.ts        — StandardSchemaV1 types (inline), SearchSchemaPluginOptions
-│   ├── constants.ts    — ERROR_PREFIX
+│   ├── constants.ts    — LOGGER_CONTEXT, ERROR_PREFIX
 │   └── validation.ts   — validateOptions (factory-time type checks)
 ```
 
@@ -42,15 +42,14 @@ index.ts
             │       │       └── (types.ts — types only)
             │       ├── report.ts
             │       │       ├── helpers.ts
-            │       │       ├── (types.ts — types only)
-            │       │       └── constants.ts
+            │       │       └── (types.ts — types only)
             │       ├── (types.ts — types only)
             │       └── constants.ts
             └── validation.ts
                     └── constants.ts
 
 types.ts     ← imported by index.ts, factory.ts, plugin.ts, helpers.ts, report.ts, validation.ts
-constants.ts ← imported by plugin.ts, report.ts, validation.ts
+constants.ts ← imported by plugin.ts, validation.ts
 ```
 
 External dependencies:
@@ -58,7 +57,7 @@ External dependencies:
 | Dependency              | What it provides                                         | Used in                                 |
 | ----------------------- | -------------------------------------------------------- | --------------------------------------- |
 | `@real-router/core`     | `Params`, `Plugin`, `Route`, `PluginFactory` types       | `factory.ts`, `plugin.ts`, `helpers.ts`, `report.ts`, `types.ts` |
-| `@real-router/core/api` | `getPluginApi`, `getRoutesApi`, `PluginApi`, `RoutesApi` | `factory.ts`, `plugin.ts`               |
+| `@real-router/core/api` | `getPluginApi`, `getRoutesApi`, `PluginApi` (its `logger` takes the plugin's messages), `RoutesApi` | `factory.ts`, `plugin.ts`               |
 | `@real-router/core/utils` | `putField`                                             | `plugin.ts`, `helpers.ts`               |
 
 No schema library dependency — Standard Schema V1 types are inlined in `types.ts`.
@@ -203,12 +202,12 @@ navigate(name, params, search) / matchPath(url)
                     │          (no logging, no strip — full callback control)
                     │
                     ├── mode === "development"?
-                    │     YES: console.error(describeRejection(routeName, input, issues, text), issues)
+                    │     YES: logger.error(LOGGER_CONTEXT, describeRejection(routeName, input, issues, text), issues)
                     │
                     └── return writeBack(#repair(schema, routeName, verdict.input, verdict.issues))
 
   #validate(schema, routeName, channel)
-        ├── first = schema["~standard"].validate(channel)   ← a Promise throws TypeError
+        ├── first = #runSchema(schema, routeName, channel)
         │     └── "value" in first? YES: { input: channel, value }
         │
         ├── rounds, while input = readAsText(channel, input, issues, done) names a value:
@@ -217,7 +216,7 @@ navigate(name, params, search) / matchPath(url)
         │     │   index — is String(value), where `channel` holds a number
         │     │   or a boolean too; a value in `done` is not named twice, so
         │     │   the rounds end
-        │     └── run = schema["~standard"].validate(input)   ← a text run; a Promise throws
+        │     └── run = #runSchema(schema, routeName, input)   ← a text run
         │           └── "value" in run? YES: { input, value }
         │         (a schema that reports every issue at once takes one round;
         │          a staged one names the next value once the one before is text,
@@ -230,7 +229,7 @@ navigate(name, params, search) / matchPath(url)
             as decoded — with the schema's issues on it:
               ├── no key unfixed:          { input: the last input, issues: the last run's }
               ├── every key tried unfixed: { input: channel,        issues: first's }
-              └── otherwise: run = schema["~standard"].validate(settled)   ← a Promise throws
+              └── otherwise: run = #runSchema(schema, routeName, settled)
                     ├── "value" in run? YES: { input: settled, value }
                     └── { input: settled, issues: the run's }
 
@@ -245,7 +244,7 @@ navigate(name, params, search) / matchPath(url)
         ├── repaired = { ...pickKeys(defaults, invalidKeys), ...stripped }
         │     ← each rejected key takes its default, or is dropped
         │
-        ├── schema["~standard"].validate(repaired)   ← the repair's run; a Promise throws
+        ├── #runSchema(schema, routeName, repaired)   ← the repair's run
         │
         ├── "value" in the result?
         │     YES: { ...defaults, ...output }   ← output merged over `repaired`,
@@ -253,6 +252,17 @@ navigate(name, params, search) / matchPath(url)
         │
         └── NO:  { ...defaults, ...stripped }   ← no output to write: the
                                                    repaired query as built
+
+  #runSchema(schema, routeName, input)   ← every run above
+        ├── answer = schema["~standard"].validate(input)
+        ├── answer instanceof Promise?
+        │     YES: answer.catch(…)   ← mode "development" without onError:
+        │                               logger.error(LOGGER_CONTEXT, describeThrow(…), error)
+        │          throw TypeError   ← forwardState is synchronous
+        └── readAnswer(routeName, answer)
+              ├── issues truthy? → { issues }    ← a `value` beside them changes nothing
+              ├── no "value"?    → throw TypeError   ← not a Standard Schema result
+              └── { value }
 
   #writeBack(result, pathParams, validated)
         ├── params := path slots verbatim + the validated value for every key that
@@ -297,7 +307,7 @@ navigate("products", {}, { page: -1, sortBy: "name" })   — or URL: /products?p
   → { issues: [{ message: "...", path: ["page"] }] }   ← the text is rejected too
         │
         ▼  mode: "development"
-  console.error('[search-schema-plugin] Route "products": the schema rejected these search params; …', issues)
+  logger.error("search-schema-plugin", 'Route "products": the schema rejected these search params; …', issues)
         │     (a line per issue with its value as decoded, then what the last
         │      text run said about page as text, then how the router decodes —
         │      page goes back as decoded, so the issues are the first run's)
@@ -407,9 +417,11 @@ constructor()
                             │
                             ├── no schema for route? → skip
                             ├── no defaultSearch? → skip
-                            ├── schema.validate(defaultSearch) returns Promise? → skip
-                            └── "issues" in validation?
-                                  YES: console.warn(routeName, issues)
+                            ├── schema.validate(defaultSearch) returns a Promise?
+                            │     → skip; a rejection: logger.warn(LOGGER_CONTEXT, describeThrow(…), error),
+                            │       whatever onError is
+                            └── run = readAnswer(routeName, answer)   ← throws on a non-result
+                                  "issues" in run? YES: logger.warn(LOGGER_CONTEXT, message, issues)
 ```
 
 **At TREE_CHANGED time** (dev mode only) — runtime tree mutations:
@@ -429,17 +441,22 @@ routesApi.add / update / replace / remove / clear
                     (same single-route check as above)
 ```
 
+A throw out of the check — a schema that answers with neither `issues` nor a `value` — leaves `usePlugin()` at constructor time. At TREE_CHANGED time the mutation has committed, and core logs the throw as an error of the listener.
+
 ### Runtime schema validation (forwardState interceptor)
 
-On every navigation, `#validate` calls `schema["~standard"].validate(channel)`, once more on each text copy while the latest run rejects a number or a boolean not tried before, once more on the query the runs settle on when the text fixed some of the keys it tried and not the others, and after the issues left `#repair` calls it on the repaired query. The Standard Schema V1 contract guarantees:
+On every navigation, `#validate` calls `schema["~standard"].validate(channel)`, once more on each text copy while the latest run rejects a number or a boolean not tried before, once more on the query the runs settle on when the text fixed some of the keys it tried and not the others, and after the issues left `#repair` calls it on the repaired query. Each call goes through `#runSchema`, and `readAnswer` reads the answer as the Standard Schema V1 contract decides it — by `issues`:
 
-- **Success:** returns `{ value: Output }` — typed, coerced, transformed output
-- **Failure:** returns `{ issues: readonly StandardSchemaV1Issue[] }` — array of validation problems
-- **Async:** returns a `Promise` — thrown immediately (synchronous pipeline only)
+- **Failure:** a truthy `issues` — `readonly StandardSchemaV1Issue[]`, an empty array included. valibot's failure carries a `value` as well, which is not read
+- **Success:** no truthy `issues` and a `value` — the typed, coerced, transformed output; `issues: undefined` beside it is a success
+- **Neither:** not a Standard Schema result — the run throws `TypeError`
+- **Async:** a `Promise` — the run throws `TypeError` (synchronous pipeline only), once a rejection handler is attached: zod answers a throw in a transform or a refinement with a rejected Promise. The Promise is recognised by `instanceof Promise`; one from another realm reads as neither
 
 Issues with a `path` array contribute to key-level stripping via `getInvalidKeys`. Issues without a path (object-level failures) do not produce strippable keys — the whole param set passes through the strip step unchanged for those issues.
 
 ## Error Recovery Strategy
+
+The plugin's messages go through `PluginApi.logger` under the context `search-schema-plugin`, so the router's `logger` option — its `level` and its `callback` — applies to them. Core's logger prints the context in brackets ahead of the message, so a logged message carries none of its own; a thrown message keeps `ERROR_PREFIX`.
 
 Recovery applies only when `onError` is not set, to the query the text runs settle on and the schema's issues on it: a key whose text passed is text there, every other key as decoded. The sequence is:
 
@@ -467,13 +484,15 @@ So a repaired query the schema accepts comes back as the schema outputs it, and 
 
 **Mode behavior:**
 
-| Scenario                        | `console.error`       | Repair (strip, restore, validate again) |
+| Scenario                        | `logger.error`        | Repair (strip, restore, validate again) |
 | ------------------------------- | --------------------- | --------------------------------------- |
 | `mode: "development"` (default) | Yes — before strip    | Yes                                     |
 | `mode: "production"`            | No                    | Yes                                     |
 | `onError` set (any mode)        | No — callback owns it | No — callback owns it                   |
 
-The text runs come first in every row, so a query the text fixes reaches neither `console.error`, the repair nor `onError`.
+The text runs come first in every row, so a query the text fixes reaches neither `logger.error`, the repair nor `onError`.
+
+A schema that answers a run with a rejected Promise refuses the navigation in every row, and `onError` is not called. Its error follows the `logger.error` column: logged with `describeThrow` in mode `"development"` without `onError`, dropped otherwise.
 
 **`onError` contract:**
 

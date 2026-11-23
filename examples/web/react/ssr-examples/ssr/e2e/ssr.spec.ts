@@ -442,10 +442,11 @@ test.describe("SSR", () => {
     page,
   }) => {
     // Document the by-design limitation: ssr-data-plugin intercepts start(),
-    // not navigate(). After initial hydration, client-side <Link> clicks
-    // reuse state.context.data only if the target route already populated it
-    // during the initial start. New routes visited via navigate() see
-    // state.context.data === undefined unless re-resolved via reload/start.
+    // not navigate(). Each client navigation commits a state with a new
+    // state.context, so the route it reaches renders without
+    // state.context.data, the server-rendered route included, unless
+    // invalidate(router, "data") marked the data stale first; this example
+    // never calls it.
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 

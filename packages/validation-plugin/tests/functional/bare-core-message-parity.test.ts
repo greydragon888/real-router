@@ -1,13 +1,9 @@
 import { createRouter } from "@real-router/core";
-import { getPluginApi, getRoutesApi } from "@real-router/core/api";
+import { getRoutesApi } from "@real-router/core/api";
 import { describe, expect, it } from "vitest";
 
 import { validationPlugin } from "@real-router/validation-plugin";
 
-import {
-  validateEventName,
-  validateListenerArgs,
-} from "../../src/validators/eventBus";
 import { throwIfInternalRoute } from "../../src/validators/routes";
 
 import type { RoutesApi } from "@real-router/core/api";
@@ -29,9 +25,9 @@ import type { RoutesApi } from "@real-router/core/api";
  *
  * ⚑ **A mirrored wording is compared by CALLING the plugin's copy directly.**
  * Core refuses first at every one of these doors, so driving the door twice
- * compares one code path with itself; what the two `addEventListener` cells and
- * the reserved-prefix cell below do instead is put core's live message beside
- * the string this plugin would have produced.
+ * compares one code path with itself; what the reserved-prefix cell below does
+ * instead is put core's live message beside the string this plugin would have
+ * produced.
  *
  * ⚑ It lives HERE and not in core because core devDepends only on
  * `@real-router/ssr-utils` — the two layers can only be compared from this side.
@@ -157,60 +153,6 @@ describe("bare core matches the validated build, message for message (#1896)", (
         router.usePlugin(validationPlugin());
       }),
     ).toBe("[router.addRoute] Route name must be a string, got object");
-  });
-
-  it("addEventListener: both layers refuse an unknown event name identically", () => {
-    // The fifth door of #1888's shape, one operand over. Core derives the seven
-    // from `events` and this plugin now derives its set from the same constant,
-    // so only the MESSAGE is still written twice — which is what this pins.
-    const nonString = { toString: () => "$$success" };
-
-    const bareMessage = messageOf(() =>
-      (
-        getPluginApi(createRouter(ROUTES, {})).addEventListener as (
-          n: unknown,
-          cb: unknown,
-        ) => unknown
-      )(nonString, () => {}),
-    );
-
-    const router = createRouter(ROUTES, {});
-
-    router.usePlugin(validationPlugin());
-
-    // CONTROL — the plugin's own copy is reached only when core lets it through,
-    // so this compares the two WORDINGS, not the two code paths.
-    expect(bareMessage).toBe(
-      "[router.addEventListener] Invalid event name: $$success. Must be one of: $start, $stop, $$start, $$leaveApprove, $$cancel, $$success, $$error",
-    );
-    expect(
-      messageOf(() => {
-        validateEventName(nonString);
-      }),
-    ).toBe(bareMessage);
-  });
-
-  it("addEventListener refuses a non-function callback with one wording", () => {
-    const bareMessage = messageOf(() =>
-      (
-        getPluginApi(createRouter(ROUTES, {})).addEventListener as unknown as (
-          name: unknown,
-          cb: unknown,
-        ) => unknown
-      )("$$success", "not a function"),
-    );
-
-    expect(bareMessage).toBe(
-      "[router.addEventListener] callback must be a function, got string",
-    );
-
-    // CONTROL — the plugin's own copy is reached only when core lets it through,
-    // so this compares the two WORDINGS, not the two code paths.
-    expect(
-      messageOf(() => {
-        validateListenerArgs("$$success", "not a function" as never);
-      }),
-    ).toBe(bareMessage);
   });
 
   it("add: both layers refuse `forwardTo: 42` with one sentence under two prefixes (#2394, #2459)", () => {

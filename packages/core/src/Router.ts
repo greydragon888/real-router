@@ -29,7 +29,9 @@ import { adoptChannel, withoutUnsafeKey } from "./helpers";
 import {
   createInterceptable,
   createTernaryInterceptable,
+  DIAGNOSTIC,
   getInternals,
+  hasChecks,
   POSITION,
   registerInternals,
   runChecks,
@@ -66,8 +68,12 @@ import { EventEmitter } from "./utils/event-emitter";
 import { RouterLogger } from "./utils/logger";
 import { wireNamespaces } from "./wiring";
 
-import type { DependenciesStore } from "./dependenciesStore";
+import type {
+  DependenciesStore,
+  DependencyDiagnostics,
+} from "./dependenciesStore";
 import type { RouterInternals } from "./internals";
+import type { TreeChangedChannel } from "./namespaces/RoutesNamespace";
 import type {
   AdoptedOrigins,
   DefaultDependencies,
@@ -89,7 +95,6 @@ import type { Limits, RouterEventMap } from "./types/internal";
 /** One binding per door this module refuses behind (#2487). */
 const atNavigateToNotFound = raiser("router", "navigateToNotFound");
 
-const atUsePlugin = raiser("router", "usePlugin");
 const atStart = raiser("router", "start");
 const atRouter = raiser("router");
 
@@ -281,15 +286,38 @@ export class Router<
     this.#options = new OptionsNamespace(adoptedOptions);
     this.#limits = createLimits(adoptedOptions.limits);
     this.#limitKeys = snapshotLimitKeys(adoptedOptions.limits);
+    // The dependency doors' reports, built before the bus like `treeChanged`
+    // below and for the same reason: each arrow reads `#eventBus` when called.
+    const dependencyDiagnostics: DependencyDiagnostics = {
+      emit: (key, ...args) => {
+        this.#eventBus.emitDiagnostic(key, ...args);
+      },
+      listenerCount: (key) => this.#eventBus.diagnosticListenerCount(key),
+    };
+
     this.#dependenciesStore = createDependenciesStore<Dependencies>(
       dependencies,
       this.#limits,
+      dependencyDiagnostics,
     );
     this.#state = new StateNamespace();
+    // The routes doors' tree-change channel. The store that carries it is built
+    // before the bus, so each arrow reads `#eventBus` when called; no door can
+    // reach the store before `registerInternals`, which runs after the bus.
+    const treeChanged: TreeChangedChannel = {
+      emit: (event) => {
+        this.#eventBus.emitTreeChanged(event);
+      },
+      subscribe: (handler) => this.#eventBus.subscribeTreeChanged(handler),
+      listenerCount: () => this.#eventBus.treeChangedListenerCount(),
+      isEmitting: () => this.#eventBus.isEmittingTreeChanged(),
+    };
+
     this.#routes = new RoutesNamespace<Dependencies>(
       routeBatch,
       deriveMatcherOptions(this.#options.get()),
       logger,
+      treeChanged,
     );
     this.#routeLifecycle = new RouteLifecycleNamespace<Dependencies>();
     this.#plugins = new PluginsNamespace<Dependencies>();
@@ -588,7 +616,7 @@ export class Router<
     );
 
     // ⚑ Named rather than passed as a literal, so an adapter below can reach
-    // `internals.validator` at CALL time without a WeakMap hop per call. The
+    // `internals.checks` at CALL time without a WeakMap hop per call. The
     // guards live here rather than on the facade (#2259): `getInternals` ships
     // from `@real-router/core/validation` and a door reachable both ways must
     // refuse the same values from either side.
@@ -601,8 +629,14 @@ export class Router<
         // rather than on the facade so both doors judge and ship the same one.
         const ownParams = adoptChannel(params);
 
-        internals.validator?.state.validateMakeStateArgs(name, ownParams, path);
-        internals.validator?.navigation.validateSearch(search, "makeState");
+        runChecks(
+          internals.checks,
+          POSITION["makeState:state"],
+          name,
+          ownParams,
+          search,
+          path,
+        );
 
         return this.#state.makeState(name, ownParams, search, path);
       },
@@ -625,16 +659,16 @@ export class Router<
         // depends on it — a declared query name handed in the PATH bag makes
         // the RESOLVING door throw and this one print, which is the href that
         // arm has always rendered.
-        internals.validator?.navigation.validateParamsShape(
+        //
+        // ⚑ Core does not hold the refusals here — it asks whether anyone
+        // objects (#2388): about the caller's two bags, then at the position
+        // handed the copy that ships.
+        runChecks(
+          internals.checks,
+          POSITION["buildPathResolved:entry"],
           params,
-          "buildPathResolved",
-        );
-        internals.validator?.navigation.validateSearch(
           search,
-          "buildPathResolved",
         );
-        // ⚑ Core does not hold the refusal here — it asks whether anyone
-        // objects (#2388), at the position handed the copy that ships.
         runChecks(
           internals.checks,
           POSITION["buildPathResolved:params"],
@@ -649,7 +683,7 @@ export class Router<
       },
       port: () => this.#routes.getPort(),
       matchPath: (path, matchOptions) => {
-        internals.validator?.routes.validateMatchPathArgs(path);
+        runChecks(internals.checks, POSITION["matchPath:entry"], path);
 
         // ⚠ The signature declares `options?`, so the bag may be OMITTED — and
         // the matcher reads `rewritePathOnMatch` off it, which made the door
@@ -668,24 +702,24 @@ export class Router<
 
         assertEventNameIsValid(eventName);
         assertListenerIsFunction(cb);
-        internals.validator?.eventBus.validateListenerArgs(eventName, cb);
 
-        return this.#eventBus.addEventListener(
+        const unsubscribe = this.#eventBus.addEventListener(
           eventName,
           cb,
           "addEventListener",
         );
+
+        // ⚑ Again, after the listener-count report (#1859): its handlers run
+        // application code, and this stops the call handing back an
+        // unsubscribe on a router that code disposed. Asked here rather than
+        // in the namespace, which `usePlugin` shares: a refusal inside its hook
+        // loop would skip the teardown its own last question runs.
+        throwIfDisposed(internals.isDisposed);
+
+        return unsubscribe;
       },
       subscribeDiagnostic: (key, handler) =>
         this.#eventBus.subscribeDiagnostic(key, handler),
-      treeChanged: {
-        emit: (event) => {
-          this.#eventBus.emitTreeChanged(event);
-        },
-        subscribe: (handler) => this.#eventBus.subscribeTreeChanged(handler),
-        listenerCount: () => this.#eventBus.treeChangedListenerCount(),
-        isEmitting: () => this.#eventBus.isEmittingTreeChanged(),
-      },
       emitTransitionError: (error) => {
         // Channel (b): a REPORT to observers, not a machine failure. It comes
         // from a plugin, at a moment core does not control, so it must never
@@ -727,14 +761,7 @@ export class Router<
         // but the safety now belongs to the namespace that creates the promise,
         // so this closure only owes callers the Promise shape.
         throwIfDisposed(internals.isDisposed);
-        internals.validator?.navigation.validateNavigateToStateArgs(state);
-
-        if (navOpts !== undefined) {
-          internals.validator?.navigation.validateNavigationOptions(
-            navOpts,
-            "navigateToState",
-          );
-        }
+        runChecks(checksMap, POSITION["navigateToState:entry"], state, navOpts);
 
         this.#assertNotReentrant();
 
@@ -745,13 +772,12 @@ export class Router<
       interceptors: interceptorsMap,
       checks: checksMap,
       setRootPath: (rootPath) => {
-        internals.validator?.routes.validateSetRootPathArgs(rootPath);
+        runChecks(checksMap, POSITION["setRootPath:entry"], rootPath);
         this.#routes.setRootPath(rootPath);
       },
       getRootPath: () => this.#routes.getStore().rootPath,
       getTree: () => this.#routes.getStore().tree,
       isDisposed: () => this.#eventBus.isDisposed(),
-      validator: null,
       // Dependencies (issue #172)
       dependenciesGetStore: () => this.#dependenciesStore,
       // Clone support (issue #173)
@@ -916,22 +942,28 @@ export class Router<
     strictEquality?: boolean,
     ignoreQueryParams?: boolean,
   ): boolean {
-    // ⚑ ONE handle for the whole method. `getInternals` is a WeakMap lookup, and
-    // this is a render-path predicate — a `<Link>` asks it on every render, so
-    // repeating the lookup per validator hop is measurable (#1972).
+    // ⚑ ONE handle for the whole method: `getInternals` is a WeakMap lookup,
+    // and a `<Link>` asks this predicate on every render (#1972).
     const ctx = getInternals(this);
 
-    ctx.validator?.routes.validateIsActiveRouteArgs(
+    runChecks(
+      ctx.checks,
+      POSITION["isActiveRoute:entry"],
       name,
       params,
+      search,
       strictEquality,
       ignoreQueryParams,
     );
-    // ⚑ Beside it, not inside: the path bag is checked by the call above and
-    // the query bag by its twin, so both halves of #1972's rule stand at every
-    // door that takes both — including the two predicates.
-    ctx.validator?.navigation.validateSearch(search, "isActiveRoute");
-    ctx.validator?.routes.validateRouteName(name, "isActiveRoute");
+
+    // ⚑ After the entry checks, so a call they refuse reports nothing. The
+    // listener count is asked first: `emitDiagnostic` gathers its arguments
+    // into an array, and a render-path predicate builds none on bare core.
+    if (
+      this.#eventBus.diagnosticListenerCount(DIAGNOSTIC.IS_ACTIVE_ROUTE) > 0
+    ) {
+      this.#eventBus.emitDiagnostic(DIAGNOSTIC.IS_ACTIVE_ROUTE, name, params);
+    }
 
     // Empty string is special case - warn and return false (root node is not a parent)
     if (name === "") {
@@ -957,22 +989,27 @@ export class Router<
   buildPath(route: string, params?: Params, search?: SearchParams): string {
     const ctx = getInternals(this);
 
-    ctx.validator?.routes.validateBuildPathArgs(route, params);
-    ctx.validator?.navigation.validateParamsShape(params, "buildPath");
-    ctx.validator?.navigation.validateSearch(search, "buildPath");
+    // ⚑ Core does not hold the refusals here — it asks whether anyone objects
+    // (#2388), first about the arguments as the caller passed them: the bag is
+    // the caller's, before the copy below.
+    runChecks(ctx.checks, POSITION["buildPath:entry"], route, params, search);
+
+    // ⚑ After the entry checks, so a call they refuse reports nothing; the
+    // listener count is asked first, for the reason `isActiveRoute` gives.
+    if (this.#eventBus.diagnosticListenerCount(DIAGNOSTIC.BUILD_PATH) > 0) {
+      this.#eventBus.emitDiagnostic(DIAGNOSTIC.BUILD_PATH, route, params);
+    }
 
     // ⚑ Core's SINGLE read of the caller's bag, and it happens here so that the
     // layer which judges and the layer which ships read the same one (#2134).
-    // Everything below — the seam, the validator's value walk, the merge — sees
-    // this object, so a key that answers differently per read is admitted on
-    // the same value it is printed with.
+    // Everything below — the seam, the checks at `buildPath:params`, the merge —
+    // sees this object, so a key that answers differently per read is admitted
+    // on the same value it is printed with.
     const ownParams = adoptChannel(params);
 
-    // ⚑ Core does not hold the refusal here — it asks whether anyone objects
-    // (#2388). `@real-router/validation-plugin` registers the value walk at this
-    // position; with no plugin installed nothing is registered and the call runs
-    // on. The three consultations above still reach `ctx.validator`, so this
-    // door is the one where both shapes stand side by side.
+    // ⚑ Then about the copy that ships: `@real-router/validation-plugin`
+    // registers the value walk at this position; with no plugin installed
+    // nothing is registered and the call runs on.
     runChecks(ctx.checks, POSITION["buildPath:params"], ownParams);
 
     // `search` (RFC-4 M2 / #1548) is the explicit query channel; the matcher
@@ -1019,7 +1056,9 @@ export class Router<
     state2: State | undefined,
     ignoreQueryParams = true,
   ): boolean {
-    getInternals(this).validator?.state.validateAreStatesEqualArgs(
+    runChecks(
+      getInternals(this).checks,
+      POSITION["areStatesEqual:entry"],
       state1,
       state2,
       ignoreQueryParams,
@@ -1031,7 +1070,11 @@ export class Router<
   shouldUpdateNode(
     nodeName: string,
   ): (toState: State, fromState?: State) => boolean {
-    getInternals(this).validator?.routes.validateShouldUpdateNodeArgs(nodeName);
+    runChecks(
+      getInternals(this).checks,
+      POSITION["shouldUpdateNode:entry"],
+      nodeName,
+    );
 
     return RoutesNamespace.shouldUpdateNode(nodeName, (name) =>
       this.#routes.getMetaForState(name),
@@ -1315,15 +1358,10 @@ export class Router<
   ): Unsubscribe {
     // Post-dispose guard, mirroring #946 for subscribe/subscribeLeave. A
     // reference captured before dispose() (`const up = router.usePlugin`)
-    // bypasses the #markDisposed method swap, so the swap alone is not enough:
-    // without this, the factory would run on a disposed router (real side
-    // effects), listeners would land in the cleared emitter, and teardown would
-    // never fire — a silent zombie plugin (#1196).
-    if (this.#eventBus.isDisposed()) {
-      throw atUsePlugin.code(
-        errorCodes.ROUTER_DISPOSED,
-      )`cannot install a plugin on a disposed router — dispose() is terminal`;
-    }
+    // bypasses the #markDisposed method swap (#1196). The namespace asks again
+    // before each factory; this question is the one a call that carries no
+    // factory meets, which would otherwise return a no-op unsubscribe.
+    PluginsNamespace.validateNotDisposed(this.#eventBus.isDisposed());
 
     const filtered = plugins.filter(Boolean) as PluginFactory<Dependencies>[];
 
@@ -1331,23 +1369,27 @@ export class Router<
       return () => {};
     }
 
-    const ctx = getInternals(this);
+    const { checks } = getInternals(this);
 
-    // A factory repeated in one batch is registered once, so it takes one slot.
-    ctx.validator?.plugins.validatePluginLimit(
-      this.#plugins.count(),
-      new Set(filtered).size,
-      this.#limits,
-    );
-    for (const plugin of filtered) {
-      // `getAll()` sits inside the optional-chain argument on purpose: with no
-      // validator installed (production default) the `?.` short-circuits and the
-      // array is never allocated. Hoisting it out would either allocate on the
-      // no-validator hot path or push the dev-only branch out of coverage.
-      ctx.validator?.plugins.validateNoDuplicatePlugins(
-        plugin,
-        this.#plugins.getAll(),
+    // ⚑ Each argument is computed only for a check standing at its position,
+    // so bare core allocates neither the distinct set nor the registered list.
+    if (hasChecks(checks, POSITION["usePlugin:count"])) {
+      runChecks(
+        checks,
+        POSITION["usePlugin:count"],
+        this.#plugins.count(),
+        // A factory the call repeats is registered once, so it takes one slot.
+        new Set(filtered).size,
+        this.#limits.maxPlugins,
       );
+    }
+
+    if (hasChecks(checks, POSITION["usePlugin:entry"])) {
+      const registered = this.#plugins.getAll();
+
+      for (const plugin of filtered) {
+        runChecks(checks, POSITION["usePlugin:entry"], plugin, registered);
+      }
     }
 
     return this.#plugins.use(...filtered);
@@ -1434,10 +1476,10 @@ export class Router<
       opts,
     );
 
-    // ⚑ One read for the whole navigation (#2134). `buildNavigateState` runs
-    // `validateStateBuilderArgs` further down the pipeline, and it now receives
-    // this object rather than the caller's — which is why the door's count
-    // falls from four reads to one and not merely to two.
+    // ⚑ One read for the whole navigation (#2134). The checks at
+    // `navigate:state`, which `buildNavigateState` asks further down the
+    // pipeline, receive this object rather than the caller's, so the caller's
+    // bag is read once.
     //
     // ⚠ A REJECTION, not a synchronous throw. The read is application code, and
     // everything this method answers with is a promise — a getter that throws
@@ -1470,16 +1512,19 @@ export class Router<
 
     const ctx = getInternals(this);
 
-    ctx.validator?.navigation.validateNavigateToDefaultArgs(options);
+    runChecks(ctx.checks, POSITION["navigateToDefault:entry"], options);
 
-    const opts = options ?? EMPTY_OPTS;
+    // ⚑ After the entry checks, so a call they refuse reports nothing.
+    this.#eventBus.emitDiagnostic(DIAGNOSTIC.NAVIGATE_TO_DEFAULT);
 
-    ctx.validator?.navigation.validateNavigationOptions(
-      opts,
-      "navigateToDefault",
+    // ⚑ The checks and the report's handlers run application code — the
+    // logger callback among it — so a router disposed there refuses this call
+    // with `ROUTER_DISPOSED` before the navigation starts.
+    throwIfDisposed(ctx.isDisposed);
+
+    return Router.#asPromise(
+      this.#navigation.navigateToDefault(options ?? EMPTY_OPTS),
     );
-
-    return Router.#asPromise(this.#navigation.navigateToDefault(opts));
   }
 
   navigateToNotFound(path?: string): State {
@@ -1549,7 +1594,9 @@ export class Router<
     // rejection it gets everywhere else.
     this.#assertNotReentrant();
 
-    getInternals(this).validator?.navigation.validateStartArgs(startPath);
+    // ⚑ Before the interceptor chain, which may supply the path: a check here
+    // refuses synchronously, and the always-on guard after the chain rejects.
+    runChecks(getInternals(this).checks, POSITION["start:entry"], startPath);
 
     // FSM bookkeeping is split across the facade and RouterLifecycleNamespace by
     // design, NOT a missed consolidation (#940): `sendStart()` runs HERE, before

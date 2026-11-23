@@ -2409,21 +2409,22 @@ describe("validation-plugin — codec round-trip diagnostic (#2905)", () => {
 
     it("an app-level key no URL carries (#1553): the undeclared-key diagnostic reports it", async () => {
       const { router, warnings } = await started(ROUTES);
-      const consoleWarn = vi
-        .spyOn(console, "warn")
-        .mockImplementation(() => {});
 
-      // The README's codec rebuilds the bag, so `note` is not in the URL.
+      // The README's codec rebuilds the bag, so `note` is not in the URL. The
+      // undeclared-key report shares the router's logger with this one
+      // (#2975), so the one line is the undeclared-key report alone.
       const state = await router.navigate("product", { id: 1, note: "x" });
 
       expect(state.params).toStrictEqual({ id: 1, note: "x" });
-      expect(warnings).toStrictEqual([]);
-      expect(consoleWarn).toHaveBeenCalledTimes(1);
-      expect(consoleWarn).toHaveBeenCalledWith(
-        expect.stringContaining(`Param "note" is declared nowhere`),
-      );
+      expect(warnings).toStrictEqual([
+        [
+          "router",
+          expect.stringMatching(
+            /^Param "note" is declared nowhere on route "product" /,
+          ),
+        ],
+      ]);
 
-      consoleWarn.mockRestore();
       router.stop();
     });
 
@@ -2549,7 +2550,8 @@ describe("validation-plugin — codec round-trip diagnostic (#2905)", () => {
 
     it("again after the plugin is torn down and re-registered (#1583)", () => {
       // Pre-start, because the plugin refuses registration after `start()`.
-      // `buildNavigationState` is the other committing producer.
+      // `buildNavigationState` is the committing producer that runs on a
+      // router not yet started.
       const { router, warnings } = logged(ROUTES);
       const unsubscribe = router.usePlugin(validationPlugin());
 

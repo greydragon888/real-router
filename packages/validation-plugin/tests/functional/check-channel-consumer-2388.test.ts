@@ -9,18 +9,17 @@ import { describe, it, expect } from "vitest";
 import { validationPlugin } from "../../src/validationPlugin";
 
 /**
- * The first refusal to leave `RouterValidator` for the check channel (#2388):
- * `buildPath`'s path-bag VALUE walk, registered at `buildPath:params`.
+ * `buildPath`'s path-bag VALUE walk, a check at `buildPath:params` (#2388).
  *
- * ⚑ **Why this one first.** Core hands that position `ownParams` — the copy it
- * will print the path from (#2134) — so the check judges the object that ships
- * rather than the one the caller still holds. No interceptor can express it: at
- * the call boundary the copy does not exist yet.
+ * ⚑ **The position receives core's copy.** Core hands it `ownParams` — the copy
+ * it will print the path from (#2134) — so the check judges the object that
+ * ships rather than the one the caller still holds. No interceptor can express
+ * it: at the call boundary the copy does not exist yet.
  *
- * ⚠ The SHAPE half stays on `ctx.validator`, and the asymmetry is the point:
- * `validateNavigateParamsShape` must run on the caller's bag, before core copies,
- * because a copy launders every shape it exists to refuse. Only the value half
- * belongs to core's copy, so only the value half moved.
+ * ⚠ The SHAPE half is a check at `buildPath:entry`, and the asymmetry is the
+ * point: `validateNavigateParamsShape` must run on the caller's bag, before core
+ * copies, because a copy launders every shape it exists to refuse. Only the
+ * value half belongs to core's copy, so only the value half stands here.
  */
 describe("the validation plugin refuses through the check channel (#2388)", () => {
   const routes = [{ name: "items", path: "/items/:id" }];
@@ -48,10 +47,8 @@ describe("the validation plugin refuses through the check channel (#2388)", () =
   });
 
   it("teardown removes the registration, and the door stops refusing", () => {
-    // ⚠ The check outlives the validator slot unless teardown says otherwise:
-    // nulling `ctx.validator` is what silences every OTHER door, and it does
-    // nothing to a channel registration. A leak here leaves a torn-down plugin
-    // still refusing.
+    // ⚠ The check outlives the plugin unless teardown removes it: a leak here
+    // leaves a torn-down plugin still refusing.
     const router = createRouter(routes);
     const remove = router.usePlugin(validationPlugin());
 
@@ -119,9 +116,7 @@ describe("the validation plugin refuses through the check channel (#2388)", () =
     await router.start("/items/1");
 
     // ⚑ ENTRY refuses SYNCHRONOUSLY, from a method whose declared return is a
-    // promise — the facade's own shape for programmer error, pinned by #1572
-    // and unchanged by the conversion. `validateNavigateArgs` is the member
-    // that left `RouterValidator` with this slice: this was its only caller.
+    // promise — the facade's own shape for programmer error, pinned by #1572.
     expect(() => router.navigate(42 as never)).toThrow(
       "[router.navigate] Invalid route name: expected string, got number",
     );
@@ -138,8 +133,8 @@ describe("the validation plugin refuses through the check channel (#2388)", () =
 
   it("canNavigateTo refuses through the channel, and the message names IT", () => {
     // ⚠ This door is TOTAL in bare core, and refusing here is the analyser's
-    // documented divergence rather than a regression — the same shape it had
-    // when the validator answered at this position.
+    // documented divergence rather than a regression (INVARIANTS
+    // `canNavigateTo` #5).
     const router = createRouter(routes);
 
     router.usePlugin(validationPlugin());

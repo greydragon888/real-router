@@ -76,8 +76,10 @@ ordinal naming "the next one": an ordinal adds a second edit to every addition.)
   `typeof` (#2088), because the emitter stores whatever it is handed and isolates
   the call, so a non-function logs `cb is not a function` on every emit of that
   event for the life of the router — a registration that reported success and
-  never works. Both wordings are mirrored by `@real-router/validation-plugin` and
-  pinned against it by `bare-core-message-parity.test.ts`.
+  never works. Core is the only tier that refuses either, so both texts are the
+  same with `@real-router/validation-plugin` installed and without it;
+  `invalid-event-name-1888.test.ts` and `observable/addEventListener.test.ts`
+  hold them.
 - **`addInterceptor(method, fn)`** — refuses both arguments (#2088), because the
   door meets BOTH halves of the criterion at once: a name no seam reads registers
   cleanly, never fires and hands back a working `Unsubscribe` (a), and a
@@ -97,7 +99,8 @@ InterceptableMethodMap]: K }` ties it to the type in both directions: a seam
   `CheckPositionMap` by `satisfies` in both directions, and neither half coerces
   the name. ⚑ The channel is REFUSAL-ONLY — a check may throw and may do nothing
   else — which is what separates it from a seam: measured, no shipped interceptor
-  refuses and no validator refusal replaces an argument.
+  refuses and no validator refusal replaces an argument. A check that returns a
+  thenable refuses its door instead; `CheckFn`'s docblock owns why (#2836).
 - **`addActivateGuard("")` / `addDeactivateGuard("")`** — refuse the root node
   (#2895), by criterion **(a)**: the root is no segment, so no transition
   activates or deactivates it, and a guard there would register cleanly and
@@ -167,8 +170,8 @@ criterion above:
   is accepted. Its radius is diagnostics: nothing routing reads it, so a hijack
   silences messages instead of steering a navigation. Neither (a) nor (b).
 - **`PluginApi.emitTransitionError`'s argument is checked by no tier.** Core
-  asserts nothing and `RouterValidator` has no member for it, so the plugin
-  cannot cover it either; every shape reaches `$$error` subscribers verbatim.
+  asserts nothing and asks no check position about it, so the plugin cannot
+  cover it either; every shape reaches `$$error` subscribers verbatim.
   ⚠ Its sibling `navigateToNotFound` distrusts its own declared type at the same
   layer — the asymmetry is real, and it is this door that is the exception.
 
@@ -207,7 +210,7 @@ the user runs. That is the intended shape — the analyser is stricter — and i
 is the reason a refusal belongs to the plugin only where core can keep working.
 
 ⚑ **Worked application — four plugin-facing doors (#2247).** The rule answers
-each without a new `RouterValidator` member:
+each without a check position:
 
 | door                              | outcome                                          | measured reason                                                                                                                                                                           |
 | --------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -341,9 +344,10 @@ ledger rather than closed. Where a door is reached internally, the adapter is
 not a boundary.
 
 ⚠ **A "deliberately unguarded tier" is refused on evidence, not taste.** Most
-facade guards are `ctx.validator?.…`, so the gap WIDENS when an application
-installs `@real-router/validation-plugin` — a tier whose contract changes with a
-plugin is not a contract.
+facade guards are checks at named positions, which
+`@real-router/validation-plugin` registers, so the gap WIDENS when an
+application installs it — a tier whose contract changes with a plugin is not a
+contract.
 
 ⚑ **Three outcomes, and only the first is a defect.** A door may BYPASS (the
 guarded side refuses, the internal side accepts), be a PLAIN ALIAS (`X: ctx.X`,
@@ -405,8 +409,8 @@ in shipped source carrying eight members or more was checked for members the
 declaring package never uses — the mechanical form of "it landed because someone
 else needed it". The majority came back clean, and the clean ones all have a
 construction that can say no: a dependency bag admits nothing without a call site
-that reads it, a store admits only state its namespace owns, a validator method
-needs a door to guard.
+that reads it, and a store admits only state its namespace owns and references
+its doors read.
 
 ⚠ **Size is not the signal, and neither is a member with one reader.** Both were
 tried and both failed: `NavigationDependencies` carries 29 members with over half
@@ -611,12 +615,10 @@ bind in the constructor if it touches private fields.
 **Standalone API methods:** module-private CRUD function in `api/get*Api.ts` →
 method on the returned object → reach internals via `getInternals(router)`.
 
-**Adding validation** never adds a member to `RouterValidator` or a call to one,
-wherever in core it goes: the calls core still makes are #2388's to convert, and
-that issue removes the interface. A refusal goes on the check channel and a
-report on the diagnostic channel; a consultation that does both is split
-between them. Whether a refusal belongs to core rather than to the plugin is
-decided under _Who refuses — core or the analyser_ above.
+**Adding validation** goes on the two channels (#2388): a refusal on the check
+channel and a report on the diagnostic channel, and a consultation that does
+both is split between them. Whether a refusal belongs to core rather than to
+the plugin is decided under _Who refuses — core or the analyser_ above.
 
 - **A refusal is a check at a named position.** Declare the argument tuple in
   `CheckPositionMap` (`src/types/api.ts`) and the key in `POSITION`
@@ -658,7 +660,8 @@ Neither authority asks which calls REACH a site;
 
 Validation changes go in `@real-router/validation-plugin`'s
 `src/validators/<namespace>.ts`; logic changes in the namespace method or the
-`api/` function. `Router.ts` only CALLS validators — it never implements one.
+`api/` function. `Router.ts` only ASKS — `runChecks` at a position,
+`emitDiagnostic` for a kind — and implements no check.
 
 ### Type Locations
 
@@ -712,9 +715,8 @@ TypeScript-enforced invariants, and always give the reason.
 ### Mutation testing (Stryker)
 
 The score stops short of 100 %, and the remainder is structurally not worth
-disabling: **entangled** mutators (a killed and a survived variant on one line),
-**equivalents** (no test can kill them), and **validator-opt-in** branches that are
-dead in core and covered in the plugin.
+disabling: **entangled** mutators (a killed and a survived variant on one line)
+and **equivalents** (no test can kill them).
 
 - **`survived ≠ equivalent`.** Disable ONLY after proving equivalence empirically.
   Silencing an unproven survivor hides a real gap — the exact anti-pattern
@@ -737,5 +739,5 @@ Full record: `.claude/mutation-audit-2026-06-22.md`.
 - [src/channels/CLAUDE.md](src/channels/CLAUDE.md) — channel-correctness subsystem, the mode gate
 - [src/engine/CLAUDE.md](src/engine/CLAUDE.md) — routing engine
 - [src/utils/fsm/CLAUDE.md](src/utils/fsm/CLAUDE.md) — FSM engine internals
-- [packages/validation-plugin/CLAUDE.md](../validation-plugin/CLAUDE.md) — validator namespaces
+- [packages/validation-plugin/CLAUDE.md](../validation-plugin/CLAUDE.md) — where core asks the plugin
 - [root ARCHITECTURE.md](../../ARCHITECTURE.md) · [IMPLEMENTATION_NOTES.md](../../IMPLEMENTATION_NOTES.md) — system design, and the home of every "why it is this way"

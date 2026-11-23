@@ -1,9 +1,7 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createRouter, errorCodes } from "@real-router/core";
 import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
-
-import { installSpyValidator } from "../../helpers/spyValidator";
 
 import type { Params, Router, SearchParams, State } from "@real-router/core";
 
@@ -222,19 +220,18 @@ describe("a name the root declares belongs to no segment (#2895)", () => {
 
   it("counts a root slot as declared in the undeclared-key diagnostic", async () => {
     const r = await startUnder("/app/:tenant", "/app/a/users/1/view");
-    const validator = installSpyValidator(r);
+    const undeclared = vi.fn();
+
+    getPluginApi(r).subscribeDiagnostic("UNDECLARED_PARAM_KEY", undeclared);
 
     await r.navigate("users.view", { tenant: "b", uid: "1" });
 
-    expect(validator.state.reportUndeclaredParamKey).not.toHaveBeenCalled();
+    expect(undeclared).not.toHaveBeenCalled();
 
     // A key declared nowhere is still reported beside it.
     await r.navigate("users.view", { tenant: "c", uid: "1", extra: "e" });
 
-    expect(validator.state.reportUndeclaredParamKey).toHaveBeenCalledTimes(1);
-    expect(validator.state.reportUndeclaredParamKey).toHaveBeenCalledWith(
-      "users.view",
-      "extra",
-    );
+    expect(undeclared).toHaveBeenCalledTimes(1);
+    expect(undeclared).toHaveBeenCalledWith("users.view", "extra");
   });
 });
