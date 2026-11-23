@@ -20,7 +20,7 @@ import { createIsomorphicConfig } from "../../tsdown.base.js";
 //
 // Why SEQUENTIAL passes rather than one config array: tsdown runs every config
 // in a single `Promise.all`, and pass 1 cannot be stopped from emitting JS for
-// CJS — `emitDtsOnly` covers ESM, where declarations and JS come from one
+// CJS — `dtsOnly` covers ESM, where declarations and JS come from one
 // build, but CJS declarations are a SEPARATE build (`buildSingle`:
 // `format === "cjs" && dts` pushes an extra `cjsDts` config), so the ordinary
 // CJS build still runs. Both passes therefore wrote `dist/cjs/index.js` &
@@ -33,7 +33,7 @@ import { createIsomorphicConfig } from "../../tsdown.base.js";
  *
  * Scoped to ONE outDir and run from that config's own `build:done`, so the
  * concurrent ESM and CJS passes never touch each other's output. It is a no-op
- * for ESM (there `emitDtsOnly` really does suppress JS), which is also why
+ * for ESM (there `dtsOnly` really does suppress JS), which is also why
  * matching on extension is safe rather than heuristic: the only `.js` under
  * `dist` at this point is the CJS graph being discarded — declarations are
  * `.d.ts` / `.d.mts`.
@@ -72,7 +72,7 @@ export default process.env.RR_DTS_PASS
       custom: {
         entry,
         unbundle: true,
-        dts: { sourcemap: true, emitDtsOnly: true },
+        dts: { sourcemap: true, dtsOnly: true },
         // Pass 1 owns the cleanup for the whole build — it wipes both outDirs
         // before writing, so the `bundle` script needs no `rm -rf dist`.
         // Pass 2 runs `clean: false` so it cannot wipe these declarations.
