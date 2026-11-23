@@ -30,7 +30,7 @@
 | `LoaderTimeout`  | class    | Thrown by `withTimeout()` when the deadline elapses. Fields: `route: string`, `ms: number` |
 | `withTimeout`    | function | `(routeName, ms, loader, options?) => Promise<T>` — race against a deadline; passes `{ signal }` to the loader for cooperative cancellation; optional `options.upstreamSignal` composes via `AbortSignal.any` (Node 20.3+) |
 
-Mirror of `@real-router/ssr-data-plugin/errors` — same `shared/ssr/errors.ts` source. RSC apps that use `rsc-server-plugin` can import from this subpath without taking a dependency on `ssr-data-plugin`. Discriminator is structural (`error.code === "LOADER_NOT_FOUND" | ...`).
+Re-exported from `@real-router/ssr-utils`, their home (`packages/ssr-utils/src/errors.ts`), as `@real-router/ssr-data-plugin/errors` re-exports them, so RSC apps that use `rsc-server-plugin` import them from this subpath without taking a dependency on `ssr-data-plugin`. The discriminator is `code` (`error.code === "LOADER_NOT_FOUND" | ...`); `instanceof` holds as well, for an error from another copy of `ssr-utils` and from its other build, ESM or CJS.
 
 ## How It Works
 
@@ -166,10 +166,10 @@ src/
 ├── getSsrRscMode.ts    — getSsrRscMode(state): runtime-guarded reader of state.context.ssrRscMode
 ├── invalidate.ts       — invalidate(router, "rsc"): typed wrapper over markStale for CSR revalidation
 ├── types.ts            — RscLoaderFn, RscLoaderFnFactory, RscLoaderFactoryMap, RscActionResult, RscPayload (public-facing types)
-├── errors.ts           — Re-export from shared-ssr/errors (LoaderRedirect, LoaderNotFound, LoaderTimeout, withTimeout)
+├── errors.ts           — Re-export from @real-router/ssr-utils (LoaderRedirect, LoaderNotFound, LoaderTimeout, withTimeout)
 ├── constants.ts        — ERROR_PREFIX (logger context, internal) + ALLOWED_RSC_MODES (single source of truth for factory / validator / read-side guard)
 ├── index.ts            — Public exports + module augmentation on @real-router/core/types (StateContext: rsc, rscAction, ssrRscMode — three namespaces total)
-└── shared-ssr/         — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, staleRegistry, errors)
+└── shared-ssr/         — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, staleRegistry)
 ```
 
 `factory.ts` is intentionally a tiny adapter — the actual try/catch + interceptor + claim logic lives in [`shared/ssr/`](../../shared/ssr/) and is consumed by both `rsc-server-plugin` (`T = ReactNode`, namespaces `"rsc"` + `"ssrRscMode"`, no deferred channel) and `ssr-data-plugin` (`T = unknown`, namespaces `"data"` + `"ssrDataMode"` + `"ssrDataDeferred"` + `"ssrDataDeferredKeys"`). `factory.ts` binds `validateLoaders` itself (one consumer, no other importer); the validator factory is shared at `shared-ssr/createLoadersValidator.ts`.
@@ -198,7 +198,7 @@ The Flight payload travels via the bundler's stream renderer; the router state J
 
 ### No bundler dependency
 
-This package's peers are `react` and `@real-router/core`; its one regular dependency is `@real-router/ssr-utils`, whose hydration scratchpad `shared/ssr/createSsrLoaderPlugin.ts` reads through `getHydrationState` (`ssr-utils`'s CLAUDE.md says why a dependency rather than a peer). Notably absent: `react-server-dom-*`, `@vitejs/plugin-rsc`, `react-dom`. The caller wires the renderer.
+This package's peers are `react` and `@real-router/core`; its one regular dependency is `@real-router/ssr-utils`: `shared/ssr/createSsrLoaderPlugin.ts` reads its hydration scratchpad through `getHydrationState`, and `src/errors.ts` re-exports its loader errors and `withTimeout` (`ssr-utils`'s CLAUDE.md says why a dependency rather than a peer). Notably absent: `react-server-dom-*`, `@vitejs/plugin-rsc`, `react-dom`. The caller wires the renderer.
 
 ### Single rsc-server-plugin per router
 

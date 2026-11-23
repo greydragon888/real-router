@@ -5,7 +5,7 @@
 [![bundle size](https://deno.bundlejs.com/?q=@real-router/ssr-utils&treeshake=[*]&badge=detailed)](https://bundlejs.com/?q=@real-router/ssr-utils&treeshake=[*])
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](../../LICENSE)
 
-> Router-level SSR/SSG/hydration helpers for [Real-Router](https://github.com/greydragon888/real-router). Serialize state for transport, hydrate on the client, enumerate static paths, isolate per-request router clones.
+> Router-level SSR/SSG/hydration helpers for [Real-Router](https://github.com/greydragon888/real-router). Serialize state for transport, hydrate on the client, enumerate static paths, isolate per-request router clones, and give loaders typed errors and a deadline.
 
 ## Installation
 
@@ -32,14 +32,16 @@ await hydrateRouter(router, window.__SSR_STATE__);
 
 ## API
 
-| Function                                   | Description                                                        |
-| ------------------------------------------ | ------------------------------------------------------------------ |
-| `serializeState(data, opts?)`              | XSS-safe JSON serialization for embedding in HTML `<script>` tags  |
-| `serializeRouterState(state, opts?)`       | XSS-safe `State` serializer — strips `transition`, keeps `context` |
-| `hydrateRouter(router, source, opts?)`     | Hydrate a fresh router from server-serialized state                |
-| `getHydrationState(router)`                | The state an in-flight `hydrateRouter` call deposited, or `null`   |
-| `getStaticPaths(router, entries?)`         | Enumerate leaf routes and build URLs for SSG pre-rendering         |
-| `createRequestScope(request, base, deps?)` | Per-request SSR isolation via a cloned router                      |
+| Export                                              | Description                                                        |
+| --------------------------------------------------- | ------------------------------------------------------------------ |
+| `serializeState(data, opts?)`                       | XSS-safe JSON serialization for embedding in HTML `<script>` tags  |
+| `serializeRouterState(state, opts?)`                | XSS-safe `State` serializer — strips `transition`, keeps `context` |
+| `hydrateRouter(router, source, opts?)`              | Hydrate a fresh router from server-serialized state                |
+| `getHydrationState(router)`                         | The state an in-flight `hydrateRouter` call deposited, or `null`   |
+| `getStaticPaths(router, entries?)`                  | Enumerate leaf routes and build URLs for SSG pre-rendering         |
+| `createRequestScope(request, base, deps?)`          | Per-request SSR isolation via a cloned router                      |
+| `withTimeout(routeName, ms, loader, opts?)`         | Race a loader against a deadline; rejects with `LoaderTimeout`     |
+| `LoaderNotFound`, `LoaderRedirect`, `LoaderTimeout` | Loader errors a server handler maps to 404, 30x and 504            |
 
 ### `serializeRouterState(state, options?)`
 
@@ -156,6 +158,54 @@ Binds an `AbortSignal` to the request lifetime (Node `"close"` event / Web
 `request.signal`), injected into the clone's dependencies under
 `abortSignal` — loaders read `getDep("abortSignal")` for cooperative
 cancellation.
+
+### Loader errors and `withTimeout(routeName, ms, loader, options?)`
+
+A loader throws `LoaderNotFound` or `LoaderRedirect`, and `withTimeout` rejects
+with `LoaderTimeout` once the deadline passes; the server's handler maps each to
+an HTTP status. `@real-router/ssr-data-plugin/errors` and
+`@real-router/rsc-server-plugin/errors` re-export the same four names.
+
+```typescript
+import {
+  LoaderNotFound,
+  LoaderRedirect,
+  LoaderTimeout,
+  withTimeout,
+} from "@real-router/ssr-utils";
+
+// A loader: the deadline and the request's signal both abort `signal`.
+async function loadUser(id: string, upstreamSignal: AbortSignal) {
+  const user = await withTimeout(
+    "users.profile",
+    250,
+    ({ signal }) => fetchUser(id, { signal }),
+    { upstreamSignal },
+  );
+
+  if (!user) throw new LoaderNotFound(`user:${id}`);
+
+  return { user };
+}
+
+// The handler: each loader error is an HTTP status.
+function statusOf(error: unknown): number {
+  if (error instanceof LoaderNotFound) return 404;
+  if (error instanceof LoaderRedirect) return error.status;
+  if (error instanceof LoaderTimeout) return 504;
+
+  return 500;
+}
+```
+
+`instanceof` holds across copies of this package and across its two builds: an
+error made by another copy, or by the CommonJS build while the handler imports
+the ES module one, is still an instance, because each class admits a value that
+carries its mark as well as what its prototype chain admits. An application's
+subclass reads its own prototype chain alone, so `instanceof ProductNotFound`
+admits no plain `LoaderNotFound`. The `code` field —
+`"LOADER_NOT_FOUND"`, `"LOADER_REDIRECT"`, `"LOADER_TIMEOUT"` — tells them apart
+as well, without importing the classes.
 
 ## Documentation
 

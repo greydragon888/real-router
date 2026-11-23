@@ -547,18 +547,6 @@ describe("reachability census (#2303)", () => {
         "@real-router/svelte",
         "@real-router/vue",
       ],
-      LoaderNotFound: [
-        "@real-router/rsc-server-plugin/errors",
-        "@real-router/ssr-data-plugin/errors",
-      ],
-      LoaderRedirect: [
-        "@real-router/rsc-server-plugin/errors",
-        "@real-router/ssr-data-plugin/errors",
-      ],
-      LoaderTimeout: [
-        "@real-router/rsc-server-plugin/errors",
-        "@real-router/ssr-data-plugin/errors",
-      ],
       SsrLoaderContext: [
         "@real-router/rsc-server-plugin",
         "@real-router/ssr-data-plugin",
@@ -575,10 +563,6 @@ describe("reachability census (#2303)", () => {
       defer: ["@real-router/ssr-data-plugin"],
       getDeferBootstrapScript: ["@real-router/ssr-data-plugin/server"],
       isDeferred: ["@real-router/ssr-data-plugin"],
-      withTimeout: [
-        "@real-router/rsc-server-plugin/errors",
-        "@real-router/ssr-data-plugin/errors",
-      ],
     });
   });
 

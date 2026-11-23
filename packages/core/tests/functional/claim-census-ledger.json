@@ -1183,6 +1183,10 @@
       "feb11ec12a7a",
       "c5003c7cf069"
     ],
+    "packages/ssr-utils/src/errors.ts": [
+      "5c4222c1ffb5",
+      "d77115dd48dd"
+    ],
     "packages/ssr-utils/src/getStaticPaths.ts": [
       "1a9864dfed80",
       "d7294177f708",
@@ -1505,9 +1509,6 @@
     ],
     "shared/ssr/deferWireFormat.ts": [
       "b07ec747d67c"
-    ],
-    "shared/ssr/errors.ts": [
-      "287b321d70fd"
     ]
   },
   "docs": {
@@ -2224,9 +2225,10 @@
       "a539f07d05ee"
     ],
     "packages/ssr-utils/CLAUDE.md": [
-      "bf3c2a6ca437",
+      "f6db3865fe41",
       "be9c5b15b4c6",
-      "d7d5aa8c9600",
+      "a5656f564e2f",
+      "897bf7ff7d62",
       "fd510d6f5692",
       "91dc61f70b55"
     ],

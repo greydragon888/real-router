@@ -201,7 +201,7 @@ The skip is single-shot — only the first `start()` triggered by `hydrateRouter
 
 ## Typed Loader Errors (`@real-router/ssr-data-plugin/errors`)
 
-The plugin is HTTP-agnostic — it only awaits the loader and writes the result to `state.context.data`. To bridge loader failures to HTTP semantics (404, 30x, 504), import typed error classes from the `errors` subpath and let your handler catch them:
+The plugin is HTTP-agnostic — it only awaits the loader and writes the result to `state.context.data`. To bridge loader failures to HTTP semantics (404, 30x, 504), throw typed errors from the loader and let your handler catch them. The classes and `withTimeout` live in [`@real-router/ssr-utils`](../ssr-utils/README.md#loader-errors-and-withtimeoutroutename-ms-loader-options); the `errors` subpath re-exports them, and `instanceof` holds across the two imports, even when they resolve different copies of `ssr-utils`:
 
 <!-- doc-code: skip — the body of a request handler: a top-level return -->
 ```typescript
@@ -251,7 +251,7 @@ try {
 }
 ```
 
-Discriminator is the `code` field — match structurally without `instanceof`. Identical errors are also re-exported from `@real-router/rsc-server-plugin/errors` (same shared source) so RSC apps don't need to add a `ssr-data-plugin` dependency just to throw `LoaderNotFound`.
+The `code` field is the discriminator. `instanceof` holds as well, for an error from another copy of `@real-router/ssr-utils` and from its other build, ESM or CJS. `@real-router/rsc-server-plugin/errors` re-exports the same names, so an RSC app does not need `ssr-data-plugin` to throw `LoaderNotFound`.
 
 ## Deferred data with `defer()` (#610)
 

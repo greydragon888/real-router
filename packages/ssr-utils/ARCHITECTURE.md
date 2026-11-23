@@ -12,12 +12,13 @@ src/
 ├── hydrationScratchpad.ts   — Module-private WeakMap; getHydrationState (exported) and the deposit hydrateRouter uses
 ├── getStaticPaths.ts        — Leaf-route enumeration, imports getPluginApi from @real-router/core/api
 ├── createRequestScope.ts    — Per-request router clone, imports cloneRouter from @real-router/core/api
+├── errors.ts                — Loader errors and withTimeout, no core dependency
 └── index.ts                 — Public exports (incl. SerializedRouterState re-export from core)
 
 tests/
-├── functional/   — one file per exported function (the scratchpad is exercised through hydrateRouter.test.ts), plus clone-behaviour-1893 (100% coverage)
-├── property/     — getStaticPaths (model-based leaf-enumeration oracle), serializeRouterState (fast-check invariants)
-├── stress/       — get-static-paths-scale, start-hydrate-cycles, serialize-state-xss (heap/timing regression guards)
+├── functional/   — one file per source module (the scratchpad is exercised through hydrateRouter.test.ts), plus clone-behaviour-1893 (100% coverage)
+├── property/     — getStaticPaths (model-based leaf-enumeration oracle), hydrateRouter (scratchpad), serializeRouterState (fast-check invariants), withTimeout (race semantics)
+├── stress/       — get-static-paths-scale, start-hydrate-cycles, serialize-state-xss (heap/timing regression guards), with-timeout-fan-out (no unhandled rejection from late loaders)
 └── helpers/      — testRouters.ts (fixture router builder, public-API-only)
 ```
 
@@ -59,13 +60,32 @@ plugins call it from their `start` interceptor, so writer and reader must
 resolve the same copy of this package — `ssr-data-plugin` and
 `rsc-server-plugin` declare it as a `dependency` for that reason.
 
+## Loader errors
+
+`errors.ts` holds `LoaderRedirect`, `LoaderNotFound` and `LoaderTimeout`, which
+a loader throws for the server's handler to map to an HTTP status, and
+`withTimeout`, which rejects with a `LoaderTimeout` once its deadline passes.
+The SSR plugins' `./errors` subpaths re-export the four names.
+
+Each instance carries a mark under `Symbol.for("@real-router/ssr-utils/loader-error")`,
+whose value is its class's `code`. `Symbol.hasInstance` of each class admits
+what the prototype chain admits, and, when `instanceof` asks the class itself,
+a value that carries the class's mark as well; a subclass reads the chain
+alone. Two copies of this package in one process, or its ESM and CJS
+builds, therefore hold different class objects and one answer to `instanceof`
+for every error their constructors make; an object built on a class's
+prototype without the constructor passes in its own copy alone, and a subclass
+still admits only its own instances. The key string and the three
+values are the contract between versions: a copy that spells either
+differently does not recognise this copy's errors.
+
 ## Consumers
 
 | Consumer | How |
 |----------|-----|
 | `@real-router/angular` | `provideRealRouterFactory` — TransferState SSR bridge (server serialize, client hydrate) |
-| `@real-router/ssr-data-plugin` | `getHydrationState` in the loader's `start` interceptor (runtime); `hydrateRouter` + `serializeRouterState` in test fixtures |
-| `@real-router/rsc-server-plugin` | Same, through the shared loader scaffolding |
+| `@real-router/ssr-data-plugin` | `getHydrationState` in the loader's `start` interceptor (runtime); `./errors` re-exports the loader errors and `withTimeout`; `hydrateRouter` + `serializeRouterState` in test fixtures |
+| `@real-router/rsc-server-plugin` | Same, through the shared loader scaffolding and its own `./errors` |
 | 6 SSR/SSG/streaming/mixed example apps × 6 frameworks (React, Preact, Solid, Vue, Svelte, Angular) | `entry-client` / `entry-server` boilerplate |
 
 Not consumed by `@real-router/core` itself, and not merged into
@@ -79,6 +99,7 @@ Not consumed by `@real-router/core` itself, and not merged into
 | `hydrateRouter` | usable, rarely needed | ✅ primary use |
 | `getStaticPaths` | ✅ SSG build step | not typically called |
 | `createRequestScope` | ✅ Node/Web request lifetime | N/A (no request object) |
+| `withTimeout`, loader errors | ✅ in a loader the server runs | usable in a loader the client runs |
 
 No platform-specific imports (`window`, `document`, Node built-ins) appear in
 any module — `createRequestScope`'s Node-vs-Web branch duck-types on the

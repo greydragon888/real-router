@@ -466,6 +466,12 @@ describe("door total (#2303)", () => {
     // Shapes of the host platform, not of this library.
     IncomingMessageLike: "external platform shape",
     RequestLike: "external platform shape",
+    // Error classes: their one static member is `Symbol.hasInstance`, which
+    // answers from the value `instanceof` hands it — its prototype chain, or
+    // its mark — and keeps nothing.
+    LoaderNotFound: "thrown by an application's loader, caught by its handler",
+    LoaderRedirect: "thrown by an application's loader, caught by its handler",
+    LoaderTimeout: "output — `withTimeout` rejects with it",
     // Factories the census does not seed, each for its own reason.
     createRouterPlugin: "takes core's own router, not an application value",
     internalDefect:

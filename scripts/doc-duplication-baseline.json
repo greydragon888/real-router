@@ -71,7 +71,6 @@
   "814a47047759": "packages/solid/src/components/HttpStatusCode.tsx:12 -> packages/solid/README.md (75%)",
   "929e362eee18": "packages/sources/src/canonicalJson.ts:19 -> packages/sources/INVARIANTS.md (76%)",
   "6778466b0abb": "packages/sources/src/createRouteEnterGate.ts:30 -> packages/sources/INVARIANTS.md (71%)",
-  "5bf5fc49102c": "packages/ssr-data-plugin/src/shared-ssr/errors.ts:52 -> packages/ssr-data-plugin/INVARIANTS.md (69%)",
   "96318457a579": "packages/svelte/src/composables/useRouteEnter.svelte.ts:25 -> packages/svelte/CLAUDE.md (92%)",
   "b385ee105be8": "packages/svelte/src/composables/useRouteEnter.svelte.ts:25 -> packages/svelte/CLAUDE.md (100%)",
   "7391b458fde4": "packages/svelte/src/composables/useRouteEnter.svelte.ts:25 -> packages/svelte/README.md (61%)",
