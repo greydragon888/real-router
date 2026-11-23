@@ -22,11 +22,6 @@ overrides:
   # vite-plugin-solid (`^7.23.3`), babel-preset-solid and @rollup/plugin-babel (peer
   # `^7.0.0`) all declare carets that semver cannot resolve to 8 anyway.
   'vite-plugin-solid>@babel/core': '>=7.29.6 <8'
-  # Floor for the axios advisories fixed in 1.16.0 and 1.18.0 — GHSA-35jp-ww65-95wh
-  # and GHSA-mmx7-hfxf-jppx among them. Scoped to @codspeed/core, whose `^1.4.0`
-  # admits the affected releases: @sonar/scan pins an exact 1.20.0, and an
-  # unscoped floor would replace that pin too.
-  '@codspeed/core>axios': '>=1.18.0'
   # Floor for GHSA-4mjr-xmp4-gh2g + GHSA-x5fp-wj9c-mxmx (both Medium, fixed in
   # 6.16.0) and GHSA-6pq8-jhm2-2vcw (Medium, fixed in 6.16.1).
   # Parents are @gitbeaker and typed-rest-client — CI tooling, never a published
