@@ -353,7 +353,7 @@ jobs:
       # the payload at all, so without these the scan would be filed as a branch
       # analysis of whatever `sonar.branch.name` defaulted to.
       - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@e805d875275f728fac1885b413934be6d7c63f65 # v8.4.1
+        uses: SonarSource/sonarqube-scan-action@59202af334b4ba7b5db01b701b8e79f8b3bef0f4 # v8.5.0
         with:
           args: >
             -Dsonar.projectVersion=${{ steps.version.outputs.version }}
