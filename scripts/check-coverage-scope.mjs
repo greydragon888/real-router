@@ -30,8 +30,9 @@
  *   5. `turbo.json` — every package whose `src/` symlinks `shared/<dir>` lists
  *      `../../shared/<dir>/` in the inputs of its cached tasks, in its own
  *      `turbo.json`; no other package and not the root lists `shared/` there.
- *      turbo does not hash through a symlink, so a consumer without the input
- *      replays its tasks from cache after a change in the dir.
+ *      turbo's affected filter matches a changed path against the declared
+ *      inputs, not through the symlink, so CI's shards leave out a consumer
+ *      without the input on a pull request that changes the dir.
  *   6. Layout — every package's code lives under `src/`: each
  *      `@real-router/internal-source` target in `exports` is under `./src/`,
  *      no code file sits outside `src/`, `tests/`, `scripts/` and the
@@ -273,10 +274,11 @@ for (const pkg of SIZE_LIMIT_EXCEPTIONS.keys()) {
 }
 
 // --- Check 5: turbo keys each shared/ consumer on its own dir, and only it ---
-// turbo does not hash through a symlink: a package whose src/ links
-// shared/<dir> has none of those files among its inputs unless its turbo.json
-// names ../../shared/<dir>/ in each cached task that reads src/. A consumer
-// that omits it replays that task from cache after a change in the dir. The
+// turbo hashes the files behind a src/ symlink, but its affected filter
+// (`--filter=...[ref]`, which build-matrix.mjs shards from) matches a changed
+// path against the declared inputs: a change under shared/<dir> selects a
+// consumer's task only when its turbo.json names ../../shared/<dir>/ in it. A
+// consumer that omits it gets no shard on such a pull request. The
 // consumers are DERIVED from the symlinks, as for the lint alias above, and
 // each declares the dir in its own turbo.json, so an input inherited through
 // `extends` does not count. The reverse directions keep shared/ out of the key
@@ -336,7 +338,7 @@ for (const pkg of packages) {
 
   if (dirs.length > 0 && turbo === undefined) {
     errors.push(
-      `packages/${pkg}: src/ links shared/${dirs.join(", shared/")} but the package has no turbo.json — turbo does not hash through the symlink, so no task of it is keyed on those files`,
+      `packages/${pkg}: src/ links shared/${dirs.join(", shared/")} but the package has no turbo.json — turbo's affected filter does not see through the symlink, so a change there selects no task of it`,
     );
     continue;
   }
@@ -349,7 +351,7 @@ for (const pkg of packages) {
 
       if (!listed) {
         errors.push(
-          `packages/${pkg}/turbo.json: task "${task}" does not list ${SHARED_PREFIX}${dir}/ — turbo does not hash through the src/ symlink, so a change there replays the task from cache`,
+          `packages/${pkg}/turbo.json: task "${task}" does not list ${SHARED_PREFIX}${dir}/ — turbo's affected filter does not see through the src/ symlink, so a change there leaves the task out of CI's shards`,
         );
       }
     }
