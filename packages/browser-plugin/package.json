@@ -1,6 +1,6 @@
 {
   "name": "@real-router/browser-plugin",
-  "version": "0.28.0",
+  "version": "0.28.1",
   "type": "commonjs",
   "description": "Browser integration plugin with History API, hash routing, and popstate support",
   "main": "./dist/cjs/index.js",
@@ -60,6 +60,6 @@
     "jsdom": "31.0.1"
   },
   "peerDependencies": {
-    "@real-router/core": "workspace:>=0.170.0"
+    "@real-router/core": "workspace:>=0.170.1"
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@real-router/ssr-data-plugin",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "type": "commonjs",
   "description": "SSR per-route data loading plugin for Real-Router",
   "main": "./dist/cjs/index.js",
@@ -77,7 +77,7 @@
     "@real-router/ssr-utils": "workspace:^"
   },
   "peerDependencies": {
-    "@real-router/core": "workspace:>=0.170.0"
+    "@real-router/core": "workspace:>=0.170.1"
   },
   "devDependencies": {
     "@real-router/core": "workspace:^",

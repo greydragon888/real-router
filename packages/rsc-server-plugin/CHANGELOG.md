@@ -1,5 +1,37 @@
 # @real-router/rsc-server-plugin
 
+## 0.6.0
+
+### Minor Changes
+
+- [#3011](https://github.com/greydragon888/real-router/pull/3011) [`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse a second registration of either plugin on a router that already carries it ([#2974](https://github.com/greydragon888/real-router/issues/2974))
+
+  `rscServerPluginFactory(loaders)` and `rscActionPluginFactory(getResult)` each
+  refuse a registration on a router that already carries that plugin with an
+  `Error` with no `code`, thrown before the plugin claims anything:
+
+  ```text
+  [@real-router/rsc-server-plugin] is already registered on this router — a clone already carries the plugins of its base router
+  ```
+
+  A clone counts: `cloneRouter`, and `createRequestScope` through it, re-run the
+  base router's plugin factories, so a request router already carries the base's
+  plugins. Each factory keeps a mark of its own, so one router still takes both
+  plugins, and `@real-router/ssr-data-plugin` beside them. The first instance
+  keeps working, and after its `unsubscribe()` the router takes the plugin again.
+  A plugin that holds the `rsc` or `rscAction` namespace still meets core's
+  `RouterError(CONTEXT_NAMESPACE_ALREADY_CLAIMED)`.
+
+  **Breaking Change:** the repeat threw core's
+  `RouterError(CONTEXT_NAMESPACE_ALREADY_CLAIMED)`, as the README said. Remove the
+  second registration; a handler that matched that code for the repeat no longer
+  sees one.
+
+### Patch Changes
+
+- Updated dependencies [[`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232)]:
+  - @real-router/core@0.170.1
+
 ## 0.5.2
 
 ### Patch Changes
