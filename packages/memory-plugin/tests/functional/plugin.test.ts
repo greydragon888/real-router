@@ -795,82 +795,8 @@ describe("Memory plugin", () => {
     //
     // onStop and teardown drop the restore in flight (#clear): a settler from
     // before them no longer finds its own restore in flight and writes
-    // nothing, and the next lifecycle starts clean.
-
-    it("stop() mid-flight leaves history empty and next navigation records entry", async () => {
-      router.usePlugin(memoryPluginFactory());
-      await router.start("/");
-      await router.navigate("users");
-      await router.navigate("user", { id: "42" });
-
-      // History: [home, users, user/42], index = 2.
-
-      // Stall the in-flight navigate so its settler cannot run before
-      // router.stop() clears the plugin. A rejected navigate fires after
-      // stop() — the reject-handler must then observe a generation mismatch
-      // and skip its revert.
-      const navigateSpy = vi.spyOn(router, "navigate").mockImplementationOnce(
-        () =>
-          new Promise((_, reject) => {
-            setTimeout(() => {
-              reject(new Error("stalled rejection"));
-            }, 50);
-          }),
-      );
-
-      router.back(); // kicks off #go(-1): optimistic #index = 1
-
-      router.stop(); // #clear + generation bump — settler must no-op
-
-      // Wait out the mocked rejection so the settler has a chance to run.
-      await new Promise((r) => setTimeout(r, 100));
-
-      // Post-stop invariants: history empty, geometry reports cleared.
-      expect(router.canGoBack()).toBe(false);
-      expect(router.canGoForward()).toBe(false);
-
-      navigateSpy.mockRestore();
-
-      // Restart: the next navigation must actually record a new entry, not
-      // be taken for the restore that was in flight across the stop.
-      await router.start("/");
-      await router.navigate("users");
-
-      expect(router.canGoBack()).toBe(true);
-      expect(router.canGoForward()).toBe(false);
-      expect(router.getState()?.name).toBe("users");
-      expect(router.getState()?.context.memory?.historyIndex).toBe(1);
-    });
-
-    it("unsubscribe() mid-flight does not desync #index against cleared entries", async () => {
-      const unsubscribe = router.usePlugin(memoryPluginFactory());
-
-      await router.start("/");
-      await router.navigate("users");
-      await router.navigate("user", { id: "42" });
-
-      const navigateSpy = vi.spyOn(router, "navigate").mockImplementationOnce(
-        () =>
-          new Promise((_, reject) => {
-            setTimeout(() => {
-              reject(new Error("stalled rejection"));
-            }, 50);
-          }),
-      );
-
-      router.back(); // in-flight #go
-
-      unsubscribe(); // teardown: removes extensions, bumps generation
-
-      await new Promise((r) => setTimeout(r, 100));
-
-      // After teardown the router no longer exposes the memory extensions;
-      // accessing them should throw (extendRouter unsubscribe removes them).
-      expect(() => router.canGoBack()).toThrow();
-      expect(() => router.canGoForward()).toThrow();
-
-      navigateSpy.mockRestore();
-    });
+    // nothing, and the next lifecycle starts clean. A restore held in flight
+    // across stop() is exercised in restore-belongs-to-its-go.test.ts.
 
     it("stop() → start() cycle records a fresh history even with no in-flight #go", async () => {
       // Sanity check: the #clear() reset must not introduce regressions for
