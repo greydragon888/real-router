@@ -1326,6 +1326,7 @@ const LEDGER: Readonly<Record<string, Readonly<Record<string, string>>>> = {
     "provideRealRouterFactory › sign:start": NO,
   },
   "packages/browser-plugin/src/factory.ts": {
+    "<module> › slot:REGISTERED": NO,
     "createBrowserPlugin › slot:currentHash": NO,
     "createBrowserPlugin › slot:myHashRemover": NO,
     "createDefaultBrowser › slot:cachedPathname": NO,
@@ -1340,6 +1341,7 @@ const LEDGER: Readonly<Record<string, Readonly<Record<string, string>>>> = {
     "onTransitionSuccess › hook:onTransitionSuccess": NO,
   },
   "packages/lifecycle-plugin/src/factory.ts": {
+    "<module> › slot:REGISTERED": NO,
     "createPlugin › hook:onStop": NO,
     "createPlugin › slot:commitController": NO,
     "createPlugin › slot:compiledHooks": NO,

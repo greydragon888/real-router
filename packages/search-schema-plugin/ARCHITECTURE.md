@@ -79,17 +79,23 @@ searchSchemaPlugin(options)     ← factory.ts
                 │
                 │  Called by the router on router.usePlugin():
                 │
+                ├── REGISTERED.has(router)? → throws, nothing registered
                 ├── pluginApi = getPluginApi(router)
                 ├── routesApi = getRoutesApi(router)
-                └── new SearchSchemaPlugin(pluginApi, routesApi, frozenOptions)
-                            │
-                            │  Constructor:
-                            │  - #validateExistingDefaultParams()  ← dev mode: tree walk
-                            │  - pluginApi.addInterceptor("forwardState", ...)
-                            │  - routesApi.subscribeChanges(...)  ← dev mode only
-                            │
-                            └── .getPlugin()  → Plugin { teardown }
+                ├── new SearchSchemaPlugin(pluginApi, routesApi, frozenOptions)
+                │           │
+                │           │  Constructor:
+                │           │  - #validateExistingDefaultParams()  ← dev mode: tree walk
+                │           │  - pluginApi.addInterceptor("forwardState", ...)
+                │           │  - routesApi.subscribeChanges(...)  ← dev mode only
+                │           │
+                │           └── .getPlugin()  → Plugin { teardown }
+                │
+                └── REGISTERED.add(router) → returns the plugin with a teardown
+                    that deletes the router from REGISTERED, then runs its own
 ```
+
+`REGISTERED` is a module-level `WeakSet` of the routers the plugin is registered on. A clone carries its base's plugins, so a registration there is refused too.
 
 **Why this split instead of a single object?**
 
@@ -112,11 +118,28 @@ export function searchSchemaPlugin(
   });
 
   return (router): Plugin => {
+    if (REGISTERED.has(router)) {
+      throw new Error(`${ERROR_PREFIX} is already registered on this router — …`);
+    }
+
     const pluginApi = getPluginApi(router);
     const routesApi = getRoutesApi(router);
-    const plugin = new SearchSchemaPlugin(pluginApi, routesApi, frozenOptions);
+    const plugin = new SearchSchemaPlugin(
+      pluginApi,
+      routesApi,
+      frozenOptions,
+    ).getPlugin();
 
-    return plugin.getPlugin();
+    REGISTERED.add(router); // after the last call that may throw
+
+    return {
+      ...plugin,
+      teardown: () => {
+        REGISTERED.delete(router);
+
+        return plugin.teardown?.();
+      },
+    };
   };
 }
 ```

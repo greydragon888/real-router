@@ -348,8 +348,8 @@ describe("core/plugins", () => {
         warnSpy.mockRestore();
       });
 
-      // #1202: bare core tolerates registering the SAME factory reference twice
-      // (validator-gated misuse), but `#plugins` is a Set while listener
+      // #1202: core accepts the SAME factory reference twice, with
+      // validation-plugin or without, but `#plugins` is a Set while listener
       // registrations are a multiset — so the Set bookkeeping diverges from the
       // live listeners, and a clone silently loses the still-active plugin. Pin
       // the current (acceptable) semantics so a refactor can't change them unseen.

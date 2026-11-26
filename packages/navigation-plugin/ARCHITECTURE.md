@@ -99,15 +99,21 @@ navigationPluginFactory(opts?, browser?)   ← factory.ts
                 │
                 │  Called by the router on router.usePlugin():
                 │
-                └── new NavigationPlugin(router, api, options, browser, ...)
-                            │
-                            │  Constructor:
-                            │  - registers start interceptor
-                            │  - calls api.extendRouter({buildUrl, matchUrl, replaceHistoryState, ...9 exclusive})
-                            │  - creates navigate event handler and lifecycle
-                            │
-                            └── .getPlugin()  → Plugin { onStart, onStop, ... }
+                ├── REGISTERED.has(router)? → throws, nothing registered
+                ├── new NavigationPlugin(router, api, options, browser, ...)
+                │           │
+                │           │  Constructor:
+                │           │  - registers start interceptor
+                │           │  - calls api.extendRouter({buildUrl, matchUrl, replaceHistoryState, ...9 exclusive})
+                │           │  - creates navigate event handler and lifecycle
+                │           │
+                │           └── .getPlugin()  → Plugin { onStart, onStop, ... }
+                │
+                └── REGISTERED.add(router) → returns the plugin with a teardown
+                    that deletes the router from REGISTERED, then runs its own
 ```
+
+`REGISTERED` is a module-level `WeakSet` of the routers the plugin is registered on. A clone carries its base's plugins, so a registration there is refused too.
 
 **Why this split instead of a single object?**
 
@@ -136,6 +142,10 @@ export function navigationPluginFactory(opts?, browser?): PluginFactory {
   const shared: NavigationSharedState = { removeNavigateListener: undefined };
 
   return function navigationPlugin(routerBase) {
+    if (REGISTERED.has(routerBase)) {
+      throw new Error("[navigation-plugin] is already registered on this router — …");
+    }
+
     const plugin = new NavigationPlugin(
       routerBase as Router,
       getPluginApi(routerBase),
@@ -143,9 +153,18 @@ export function navigationPluginFactory(opts?, browser?): PluginFactory {
       resolvedBrowser,
       transitionOptions,
       shared,
-    );
+    ).getPlugin();
 
-    return plugin.getPlugin();
+    REGISTERED.add(routerBase); // after the last call that may throw
+
+    return {
+      ...plugin,
+      teardown: () => {
+        REGISTERED.delete(routerBase);
+
+        return plugin.teardown?.();
+      },
+    };
   };
 }
 
@@ -316,6 +335,7 @@ router.usePlugin(navigationPluginFactory(opts))
         ▼
   navigationPlugin(router)  ← called by the core
         │
+        ├── REGISTERED.has(router)? → throws, nothing registered
         ├── new NavigationPlugin(...)
         │     ├── api.claimContextNamespace("navigation") → stores #claim
         │     ├── Registers start interceptor
@@ -326,7 +346,9 @@ router.usePlugin(navigationPluginFactory(opts))
         │     └── api.extendRouter({buildUrl, matchUrl, replaceHistoryState, ...9 exclusive})
         │           → stores returned unsubscribe as #removeExtensions
         │
-        └── plugin.getPlugin() → { onStart, onStop, onTransitionStart, onTransitionSuccess, teardown }
+        ├── plugin.getPlugin() → { onStart, onStop, onTransitionStart, onTransitionSuccess, teardown }
+        └── REGISTERED.add(router) → returns that plugin with a teardown that
+            deletes the router from REGISTERED, then runs its own
 
 router.start()
         │
@@ -702,7 +724,7 @@ Created once in `navigationPluginFactory()` and passed to the lifecycle helpers.
 
 The factory may be called again — for example, during HMR or when reusing the factory with different routers. Each new plugin instance registers its own navigate listener in `onStart`. Without `shared`, the previous listener would remain in memory.
 
-`shared` is intentionally mutable. It's the only shared state between instances of the same factory.
+`shared` is intentionally mutable. The instances of one factory share it, and every instance of the plugin shares the module's `REGISTERED` set.
 
 **Factory pool — last-wins (concurrent-live caveat).** Because the single `removeNavigateListener` slot is shared — and there is a single global `window.navigation` — each `onStart` removes the previous instance's navigate listener before installing its own. The pattern is built for a pool where routers are created/destroyed **sequentially** (one live router at a time). If two routers from the same factory are live **at the same time**, only the **last-started** one receives `navigate` events; the earlier one silently desyncs. This mutual exclusivity is inherent to the single global Navigation API. For genuinely concurrent routers, give each its own factory instance. Locked by `tests/stress/listener-leak.stress.ts` (N12.3).
 

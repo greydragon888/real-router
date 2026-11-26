@@ -134,14 +134,16 @@ describe("one router, one validator (#2349)", () => {
     router.stop();
   });
 
-  it("CONTROL — core still refuses the SAME factory twice, with its own message", () => {
+  it("the SAME factory twice meets the plugin's own refusal (#2974)", () => {
+    // No check refuses a repeat of a factory object before the factory runs,
+    // so the second call reaches the mark.
     const router = make();
     const factory = validationPlugin();
 
     router.usePlugin(factory);
 
-    expect(() => router.usePlugin(factory)).toThrow(
-      "Plugin factory already registered",
+    expect(refusalFrom(() => router.usePlugin(factory)).code).toBe(
+      "VALIDATION_PLUGIN_ALREADY_INSTALLED",
     );
   });
 

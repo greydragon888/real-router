@@ -44,7 +44,6 @@ import {
 import { validateOptions } from "./validators/options";
 import {
   validatePluginLimit,
-  validateNoDuplicatePlugins,
   validatePluginKeys,
   validateCountThresholds as validatePluginCountThresholds,
   warnBatchDuplicates,
@@ -644,13 +643,6 @@ export function validationPlugin<
       },
     );
 
-    const removeUsePluginEntryCheck = api.addCheck(
-      "usePlugin:entry",
-      (factory, registered) => {
-        validateNoDuplicatePlugins(factory, registered);
-      },
-    );
-
     const removeUsePluginPluginCheck = api.addCheck(
       "usePlugin:plugin",
       (plugin) => {
@@ -1102,8 +1094,6 @@ export function validationPlugin<
         removeCloneRouterEntryCheck();
 
         removeUsePluginCountCheck();
-
-        removeUsePluginEntryCheck();
 
         removeUsePluginPluginCheck();
 

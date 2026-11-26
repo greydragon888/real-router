@@ -53,6 +53,7 @@
   "sideEffects": false,
   "devDependencies": {
     "@real-router/core": "workspace:^",
+    "@real-router/validation-plugin": "workspace:^",
     "jsdom": "31.0.1"
   },
   "peerDependencies": {

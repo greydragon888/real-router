@@ -18,7 +18,7 @@ persistentParamsPluginFactory({ lang: "en", theme: "light" });
 
 `null`, arrays, and objects throw `TypeError` at navigation time. `NaN` and `Infinity` are also rejected (via `isPrimitiveValue`, `src/is-primitive-value.ts`).
 
-Empty config (`{}` or `[]`) returns a no-op `PluginFactory` — no interceptor registered, no root path change.
+Empty config (`{}` or `[]`) returns a factory whose plugin registers no interceptor and leaves the root path alone; it still marks the router, so a second registration is refused ("A repeat registration throws the plugin's own error" below).
 
 Validation runs at factory call time (param names) and again at navigation time (param values).
 
@@ -114,9 +114,9 @@ The primary param **injection** happens in the interceptor. `onTransitionSuccess
 
 After updating the snapshot, `onTransitionSuccess` publishes it to `state.context.persistentParams` via `claim.write(toState, #persistentParams)`. This happens before subscriber callbacks fire, so `router.subscribe()` listeners always see the current persistent params snapshot on `state.context.persistentParams`.
 
-### Double initialization throws
+### A repeat registration throws the plugin's own error (#2974)
 
-`usePlugin` is called once per router. Calling it twice with the same factory (without `unsubscribe()` in between) throws from core: the second instance's `claimContextNamespace("persistentParams")` hits the already-claimed namespace (`CONTEXT_NAMESPACE_ALREADY_CLAIMED`). The plugin itself adds no explicit guard — the core namespace-claim collision is the backstop. (With `@real-router/validation-plugin`, the duplicate **factory** is rejected even earlier, before the factory runs — #726.)
+A registration on a router that already carries the plugin — under any config, the empty one included, and on a clone, which re-runs the base's factories — throws `Error: [@real-router/persistent-params-plugin] is already registered on this router — a clone already carries the plugins of its base router` before it claims anything. Teardown takes the router out of the mark, so `unsubscribe()` followed by `usePlugin` registers again. A plugin that holds the `persistentParams` namespace makes core refuse the claim with `CONTEXT_NAMESPACE_ALREADY_CLAIMED`, and the router takes the plugin once that one is gone. `tests/functional/reregistration-2974.test.ts` holds the cells.
 
 ### Composition order with `search-schema-plugin` decides whether persistent params are validated
 

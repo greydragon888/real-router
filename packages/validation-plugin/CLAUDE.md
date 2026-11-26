@@ -222,6 +222,12 @@ before the call's first factory — and each report is a diagnostic kind.
 `validator-boundary-authority-2322.test.ts` names, call by call, the file that
 reds without it.
 
+⚠ **No check of this plugin stands at `usePlugin:entry`.** A plugin of the
+monorepo refuses its own second registration (#2974), so this plugin does not
+look for a factory an earlier call registered;
+`tests/functional/integration/plugin-lifecycle.test.ts` holds a repeat it lets
+through.
+
 ⚑ **One count, two halves.** `validateDependencyLimit` and
 `validatePluginLimit` refuse at the count positions, and
 `reportDependencyCount` and `validatePluginCountThresholds` log the `warn` /

@@ -119,7 +119,7 @@ describe("preload-plugin — lifecycle", () => {
     expect("getPreloadSettings" in router).toBe(false);
   });
 
-  it("returns empty plugin object in SSR environment (no document)", async () => {
+  it("returns a plugin with a teardown alone in SSR environment (no document)", async () => {
     vi.stubGlobal("document", undefined);
 
     const factory = preloadPluginFactory();
@@ -129,11 +129,15 @@ describe("preload-plugin — lifecycle", () => {
     const getDep = () => {
       throw new Error("no deps");
     };
-    const plugin = factory(router, getDep);
 
-    expect(plugin).toStrictEqual({});
+    try {
+      const plugin = factory(router, getDep);
 
-    vi.unstubAllGlobals();
+      // The teardown takes the router out of the registration mark (#2974).
+      expect(Object.keys(plugin)).toStrictEqual(["teardown"]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("getPreloadSettings() returns configured options", () => {

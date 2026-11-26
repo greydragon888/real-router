@@ -77,16 +77,22 @@ hashPluginFactory(opts?, browser?)   ← factory.ts
                 │
                 │  Called by the router on router.usePlugin():
                 │
-                └── new HashPlugin(router, api, options, browser, prefixRegex, ...)
-                            │
-                            │  Constructor:
-                            │  - registers start interceptor (via browser-env)
-                            │  - pre-computes urlPrefix = `${base}#${hashPrefix}`
-                            │  - calls api.extendRouter({buildUrl, matchUrl, replaceHistoryState})
-                            │  - creates popstate handler + hash-sync lifecycle (popstate & hashchange, via browser-env)
-                            │
-                            └── .getPlugin()  → Plugin { onStart, onStop, ... }
+                ├── REGISTERED.has(router)? → throws, nothing registered
+                ├── new HashPlugin(router, api, options, browser, prefixRegex, ...)
+                │           │
+                │           │  Constructor:
+                │           │  - registers start interceptor (via browser-env)
+                │           │  - pre-computes urlPrefix = `${base}#${hashPrefix}`
+                │           │  - calls api.extendRouter({buildUrl, matchUrl, replaceHistoryState})
+                │           │  - creates popstate handler + hash-sync lifecycle (popstate & hashchange, via browser-env)
+                │           │
+                │           └── .getPlugin()  → Plugin { onStart, onStop, ... }
+                │
+                └── REGISTERED.add(router) → returns the plugin with a teardown
+                    that deletes the router from REGISTERED, then runs its own
 ```
+
+`REGISTERED` is a module-level `WeakSet` of the routers the plugin is registered on. A clone carries its base's plugins, so a registration there is refused too.
 
 **Why this split instead of a single object?**
 
@@ -119,6 +125,10 @@ export function hashPluginFactory(opts?, browser?): PluginFactory {
   const shared: SharedFactoryState = { removePopStateListener: undefined };
 
   return function hashPlugin(routerBase) {
+    if (REGISTERED.has(routerBase)) {
+      throw new Error(`[${LOGGER_CONTEXT}] is already registered on this router — …`);
+    }
+
     const plugin = new HashPlugin(
       routerBase,
       getPluginApi(routerBase),
@@ -127,9 +137,18 @@ export function hashPluginFactory(opts?, browser?): PluginFactory {
       prefixRegex,
       transitionOptions,
       shared,
-    );
+    ).getPlugin();
 
-    return plugin.getPlugin();
+    REGISTERED.add(routerBase); // after the last call that may throw
+
+    return {
+      ...plugin,
+      teardown: () => {
+        REGISTERED.delete(routerBase);
+
+        return plugin.teardown?.();
+      },
+    };
   };
 }
 ```
@@ -289,7 +308,7 @@ The `shared` object is created once in `hashPluginFactory()` and passed to `crea
 The factory may be called again — for example, during hot module replacement (HMR) or when reusing the factory with different routers.
 Each new plugin instance registers its own popstate + hashchange listeners in `onStart`. Without `shared`, the previous listeners would remain in memory.
 
-`shared` is intentionally mutable. It's the only shared state between instances of the same factory.
+`shared` is intentionally mutable. The instances of one factory share it, and every instance of the plugin shares the module's `REGISTERED` set.
 
 **Factory pool — last-wins (concurrent-live caveat).** Because the single `removePopStateListener` slot is shared, each `onStart` removes the previous instance's listeners before installing its own. (For hash-plugin the slot holds a combined remover for **both** the popstate and hashchange listeners.) The pattern is built for a pool where routers are created/destroyed **sequentially** (one live router at a time). If two routers from the same factory are live **at the same time** on one window, only the **last-started** one tracks `popstate`/`hashchange` — the earlier one silently desyncs from the URL. There is a single event stream and a single URL, so this mutual exclusivity is inherent. For genuinely concurrent routers, give each its own factory instance. Locked by `tests/stress/plugin-lifecycle-churn.stress.ts`.
 
@@ -497,12 +516,15 @@ router.usePlugin(hashPluginFactory(opts))
         ▼
   hashPlugin(router)  ← called by the core
         │
+        ├── REGISTERED.has(router)? → throws, nothing registered
         ├── new HashPlugin(...)
         │     ├── Registers start interceptor
         │     └── api.extendRouter({buildUrl, matchUrl, replaceHistoryState})
         │           → stores returned unsubscribe as #removeExtensions
         │
-        └── plugin.getPlugin() → { onStart, onStop, onTransitionSuccess, teardown }
+        ├── plugin.getPlugin() → { onStart, onStop, onTransitionSuccess, teardown }
+        └── REGISTERED.add(router) → returns that plugin with a teardown that
+            deletes the router from REGISTERED, then runs its own
 
 router.start()
         │

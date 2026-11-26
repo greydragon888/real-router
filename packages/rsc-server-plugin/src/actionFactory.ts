@@ -10,6 +10,13 @@ import type {
 } from "@real-router/core";
 
 /**
+ * The routers this plugin is registered on (#2974). A second registration on
+ * one of them throws before it registers anything, and teardown takes the
+ * router out. `tests/functional/reregistration-2974.test.ts` holds the cells.
+ */
+const REGISTERED = new WeakSet<object>();
+
+/**
  * Per-start runtime validator for `getResult()` return values.
  *
  * Returns `null` when the value is acceptable (typed `RscActionResult`: a
@@ -108,6 +115,12 @@ export function rscActionPluginFactory<
   }
 
   return (router): Plugin => {
+    if (REGISTERED.has(router)) {
+      throw new Error(
+        `${ERROR_PREFIX} is already registered on this router — a clone already carries the plugins of its base router`,
+      );
+    }
+
     const api = getPluginApi(router);
     const claim = api.claimContextNamespace("rscAction");
 
@@ -145,8 +158,11 @@ export function rscActionPluginFactory<
       },
     );
 
+    REGISTERED.add(router);
+
     return {
       teardown() {
+        REGISTERED.delete(router);
         removeStartInterceptor();
         claim.release();
       },

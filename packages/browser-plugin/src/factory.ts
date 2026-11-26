@@ -52,6 +52,13 @@ const FROZEN_NAVIGATE: BrowserContext = Object.freeze({
   direction: "forward",
 });
 
+/**
+ * The routers this plugin is registered on (#2974). A second registration on
+ * one of them throws before it registers anything, and teardown takes the
+ * router out. `tests/functional/reregistration-2974.test.ts` holds the cells.
+ */
+const REGISTERED = new WeakSet<object>();
+
 export function browserPluginFactory(
   opts?: Partial<BrowserPluginOptions>,
   browser?: Browser,
@@ -127,6 +134,12 @@ function createBrowserPlugin(
   transitionOptions: PopstateTransitionOptions,
   shared: SharedFactoryState,
 ): Plugin {
+  if (REGISTERED.has(router)) {
+    throw new Error(
+      `[${LOGGER_CONTEXT}] is already registered on this router — a clone already carries the plugins of its base router`,
+    );
+  }
+
   // Every entry this plugin writes carries its position, so a refused
   // traversal can return to the entry it started from (#2740).
   const positions = createEntryPositions();
@@ -223,6 +236,8 @@ function createBrowserPlugin(
   // disconnects the LIVE router (#1213). Mirrors the popstate lifecycle guard.
   let myHashRemover: (() => void) | undefined;
 
+  REGISTERED.add(router);
+
   return {
     onStart: () => {
       lifecycle.onStart?.();
@@ -246,6 +261,8 @@ function createBrowserPlugin(
     },
 
     teardown: () => {
+      REGISTERED.delete(router);
+
       if (myHashRemover && shared.removeHashChangeListener === myHashRemover) {
         shared.removeHashChangeListener();
         shared.removeHashChangeListener = undefined;

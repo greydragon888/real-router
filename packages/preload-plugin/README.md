@@ -208,7 +208,7 @@ Errors in `preload` are silently caught — error handling is your data layer's 
 
 ## SSR Support
 
-The plugin is SSR-safe — returns an empty plugin object when `document` is not available:
+The plugin is SSR-safe — when `document` is not available it adds no listener and no router method:
 
 ```typescript
 // Server-side — no errors, no listeners

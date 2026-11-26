@@ -81,9 +81,10 @@ export class PluginsNamespace<
   /**
    * Registers one or more plugin factories.
    * Returns unsubscribe function to remove all added plugins.
-   * Input already validated by facade (limit, duplicates).
+   * The facade has asked the checks standing at `usePlugin:count` and
+   * `usePlugin:entry`.
    *
-   * @param factories - Already validated by facade
+   * @param factories - The factories of the call, past the facade's checks
    */
   use(...factories: PluginFactory<Dependencies>[]): Unsubscribe {
     this.#deps.emitDiagnostic(
@@ -116,7 +117,7 @@ export class PluginsNamespace<
       return unsubscribe;
     }
 
-    // Deduplicate batch with warning (validation already done by facade)
+    // Deduplicate within the batch
     const seenInBatch = this.#deduplicateBatch(factories);
 
     // Track successfully initialized plugins for cleanup
@@ -212,8 +213,9 @@ export class PluginsNamespace<
   };
 
   /**
-   * Deduplicates batch with warning for duplicates within batch.
-   * Validation (existing duplicates) is done by facade.
+   * Deduplicates the batch; each repeat in it emits
+   * `USE_PLUGIN_DUPLICATE_IN_BATCH`. A factory an earlier call registered is
+   * not looked for.
    */
   #deduplicateBatch(
     plugins: PluginFactory<Dependencies>[],

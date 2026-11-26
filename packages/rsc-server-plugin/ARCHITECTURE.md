@@ -108,12 +108,13 @@ Same closure-based factory as `ssr-data-plugin` — no class; after `usePlugin()
 rscServerPluginFactory(loaders)              ← factory.ts
         │
         │  1. validateLoaders(loaders)         ← inlined binding of createLoadersValidator(ERROR_PREFIX, ALLOWED_RSC_MODES) (one consumer, no other importer)
-        │  2. createSsrLoaderPlugin<ReactNode, Dependencies>(loaders, { namespace: "rsc", modeNamespace: "ssrRscMode", errorPrefix, allowedModes })
+        │  2. createSsrLoaderPlugin<ReactNode, Dependencies>(loaders, { namespace: "rsc", modeNamespace: "ssrRscMode", errorPrefix, allowedModes, registered: REGISTERED })
         │
         └── createSsrLoaderPlugin returns PluginFactory (closure)
                 │
                 │  Called by router.usePlugin():
                 │
+                ├── registered.has(router)? → throws, nothing claimed
                 ├── api = getPluginApi(router)
                 ├── acquired: ContextNamespaceClaim[] = []
                 ├── try:
@@ -127,9 +128,10 @@ rscServerPluginFactory(loaders)              ← factory.ts
                 │       └── claim.write(state, await loader({ params: state.params, search: state.search })) + modeClaim.write(state, resolveMode(...))
                 ├── router.subscribeLeave(...)
                 │       └── write mode → peek staleMark → await loader → write ReactNode → record the refresh in refreshes
+                ├── registered.add(router)
                 └── return { onTransitionSuccess, teardown }
                         ├── onTransitionSuccess: committed state carries a refresh → clearStaleMark
-                        └── teardown: removeStartInterceptor() + removeLeaveListener() + claim.release() + modeClaim.release()
+                        └── teardown: registered.delete(router) + removeStartInterceptor() + removeLeaveListener() + claim.release() + modeClaim.release()
 ```
 
 ## Sibling: `rscActionPluginFactory` (Server Actions)
@@ -149,6 +151,7 @@ rscActionPluginFactory(getResult)             ← actionFactory.ts
                 │
                 │  Called by router.usePlugin():
                 │
+                ├── REGISTERED.has(router)? → throws, nothing claimed
                 ├── api = getPluginApi(router)
                 ├── claim = api.claimContextNamespace("rscAction")
                 ├── api.addInterceptor("start", async (next, path) => {
@@ -165,7 +168,8 @@ rscActionPluginFactory(getResult)             ← actionFactory.ts
                 │       claim.write(state, result);
                 │       return state;
                 │   })
-                └── return { teardown: removeStartInterceptor + claim.release }
+                ├── REGISTERED.add(router)
+                └── return { teardown: REGISTERED.delete(router) + removeStartInterceptor + claim.release }
 ```
 
 **Why a separate factory?** Server Action results are produced *outside*

@@ -2025,6 +2025,7 @@ describe("@real-router/ssr-data-plugin", () => {
             deferredNamespace: "ssrDataDeferred",
             // missing deferredKeysNamespace
             errorPrefix: "[test]",
+            registered: new WeakSet(),
           },
         ),
       ).toThrow(/must be set together/);
@@ -2038,6 +2039,7 @@ describe("@real-router/ssr-data-plugin", () => {
             deferredKeysNamespace: "ssrDataDeferredKeys",
             // missing deferredNamespace
             errorPrefix: "[test]",
+            registered: new WeakSet(),
           },
         ),
       ).toThrow(/must be set together/);

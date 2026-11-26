@@ -796,13 +796,15 @@ describe("@real-router/rsc-server-plugin", () => {
         rscServerPluginFactory({ home: () => () => node("First") }),
       );
 
-      // The "rsc" namespace is exclusive — the second factory tries to
-      // claim it again and core's collision detector throws.
+      // The plugin refuses its second registration itself, before the second
+      // instance claims the "rsc" namespace (#2974).
       expect(() => {
         router.usePlugin(
           rscServerPluginFactory({ home: () => () => node("Second") }),
         );
-      }).toThrow(/already claimed/i);
+      }).toThrow(
+        "[@real-router/rsc-server-plugin] is already registered on this router — a clone already carries the plugins of its base router",
+      );
     });
 
     it("releases the rsc namespace on teardown so a fresh factory can re-register", async () => {

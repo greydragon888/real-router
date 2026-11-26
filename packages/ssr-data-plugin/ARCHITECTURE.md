@@ -89,12 +89,14 @@ ssrDataPluginFactory(loaders)                ← factory.ts
         │       deferredNamespace: "ssrDataDeferred",
         │       deferredKeysNamespace: "ssrDataDeferredKeys",
         │       errorPrefix,
+        │       registered: REGISTERED,    ← factory.ts's WeakSet of the routers it is registered on
         │     })
         │
         └── createSsrLoaderPlugin returns PluginFactory (closure)
                 │
                 │  Called by router.usePlugin():
                 │
+                ├── registered.has(router)? → throws, nothing claimed
                 ├── api = getPluginApi(router)
                 ├── try:
                 │       ├── dataClaim          = api.claimContextNamespace("data")
@@ -109,9 +111,11 @@ ssrDataPluginFactory(loaders)                ← factory.ts
                 │       └── scratchpad-hit OR await loader → write critical/mode/deferred/keys
                 ├── removeLeaveListener = router.subscribeLeave(...)
                 │       └── write mode → peek staleMark → await loader → write critical/deferred/keys → record the refresh in refreshes
+                ├── registered.add(router)
                 └── return { onTransitionSuccess, teardown }
                         ├── onTransitionSuccess: committed state carries a refresh → clearStaleMark
-                        └── teardown: removeStartInterceptor() + removeLeaveListener()
+                        └── teardown: registered.delete(router)
+                            + removeStartInterceptor() + removeLeaveListener()
                             + dataClaim.release() + modeClaim.release()
                             + deferredClaim.release() + deferredKeysClaim.release()
 ```
@@ -119,7 +123,7 @@ ssrDataPluginFactory(loaders)                ← factory.ts
 **Why a closure instead of a class?**
 
 - Bindings are write-once at construction (`dataClaim`, `modeClaim`, `deferredClaim`, `deferredKeysClaim`, `compiledLoaders`, listener removers) — after `usePlugin()` returns, the only instance state that changes is the contents of `refreshes`, which carries each refresh from the leave listener to `onTransitionSuccess`.
-- No state shared across instances — every binding lives in one instance's closure, and `refreshes` is the one two methods share: the leave listener records a refresh, `onTransitionSuccess` clears the flag it answered.
+- One set is shared across instances: `REGISTERED` of `factory.ts`, the routers the plugin is registered on. Every other binding lives in one instance's closure, and `refreshes` is the one two methods share: the leave listener records a refresh, `onTransitionSuccess` clears the flag it answered.
 - Fewer files, fewer abstractions — proportional to the plugin's complexity.
 
 ## Data Flow

@@ -1,7 +1,7 @@
 import { getPluginApi } from "@real-router/core/api";
 
 import { createSafeBrowser, normalizeBase } from "./browser-env";
-import { defaultOptions, source } from "./constants";
+import { defaultOptions, LOGGER_CONTEXT, source } from "./constants";
 import { buildHashLocation, createHashPrefixRegex } from "./hash-utils";
 import { HashPlugin } from "./plugin";
 import { validateOptions } from "./validation";
@@ -24,6 +24,13 @@ import type { PluginFactory, Router } from "@real-router/core";
  * (#1798), which is the doctrine's own caveat and travels with it.
  */
 const objectEntries = Object.entries;
+
+/**
+ * The routers this plugin is registered on (#2974). A second registration on
+ * one of them throws before it registers anything, and teardown takes the
+ * router out. `tests/functional/reregistration-2974.test.ts` holds the cells.
+ */
+const REGISTERED = new WeakSet<object>();
 
 export function hashPluginFactory(
   opts?: Partial<HashPluginOptions>,
@@ -68,6 +75,12 @@ export function hashPluginFactory(
   const shared: SharedFactoryState = { removePopStateListener: undefined };
 
   return function hashPlugin(routerBase) {
+    if (REGISTERED.has(routerBase)) {
+      throw new Error(
+        `[${LOGGER_CONTEXT}] is already registered on this router — a clone already carries the plugins of its base router`,
+      );
+    }
+
     const plugin = new HashPlugin(
       routerBase as Router,
       getPluginApi(routerBase),
@@ -76,8 +89,17 @@ export function hashPluginFactory(
       prefixRegex,
       transitionOptions,
       shared,
-    );
+    ).getPlugin();
 
-    return plugin.getPlugin();
+    REGISTERED.add(routerBase);
+
+    return {
+      ...plugin,
+      teardown: () => {
+        REGISTERED.delete(routerBase);
+
+        return plugin.teardown?.();
+      },
+    };
   };
 }
