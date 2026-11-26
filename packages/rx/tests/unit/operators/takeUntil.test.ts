@@ -1,10 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 
 import { RxObservable, takeUntil } from "../../../src";
 
 import type { Observer } from "../../../src";
 
 describe("takeUntil()", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("should complete when notifier emits", async () => {
     const values: number[] = [];
     const completeCalls: number[] = [];
@@ -88,6 +92,8 @@ describe("takeUntil()", () => {
   });
 
   it("should propagate error from notifier", async () => {
+    vi.useFakeTimers();
+
     const errors: unknown[] = [];
 
     const notifier = new RxObservable<void>((observer) => {
@@ -111,13 +117,15 @@ describe("takeUntil()", () => {
       error: (error) => errors.push(error),
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await vi.advanceTimersByTimeAsync(100);
 
     expect(errors).toHaveLength(1);
     expect((errors[0] as Error).message).toBe("notifier error");
   });
 
   it("should propagate error from source", async () => {
+    vi.useFakeTimers();
+
     const errors: unknown[] = [];
 
     const notifier = new RxObservable<void>((observer) => {
@@ -137,7 +145,7 @@ describe("takeUntil()", () => {
       error: (error) => errors.push(error),
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await vi.advanceTimersByTimeAsync(100);
 
     expect(errors).toHaveLength(1);
     expect((errors[0] as Error).message).toBe("source error");
@@ -173,6 +181,8 @@ describe("takeUntil()", () => {
   });
 
   it("should emit values before notifier emits", async () => {
+    vi.useFakeTimers();
+
     const values: number[] = [];
 
     const notifier = new RxObservable<void>((observer) => {
@@ -194,7 +204,7 @@ describe("takeUntil()", () => {
       next: (value) => values.push(value),
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await vi.advanceTimersByTimeAsync(100);
 
     expect(values).toStrictEqual([1, 2, 3]);
   });
@@ -236,6 +246,8 @@ describe("takeUntil()", () => {
   });
 
   it("should not emit after notifier emits", async () => {
+    vi.useFakeTimers();
+
     const values: number[] = [];
 
     const notifier = new RxObservable<void>((observer) => {
@@ -258,7 +270,7 @@ describe("takeUntil()", () => {
 
     emitFn?.(1);
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await vi.advanceTimersByTimeAsync(100);
 
     emitFn?.(2);
 

@@ -1,8 +1,12 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 
 import { RxObservable, debounceTime } from "../../../src";
 
 describe("debounceTime()", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("should not emit on complete when no value was ever received (hasValue starts false)", () => {
     const next = vi.fn();
     const source = new RxObservable<number>((observer) => {
@@ -57,6 +61,8 @@ describe("debounceTime()", () => {
   });
 
   it("should emit multiple values if they are spaced apart", async () => {
+    vi.useFakeTimers();
+
     const values: number[] = [];
 
     const source = new RxObservable<number>((observer) => {
@@ -72,12 +78,14 @@ describe("debounceTime()", () => {
       next: (value) => values.push(value),
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    await vi.advanceTimersByTimeAsync(400);
 
     expect(values).toStrictEqual([1, 2, 3]);
   });
 
   it("should work with duration 0 (still async via setTimeout)", async () => {
+    vi.useFakeTimers();
+
     const values: number[] = [];
 
     const source = new RxObservable<number>((observer) => {
@@ -93,7 +101,7 @@ describe("debounceTime()", () => {
       next: (value) => values.push(value),
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await vi.advanceTimersByTimeAsync(100);
 
     expect(values).toStrictEqual([3]);
   });
@@ -123,6 +131,8 @@ describe("debounceTime()", () => {
   });
 
   it("should clear timeout on error", async () => {
+    vi.useFakeTimers();
+
     const values: number[] = [];
     const errors: unknown[] = [];
 
@@ -139,7 +149,7 @@ describe("debounceTime()", () => {
       error: (error) => errors.push(error),
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await vi.advanceTimersByTimeAsync(100);
 
     expect(values).toStrictEqual([]);
     expect(errors).toHaveLength(1);
@@ -147,6 +157,8 @@ describe("debounceTime()", () => {
   });
 
   it("should flush pending value on complete", async () => {
+    vi.useFakeTimers();
+
     const values: number[] = [];
     const completeCalls: number[] = [];
 
@@ -163,13 +175,15 @@ describe("debounceTime()", () => {
       complete: () => completeCalls.push(1),
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await vi.advanceTimersByTimeAsync(100);
 
     expect(values).toStrictEqual([2]);
     expect(completeCalls).toStrictEqual([1]);
   });
 
   it("should propagate error from source", async () => {
+    vi.useFakeTimers();
+
     const errors: unknown[] = [];
 
     const source = new RxObservable<number>((observer) => {
@@ -183,7 +197,7 @@ describe("debounceTime()", () => {
       error: (error) => errors.push(error),
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await vi.advanceTimersByTimeAsync(100);
 
     expect(errors).toHaveLength(1);
     expect((errors[0] as Error).message).toBe("source error");
@@ -288,6 +302,8 @@ describe("debounceTime()", () => {
   });
 
   it("should flush then complete in correct order", async () => {
+    vi.useFakeTimers();
+
     const events: string[] = [];
 
     const source = new RxObservable<number>((observer) => {
@@ -303,7 +319,7 @@ describe("debounceTime()", () => {
       complete: () => events.push("complete"),
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await vi.advanceTimersByTimeAsync(100);
 
     expect(events).toStrictEqual(["next:2", "complete"]);
   });

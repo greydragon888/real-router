@@ -20,6 +20,12 @@ describe("withTimeout under fan-out", () => {
     process.on("unhandledRejection", trackUnhandled);
 
     try {
+      let rejected = 0;
+      let allRejected: () => void = () => {};
+      const lateRejections = new Promise<void>((resolve) => {
+        allRejected = resolve;
+      });
+
       const racing = Array.from({ length: 100 }, (_, i) =>
         withTimeout(
           `route-${i}`,
@@ -28,6 +34,11 @@ describe("withTimeout under fan-out", () => {
             new Promise<never>((_, reject) => {
               setTimeout(() => {
                 reject(new Error(`late-${i}`));
+                rejected += 1;
+
+                if (rejected === 100) {
+                  allRejected();
+                }
               }, 30);
             }),
         ),
@@ -44,10 +55,10 @@ describe("withTimeout under fan-out", () => {
 
       expect(allTimeouts).toBe(true);
 
-      // Wait long enough for every late rejection (30ms) + handler
-      // bookkeeping to settle. 100ms is comfortably above the loader's
-      // own 30ms scheduling so the rejection has fired by now.
-      await new Promise((r) => setTimeout(r, 100));
+      // Every loader has rejected once its own timer has run; a macrotask
+      // after the last one lets Node report a rejection nobody handled.
+      await lateRejections;
+      await new Promise((r) => setTimeout(r, 0));
 
       expect(seenUnhandled).toStrictEqual([]);
     } finally {
