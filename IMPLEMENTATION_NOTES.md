@@ -16254,3 +16254,15 @@ So a pull request that edits the dir gets no shard for a consumer without the in
 
 - the same factory object of a plugin outside the monorepo, twice on one router, where core refuses nothing its first instance holds — a `state.context` namespace, a router property, a hook function both instances share, a route name: the base runs two instances and its clone one, and after an `unsubscribe` of the first the base runs one and a clone none — core's `#plugins` is a `Set`, which holds the factory once;
 - two copies of a plugin package in one process, both installed on one router: each copy holds a set of its own, so the second copy meets what a second instance with a factory of its own met on `53814ece6` (Problem above) — core's conflict where the plugin claims a namespace or extends the router, and a doubled effect for logger-plugin, lifecycle-plugin and search-schema-plugin.
+
+## A test listens for unhandled rejections on `process`, and a lint restriction holds it (2026-11-26)
+
+**Problem.** Under vitest's jsdom environment an `unhandledrejection` listener on `window` never runs: jsdom does not deliver Node's unhandled rejections to it. A cell that checked "no unhandled rejection" through such a listener stayed green with a rejection planted right after the listener, while vitest reported the rejection itself and failed the run. Fourteen such listeners in eleven test files of the adapters and `hash-plugin`, measured in one file of each package, guarded nothing and were removed.
+
+**Solution.** `eslint.config.mjs` restricts the listener in files under `tests/`: `no-restricted-syntax` flags `addEventListener("unhandledrejection", …)` called on any object, bare or through a computed key, with a string or a template literal, and an assignment to `onunhandledrejection`. vitest's own handler fails the run on an unhandled rejection; a cell that needs the check inside it listens with `process.on("unhandledRejection")`.
+
+**Why.**
+
+- The shape has no use in a vitest test of this repository: under jsdom the listener never runs, and Node has no `globalThis.addEventListener`. In production code a `window` listener runs in a real browser, so `src/` stays outside the restriction.
+- A block that sets `no-restricted-syntax` again replaces the whole list for the files it matches, so the test-file block spreads the base entries (`ISOLATE_PRODUCE_RESTRICTIONS`) before its own. With the spread removed, a fire-test showed `runHook(compileHook())` in a test go unflagged.
+- The fire-test flags the eight forms in a `.ts` test and the method form in a `.svelte` component under `tests/`. It leaves `process.on("unhandledRejection")`, a `popstate` listener and `removeEventListener` alone, and an event name held in a variable as well, which the selector cannot see.
