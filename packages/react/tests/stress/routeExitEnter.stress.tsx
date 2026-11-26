@@ -208,19 +208,14 @@ describe("R11 — useRouteEnter/useRouteExit stress", () => {
     // tail finally tries to setState on the dead component. The hook must
     // either (a) skip the dispatch entirely because the host is gone, or
     // (b) the host must defend its setState — either way, no React warning,
-    // no unhandled rejection. The probe asserts both via the console + the
-    // global rejection listener.
+    // no unhandled rejection. The cell asserts the warning half via the
+    // console; an unhandled rejection fails the run through vitest's own
+    // handler.
     const router = createStressRouter(5);
 
     await router.start("/route0");
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    let unhandledRejection = false;
-    const rejectionHandler = (): void => {
-      unhandledRejection = true;
-    };
-
-    globalThis.addEventListener("unhandledrejection", rejectionHandler);
 
     let releaseHandler!: () => void;
     let handlerReached = false;
@@ -288,7 +283,6 @@ describe("R11 — useRouteEnter/useRouteExit stress", () => {
     });
 
     expect(setStateOnDeadCalled).toBe(true);
-    expect(unhandledRejection).toBe(false);
 
     // React 19 silently no-ops setState on unmounted; if it ever regresses
     // to warning again, the assertion catches it.
@@ -301,7 +295,6 @@ describe("R11 — useRouteEnter/useRouteExit stress", () => {
     expect(reactWarnings).toHaveLength(0);
 
     consoleSpy.mockRestore();
-    globalThis.removeEventListener("unhandledrejection", rejectionHandler);
     router.stop();
   });
 

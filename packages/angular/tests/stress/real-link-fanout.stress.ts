@@ -1,6 +1,6 @@
 import { Component } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MB, createStressRouter, takeHeapSnapshot } from "./helpers";
 import { RealLink } from "../../src/directives/RealLink";
@@ -217,13 +217,7 @@ describe("RealLink / RealLinkActive directive fanout stress", () => {
     const anchors: NodeListOf<HTMLAnchorElement> =
       fixture.nativeElement.querySelectorAll("a");
 
-    // Track unhandled rejections during the storm.
-    const unhandled: PromiseRejectionEvent[] = [];
-    const handler = (event: PromiseRejectionEvent): void => {
-      unhandled.push(event);
-    };
-
-    globalThis.addEventListener("unhandledrejection", handler);
+    const navigateSpy = vi.spyOn(router, "navigate");
 
     // Dispatch 50 click events synchronously. Each anchor calls
     // router.navigate("") which rejects (empty routeName → buildPath
@@ -238,12 +232,12 @@ describe("RealLink / RealLinkActive directive fanout stress", () => {
       a.dispatchEvent(event);
     }
 
-    // Let any pending promises settle.
+    // Let any pending promises settle: a rejection RealLink fails to swallow
+    // fails the run through vitest's own handler.
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    globalThis.removeEventListener("unhandledrejection", handler);
-
-    expect(unhandled).toHaveLength(0);
+    // Every click reached router.navigate.
+    expect(navigateSpy).toHaveBeenCalledTimes(50);
 
     fixture.destroy();
   });

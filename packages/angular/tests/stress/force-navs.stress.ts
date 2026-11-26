@@ -1,6 +1,6 @@
 import { Component } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MB, createStressRouter, takeHeapSnapshot } from "./helpers";
 import { RealLink } from "../../src/directives/RealLink";
@@ -178,13 +178,7 @@ describe("concurrent force-navs stress", () => {
 
     expect(anchors).toHaveLength(50);
 
-    // Track unhandled rejections.
-    const unhandled: PromiseRejectionEvent[] = [];
-    const handler = (event: PromiseRejectionEvent): void => {
-      unhandled.push(event);
-    };
-
-    globalThis.addEventListener("unhandledrejection", handler);
+    const navigateSpy = vi.spyOn(router, "navigate");
 
     // Storm: 50 synchronous dispatches.
     for (const a of anchors) {
@@ -193,14 +187,13 @@ describe("concurrent force-navs stress", () => {
       );
     }
 
-    // Drain pending promises.
+    // Drain pending promises. Each click's navigate-rejection is swallowed
+    // via .catch(() => {}); one that escapes fails the run through vitest's
+    // own handler.
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    globalThis.removeEventListener("unhandledrejection", handler);
-
-    // Each click's navigate-rejection should be swallowed via
-    // .catch(() => {}). No unhandled rejection escapes.
-    expect(unhandled).toHaveLength(0);
+    // Every click reached router.navigate.
+    expect(navigateSpy).toHaveBeenCalledTimes(50);
 
     fixture.destroy();
   }, 30_000);

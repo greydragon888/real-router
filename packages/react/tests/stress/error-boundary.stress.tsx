@@ -112,13 +112,7 @@ describe("R4 — RouterErrorBoundary stress", () => {
   });
 
   it("4.3: mount/unmount × 100 boundaries with interleaved errors — no unhandled rejections", async () => {
-    let unhandled = false;
-
-    const handler = (): void => {
-      unhandled = true;
-    };
-
-    globalThis.addEventListener("unhandledrejection", handler);
+    let fallbacks = 0;
 
     for (let i = 0; i < 100; i++) {
       const { unmount } = render(
@@ -138,13 +132,17 @@ describe("R4 — RouterErrorBoundary stress", () => {
         await router.navigate("route1").catch(() => {});
       });
 
+      if (screen.queryByTestId("fallback")) {
+        fallbacks += 1;
+      }
+
       unmount();
     }
 
-    // Dangling error-source subscriptions would surface as unhandled rejections.
-    expect(unhandled).toBe(false);
-
-    globalThis.removeEventListener("unhandledrejection", handler);
+    // Every boundary rendered the guard's rejection. A dangling error-source
+    // subscription would surface as an unhandled rejection, which fails the
+    // run through vitest's own handler.
+    expect(fallbacks).toBe(100);
   });
 
   it("4.4: multiple concurrent boundaries share error snapshot — no duplicate renders", async () => {

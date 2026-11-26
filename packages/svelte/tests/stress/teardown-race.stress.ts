@@ -7,25 +7,20 @@ import type { Router } from "@real-router/core";
 
 describe("Stress: teardown race", () => {
   let router: Router;
-  const unhandled: PromiseRejectionEvent[] = [];
-  const onUnhandled = (event: PromiseRejectionEvent) => unhandled.push(event);
 
   beforeEach(async () => {
     router = createStressRouter(8);
     await router.start("/route0");
-    unhandled.length = 0;
-    globalThis.addEventListener("unhandledrejection", onUnhandled);
   });
 
   afterEach(() => {
-    globalThis.removeEventListener("unhandledrejection", onUnhandled);
     router.stop();
   });
 
   it("11.1 Click 100 Links and immediately unmount — no unhandled rejections, no thrown errors", async () => {
     // Spy on navigate so we can prove the click handlers actually ran — without
-    // this the "no unhandled rejections" assertion passes even if NO click fired
-    // (an empty set of clicks trivially produces zero rejections). Each of the 8
+    // this the cell passes even if NO click fired (an empty set of clicks
+    // trivially produces no rejection for vitest to report). Each of the 8
     // distinct Links must drive exactly one router.navigate call.
     const navigateSpy = vi.spyOn(router, "navigate");
 
@@ -58,12 +53,12 @@ describe("Stress: teardown race", () => {
     // never wired up would drop the count below 8.
     expect(navigateSpy).toHaveBeenCalledTimes(8);
 
-    expect(unhandled).toHaveLength(0);
-
     navigateSpy.mockRestore();
   });
 
   it("11.2 Repeated mount → click → unmount cycle (50 iterations) — bounded by Link.svelte's catch-noop, no leaks", async () => {
+    const navigateSpy = vi.spyOn(router, "navigate");
+
     for (let i = 0; i < 50; i++) {
       const { container, unmount } = renderWithRouter(router, ManyLinks, {
         count: 8,
@@ -82,7 +77,8 @@ describe("Stress: teardown race", () => {
       await Promise.resolve();
     }
 
-    expect(unhandled).toHaveLength(0);
+    // Every click reached router.navigate.
+    expect(navigateSpy).toHaveBeenCalledTimes(50);
   });
 
   // Covers review gap #2: programmatic router.navigate() racing with unmount.
@@ -109,6 +105,7 @@ describe("Stress: teardown race", () => {
       await Promise.resolve();
     }
 
-    expect(unhandled).toHaveLength(0);
+    // The router stayed consistent: the last navigation (route7) committed.
+    expect(router.getState()?.name).toBe("route7");
   });
 });

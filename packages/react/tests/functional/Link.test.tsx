@@ -841,10 +841,6 @@ describe("Link component", () => {
 
       lifecycle.addActivateGuard("home", guard);
 
-      const unhandledRejection = vi.fn();
-
-      globalThis.addEventListener("unhandledrejection", unhandledRejection);
-
       const initialState = router.getState();
 
       render(
@@ -863,11 +859,8 @@ describe("Link component", () => {
         });
       });
 
-      expect(unhandledRejection).not.toHaveBeenCalled();
       expect(guard).toHaveBeenCalled();
       expect(router.getState()?.name).toBe(initialState?.name);
-
-      globalThis.removeEventListener("unhandledrejection", unhandledRejection);
     });
   });
 

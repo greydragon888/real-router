@@ -1,4 +1,4 @@
-import { createRouter } from "@real-router/core";
+import { createRouter, errorCodes } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 import { flushPromises } from "@vue/test-utils";
 import { describe, it, expect, afterEach } from "vitest";
@@ -264,14 +264,6 @@ describe("V7 — useRouterTransition stress (Vue)", () => {
         }),
     );
 
-    let unhandledRejection = false;
-
-    const rejectionHandler = (): void => {
-      unhandledRejection = true;
-    };
-
-    globalThis.addEventListener("unhandledrejection", rejectionHandler);
-
     const Consumer = defineComponent({
       name: "Consumer",
       setup() {
@@ -284,7 +276,10 @@ describe("V7 — useRouterTransition stress (Vue)", () => {
     const wrapper = mountWithProvider(router, () => h(Consumer));
 
     // Pending guard, do NOT await.
-    const pending = router.navigate("slow").catch(() => {});
+    let cancelled: unknown;
+    const pending = router.navigate("slow").catch((error: unknown) => {
+      cancelled = error;
+    });
 
     router.stop();
     wrapper.unmount();
@@ -293,9 +288,10 @@ describe("V7 — useRouterTransition stress (Vue)", () => {
 
     await new Promise<void>((resolve) => setTimeout(resolve, 100));
 
-    expect(unhandledRejection).toBe(false);
-
-    globalThis.removeEventListener("unhandledrejection", rejectionHandler);
+    // stop() landed mid-transition. The guard resolves into the stopped
+    // router; a rejection that escapes fails the run through vitest's own
+    // handler.
+    expect(cancelled).toMatchObject({ code: errorCodes.TRANSITION_CANCELLED });
   });
 
   it("7.6: concurrent navigations with mixed-duration async guards — no zombie isTransitioning", async () => {

@@ -40,13 +40,6 @@ describe("Teardown Mid-Navigation (Hash)", () => {
         }),
     );
 
-    const unhandled: unknown[] = [];
-    const listener = (event: PromiseRejectionEvent | { reason?: unknown }) => {
-      unhandled.push("reason" in event ? event.reason : event);
-    };
-
-    (globalThis as any).addEventListener?.("unhandledrejection", listener);
-
     const pending = router.navigate("users.view", { id: "1" }).catch(noop);
 
     // Tear down (plugin only) while the guard is still resolving. The core
@@ -57,8 +50,6 @@ describe("Teardown Mid-Navigation (Hash)", () => {
     await pending;
     await waitForTransitions(60);
 
-    expect(unhandled).toHaveLength(0);
-
     // Whatever route won, the committed state must be internally consistent:
     // its path must be exactly what buildPath() produces for its name+params
     // (a torn/corrupt commit would leave name and path disagreeing).
@@ -68,8 +59,6 @@ describe("Teardown Mid-Navigation (Hash)", () => {
     expect(after?.name).toBe("users.view");
     expect(after?.path).toBe(router.buildPath(after!.name, after!.params));
     expect(after?.params).toStrictEqual({ id: "1" });
-
-    (globalThis as any).removeEventListener?.("unhandledrejection", listener);
   });
 
   it("teardown races popstate storm: router stays consistent, no listener leak", async () => {
@@ -170,21 +159,12 @@ describe("Teardown Mid-Navigation (Hash)", () => {
     await router.start();
     await router.navigate("users.list").catch(noop);
 
-    const unhandled: unknown[] = [];
-    const listener = (event: PromiseRejectionEvent | { reason?: unknown }) => {
-      unhandled.push("reason" in event ? event.reason : event);
-    };
-
-    (globalThis as any).addEventListener?.("unhandledrejection", listener);
-
     // Fire popstate while teardown is in flight — the handler must not throw
     // even if router.buildUrl has already been removed from the instance.
     dispatchPopstate({ name: "home", params: {}, path: "/home" });
     unsubscribe();
 
     await waitForTransitions(50);
-
-    expect(unhandled).toHaveLength(0);
 
     // The handler must have swallowed the buildUrl-after-teardown path WITHOUT
     // corrupting state. Whatever route is current (the popstate-driven "home"
@@ -195,8 +175,6 @@ describe("Teardown Mid-Navigation (Hash)", () => {
     expect(after).toBeDefined();
     expect(["home", "users.list"]).toContain(after?.name);
     expect(after?.path).toBe(router.buildPath(after!.name, after!.params));
-
-    (globalThis as any).removeEventListener?.("unhandledrejection", listener);
   });
 
   it("navigate() called after teardown: resolves fresh & consistent, never stale (M8)", async () => {

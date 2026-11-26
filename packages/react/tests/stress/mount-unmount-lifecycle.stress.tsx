@@ -444,14 +444,6 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
   });
 
   it("3.11: navigate during unmount — no unhandled rejections", async () => {
-    let unhandledRejection = false;
-
-    const handler = (): void => {
-      unhandledRejection = true;
-    };
-
-    globalThis.addEventListener("unhandledrejection", handler);
-
     const NavigateOnUnmount: FC = () => {
       const routerRef = useRef(router);
 
@@ -478,20 +470,12 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
       setTimeout(resolve, 50);
     });
 
-    expect(unhandledRejection).toBe(false);
-
-    globalThis.removeEventListener("unhandledrejection", handler);
+    // The cleanup's navigation committed. It discards the promise without a
+    // handler, so a rejection would fail the run through vitest's own handler.
+    expect(router.getState()?.name).toBe("route1");
   });
 
   it("3.11b: 50 mount/unmount cycles with concurrent navigate — no leaks, no rejections", async () => {
-    let unhandledRejection = false;
-
-    const handler = (): void => {
-      unhandledRejection = true;
-    };
-
-    globalThis.addEventListener("unhandledrejection", handler);
-
     const NavigateOnUnmount: FC<{ target: string }> = ({ target }) => {
       const routerRef = useRef(router);
       const targetRef = useRef(target);
@@ -535,10 +519,7 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
 
     const heapAfter = takeHeapSnapshot();
 
-    expect(unhandledRejection).toBe(false);
     expect(heapAfter - heapBefore).toBeLessThan(30 * MB);
-
-    globalThis.removeEventListener("unhandledrejection", handler);
   });
 
   it("3.12: 10000 navigate cycles on single mounted tree — bounded heap growth", async () => {

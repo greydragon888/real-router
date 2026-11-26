@@ -1,4 +1,4 @@
-import { createRouter } from "@real-router/core";
+import { createRouter, errorCodes } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -240,14 +240,6 @@ describe("R7 — useRouterTransition stress", () => {
         }),
     );
 
-    let unhandledRejection = false;
-
-    const rejectionHandler = (): void => {
-      unhandledRejection = true;
-    };
-
-    globalThis.addEventListener("unhandledrejection", rejectionHandler);
-
     const Consumer = makeTransitionConsumer(() => {});
     const { unmount } = render(
       <RouterProvider router={router}>
@@ -256,7 +248,10 @@ describe("R7 — useRouterTransition stress", () => {
     );
 
     // Start transition (pending guard). Do NOT await.
-    const navPromise = router.navigate("slow").catch(() => {});
+    let cancelled: unknown;
+    const navPromise = router.navigate("slow").catch((error: unknown) => {
+      cancelled = error;
+    });
 
     // Immediately tear down mid-transition.
     router.stop();
@@ -268,9 +263,10 @@ describe("R7 — useRouterTransition stress", () => {
       setTimeout(resolve, 100);
     });
 
-    expect(unhandledRejection).toBe(false);
-
-    globalThis.removeEventListener("unhandledrejection", rejectionHandler);
+    // stop() landed mid-transition. The guard resolves into the stopped
+    // router; a rejection that escapes fails the run through vitest's own
+    // handler.
+    expect(cancelled).toMatchObject({ code: errorCodes.TRANSITION_CANCELLED });
   });
 
   it("7.6: concurrent navigations with async guards of mixed duration — no zombie isTransitioning", async () => {
@@ -370,13 +366,6 @@ describe("R7 — useRouterTransition stress", () => {
       snapshot = t;
     });
 
-    let unhandledRejection = false;
-    const rejectionHandler = (): void => {
-      unhandledRejection = true;
-    };
-
-    globalThis.addEventListener("unhandledrejection", rejectionHandler);
-
     render(
       <RouterProvider router={router}>
         <Consumer />
@@ -398,9 +387,7 @@ describe("R7 — useRouterTransition stress", () => {
 
     expect(snapshot.isTransitioning).toBe(false);
     expect(router.getState()?.name).toBe(targets.at(-1));
-    expect(unhandledRejection).toBe(false);
 
-    globalThis.removeEventListener("unhandledrejection", rejectionHandler);
     router.stop();
   });
 });

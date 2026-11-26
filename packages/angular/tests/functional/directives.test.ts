@@ -233,13 +233,6 @@ describe("RealLink directive", () => {
 
     it("swallows rejected router.navigate on click (no unhandled rejection)", async () => {
       const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-      const unhandledRejections: unknown[] = [];
-      const onUnhandled = (event: PromiseRejectionEvent): void => {
-        unhandledRejections.push(event.reason);
-      };
-
-      globalThis.addEventListener("unhandledrejection", onUnhandled);
-
       const navigateSpy = vi
         .spyOn(router, "navigate")
         .mockRejectedValue(new Error("rejected by guard"));
@@ -276,10 +269,8 @@ describe("RealLink directive", () => {
 
       // Prove navigate WAS called (mock path exercised) AND rejection was caught.
       expect(navigateSpy).toHaveBeenCalled();
-      expect(unhandledRejections).toStrictEqual([]);
       expect(spy).toHaveBeenCalled();
 
-      globalThis.removeEventListener("unhandledrejection", onUnhandled);
       spy.mockRestore();
     });
 
