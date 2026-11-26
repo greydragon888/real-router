@@ -6,6 +6,13 @@ import { PreloadPlugin } from "./plugin";
 import type { PreloadPluginOptions } from "./types";
 import type { PluginFactory, Router } from "@real-router/core";
 
+/**
+ * The routers this plugin is registered on (#2974). A second registration on
+ * one of them throws before it registers anything, and teardown takes the
+ * router out. `tests/functional/reregistration-2974.test.ts` holds the cells.
+ */
+const REGISTERED = new WeakSet<object>();
+
 export function preloadPluginFactory(
   opts?: Partial<PreloadPluginOptions>,
 ): PluginFactory {
@@ -19,8 +26,20 @@ export function preloadPluginFactory(
   }
 
   return function preloadPlugin(routerBase, getDependency) {
+    if (REGISTERED.has(routerBase)) {
+      throw new Error(
+        `[@real-router/preload-plugin] is already registered on this router — a clone already carries the plugins of its base router`,
+      );
+    }
+
     if (typeof document === "undefined") {
-      return {};
+      REGISTERED.add(routerBase);
+
+      return {
+        teardown: () => {
+          REGISTERED.delete(routerBase);
+        },
+      };
     }
 
     const plugin = new PreloadPlugin(
@@ -28,8 +47,17 @@ export function preloadPluginFactory(
       getPluginApi(routerBase),
       options,
       getDependency,
-    );
+    ).getPlugin();
 
-    return plugin.getPlugin();
+    REGISTERED.add(routerBase);
+
+    return {
+      ...plugin,
+      teardown: () => {
+        REGISTERED.delete(routerBase);
+
+        return plugin.teardown?.();
+      },
+    };
   };
 }

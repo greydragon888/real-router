@@ -77,6 +77,7 @@ browserPluginFactory(opts?, browser?)         ← public
                 └── createBrowserPlugin(router, api, options, browser, ...)   ← internal function
                             │
                             │  Per-plugin-instance setup:
+                            │  - REGISTERED.has(router)? → throws, nothing registered
                             │  - api.claimContextNamespace("browser")
                             │  - createUpdateBrowserState() — closure with reusable
                             │    mutable {name, params, search, path} buffer (the
@@ -84,9 +85,12 @@ browserPluginFactory(opts?, browser?)         ← public
                             │  - createStartInterceptor (via browser-env)
                             │  - api.extendRouter({buildUrl, matchUrl, replaceHistoryState})
                             │  - createPopstateHandler + createPopstateLifecycle
+                            │  - REGISTERED.add(router); teardown deletes it
                             │
                             └── returns Plugin { onStart, onStop, teardown, onTransitionSuccess }
 ```
+
+`REGISTERED` is a module-level `WeakSet` of the routers the plugin is registered on. A clone carries its base's plugins, so a registration there is refused too.
 
 **Why no class?**
 
@@ -278,7 +282,7 @@ The `shared` object is created once in `browserPluginFactory()` and passed to `c
 The factory may be called again — for example, during hot module replacement (HMR) or when reusing the factory with different routers.
 Each new plugin instance registers its own popstate listener in `onStart`. Without `shared`, the previous listener would remain in memory.
 
-`shared` is intentionally mutable. It's the only shared state between instances of the same factory.
+`shared` is intentionally mutable. The instances of one factory share it, and every instance of the plugin shares the module's `REGISTERED` set.
 
 **Factory pool — last-wins (concurrent-live caveat).** Because the single `removePopStateListener` slot is shared, each `onStart` removes the previous instance's listener before installing its own. The pattern is built for a pool where routers are created/destroyed **sequentially** (one live router at a time). If two routers from the same factory are live **at the same time** on one window, only the **last-started** one tracks `popstate` — the earlier one silently desyncs from the URL. There is a single `popstate` stream and a single URL, so this mutual exclusivity is inherent (who owns the URL with two live routers?). For genuinely concurrent routers, give each its own factory instance. Locked by `tests/stress/factory-instance-cleanup.stress.ts` (B7.5).
 

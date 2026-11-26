@@ -68,7 +68,7 @@ All three listeners attach to `document` with `{ capture: true, passive: true }`
 
 ### SSR safety
 
-The factory function checks `typeof document === "undefined"` before instantiating `PreloadPlugin`. Returns `{}` (empty plugin) on the server, so `router.usePlugin(preloadPluginFactory())` is safe in SSR contexts.
+The factory function checks `typeof document === "undefined"` before instantiating `PreloadPlugin`. On the server it returns a plugin whose only member is a `teardown`, which takes the router out of the mark that refuses a second registration (#2974), so `router.usePlugin(preloadPluginFactory())` is safe in SSR contexts.
 
 ### Preload function caching
 

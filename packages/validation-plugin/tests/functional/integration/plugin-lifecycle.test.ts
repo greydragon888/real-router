@@ -1,10 +1,14 @@
 import { createRouter, RouterError } from "@real-router/core";
-import { getDependenciesApi, getRoutesApi } from "@real-router/core/api";
+import {
+  cloneRouter,
+  getDependenciesApi,
+  getRoutesApi,
+} from "@real-router/core/api";
 import { describe, it, expect, afterEach } from "vitest";
 
 import { validationPlugin } from "@real-router/validation-plugin";
 
-import type { Router } from "@real-router/core";
+import type { PluginFactory, Router } from "@real-router/core";
 
 describe("validationPlugin — lifecycle integration", () => {
   let router: Router;
@@ -180,18 +184,55 @@ describe("validationPlugin — lifecycle integration", () => {
     expect(() => router.areStatesEqual(state, state, true)).not.toThrow();
   });
 
-  describe("duplicate plugin detection (#726)", () => {
-    it("usePlugin throws when the same factory is registered twice", () => {
+  describe("no factory is refused for a registration before it (#2974)", () => {
+    // The plugin's hooks are new functions on every call and it claims
+    // nothing, so nothing in core refuses its second instance either.
+    const counting =
+      (starts: { count: number }): PluginFactory =>
+      () => ({
+        onStart: () => {
+          starts.count += 1;
+        },
+      });
+
+    it("on the same router — both instances run", async () => {
       router = createRouter([{ name: "home", path: "/home" }], {
         defaultRoute: "home",
       });
       router.usePlugin(validationPlugin());
 
-      const myPlugin = () => ({});
+      const starts = { count: 0 };
+      const factory = counting(starts);
 
-      router.usePlugin(myPlugin);
+      router.usePlugin(factory);
 
-      expect(() => router.usePlugin(myPlugin)).toThrow(/already registered/i);
+      expect(() => router.usePlugin(factory)).not.toThrow();
+
+      await router.start("/home");
+
+      expect(starts.count).toBe(2);
+    });
+
+    it("on a clone of a router that carries it — both instances run", async () => {
+      const base = createRouter([{ name: "home", path: "/home" }], {
+        defaultRoute: "home",
+      });
+
+      base.usePlugin(validationPlugin());
+
+      const starts = { count: 0 };
+      const factory = counting(starts);
+
+      base.usePlugin(factory);
+      router = cloneRouter(base);
+
+      expect(() => router.usePlugin(factory)).not.toThrow();
+
+      await router.start("/home");
+
+      expect(starts.count).toBe(2);
+
+      base.dispose();
     });
 
     it("usePlugin does not throw for distinct factories", () => {

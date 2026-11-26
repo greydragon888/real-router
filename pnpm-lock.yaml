@@ -351,6 +351,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
+      '@real-router/validation-plugin':
+        specifier: workspace:^
+        version: link:../validation-plugin
       '@testing-library/jest-dom':
         specifier: ~7.0.1
         version: 7.0.1(@testing-library/dom@10.4.2)(vitest@5.1.0)
@@ -365,6 +368,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
+      '@real-router/validation-plugin':
+        specifier: workspace:^
+        version: link:../validation-plugin
       '@testing-library/jest-dom':
         specifier: ~7.0.1
         version: 7.0.1(@testing-library/dom@10.4.2)(vitest@5.1.0)
@@ -377,24 +383,36 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
+      '@real-router/validation-plugin':
+        specifier: workspace:^
+        version: link:../validation-plugin
 
   packages/logger-plugin:
     devDependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
+      '@real-router/validation-plugin':
+        specifier: workspace:^
+        version: link:../validation-plugin
 
   packages/memory-plugin:
     devDependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
+      '@real-router/validation-plugin':
+        specifier: workspace:^
+        version: link:../validation-plugin
 
   packages/navigation-plugin:
     devDependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
+      '@real-router/validation-plugin':
+        specifier: workspace:^
+        version: link:../validation-plugin
       jsdom:
         specifier: 31.0.1
         version: 31.0.1(@noble/hashes@2.2.0)
@@ -407,6 +425,9 @@ importers:
       '@real-router/search-schema-plugin':
         specifier: workspace:^
         version: link:../search-schema-plugin
+      '@real-router/validation-plugin':
+        specifier: workspace:^
+        version: link:../validation-plugin
 
   packages/preact:
     dependencies:
@@ -447,6 +468,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
+      '@real-router/validation-plugin':
+        specifier: workspace:^
+        version: link:../validation-plugin
       jsdom:
         specifier: 31.0.1
         version: 31.0.1(@noble/hashes@2.2.0)
@@ -524,6 +548,9 @@ importers:
       '@real-router/ssr-data-plugin':
         specifier: workspace:^
         version: link:../ssr-data-plugin
+      '@real-router/validation-plugin':
+        specifier: workspace:^
+        version: link:../validation-plugin
       '@types/react':
         specifier: 19.3.0
         version: 19.3.0
@@ -542,6 +569,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
+      '@real-router/validation-plugin':
+        specifier: workspace:^
+        version: link:../validation-plugin
 
   packages/solid:
     dependencies:
@@ -623,6 +653,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
+      '@real-router/validation-plugin':
+        specifier: workspace:^
+        version: link:../validation-plugin
 
   packages/ssr-utils:
     devDependencies:

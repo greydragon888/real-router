@@ -11,6 +11,13 @@ type HookName = (typeof HOOK_NAMES)[number];
 const LOGGER_CONTEXT = "lifecycle-plugin";
 
 /**
+ * The routers this plugin is registered on (#2974). A second registration on
+ * one of them throws before it registers anything, and teardown takes the
+ * router out. `tests/functional/reregistration-2974.test.ts` holds the cells.
+ */
+const REGISTERED = new WeakSet<object>();
+
+/**
  * The hook's own abort: a rejection with the reason of the signal it was
  * handed, or with that reason as its `cause` — one level, as `setTimeout` of
  * `node:timers/promises` and `events.once` reject. Before the signal aborts
@@ -70,6 +77,13 @@ function createPlugin(
   ...args: Parameters<PluginFactory>
 ): ReturnType<PluginFactory> {
   const [router, getDependency] = args;
+
+  if (REGISTERED.has(router)) {
+    throw new Error(
+      `[@real-router/${LOGGER_CONTEXT}] is already registered on this router — a clone already carries the plugins of its base router`,
+    );
+  }
+
   const api = getPluginApi(router);
   const compiledHooks = new Map<
     string,
@@ -242,6 +256,8 @@ function createPlugin(
     }
   }
 
+  REGISTERED.add(router);
+
   return {
     // Every hook runs on the commit (#2691): leave-approve is tentative — an
     // activation guard can still refuse, or the navigation be cancelled — and
@@ -269,6 +285,7 @@ function createPlugin(
     onStop: end,
 
     teardown: () => {
+      REGISTERED.delete(router);
       removeChangesSubscription();
       end();
     },

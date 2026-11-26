@@ -51,15 +51,6 @@ export function validatePluginLimit(
   }
 }
 
-export function validateNoDuplicatePlugins(
-  factory: unknown,
-  factories: readonly unknown[],
-): void {
-  if (factories.includes(factory)) {
-    throw atUsePlugin.plain`Plugin factory already registered. To re-register, first unsubscribe the existing plugin.`;
-  }
-}
-
 export function validateCountThresholds(
   count: number,
   maxPlugins: number,

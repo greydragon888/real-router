@@ -66,6 +66,7 @@
   "devDependencies": {
     "@real-router/core": "workspace:^",
     "@real-router/ssr-data-plugin": "workspace:^",
+    "@real-router/validation-plugin": "workspace:^",
     "@types/react": "19.3.0",
     "react": "~19.3.0"
   },

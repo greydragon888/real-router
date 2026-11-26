@@ -69,7 +69,7 @@ persistentParamsPluginFactory(params)   ← factory.ts
         │  Runs once on call:
         │  - validateConfig(params)
         │  - builds paramNames array
-        │  - early return noop if paramNames.length === 0
+        │  - early return of a mark-only PluginFactory if paramNames.length === 0
         │  - builds initialParams object (array → all undefined, object → copy)
         │  - Object.freeze(initialParams)
         │  - creates paramNamesSet = new Set(paramNames)
@@ -78,18 +78,24 @@ persistentParamsPluginFactory(params)   ← factory.ts
                 │
                 │  Called by the router on router.usePlugin():
                 │
+                ├── refuseRepeat(router)  ← throws when REGISTERED holds the router
                 ├── api = getPluginApi(router)
                 ├── new Set(paramNamesSet)  ← clone, not shared
-                └── new PersistentParamsPlugin(api, initialParams, clonedSet, api.getRootPath())
-                            │
-                            │  Constructor:
-                            │  - api.claimContextNamespace("persistentParams")
-                            │  - api.setRootPath(originalRootPath + "?" + paramNames.join("&"))
-                            │  - api.addInterceptor("forwardState", ...)
-                            │  - rollback on partial failure
-                            │
-                            └── .getPlugin()  → Plugin { onTransitionSuccess, teardown }
+                ├── new PersistentParamsPlugin(api, initialParams, clonedSet, api.getRootPath())
+                │           │
+                │           │  Constructor:
+                │           │  - api.claimContextNamespace("persistentParams")
+                │           │  - api.setRootPath(originalRootPath + "?" + paramNames.join("&"))
+                │           │  - api.addInterceptor("forwardState", ...)
+                │           │  - rollback on partial failure
+                │           │
+                │           └── .getPlugin()  → Plugin { onTransitionSuccess, teardown }
+                │
+                └── REGISTERED.add(router) → returns the plugin with a teardown
+                    that deletes the router from REGISTERED, then runs its own
 ```
+
+`REGISTERED` is a module-level `WeakSet` of the routers the plugin is registered on. A clone carries its base's plugins, so a registration there is refused too.
 
 **Why this split instead of a single object?**
 
@@ -110,7 +116,17 @@ export function persistentParamsPluginFactory(
   const paramNames = Array.isArray(params) ? params : Object.keys(params);
 
   if (paramNames.length === 0) {
-    return noop; // shared singleton — frozen by core
+    // Registers nothing, and still marks the router
+    return (router): Plugin => {
+      refuseRepeat(router);
+      REGISTERED.add(router);
+
+      return {
+        teardown: () => {
+          REGISTERED.delete(router);
+        },
+      };
+    };
   }
 
   const initialParams: Params = {};
@@ -120,15 +136,26 @@ export function persistentParamsPluginFactory(
   const paramNamesSet = new Set<string>(paramNames);
 
   return (router): Plugin => {
+    refuseRepeat(router); // throws when REGISTERED holds the router
+
     const api = getPluginApi(router);
     const plugin = new PersistentParamsPlugin(
       api,
       initialParams,
       new Set(paramNamesSet), // clone per usePlugin() call
       api.getRootPath(),
-    );
+    ).getPlugin();
 
-    return plugin.getPlugin();
+    REGISTERED.add(router); // after the last call that may throw
+
+    return {
+      ...plugin,
+      teardown: () => {
+        REGISTERED.delete(router);
+
+        return plugin.teardown?.();
+      },
+    };
   };
 }
 ```
@@ -391,7 +418,7 @@ On teardown, `api.setRootPath(originalRootPath)` restores the original value.
 | Single `extractOwnParams` call per interceptor | `plugin.ts`          | One pass over params before merge                                                   |
 | Lazy copy of `#persistentParams`               | `plugin.ts`          | `newParams ??= { ...this.#persistentParams }` — copy only when a change is detected |
 | `Object.freeze(newParams)` after update        | `plugin.ts`          | Immutable snapshot; next update creates a new copy                                  |
-| `noop` factory for empty config                | `factory.ts`         | Zero overhead when no params are configured                                         |
+| Mark-only plugin for empty config              | `factory.ts`         | No claim, interceptor or root-path change when no params are configured             |
 | `Set.has` / `Set.delete`                       | `plugin.ts`          | O(1) membership and removal checks                                                  |
 
 ## Related Documents

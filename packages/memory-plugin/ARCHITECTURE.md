@@ -194,14 +194,18 @@ router.usePlugin(memoryPluginFactory(options))
             │
             (router) => Plugin
                 │
+                REGISTERED.has(router)? → throws, nothing registered
                 getPluginApi(router)
                 new MemoryPlugin(router, api, options)
                     └── api.extendRouter({ back, forward, go, canGoBack, canGoForward })
                         └── returns removeExtensions()
                 │
-                return plugin.getPlugin()
+                .getPlugin() of that instance
                     └── { onTransitionStart, onTransitionSuccess, onTransitionError,
                           onTransitionCancel, onStop, teardown }
+                REGISTERED.add(router)
+                return that plugin, with a teardown that deletes the router
+                from REGISTERED, then runs its own
 
 router.stop()
     └── onStop → #clear() (entries, shown index and the restore in flight reset, extensions remain)

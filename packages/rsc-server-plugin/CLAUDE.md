@@ -200,9 +200,9 @@ The Flight payload travels via the bundler's stream renderer; the router state J
 
 This package's peers are `react` and `@real-router/core`; its one regular dependency is `@real-router/ssr-utils`: `shared/ssr/createSsrLoaderPlugin.ts` reads its hydration scratchpad through `getHydrationState`, and `src/errors.ts` re-exports its loader errors and `withTimeout` (`ssr-utils`'s CLAUDE.md says why a dependency rather than a peer). Notably absent: `react-server-dom-*`, `@vitejs/plugin-rsc`, `react-dom`. The caller wires the renderer.
 
-### Single rsc-server-plugin per router
+### One instance of each plugin per router (#2974)
 
-The `"rsc"` namespace is exclusive (collision detection in `claimContextNamespace`). Registering two `rscServerPluginFactory()` plugins on the same router throws `RouterError(CONTEXT_NAMESPACE_ALREADY_CLAIMED)`.
+A registration of `rscServerPluginFactory()` or `rscActionPluginFactory()` on a router that already carries that plugin — a clone included, which re-runs the base's factories — throws the plugin's own `Error` before it claims anything: `[@real-router/rsc-server-plugin] is already registered on this router — a clone already carries the plugins of its base router`. Teardown takes the router out of the mark. Each factory keeps a mark of its own, so one router takes both, and `ssr-data-plugin` beside them. A plugin whose namespace another plugin holds still meets core's `RouterError(CONTEXT_NAMESPACE_ALREADY_CLAIMED)`. `tests/functional/reregistration-2974.test.ts` holds the cells.
 
 ### Teardown releases both claims
 

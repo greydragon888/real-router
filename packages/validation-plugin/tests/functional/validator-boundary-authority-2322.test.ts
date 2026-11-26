@@ -234,8 +234,6 @@ const REGISTRATION_OWNER: Record<string, string> = {
   "updateRoute:entry › validateUpdateRoutePropertyTypes":
     "routes.validation.test.ts",
   "usePlugin:count › validatePluginLimit": "limits.test.ts",
-  "usePlugin:entry › validateNoDuplicatePlugins":
-    "integration/plugin-lifecycle.test.ts",
   "usePlugin:plugin › validatePluginKeys": "plugin-api.validation.test.ts",
 };
 

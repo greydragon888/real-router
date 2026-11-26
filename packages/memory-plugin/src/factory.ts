@@ -8,6 +8,13 @@ import type { PluginFactory, Plugin, Router } from "@real-router/core";
 /** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
 const freeze = Object.freeze;
 
+/**
+ * The routers this plugin is registered on (#2974). A second registration on
+ * one of them throws before it registers anything, and teardown takes the
+ * router out. `tests/functional/reregistration-2974.test.ts` holds the cells.
+ */
+const REGISTERED = new WeakSet<object>();
+
 export function memoryPluginFactory(
   options: MemoryPluginOptions = {},
 ): PluginFactory {
@@ -29,9 +36,28 @@ export function memoryPluginFactory(
   const frozenOptions: MemoryPluginOptions = freeze({ ...options });
 
   return (router): Plugin => {
-    const api = getPluginApi(router);
-    const plugin = new MemoryPlugin(router as Router, api, frozenOptions);
+    if (REGISTERED.has(router)) {
+      throw new Error(
+        `[memory-plugin] is already registered on this router — a clone already carries the plugins of its base router`,
+      );
+    }
 
-    return plugin.getPlugin();
+    const api = getPluginApi(router);
+    const plugin = new MemoryPlugin(
+      router as Router,
+      api,
+      frozenOptions,
+    ).getPlugin();
+
+    REGISTERED.add(router);
+
+    return {
+      ...plugin,
+      teardown: () => {
+        REGISTERED.delete(router);
+
+        return plugin.teardown?.();
+      },
+    };
   };
 }

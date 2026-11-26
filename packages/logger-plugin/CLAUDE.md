@@ -25,6 +25,7 @@ router.usePlugin(loggerPluginFactory(options))
     ├── Config merge: { ...DEFAULT_CONFIG, ...options }
     └── Return PluginFactory closure
             │
+            ├── REGISTERED.has(router)? → throws; REGISTERED.add(router) once the plugin is built
             └── new LoggerPlugin(config).getPlugin()
                     │
                     ├── Constructor: pre-compute flags, create GroupManager + PerformanceTracker
@@ -37,7 +38,7 @@ onTransitionSuccess()      → perf.mark + perf.measure + log with timing + rese
 onTransitionCancel()       → perf.mark + perf.measure + warn + resetTransitionState
 onTransitionError()        → error with code; for the transition's own error also perf.mark + perf.measure + timing + resetTransitionState
 onStop()                   → groups.close + perf.mark + perf.measure("router:lifetime") + log if logLifecycle
-teardown()                 → resetTransitionState
+teardown()                 → REGISTERED.delete(router) + resetTransitionState
 ```
 
 ## Gotchas
@@ -96,7 +97,8 @@ Closure-based `isOpened` flag prevents `console.group()` from being called twice
 ```
 src/
 ├── factory.ts              — loggerPluginFactory: validates options, merges defaults,
-│                             returns PluginFactory → new LoggerPlugin(config).getPlugin()
+│                             returns PluginFactory → new LoggerPlugin(config).getPlugin(),
+│                             refusing a router REGISTERED already holds
 ├── plugin.ts               — LoggerPlugin class: pre-computes flags in constructor,
 │                             getPlugin() returns Plugin with 7 lifecycle hooks + teardown
 ├── validation.ts           — validateOptions: level, context, boolean flags (TypeError)

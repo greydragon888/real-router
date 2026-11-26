@@ -316,6 +316,12 @@ export function createSsrLoaderPlugin<
       : null;
 
   return (router, getDependency): Plugin => {
+    if (config.registered.has(router)) {
+      throw new Error(
+        `${config.errorPrefix} is already registered on this router — a clone already carries the plugins of its base router`,
+      );
+    }
+
     const api = getPluginApi(router);
     const allowed = config.allowedModes ?? ALL_SSR_MODES;
 
@@ -648,6 +654,8 @@ export function createSsrLoaderPlugin<
       },
     );
 
+    config.registered.add(router);
+
     return {
       onTransitionSuccess(toState) {
         const mark = refreshes.get(toState.context);
@@ -658,6 +666,7 @@ export function createSsrLoaderPlugin<
       },
 
       teardown() {
+        config.registered.delete(router);
         removeStartInterceptor();
         removeLeaveListener();
         dataClaim.release();

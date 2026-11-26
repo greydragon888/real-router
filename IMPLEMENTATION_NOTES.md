@@ -15942,6 +15942,8 @@ The real pair gains five entries: `SubtreeExit`, a class both twins declare and 
 - #2578: the #2577 delivery removes the shape. A repair of `getUrlParams` for tables that are about to stop registering would be thrown away with them.
 - #2580: the one candidate, a registration refusal of a childless top-level `""` / `"?x"` route beside `"/"`, was not measured, and the shapes it would refuse are ones no application declares.
 
+⚑ Two more repeat registrations are recorded as unsupported under "A plugin of the monorepo refuses its own repeat registration (#2974, 2026-11-26)".
+
 ## An owner reports the shared files no test loads (#2694, 2026-11-12)
 
 **Problem.** The three owners of a `shared/<dir>` — `react`, `browser-plugin` and `ssr-data-plugin` — reported only the shared files their tests load. Vitest takes a file no test loads into the report by globbing `coverage.include` with the package's directory as `cwd` (`getUntestedFilesByRoot` of `vitest` 5.1), and from `packages/<owner>` the `**/shared/<dir>/**/*.ts` entry reaches no file. A file a test loads is matched by path, and its absolute path matches that entry, so every shared file a test reached was reported. A planted function with an `if`, in each `shared/<dir>`, left all three runs at exit 0 and 100 % with no lcov record for it, and `shared/browser-env/types.ts`, which no test loads, had none either. In an owner's `src/` the same file failed the thresholds ("Vitest 5: three coverage reports shrink at 100 %, and a nested `??` becomes a branch").
@@ -16221,3 +16223,34 @@ After step 6, `RouterValidator` declared no member and core read `ctx.validator`
 - One commit drops `../../shared/dom-utils/**/*.ts` from `packages/react/turbo.json`, the next edits `shared/dom-utils/link-utils.ts`. Under 2.11.10 `react#test` keeps its hash and `--filter=...[base]` leaves it out. Under 2.11.13 its hash moves, and the filter still leaves it out. `preact#test`, which keeps the input, moves and is selected under both.
 
 So a pull request that edits the dir gets no shard for a consumer without the input: `build-matrix.mjs` takes its shards from that filter.
+
+## A plugin of the monorepo refuses its own repeat registration (#2974, 2026-11-26)
+
+**Problem.** A second `usePlugin` of a monorepo plugin on a router that already carries it — that router, or a clone, which re-runs the base's factories — never met a refusal of the plugin's own. Measured on `53814ece6` by a probe over every creator:
+
+- lifecycle-plugin, logger-plugin and search-schema-plugin accepted it and ran twice: the `onNavigate` hooks, the log lines and the schema runs all doubled;
+- preload-plugin on Node and `persistentParamsPluginFactory([])` accepted it, with nothing to see;
+- the rest were refused by core with a conflict about another plugin — `"browser" is already claimed by another plugin`, `property "buildUrl" already exists` — and after a repeat of hash-plugin with another `browser` was refused so, `start()` without a path took its location from the refused instance's browser;
+- with validation-plugin installed, a repeat of the same factory object never reached the plugin: `validateNoDuplicatePlugins` refused it at `usePlugin:entry` and advised "first unsubscribe the existing plugin", which a clone cannot do: `cloneRouter` drops the `Unsubscribe` of its replay.
+
+**Solution.**
+
+- Each creator keeps a module-level `WeakSet` of the routers it is registered on, as validation-plugin keeps `INSTALLED` (#2349). Its factory checks the set before it registers anything and throws an `Error` with no `code`: `<head> is already registered on this router — a clone already carries the plugins of its base router`. It adds the router after its last possible throw, and teardown deletes it. A refusal of core after the factory returns, on a router still live — a hook over `limits.maxListeners`, a check at `usePlugin:plugin` — runs no teardown, so the mark stays with the rest of what that install registered, and the next registration on that router is refused as a repeat: the #2581 case, a second `usePlugin` where the first install threw. The head comes from where the package already writes one: its `ERROR_PREFIX` — `[@real-router/<package>]` for logger, persistent-params, ssr-data and rsc-server, `[search-schema-plugin]` for search-schema —, the `[memory-plugin]` and `[navigation-plugin]` literals, and for browser and hash the `[<package>]` with which `createOptionsValidator` signs their option refusals. Lifecycle and preload refuse nothing else and take `[@real-router/<package>]`.
+- The set belongs to the creator, not to the factory object or to the package: a second instance is refused under other options too, and `rscServerPluginFactory` and `rscActionPluginFactory` keep one each, so one router takes both.
+- `createSsrLoaderPlugin` (`shared/ssr`) takes the set from its config (`registered`), and each of the two loader plugins passes its own: under vitest both load one copy of `shared/ssr`, so a set in that module would refuse rsc-server-plugin on a router that carries ssr-data-plugin.
+- The branches that register nothing — preload-plugin without `document`, `persistentParamsPluginFactory([])` — return a plugin of their own whose teardown deletes the mark; the `EMPTY_PLUGIN` singleton that persistent-params handed every router could not.
+- A factory whose plugin comes from a class's `getPlugin()` returns a copy of it whose teardown deletes the mark and then runs the class's own.
+- validation-plugin no longer looks for a factory an earlier call registered: `validateNoDuplicatePlugins` is gone, and with it the only check of the monorepo at `usePlugin:entry`. The position stays: it is a public extension point, and the cells of `packages/core/tests/functional/plugin-channels-2388.test.ts` hold it with checks of their own. The #2388 step 2 entry above names `usePlugin:entry` among the positions validation-plugin refuses at; that held until this entry. `warnBatchDuplicates` stays: core registers a factory repeated inside one call once.
+
+**Why.**
+
+- The plugin is the one party that can tell its second instance from another plugin: a plugin has no name core could compare, and validation-plugin's identity check saw the same factory object alone, not a second instance of the plugin.
+- A mark in the plugin needs no new member of `PluginApi` and no new public type.
+- `Error` without `code`: a repeat is a programmer error seen on the first run, nothing branches on it, and a code without a consumer is public surface.
+
+**Measured.** The probe runs 104 repeats of the 12 creators: 13 rows (persistent-params under two configs) × that router or a clone × a factory of its own or the first one's × validation-plugin on the base or not. On the branch each is refused with its plugin's message, and the effect on one `start()` is that of the first instance alone. On `53814ece6` none is refused so, and 20 show another effect. validation-plugin's own four repeats are refused on both trees, on `53814ece6` with the same factory object by `validateNoDuplicatePlugins`.
+
+**Unsupported, in addition to #2581.** Two repeats stay as they behave, and no issue is filed for them:
+
+- the same factory object of a plugin outside the monorepo, twice on one router, where core refuses nothing its first instance holds — a `state.context` namespace, a router property, a hook function both instances share, a route name: the base runs two instances and its clone one, and after an `unsubscribe` of the first the base runs one and a clone none — core's `#plugins` is a `Set`, which holds the factory once;
+- two copies of a plugin package in one process, both installed on one router: each copy holds a set of its own, so the second copy meets what a second instance with a factory of its own met on `53814ece6` (Problem above) — core's conflict where the plugin claims a namespace or extends the router, and a doubled effect for logger-plugin, lifecycle-plugin and search-schema-plugin.

@@ -551,13 +551,13 @@ describe("@real-router/logger-plugin", () => {
 
   describe("onTransitionLeaveApprove hook", () => {
     it("should have onTransitionLeaveApprove in the plugin object", () => {
-      const plugin = loggerPluginFactory()(null as any, null as any);
+      const plugin = loggerPluginFactory()(createRouter(), null as any);
 
       expect(typeof plugin.onTransitionLeaveApprove).toBe("function");
     });
 
     it("should log leave-approved when hook is invoked directly", () => {
-      const plugin = loggerPluginFactory()(null as any, null as any);
+      const plugin = loggerPluginFactory()(createRouter(), null as any);
       const toState = { name: "users", params: {}, path: "/users" } as any;
       const fromState = { name: "home", params: {}, path: "/" } as any;
 
@@ -574,7 +574,7 @@ describe("@real-router/logger-plugin", () => {
 
     it("should not log leave-approved when level is none", () => {
       const plugin = loggerPluginFactory({ level: "none" })(
-        null as any,
+        createRouter(),
         null as any,
       );
       const toState = { name: "users", params: {}, path: "/users" } as any;
@@ -591,7 +591,7 @@ describe("@real-router/logger-plugin", () => {
 
     it("should not log leave-approved when level is errors", () => {
       const plugin = loggerPluginFactory({ level: "errors" })(
-        null as any,
+        createRouter(),
         null as any,
       );
       const toState = { name: "users", params: {}, path: "/users" } as any;
@@ -609,7 +609,7 @@ describe("@real-router/logger-plugin", () => {
     it("should record perf mark for leave-approved when usePerformanceMarks is true", () => {
       const perfMarkSpy = vi.spyOn(performance, "mark");
       const plugin = loggerPluginFactory({ usePerformanceMarks: true })(
-        null as any,
+        createRouter(),
         null as any,
       );
       const toState = { name: "users", params: {}, path: "/users" } as any;
@@ -626,7 +626,7 @@ describe("@real-router/logger-plugin", () => {
     });
 
     it("should pass toState and fromState to the hook correctly", () => {
-      const plugin = loggerPluginFactory()(null as any, null as any);
+      const plugin = loggerPluginFactory()(createRouter(), null as any);
       const toState = { name: "users", params: {}, path: "/users" } as any;
       const fromState = { name: "home", params: {}, path: "/" } as any;
 

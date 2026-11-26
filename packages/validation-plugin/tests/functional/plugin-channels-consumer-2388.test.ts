@@ -64,15 +64,6 @@ describe("teardown removes every usePlugin registration (#2388)", () => {
       },
     ],
     [
-      "usePlugin:entry",
-      (router) => {
-        const factory: PluginFactory = () => ({});
-
-        router.usePlugin(factory);
-        router.usePlugin(factory);
-      },
-    ],
-    [
       "usePlugin:plugin",
       (router) => {
         router.usePlugin(() => ({ unknownProp: 1 }) as unknown as Plugin);

@@ -79,7 +79,7 @@ describe("Lifecycle Plugin Churn", () => {
     expect(completed).toBe(50);
   });
 
-  it("multiple plugins on same router: hooks fire once per plugin instance", async () => {
+  it("a repeat registration on one router is refused: hooks fire once per navigation (#2974)", async () => {
     const enterCallsA: number[] = [];
     const enterCallsB: number[] = [];
 
@@ -98,8 +98,13 @@ describe("Lifecycle Plugin Churn", () => {
       { defaultRoute: "home" },
     );
 
-    const unsub1 = router.usePlugin(lifecyclePluginFactory());
-    const unsub2 = router.usePlugin(lifecyclePluginFactory());
+    const unsub = router.usePlugin(lifecyclePluginFactory());
+
+    for (let i = 0; i < 50; i++) {
+      expect(() => router.usePlugin(lifecyclePluginFactory())).toThrow(
+        "[@real-router/lifecycle-plugin] is already registered on this router",
+      );
+    }
 
     await router.start("/");
 
@@ -108,15 +113,12 @@ describe("Lifecycle Plugin Churn", () => {
       await router.navigate("home");
     }
 
-    // Each plugin instance fires onEnter independently
-    // onEnterA fires twice per round-trip (once per plugin instance) * 50 trips
-    // BUT both plugins share the same route config with the same onEnter callback,
-    // so onEnterA fires 2 * 50 = 100 times total
-    expect(enterCallsA).toHaveLength(100);
+    // The refused repeats left one instance: onEnterA fires once per trip.
+    expect(enterCallsA).toHaveLength(50);
 
-    unsub1();
+    unsub();
 
-    // Now detach plugin B and use a route with a different callback
+    // Another router carries an instance of its own.
     const routerB = createRouter(
       [
         { name: "home", path: "/" },
@@ -135,7 +137,6 @@ describe("Lifecycle Plugin Churn", () => {
 
     expect(enterCallsB).toHaveLength(25);
 
-    unsub2();
     router.stop();
     routerB.stop();
   });

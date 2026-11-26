@@ -49,6 +49,7 @@ function rscServerPluginFactoryProxy(
     modeNamespace: "ssrRscMode",
     errorPrefix: "[rsc-proxy]",
     allowedModes: ["full", "client-only"],
+    registered: new WeakSet(),
   });
 }
 

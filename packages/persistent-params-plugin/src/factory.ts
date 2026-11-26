@@ -3,6 +3,7 @@
 import { getPluginApi } from "@real-router/core/api";
 import { copyFields, putField } from "@real-router/core/utils";
 
+import { ERROR_PREFIX } from "./constants";
 import { PersistentParamsPlugin } from "./plugin";
 import { validateConfig } from "./validation";
 
@@ -27,9 +28,21 @@ const freeze = Object.freeze;
  */
 const objectKeys = Object.keys;
 
-// Shared singleton — frozen by core on first use. Do not add properties.
-const EMPTY_PLUGIN: Plugin = {};
-const noop: PluginFactory = () => EMPTY_PLUGIN;
+/**
+ * The routers this plugin is registered on (#2974), with any config, the empty
+ * one included. A second registration on one of them throws before it
+ * registers anything, and teardown takes the router out.
+ * `tests/functional/reregistration-2974.test.ts` holds the cells.
+ */
+const REGISTERED = new WeakSet<object>();
+
+function refuseRepeat(router: object): void {
+  if (REGISTERED.has(router)) {
+    throw new Error(
+      `${ERROR_PREFIX} is already registered on this router — a clone already carries the plugins of its base router`,
+    );
+  }
+}
 
 /**
  * Factory for the persistent parameters' plugin.
@@ -76,7 +89,7 @@ const noop: PluginFactory = () => EMPTY_PLUGIN;
  * unsubscribe(); // Restores original router state
  *
  * @throws {TypeError} If params is not a valid array of strings or object with primitives
- * @throws {Error} If plugin is already initialized on this router instance
+ * @throws {Error} From the returned factory, if the plugin is already registered on the router
  */
 export function persistentParamsPluginFactory(
   params: PersistentParamsConfig = {},
@@ -86,7 +99,16 @@ export function persistentParamsPluginFactory(
   const paramNames = Array.isArray(params) ? params : objectKeys(params);
 
   if (paramNames.length === 0) {
-    return noop;
+    return (router): Plugin => {
+      refuseRepeat(router);
+      REGISTERED.add(router);
+
+      return {
+        teardown: () => {
+          REGISTERED.delete(router);
+        },
+      };
+    };
   }
 
   const initialParams: Params = {};
@@ -111,14 +133,25 @@ export function persistentParamsPluginFactory(
   const paramNamesSet = new Set<string>(paramNames);
 
   return (router): Plugin => {
+    refuseRepeat(router);
+
     const api = getPluginApi(router);
     const plugin = new PersistentParamsPlugin(
       api,
       initialParams,
       new Set(paramNamesSet),
       api.getRootPath(),
-    );
+    ).getPlugin();
 
-    return plugin.getPlugin();
+    REGISTERED.add(router);
+
+    return {
+      ...plugin,
+      teardown: () => {
+        REGISTERED.delete(router);
+
+        return plugin.teardown?.();
+      },
+    };
   };
 }

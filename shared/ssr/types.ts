@@ -102,6 +102,11 @@ export interface SsrLoaderPluginConfig {
   namespace: string;
   modeNamespace: string;
   errorPrefix: string;
+  /**
+   * The routers the plugin is registered on, one set per creator. A
+   * registration on a router in it throws before it registers anything.
+   */
+  registered: WeakSet<object>;
   allowedModes?: readonly SsrMode[];
   /**
    * When set, the plugin recognises `defer()` payloads from loaders.

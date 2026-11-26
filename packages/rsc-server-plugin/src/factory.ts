@@ -9,6 +9,14 @@ import type { ReactNode } from "react";
 const validateLoaders = createLoadersValidator(ERROR_PREFIX, ALLOWED_RSC_MODES);
 
 /**
+ * The routers this plugin is registered on (#2974). `createSsrLoaderPlugin`
+ * reads and writes it, and each creator keeps its own: under vitest the two
+ * loader plugins share one copy of `shared/ssr`.
+ * `tests/functional/reregistration-2974.test.ts` holds the cells.
+ */
+const REGISTERED = new WeakSet<object>();
+
+/**
  * Plugin factory that loads per-route `ReactNode` (RSC payload) by intercepting
  * `router.start()`. Variant B from the RSC integration RFC: the plugin stores a
  * `ReactNode` on `state.context.rsc` — it does NOT render Flight bytes itself.
@@ -50,5 +58,6 @@ export function rscServerPluginFactory<
     modeNamespace: "ssrRscMode",
     errorPrefix: ERROR_PREFIX,
     allowedModes: ALLOWED_RSC_MODES,
+    registered: REGISTERED,
   });
 }

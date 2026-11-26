@@ -61,6 +61,7 @@ describe("shared/ssr loader plugin (#809 owner coverage)", () => {
             modeNamespace: "ssrRscMode",
             errorPrefix: "[test-rsc]",
             allowedModes: ["full", "client-only"],
+            registered: new WeakSet(),
           },
         ),
       );
@@ -93,6 +94,7 @@ describe("shared/ssr loader plugin (#809 owner coverage)", () => {
             modeNamespace: "ssrRscMode",
             errorPrefix: "[test-rsc]",
             allowedModes: ["full", "client-only"],
+            registered: new WeakSet(),
           },
         ),
       );
@@ -117,6 +119,7 @@ describe("shared/ssr loader plugin (#809 owner coverage)", () => {
             modeNamespace: "ssrRscMode",
             errorPrefix: "[test-rsc]",
             allowedModes: ["full", "client-only"],
+            registered: new WeakSet(),
           },
         ),
       );

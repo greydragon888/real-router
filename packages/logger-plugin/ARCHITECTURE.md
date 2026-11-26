@@ -14,7 +14,8 @@
 logger-plugin/
 ├── src/
 │   ├── factory.ts                     — loggerPluginFactory: validates options, merges defaults,
-│   │                                    returns PluginFactory → new LoggerPlugin(config).getPlugin()
+│   │                                    returns PluginFactory → new LoggerPlugin(config).getPlugin(),
+│   │                                    refusing a router REGISTERED already holds
 │   ├── plugin.ts                      — LoggerPlugin class: pre-computes flags in constructor,
 │   │                                    getPlugin() returns Plugin with lifecycle hooks + teardown
 │   ├── validation.ts                  — validateOptions: level, context, boolean flags (TypeError)
@@ -118,6 +119,7 @@ router.usePlugin(loggerPluginFactory(options))
     ├── Config merge: { ...DEFAULT_CONFIG, ...options }
     └── Return factory → called per router instance
             │
+            ├── REGISTERED.has(router)? → throws; REGISTERED.add(router) once the plugin is built
             └── new LoggerPlugin(config).getPlugin()
                     │
                     ├── Constructor: create GroupManager + PerformanceTracker
@@ -168,6 +170,7 @@ onStop()
     └── if logLifecycle → console.log("[ctx] Router stopped")
 
 teardown()
+    ├── REGISTERED.delete(router)
     └── resetTransitionState()
 ```
 
