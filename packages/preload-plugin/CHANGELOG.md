@@ -1,5 +1,35 @@
 # @real-router/preload-plugin
 
+## 0.9.0
+
+### Minor Changes
+
+- [#3011](https://github.com/greydragon888/real-router/pull/3011) [`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse a second registration on a router that already carries the plugin ([#2974](https://github.com/greydragon888/real-router/issues/2974))
+
+  `router.usePlugin(preloadPluginFactory(options))` on a router that already
+  carries the plugin, under any options and with `document` or without it, throws
+  an `Error` with no `code` before it registers anything:
+
+  ```text
+  [@real-router/preload-plugin] is already registered on this router — a clone already carries the plugins of its base router
+  ```
+
+  A clone counts: `cloneRouter`, and `createRequestScope` through it, re-run the
+  base router's plugin factories, so a request router already carries the plugin.
+  The first instance keeps working, and after its `unsubscribe()` the router takes
+  the plugin again. Without `document` the plugin is a `teardown` alone, which
+  takes the router out of the mark.
+
+  **Breaking Change:** on a server, where the plugin registers nothing, the repeat
+  was accepted; with `document`, core refused it with a `RouterError` with the
+  code `PLUGIN_CONFLICT`. Remove the second registration — on a request clone, the
+  base router's registration already covers it.
+
+### Patch Changes
+
+- Updated dependencies [[`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232)]:
+  - @real-router/core@0.170.1
+
 ## 0.8.0
 
 ### Minor Changes

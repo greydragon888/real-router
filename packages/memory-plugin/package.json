@@ -1,6 +1,6 @@
 {
   "name": "@real-router/memory-plugin",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "type": "commonjs",
   "description": "In-memory history engine for Real-Router \u2014 non-browser environments and benchmarks",
   "main": "./dist/cjs/index.js",
@@ -53,7 +53,7 @@
   },
   "sideEffects": false,
   "peerDependencies": {
-    "@real-router/core": "workspace:>=0.170.0"
+    "@real-router/core": "workspace:>=0.170.1"
   },
   "devDependencies": {
     "@real-router/core": "workspace:^",

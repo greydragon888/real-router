@@ -5,6 +5,337 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-11-26]
+
+### @real-router/lifecycle-plugin@0.11.0
+
+### Minor Changes
+
+- [#3011](https://github.com/greydragon888/real-router/pull/3011) [`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse a second registration on a router that already carries the plugin ([#2974](https://github.com/greydragon888/real-router/issues/2974))
+
+  `router.usePlugin(lifecyclePluginFactory())` on a router that already carries
+  the plugin throws an `Error` with no `code` before it registers anything:
+
+  ```text
+  [@real-router/lifecycle-plugin] is already registered on this router — a clone already carries the plugins of its base router
+  ```
+
+  A clone counts: `cloneRouter`, and `createRequestScope` through it, re-run the
+  base router's plugin factories, so a request router already carries the plugin.
+  The first instance keeps working, and after its `unsubscribe()` the router takes
+  the plugin again.
+
+  **Breaking Change:** without `@real-router/validation-plugin` the repeat was
+  accepted and every route hook ran twice; with it, the repeat was refused with
+  `[router.usePlugin] Plugin factory already registered…`. Remove the second
+  registration — on a request clone, the base router's registration already
+  covers it.
+
+### Patch Changes
+
+- Updated dependencies [[`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232)]:
+  - @real-router/core@0.170.1
+
+### @real-router/logger-plugin@0.8.0
+
+### Minor Changes
+
+- [#3011](https://github.com/greydragon888/real-router/pull/3011) [`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse a second registration on a router that already carries the plugin ([#2974](https://github.com/greydragon888/real-router/issues/2974))
+
+  `router.usePlugin(loggerPluginFactory(options))` on a router that already
+  carries the plugin, under any options, throws an `Error` with no `code` before
+  it registers anything:
+
+  ```text
+  [@real-router/logger-plugin] is already registered on this router — a clone already carries the plugins of its base router
+  ```
+
+  A clone counts: `cloneRouter`, and `createRequestScope` through it, re-run the
+  base router's plugin factories, so a request router already carries the plugin.
+  The first instance keeps working, and after its `unsubscribe()` the router takes
+  the plugin again.
+
+  **Breaking Change:** the repeat was accepted and every log line was printed
+  twice; `@real-router/validation-plugin` refused only a repeat of the same factory
+  object. Remove the second registration — on a request clone, the base router's
+  registration already covers it.
+
+### Patch Changes
+
+- Updated dependencies [[`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232)]:
+  - @real-router/core@0.170.1
+
+### @real-router/persistent-params-plugin@0.8.0
+
+### Minor Changes
+
+- [#3011](https://github.com/greydragon888/real-router/pull/3011) [`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse a second registration on a router that already carries the plugin ([#2974](https://github.com/greydragon888/real-router/issues/2974))
+
+  `router.usePlugin(persistentParamsPluginFactory(config))` on a router that
+  already carries the plugin, under any config and the empty one included, throws
+  an `Error` with no `code` before it claims anything:
+
+  ```text
+  [@real-router/persistent-params-plugin] is already registered on this router — a clone already carries the plugins of its base router
+  ```
+
+  A clone counts: `cloneRouter`, and `createRequestScope` through it, re-run the
+  base router's plugin factories, so a request router already carries the plugin.
+  The first instance keeps working, and after its `unsubscribe()` the router takes
+  the plugin again. A plugin that holds the `persistentParams` namespace still
+  meets core's `RouterError(CONTEXT_NAMESPACE_ALREADY_CLAIMED)`.
+
+  **Breaking Change:** with an empty config (`[]` or `{}`) the repeat was accepted;
+  with params, core refused it with `RouterError(CONTEXT_NAMESPACE_ALREADY_CLAIMED)`
+  when the second instance claimed `persistentParams`, and a handler that matched
+  that code for the repeat no longer sees one. Remove the second registration, or
+  `unsubscribe()` the first one before registering again.
+
+### Patch Changes
+
+- Updated dependencies [[`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232)]:
+  - @real-router/core@0.170.1
+
+### @real-router/preload-plugin@0.9.0
+
+### Minor Changes
+
+- [#3011](https://github.com/greydragon888/real-router/pull/3011) [`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse a second registration on a router that already carries the plugin ([#2974](https://github.com/greydragon888/real-router/issues/2974))
+
+  `router.usePlugin(preloadPluginFactory(options))` on a router that already
+  carries the plugin, under any options and with `document` or without it, throws
+  an `Error` with no `code` before it registers anything:
+
+  ```text
+  [@real-router/preload-plugin] is already registered on this router — a clone already carries the plugins of its base router
+  ```
+
+  A clone counts: `cloneRouter`, and `createRequestScope` through it, re-run the
+  base router's plugin factories, so a request router already carries the plugin.
+  The first instance keeps working, and after its `unsubscribe()` the router takes
+  the plugin again. Without `document` the plugin is a `teardown` alone, which
+  takes the router out of the mark.
+
+  **Breaking Change:** on a server, where the plugin registers nothing, the repeat
+  was accepted; with `document`, core refused it with a `RouterError` with the
+  code `PLUGIN_CONFLICT`. Remove the second registration — on a request clone, the
+  base router's registration already covers it.
+
+### Patch Changes
+
+- Updated dependencies [[`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232)]:
+  - @real-router/core@0.170.1
+
+### @real-router/rsc-server-plugin@0.6.0
+
+### Minor Changes
+
+- [#3011](https://github.com/greydragon888/real-router/pull/3011) [`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse a second registration of either plugin on a router that already carries it ([#2974](https://github.com/greydragon888/real-router/issues/2974))
+
+  `rscServerPluginFactory(loaders)` and `rscActionPluginFactory(getResult)` each
+  refuse a registration on a router that already carries that plugin with an
+  `Error` with no `code`, thrown before the plugin claims anything:
+
+  ```text
+  [@real-router/rsc-server-plugin] is already registered on this router — a clone already carries the plugins of its base router
+  ```
+
+  A clone counts: `cloneRouter`, and `createRequestScope` through it, re-run the
+  base router's plugin factories, so a request router already carries the base's
+  plugins. Each factory keeps a mark of its own, so one router still takes both
+  plugins, and `@real-router/ssr-data-plugin` beside them. The first instance
+  keeps working, and after its `unsubscribe()` the router takes the plugin again.
+  A plugin that holds the `rsc` or `rscAction` namespace still meets core's
+  `RouterError(CONTEXT_NAMESPACE_ALREADY_CLAIMED)`.
+
+  **Breaking Change:** the repeat threw core's
+  `RouterError(CONTEXT_NAMESPACE_ALREADY_CLAIMED)`, as the README said. Remove the
+  second registration; a handler that matched that code for the repeat no longer
+  sees one.
+
+### Patch Changes
+
+- Updated dependencies [[`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232)]:
+  - @real-router/core@0.170.1
+
+### @real-router/search-schema-plugin@0.12.0
+
+### Minor Changes
+
+- [#3011](https://github.com/greydragon888/real-router/pull/3011) [`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse a second registration on a router that already carries the plugin ([#2974](https://github.com/greydragon888/real-router/issues/2974))
+
+  `router.usePlugin(searchSchemaPlugin(options))` on a router that already
+  carries the plugin, under any options, throws an `Error` with no `code` before
+  it registers anything:
+
+  ```text
+  [search-schema-plugin] is already registered on this router — a clone already carries the plugins of its base router
+  ```
+
+  A clone counts: `cloneRouter`, and `createRequestScope` through it, re-run the
+  base router's plugin factories, so a request router already carries the plugin.
+  The first instance keeps working, and after its `unsubscribe()` the router takes
+  the plugin again.
+
+  **Breaking Change:** the repeat was accepted, so every schema ran twice and each
+  rejection was reported twice; `@real-router/validation-plugin` refused only a
+  repeat of the same factory object. Remove the second registration — on a request
+  clone, the base router's registration already covers it.
+
+### Patch Changes
+
+- Updated dependencies [[`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232)]:
+  - @real-router/core@0.170.1
+
+### @real-router/validation-plugin@0.42.0
+
+### Minor Changes
+
+- [#3011](https://github.com/greydragon888/real-router/pull/3011) [`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232) Thanks [@greydragon888](https://github.com/greydragon888)! - Stop refusing a plugin factory an earlier `usePlugin` call registered ([#2974](https://github.com/greydragon888/real-router/issues/2974))
+
+  The check behind `[router.usePlugin] Plugin factory already registered…` is
+  removed, so this plugin no longer stops a second `usePlugin` of the same factory
+  object. Every `@real-router/*` plugin refuses its own repeat registration itself,
+  with this plugin or without it. A repeat of another plugin is accepted unless
+  that plugin refuses it or core refuses what its first instance already holds: a
+  `state.context` namespace, a router property, a hook function both instances
+  share, a route name.
+
+  The warning about a factory repeated inside one `usePlugin(f, f)` call stays,
+  and so does this plugin's refusal of its own second installation
+  (`VALIDATION_PLUGIN_ALREADY_INSTALLED`).
+
+  **Breaking Change:** a plugin of your own that must not run twice on one router
+  refuses the repeat itself: keep a module-level `WeakSet` of the routers it is
+  registered on, check it in the factory before anything is registered, add the
+  router after the last call that may throw, and delete it in `teardown`.
+
+### Patch Changes
+
+- Updated dependencies [[`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232)]:
+  - @real-router/core@0.170.1
+
+### @real-router/browser-plugin@0.28.1
+
+### Patch Changes
+
+- [#3011](https://github.com/greydragon888/real-router/pull/3011) [`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse a repeat registration with the plugin's own error ([#2974](https://github.com/greydragon888/real-router/issues/2974))
+
+  A registration on a router that already carries the plugin throws an `Error`
+  with no `code` before the plugin claims anything:
+
+  ```text
+  [browser-plugin] is already registered on this router — a clone already carries the plugins of its base router
+  ```
+
+  A clone counts: `cloneRouter`, and `createRequestScope` through it, re-run the
+  base router's plugin factories. Core refused the repeat with
+  `RouterError(CONTEXT_NAMESPACE_ALREADY_CLAIMED)`, whose message named another
+  plugin. A plugin that holds the `browser` namespace still meets that refusal.
+
+- Updated dependencies [[`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232)]:
+  - @real-router/core@0.170.1
+
+### @real-router/core@0.170.1
+
+### Patch Changes
+
+- [#3011](https://github.com/greydragon888/real-router/pull/3011) [`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232) Thanks [@greydragon888](https://github.com/greydragon888)! - Correct what the `PluginsNamespace` docblocks say the facade checks ([#2974](https://github.com/greydragon888/real-router/issues/2974))
+
+  `PluginsNamespace.use` and its batch deduplication no longer describe a
+  duplicate check by the facade: the facade asks the checks that stand at
+  `usePlugin:count` and `usePlugin:entry`, and a factory an earlier call
+  registered is not looked for. Comments only; no runtime change.
+
+### @real-router/hash-plugin@0.18.1
+
+### Patch Changes
+
+- [#3011](https://github.com/greydragon888/real-router/pull/3011) [`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse a repeat registration with the plugin's own error ([#2974](https://github.com/greydragon888/real-router/issues/2974))
+
+  A registration on a router that already carries the plugin throws an `Error`
+  with no `code` before the plugin registers anything:
+
+  ```text
+  [hash-plugin] is already registered on this router — a clone already carries the plugins of its base router
+  ```
+
+  A clone counts: `cloneRouter`, and `createRequestScope` through it, re-run the
+  base router's plugin factories. Core refused the repeat with
+  `RouterError(PLUGIN_CONFLICT)` (`property "buildUrl" already exists`), and after
+  a refused repeat with another `browser`, `start()` without a path took its
+  location from that `browser`. A plugin that holds one of this plugin's router
+  properties still meets core's refusal.
+
+- Updated dependencies [[`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232)]:
+  - @real-router/core@0.170.1
+
+### @real-router/memory-plugin@0.7.1
+
+### Patch Changes
+
+- [#3011](https://github.com/greydragon888/real-router/pull/3011) [`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse a repeat registration with the plugin's own error ([#2974](https://github.com/greydragon888/real-router/issues/2974))
+
+  A registration on a router that already carries the plugin throws an `Error`
+  with no `code` before the plugin claims anything:
+
+  ```text
+  [memory-plugin] is already registered on this router — a clone already carries the plugins of its base router
+  ```
+
+  A clone counts: `cloneRouter`, and `createRequestScope` through it, re-run the
+  base router's plugin factories. Core refused the repeat with
+  `RouterError(CONTEXT_NAMESPACE_ALREADY_CLAIMED)`, whose message named another
+  plugin. A plugin that holds the `memory` namespace still meets that refusal.
+
+- Updated dependencies [[`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232)]:
+  - @real-router/core@0.170.1
+
+### @real-router/navigation-plugin@0.17.1
+
+### Patch Changes
+
+- [#3011](https://github.com/greydragon888/real-router/pull/3011) [`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse a repeat registration with the plugin's own error ([#2974](https://github.com/greydragon888/real-router/issues/2974))
+
+  A registration on a router that already carries the plugin throws an `Error`
+  with no `code` before the plugin claims anything:
+
+  ```text
+  [navigation-plugin] is already registered on this router — a clone already carries the plugins of its base router
+  ```
+
+  A clone counts: `cloneRouter`, and `createRequestScope` through it, re-run the
+  base router's plugin factories. Core refused the repeat with
+  `RouterError(CONTEXT_NAMESPACE_ALREADY_CLAIMED)`, whose message named another
+  plugin. A plugin that holds the `navigation` namespace still meets that refusal.
+
+- Updated dependencies [[`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232)]:
+  - @real-router/core@0.170.1
+
+### @real-router/ssr-data-plugin@0.7.3
+
+### Patch Changes
+
+- [#3011](https://github.com/greydragon888/real-router/pull/3011) [`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse a repeat registration with the plugin's own error ([#2974](https://github.com/greydragon888/real-router/issues/2974))
+
+  A registration on a router that already carries the plugin throws an `Error`
+  with no `code` before the plugin claims anything:
+
+  ```text
+  [@real-router/ssr-data-plugin] is already registered on this router — a clone already carries the plugins of its base router
+  ```
+
+  A clone counts: `cloneRouter`, and `createRequestScope` through it, re-run the
+  base router's plugin factories, so a request router already carries the plugin
+  its base registered. Core refused the repeat with
+  `RouterError(CONTEXT_NAMESPACE_ALREADY_CLAIMED)`, whose message named another
+  plugin. A plugin that holds the `data` namespace still meets that refusal, and
+  `@real-router/rsc-server-plugin` keeps a mark of its own, so one router takes
+  both.
+
+- Updated dependencies [[`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232)]:
+  - @real-router/core@0.170.1
+
 ## [2026-11-23]
 
 ### @real-router/ssr-utils@0.4.0

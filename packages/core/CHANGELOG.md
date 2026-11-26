@@ -1,5 +1,16 @@
 # @real-router/core
 
+## 0.170.1
+
+### Patch Changes
+
+- [#3011](https://github.com/greydragon888/real-router/pull/3011) [`5b57cbf`](https://github.com/greydragon888/real-router/commit/5b57cbfbbc81080f367affc1204df41313e09232) Thanks [@greydragon888](https://github.com/greydragon888)! - Correct what the `PluginsNamespace` docblocks say the facade checks ([#2974](https://github.com/greydragon888/real-router/issues/2974))
+
+  `PluginsNamespace.use` and its batch deduplication no longer describe a
+  duplicate check by the facade: the facade asks the checks that stand at
+  `usePlugin:count` and `usePlugin:entry`, and a factory an earlier call
+  registered is not looked for. Comments only; no runtime change.
+
 ## 0.170.0
 
 ### Minor Changes

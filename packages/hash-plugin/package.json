@@ -1,6 +1,6 @@
 {
   "name": "@real-router/hash-plugin",
-  "version": "0.18.0",
+  "version": "0.18.1",
   "type": "commonjs",
   "description": "Hash-based routing plugin for Real-Router",
   "main": "./dist/cjs/index.js",
@@ -57,6 +57,6 @@
     "jsdom": "31.0.1"
   },
   "peerDependencies": {
-    "@real-router/core": "workspace:>=0.170.0"
+    "@real-router/core": "workspace:>=0.170.1"
   }
 }
