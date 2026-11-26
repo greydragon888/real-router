@@ -1,5 +1,5 @@
 import { render } from "@testing-library/svelte";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import {
   createTestRouter,
@@ -105,11 +105,12 @@ describe("useRouter composable", () => {
       },
     });
 
-    // setTimeout(..., 0) fires after the current microtask queue drains.
-    // Poll until the helper invokes its callback to avoid flake on slower CI.
-    await new Promise((resolve) => setTimeout(resolve, 16));
+    // Waits for the component's timer itself: a fixed 16 ms wait shares
+    // Node's timer list with jsdom's rendering interval and can end first.
+    await vi.waitFor(() => {
+      expect(capturedError).toBeInstanceOf(Error);
+    });
 
-    expect(capturedError).toBeInstanceOf(Error);
     // Svelte 5 emits a structured `lifecycle_outside_component` code with a
     // human-readable message about `getContext`. Match the code rather than
     // the full message — the message text has changed between Svelte minor

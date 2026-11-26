@@ -491,9 +491,12 @@ describe("createLinkAction", () => {
       },
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 16));
+    // Waits for the component's timer itself: a fixed 16 ms wait shares
+    // Node's timer list with jsdom's rendering interval and can end first.
+    await vi.waitFor(() => {
+      expect(capturedError).toBeInstanceOf(Error);
+    });
 
-    expect(capturedError).toBeInstanceOf(Error);
     expect((capturedError as Error).message).toMatch(
       /lifecycle_outside_component|getContext/,
     );
