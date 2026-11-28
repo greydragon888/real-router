@@ -107,7 +107,7 @@
     "@vitest/eslint-plugin": "1.6.28",
     "@vitest/ui": "5.1.0",
     "czg": "1.14.0",
-    "danger": "14.0.7",
+    "danger": "14.1.0",
     "dotenv-cli": "11.0.0",
     "eslint": "10.11.0",
     "eslint-config-prettier": "10.1.8",
