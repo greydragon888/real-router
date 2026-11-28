@@ -128,6 +128,17 @@ const UNICORN_NON_SHIPPED_OFF = {
   "unicorn/no-nonstandard-builtin-properties": "off", // proto-pollution tests touch nonstandard Symbol props
 };
 
+// The isolate(produce()) guard's entries; its rule in the base TypeScript
+// block says why.
+const ISOLATE_PRODUCE_RESTRICTIONS = [
+  {
+    selector:
+      "CallExpression[callee.name='runHook'][arguments.0.type='CallExpression']",
+    message:
+      "isolate(produce()) anti-pattern: pass a recipe (the hook NAME), not a produced value, to runHook — `runHook(compileHook(...))` evaluates the factory outside runHook's try/catch and leaks a compile-throw that swallows sibling hooks. Use `runHook(hookName, routeName, toState, fromState, signal)`.",
+  },
+];
+
 const blocks = tsEslint.config(
   // ============================================
   // 1. GLOBAL IGNORES (ESLint 9.30+ globalIgnores helper)
@@ -327,15 +338,9 @@ const blocks = tsEslint.config(
       // whose sync throw escapes the async-only `.catch` — is not
       // syntactically distinguishable from any promise chain, so it is guarded by
       // a per-site sync-throw test at each producer, not by this rule.)
-      "no-restricted-syntax": [
-        "error",
-        {
-          selector:
-            "CallExpression[callee.name='runHook'][arguments.0.type='CallExpression']",
-          message:
-            "isolate(produce()) anti-pattern: pass a recipe (the hook NAME), not a produced value, to runHook — `runHook(compileHook(...))` evaluates the factory outside runHook's try/catch and leaks a compile-throw that swallows sibling hooks. Use `runHook(hookName, routeName, toState, fromState, signal)`.",
-        },
-      ],
+      // A block that sets this rule again replaces the list for its files, so
+      // it spreads ISOLATE_PRODUCE_RESTRICTIONS into its own.
+      "no-restricted-syntax": ["error", ...ISOLATE_PRODUCE_RESTRICTIONS],
 
       // ============================================
       // STYLISTIC TYPE-CHECKED RULES (v8.0+)

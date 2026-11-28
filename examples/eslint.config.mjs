@@ -122,6 +122,35 @@ const UNICORN_NON_SHIPPED_OFF = {
   "unicorn/no-nonstandard-builtin-properties": "off", // proto-pollution tests touch nonstandard Symbol props
 };
 
+// The isolate(produce()) guard's entries; its rule in the base TypeScript
+// block says why.
+const ISOLATE_PRODUCE_RESTRICTIONS = [
+  {
+    selector:
+      "CallExpression[callee.name='runHook'][arguments.0.type='CallExpression']",
+    message:
+      "isolate(produce()) anti-pattern: pass a recipe (the hook NAME), not a produced value, to runHook — `runHook(compileHook(...))` evaluates the factory outside runHook's try/catch and leaks a compile-throw that swallows sibling hooks. Use `runHook(hookName, routeName, toState, fromState, signal)`.",
+  },
+];
+
+// jsdom does not deliver Node's unhandled rejections to `window`, so an
+// `unhandledrejection` listener in a vitest cell never runs, and a check built
+// on it passes whatever the code does. The test-file block restricts it.
+const WINDOW_REJECTION_LISTENER_MESSAGE =
+  "jsdom does not deliver Node's unhandled rejections to window, so this listener never runs and a check built on it passes whatever happens. vitest fails the run on an unhandled rejection by itself; to check inside the cell, listen with process.on('unhandledRejection') and remove it with process.off.";
+const WINDOW_REJECTION_LISTENER_RESTRICTIONS = [
+  {
+    selector:
+      "CallExpression:matches([callee.name='addEventListener'], [callee.property.name='addEventListener'], [callee.property.value='addEventListener']):matches([arguments.0.value='unhandledrejection'], [arguments.0.quasis.0.value.cooked='unhandledrejection'])",
+    message: WINDOW_REJECTION_LISTENER_MESSAGE,
+  },
+  {
+    selector:
+      "AssignmentExpression:matches([left.name='onunhandledrejection'], [left.property.name='onunhandledrejection'], [left.property.value='onunhandledrejection'])",
+    message: WINDOW_REJECTION_LISTENER_MESSAGE,
+  },
+];
+
 const blocks = tsEslint.config(
   // ============================================
   // 1. GLOBAL IGNORES (ESLint 9.30+ globalIgnores helper)
@@ -329,15 +358,9 @@ const blocks = tsEslint.config(
       // whose sync throw escapes the async-only `.catch` — is not
       // syntactically distinguishable from any promise chain, so it is guarded by
       // a per-site sync-throw test at each producer, not by this rule.)
-      "no-restricted-syntax": [
-        "error",
-        {
-          selector:
-            "CallExpression[callee.name='runHook'][arguments.0.type='CallExpression']",
-          message:
-            "isolate(produce()) anti-pattern: pass a recipe (the hook NAME), not a produced value, to runHook — `runHook(compileHook(...))` evaluates the factory outside runHook's try/catch and leaks a compile-throw that swallows sibling hooks. Use `runHook(hookName, routeName, toState, fromState, signal)`.",
-        },
-      ],
+      // A block that sets this rule again replaces the list for its files, so
+      // it spreads ISOLATE_PRODUCE_RESTRICTIONS into its own.
+      "no-restricted-syntax": ["error", ...ISOLATE_PRODUCE_RESTRICTIONS],
 
       // ============================================
       // STYLISTIC TYPE-CHECKED RULES (v8.0+)
@@ -1284,6 +1307,23 @@ const blocks = tsEslint.config(
       "vitest/no-conditional-expect": "off",
       // test/it come from @fast-check/vitest, not vitest — fixer would add duplicate imports
       "vitest/prefer-importing-vitest-globals": "off",
+    },
+  },
+
+  // ============================================
+  // 12.2 NO unhandledrejection LISTENER ON window (Test Files)
+  // ============================================
+  // WINDOW_REJECTION_LISTENER_RESTRICTIONS says why. Setting the rule here
+  // replaces the base block's list for these files, so the list spreads the
+  // base entries first.
+  {
+    files: ["**/tests/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...ISOLATE_PRODUCE_RESTRICTIONS,
+        ...WINDOW_REJECTION_LISTENER_RESTRICTIONS,
+      ],
     },
   },
 

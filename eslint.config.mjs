@@ -149,7 +149,7 @@ const WINDOW_REJECTION_LISTENER_RESTRICTIONS = [
   },
   {
     selector:
-      "AssignmentExpression:matches([left.name='onunhandledrejection'], [left.property.name='onunhandledrejection'])",
+      "AssignmentExpression:matches([left.name='onunhandledrejection'], [left.property.name='onunhandledrejection'], [left.property.value='onunhandledrejection'])",
     message: WINDOW_REJECTION_LISTENER_MESSAGE,
   },
 ];
@@ -353,8 +353,8 @@ const blocks = tsEslint.config(
       // whose sync throw escapes the async-only `.catch` — is not
       // syntactically distinguishable from any promise chain, so it is guarded by
       // a per-site sync-throw test at each producer, not by this rule.)
-      // The entries live in ISOLATE_PRODUCE_RESTRICTIONS, which the test-file
-      // block spreads into its own list.
+      // A block that sets this rule again replaces the list for its files, so
+      // it spreads ISOLATE_PRODUCE_RESTRICTIONS into its own.
       "no-restricted-syntax": ["error", ...ISOLATE_PRODUCE_RESTRICTIONS],
 
       // ============================================
