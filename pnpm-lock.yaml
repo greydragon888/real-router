@@ -35,8 +35,8 @@ importers:
         specifier: 0.18.5
         version: 0.18.5
       '@changesets/changelog-github':
-        specifier: 1.0.1
-        version: 1.0.1
+        specifier: 2.0.0
+        version: 2.0.0
       '@changesets/cli':
         specifier: 3.0.3
         version: 3.0.3
@@ -1267,8 +1267,8 @@ packages:
     resolution: {integrity: sha512-3Dst2Ime2Op5nd4XmWJLPIgp11ZFqJqSkVug9izK6TDcIV4YlhPS4ECbEVR+eGI0bk0r1ItogD4j2Oli87bJrA==}
     engines: {node: ^22.11 || ^24 || >=26}
 
-  '@changesets/changelog-github@1.0.1':
-    resolution: {integrity: sha512-QUcrV7878yHlWPXXPA6gqSxNKwtVHCd1K22L7ZAoJw2yGy8K4QvjwOStD75+1Q9KD9ZSUgGS94HuYdd7HOVtpA==}
+  '@changesets/changelog-github@2.0.0':
+    resolution: {integrity: sha512-i2c9rub+cYmgzYZ+xc6cFP/mOXRkd0pgcINOdsjC2rVGBWw95Kds7Nfpl9PHIB7QSmTfQdvkThVaUeYsW9tI8w==}
     engines: {node: ^22.11 || ^24 || >=26}
 
   '@changesets/cli@3.0.3':
@@ -1316,8 +1316,8 @@ packages:
     resolution: {integrity: sha512-pwqoJmbONn1XgXmZXPEExgAaT+HdZLjALFTDgIm+PnS5KeO2nLtzA2/Q+4aMFY14kFMuXKG30MObhvDzWgzDgg==}
     engines: {node: ^22.11 || ^24 || >=26}
 
-  '@changesets/types@7.0.0':
-    resolution: {integrity: sha512-c5GoiQyt3pxiXjrWSNoP8/GRf4kG+VnKzovx1OQM8dYYALlSwgedmkPmJ+ZqGxqwg9D3Bkj85Uo4KLd5BN3A0w==}
+  '@changesets/types@7.1.0':
+    resolution: {integrity: sha512-UmpOTft7EIMCJRpLy5oy8rLNXdyhTBMMOaNi5t4B/2zEiluyys3pKc1jBXDE22SXmmwMgKtJ/m2qxgD/w1iJJA==}
     engines: {node: ^22.11 || ^24 || >=26}
 
   '@changesets/write@1.0.1':
@@ -8063,7 +8063,7 @@ snapshots:
       '@changesets/format': 0.1.2
       '@changesets/git': 4.0.1
       '@changesets/should-skip-package': 1.0.0
-      '@changesets/types': 7.0.0
+      '@changesets/types': 7.1.0
       import-meta-resolve: 4.2.0
       jsonc-parser: 3.3.1
       semver: 7.8.5
@@ -8073,17 +8073,17 @@ snapshots:
       '@changesets/errors': 1.0.0
       '@changesets/get-dependents-graph': 3.0.0
       '@changesets/should-skip-package': 1.0.0
-      '@changesets/types': 7.0.0
+      '@changesets/types': 7.1.0
       semver: 7.8.5
 
   '@changesets/changelog-git@1.0.0':
     dependencies:
-      '@changesets/types': 7.0.0
+      '@changesets/types': 7.1.0
 
-  '@changesets/changelog-github@1.0.1':
+  '@changesets/changelog-github@2.0.0':
     dependencies:
       '@changesets/get-github-info': 1.0.1
-      '@changesets/types': 7.0.0
+      '@changesets/types': 7.1.0
 
   '@changesets/cli@3.0.3':
     dependencies:
@@ -8097,7 +8097,7 @@ snapshots:
       '@changesets/pre': 3.0.0
       '@changesets/read': 1.0.1
       '@changesets/should-skip-package': 1.0.0
-      '@changesets/types': 7.0.0
+      '@changesets/types': 7.1.0
       '@changesets/write': 1.0.1
       '@clack/prompts': 1.7.0
       '@manypkg/get-packages': 3.1.0
@@ -8113,7 +8113,7 @@ snapshots:
     dependencies:
       '@changesets/get-dependents-graph': 3.0.0
       '@changesets/should-skip-package': 1.0.0
-      '@changesets/types': 7.0.0
+      '@changesets/types': 7.1.0
       '@manypkg/get-packages': 3.1.0
       picomatch: 4.0.7
 
@@ -8126,7 +8126,7 @@ snapshots:
 
   '@changesets/get-dependents-graph@3.0.0':
     dependencies:
-      '@changesets/types': 7.0.0
+      '@changesets/types': 7.1.0
       semver: 7.8.5
 
   '@changesets/get-github-info@1.0.1':
@@ -8136,38 +8136,38 @@ snapshots:
   '@changesets/git@4.0.1':
     dependencies:
       '@changesets/errors': 1.0.0
-      '@changesets/types': 7.0.0
+      '@changesets/types': 7.1.0
       '@manypkg/get-packages': 3.1.0
       picomatch: 4.0.7
       tinyexec: 1.3.1
 
   '@changesets/parse@1.0.0':
     dependencies:
-      '@changesets/types': 7.0.0
+      '@changesets/types': 7.1.0
       yaml: 2.9.1
 
   '@changesets/pre@3.0.0':
     dependencies:
       '@changesets/errors': 1.0.0
-      '@changesets/types': 7.0.0
+      '@changesets/types': 7.1.0
       '@manypkg/get-packages': 3.1.0
 
   '@changesets/read@1.0.1':
     dependencies:
       '@changesets/git': 4.0.1
       '@changesets/parse': 1.0.0
-      '@changesets/types': 7.0.0
+      '@changesets/types': 7.1.0
 
   '@changesets/should-skip-package@1.0.0':
     dependencies:
-      '@changesets/types': 7.0.0
+      '@changesets/types': 7.1.0
 
-  '@changesets/types@7.0.0': {}
+  '@changesets/types@7.1.0': {}
 
   '@changesets/write@1.0.1':
     dependencies:
       '@changesets/format': 0.1.2
-      '@changesets/types': 7.0.0
+      '@changesets/types': 7.1.0
       human-id: 4.2.1
 
   '@clack/core@1.4.3':

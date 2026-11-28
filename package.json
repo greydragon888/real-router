@@ -87,7 +87,7 @@
   "homepage": "https://github.com/greydragon888/real-router#readme",
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
-    "@changesets/changelog-github": "1.0.1",
+    "@changesets/changelog-github": "2.0.0",
     "@changesets/cli": "3.0.3",
     "@codspeed/tinybench-plugin": "6.1.1",
     "@commitlint/cli": "21.2.3",
